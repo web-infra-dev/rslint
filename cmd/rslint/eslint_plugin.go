@@ -53,8 +53,8 @@ func buildPluginFileInputs(runOpts linter.RunLinterOptions, resolver pluginConfi
 	}
 	var inputs []linter.EslintPluginFileInput
 	for _, t := range targets {
-		// Short-circuit pure-native files before resolving their config (resolve
-		// re-runs GetConfigForFile), avoiding that cost across the whole repo.
+		// Pure-native files never need a plugin routing key or merged plugin maps.
+		// Skip that lookup before consulting the per-run config resolver.
 		if !hasEslintPluginRule(t.Rules) {
 			continue
 		}

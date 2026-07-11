@@ -8,9 +8,14 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/diagnostics"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -644,6 +649,40 @@ func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
 	}
 	if typeCheckFilesystemPathID(program, realPath) != typeCheckFilesystemPathID(program, aliasPath) {
 		t.Fatalf("expected real and alias paths to share a typecheck identity: real=%q alias=%q", realPath, aliasPath)
+	}
+}
+
+type caseInsensitiveTypeCheckFS struct {
+	vfs.FS
+	realPaths map[string]string
+}
+
+func (fs *caseInsensitiveTypeCheckFS) UseCaseSensitiveFileNames() bool { return false }
+func (fs *caseInsensitiveTypeCheckFS) Realpath(filePath string) string {
+	if realPath := fs.realPaths[tspath.NormalizePath(filePath)]; realPath != "" {
+		return realPath
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func TestTypeCheckFilesystemPathIDPreservesDistinctCanonicalCase(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	upper := tspath.ResolvePath(dir, "Source.ts")
+	lower := tspath.ResolvePath(dir, "source.ts")
+	fsys := &caseInsensitiveTypeCheckFS{
+		FS: bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		realPaths: map[string]string{
+			upper: upper,
+			lower: lower,
+		},
+	}
+	host := utils.CreateCompilerHost(dir, fsys)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{}, nil, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+	if typeCheckFilesystemPathID(program, upper) == typeCheckFilesystemPathID(program, lower) {
+		t.Fatalf("distinct canonical paths must retain exact identity: upper=%q lower=%q", upper, lower)
 	}
 }
 

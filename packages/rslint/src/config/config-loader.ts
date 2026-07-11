@@ -1,32 +1,46 @@
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
+export {
+  filterConfigsByParentIgnores,
+  type ConfigEntry,
+} from './config-hierarchy.js';
+
 export const JS_CONFIG_FILES = [
   'rslint.config.js',
   'rslint.config.mjs',
+  'rslint.config.cjs',
   'rslint.config.ts',
   'rslint.config.mts',
+  'rslint.config.cts',
 ] as const;
+
+let freshConfigLoadNonce = 0;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 
 /**
  * Load a JS/TS config file.
- * - .js/.mjs: native import()
- * - .ts/.mts: native import() when Node.js has TypeScript support (>= 22.6),
+ * - .js/.mjs/.cjs: native import()
+ * - .ts/.mts/.cts: native import() when Node.js has TypeScript support (>= 22.6),
  *             otherwise fall back to jiti
  */
 export async function loadConfigFile(configPath: string): Promise<unknown> {
   const ext = path.extname(configPath);
 
-  if (ext === '.js' || ext === '.mjs') {
+  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
     const mod: Record<string, unknown> = await import(
       pathToFileURL(configPath).href
     );
     return mod.default ?? mod;
   }
 
-  if (ext === '.ts' || ext === '.mts') {
+  if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
     // Use feature detection to decide the loading strategy (same as rsbuild).
     // process.features.typescript is available in Node.js >= 22.6.
     const useNative = Boolean(process.features.typescript);
@@ -53,6 +67,55 @@ export async function loadConfigFile(configPath: string): Promise<unknown> {
   }
 
   throw new Error(`Unsupported config file extension: ${ext}`);
+}
+
+/**
+ * Load a config without reusing the config module from a previous reload.
+ * TypeScript loading selects native stripping or jiti before evaluation so a
+ * runtime exception from the config is propagated without executing it again.
+ */
+export async function loadConfigFileFresh(
+  configPath: string,
+): Promise<unknown> {
+  const ext = path.extname(configPath);
+  const requireFromConfig = createRequire(pathToFileURL(configPath));
+  const evictCommonJSCache = (): void => {
+    try {
+      Reflect.deleteProperty(
+        requireFromConfig.cache,
+        requireFromConfig.resolve(configPath),
+      );
+    } catch {
+      // ESM-only configs are not present in the CommonJS module cache.
+    }
+  };
+
+  if (ext === '.cjs') {
+    evictCommonJSCache();
+    return requireFromConfig(configPath) as unknown;
+  }
+
+  if (ext === '.js' || ext === '.mjs') {
+    evictCommonJSCache();
+    return importConfigFresh(configPath);
+  }
+
+  if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
+    evictCommonJSCache();
+    if (process.features.typescript) {
+      return importConfigFresh(configPath);
+    }
+    return loadConfigFile(configPath);
+  }
+
+  throw new Error(`Unsupported config file extension: ${ext}`);
+}
+
+async function importConfigFresh(configPath: string): Promise<unknown> {
+  const url = pathToFileURL(configPath);
+  url.searchParams.set('rslint', String(freshConfigLoadNonce++));
+  const mod: Record<string, unknown> = await import(url.href);
+  return mod.default ?? mod;
 }
 
 /**
@@ -86,6 +149,14 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     );
   }
 
+  for (let index = 0; index < config.length; index++) {
+    if (!Object.prototype.hasOwnProperty.call(config, index)) {
+      throw new Error(
+        `[rslint] Config entry at index ${index}: unexpected undefined config`,
+      );
+    }
+  }
+
   return config.map((rawEntry: unknown, index: number) => {
     if (rawEntry === null) {
       throw new Error(
@@ -97,13 +168,13 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         `[rslint] Config entry at index ${index}: unexpected array`,
       );
     }
-    if (typeof rawEntry !== 'object') {
+    if (!isRecord(rawEntry)) {
       throw new Error(
         `[rslint] Config entry at index ${index} must be an object, got ${typeof rawEntry}`,
       );
     }
 
-    const entry = rawEntry as Record<string, unknown>;
+    const entry = rawEntry;
 
     const hasFiles = Object.prototype.hasOwnProperty.call(entry, 'files');
     if (hasFiles && !Array.isArray(entry.files)) {
@@ -156,6 +227,20 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
           `[rslint] Config entry at index ${index}: "${key}" must be an object`,
         );
       }
+    }
+
+    if (isRecord(entry.rules)) {
+      validateRules(entry.rules, index);
+    }
+
+    const languageOptions = isRecord(entry.languageOptions)
+      ? entry.languageOptions
+      : undefined;
+    if (
+      languageOptions &&
+      Object.prototype.hasOwnProperty.call(languageOptions, 'globals')
+    ) {
+      validateGlobals(languageOptions.globals, index);
     }
 
     const hasPlugins = Object.prototype.hasOwnProperty.call(entry, 'plugins');
@@ -258,6 +343,59 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
   });
 }
 
+const GLOBAL_ACCESS_VALUES = new Set<unknown>([
+  true,
+  'true',
+  'writable',
+  'writeable',
+  false,
+  'false',
+  'readonly',
+  'readable',
+  null,
+  'off',
+]);
+
+const RULE_SEVERITIES = new Set<unknown>(['off', 'warn', 'error', 0, 1, 2]);
+
+function validateRules(
+  rules: Record<string, unknown>,
+  entryIndex: number,
+): void {
+  for (const [name, value] of Object.entries(rules)) {
+    const severity = Array.isArray(value) ? value[0] : value;
+    if (
+      (Array.isArray(value) && value.length === 0) ||
+      !RULE_SEVERITIES.has(severity)
+    ) {
+      throw new Error(
+        `[rslint] Config entry at index ${entryIndex}: rule "${name}" must use severity ` +
+          `'off', 'warn', 'error', 0, 1, or 2`,
+      );
+    }
+  }
+}
+
+function validateGlobals(value: unknown, entryIndex: number): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(
+      `[rslint] Config entry at index ${entryIndex}: "languageOptions.globals" must be an object`,
+    );
+  }
+  for (const [name, access] of Object.entries(value)) {
+    if (name !== name.trim()) {
+      throw new Error(
+        `[rslint] Config entry at index ${entryIndex}: global "${name}" has leading or trailing whitespace`,
+      );
+    }
+    if (!GLOBAL_ACCESS_VALUES.has(access)) {
+      throw new Error(
+        `[rslint] Config entry at index ${entryIndex}: global "${name}" must be "readonly", "writable", or "off"`,
+      );
+    }
+  }
+}
+
 /** A worker-pool config descriptor: which config file to import and the
  *  directory key per-file plugin-lint tasks route on. */
 export interface PluginConfigDescriptor {
@@ -273,9 +411,9 @@ export interface PluginConfigDescriptor {
  * (Rslint.ts) so both produce the identical `eslintPlugins` shape Go parses.
  * ruleNames for a shared prefix are merged (set union) across configs: Go's
  * placeholder registry is a per-prefix superset, while the worker routes the
- * actual rules per-config. This is NOT a validation — a genuinely conflicting
- * redefinition (same prefix, different plugin object) is caught at worker init
- * (plugin-loader throws ESLint's `Cannot redefine plugin` error), not here.
+ * actual rules per config. This is not the validation boundary: worker config
+ * loading rejects conflicting plugin definitions, including duplicate routing
+ * descriptors that mount different instances under the same prefix.
  */
 export function collectPluginMeta(
   configs: ReadonlyArray<{

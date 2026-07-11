@@ -89,7 +89,8 @@ func TestParseConfigPayload_MultiConfigTargetFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	targets := result.ConfigTargetFiles["/project/packages/foo"]
+	scope := result.ConfigTargetScopes["/project/packages/foo"]
+	targets := scope.Files
 	if len(targets) != 2 {
 		t.Fatalf("Expected 2 target files, got %v", targets)
 	}
@@ -98,6 +99,29 @@ func TestParseConfigPayload_MultiConfigTargetFiles(t *testing.T) {
 	}
 	if targets[1] != "/project/packages/foo/src/b.ts" {
 		t.Errorf("Expected relative target to resolve from config dir, got %q", targets[1])
+	}
+	if scope.ExplicitOnly {
+		t.Fatal("ordinary explicit ownership must preserve directory discovery")
+	}
+}
+
+func TestParseConfigPayload_ExplicitOnlyScope(t *testing.T) {
+	data := []byte(`{
+		"configs": [{
+			"configDirectory": "/project/packages/foo",
+			"entries": [{}],
+			"targetFiles": ["src/a.ts"],
+			"explicitOnly": true
+		}]
+	}`)
+
+	result, err := parseConfigPayload(data)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	scope := result.ConfigTargetScopes["/project/packages/foo"]
+	if !scope.ExplicitOnly {
+		t.Fatal("explicit-only scope must suppress directory discovery")
 	}
 }
 
@@ -239,7 +263,33 @@ type caseInsensitivePayloadFS struct {
 
 func (f *caseInsensitivePayloadFS) UseCaseSensitiveFileNames() bool { return false }
 func (f *caseInsensitivePayloadFS) Realpath(filePath string) string {
+	return strings.ToLower(tspath.NormalizePath(filePath))
+}
+
+type mixedCasePayloadFS struct {
+	vfs.FS
+}
+
+func (f *mixedCasePayloadFS) UseCaseSensitiveFileNames() bool { return false }
+func (f *mixedCasePayloadFS) Realpath(filePath string) string {
 	return tspath.NormalizePath(filePath)
+}
+
+func TestParseConfigPayload_PreservesDistinctCanonicalConfigDirs(t *testing.T) {
+	data := []byte(`{
+		"configs": [
+			{"configDirectory": "C:/Repo", "entries": []},
+			{"configDirectory": "c:/repo", "entries": []}
+		]
+	}`)
+
+	result, err := parseConfigPayload(data, &mixedCasePayloadFS{FS: osvfs.FS()})
+	if err != nil {
+		t.Fatalf("distinct physical paths must not be collapsed by a global case flag: %v", err)
+	}
+	if len(result.ConfigMap) != 2 {
+		t.Fatalf("expected both canonical config roots, got %v", keysOf(result.ConfigMap))
+	}
 }
 
 func TestParseConfigPayload_RejectsCaseEquivalentConfigDirs(t *testing.T) {
@@ -251,7 +301,7 @@ func TestParseConfigPayload_RejectsCaseEquivalentConfigDirs(t *testing.T) {
 	}`)
 
 	_, err := parseConfigPayload(data, &caseInsensitivePayloadFS{FS: osvfs.FS()})
-	if err == nil || !strings.Contains(err.Error(), "equivalent on this filesystem") {
+	if err == nil || !strings.Contains(err.Error(), "same filesystem location") {
 		t.Fatalf("expected case-equivalent config roots to be rejected, got %v", err)
 	}
 }

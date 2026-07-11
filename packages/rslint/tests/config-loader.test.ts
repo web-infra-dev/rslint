@@ -1,6 +1,7 @@
 import { describe, test, expect } from '@rstest/core';
 import {
   loadConfigFile,
+  loadConfigFileFresh,
   normalizeConfig,
   collectPluginMeta,
 } from '../src/config/config-loader.js';
@@ -48,6 +49,37 @@ describe('loadConfigFile', () => {
     }
   });
 
+  test('loads a .cjs config file', async () => {
+    const tmp = createTempDir();
+    try {
+      fs.writeFileSync(
+        path.join(tmp, 'rslint.config.cjs'),
+        'module.exports = [{ files: ["**/*.js"], rules: { "no-console": "error" } }];',
+      );
+      const result = await loadConfigFile(path.join(tmp, 'rslint.config.cjs'));
+      expect(Array.isArray(result)).toBe(true);
+      expect((result as Array<{ rules: unknown }>)[0].rules).toEqual({
+        'no-console': 'error',
+      });
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('loads a .cts config file', async () => {
+    const tmp = createTempDir();
+    try {
+      fs.writeFileSync(
+        path.join(tmp, 'rslint.config.cts'),
+        'const config: Array<Record<string, unknown>> = [{ files: ["**/*.ts"], rules: {} }]; module.exports = config;',
+      );
+      const result = await loadConfigFile(path.join(tmp, 'rslint.config.cts'));
+      expect(Array.isArray(result)).toBe(true);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
   test('resolves a thenable (Promise) default export', async () => {
     const tmp = createTempDir();
     try {
@@ -78,6 +110,53 @@ describe('loadConfigFile', () => {
   });
 });
 
+describe('loadConfigFileFresh', () => {
+  test.each(['cjs', 'cts'])(
+    'reloads a changed .%s config',
+    async (extension) => {
+      const tmp = createTempDir();
+      const configPath = path.join(tmp, `rslint.config.${extension}`);
+      try {
+        fs.writeFileSync(configPath, 'module.exports = [{ name: "first" }];');
+        expect(await loadConfigFileFresh(configPath)).toEqual([
+          { name: 'first' },
+        ]);
+
+        fs.writeFileSync(configPath, 'module.exports = [{ name: "second" }];');
+        expect(await loadConfigFileFresh(configPath)).toEqual([
+          { name: 'second' },
+        ]);
+      } finally {
+        cleanup(tmp);
+      }
+    },
+  );
+
+  test.each(['ts', 'mts', 'cts'])(
+    'does not re-execute a .%s config after a runtime error',
+    async (extension) => {
+      const tmp = createTempDir();
+      const configPath = path.join(tmp, `rslint.config.${extension}`);
+      const sideEffectPath = path.join(tmp, 'executions.txt');
+      const sideEffect = `fs.appendFileSync(${JSON.stringify(sideEffectPath)}, 'x');`;
+      const source =
+        extension === 'mts'
+          ? `import fs from 'node:fs'; ${sideEffect} throw new Error('config runtime failure'); export default [];`
+          : `const fs = require('node:fs'); ${sideEffect} throw new Error('config runtime failure'); module.exports = [];`;
+
+      try {
+        fs.writeFileSync(configPath, source);
+        await expect(loadConfigFileFresh(configPath)).rejects.toThrow(
+          'config runtime failure',
+        );
+        expect(fs.readFileSync(sideEffectPath, 'utf8')).toBe('x');
+      } finally {
+        cleanup(tmp);
+      }
+    },
+  );
+});
+
 describe('normalizeConfig', () => {
   test('accepts a valid flat config array', () => {
     const result = normalizeConfig([
@@ -87,6 +166,33 @@ describe('normalizeConfig', () => {
     expect(result[0].files).toEqual(['**/*.ts']);
     expect(result[0].rules).toEqual({ 'no-console': 'error' });
   });
+
+  test('accepts numeric rule severities and positional options', () => {
+    expect(
+      normalizeConfig([
+        {
+          rules: {
+            off: 0,
+            warn: [1],
+            error: [2, 'always', { exceptRange: true }],
+          },
+        },
+      ])[0].rules,
+    ).toEqual({
+      off: 0,
+      warn: [1],
+      error: [2, 'always', { exceptRange: true }],
+    });
+  });
+
+  test.each([3, 'fatal', [], [3], {}, null])(
+    'rejects invalid rule configuration %p',
+    (ruleValue) => {
+      expect(() =>
+        normalizeConfig([{ rules: { example: ruleValue } }]),
+      ).toThrow(/rule "example".*severity/);
+    },
+  );
 
   test('throws when config is not an array', () => {
     expect(() => normalizeConfig({ rules: {} })).toThrow(
@@ -130,6 +236,12 @@ describe('normalizeConfig', () => {
 
   test('handles empty array', () => {
     expect(normalizeConfig([])).toEqual([]);
+  });
+
+  test('rejects sparse config arrays', () => {
+    expect(() => normalizeConfig(new Array(1))).toThrow(
+      /unexpected undefined config/,
+    );
   });
 
   test.each([null, undefined, 42, 'string'])(
@@ -199,6 +311,33 @@ describe('normalizeConfig', () => {
     expect(result[0].ignores).toBeUndefined();
     expect(Object.hasOwn(result[0], 'ignores')).toBe(false);
   });
+
+  test('accepts ESLint global access values', () => {
+    const globals = {
+      writableBoolean: true,
+      writableString: 'true',
+      writable: 'writable',
+      writeable: 'writeable',
+      readonlyBoolean: false,
+      readonlyString: 'false',
+      readonly: 'readonly',
+      readable: 'readable',
+      nullReadonly: null,
+      disabled: 'off',
+    };
+    expect(normalizeConfig([{ languageOptions: { globals } }])[0]).toEqual({
+      languageOptions: { globals },
+    });
+  });
+
+  test.each([null, [], { value: 'invalid' }, { ' padded ': 'readonly' }])(
+    'rejects invalid globals value %p',
+    (globals) => {
+      expect(() => normalizeConfig([{ languageOptions: { globals } }])).toThrow(
+        /globals|global/,
+      );
+    },
+  );
 
   test('throws when files is explicitly undefined', () => {
     expect(() =>

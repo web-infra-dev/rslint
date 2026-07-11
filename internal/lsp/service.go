@@ -204,6 +204,7 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 		Configs    []struct {
 			ConfigDirectory string              `json:"configDirectory"`
 			Entries         config.RslintConfig `json:"entries"`
+			Unavailable     bool                `json:"unavailable,omitempty"`
 		} `json:"configs"`
 		// EslintPlugins carries the {prefix, ruleNames} metadata for every
 		// ESLint plugin mounted across all configs, aggregated by the VS Code
@@ -238,6 +239,9 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 			)
 		}
 		seenConfigDirs[configID] = cfg.ConfigDirectory
+		if cfg.Unavailable && len(cfg.Entries) != 0 {
+			return fmt.Errorf("unavailable config %q must not contain entries", cfg.ConfigDirectory)
+		}
 		if err := config.ValidateConfig(cfg.Entries); err != nil {
 			return fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
 		}
@@ -248,6 +252,9 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	// preserving the previous config atomically.
 	candidateConfigs := make(map[string]config.RslintConfig, len(payload.Configs))
 	candidateTsConfigs := make(map[string][]string, len(payload.Configs))
+	candidateConfigsByPath := make(map[string]config.RslintConfig, len(payload.Configs))
+	candidateConfigKeyByPath := make(map[string]string, len(payload.Configs))
+	candidateUnavailableConfigs := make(map[string]struct{})
 	for _, cfg := range payload.Configs {
 		configDir := uriToPath(lsproto.DocumentUri(cfg.ConfigDirectory))
 		paths, err := s.resolveTsConfigPaths(cfg.Entries, configDir)
@@ -256,7 +263,14 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 		}
 		candidateConfigs[cfg.ConfigDirectory] = cfg.Entries
 		candidateTsConfigs[cfg.ConfigDirectory] = paths
+		normalizedConfigDir := tspath.NormalizePath(configDir)
+		candidateConfigsByPath[normalizedConfigDir] = cfg.Entries
+		candidateConfigKeyByPath[normalizedConfigDir] = cfg.ConfigDirectory
+		if cfg.Unavailable {
+			candidateUnavailableConfigs[cfg.ConfigDirectory] = struct{}{}
+		}
 	}
+	candidateConfigResolver := config.NewConfigOwnerResolver(candidateConfigsByPath, s.fs)
 
 	candidateJSONConfig := s.jsonConfig
 	candidateJSONConfigPath := s.rslintConfigPath
@@ -282,6 +296,9 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	// matching the URI format used throughout the LSP protocol.
 	s.jsConfigs = candidateConfigs
 	s.tsConfigPathsByConfig = candidateTsConfigs
+	s.jsConfigOwnerResolver = candidateConfigResolver
+	s.jsConfigKeyByPath = candidateConfigKeyByPath
+	s.jsUnavailableConfigs = candidateUnavailableConfigs
 	s.eslintPluginConfigGeneration = payload.Generation
 	if len(payload.Configs) == 0 {
 		s.jsonConfig = candidateJSONConfig
@@ -489,6 +506,13 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 		s.documents[uri] = params.ContentChanges[0].WholeDocument.Text
 	}
 
+	// A content version change supersedes plugin work immediately, not when the
+	// debounce timer eventually starts the next lint. Otherwise an older worker
+	// result can be published against the new buffer while the user is typing.
+	s.docGeneration[uri]++
+	s.cancelInflightPluginDispatch(uri)
+	delete(s.diagnostics, uri)
+
 	// Notify session immediately so tsgo's overlay stays up-to-date for
 	// other LSP features (completions, hover, etc.).  Lint is deferred
 	// via scheduleLint to avoid running the linter on every keystroke.
@@ -644,8 +668,8 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 const maxFixPasses = 10
 
 // handleFixAllCodeAction computes all auto-fixes for the given URI using
-// multi-pass fixing: each pass lints → applies fixes → updates the session
-// overlay, repeating until no more fixes are found or maxFixPasses is reached.
+// multi-pass fixing: each pass lints and applies fixes to an isolated overlay,
+// repeating until no more fixes are found or maxFixPasses is reached.
 // This handles cascading fixes (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 // It does NOT push diagnostics or update s.diagnostics — that is left to the
 // subsequent didSave handler in the normal save flow.
@@ -660,6 +684,9 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 		return empty, nil
 	}
 	if !isLintableScriptFile(uri) {
+		return empty, nil
+	}
+	if s.isUnavailableConfigForURI(uri) {
 		return empty, nil
 	}
 
@@ -881,28 +908,29 @@ func runLintWithProgramLoader(
 	loadProgram lintProgramLoader,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
+	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
+	if isDefaultExcludedLintPath(configFilePath, configCwd, fs) {
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
+	}
 
 	// Files excluded by the config's `ignores` patterns produce no diagnostics,
 	// matching CLI behavior. Return early before spinning up the language service.
-	if rslintConfig.IsFileIgnored(filename, cwd) {
+	if rslintConfig.IsFileIgnored(configFilePath, configCwd) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
 	}
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins)
-	// Files outside the config's `files` set should not spin up TypeScript LS.
-	if fileConfigResolver.ConfigForFile(filename) == nil {
-		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
-	}
+	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, configCwd, enforcePlugins)
 
 	program, hasTypeInfo, err := selectLintProgram(uri, session, ctx, tsConfigPaths, fs, loadProgram)
 	if err != nil {
 		return lintPassResult{}, err
 	}
-	return lintSingleFile(program, filename, hasTypeInfo, fileConfigResolver, ctx, fs), nil
+	return lintSingleFile(program, filename, configFilePath, hasTypeInfo, fileConfigResolver, ctx, fs), nil
 }
 
 func lintSingleFile(
 	program *compiler.Program,
 	filename string,
+	configFilePath string,
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	ctx context.Context,
@@ -912,8 +940,20 @@ func lintSingleFile(
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
-	if len(program.GetSyntacticDiagnostics(ctx, sourceFile)) > 0 {
-		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}
+	if syntacticDiagnostics := program.GetSyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
+		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
+		for _, diagnostic := range syntacticDiagnostics {
+			diagnostics = append(diagnostics, rule.RuleDiagnostic{
+				RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
+				SourceFile:   sourceFile,
+				FilePath:     sourceFile.FileName(),
+				Range:        diagnostic.Loc(),
+				Message:      rule.RuleMessage{Description: diagnostic.String()},
+				Severity:     rule.SeverityError,
+				PreFormatted: true,
+			})
+		}
+		return lintPassResult{Diagnostics: diagnostics, HasSyntaxErrors: true}
 	}
 
 	// Collect diagnostics
@@ -932,7 +972,7 @@ func lintSingleFile(
 		File:        sourceFile.FileName(),
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(filename, hasTypeInfo)
+			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
 		},
 		OnDiagnostic: diagnosticCollector,
 	})
@@ -953,8 +993,9 @@ func selectLintProgram(
 ) (*compiler.Program, bool, error) {
 	filename := uriToPath(uri)
 	// Flush pending document changes and collect every already-loaded project
-	// containing the file. The default language service remains the AST-only
-	// fallback when none of the config's declared projects contains the file.
+	// containing the file. The default language service remains the
+	// non-project-backed fallback when none of the config's declared projects
+	// contains the file.
 	_, languageService, loadedProjects, err := session.GetLanguageServiceAndProjectsForFile(ctx, uri)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get language service: %w", err)
@@ -968,7 +1009,7 @@ func selectLintProgram(
 	// mutating the Session's permanent API-open project set.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
-		if candidate == nil || candidate.GetProgram() == nil || !programContainsFile(candidate.GetProgram(), filename, fs) {
+		if candidate == nil || candidate.GetProgram() == nil {
 			continue
 		}
 		loadedByConfig[lspFilesystemPathID(string(candidate.Id()), fs)] = candidate.GetProgram()
@@ -997,33 +1038,45 @@ func programContainsFile(program *compiler.Program, filename string, fs vfs.FS) 
 }
 
 func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *ast.SourceFile {
-	if program == nil {
-		return nil
+	return utils.NewProgramSourceLookup(program, fs).SourceFileForPath(filename)
+}
+
+func (s *Server) currentEditorOverlayFS(preferred ...lsproto.DocumentUri) vfs.FS {
+	return utils.NewOverlayVFS(s.fs, s.currentEditorOverlayFiles(preferred...))
+}
+
+func (s *Server) currentEditorOverlayFiles(preferred ...lsproto.DocumentUri) map[string]string {
+	files := make(map[string]string, len(s.documents)*2)
+	for uri, content := range s.documents {
+		if len(preferred) > 0 && uri == preferred[0] {
+			continue
+		}
+		s.addEditorOverlayFile(files, uriToPath(uri), content)
 	}
-	if sourceFile := program.GetSourceFile(filename); sourceFile != nil {
-		return sourceFile
-	}
-	if fs != nil {
-		if realPath := fs.Realpath(filename); realPath != "" && realPath != filename {
-			return program.GetSourceFile(realPath)
+	if len(preferred) > 0 {
+		if content, ok := s.documents[preferred[0]]; ok {
+			s.addEditorOverlayFile(files, uriToPath(preferred[0]), content)
 		}
 	}
-	return nil
+	return files
 }
 
-func (s *Server) currentEditorOverlayFS() vfs.FS {
-	files := make(map[string]string, len(s.documents))
-	for uri, content := range s.documents {
-		files[tspath.NormalizePath(uriToPath(uri))] = content
+func (s *Server) addEditorOverlayFile(files map[string]string, filePath string, content string) {
+	filePath = tspath.NormalizePath(filePath)
+	files[filePath] = content
+	if s.fs == nil {
+		return
 	}
-	return utils.NewOverlayVFS(s.fs, files)
+	if realPath := s.fs.Realpath(filePath); realPath != "" {
+		files[tspath.NormalizePath(realPath)] = content
+	}
 }
 
-func (s *Server) newStandaloneLintProgramLoader() lintProgramLoader {
+func (s *Server) newStandaloneLintProgramLoader(uri lsproto.DocumentUri) lintProgramLoader {
 	var overlayFS vfs.FS
 	return func(tsConfigPath string) (*compiler.Program, error) {
 		if overlayFS == nil {
-			overlayFS = s.currentEditorOverlayFS()
+			overlayFS = s.currentEditorOverlayFS(uri)
 		}
 		return createStandaloneLintProgram(tsConfigPath, overlayFS)
 	}
@@ -1064,7 +1117,7 @@ func (s *Server) runConfiguredLint(
 		enforcePlugins,
 		tsConfigPaths,
 		s.fs,
-		s.newStandaloneLintProgramLoader(),
+		s.newStandaloneLintProgramLoader(uri),
 	)
 }
 
@@ -1081,19 +1134,19 @@ func (s *Server) runConfiguredLintForContent(
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
 	filename := tspath.NormalizePath(uriToPath(uri))
-	if rslintConfig.IsFileIgnored(filename, cwd) {
+	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, s.fs)
+	if isDefaultExcludedLintPath(configFilePath, configCwd, s.fs) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
 	}
-	resolver := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins)
-	if resolver.ConfigForFile(filename) == nil {
+	if rslintConfig.IsFileIgnored(configFilePath, configCwd) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
 	}
+	resolver := config.NewFileConfigResolver(rslintConfig, configCwd, enforcePlugins)
 
-	files := make(map[string]string, len(s.documents)+1)
-	for documentURI, documentContent := range s.documents {
-		files[tspath.NormalizePath(uriToPath(documentURI))] = documentContent
-	}
-	files[filename] = content
+	files := s.currentEditorOverlayFiles()
+	// Apply the speculative target last so it wins over every open URI alias
+	// that resolves to the same physical file.
+	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
 	for _, tsConfigPath := range tsConfigPaths {
@@ -1102,27 +1155,33 @@ func (s *Server) runConfiguredLintForContent(
 			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
 		}
 		if programContainsFile(program, filename, overlayFS) {
-			return lintSingleFile(program, filename, true, resolver, ctx, overlayFS), nil
+			return lintSingleFile(program, filename, configFilePath, true, resolver, ctx, overlayFS), nil
 		}
 	}
 
-	program, err := createStandaloneFallbackProgram(filename, cwd, overlayFS)
+	program, err := createStandaloneFallbackProgram(filename, configCwd, overlayFS)
 	if err != nil {
 		return lintPassResult{}, fmt.Errorf("create fallback lint program: %w", err)
 	}
-	return lintSingleFile(program, filename, false, resolver, ctx, overlayFS), nil
+	return lintSingleFile(program, filename, configFilePath, false, resolver, ctx, overlayFS), nil
 }
 
 func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
-	useCaseSensitive := true
 	if fs != nil {
-		useCaseSensitive = fs.UseCaseSensitiveFileNames()
 		if realPath := fs.Realpath(filePath); realPath != "" {
 			filePath = tspath.NormalizePath(realPath)
 		}
 	}
-	return string(tspath.ToPath(filePath, "", useCaseSensitive))
+	return string(tspath.ToPath(filePath, "", true))
+}
+
+func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
+	useCaseSensitive := true
+	if fs != nil {
+		useCaseSensitive = fs.UseCaseSensitiveFileNames()
+	}
+	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
 
 func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
@@ -1201,6 +1260,9 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 
 // Helper function to create disable rule actions for diagnostics without fixes
 func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
+	if strings.HasPrefix(ruleDiag.RuleName, "TypeScript(TS") {
+		return nil
+	}
 	var actions []lsproto.CommandOrCodeAction
 
 	lspDiagnostic := convertRuleDiagnosticToLSP(ruleDiag)
@@ -1291,10 +1353,9 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 	}
 }
 
-// getConfigForURI resolves the rslint config for a given file URI.
-// It walks upward from the file's directory looking for the closest
-// JS/TS config (matching ESLint v10 flat config behavior).
-// Falls back to the JSON config if no JS/TS config matches.
+// getConfigForURI resolves a file against the JS/TS config catalog supplied by
+// the extension. It falls back to the JSON config when that catalog has no
+// owner for the file.
 // Returns the config entries, the directory to use as cwd for glob matching,
 // and whether the config is from a JS/TS config (for plugin enforcement).
 // For JS configs the cwd is the config's own directory (URI → path);
@@ -1306,41 +1367,52 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 	return s.jsonConfig, s.cwd, false
 }
 
-// nearestJSConfigKey returns the deepest JS/TS config directory containing uri.
-// Matching uses filesystem path semantics instead of URI string identity so
-// Windows drive letters, UNC authorities, and path casing behave consistently
-// with the compiler and config resolver.
+func (s *Server) isUnavailableConfigForURI(uri lsproto.DocumentUri) bool {
+	configKey, ok := s.nearestJSConfigKey(uri)
+	if !ok {
+		return false
+	}
+	_, unavailable := s.jsUnavailableConfigs[configKey]
+	return unavailable
+}
+
+// nearestJSConfigKey returns the nearest supplied JS/TS config directory for
+// uri. Matching uses normalized filesystem paths instead of URI identity;
+// lexical ownership is tried before a realpath fallback.
 func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 	if len(s.jsConfigs) == 0 {
 		return "", false
 	}
-	useCaseSensitive := true
-	if s.fs != nil {
-		useCaseSensitive = s.fs.UseCaseSensitiveFileNames()
-	}
 	filePath := tspath.NormalizePath(uriToPath(uri))
-	compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
-	bestKey := ""
-	bestDir := ""
-	for configKey := range s.jsConfigs {
-		configDir := tspath.NormalizePath(uriToPath(lsproto.DocumentUri(configKey)))
-		if configDir == "" {
-			continue
-		}
-		contains := tspath.ComparePaths(filePath, configDir, compareOptions) == 0 ||
-			tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive)
-		if contains && len(configDir) > len(bestDir) {
-			bestKey = configKey
-			bestDir = configDir
+	if s.jsConfigOwnerResolver != nil {
+		if configDir, _ := s.jsConfigOwnerResolver.Resolve(filePath); configDir != "" {
+			if configKey := s.jsConfigKeyByPath[configDir]; configKey != "" {
+				if _, active := s.jsConfigs[configKey]; active {
+					return configKey, true
+				}
+			}
 		}
 	}
-	return bestKey, bestKey != ""
+
+	// Compatibility fallback for tests and embedded callers that populate jsConfigs
+	// directly instead of committing a config transaction.
+	configsByPath := make(map[string]config.RslintConfig, len(s.jsConfigs))
+	configKeyByPath := make(map[string]string, len(s.jsConfigs))
+	for configKey, entries := range s.jsConfigs {
+		configDir := tspath.NormalizePath(uriToPath(lsproto.DocumentUri(configKey)))
+		if configDir != "" {
+			configsByPath[configDir] = entries
+			configKeyByPath[configDir] = configKey
+		}
+	}
+	configDir, _ := config.NewConfigOwnerResolver(configsByPath, s.fs).Resolve(filePath)
+	configKey := configKeyByPath[configDir]
+	return configKey, configKey != ""
 }
 
-// tsConfigPathsForURI returns the resolved parserOptions.project tsconfig
-// paths for the rslint config that governs the given URI. It walks parents
-// the same way getConfigForURI does so a nested config with no tsconfig
-// does not affect type-info decisions for sibling configs.
+// tsConfigPathsForURI returns parserOptions.project paths from the config owner
+// selected by getConfigForURI. A nested config with no tsconfig therefore does
+// not affect type-info decisions for sibling configs.
 //
 // A nil return means the governing config has no resolved tsconfig, so callers
 // must disable type-aware rules for this file.
@@ -1380,18 +1452,35 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	// Bump this URI's generation BEFORE linting. Native diagnostics are
-	// published synchronously below; the eslint-plugin pass runs in a
-	// goroutine and stamps its result with this value so the main loop can
-	// drop it if a newer keystroke relints in the meantime.
+	// Supersede the previous plugin pass before linting. Native diagnostics are
+	// published synchronously below; the next plugin pass is stamped with this
+	// generation so the main loop can reject an older result.
 	s.docGeneration[uri]++
 	generation := s.docGeneration[uri]
+	s.cancelInflightPluginDispatch(uri)
+	if s.isUnavailableConfigForURI(uri) {
+		delete(s.diagnostics, uri)
+		if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
+			Uri:         uri,
+			Diagnostics: []*lsproto.Diagnostic{},
+		}); err != nil {
+			log.Printf("Error clearing diagnostics for unavailable config: %v", err)
+		}
+		return
+	}
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	lintResult, err := s.runConfiguredLint(uri, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
+		delete(s.diagnostics, uri)
+		if publishErr := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
+			Uri:         uri,
+			Diagnostics: []*lsproto.Diagnostic{},
+		}); publishErr != nil {
+			log.Printf("Error clearing diagnostics after lint failure: %v", publishErr)
+		}
 		return
 	}
 	ruleDiags := lintResult.Diagnostics

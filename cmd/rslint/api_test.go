@@ -10,10 +10,46 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
+
+type canonicalPathBaseFS struct {
+	vfs.FS
+	realpathCalls atomic.Int32
+}
+
+func (fs *canonicalPathBaseFS) Realpath(filePath string) string {
+	fs.realpathCalls.Add(1)
+	return fs.FS.Realpath(filePath)
+}
+
+func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
+	base := &canonicalPathBaseFS{FS: osvfs.FS()}
+	fsys := &canonicalPathVFS{
+		FS:             base,
+		canonicalPaths: map[string]string{exactFilesystemPathID("/lexical/a.ts"): "/physical/a.ts"},
+	}
+	if got := fsys.Realpath("/lexical/a.ts"); got != "/physical/a.ts" {
+		t.Fatalf("Realpath returned %q, want request hint", got)
+	}
+	if calls := base.realpathCalls.Load(); calls != 0 {
+		t.Fatalf("request hint must avoid base realpath, got %d calls", calls)
+	}
+}
+
+func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
+	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Files:          []string{"a.ts"},
+		CanonicalFiles: []string{"a.ts", "b.ts"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "canonicalFiles must be parallel to files") {
+		t.Fatalf("expected canonicalFiles length error, got %v", err)
+	}
+}
 
 func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
@@ -153,6 +189,56 @@ func TestHandleLint_AllIgnored_EmptyLintedFiles(t *testing.T) {
 	}
 	if len(response.Diagnostics) != 0 {
 		t.Fatalf("expected zero diagnostics, got %d", len(response.Diagnostics))
+	}
+}
+
+func TestHandleLint_AllIgnoredDoesNotResolveInactiveProject(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.ts")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "ignores": ["ignored.ts"] },
+		{
+			"languageOptions": { "parserOptions": { "project": ["./missing.json"] } },
+			"rules": { "no-debugger": "error" }
+		}
+	]`)
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("an inactive project must not fail plain API lint: %v", err)
+	}
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 {
+		t.Fatalf("ignored request should lint no files: %+v", response)
+	}
+}
+
+func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "selected.ts")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	config := json.RawMessage(`[{
+		"languageOptions": { "parserOptions": { "project": ["./missing.json"] } },
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err == nil || !strings.Contains(err.Error(), "missing.json") {
+		t.Fatalf("selected target must resolve its governing project, got %v", err)
 	}
 }
 
@@ -812,7 +898,7 @@ func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
 	// The tsconfig only covers src/, so a selected file at the fixtures root is
-	// bound to the AST-only fallback. array-type is a non-type-aware
+	// bound to the non-project-backed fallback. array-type is a non-type-aware
 	// (syntactic) rule, so it must still run there.
 	config := json.RawMessage(`[{
 		"files": ["**/*.ts"],
@@ -1190,6 +1276,7 @@ func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind,
 
 func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 	dir := t.TempDir()
+	pluginConfigDirectory := filepath.Join(dir, "authored-config")
 	target := filepath.Join(dir, "input.js")
 	const source = "const bad = 1;\n"
 	config := json.RawMessage(`[{
@@ -1213,8 +1300,8 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		if len(req.Files) != 1 || req.Files[0].Text == nil || *req.Files[0].Text != source {
 			t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
 		}
-		if req.Files[0].ConfigKey != dir {
-			t.Fatalf("expected configKey %q, got %q", dir, req.Files[0].ConfigKey)
+		if req.Files[0].ConfigKey != pluginConfigDirectory {
+			t.Fatalf("expected configKey %q, got %q", pluginConfigDirectory, req.Files[0].ConfigKey)
 		}
 		ruleConfig, ok := req.Rules["community/rename"]
 		if !ok || len(ruleConfig.Options) != 1 {
@@ -1239,11 +1326,12 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 	})
 
 	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-		Config:           config,
-		ConfigDirectory:  dir,
-		WorkingDirectory: dir,
-		Files:            []string{target},
-		FileContents:     map[string]string{target: source},
+		Config:                config,
+		ConfigDirectory:       dir,
+		PluginConfigDirectory: pluginConfigDirectory,
+		WorkingDirectory:      dir,
+		Files:                 []string{target},
+		FileContents:          map[string]string{target: source},
 		EslintPlugins: []api.EslintPluginEntry{{
 			Prefix:    "community",
 			RuleNames: []string{"rename"},

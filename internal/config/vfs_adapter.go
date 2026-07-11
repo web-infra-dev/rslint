@@ -41,7 +41,7 @@ type vfsAdapter struct {
 	root           string
 	followSymlinks bool
 	realpathMu     sync.Mutex
-	realpaths      map[string]string
+	resolvedPaths  map[string]string
 }
 
 var _ fs.FS = (*vfsAdapter)(nil)
@@ -72,14 +72,14 @@ func (a *vfsAdapter) cachedRealpath(path string) string {
 	a.realpathMu.Lock()
 	defer a.realpathMu.Unlock()
 
-	if realpath, ok := a.realpaths[path]; ok {
+	if realpath, ok := a.resolvedPaths[path]; ok {
 		return realpath
 	}
-	if a.realpaths == nil {
-		a.realpaths = make(map[string]string)
+	if a.resolvedPaths == nil {
+		a.resolvedPaths = make(map[string]string)
 	}
 	realpath := a.vfs.Realpath(path)
-	a.realpaths[path] = realpath
+	a.resolvedPaths[path] = realpath
 	return realpath
 }
 
@@ -172,7 +172,8 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			f.entries = append(f.entries, &vfsDirEntry{name: dir, isDir: true})
 		}
 		for _, file := range accessible.Files {
-			f.entries = append(f.entries, &vfsDirEntry{name: file, isDir: false})
+			_, isSymlink := accessible.Symlinks[file]
+			f.entries = append(f.entries, &vfsDirEntry{name: file, isSymlink: isSymlink})
 		}
 		sort.Slice(f.entries, func(i, j int) bool {
 			return f.entries[i].Name() < f.entries[j].Name()
@@ -206,8 +207,9 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 
 // vfsDirEntry implements fs.DirEntry.
 type vfsDirEntry struct {
-	name  string
-	isDir bool
+	name      string
+	isDir     bool
+	isSymlink bool
 }
 
 func (e *vfsDirEntry) Name() string { return e.name }
@@ -215,6 +217,9 @@ func (e *vfsDirEntry) IsDir() bool  { return e.isDir }
 func (e *vfsDirEntry) Type() fs.FileMode {
 	if e.isDir {
 		return fs.ModeDir
+	}
+	if e.isSymlink {
+		return fs.ModeSymlink
 	}
 	return 0
 }

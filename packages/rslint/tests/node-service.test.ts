@@ -82,8 +82,12 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
   test('does not harm a normal request/response round-trip', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     await expect(
-      svc.sendMessage('handshake', { version: '1.0.0' }),
-    ).resolves.toEqual({ version: '1.0.0', ok: true });
+      svc.sendMessage('handshake', { version: '2.0.0' }),
+    ).resolves.toEqual({
+      version: '2.0.0',
+      ok: true,
+      capabilities: ['reversePluginLint'],
+    });
     svc.terminate();
   });
 
@@ -105,7 +109,7 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     process.env.RSLINT_FAKE_EXIT_SILENT = '1';
     try {
       const svc = new NodeRslintService({ rslintPath: FAKE });
-      await svc.sendMessage('handshake', { version: '1.0.0' });
+      await svc.sendMessage('handshake', { version: '2.0.0' });
       await expect(svc.sendMessage('exit', {})).resolves.toBeNull();
     } finally {
       delete process.env.RSLINT_FAKE_EXIT_SILENT;

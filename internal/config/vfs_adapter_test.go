@@ -200,7 +200,7 @@ func TestVfsAdapter_SymlinkCycleFilteredWhenFollowing(t *testing.T) {
 type vfsAdapterMockFS struct {
 	vfs.FS
 	entries         map[string]vfs.Entries
-	realpaths       map[string]string
+	resolvedPaths   map[string]string
 	realpathCalls   []string
 	caseSensitiveFS bool
 }
@@ -211,7 +211,7 @@ func (m *vfsAdapterMockFS) GetAccessibleEntries(path string) vfs.Entries {
 
 func (m *vfsAdapterMockFS) Realpath(path string) string {
 	m.realpathCalls = append(m.realpathCalls, path)
-	if realpath, ok := m.realpaths[path]; ok {
+	if realpath, ok := m.resolvedPaths[path]; ok {
 		return realpath
 	}
 	return path
@@ -232,7 +232,7 @@ func TestVfsAdapter_UsesSymlinkMetadataBeforeRealpath(t *testing.T) {
 						Symlinks:    map[string]struct{}{"link": {}},
 					},
 				},
-				realpaths: map[string]string{"/repo/link": "/target"},
+				resolvedPaths: map[string]string{"/repo/link": "/target"},
 			}
 			adapter := &vfsAdapter{vfs: mock, root: "/repo", followSymlinks: followSymlinks}
 
@@ -268,7 +268,7 @@ func TestVfsAdapter_FollowSymlinksKeepsDistinctAliasesToSameTarget(t *testing.T)
 				},
 			},
 		},
-		realpaths: map[string]string{
+		resolvedPaths: map[string]string{
 			"/repo":         "/repo",
 			"/repo/alias-a": "/shared",
 			"/repo/alias-b": "/shared",
@@ -360,6 +360,10 @@ func TestVfsDirEntry_TypeAndInfo(t *testing.T) {
 	fileEntry := &vfsDirEntry{name: "file.txt", isDir: false}
 	assert.Assert(t, !fileEntry.IsDir())
 	assert.Equal(t, fileEntry.Type(), fs.FileMode(0))
+
+	symlinkEntry := &vfsDirEntry{name: "link.ts", isSymlink: true}
+	assert.Assert(t, !symlinkEntry.IsDir())
+	assert.Equal(t, symlinkEntry.Type(), fs.ModeSymlink)
 }
 
 // spyVFS wraps a real VFS and counts DirectoryExists calls.

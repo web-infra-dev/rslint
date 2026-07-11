@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -72,12 +71,19 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 // Must be called from the main dispatch loop: it reads s.jsConfigs (lock-free)
 // and the s.documents overlay.
 func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *string) (linter.EslintPluginFileInput, bool) {
+	if s.isUnavailableConfigForURI(uri) {
+		return linter.EslintPluginFileInput{}, false
+	}
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
 	configKey := s.pluginConfigKeyForURI(uri)
 	filePath := uriToPath(uri)
+	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
+	if isDefaultExcludedLintPath(configFilePath, matchConfigDir, s.fs) {
+		return linter.EslintPluginFileInput{}, false
+	}
 
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, configCwd, isJSConfig)
-	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(filePath)
+	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, matchConfigDir, isJSConfig)
+	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(configFilePath)
 	if merged == nil {
 		// File is globally ignored — no plugin (or native) diagnostics.
 		return linter.EslintPluginFileInput{}, false
@@ -154,28 +160,15 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 	}
 	ctx, cancel := context.WithTimeout(s.backgroundCtx, timeout)
 
-	// Register so a later supersede/close can cancel us; sendRequest fills in the
-	// reverse-request id via the sink so cancelInflightPluginDispatch can
-	// $/cancelRequest it.
-	handle := &pluginDispatchHandle{cancel: cancel}
+	// Register so a later supersede or close can cancel the request. sendRequest
+	// forwards that context cancellation to the client.
+	handle := &pluginDispatchHandle{cancel: cancel, done: make(chan struct{})}
 	s.inflightPluginDispatchMu.Lock()
 	s.inflightPluginDispatch[uri] = handle
 	s.inflightPluginDispatchMu.Unlock()
-	ctx = context.WithValue(ctx, pluginReqIDSinkKey{}, func(id *jsonrpc.ID) {
-		s.inflightPluginDispatchMu.Lock()
-		if s.inflightPluginDispatch[uri] == handle {
-			handle.reqID = id
-			s.inflightPluginDispatchMu.Unlock()
-			return
-		}
-		// Already superseded before the id was minted: the supersede saw a nil
-		// reqID and could not $/cancelRequest. Send it now so the client still
-		// stops the worker — closes the narrow reqID==nil race window.
-		s.inflightPluginDispatchMu.Unlock()
-		s.sendCancelRequest(id)
-	})
 
 	go func() {
+		defer close(handle.done)
 		defer cancel()
 		defer s.clearInflightPluginDispatch(uri, handle)
 		// onDiagnostic is invoked serially (DispatchEslintPluginRules emits
@@ -235,18 +228,16 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
 	s.inflightPluginDispatchMu.Lock()
 	handle, ok := s.inflightPluginDispatch[uri]
-	var reqID *jsonrpc.ID
 	if ok {
-		reqID = handle.reqID
 		delete(s.inflightPluginDispatch, uri)
 	}
 	s.inflightPluginDispatchMu.Unlock()
 	if !ok {
 		return
 	}
-	handle.cancel() // Go-side: sendRequest's ctx.Done frees the goroutine + pending entry
-	if reqID != nil {
-		s.sendCancelRequest(reqID) // client-side: stop the Node worker
+	handle.cancel()
+	if handle.done != nil {
+		<-handle.done
 	}
 }
 

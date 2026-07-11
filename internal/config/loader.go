@@ -273,18 +273,19 @@ func normalizeGlobPath(path string) string {
 	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
-// LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations
-func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, []string, string, error) {
-	var rslintConfig RslintConfig
-	var configDirectory string
-	var err error
-
+// LoadRslintConfiguration loads and validates only the rslint configuration.
+// Project resolution is a separate orchestration step because plain linting
+// first needs the effective target set.
+func (loader *ConfigLoader) LoadRslintConfiguration(configPath string) (RslintConfig, string, error) {
 	if configPath != "" {
-		rslintConfig, configDirectory, err = loader.LoadRslintConfig(configPath)
-	} else {
-		rslintConfig, configDirectory, err = loader.LoadDefaultRslintConfig()
+		return loader.LoadRslintConfig(configPath)
 	}
+	return loader.LoadDefaultRslintConfig()
+}
 
+// LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations.
+func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, []string, string, error) {
+	rslintConfig, configDirectory, err := loader.LoadRslintConfiguration(configPath)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -295,18 +296,4 @@ func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, 
 	}
 
 	return rslintConfig, tsConfigs, configDirectory, nil
-}
-
-// LoadConfigurationWithFallback loads configuration and handles errors by printing to stderr and exiting
-// This is for backward compatibility with the existing cmd behavior
-func LoadConfigurationWithFallback(configPath string, currentDirectory string, fs vfs.FS) (RslintConfig, []string, string) {
-	loader := NewConfigLoader(fs, currentDirectory)
-
-	rslintConfig, tsConfigs, configDirectory, err := loader.LoadConfiguration(configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	return rslintConfig, tsConfigs, configDirectory
 }

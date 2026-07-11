@@ -1,8 +1,9 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 type PathOperations = Pick<
   typeof path,
-  'dirname' | 'isAbsolute' | 'normalize' | 'parse' | 'relative' | 'sep'
+  'dirname' | 'normalize' | 'parse' | 'sep'
 >;
 
 export interface PathIdentity {
@@ -16,8 +17,8 @@ export interface PathIdentity {
 
 /**
  * Create lexical filesystem-path identity for a platform path implementation.
- * The caller supplies the host filesystem's case behavior independently from
- * its separator/path flavor (notably, macOS uses POSIX paths but folds case).
+ * Physical equivalence is deliberately outside this helper and must be based on
+ * a filesystem-resolved path.
  */
 export function createPathIdentity(
   paths: PathOperations,
@@ -43,14 +44,13 @@ export function createPathIdentity(
     normalize,
     equals: (left, right) => key(left) === key(right),
     isSameOrChild: (parent, child) => {
-      if (key(parent) === key(child)) return true;
-      const relative = paths.relative(key(parent), key(child));
-      return (
-        relative !== '' &&
-        relative !== '..' &&
-        !relative.startsWith(`..${paths.sep}`) &&
-        !paths.isAbsolute(relative)
-      );
+      const parentKey = key(parent);
+      const childKey = key(child);
+      if (parentKey === childKey) return true;
+      const prefix = parentKey.endsWith(paths.sep)
+        ? parentKey
+        : `${parentKey}${paths.sep}`;
+      return childKey.startsWith(prefix);
     },
     compare: (left, right) =>
       key(left).localeCompare(key(right)) ||
@@ -58,10 +58,126 @@ export function createPathIdentity(
   };
 }
 
-export const nativePathIdentity = createPathIdentity(
-  path,
-  process.platform !== 'win32' && process.platform !== 'darwin',
-);
+export const nativePathIdentity = createPathIdentity(path, true);
+
+export interface ResolvedFilesystemPath {
+  lexicalPath: string;
+  lexicalKey: string;
+  canonicalPath: string;
+  canonicalKey: string;
+}
+
+type ResolvedPathState = ResolvedFilesystemPath & {
+  physicallyResolved: boolean;
+};
+
+async function realpathNative(filePath: string): Promise<string> {
+  const resolvedPath = await new Promise<string>((resolve, reject) => {
+    fs.realpath.native(filePath, (error, resolvedPath) => {
+      if (error) reject(error);
+      else resolve(resolvedPath);
+    });
+  });
+  return resolvedPath;
+}
+
+/**
+ * Resolves physical path identity for one lint operation. The memo is scoped to
+ * this instance and callers should discard it when the operation completes.
+ */
+export class RunPathResolver {
+  readonly #resolved = new Map<string, Promise<ResolvedPathState>>();
+
+  async resolve(filePath: string): Promise<ResolvedFilesystemPath> {
+    const resolved = await this.#resolveState(filePath);
+    return resolved;
+  }
+
+  async #resolveState(filePath: string): Promise<ResolvedPathState> {
+    const lexicalPath = nativePathIdentity.normalize(filePath);
+    const lexicalKey = nativePathIdentity.key(lexicalPath);
+    let pending = this.#resolved.get(lexicalKey);
+    if (!pending) {
+      pending = (async () => {
+        let canonicalPath = lexicalPath;
+        let physicallyResolved = false;
+        try {
+          canonicalPath = nativePathIdentity.normalize(
+            await realpathNative(lexicalPath),
+          );
+          physicallyResolved = true;
+        } catch {
+          // Virtual, missing, or inaccessible paths retain exact lexical identity.
+        }
+        return {
+          lexicalPath,
+          lexicalKey,
+          canonicalPath,
+          canonicalKey: nativePathIdentity.key(canonicalPath),
+          physicallyResolved,
+        };
+      })();
+      this.#resolved.set(lexicalKey, pending);
+    }
+    const resolved = await pending;
+    return resolved;
+  }
+
+  /**
+   * Resolve a virtual or missing path through its nearest existing ancestor.
+   * The unresolved suffix is appended to that ancestor's realpath, preserving
+   * directory-symlink identity without requiring the target itself on disk.
+   */
+  async resolveWithAncestorFallback(
+    filePath: string,
+  ): Promise<ResolvedFilesystemPath> {
+    const exact = await this.#resolveState(filePath);
+    if (exact.physicallyResolved) return exact;
+
+    const suffix: string[] = [];
+    let current = exact.lexicalPath;
+    while (true) {
+      const parent = path.dirname(current);
+      if (nativePathIdentity.equals(parent, current)) return exact;
+      suffix.unshift(path.basename(current));
+
+      const resolvedParent = await this.#resolveState(parent);
+      if (resolvedParent.physicallyResolved) {
+        const canonicalPath = nativePathIdentity.normalize(
+          path.resolve(resolvedParent.canonicalPath, ...suffix),
+        );
+        return {
+          lexicalPath: exact.lexicalPath,
+          lexicalKey: exact.lexicalKey,
+          canonicalPath,
+          canonicalKey: nativePathIdentity.key(canonicalPath),
+        };
+      }
+      current = parent;
+    }
+  }
+
+  async resolveAll(
+    filePaths: readonly string[],
+    concurrency = 32,
+  ): Promise<ResolvedFilesystemPath[]> {
+    const results = new Array<ResolvedFilesystemPath>(filePaths.length);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const index = next++;
+        if (index >= filePaths.length) return;
+        results[index] = await this.resolve(filePaths[index]);
+      }
+    };
+    const workerCount = Math.min(
+      filePaths.length,
+      Math.max(1, Math.floor(concurrency)),
+    );
+    await Promise.all(Array.from({ length: workerCount }, worker));
+    return results;
+  }
+}
 
 /** Cache an upward lookup, including misses, for every traversed directory. */
 export function createCachedAncestorFinder<T>(

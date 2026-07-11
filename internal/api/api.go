@@ -59,22 +59,30 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "1.0.0"
+const Version = "2.0.0"
+
+const CapabilityReversePluginLint = "reversePluginLint"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
-	Version string `json:"version"`
+	Version      string   `json:"version"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // HandshakeResponse represents a handshake response
 type HandshakeResponse struct {
-	Version string `json:"version"`
-	OK      bool   `json:"ok"`
+	Version      string   `json:"version"`
+	OK           bool     `json:"ok"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
 	Files []string `json:"files,omitempty"`
+	// CanonicalFiles is parallel to Files when the host already resolved physical
+	// identity. Go uses these paths for this request instead of repeating realpath
+	// calls; omitted by lower-level clients that have no pre-resolved identity.
+	CanonicalFiles []string `json:"canonicalFiles,omitempty"`
 	// Final resolved config — a serialized RslintConfig (RslintConfigEntry[]).
 	// The JS side does ALL of overrideConfig / config-file / auto-discovery /
 	// normalize and hands Go only this object; --api never reads config from
@@ -84,9 +92,13 @@ type LintRequest struct {
 	Config json.RawMessage `json:"config,omitempty"`
 	// Anchor directory for resolving the config's relative
 	// files / ignores / parserOptions.project. Defaults to the working dir.
-	ConfigDirectory  string            `json:"configDirectory,omitempty"`
-	WorkingDirectory string            `json:"workingDirectory,omitempty"`
-	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	ConfigDirectory string `json:"configDirectory,omitempty"`
+	// PluginConfigDirectory is the opaque worker routing key for community
+	// plugins. It can differ from ConfigDirectory when overrideConfig rebases
+	// authored path patterns to the API cwd.
+	PluginConfigDirectory string            `json:"pluginConfigDirectory,omitempty"`
+	WorkingDirectory      string            `json:"workingDirectory,omitempty"`
+	FileContents          map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
 	// EslintPlugins carries the names Go must register as Node-dispatched rule
 	// placeholders. The live plugin implementations remain in the JS host.
 	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
@@ -211,7 +223,9 @@ type Service struct {
 	// Preserve the old service's one-at-a-time inbound handling. Channel keeps
 	// reading while this lock is held, so reverse responses are still routed and
 	// a lint handler can synchronously await pluginLint without deadlocking.
-	handlerMu sync.Mutex
+	handlerMu        sync.Mutex
+	handshakeOK      bool
+	peerCapabilities map[string]struct{}
 
 	exitMu        sync.Mutex
 	exitRequestID int
@@ -268,24 +282,52 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 	case ipc.KindHandshake:
 		var req HandshakeRequest
 		if err := msg.Decode(&req); err != nil {
-			return nil, fmt.Errorf("failed to parse handshake request: %v", err)
+			return nil, fmt.Errorf("failed to parse handshake request: %w", err)
 		}
-		return HandshakeResponse{Version: Version, OK: true}, nil
+		s.handshakeOK = req.Version == Version
+		s.peerCapabilities = make(map[string]struct{}, len(req.Capabilities))
+		for _, capability := range req.Capabilities {
+			s.peerCapabilities[capability] = struct{}{}
+		}
+		var capabilities []string
+		if _, ok := s.handler.(BidirectionalHandler); ok {
+			capabilities = []string{CapabilityReversePluginLint}
+		}
+		return HandshakeResponse{
+			Version:      Version,
+			OK:           s.handshakeOK,
+			Capabilities: capabilities,
+		}, nil
 
 	case KindLint:
+		if !s.handshakeOK {
+			return nil, fmt.Errorf("API protocol handshake required (expected version %s)", Version)
+		}
 		var req LintRequest
 		if err := msg.Decode(&req); err != nil {
-			return nil, fmt.Errorf("failed to parse lint request: %v", err)
+			return nil, fmt.Errorf("failed to parse lint request: %w", err)
 		}
-		if handler, ok := s.handler.(BidirectionalHandler); ok {
+		handler, bidirectional := s.handler.(BidirectionalHandler)
+		if len(req.EslintPlugins) > 0 {
+			if !bidirectional {
+				return nil, errors.New("API handler does not support reversePluginLint requests")
+			}
+			if _, ok := s.peerCapabilities[CapabilityReversePluginLint]; !ok {
+				return nil, errors.New("API peer does not advertise reversePluginLint capability")
+			}
+		}
+		if bidirectional {
 			return handler.HandleLintWithContext(ctx, req, s.channel)
 		}
 		return s.handler.HandleLint(req)
 
 	case KindGetAstInfo:
+		if !s.handshakeOK {
+			return nil, fmt.Errorf("API protocol handshake required (expected version %s)", Version)
+		}
 		var req GetAstInfoRequest
 		if err := msg.Decode(&req); err != nil {
-			return nil, fmt.Errorf("failed to parse get ast info request: %v", err)
+			return nil, fmt.Errorf("failed to parse get ast info request: %w", err)
 		}
 		return s.handler.HandleGetAstInfo(req)
 
@@ -296,7 +338,7 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 			s.exitRequestID = msg.ID
 		}
 		s.exitMu.Unlock()
-		return nil, nil
+		return struct{}{}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown message kind: %s", msg.Kind)
@@ -462,7 +504,9 @@ func (w *frameObserverWriter) Write(p []byte) (int, error) {
 // Preserve Channel's write-deadline support when the underlying writer is an
 // *os.File or net.Conn. Channel intentionally ignores unsupported deadlines.
 func (w *frameObserverWriter) SetWriteDeadline(deadline time.Time) error {
-	if writer, ok := w.writer.(interface{ SetWriteDeadline(time.Time) error }); ok {
+	if writer, ok := w.writer.(interface {
+		SetWriteDeadline(deadline time.Time) error
+	}); ok {
 		return writer.SetWriteDeadline(deadline)
 	}
 	return nil

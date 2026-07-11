@@ -275,6 +275,43 @@ suite('PluginLintPool generations', () => {
     await pool.dispose();
   });
 
+  test('dispose shuts down a retired host that still has an active lease', async () => {
+    const hosts = new Map<string, TestHost>();
+    const pool = new PluginLintPool(
+      testLogger(),
+      async (configs) => {
+        const host = new TestHost();
+        hosts.set(configs[0].configPath, host);
+        return host;
+      },
+      0,
+    );
+
+    await pool.prepare(descriptor('a'), 'fingerprint-a', 'a');
+    await pool.commit('a');
+    const hostA = hosts.get('/a.mjs')!;
+    const lintResult = deferred<EslintPluginLintResult>();
+    hostA.lintResult = lintResult.promise;
+    const lint = pool.lint(request('a'));
+    await hostA.started.promise;
+
+    await pool.prepare(descriptor('b'), 'fingerprint-b', 'b');
+    await pool.commit('b');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.strictEqual(hostA.shutdownCalls, 0);
+
+    await pool.dispose();
+    assert.strictEqual(
+      hostA.shutdownCalls,
+      1,
+      'dispose must include retired states that are no longer routable',
+    );
+    assert.strictEqual(hosts.get('/b.mjs')!.shutdownCalls, 1);
+
+    lintResult.resolve({ results: [] });
+    await lint;
+  });
+
   test('a failed replacement can be aborted without changing the active host', async () => {
     const hostA = new TestHost();
     const pool = new PluginLintPool(

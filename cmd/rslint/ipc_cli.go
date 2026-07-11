@@ -68,7 +68,7 @@ type initPayload struct {
 	// Re-marshaled byte-for-byte into the synthesized parseConfigPayload input
 	// so IPC init and the legacy stdin path share identical config semantics.
 	// Empty/nil means "no JS config — load JSON config from disk via
-	// LoadConfigurationWithFallback (ConfigStdin=false branch)".
+	// the JSON configuration loader (ConfigStdin=false branch)".
 	Configs []json.RawMessage `json:"configs,omitempty"`
 
 	// Runtime: out-of-band switches without a 1:1 user flag.

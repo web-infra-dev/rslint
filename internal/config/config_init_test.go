@@ -59,14 +59,25 @@ func TestInitDefaultConfig_JSProject_CJSPackage(t *testing.T) {
 }
 
 func TestInitDefaultConfig_AlreadyExists(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "rslint.config.ts"), "")
+	for _, name := range []string{
+		"rslint.config.js",
+		"rslint.config.mjs",
+		"rslint.config.cjs",
+		"rslint.config.ts",
+		"rslint.config.mts",
+		"rslint.config.cts",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, name), "")
 
-	err := InitDefaultConfig(dir)
-	if err == nil {
-		t.Error("Expected error when JS/TS config already exists")
+			err := InitDefaultConfig(dir)
+			if err == nil {
+				t.Fatal("expected error when a JS/TS config already exists")
+			}
+			assertContains(t, err.Error(), "config file already exists")
+		})
 	}
-	assertContains(t, err.Error(), "config file already exists")
 }
 
 // --- Migration branch tests ---

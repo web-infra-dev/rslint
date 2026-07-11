@@ -24,7 +24,11 @@ function onMessage(msg) {
     send({
       kind: 'response',
       id: msg.id,
-      data: { version: '1.0.0', ok: true },
+      data: {
+        version: '2.0.0',
+        ok: true,
+        capabilities: ['reversePluginLint'],
+      },
     });
   } else if (msg.kind === 'crash') {
     process.exit(42);

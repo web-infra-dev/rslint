@@ -656,7 +656,7 @@ func remapDiagnosticTargetPaths(diags []rule.RuleDiagnostic, targetPathBySourceP
 	for i := range diags {
 		targetPath := targetPathBySourcePath[diags[i].FilePath]
 		if targetPath == "" {
-			targetPath = targetPathBySourcePath[filesystemPathID(diags[i].FilePath, fsys)]
+			targetPath = targetPathBySourcePath[canonicalFilesystemPathID(diags[i].FilePath, fsys)]
 		}
 		if targetPath != "" {
 			diags[i].FilePath = targetPath
@@ -738,8 +738,8 @@ func deduplicateTypeScriptDiagnostics(
 
 func preferTypeScriptDiagnostic(candidate rule.RuleDiagnostic, current rule.RuleDiagnostic, callerTarget string, fsys vfs.FS) bool {
 	if callerTarget != "" {
-		candidateIsCaller := filesystemPathID(candidate.FilePath, fsys) == filesystemPathID(callerTarget, fsys)
-		currentIsCaller := filesystemPathID(current.FilePath, fsys) == filesystemPathID(callerTarget, fsys)
+		candidateIsCaller := exactFilesystemPathID(candidate.FilePath) == exactFilesystemPathID(callerTarget)
+		currentIsCaller := exactFilesystemPathID(current.FilePath) == exactFilesystemPathID(callerTarget)
 		if candidateIsCaller != currentIsCaller {
 			return candidateIsCaller
 		}
@@ -849,8 +849,8 @@ func collectAllowFileWarnings(
 		return nil
 	}
 
-	// Cache FindNearestConfig results by directory to avoid redundant lookups
-	// when many files are in the same directory (e.g., lint-staged).
+	// Reuse owner resolution by directory when many explicit files share a
+	// directory (for example, lint-staged invocations).
 	type cachedConfig struct {
 		cfgDir string
 		cfg    rslintconfig.RslintConfig
@@ -860,6 +860,10 @@ func collectAllowFileWarnings(
 	if len(filesystems) > 0 {
 		fsys = filesystems[0]
 	}
+	var configOwnerResolver *rslintconfig.ConfigOwnerResolver
+	if configMap != nil {
+		configOwnerResolver = rslintconfig.NewConfigOwnerResolver(configMap, fsys)
+	}
 
 	var out []allowFileWarning
 	for _, f := range allowFiles {
@@ -867,19 +871,12 @@ func collectAllowFileWarnings(
 		var cfg rslintconfig.RslintConfig
 		if configMap != nil {
 			dir := tspath.GetDirectoryPath(f)
-			cacheKey := dir
-			if fsys != nil {
-				cacheKey = filesystemPathID(dir, fsys)
-			}
+			cacheKey := exactFilesystemPathID(dir)
 			cached, ok := dirConfigCache[cacheKey]
 			if !ok {
 				var foundDir string
 				var foundCfg rslintconfig.RslintConfig
-				if fsys != nil {
-					foundDir, foundCfg = rslintconfig.FindNearestConfigWithFS(f, configMap, fsys)
-				} else {
-					foundDir, foundCfg = rslintconfig.FindNearestConfigWithCaseSensitivity(f, configMap, useCaseSensitive)
-				}
+				foundDir, foundCfg = configOwnerResolver.Resolve(f)
 				cached = &cachedConfig{cfgDir: foundDir, cfg: foundCfg}
 				dirConfigCache[cacheKey] = cached
 			}
@@ -893,7 +890,7 @@ func collectAllowFileWarnings(
 		matchDir := cfgDir
 		if fsys != nil && cfgDir != "" {
 			canonicalPath := authoritativeFilesystemPath(f, fsys)
-			matchFile = configPathForBoundSource(f, resolvedLintTarget{
+			matchFile = configPathForLintTarget(resolvedLintTarget{
 				Path:           tspath.NormalizePath(f),
 				CanonicalPath:  canonicalPath,
 				OwnerConfigDir: cfgDir,
@@ -1143,8 +1140,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
 	// Run-scoped parse cache shared by every Program built in this pipeline
-	// (initial build, gap fallback, --fix rebuilds). Created here and passed
-	// down explicitly — see utils.WithParseCache (I5: no package singleton).
+	// (initial build, gap fallback, --fix rebuilds). It is passed explicitly and
+	// discarded after the invocation; no package-level cache is involved.
 	parseCache := utils.NewParseCache()
 
 	// Initialize rule registry with all available rules
@@ -1163,11 +1160,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// round-trips raw (byte-matching the worker's plugin map key). nil outside
 	// multi-config mode (single-config / JSON configs never mount plugins).
 	var originalConfigDir map[string]string
-	var configTargetFiles map[string][]string
+	var configTargetScopes map[string]rslintconfig.LintDiscoveryScope
 
-	// Real tsconfig-backed Programs are built independently from lint targets.
-	// Shared tsconfigs are deduplicated while retaining every config association.
+	// Program-wide type checking builds every configured project. Plain linting
+	// waits for target discovery and builds only the projects owned by configs
+	// that govern at least one selected target.
 	var realProgramSet lintProgramSet
+	buildAllPrograms := typeCheck || typeCheckOnly
+	needsLintTargets := !typeCheckOnly
 
 	if configStdin {
 		// Read config JSON from stdin (sent by JS config loader).
@@ -1193,7 +1193,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Multi-config format
 			configMap = payload.ConfigMap
 			originalConfigDir = payload.OriginalConfigDir
-			configTargetFiles = payload.ConfigTargetFiles
+			configTargetScopes = payload.ConfigTargetScopes
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
@@ -1207,12 +1207,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// the same predicate used by the linter — blocked dirs' files
 			// are never linted, so their .gitignore patterns are irrelevant.
 			//
-			// configMap is NOT mutated by gitignore goroutines; results are
-			// collected via channel and merged in the main goroutine after
-			// Program registry construction. Program construction sees the
-			// pre-augmentation entries and reads only
-			// languageOptions.parserOptions.project, so ignore entries are
-			// irrelevant to it.
+			// configMap is not mutated by gitignore workers. Results are collected
+			// and merged on this goroutine before target discovery.
 			type giResult struct {
 				configDir string
 				globs     []string
@@ -1222,21 +1218,22 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				giMu      sync.Mutex
 			)
 			giWG := core.NewWorkGroup(singleThreaded)
-			for configDir, entries := range configMap {
-				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-				giWG.Queue(func() {
-					if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
-						giMu.Lock()
-						giResults = append(giResults, giResult{configDir, globs})
-						giMu.Unlock()
-					}
-				})
+			if needsLintTargets {
+				for configDir, entries := range configMap {
+					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+					giWG.Queue(func() {
+						if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
+							giMu.Lock()
+							giResults = append(giResults, giResult{configDir, globs})
+							giMu.Unlock()
+						}
+					})
+				}
 			}
 
-			realProgramSet, err = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
+			var programErr error
+			if buildAllPrograms {
+				realProgramSet, programErr = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
 			}
 
 			// Join the gitignore reads and merge into configMap. Must complete
@@ -1248,18 +1245,24 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					configMap[r.configDir]...,
 				)
 			}
+			if programErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
+				return 1
+			}
 		} else {
 			// Legacy single-config format
 			rslintConfig = payload.SingleConfig
 			currentDirectory = payload.SingleConfigDir
 
-			// Inject .gitignore patterns as global ignores. Run gitignore
-			// reading in parallel with Program registry construction. They are
-			// independent because Program construction only reads
-			// languageOptions.parserOptions.project, not Ignores).
-			rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
-			)
+			if typeCheckOnly {
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			} else if buildAllPrograms {
+				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
+					rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
+				)
+			} else {
+				rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return 1
@@ -1267,7 +1270,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
-		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
+		rslintConfig, currentDirectory, err = loader.LoadRslintConfiguration(config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
 		if config != "" {
 			// Explicit --config follows flat-config invocation semantics: file,
 			// ignore, project, and implicit no-args target scope are rooted at
@@ -1275,11 +1283,15 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = workingDirectory
 		}
 
-		// Inject .gitignore patterns as global ignores. Run gitignore reading
-		// in parallel with Program registry construction (see above).
-		rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-			rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
-		)
+		if typeCheckOnly {
+			realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+		} else if buildAllPrograms {
+			rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
+				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
+			)
+		} else {
+			rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -1317,7 +1329,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          cwd,
-		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
+		UseCaseSensitiveFileNames: true,
 	}
 
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
@@ -1329,6 +1341,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	// --- Lint target discovery and fallback Program binding ---
 	programs := realProgramSet.Programs
+	programConfigMap := configMap
+	buildSingleConfigPrograms := buildAllPrograms
 	var (
 		targetPlan                 lintTargetPlan
 		typeInfoFiles              map[string]struct{}
@@ -1344,7 +1358,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			targetConfigMap,
 			targetRslintConfig,
 			currentDirectory,
-			configTargetFiles,
+			configTargetScopes,
 			fs,
 			allowFiles,
 			allowDirs,
@@ -1353,6 +1367,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
+		}
+		if !buildAllPrograms {
+			if configMap != nil {
+				programConfigMap = configsForLintTargetPlan(configMap, targetPlan)
+				realProgramSet, err = createProgramSetForConfigs(programConfigMap, singleThreaded, fs, parseCache)
+			} else if len(targetPlan.Targets) > 0 {
+				buildSingleConfigPrograms = true
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return 1
+			}
 		}
 		binding, err := bindLintTargetPlan(realProgramSet, targetPlan, currentDirectory, fs, parseCache, singleThreaded)
 		if err != nil {
@@ -1367,10 +1394,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		ownerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
 	}
 
-	// Initial build (including any fallback) is complete: evict cache
-	// entries for files that ended up in no program — build-time dedup
-	// losers, parsed-then-dropped duplicates. Deletion-only, see
-	// ParseCache.RetainOnly (I7).
+	// Initial build (including any fallback) is complete. Evict entries for
+	// parsed files that ended up in no Program.
 	parseCache.RetainOnly(programs)
 
 	// Rebuild real Programs and bind the original stable target plan again on
@@ -1380,8 +1405,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		var rebuilt lintProgramSet
 		var err error
 		if configMap != nil {
-			rebuilt, err = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
-		} else {
+			rebuilt, err = createProgramSetForConfigs(programConfigMap, singleThreaded, fs, parseCache)
+		} else if buildSingleConfigPrograms {
 			rebuilt, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
 		}
 		if err != nil {
@@ -1414,9 +1439,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		CurrentDirectory:           currentDirectory,
 		EnforcePlugins:             enforcePlugins,
 		TypeInfoFiles:              typeInfoFiles,
-		TargetPathBySourcePath:     targetPathBySourcePath,
 		ConfigPathBySourcePath:     configPathBySourcePath,
 		OwnerConfigDirBySourcePath: ownerConfigDirBySourcePath,
+		SourceMappingsCanonical:    true,
 		FS:                         fs,
 	})
 	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
@@ -1429,7 +1454,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Programs not backed by a real tsconfig are excluded from --type-check:
 	// their CompilerOptions are synthesized defaults, not the user's tsconfig,
 	// so semantic diagnostics there would be unreliable. This includes the
-	// AST-only fallback used for selected files outside tsconfig coverage and
+	// non-project-backed fallback used for selected files outside tsconfig coverage and
 	// for projects with no tsconfig at all, honoring the "Gap files" contract
 	// in website/docs/en/guide/type-checking.md.
 	skipTypeCheck := buildTypeCheckSkipMask(programs)
@@ -1550,7 +1575,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// losers. The live set is the union of this round's programs and
 			// the initial ones — the initial slice stays referenced until the
 			// end of this function, so its objects are alive regardless and
-			// keeping their entries costs nothing (deletion-only, I7).
+			// keeping their entries costs nothing because RetainOnly only deletes.
 			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint using the fresh binding derived from the stable target plan.
@@ -1564,9 +1589,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				CurrentDirectory:           currentDirectory,
 				EnforcePlugins:             enforcePlugins,
 				TypeInfoFiles:              fixTypeInfoFiles,
-				TargetPathBySourcePath:     fixTargetPathBySourcePath,
 				ConfigPathBySourcePath:     newBinding.ConfigPathBySourcePath,
 				OwnerConfigDirBySourcePath: newBinding.OwnerConfigDirBySourcePath,
+				SourceMappingsCanonical:    true,
 				FS:                         fs,
 			})
 			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
@@ -1652,7 +1677,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}
 
-	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, preferredCallerTargetPaths(targetPlan, fs))
+	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, preferredCallerTargetPaths(targetPlan))
 
 	// Diagnostics arrive in completion order — programs and, within a
 	// program, file shards run in parallel — so impose a deterministic

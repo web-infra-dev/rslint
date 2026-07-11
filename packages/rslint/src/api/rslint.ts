@@ -14,7 +14,8 @@
  */
 import path from 'node:path';
 import { lstat, readFile, stat, writeFile } from 'node:fs/promises';
-import { glob, isDynamicPattern } from 'tinyglobby';
+import { convertPathToPattern, glob, isDynamicPattern } from 'tinyglobby';
+import picomatch from 'picomatch';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
@@ -24,15 +25,19 @@ import {
   normalizeConfig,
 } from '../config/config-loader.js';
 import {
+  coalesceCaseAliasedConfigs,
   discoverConfigs,
   filterConfigsByParentIgnores,
   findJSConfig,
+  findNativeCaseAliasConfigPath,
   type ConfigEntry,
 } from '../utils/config-discovery.js';
 import {
   AncestorPathIndex,
   createCachedAncestorFinder,
   nativePathIdentity,
+  RunPathResolver,
+  type ResolvedFilesystemPath,
 } from './path-identity.js';
 import type { RslintConfigEntry } from '../config/define-config.js';
 import type { Diagnostic, Fix, LintResponse } from '../types.js';
@@ -107,6 +112,7 @@ interface ResolvedConfig {
   config: Record<string, unknown>[];
   configPath?: string;
   configDirectory: string;
+  pluginConfigDirectory: string;
   routingKey: string;
 }
 
@@ -127,7 +133,7 @@ type CreatePluginLintHost = (
 
 let pluginHostFactoryPromise: Promise<CreatePluginLintHost> | undefined;
 
-function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
+async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
   pluginHostFactoryPromise ??= (async () => {
     // A package self-reference resolves to src under the test condition and to
     // dist/eslint-plugin in published builds. Keep it runtime-only: the library
@@ -138,7 +144,12 @@ function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
     );
     return module.createPluginLintHost;
   })();
-  return pluginHostFactoryPromise;
+  const factory = await pluginHostFactoryPromise;
+  return factory;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 interface LoadedConfigCandidate {
@@ -160,95 +171,25 @@ type ConfigCandidate = LoadedConfigCandidate | FailedConfigCandidate;
 
 interface ClassifiedLintPatterns {
   literalFilePatterns: string[];
+  literalDirectorySymlinks: string[];
   scanDirectories: string[];
 }
 
-function rebaseRelativePath(
-  value: string,
-  fromDirectory: string,
-  toDirectory: string,
-  allowNegation: boolean,
-): string {
-  const negated = allowNegation && value.startsWith('!');
-  const relativePath = negated ? value.slice(1) : value;
-  if (!relativePath || path.isAbsolute(relativePath)) return value;
+type GlobPatternRole = 'match' | 'ignore' | 'skip';
 
-  const prefix = path
-    .relative(toDirectory, fromDirectory)
-    .split(path.sep)
-    .join('/');
-  if (!prefix) return value;
-
-  const normalizedPath = relativePath.split(path.sep).join('/');
-  const rebased = path.posix.normalize(path.posix.join(prefix, normalizedPath));
-  return negated ? `!${rebased}` : rebased;
+// Keep this classification aligned with tinyglobby's processPatterns(): a
+// leading `!(` starts a positive extglob, while `!pattern` is an exclusion.
+function globPatternRole(pattern: string): GlobPatternRole {
+  if (pattern[0] !== '!' || pattern[1] === '(') return 'match';
+  if (pattern[1] !== '!' || pattern[2] === '(') return 'ignore';
+  return 'skip';
 }
 
-function rebaseConfigPaths(
-  config: Record<string, unknown>[],
-  fromDirectory: string,
-  toDirectory: string,
-): Record<string, unknown>[] {
-  if (nativePathIdentity.equals(fromDirectory, toDirectory)) return config;
-
-  return config.map((entry) => {
-    const rebased: Record<string, unknown> = { ...entry };
-
-    if (Array.isArray(entry.files)) {
-      rebased.files = entry.files.map((selector) => {
-        if (Array.isArray(selector)) {
-          return selector.map((pattern) =>
-            rebaseRelativePath(
-              pattern as string,
-              fromDirectory,
-              toDirectory,
-              true,
-            ),
-          );
-        }
-        return rebaseRelativePath(
-          selector as string,
-          fromDirectory,
-          toDirectory,
-          true,
-        );
-      });
-    }
-    if (Array.isArray(entry.ignores)) {
-      rebased.ignores = entry.ignores.map((pattern) =>
-        rebaseRelativePath(pattern as string, fromDirectory, toDirectory, true),
-      );
-    }
-
-    const languageOptions = entry.languageOptions;
-    if (languageOptions == null || typeof languageOptions !== 'object') {
-      return rebased;
-    }
-    const parserOptions = (languageOptions as Record<string, unknown>)
-      .parserOptions;
-    if (parserOptions == null || typeof parserOptions !== 'object') {
-      return rebased;
-    }
-    const project = (parserOptions as Record<string, unknown>).project;
-    if (typeof project !== 'string' && !Array.isArray(project)) return rebased;
-
-    const rebaseProject = (projectPath: string): string =>
-      rebaseRelativePath(projectPath, fromDirectory, toDirectory, false);
-    rebased.languageOptions = {
-      ...(languageOptions as Record<string, unknown>),
-      parserOptions: {
-        ...(parserOptions as Record<string, unknown>),
-        project:
-          typeof project === 'string'
-            ? rebaseProject(project)
-            : project.map((projectPath) =>
-                rebaseProject(projectPath as string),
-              ),
-      },
-    };
-    return rebased;
-  });
+interface PlannedLintFile extends ResolvedFilesystemPath {
+  explicit: boolean;
 }
+
+const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
 
 function staticGlobRoot(pattern: string, cwd: string): string {
   const absolutePattern = path.resolve(cwd, pattern);
@@ -285,19 +226,60 @@ function compactScanDirectories(directories: Iterable<string>): string[] {
   return compact;
 }
 
+function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
+  let normalized = pattern;
+  if (normalized.endsWith('/') || normalized.endsWith('\\')) {
+    normalized = normalized.slice(0, -1);
+  }
+  if (path.isAbsolute(normalized)) {
+    normalized = path.relative(cwd, normalized);
+  }
+  normalized = normalized.split(path.sep).join('/');
+  return path.posix.normalize(normalized);
+}
+
+function matchesExcludedLiteral(
+  filePath: string,
+  patterns: readonly string[],
+  cwd: string,
+): boolean {
+  const candidate = path.relative(cwd, filePath).split(path.sep).join('/');
+  for (const rawPattern of patterns) {
+    let pattern = rawPattern;
+    if (pattern.startsWith('!')) {
+      if (pattern[1] === '(') continue;
+      if (pattern[1] === '!' && pattern[2] !== '(') continue;
+      pattern = pattern.slice(1);
+    }
+    pattern = normalizeGlobPatternForCwd(pattern, cwd);
+    const expandedPatterns = pattern.endsWith('*')
+      ? [pattern]
+      : [pattern, `${pattern}/**`];
+    if (picomatch(expandedPatterns, { dot: true, nocase: false })(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function classifyLintPatterns(
   patterns: string[],
   cwd: string,
 ): Promise<ClassifiedLintPatterns> {
   const literalFilePatterns: string[] = [];
+  const literalDirectorySymlinks: string[] = [];
   const scanDirectories = new Set<string>();
+  const excludedLiteralPatterns = [
+    ...DEFAULT_LINT_GLOB_IGNORES,
+    ...patterns.filter((pattern) => globPatternRole(pattern) === 'ignore'),
+  ];
 
   for (const pattern of patterns) {
-    if (pattern.startsWith('!')) continue;
+    if (globPatternRole(pattern) !== 'match') continue;
     if (isDynamicPattern(pattern)) {
       const scanRoot = staticGlobRoot(pattern, cwd);
       try {
-        if (!(await lstat(scanRoot)).isSymbolicLink()) {
+        if ((await stat(scanRoot)).isDirectory()) {
           scanDirectories.add(scanRoot);
         }
       } catch {
@@ -310,11 +292,17 @@ async function classifyLintPatterns(
     try {
       const info = await stat(absolute);
       if (info.isDirectory()) {
-        if (!(await lstat(absolute)).isSymbolicLink()) {
-          scanDirectories.add(absolute);
+        scanDirectories.add(absolute);
+        if ((await lstat(absolute)).isSymbolicLink()) {
+          literalDirectorySymlinks.push(absolute);
         }
       } else if (info.isFile()) {
-        literalFilePatterns.push(pattern);
+        const absolutePattern = path.resolve(cwd, pattern);
+        if (
+          !matchesExcludedLiteral(absolutePattern, excludedLiteralPatterns, cwd)
+        ) {
+          literalFilePatterns.push(absolutePattern);
+        }
       }
     } catch {
       // tinyglobby will omit a missing literal from the match set.
@@ -323,6 +311,7 @@ async function classifyLintPatterns(
 
   return {
     literalFilePatterns,
+    literalDirectorySymlinks,
     scanDirectories: compactScanDirectories(scanDirectories),
   };
 }
@@ -374,8 +363,16 @@ export class Rslint {
     options: { filePath?: string } = {},
   ): Promise<LintResult[]> {
     const filePath = path.resolve(this.#cwd, options.filePath ?? '__text__.ts');
-    const resolved = await this.#resolveConfig(path.dirname(filePath));
-    const { config, configDirectory } = resolved;
+    const lexicalDirectory = path.dirname(filePath);
+    const pathResolver = new RunPathResolver();
+    const resolvedFile =
+      await pathResolver.resolveWithAncestorFallback(filePath);
+    const canonicalDirectory = path.dirname(resolvedFile.canonicalPath);
+    const resolved = await this.#resolveConfig(
+      lexicalDirectory,
+      canonicalDirectory,
+    );
+    const { config, configDirectory, pluginConfigDirectory } = resolved;
     const pluginSession = await this.#createPluginLintSession([resolved]);
     try {
       const response = await this.#service.lint(
@@ -383,6 +380,7 @@ export class Rslint {
           config,
           eslintPlugins: pluginSession?.eslintPlugins,
           configDirectory,
+          pluginConfigDirectory,
           workingDirectory: this.#cwd,
           files: [filePath],
           // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
@@ -391,7 +389,12 @@ export class Rslint {
           fix: this.#fix,
         },
         pluginSession
-          ? { pluginLint: (request) => pluginSession.host.lint(request) }
+          ? {
+              pluginLint: async (request) => {
+                const result = await pluginSession.host.lint(request);
+                return result;
+              },
+            }
           : {},
       );
       const results = this.#toLintResults(
@@ -429,59 +432,76 @@ export class Rslint {
    */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
     const globs = Array.isArray(patterns) ? patterns : [patterns];
-    const { literalFilePatterns, scanDirectories } = await classifyLintPatterns(
-      globs,
-      this.#cwd,
-    );
+    const { literalFilePatterns, literalDirectorySymlinks, scanDirectories } =
+      await classifyLintPatterns(globs, this.#cwd);
     const globOptions = {
       cwd: this.#cwd,
       absolute: true,
       onlyFiles: true,
       dot: true,
-      ignore: ['**/node_modules/**', '**/.git/**'],
+      ignore: DEFAULT_LINT_GLOB_IGNORES,
     } as const;
     const matched = await glob(globs, {
       ...globOptions,
       followSymbolicLinks: false,
     });
-    const literalMatches =
-      literalFilePatterns.length === 0
+    const directorySymlinkMatches =
+      literalDirectorySymlinks.length === 0
         ? []
         : await glob(
             [
-              ...literalFilePatterns,
+              ...literalDirectorySymlinks.map(
+                (directory) => `${convertPathToPattern(directory)}/**/*`,
+              ),
               ...globs.filter((pattern) => pattern.startsWith('!')),
             ],
             {
               ...globOptions,
-              // This glob contains only literal file positives. Following them
-              // includes a file symlink without allowing a directory walk.
-              followSymbolicLinks: true,
+              // The explicitly named symlink is the scan root; nested directory
+              // symlinks remain excluded.
+              followSymbolicLinks: false,
             },
           );
+    // stat() already established each literal as a file. Keep its caller
+    // spelling directly, including file symlinks, without a second glob crawl.
+    const literalMatches = literalFilePatterns;
 
-    const filesByIdentity = new Map<string, string>();
-    for (const file of matched) {
+    const filesByIdentity = new Map<
+      string,
+      { filePath: string; explicit: boolean }
+    >();
+    for (const file of [...matched, ...directorySymlinkMatches]) {
       const normalized = path.normalize(file);
       const key = nativePathIdentity.key(normalized);
-      if (!filesByIdentity.has(key)) filesByIdentity.set(key, normalized);
+      if (!filesByIdentity.has(key)) {
+        filesByIdentity.set(key, { filePath: normalized, explicit: false });
+      }
     }
-    const explicitFiles = new Set<string>();
     for (const file of literalMatches) {
       const normalized = path.normalize(file);
       const key = nativePathIdentity.key(normalized);
-      explicitFiles.add(key);
       // Preserve the spelling of a literal target over an overlapping glob.
-      filesByIdentity.set(key, normalized);
+      filesByIdentity.set(key, { filePath: normalized, explicit: true });
     }
 
-    const files = [...filesByIdentity.values()];
-    if (files.length === 0) return [];
+    const lexicalFiles = [...filesByIdentity.values()];
+    if (lexicalFiles.length === 0) return [];
+
+    const pathResolver = new RunPathResolver();
+    const resolvedPaths = await pathResolver.resolveAll(
+      lexicalFiles.map(({ filePath }) => filePath),
+    );
+    const plannedFiles: PlannedLintFile[] = resolvedPaths.map(
+      (resolved, index) => ({
+        ...resolved,
+        explicit: lexicalFiles[index].explicit,
+      }),
+    );
 
     const configByFile = await this.#resolveLintFileConfigs(
-      files,
-      explicitFiles,
+      plannedFiles,
       scanDirectories,
+      pathResolver,
     );
     const groups = new Map<
       string,
@@ -489,27 +509,82 @@ export class Rslint {
         config: Record<string, unknown>[];
         configPath?: string;
         configDirectory: string;
+        pluginConfigDirectory: string;
         routingKey: string;
         files: string[];
+        canonicalFiles: string[];
       }
     >();
 
-    for (const file of [...files].sort(nativePathIdentity.compare)) {
-      const resolved = configByFile.get(file);
+    const selectedByCanonicalPath = new Map<
+      string,
+      {
+        file: PlannedLintFile;
+        resolved: ResolvedConfig;
+        ownerCanonicalKey: string;
+      }
+    >();
+    for (const file of [...plannedFiles].sort((left, right) =>
+      nativePathIdentity.compare(left.lexicalPath, right.lexicalPath),
+    )) {
+      const resolved = configByFile.get(file.lexicalKey);
       if (!resolved) continue;
-      const { config, configPath, configDirectory, routingKey } = resolved;
+      const owner = await pathResolver.resolve(resolved.pluginConfigDirectory);
+      const existing = selectedByCanonicalPath.get(file.canonicalKey);
+      if (existing) {
+        if (existing.ownerCanonicalKey !== owner.canonicalKey) {
+          throw new Error(
+            `Lint target aliases ${JSON.stringify(existing.file.lexicalPath)} and ${JSON.stringify(file.lexicalPath)} ` +
+              `resolve to the same file but are governed by different config directories ` +
+              `${JSON.stringify(existing.resolved.pluginConfigDirectory)} and ${JSON.stringify(resolved.pluginConfigDirectory)}`,
+          );
+        }
+        const preferFile =
+          (file.explicit && !existing.file.explicit) ||
+          (file.explicit === existing.file.explicit &&
+            nativePathIdentity.compare(
+              file.lexicalPath,
+              existing.file.lexicalPath,
+            ) < 0);
+        if (preferFile) {
+          selectedByCanonicalPath.set(file.canonicalKey, {
+            file,
+            resolved,
+            ownerCanonicalKey: owner.canonicalKey,
+          });
+        }
+        continue;
+      }
+      selectedByCanonicalPath.set(file.canonicalKey, {
+        file,
+        resolved,
+        ownerCanonicalKey: owner.canonicalKey,
+      });
+    }
+
+    for (const { file, resolved } of selectedByCanonicalPath.values()) {
+      const {
+        config,
+        configPath,
+        configDirectory,
+        pluginConfigDirectory,
+        routingKey,
+      } = resolved;
       let group = groups.get(routingKey);
       if (!group) {
         group = {
           config,
           configPath,
           configDirectory,
+          pluginConfigDirectory,
           routingKey,
           files: [],
+          canonicalFiles: [],
         };
         groups.set(routingKey, group);
       }
-      group.files.push(file);
+      group.files.push(file.lexicalPath);
+      group.canonicalFiles.push(file.canonicalPath);
     }
 
     const pluginSession = await this.#createPluginLintSession([
@@ -525,14 +600,21 @@ export class Rslint {
             config: group.config,
             eslintPlugins: pluginSession?.eslintPlugins,
             configDirectory: group.configDirectory,
+            pluginConfigDirectory: group.pluginConfigDirectory,
             workingDirectory: this.#cwd,
             files: group.files,
+            canonicalFiles: group.canonicalFiles,
             // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
             fileContents: this.#resolveOverlay(),
             fix: this.#fix,
           },
           pluginSession
-            ? { pluginLint: (request) => pluginSession.host.lint(request) }
+            ? {
+                pluginLint: async (request) => {
+                  const result = await pluginSession.host.lint(request);
+                  return result;
+                },
+              }
             : {},
         );
         const { contents, bomFiles } = await this.#readDiagnosticContents(
@@ -585,16 +667,18 @@ export class Rslint {
   }
 
   /** Tear down the long-lived Go `--api` process. */
-  close(): Promise<void> {
+  async close(): Promise<void> {
     this.#closePromise ??= this.#closeResources();
-    return this.#closePromise;
+    await this.#closePromise;
   }
 
   async #closeResources(): Promise<void> {
     this.#closeRequested = true;
     const shutdownActiveHosts = async (): Promise<void> => {
       await Promise.allSettled(
-        [...this.#activePluginHosts].map((host) => host.shutdown()),
+        [...this.#activePluginHosts].map(async (host) => {
+          await host.shutdown();
+        }),
       );
       this.#activePluginHosts.clear();
     };
@@ -642,11 +726,11 @@ export class Rslint {
     >();
     for (const resolved of resolvedConfigs) {
       if (!resolved.configPath) continue;
-      const key = `${nativePathIdentity.key(resolved.configPath)}\0${resolved.configDirectory}`;
+      const key = `${nativePathIdentity.key(resolved.configPath)}\0${resolved.pluginConfigDirectory}`;
       if (!configsByDescriptor.has(key)) {
         configsByDescriptor.set(key, {
           configPath: resolved.configPath,
-          configDirectory: resolved.configDirectory,
+          configDirectory: resolved.pluginConfigDirectory,
           entries: resolved.config,
         });
       }
@@ -722,9 +806,9 @@ export class Rslint {
   }
 
   async #resolveLintFileConfigs(
-    files: string[],
-    explicitFiles: Set<string>,
+    files: PlannedLintFile[],
     scanDirectories: string[],
+    pathResolver: RunPathResolver,
   ): Promise<Map<string, ResolvedConfig | null>> {
     const result = new Map<string, ResolvedConfig | null>();
 
@@ -732,7 +816,7 @@ export class Rslint {
     // source of truth for that config's own files/ignores matching.
     if (this.#overrideConfigFile != null) {
       const resolved = await this.#resolveConfig(this.#cwd);
-      for (const file of files) result.set(file, resolved);
+      for (const file of files) result.set(file.lexicalKey, resolved);
       return result;
     }
 
@@ -767,8 +851,11 @@ export class Rslint {
       }
     }
     for (const file of files) {
-      if (!explicitFiles.has(nativePathIdentity.key(file))) continue;
-      const configPath = findConfigUp(path.dirname(file));
+      if (!file.explicit) continue;
+      let configPath = findConfigUp(path.dirname(file.lexicalPath));
+      if (!configPath && file.canonicalKey !== file.lexicalKey) {
+        configPath = findConfigUp(path.dirname(file.canonicalPath));
+      }
       if (configPath) addDiscovered(configPath);
     }
 
@@ -778,9 +865,28 @@ export class Rslint {
         this.#cwd,
         `empty:${nativePathIdentity.key(this.#cwd)}`,
       );
-      for (const file of files) result.set(file, emptyConfig);
+      for (const file of files) result.set(file.lexicalKey, emptyConfig);
       return result;
     }
+
+    const coalescedDiscovered = coalesceCaseAliasedConfigs(
+      new Map(
+        [...discovered.values()].map(({ configPath, configDirectory }) => [
+          configPath,
+          configDirectory,
+        ]),
+      ),
+    ).configs;
+    discovered.clear();
+    for (const [configPath, configDirectory] of coalescedDiscovered) {
+      addDiscovered(configPath, configDirectory);
+    }
+    const discoveredConfigs = new Map(
+      [...discovered.values()].map(({ configPath, configDirectory }) => [
+        configPath,
+        configDirectory,
+      ]),
+    );
 
     const candidatesByPath = new Map<string, ConfigCandidate>();
     const loadCandidate = async (
@@ -803,12 +909,18 @@ export class Rslint {
       const ancestorPath = findConfigUp(path.dirname(failed.configDirectory));
       if (!ancestorPath) continue;
 
-      const key = nativePathIdentity.key(ancestorPath);
+      const normalizedPath = path.normalize(ancestorPath);
+      const configDirectory = path.dirname(normalizedPath);
+      const selectedPath =
+        findNativeCaseAliasConfigPath(
+          normalizedPath,
+          configDirectory,
+          discoveredConfigs,
+        ) ?? normalizedPath;
+      const key = nativePathIdentity.key(selectedPath);
       if (candidatesByPath.has(key)) continue;
-      const ancestor = await loadCandidate(
-        ancestorPath,
-        path.dirname(ancestorPath),
-      );
+      discoveredConfigs.set(selectedPath, configDirectory);
+      const ancestor = await loadCandidate(selectedPath, configDirectory);
       if (ancestor.status === 'failed') failedQueue.push(ancestor);
     }
 
@@ -840,6 +952,42 @@ export class Rslint {
         (candidate) => [candidate.configDirectory, candidate] as const,
       ),
     );
+    const candidateDirectories = await pathResolver.resolveAll(
+      candidates.map((candidate) => candidate.configDirectory),
+    );
+    const canonicalCandidates = new Map<
+      string,
+      { canonicalDirectory: string; candidate: ConfigCandidate }
+    >();
+    for (let index = 0; index < candidates.length; index++) {
+      const candidate = candidates[index];
+      const directory = candidateDirectories[index];
+      if (!canonicalCandidates.has(directory.canonicalKey)) {
+        canonicalCandidates.set(directory.canonicalKey, {
+          canonicalDirectory: directory.canonicalPath,
+          candidate,
+        });
+      } else {
+        const existing = canonicalCandidates.get(directory.canonicalKey);
+        if (existing?.candidate !== candidate) {
+          throw new Error(
+            `Config directories ${JSON.stringify(existing?.candidate.configDirectory)} and ` +
+              `${JSON.stringify(candidate.configDirectory)} resolve to the same filesystem location`,
+          );
+        }
+      }
+    }
+    const canonicalCandidateIndex = new AncestorPathIndex(
+      [...canonicalCandidates.values()].map(
+        ({ canonicalDirectory, candidate }) =>
+          [canonicalDirectory, candidate] as const,
+      ),
+    );
+    const nearestCandidateForFile = (
+      file: PlannedLintFile,
+    ): ConfigCandidate | undefined =>
+      candidateIndex.find(path.dirname(file.lexicalPath)) ??
+      canonicalCandidateIndex.find(path.dirname(file.canonicalPath));
     const nearestLoadedCandidate = (
       candidate: ConfigCandidate | undefined,
     ): LoadedConfigCandidate | undefined => {
@@ -860,10 +1008,8 @@ export class Rslint {
 
     const explicitConfigDirs = new Set<string>();
     for (const file of files) {
-      if (!explicitFiles.has(nativePathIdentity.key(file))) continue;
-      const loaded = nearestLoadedCandidate(
-        candidateIndex.find(path.dirname(file)),
-      );
+      if (!file.explicit) continue;
+      const loaded = nearestLoadedCandidate(nearestCandidateForFile(file));
       if (loaded) explicitConfigDirs.add(loaded.configDirectory);
     }
 
@@ -889,34 +1035,27 @@ export class Rslint {
       `empty:${nativePathIdentity.key(this.#cwd)}`,
     );
     for (const file of files) {
-      let candidate = candidateIndex.find(path.dirname(file));
+      let candidate = nearestCandidateForFile(file);
       if (!candidate) {
-        result.set(file, emptyConfig);
+        result.set(file.lexicalKey, emptyConfig);
         continue;
       }
 
-      const allowedDirs = explicitFiles.has(nativePathIdentity.key(file))
+      const allowedDirs = file.explicit
         ? effectiveConfigDirs
         : directoryConfigDirs;
-      let firstFailure: FailedConfigCandidate | undefined;
       while (candidate.status === 'failed') {
-        firstFailure ??= candidate;
         candidate = candidateIndex.findParent(candidate.configDirectory);
         if (!candidate) break;
       }
 
       if (!candidate) {
-        if (explicitFiles.has(nativePathIdentity.key(file)) && firstFailure) {
-          throw new Error(
-            `Failed to load config ${firstFailure.configPath}: ${firstFailure.error.message}`,
-          );
-        }
-        result.set(file, null);
+        result.set(file.lexicalKey, null);
         continue;
       }
 
       result.set(
-        file,
+        file.lexicalKey,
         allowedDirs.has(nativePathIdentity.key(candidate.configDirectory))
           ? candidate.resolved
           : null,
@@ -935,7 +1074,7 @@ export class Rslint {
       if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) {
         continue;
       }
-      const plugins = (entry as Record<string, unknown>).plugins;
+      const plugins = isRecord(entry) ? entry.plugins : undefined;
       if (
         plugins !== null &&
         typeof plugins === 'object' &&
@@ -945,7 +1084,7 @@ export class Rslint {
           `[rslint] overrideConfig entry at index ${index} uses object-form "plugins". ` +
             'Community ESLint plugins in overrideConfig are not supported because ' +
             'the plugin worker cannot re-import an in-memory plugin object. Move ' +
-            'the plugin declaration to rslint.config.js (or .mjs/.ts/.mts), or use ' +
+            'the plugin declaration to rslint.config.js (or .mjs/.cjs/.ts/.mts/.cts), or use ' +
             'array-form built-in plugins.',
         );
       }
@@ -962,24 +1101,30 @@ export class Rslint {
   ): ResolvedConfig {
     const override = this.#getNormalizedOverrideConfig();
     if (!override) {
-      return { config: base, configPath, configDirectory, routingKey };
+      return {
+        config: base,
+        configPath,
+        configDirectory,
+        pluginConfigDirectory: configDirectory,
+        routingKey,
+      };
     }
 
-    // One IPC config has one path base. Move the authored nested config's
-    // relative fields to cwd, then append the override unchanged so all three
-    // override path-bearing fields use Rslint's cwd as documented.
+    // ESLint resolves overrideConfig relative to the selected config's base.
+    // Explicit overrideConfigFile already supplies cwd as configDirectory.
     return {
-      config: [
-        ...rebaseConfigPaths(base, configDirectory, this.#cwd),
-        ...override,
-      ],
+      config: [...base, ...override],
       configPath,
-      configDirectory: this.#cwd,
+      configDirectory,
+      pluginConfigDirectory: configDirectory,
       routingKey,
     };
   }
 
-  async #resolveConfig(fromDir: string): Promise<ResolvedConfig> {
+  async #resolveConfig(
+    fromDir: string,
+    canonicalFromDir = fromDir,
+  ): Promise<ResolvedConfig> {
     let base: Record<string, unknown>[] = [];
     let configPath: string | undefined;
     let configDirectory = this.#cwd;
@@ -996,15 +1141,21 @@ export class Rslint {
       configDirectory = this.#cwd;
       routingKey = `config:${nativePathIdentity.key(configPath)}`;
     } else {
-      return this.#resolveAutoConfig(fromDir);
+      return this.#resolveAutoConfig(fromDir, canonicalFromDir);
     }
 
     return this.#composeConfig(base, configDirectory, routingKey, configPath);
   }
 
-  async #resolveAutoConfig(fromDir: string): Promise<ResolvedConfig> {
+  async #resolveAutoConfig(
+    fromDir: string,
+    canonicalFromDir: string,
+  ): Promise<ResolvedConfig> {
     const findConfigUp = createCachedConfigFinder();
     let configPath = findConfigUp(fromDir);
+    if (!configPath && !nativePathIdentity.equals(fromDir, canonicalFromDir)) {
+      configPath = findConfigUp(canonicalFromDir);
+    }
     if (!configPath) {
       return this.#composeConfig(
         [],

@@ -59,6 +59,9 @@ export interface LintResponse {
 
 export interface LintOptions {
   files?: string[];
+  // Optional physical paths parallel to files. High-level Node APIs provide
+  // these after target planning so Go does not repeat realpath resolution.
+  canonicalFiles?: string[];
   // Final resolved config — normalized config entries (normalizeConfig output:
   // plain objects, plugins as string[], no live functions). The JS side
   // resolves overrideConfig / config-file / discovery / normalize into this;
@@ -74,6 +77,9 @@ export interface LintOptions {
   eslintPlugins?: Array<{ prefix: string; ruleNames: string[] }>;
   // Anchor dir for resolving the config's relative files/ignores/project.
   configDirectory?: string;
+  // Opaque routing key for community-plugin workers. High-level APIs set this
+  // when config path rebasing makes it differ from configDirectory.
+  pluginConfigDirectory?: string;
   workingDirectory?: string;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
@@ -101,13 +107,11 @@ export interface IpcMessage {
 }
 
 /** Handler for a positive-id request frame sent by the Go peer. */
-export type InboundRequestHandler = (
-  message: IpcMessage,
-) => Promise<unknown> | unknown;
+export type InboundRequestHandler = (message: IpcMessage) => unknown;
 
 /** Reverse-request handlers that are scoped to one outer lint request. */
 export interface LintInboundHandlers {
-  pluginLint?: (request: unknown) => Promise<unknown> | unknown;
+  pluginLint?: (request: unknown) => unknown;
 }
 
 // Service interface that all implementations must follow

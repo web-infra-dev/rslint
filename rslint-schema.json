@@ -90,13 +90,22 @@
         },
         "globals": {
           "type": "object",
-          "description": "Global variables available to rules for matching files",
+          "description": "Global variables available to rules for matching files. Null is readonly; \"off\" disables a global; all other accepted values declare it as readonly or writable.",
           "additionalProperties": {
             "oneOf": [
               { "type": "boolean" },
+              { "type": "null" },
               {
                 "type": "string",
-                "enum": ["readonly", "writable", "off"]
+                "enum": [
+                  "true",
+                  "writable",
+                  "writeable",
+                  "false",
+                  "readonly",
+                  "readable",
+                  "off"
+                ]
               }
             ]
           }
@@ -301,44 +310,31 @@
       "description": "Rule configuration value",
       "oneOf": [
         {
-          "type": "string",
-          "enum": ["off", "warn", "error"],
-          "description": "Simple rule severity level"
+          "$ref": "#/definitions/RuleSeverity"
         },
         {
           "type": "array",
-          "description": "Array format rule configuration [severity, options]",
+          "description": "Array rule configuration [severity, ...positionalOptions]",
           "minItems": 1,
-          "maxItems": 2,
           "items": [
             {
-              "type": "string",
-              "enum": ["off", "warn", "error"],
-              "description": "Rule severity level"
-            },
-            {
-              "type": "object",
-              "description": "Rule-specific options",
-              "additionalProperties": true
+              "$ref": "#/definitions/RuleSeverity"
             }
-          ]
+          ],
+          "additionalItems": true
+        }
+      ]
+    },
+    "RuleSeverity": {
+      "description": "Rule severity: 0/off, 1/warn, or 2/error",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["off", "warn", "error"]
         },
         {
-          "type": "object",
-          "description": "Object format rule configuration",
-          "properties": {
-            "level": {
-              "type": "string",
-              "enum": ["off", "warn", "error"],
-              "description": "Rule severity level"
-            },
-            "options": {
-              "type": "object",
-              "description": "Rule-specific options",
-              "additionalProperties": true
-            }
-          },
-          "additionalProperties": false
+          "type": "integer",
+          "enum": [0, 1, 2]
         }
       ]
     }
@@ -346,7 +342,6 @@
   "examples": [
     [
       {
-        "language": "javascript",
         "ignores": ["node_modules/**", "dist/**", "*.test.ts"],
         "languageOptions": {
           "parserOptions": {

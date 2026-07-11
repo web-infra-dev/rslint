@@ -142,8 +142,8 @@ func isESMPackage(directory string) bool {
 func InitDefaultConfig(directory string) error {
 	// Check if JS/TS config already exists
 	existingConfigs := []string{
-		"rslint.config.ts", "rslint.config.mts",
-		"rslint.config.js", "rslint.config.mjs",
+		"rslint.config.js", "rslint.config.mjs", "rslint.config.cjs",
+		"rslint.config.ts", "rslint.config.mts", "rslint.config.cts",
 	}
 	for _, name := range existingConfigs {
 		p := filepath.Join(directory, name)

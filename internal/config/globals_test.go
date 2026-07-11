@@ -2,20 +2,23 @@ package config
 
 import "testing"
 
-// Locks in normalizeConfigGlobal parity with ESLint (source-code.js): only
-// the string "off" un-declares a global. Boolean false and null both map to
-// "readonly" and remain declared — a common mix-up since other ESLint config
-// knobs treat false/"off" as equivalent, but globals don't.
+// ExtractGlobals preserves the declared/disabled state needed by native rules.
+// Access aliases, including null-as-readonly, remain declared; only "off"
+// explicitly disables a name.
 func TestExtractGlobals(t *testing.T) {
 	langOpts := &LanguageOptions{
 		Raw: map[string]any{
 			"globals": map[string]any{
-				"stringOff":      "off",
-				"stringReadonly": "readonly",
-				"stringWritable": "writable",
 				"boolTrue":       true,
+				"stringTrue":     "true",
+				"writable":       "writable",
+				"writeable":      "writeable",
 				"boolFalse":      false,
-				"nullValue":      nil,
+				"stringFalse":    "false",
+				"readonly":       "readonly",
+				"readable":       "readable",
+				"nullReadonly":   nil,
+				"stringDisabled": "off",
 			},
 		},
 	}
@@ -23,12 +26,16 @@ func TestExtractGlobals(t *testing.T) {
 	globals := ExtractGlobals(langOpts)
 
 	cases := map[string]bool{
-		"stringOff":      false,
-		"stringReadonly": true,
-		"stringWritable": true,
 		"boolTrue":       true,
+		"stringTrue":     true,
+		"writable":       true,
+		"writeable":      true,
 		"boolFalse":      true,
-		"nullValue":      true,
+		"stringFalse":    true,
+		"readonly":       true,
+		"readable":       true,
+		"nullReadonly":   true,
+		"stringDisabled": false,
 	}
 	for name, want := range cases {
 		if got := globals[name]; got != want {

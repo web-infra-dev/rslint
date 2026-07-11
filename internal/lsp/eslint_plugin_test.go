@@ -306,6 +306,28 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	}
 }
 
+func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{{
+		Plugins: []string{"tplexcluded"},
+		Rules:   config.Rules{"tplexcluded/no-foo": "error"},
+	}}
+
+	for _, uri := range []lsproto.DocumentUri{
+		"file:///proj/node_modules/pkg/index.ts",
+		"file:///proj/.git/hooks/pre-commit.ts",
+	} {
+		s.documents[uri] = "foo();"
+		if input, ok := s.buildPluginFileInput(uri, nil); ok {
+			t.Fatalf("default-excluded file %q produced plugin input %+v", uri, input)
+		}
+	}
+}
+
 func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tprootcfg", RuleNames: []string{"no-root"}},
@@ -885,8 +907,8 @@ func TestSendCancelRequest_QueuesCancelNotification(t *testing.T) {
 // TestDispatchPluginLint_SupersedeCancelsPrior pins the full supersede path: a
 // newer keystroke's dispatch cancels the prior in-flight one Go-side AND sends
 // the client a $/cancelRequest for its reverse-request id (so the Node worker
-// stops instead of running to completion). Uses the real sendRequest path so the
-// id sink + reqID registration are exercised end to end.
+// stops instead of running to completion). Uses the real sendRequest path so
+// automatic context-to-$/cancelRequest forwarding is exercised end to end.
 func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tpsup", RuleNames: []string{"no-bar"}},
@@ -902,27 +924,18 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
 
-	// First dispatch: real sendRequest mints an id, fills reqID via the sink,
-	// then blocks on a response that never comes.
+	// First dispatch queues a reverse request, then blocks on a response that
+	// never comes.
 	s.dispatchPluginLint(uri, 1)
 
 	var firstID *jsonrpc.ID
-	deadline := time.Now().Add(2 * time.Second)
-	for firstID == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("first dispatch never registered its reverse-request id")
-		}
-		s.inflightPluginDispatchMu.Lock()
-		if h := s.inflightPluginDispatch[uri]; h != nil {
-			firstID = h.reqID
-		}
-		s.inflightPluginDispatchMu.Unlock()
-		time.Sleep(2 * time.Millisecond)
-	}
-
-	// Drain the first rslint/pluginLint request off the queue.
 	select {
-	case <-queue:
+	case msg := <-queue:
+		request := msg.AsRequest()
+		if request.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", request.Method, methodPluginLint)
+		}
+		firstID = request.ID
 	case <-time.After(time.Second):
 		t.Fatal("first reverse request was not sent")
 	}
@@ -968,24 +981,13 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 	s.dispatchPluginLint(uri, 1)
 
 	var firstID *jsonrpc.ID
-	deadline := time.Now().Add(2 * time.Second)
-	for firstID == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("first dispatch never registered its reverse-request id")
-		}
-		s.inflightPluginDispatchMu.Lock()
-		if h := s.inflightPluginDispatch[uri]; h != nil {
-			firstID = h.reqID
-		}
-		s.inflightPluginDispatchMu.Unlock()
-		time.Sleep(2 * time.Millisecond)
-	}
-
 	select {
 	case msg := <-queue:
-		if req := msg.AsRequest(); req.Method != methodPluginLint {
+		req := msg.AsRequest()
+		if req.Method != methodPluginLint {
 			t.Fatalf("first message = %q, want %q", req.Method, methodPluginLint)
 		}
+		firstID = req.ID
 	case <-time.After(time.Second):
 		t.Fatal("first reverse request was not sent")
 	}
@@ -1045,19 +1047,16 @@ func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
 	s.dispatchPluginLint(uri, 1)
 
 	var firstID *jsonrpc.ID
-	deadline := time.Now().Add(2 * time.Second)
-	for firstID == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("dispatch never registered its reverse-request id")
+	select {
+	case msg := <-queue:
+		request := msg.AsRequest()
+		if request.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", request.Method, methodPluginLint)
 		}
-		s.inflightPluginDispatchMu.Lock()
-		if h := s.inflightPluginDispatch[uri]; h != nil {
-			firstID = h.reqID
-		}
-		s.inflightPluginDispatchMu.Unlock()
-		time.Sleep(2 * time.Millisecond)
+		firstID = request.ID
+	case <-time.After(time.Second):
+		t.Fatal("plugin lint request was not sent")
 	}
-	<-queue // drain the rslint/pluginLint request
 
 	if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},

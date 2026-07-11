@@ -44,7 +44,7 @@ When no arguments are given, rslint scopes linting to the current working direct
 
 ### Config Discovery
 
-For each target file or directory, rslint searches for `rslint.config.{js,mjs,ts,mts}` starting from that location and walking upward to the filesystem root. The first config found is used.
+For each target file or directory, rslint searches for `rslint.config.{js,mjs,cjs,ts,mts,cts}` starting from that location and walking upward to the filesystem root. The nearest successfully loaded config is used. If a discovered config cannot be loaded, rslint warns and tries its next ancestor; the command fails when none of the discovered candidates can be loaded.
 
 In monorepo setups, rslint automatically discovers nested configs and applies the nearest one to each file:
 

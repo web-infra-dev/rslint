@@ -83,7 +83,7 @@ describe('Config discovery: parent global ignores filter nested configs', () => 
   test('nested config in globally ignored directory should not be used', async () => {
     const { diagnostics, cleanup } = await lintAndParse({
       'tsconfig.json': TS_CONFIG,
-      'rslint.config.mjs': rootConfig(['__tests__/**']),
+      'rslint.config.mjs': rootConfig(['__tests__/**/*']),
       '__tests__/fixtures/rslint.config.mjs': nestedConfig('no-console'),
       'src/index.ts': `const x: any = 1;\n`,
       '__tests__/fixtures/src/test.ts': `console.log('test');\nconst a: any = 1;\n`,

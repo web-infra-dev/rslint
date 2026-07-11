@@ -2,7 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -78,7 +80,7 @@ func (entry *ConfigEntry) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if len(config) != 1 {
-		return fmt.Errorf("expected one config entry")
+		return errors.New("expected one config entry")
 	}
 	*entry = config[0]
 	return nil
@@ -132,6 +134,9 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(entryForDecode, &decoded); err != nil {
 			return err
 		}
+		if err := validateConfigRules(decoded.Rules); err != nil {
+			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
 		// Global-ignore semantics depend on object shape, not on whether a
 		// present field decodes to a non-nil Go value. Preserve the non-global
 		// shape of entries such as {ignores, rules: null} or entries carrying a
@@ -166,20 +171,34 @@ func decodeFilesSelectors(raw json.RawMessage, entryIndex int) ([]string, [][]st
 	files := make([]string, 0, len(selectors))
 	var groups [][]string
 	for selectorIndex, selector := range selectors {
-		var pattern string
-		if err := json.Unmarshal(selector, &pattern); err == nil {
-			files = append(files, pattern)
-			continue
+		var value any
+		if err := json.Unmarshal(selector, &value); err != nil {
+			return nil, nil, err
 		}
-		var group []string
-		if err := json.Unmarshal(selector, &group); err != nil || len(group) == 0 {
+		switch value := value.(type) {
+		case string:
+			files = append(files, value)
+		case []any:
+			group := make([]string, 0, len(value))
+			for _, item := range value {
+				pattern, ok := item.(string)
+				if !ok {
+					return nil, nil, fmt.Errorf(
+						"config entry at index %d: key \"files\": item at index %d must be a string or an array of strings",
+						entryIndex,
+						selectorIndex,
+					)
+				}
+				group = append(group, pattern)
+			}
+			groups = append(groups, group)
+		default:
 			return nil, nil, fmt.Errorf(
-				"config entry at index %d: key \"files\": item at index %d must be a string or a non-empty array of strings",
+				"config entry at index %d: key \"files\": item at index %d must be a string or an array of strings",
 				entryIndex,
 				selectorIndex,
 			)
 		}
-		groups = append(groups, group)
 	}
 	return files, groups, nil
 }
@@ -191,10 +210,60 @@ func ValidateConfig(config RslintConfig) error {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
-		for groupIndex, group := range entry.FilePatternGroups {
-			if len(group) == 0 {
-				return fmt.Errorf("config entry at index %d: key \"files\": AND group at index %d must be non-empty", index, groupIndex)
-			}
+		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
+			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
+		if err := validateConfigRules(entry.Rules); err != nil {
+			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
+	}
+	return nil
+}
+
+func validateConfigGlobals(languageOptions *LanguageOptions) error {
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+	value, present := languageOptions.Raw["globals"]
+	if !present {
+		return nil
+	}
+	globals, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("key \"languageOptions.globals\": expected an object")
+	}
+	for name, access := range globals {
+		if name != strings.TrimSpace(name) {
+			return fmt.Errorf("key \"languageOptions.globals\": global %q has leading or trailing whitespace", name)
+		}
+		if !isValidGlobalAccess(access) {
+			return fmt.Errorf(
+				"key \"languageOptions.globals\": global %q has invalid access %v; expected a boolean, null, \"true\", \"false\", \"readonly\", \"readable\", \"writable\", \"writeable\", or \"off\"",
+				name,
+				access,
+			)
+		}
+	}
+	return nil
+}
+
+func isValidGlobalAccess(value any) bool {
+	switch value := value.(type) {
+	case nil, bool:
+		return true
+	case string:
+		switch value {
+		case "true", "writable", "writeable", "false", "readonly", "readable", "off":
+			return true
+		}
+	}
+	return false
+}
+
+func validateConfigRules(rules Rules) error {
+	for name, value := range rules {
+		if _, _, err := parseRuleConfigValue(value); err != nil {
+			return fmt.Errorf("key \"rules\": rule %q: %w", name, err)
 		}
 	}
 	return nil
@@ -387,32 +456,99 @@ func NormalizePluginName(pluginName string) string {
 // parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
 // Supports ESLint-compatible formats:
 // - ["off"] -> disabled rule
+// - [0] -> disabled rule
 // - ["error"] -> enabled rule with error severity
+// - [2] -> enabled rule with error severity
 // - ["warn"] -> enabled rule with warning severity
+// - [1] -> enabled rule with warning severity
 // - ["error", {...options}] -> enabled rule with error severity and options
 // - ["error", "both"] -> enabled rule with string option (e.g. no-inner-declarations)
 // - ["error", "both", {...options}] -> enabled rule with string + object options
 func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
-	if len(ruleArray) == 0 {
+	ruleConfig, _, err := parseRuleConfigValue(ruleArray)
+	if err != nil {
 		return nil
 	}
-
-	// First element should always be the severity level
-	level, ok := ruleArray[0].(string)
-	if !ok {
-		return nil
-	}
-
-	ruleConfig := &RuleConfig{Level: level}
-
-	// Remaining elements are rule options, kept as ESLint's context.options
-	// array form ([]any) — no bare-value collapsing. Every consumer of
-	// RuleConfig.Options can now assume []any uniformly.
-	if len(ruleArray) > 1 {
-		ruleConfig.Options = ruleArray[1:]
-	}
-
 	return ruleConfig
+}
+
+func parseRuleConfigValue(value any) (*RuleConfig, bool, error) {
+	if ruleArray, ok := value.([]interface{}); ok {
+		if len(ruleArray) == 0 {
+			return nil, false, errors.New("rule configuration array must contain a severity")
+		}
+		level, err := normalizeRuleSeverity(ruleArray[0])
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid array severity at index 0: %w", err)
+		}
+		ruleConfig := &RuleConfig{Level: level}
+		if len(ruleArray) > 1 {
+			// Keep ESLint's context.options array form without collapsing a
+			// single positional option to a bare value.
+			ruleConfig.Options = ruleArray[1:]
+		}
+		return ruleConfig, len(ruleArray) > 1, nil
+	}
+
+	level, err := normalizeRuleSeverity(value)
+	if err != nil {
+		return nil, false, err
+	}
+	return &RuleConfig{Level: level}, false, nil
+}
+
+func normalizeRuleSeverity(value any) (string, error) {
+	if value == nil {
+		return "", invalidRuleSeverity(value)
+	}
+	if number, ok := value.(json.Number); ok {
+		numeric, err := number.Float64()
+		if err != nil {
+			return "", invalidRuleSeverity(value)
+		}
+		return normalizeNumericRuleSeverity(numeric, value)
+	}
+
+	severity := reflect.ValueOf(value)
+	switch severity.Kind() {
+	case reflect.String:
+		level := severity.String()
+		switch level {
+		case "off", "warn", "error":
+			return level, nil
+		default:
+			return "", invalidRuleSeverity(value)
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return normalizeNumericRuleSeverity(float64(severity.Int()), value)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return normalizeNumericRuleSeverity(float64(severity.Uint()), value)
+	case reflect.Float32, reflect.Float64:
+		return normalizeNumericRuleSeverity(severity.Float(), value)
+	}
+
+	return "", invalidRuleSeverity(value)
+}
+
+func normalizeNumericRuleSeverity(value float64, original any) (string, error) {
+	switch value {
+	case 0:
+		return "off", nil
+	case 1:
+		return "warn", nil
+	case 2:
+		return "error", nil
+	default:
+		return "", invalidRuleSeverity(original)
+	}
+}
+
+func invalidRuleSeverity(value any) error {
+	return fmt.Errorf(
+		"invalid severity %v (%T); expected \"off\", \"warn\", \"error\", 0, 1, or 2",
+		value,
+		value,
+	)
 }
 
 var registerOnce sync.Once
@@ -614,16 +750,19 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 
 		entryMatched = true
 
-		// 4. Rules: shallow merge, later entries override earlier ones
+		// 4. Rules: later entries override earlier ones. When the later value
+		// changes only severity, ESLint retains the earlier rule options.
 		for ruleName, ruleValue := range entry.Rules {
-			switch v := ruleValue.(type) {
-			case string:
-				merged.Rules[ruleName] = &RuleConfig{Level: v}
-			case []interface{}:
-				if rc := parseArrayRuleConfig(v); rc != nil {
-					merged.Rules[ruleName] = rc
-				}
+			next, hasOptions, err := parseRuleConfigValue(ruleValue)
+			if err != nil {
+				// Config ingress validates rule values before merge. Keep this
+				// guard for callers that construct a config without validating it.
+				continue
 			}
+			if previous := merged.Rules[ruleName]; !hasOptions && previous != nil {
+				next.Options = append([]interface{}(nil), previous.Options...)
+			}
+			merged.Rules[ruleName] = next
 		}
 
 		// 5. Plugins: union from all matching entries (normalized to rule prefix form)
@@ -631,14 +770,13 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
 		}
 
-		// 6. Settings: shallow merge
+		// 6. Settings: recursively merge ordinary objects; arrays and scalar
+		// values are replaced by the later entry.
 		if entry.Settings != nil {
-			if merged.Settings == nil {
-				merged.Settings = make(Settings)
-			}
-			for k, v := range entry.Settings {
-				merged.Settings[k] = v
-			}
+			merged.Settings = Settings(deepMergeConfigObjects(
+				map[string]any(merged.Settings),
+				map[string]any(entry.Settings),
+			))
 		}
 
 		// 7. LanguageOptions: deep merge
@@ -675,7 +813,8 @@ func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) 
 		return true
 	}
 	for _, group := range entry.FilePatternGroups {
-		matched := len(group) > 0
+		// ESLint treats an empty nested selector as a vacuously true AND group.
+		matched := true
 		for _, pattern := range group {
 			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
 				matched = false
@@ -687,6 +826,52 @@ func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) 
 		}
 	}
 	return false
+}
+
+func deepMergeConfigObjects(base map[string]any, override map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(override))
+	for key, value := range base {
+		merged[key] = cloneConfigValue(value)
+	}
+	for key, value := range override {
+		baseObject, baseIsObject := configObject(base[key])
+		overrideObject, overrideIsObject := configObject(value)
+		if baseIsObject && overrideIsObject {
+			merged[key] = deepMergeConfigObjects(baseObject, overrideObject)
+			continue
+		}
+		merged[key] = cloneConfigValue(value)
+	}
+	return merged
+}
+
+func configObject(value any) (map[string]any, bool) {
+	switch object := value.(type) {
+	case map[string]any:
+		return object, true
+	case Settings:
+		return map[string]any(object), true
+	default:
+		return nil, false
+	}
+}
+
+func cloneConfigValue(value any) any {
+	if object, ok := configObject(value); ok {
+		return deepMergeConfigObjects(nil, object)
+	}
+	switch values := value.(type) {
+	case []any:
+		cloned := make([]any, len(values))
+		for index, item := range values {
+			cloned[index] = cloneConfigValue(item)
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), values...)
+	default:
+		return value
+	}
 }
 
 // isFileMatched checks if a file matches any of the given glob patterns
@@ -756,49 +941,21 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			if override.ParserOptions.ProjectService != nil {
 				po.ProjectService = override.ParserOptions.ProjectService
 			}
-			if len(override.ParserOptions.Project) > 0 {
+			if override.ParserOptions.Project != nil {
 				po.Project = override.ParserOptions.Project
 			}
 			merged.ParserOptions = &po
 		}
 	}
-	// Shallow-merge the raw languageOptions map (override wins per key), except
-	// globals, which ESLint merges by global name. merged is a shallow copy of
-	// base, so build fresh maps rather than mutating either input.
-	if len(override.Raw) > 0 {
-		mergedRaw := make(map[string]any, len(base.Raw)+len(override.Raw))
-		for k, v := range base.Raw {
-			mergedRaw[k] = v
-		}
-		for k, v := range override.Raw {
-			mergedRaw[k] = v
-		}
-		if overrideGlobals, ok := override.Raw["globals"].(map[string]any); ok {
-			mergedGlobals := make(map[string]any, len(overrideGlobals))
-			if baseGlobals, ok := base.Raw["globals"].(map[string]any); ok {
-				for name, value := range baseGlobals {
-					mergedGlobals[name] = value
-				}
-			}
-			for name, value := range overrideGlobals {
-				mergedGlobals[name] = value
-			}
-			mergedRaw["globals"] = mergedGlobals
-		}
-		merged.Raw = mergedRaw
-	}
+	merged.Raw = deepMergeConfigObjects(base.Raw, override.Raw)
 	return &merged
 }
 
 // ExtractGlobals reads the effective `languageOptions.globals` for a merged
 // config and normalizes it to a simple "is this name declared" set.
 //
-// Matches ESLint's own normalizeConfigGlobal (lib/languages/js/source-code/
-// source-code.js): only the string `"off"` un-declares a global. Every other
-// accepted value — including boolean `false` and `null`, which both map to
-// `"readonly"` — still declares it. (`false` does NOT mean "off"; that's a
-// common mix-up since other ESLint config knobs use `false`/`"off"`
-// interchangeably, but globals don't.)
+// Writable and readonly aliases both declare the name. As in ESLint v10, null
+// normalizes to readonly; only the string "off" disables a declaration.
 func ExtractGlobals(langOpts *LanguageOptions) map[string]bool {
 	if langOpts == nil || langOpts.Raw == nil {
 		return nil

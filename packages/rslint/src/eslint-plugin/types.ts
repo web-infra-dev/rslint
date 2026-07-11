@@ -6,6 +6,24 @@
  */
 
 /**
+ * ESLint-compatible access values carried to the plugin worker. This mirrors
+ * the public config authoring type without coupling the worker build project to
+ * the config-loader build project.
+ */
+export type GlobalAccess =
+  | boolean
+  | null
+  | 'true'
+  | 'false'
+  | 'readonly'
+  | 'readable'
+  | 'writable'
+  | 'writeable'
+  | 'off';
+
+export type GlobalsConfig = Record<string, GlobalAccess>;
+
+/**
  * Per-config descriptor handed to the worker pool. Each worker imports
  * every descriptor's `configPath` once at init, then routes per-file
  * lint tasks via `configKey === configDirectory` to the right plugin
@@ -14,7 +32,7 @@
  * it as a Map key for per-file dispatch.
  */
 export interface ConfigDescriptor {
-  /** Absolute filesystem path of the rslint config file (`rslint.config.{js,mjs,ts,mts}`). */
+  /** Absolute filesystem path of the rslint config file (`rslint.config.{js,mjs,cjs,ts,mts,cts}`). */
   configPath: string;
   /** Absolute filesystem path of the directory holding the config file.
    *  Matches the `ConfigKey` Go emits per file during plugin-lint dispatch. */

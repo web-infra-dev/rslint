@@ -42,6 +42,12 @@ describe('path identity', () => {
     expect(index.find('c:/repo/packages/APP/src')).toBe('app');
     expect(index.find('C:\\REPO\\other')).toBe('root');
     expect(index.find('D:\\Repo')).toBeUndefined();
+
+    const caseSensitive = createPathIdentity(path.win32, true);
+    expect(caseSensitive.equals('C:\\Repo', 'C:\\repo')).toBe(false);
+    expect(
+      caseSensitive.isSameOrChild('C:\\Repo', 'C:\\repo\\src\\file.ts'),
+    ).toBe(false);
   });
 
   test('routes UNC paths with Windows case semantics', () => {

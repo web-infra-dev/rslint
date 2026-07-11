@@ -312,10 +312,11 @@ describe('CLI File Arguments', () => {
     });
 
     try {
-      // No file args — should lint all files
+      // The default .mjs baseline includes the config file itself, matching
+      // ESLint v10's no-argument directory scan.
       const result = await runRslint([], tempDir);
       expect(result.exitCode).not.toBe(0);
-      expect(result.stdout).toContain('linted 2 files');
+      expect(result.stdout).toContain('linted 3 files');
     } finally {
       await cleanupTempDir(tempDir);
     }

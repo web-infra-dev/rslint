@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -18,6 +20,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type targetPlanRealpathCountingFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func (f *targetPlanRealpathCountingFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	f.mu.Lock()
+	f.calls[filePath]++
+	f.mu.Unlock()
+	return f.FS.Realpath(filePath)
+}
+
+func (f *targetPlanRealpathCountingFS) callCount(filePath string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls[tspath.NormalizePath(filePath)]
+}
 
 func writeProgramTestFiles(t *testing.T, dir string, files map[string]string) {
 	t.Helper()
@@ -137,7 +159,7 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 		t.Fatalf("expected files-driven fallback program to have no ConfigFilePath, got %q", got)
 	}
 	if !programs[0].Options().NoLib.IsTrue() || !programs[0].Options().NoResolve.IsTrue() {
-		t.Fatalf("expected files-driven fallback to stay AST-only, got options %+v", programs[0].Options())
+		t.Fatalf("expected files-driven fallback to stay non-project-backed, got options %+v", programs[0].Options())
 	}
 	skip := buildTypeCheckSkipMask(programs)
 	if len(skip) != 1 || !skip[0] {
@@ -212,7 +234,7 @@ func TestTypeCheck_SkipsGapFallbackPrograms(t *testing.T) {
   "include": ["src/in-project.ts"]
 }
 `,
-		"src/in-project.ts": `export const ok = 1;
+		"src/in-project.ts": `export const bad: number = "oops";
 `,
 		"gap.ts": `import type { Bad } from './bad';
 export const value: Bad | null = null;
@@ -275,14 +297,18 @@ export const value: Bad | null = null;
 		t.Fatalf("expected gap fallback program to have no ConfigFilePath, got %q", got)
 	}
 	if !programs[1].Options().NoLib.IsTrue() || !programs[1].Options().NoResolve.IsTrue() {
-		t.Fatalf("expected gap fallback to stay AST-only, got options %+v", programs[1].Options())
+		t.Fatalf("expected gap fallback to stay non-project-backed, got options %+v", programs[1].Options())
 	}
 	skip := buildTypeCheckSkipMask(programs)
 	if len(skip) != 2 || skip[0] || !skip[1] {
 		t.Fatalf("expected only the gap fallback program to be skipped, got %v", skip)
 	}
 
-	if diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles); containsTSDiagnostic(diags, "TS2304") {
+	diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles)
+	if !containsTSDiagnostic(diags, "TS2322") {
+		t.Fatalf("expected the tsconfig-backed Program to retain semantic diagnostics: %+v", diags)
+	}
+	if containsTSDiagnostic(diags, "TS2304") {
 		t.Fatalf("did not expect declaration diagnostics from a gap fallback program: %+v", diags)
 	}
 }
@@ -342,7 +368,8 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	if len(targetFiles) != 1 || targetFiles[0] != libPath {
 		t.Fatalf("expected lib.ts as the only target, got %v", targetFiles)
 	}
-	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != libPath {
+	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 ||
+		canonicalFilesystemPathID(targetsByProgram[0][0], fs) != canonicalFilesystemPathID(libPath, fs) {
 		t.Fatalf("expected lib.ts bound to the tsconfig Program, got %v", targetsByProgram)
 	}
 }
@@ -478,7 +505,6 @@ func TestBindLintTargetPlan_UsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *tes
 		Config:                     cfg,
 		CurrentDirectory:           linkDir,
 		TypeInfoFiles:              binding.TypeInfoFiles,
-		TargetPathBySourcePath:     binding.TargetPathBySourcePath,
 		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
 		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
 		FS:                         fsys,
@@ -486,6 +512,66 @@ func TestBindLintTargetPlan_UsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *tes
 	rules := resolver.ActiveRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-debugger" {
 		t.Fatalf("expected files selector to match in physical config space, got %v", configuredRuleNameSet(rules))
+	}
+}
+
+func TestBindLintTargetPlan_ConfigMatchingDoesNotDependOnProgramSourcePath(t *testing.T) {
+	rootDir := t.TempDir()
+	writeProgramTestFiles(t, rootDir, map[string]string{
+		"physical/index.ts": "console.log('value');\n",
+		"tsconfig.json":     `{"files":["physical/index.ts"]}`,
+	})
+	linkPath := filepath.Join(rootDir, "link.ts")
+	physicalPath := filepath.Join(rootDir, "physical/index.ts")
+	if err := os.Symlink(physicalPath, linkPath); err != nil {
+		t.Skipf("file symlink unavailable: %v", err)
+	}
+
+	rootDir = tspath.NormalizePath(rootDir)
+	linkPath = tspath.NormalizePath(linkPath)
+	physicalPath = tspath.NormalizePath(physicalPath)
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	cfg := rslintconfig.RslintConfig{{
+		Files: []string{"link.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+			Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+		}},
+		Rules: rslintconfig.Rules{"no-console": "error"},
+	}}
+	set, err := createProgramSetForConfig(rootDir, cfg, true, fsys, utils.NewParseCache())
+	if err != nil || len(set.Programs) != 1 {
+		t.Fatalf("create Program: err=%v programs=%d", err, len(set.Programs))
+	}
+	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, rootDir, linkPath)}}
+	binding, err := bindLintTargetPlan(set, plan, rootDir, fsys, utils.NewParseCache(), true)
+	if err != nil {
+		t.Fatalf("bindLintTargetPlan: %v", err)
+	}
+	if len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 1 {
+		t.Fatalf("expected lexical target to bind to the physical Program source, got %v", binding.TargetsByProgram)
+	}
+	sourcePath := binding.TargetsByProgram[0][0]
+	expectedSourcePath := authoritativeFilesystemPath(physicalPath, fsys)
+	if canonicalFilesystemPathID(sourcePath, fsys) != canonicalFilesystemPathID(expectedSourcePath, fsys) {
+		t.Fatalf("fixture must bind through physical Program source %q, got %q", expectedSourcePath, sourcePath)
+	}
+	expectedConfigPath := tspath.ResolvePath(authoritativeFilesystemPath(rootDir, fsys), "link.ts")
+	if configPath := binding.ConfigPathBySourcePath[sourcePath]; configPath != expectedConfigPath {
+		t.Fatalf("config matching must retain lexical target %q, got %q", expectedConfigPath, configPath)
+	}
+
+	rslintconfig.RegisterAllRules()
+	resolver := newLintConfigResolver(lintConfigResolverOptions{
+		Config:                     cfg,
+		CurrentDirectory:           rootDir,
+		TypeInfoFiles:              binding.TypeInfoFiles,
+		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
+		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
+		FS:                         fsys,
+	})
+	rules := resolver.ActiveRulesForFile(sourcePath)
+	if len(rules) != 1 || rules[0].Name != "no-console" {
+		t.Fatalf("Program membership changed the lexical files match: %v", configuredRuleNameSet(rules))
 	}
 }
 
@@ -689,6 +775,56 @@ func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t
 	}
 }
 
+func TestCreateProgramSetForConfigs_PreservesSymlinkedTsconfigBase(t *testing.T) {
+	rootDir := t.TempDir()
+	realDir := filepath.Join(rootDir, "z-real")
+	aliasDir := filepath.Join(rootDir, "a-alias")
+	writeProgramTestFiles(t, realDir, map[string]string{
+		"tsconfig.json": `{"include":["src/**/*.ts"]}`,
+		"src/real.ts":   `export const source = "real";`,
+	})
+	writeProgramTestFiles(t, aliasDir, map[string]string{
+		"src/alias.ts": `export const source = "alias";`,
+	})
+	aliasConfig := filepath.Join(aliasDir, "tsconfig.json")
+	if err := os.Symlink(filepath.Join(realDir, "tsconfig.json"), aliasConfig); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	realDir = tspath.NormalizePath(realDir)
+	aliasDir = tspath.NormalizePath(aliasDir)
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	set, err := createProgramSetForConfigs(map[string]rslintconfig.RslintConfig{
+		aliasDir: projectConfig("./tsconfig.json"),
+		realDir:  projectConfig("./tsconfig.json"),
+	}, true, fsys, utils.NewParseCache())
+	if err != nil {
+		t.Fatalf("createProgramSetForConfigs: %v", err)
+	}
+	if len(set.Programs) != 2 {
+		t.Fatalf("distinct declared tsconfig paths must produce two Programs, got %d", len(set.Programs))
+	}
+	programByConfigPath := make(map[string]*compiler.Program, len(set.Programs))
+	for _, program := range set.Programs {
+		programByConfigPath[exactFilesystemPathID(program.Options().ConfigFilePath)] = program
+	}
+	aliasConfigPath := tspath.ResolvePath(aliasDir, "tsconfig.json")
+	realConfigPath := tspath.ResolvePath(realDir, "tsconfig.json")
+	aliasProgram := programByConfigPath[exactFilesystemPathID(aliasConfigPath)]
+	realProgram := programByConfigPath[exactFilesystemPathID(realConfigPath)]
+	if aliasProgram == nil || realProgram == nil {
+		t.Fatalf("missing lexical tsconfig Programs: %v", programByConfigPath)
+	}
+	aliasSource := tspath.ResolvePath(aliasDir, "src/alias.ts")
+	realSource := tspath.ResolvePath(realDir, "src/real.ts")
+	if aliasProgram.GetSourceFile(aliasSource) == nil || aliasProgram.GetSourceFile(realSource) != nil {
+		t.Fatalf("symlinked tsconfig must resolve includes from %q", aliasDir)
+	}
+	if realProgram.GetSourceFile(realSource) == nil || realProgram.GetSourceFile(aliasSource) != nil {
+		t.Fatalf("real tsconfig must resolve includes from %q", realDir)
+	}
+}
+
 func TestBindLintTargetPlan_UsesGoverningConfigProjectOrder(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{
@@ -768,6 +904,79 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	}
 }
 
+func TestProgramTargetLookup_DirectMissWithoutAliasSkipsCanonicalIndex(t *testing.T) {
+	dir := t.TempDir()
+	writeProgramTestFiles(t, dir, map[string]string{
+		"inside.ts":     `export const inside = true;`,
+		"outside.ts":    `export const outside = true;`,
+		"tsconfig.json": `{"files":["inside.ts"]}`,
+	})
+	dir = tspath.NormalizePath(dir)
+	counter := &targetPlanRealpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
+	fsys := bundled.WrapFS(cachedvfs.From(counter))
+	set, err := createProgramSetForConfig(
+		dir,
+		projectConfig("./tsconfig.json"),
+		true,
+		fsys,
+		utils.NewParseCache(),
+	)
+	if err != nil || len(set.Programs) != 1 {
+		t.Fatalf("create Program: programs=%d err=%v", len(set.Programs), err)
+	}
+
+	counter.mu.Lock()
+	counter.calls = make(map[string]int)
+	counter.mu.Unlock()
+	targetPath := tspath.ResolvePath(dir, "outside.ts")
+	lookup := programTargetLookup{program: set.Programs[0], fsys: fsys}
+	if sourceFile := lookup.sourceFileForTarget(resolvedLintTarget{
+		Path:           targetPath,
+		CanonicalPath:  targetPath,
+		OwnerConfigDir: dir,
+	}); sourceFile != nil {
+		t.Fatalf("outside target unexpectedly resolved to %q", sourceFile.FileName())
+	}
+	counter.mu.Lock()
+	defer counter.mu.Unlock()
+	if len(counter.calls) != 0 {
+		t.Fatalf("ordinary Program miss performed realpath IO: %v", counter.calls)
+	}
+}
+
+func TestResolveLintTargetPlan_DirectoryWalkAvoidsPerTargetRealpath(t *testing.T) {
+	dir := t.TempDir()
+	writeProgramTestFiles(t, dir, map[string]string{
+		"src/a.ts": `export const a = 1;`,
+		"src/b.ts": `export const b = 2;`,
+	})
+	dir = tspath.NormalizePath(dir)
+	fileA := tspath.ResolvePath(dir, "src/a.ts")
+	fileB := tspath.ResolvePath(dir, "src/b.ts")
+	counter := &targetPlanRealpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
+	fsys := bundled.WrapFS(cachedvfs.From(counter))
+
+	plan, err := resolveLintTargetPlan(
+		nil,
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		dir,
+		nil,
+		fsys,
+		nil,
+		[]string{dir},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("resolveLintTargetPlan: %v", err)
+	}
+	if len(plan.Targets) != 2 {
+		t.Fatalf("targets = %v, want two files", plan.Targets)
+	}
+	if counter.callCount(fileA) != 0 || counter.callCount(fileB) != 0 {
+		t.Fatalf("regular targets performed realpath IO: a=%d b=%d", counter.callCount(fileA), counter.callCount(fileB))
+	}
+}
+
 func TestResolveLintTargetPlan_RejectsCanonicalTargetWithDifferentOwners(t *testing.T) {
 	sharedDir := t.TempDir()
 	writeProgramTestFiles(t, sharedDir, map[string]string{
@@ -817,5 +1026,209 @@ func TestResolveLintTargetPlan_RejectsCanonicalTargetWithDifferentOwners(t *test
 	}
 	if !strings.Contains(err.Error(), "resolve to the same file") || !strings.Contains(err.Error(), ownerA) || !strings.Contains(err.Error(), ownerB) {
 		t.Fatalf("unexpected ownership conflict error: %v", err)
+	}
+}
+
+func TestConfigsForLintTargetPlan_SelectsOnlyGoverningConfigs(t *testing.T) {
+	configMap := map[string]rslintconfig.RslintConfig{
+		"/repo/a": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		"/repo/b": {{LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{Project: []string{"./missing.json"}},
+		}}},
+	}
+	active := configsForLintTargetPlan(configMap, lintTargetPlan{Targets: []resolvedLintTarget{{
+		Path:           "/repo/a/index.ts",
+		CanonicalPath:  "/repo/a/index.ts",
+		OwnerConfigDir: "/repo/a",
+	}}})
+	if len(active) != 1 || active["/repo/a"] == nil {
+		t.Fatalf("expected only the governing config, got %v", active)
+	}
+	if _, present := active["/repo/b"]; present {
+		t.Fatalf("inactive config unexpectedly selected: %v", active)
+	}
+}
+
+func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active")
+	inactiveDir := filepath.Join(root, "inactive")
+	writeProgramTestFiles(t, root, map[string]string{
+		"active/index.ts":      "export const value = 1;\n",
+		"active/tsconfig.json": `{"files":["index.ts"]}`,
+	})
+	if err := os.MkdirAll(inactiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir inactive config: %v", err)
+	}
+	activeDir = tspath.NormalizePath(activeDir)
+	inactiveDir = tspath.NormalizePath(inactiveDir)
+	configMap := map[string]rslintconfig.RslintConfig{
+		activeDir:   projectConfig("./tsconfig.json"),
+		inactiveDir: projectConfig("./missing.json"),
+	}
+	plan := lintTargetPlan{Targets: []resolvedLintTarget{{
+		Path:           tspath.ResolvePath(activeDir, "index.ts"),
+		CanonicalPath:  tspath.ResolvePath(activeDir, "index.ts"),
+		OwnerConfigDir: activeDir,
+	}}}
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+	activeConfigMap := configsForLintTargetPlan(configMap, plan)
+	set, err := createProgramSetForConfigs(activeConfigMap, true, fsys, utils.NewParseCache())
+	if err != nil || len(set.Programs) != 1 {
+		t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.Programs), err)
+	}
+	if _, err := createProgramSetForConfigs(configMap, true, fsys, utils.NewParseCache()); err == nil || !strings.Contains(err.Error(), "missing.json") {
+		t.Fatalf("the all-project type-check scope must still reject the inactive missing project, got %v", err)
+	}
+}
+
+type canonicalIdentityTestFS struct {
+	vfs.FS
+	realPaths map[string]string
+}
+
+type exactCaseProgramFS struct {
+	vfs.FS
+	files map[string]string
+}
+
+func (fs *exactCaseProgramFS) UseCaseSensitiveFileNames() bool { return false }
+func (fs *exactCaseProgramFS) FileExists(filePath string) bool {
+	if _, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+		return true
+	}
+	return fs.FS.FileExists(filePath)
+}
+func (fs *exactCaseProgramFS) ReadFile(filePath string) (string, bool) {
+	if content, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+		return content, true
+	}
+	return fs.FS.ReadFile(filePath)
+}
+func (fs *exactCaseProgramFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if _, ok := fs.files[filePath]; ok {
+		return filePath
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func (fs *canonicalIdentityTestFS) UseCaseSensitiveFileNames() bool { return false }
+func (fs *canonicalIdentityTestFS) FileExists(string) bool          { return true }
+func (fs *canonicalIdentityTestFS) Realpath(filePath string) string {
+	if realPath := fs.realPaths[tspath.NormalizePath(filePath)]; realPath != "" {
+		return realPath
+	}
+	return tspath.NormalizePath(filePath)
+}
+
+func TestResolveLintTargetPlan_UsesCanonicalIdentityInsteadOfGlobalCaseFlag(t *testing.T) {
+	configDir := "C:/Repo"
+	upper := "C:/Repo/Src/A.ts"
+	lower := "c:/repo/src/a.ts"
+	config := rslintconfig.RslintConfig{{}}
+
+	t.Run("same canonical path is deduplicated", func(t *testing.T) {
+		fsys := &canonicalIdentityTestFS{
+			FS: osvfs.FS(),
+			realPaths: map[string]string{
+				upper: "C:/Repo/Src/A.ts",
+				lower: "C:/Repo/Src/A.ts",
+			},
+		}
+		plan, err := resolveLintTargetPlan(nil, config, configDir, nil, fsys, []string{upper, lower}, nil, true)
+		if err != nil || len(plan.Targets) != 1 {
+			t.Fatalf("same canonical target should be deduplicated: targets=%v err=%v", plan.Targets, err)
+		}
+	})
+
+	t.Run("distinct canonical paths remain distinct", func(t *testing.T) {
+		fsys := &canonicalIdentityTestFS{
+			FS: osvfs.FS(),
+			realPaths: map[string]string{
+				upper: upper,
+				lower: lower,
+			},
+		}
+		plan, err := resolveLintTargetPlan(nil, config, configDir, nil, fsys, []string{upper, lower}, nil, true)
+		if err != nil || len(plan.Targets) != 2 {
+			t.Fatalf("global case behavior must not merge distinct physical paths: targets=%v err=%v", plan.Targets, err)
+		}
+	})
+}
+
+func TestBindLintTargetPlan_RejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *testing.T) {
+	configDir := "/repo"
+	upper := "/repo/Source.ts"
+	lower := "/repo/source.ts"
+	fsys := &exactCaseProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			upper: "export const upper = 1;\n",
+			lower: "export const lower = 2;\n",
+		},
+	}
+	host := utils.CreateCompilerHost(configDir, fsys)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}, []string{upper}, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+	if source := program.GetSourceFile(lower); source == nil || source.FileName() != upper {
+		t.Fatalf("fixture must exercise case-folded Program lookup, got %v", source)
+	}
+
+	set := lintProgramSet{
+		Programs:     []*compiler.Program{program},
+		ConfigOrders: []programConfigOrders{{configDir: 0}},
+	}
+	plan := lintTargetPlan{Targets: []resolvedLintTarget{{
+		Path:           lower,
+		CanonicalPath:  lower,
+		OwnerConfigDir: configDir,
+	}}}
+	binding, err := bindLintTargetPlan(set, plan, configDir, fsys, utils.NewParseCache(), true)
+	if err != nil {
+		t.Fatalf("bindLintTargetPlan: %v", err)
+	}
+	if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0]) != 0 {
+		t.Fatalf("lower-case target must not bind to the distinct upper-case source: %+v", binding.TargetsByProgram)
+	}
+	if got := binding.TargetsByProgram[1]; len(got) != 1 || got[0] != lower {
+		t.Fatalf("lower-case target must bind to its exact fallback source, got %v", got)
+	}
+}
+
+func TestBindLintTargetPlan_SplitsFallbackProgramsForCaseFoldedPathCollisions(t *testing.T) {
+	configDir := "/repo"
+	upper := "/repo/Source.ts"
+	lower := "/repo/source.ts"
+	fsys := &exactCaseProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			upper: "export const upper = 1;\n",
+			lower: "export const lower = 2;\n",
+		},
+	}
+	plan := lintTargetPlan{Targets: []resolvedLintTarget{
+		{Path: upper, CanonicalPath: upper, OwnerConfigDir: configDir},
+		{Path: lower, CanonicalPath: lower, OwnerConfigDir: configDir},
+	}}
+	binding, err := bindLintTargetPlan(lintProgramSet{}, plan, configDir, fsys, utils.NewParseCache(), true)
+	if err != nil {
+		t.Fatalf("bindLintTargetPlan: %v", err)
+	}
+	if len(binding.Programs) != 2 || len(binding.TargetsByProgram) != 2 {
+		t.Fatalf("case-folded root names require separate fallback Programs, got %d", len(binding.Programs))
+	}
+	bound := []string{binding.TargetsByProgram[0][0], binding.TargetsByProgram[1][0]}
+	slices.Sort(bound)
+	want := []string{upper, lower}
+	slices.Sort(want)
+	if !slices.Equal(bound, want) {
+		t.Fatalf("fallback Programs must preserve both exact source identities: got %v want %v", bound, want)
 	}
 }

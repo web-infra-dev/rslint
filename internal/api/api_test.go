@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -135,7 +136,10 @@ func TestService_BidirectionalLintKeepsReadLoopRunning(t *testing.T) {
 	})
 
 	ctx := requestContext(t)
-	handshake, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{Version: Version})
+	handshake, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{
+		Version:      Version,
+		Capabilities: []string{CapabilityReversePluginLint},
+	})
 	if err != nil {
 		t.Fatalf("handshake: %v", err)
 	}
@@ -145,6 +149,9 @@ func TestService_BidirectionalLintKeepsReadLoopRunning(t *testing.T) {
 	}
 	if !handshakeResult.OK || handshakeResult.Version != Version {
 		t.Fatalf("unexpected handshake response: %+v", handshakeResult)
+	}
+	if len(handshakeResult.Capabilities) != 1 || handshakeResult.Capabilities[0] != CapabilityReversePluginLint {
+		t.Fatalf("bidirectional handler did not advertise reverse lint: %+v", handshakeResult.Capabilities)
 	}
 
 	msg, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{EslintPlugins: []EslintPluginEntry{{
@@ -190,6 +197,17 @@ func TestService_LegacyHandlerFallback(t *testing.T) {
 	handler := &serviceTestHandler{}
 	pair := newServiceChannelPair(t, handler, nil)
 	ctx := requestContext(t)
+	message, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{Version: Version})
+	if err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	var response HandshakeResponse
+	if err := message.Decode(&response); err != nil {
+		t.Fatalf("decode handshake: %v", err)
+	}
+	if len(response.Capabilities) != 0 {
+		t.Fatalf("legacy handler advertised unsupported capabilities: %+v", response.Capabilities)
+	}
 
 	if _, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{}); err != nil {
 		t.Fatalf("legacy lint handler: %v", err)
@@ -215,6 +233,12 @@ func TestService_TransportShutdownCancelsReverseRequest(t *testing.T) {
 	})
 
 	ctx := requestContext(t)
+	if _, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{
+		Version:      Version,
+		Capabilities: []string{CapabilityReversePluginLint},
+	}); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
 	go func() {
 		_, _ = pair.peer.SendRequest(ctx, KindLint, LintRequest{})
 	}()
@@ -245,6 +269,68 @@ func TestService_TransportShutdownCancelsReverseRequest(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("service did not stop after peer EOF")
 	}
+}
+
+func TestService_RejectsProtocolMismatch(t *testing.T) {
+	handler := &serviceTestHandler{}
+	pair := newServiceChannelPair(t, handler, nil)
+	ctx := requestContext(t)
+
+	message, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("handshake request: %v", err)
+	}
+	var response HandshakeResponse
+	if err := message.Decode(&response); err != nil {
+		t.Fatalf("decode handshake: %v", err)
+	}
+	if response.OK || response.Version != Version {
+		t.Fatalf("unexpected mismatch response: %+v", response)
+	}
+	if _, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{}); err == nil {
+		t.Fatal("lint should be rejected after a mismatched handshake")
+	}
+	_, _ = pair.peer.SendRequest(ctx, ipc.KindExit, struct{}{})
+}
+
+func TestService_RequiresPeerCapabilityForPluginLint(t *testing.T) {
+	handler := &reverseServiceTestHandler{}
+	pair := newServiceChannelPair(t, handler, nil)
+	ctx := requestContext(t)
+
+	if _, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{Version: Version}); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	_, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{
+		EslintPlugins: []EslintPluginEntry{{Prefix: "community", RuleNames: []string{"rule"}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), CapabilityReversePluginLint) {
+		t.Fatalf("expected missing-capability error, got %v", err)
+	}
+	_, _ = pair.peer.SendRequest(ctx, ipc.KindExit, struct{}{})
+}
+
+func TestService_RejectsPluginMetadataForLegacyHandler(t *testing.T) {
+	handler := &serviceTestHandler{}
+	pair := newServiceChannelPair(t, handler, nil)
+	ctx := requestContext(t)
+
+	if _, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{
+		Version:      Version,
+		Capabilities: []string{CapabilityReversePluginLint},
+	}); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	_, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{
+		EslintPlugins: []EslintPluginEntry{{Prefix: "community", RuleNames: []string{"rule"}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "handler does not support reversePluginLint") {
+		t.Fatalf("expected unsupported-handler error, got %v", err)
+	}
+	if handler.lintCalls.Load() != 0 {
+		t.Fatalf("legacy HandleLint must not receive plugin metadata, got %d calls", handler.lintCalls.Load())
+	}
+	_, _ = pair.peer.SendRequest(ctx, ipc.KindExit, struct{}{})
 }
 
 func TestService_TruncatedFrameIsNotCleanShutdown(t *testing.T) {

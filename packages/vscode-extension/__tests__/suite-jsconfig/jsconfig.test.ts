@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
+import { selectUnavailableConfigBoundaryDirectories } from '../../src/Rslint';
 
 suite('rslint JS config support', function () {
   this.timeout(120_000);
@@ -81,6 +82,33 @@ suite('rslint JS config support', function () {
     await editor.edit((edit) => edit.insert(new vscode.Position(0, 0), ' '));
     await editor.edit((edit) => edit.delete(new vscode.Range(0, 0, 0, 1)));
   }
+
+  test('unavailable config boundaries preserve JS ownership without hiding valid ancestors', () => {
+    const root = path.resolve('/workspace');
+    const app = path.join(root, 'packages', 'app');
+    const broken = path.join(root, 'packages', 'broken');
+
+    assert.deepStrictEqual(
+      selectUnavailableConfigBoundaryDirectories([app], [root]),
+      [root],
+      'a valid descendant must not expose JSON through an unavailable root',
+    );
+    assert.deepStrictEqual(
+      selectUnavailableConfigBoundaryDirectories([root], [broken]),
+      [],
+      'an unavailable child must fall back to its usable JS ancestor',
+    );
+    assert.deepStrictEqual(
+      selectUnavailableConfigBoundaryDirectories([], [broken]),
+      [broken],
+      'a lone unavailable nested config protects only its own subtree',
+    );
+    assert.deepStrictEqual(
+      selectUnavailableConfigBoundaryDirectories([], [root, broken]),
+      [root],
+      'an outer empty boundary makes a nested duplicate unnecessary',
+    );
+  });
 
   test('JS config should produce diagnostics', async () => {
     const doc = await openFixture('index.ts');
@@ -177,6 +205,58 @@ suite('rslint JS config support', function () {
       );
     } finally {
       fs.writeFileSync(configPath, originalConfig, 'utf8');
+    }
+  });
+
+  test('CJS and CTS configs support create and hot reload', async () => {
+    const root = getWorkspaceRoot();
+    const jsConfigPath = path.join(root, 'rslint.config.js');
+    const originalJSConfig = fs.readFileSync(jsConfigPath, 'utf8');
+    const probePath = path.join(root, 'src', 'config-extension-probe.ts');
+    const configSource = (ruleName: string): string => `module.exports = [{
+  files: ['**/*.ts'],
+  rules: { ${JSON.stringify(ruleName)}: 'error' },
+}];
+`;
+
+    fs.writeFileSync(probePath, 'debugger;\nconsole.log("probe");\n', 'utf8');
+    const doc = await vscode.workspace.openTextDocument(probePath);
+    await vscode.window.showTextDocument(doc);
+    fs.unlinkSync(jsConfigPath);
+
+    try {
+      for (const extension of ['cjs', 'cts']) {
+        const configPath = path.join(root, `rslint.config.${extension}`);
+        const debuggerDiagnostics = waitForDiagnostics(doc, (diagnostics) =>
+          diagnostics.some((diagnostic) =>
+            diagnostic.message.includes("Unexpected 'debugger' statement"),
+          ),
+        );
+        fs.writeFileSync(configPath, configSource('no-debugger'), 'utf8');
+        await debuggerDiagnostics;
+
+        const consoleDiagnostics = waitForDiagnostics(
+          doc,
+          (diagnostics) =>
+            diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('Unexpected console statement'),
+            ) &&
+            !diagnostics.some((diagnostic) =>
+              diagnostic.message.includes("Unexpected 'debugger' statement"),
+            ),
+        );
+        fs.writeFileSync(configPath, configSource('no-console'), 'utf8');
+        await consoleDiagnostics;
+        fs.unlinkSync(configPath);
+      }
+    } finally {
+      for (const extension of ['cjs', 'cts']) {
+        fs.rmSync(path.join(root, `rslint.config.${extension}`), {
+          force: true,
+        });
+      }
+      fs.writeFileSync(jsConfigPath, originalJSConfig, 'utf8');
+      fs.rmSync(probePath, { force: true });
     }
   });
 
@@ -335,12 +415,168 @@ suite('rslint JS config support', function () {
     }
   });
 
-  test('same-directory configs use .js > .mjs > .ts > .mts priority', async () => {
+  test('parent global ignores remove nested configs from the effective catalog', async () => {
+    const root = getWorkspaceRoot();
+    const rootConfigPath = path.join(root, 'rslint.config.js');
+    const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
+    const nestedDir = path.join(root, 'parent-ignore-catalog-probe');
+    const nestedConfigPath = path.join(nestedDir, 'rslint.config.mjs');
+    const nestedFilePath = path.join(nestedDir, 'index.ts');
+    const loadMarkerPath = path.join(nestedDir, 'config-loads.txt');
+    const rootDoc = await openFixture('index.ts');
+
+    const ignoredRootConfig = originalRootConfig
+      .replace(
+        'export default [',
+        "export default [{ ignores: ['parent-ignore-catalog-probe/**'] },",
+      )
+      .replace(
+        "'@typescript-eslint/no-explicit-any': 'off'",
+        "'@typescript-eslint/no-explicit-any': 'warn'",
+      );
+
+    try {
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(nestedFilePath, 'console.log("nested");\n', 'utf8');
+      fs.writeFileSync(
+        nestedConfigPath,
+        `import fs from 'node:fs';
+fs.appendFileSync(${JSON.stringify(loadMarkerPath)}, 'x');
+export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
+`,
+        'utf8',
+      );
+
+      const nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
+      await vscode.window.showTextDocument(nestedDoc);
+      await waitForDiagnostics(nestedDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('Unexpected console statement'),
+        ),
+      );
+
+      await vscode.window.showTextDocument(rootDoc);
+      const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-explicit-any'),
+        ),
+      );
+      const nestedCleared = waitForDiagnostics(
+        nestedDoc,
+        (diagnostics) =>
+          !diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('Unexpected console statement'),
+          ),
+      );
+
+      fs.writeFileSync(rootConfigPath, ignoredRootConfig, 'utf8');
+      await Promise.all([parentApplied, nestedCleared]);
+
+      assert.ok(
+        fs.readFileSync(loadMarkerPath, 'utf8').length >= 2,
+        'The ignored nested candidate should still be scanned and loaded',
+      );
+      assert.ok(
+        !vscode.languages
+          .getDiagnostics(nestedDoc.uri)
+          .some((diagnostic) =>
+            diagnostic.message.includes('Unexpected console statement'),
+          ),
+        'The ignored nested config must not be sent in the effective catalog',
+      );
+    } finally {
+      const restored = waitForDiagnostics(
+        rootDoc,
+        (diagnostics) =>
+          diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('no-unsafe-member-access'),
+          ) &&
+          !diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('no-explicit-any'),
+          ),
+      ).catch(() => undefined);
+      fs.rmSync(nestedDir, { recursive: true, force: true });
+      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+      await restored;
+    }
+  });
+
+  test('config search excludes node_modules and .git', async () => {
+    const root = getWorkspaceRoot();
+    const rootConfigPath = path.join(root, 'rslint.config.js');
+    const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
+    const rootDoc = await openFixture('index.ts');
+    const gitDirectory = path.join(root, '.git');
+    const gitDirectoryExisted = fs.existsSync(gitDirectory);
+    const probes = [
+      path.join(root, 'node_modules', 'rslint-config-search-probe'),
+      path.join(gitDirectory, 'rslint-config-search-probe'),
+    ];
+    const markerPaths = probes.map((probe) => path.join(probe, 'loaded.txt'));
+    const changedRootConfig = originalRootConfig.replace(
+      "'@typescript-eslint/no-explicit-any': 'off'",
+      "'@typescript-eslint/no-explicit-any': 'warn'",
+    );
+
+    try {
+      for (let index = 0; index < probes.length; index++) {
+        fs.mkdirSync(probes[index], { recursive: true });
+        fs.writeFileSync(
+          path.join(probes[index], 'rslint.config.mjs'),
+          `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(markerPaths[index])}, 'loaded'); export default [];`,
+          'utf8',
+        );
+      }
+
+      await vscode.window.showTextDocument(rootDoc);
+      const reloaded = waitForDiagnostics(rootDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-explicit-any'),
+        ),
+      );
+      fs.writeFileSync(rootConfigPath, changedRootConfig, 'utf8');
+      await reloaded;
+
+      for (const markerPath of markerPaths) {
+        assert.ok(
+          !fs.existsSync(markerPath),
+          `Excluded config was unexpectedly loaded: ${markerPath}`,
+        );
+      }
+    } finally {
+      const restored = waitForDiagnostics(
+        rootDoc,
+        (diagnostics) =>
+          diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('no-unsafe-member-access'),
+          ) &&
+          !diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('no-explicit-any'),
+          ),
+      ).catch(() => undefined);
+      for (const probe of probes) {
+        fs.rmSync(probe, { recursive: true, force: true });
+      }
+      if (!gitDirectoryExisted) {
+        try {
+          fs.rmdirSync(gitDirectory);
+        } catch {
+          // Leave a concurrently populated directory intact.
+        }
+      }
+      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+      await restored;
+    }
+  });
+
+  test('same-directory configs use .js > .mjs > .cjs > .ts > .mts > .cts priority', async () => {
     const root = getWorkspaceRoot();
     const jsPath = path.join(root, 'rslint.config.js');
     const mjsPath = path.join(root, 'rslint.config.mjs');
+    const cjsPath = path.join(root, 'rslint.config.cjs');
     const tsPath = path.join(root, 'rslint.config.ts');
     const mtsPath = path.join(root, 'rslint.config.mts');
+    const ctsPath = path.join(root, 'rslint.config.cts');
     const originalJS = fs.readFileSync(jsPath, 'utf8');
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -349,7 +585,8 @@ suite('rslint JS config support', function () {
       enabledRule:
         | '@typescript-eslint/no-explicit-any'
         | '@typescript-eslint/no-unsafe-member-access',
-    ): string => `export default [
+      commonJS = false,
+    ): string => `${commonJS ? 'module.exports =' : 'export default'} [
   {
     files: ['**/*.ts'],
     languageOptions: {
@@ -391,12 +628,22 @@ suite('rslint JS config support', function () {
       );
       fs.writeFileSync(
         tsPath,
-        configFor('@typescript-eslint/no-unsafe-member-access'),
+        configFor('@typescript-eslint/no-explicit-any'),
         'utf8',
       );
       fs.writeFileSync(
         mtsPath,
-        configFor('@typescript-eslint/no-explicit-any'),
+        configFor('@typescript-eslint/no-unsafe-member-access'),
+        'utf8',
+      );
+      fs.writeFileSync(
+        cjsPath,
+        configFor('@typescript-eslint/no-unsafe-member-access', true),
+        'utf8',
+      );
+      fs.writeFileSync(
+        ctsPath,
+        configFor('@typescript-eslint/no-explicit-any', true),
         'utf8',
       );
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -417,13 +664,19 @@ suite('rslint JS config support', function () {
       fs.unlinkSync(mjsPath);
       await expectWarning('no-unsafe-member-access');
 
+      fs.unlinkSync(cjsPath);
+      await expectWarning('no-explicit-any');
+
       fs.unlinkSync(tsPath);
+      await expectWarning('no-unsafe-member-access');
+
+      fs.unlinkSync(mtsPath);
       await expectWarning('no-explicit-any');
 
       diagnostics = vscode.languages.getDiagnostics(doc.uri);
       assert.ok(
         !diagnostics.some((d) => d.message.includes('no-unsafe-member-access')),
-        '.mts should govern after all higher-priority variants are removed',
+        '.cts should govern after all higher-priority variants are removed',
       );
     } finally {
       const restored = waitForDiagnostics(doc, (diags) =>
@@ -435,8 +688,10 @@ suite('rslint JS config support', function () {
       ).catch(() => undefined);
       fs.writeFileSync(jsPath, originalJS, 'utf8');
       fs.rmSync(mjsPath, { force: true });
+      fs.rmSync(cjsPath, { force: true });
       fs.rmSync(tsPath, { force: true });
       fs.rmSync(mtsPath, { force: true });
+      fs.rmSync(ctsPath, { force: true });
       await restored;
     }
   });

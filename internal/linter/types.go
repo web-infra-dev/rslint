@@ -25,7 +25,7 @@ type ConfiguredRule struct {
 	// Options is the raw user-configured rule options (ESLint's
 	// post-severity args). Consumed when dispatching plugin rules to the
 	// Node worker; native rules read options through Run's closure instead.
-	Options any
+	Options []any
 	Run     func(ctx rule.RuleContext) rule.RuleListeners
 }
 
@@ -86,14 +86,14 @@ type LintResult struct {
 //   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
 //     for syntax errors before resolving or running rules. A non-nil set means
 //     the caller already performed that check and names the invalid files.
-//   - TypeInfoFiles=nil                   → no gap-file distinction in the
-//     lint-rule phase (all lint targets may receive a TypeChecker). This field
-//     never restricts the program-wide type-check phase.
+//   - TypeInfoFiles=nil                   → no gap-file distinction. A non-nil
+//     set filters RequiresTypeInfo rules and withholds the TypeChecker for files
+//     outside it. This field never restricts program-wide type-check.
 //   - TypeCheck=false                     → skip the type-check phase
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
-//     AST-only fallback Program with synthesized CompilerOptions).
+//     non-project fallback Program with synthesized CompilerOptions).
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
@@ -125,13 +125,13 @@ type RunLinterOptions struct {
 	OnDiagnostic DiagnosticHandler
 }
 
-// LintSingleFileOptions configures a single-file, single-program lint pass.
-// Designed for IDE/LSP per-keystroke usage. Does not run type-check.
+// LintSingleFileOptions configures a single-file, single-program rule pass.
+// The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
 	Program *compiler.Program
 	File    string
-	// HasTypeInfo controls whether rule execution may acquire and expose a
-	// TypeChecker. False keeps plain-LSP linting AST-only.
+	// HasTypeInfo controls whether rules marked RequiresTypeInfo are eligible.
+	// Non-type-aware rules may still use the Program's checker for local analysis.
 	HasTypeInfo     bool
 	GetRulesForFile RuleHandler
 	ExcludePaths    []string

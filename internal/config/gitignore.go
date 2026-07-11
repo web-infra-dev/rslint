@@ -415,22 +415,22 @@ func filesystemPathDepth(path string) int {
 // unnecessary.
 func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern) {
 	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, configIgnores, nil, &gitignoreWalkState{
-		realpaths: make(map[string]string),
-		visited:   make(map[string]struct{}),
+		resolvedPaths: make(map[string]string),
+		visited:       make(map[string]struct{}),
 	})
 }
 
 type gitignoreWalkState struct {
-	realpaths map[string]string
-	visited   map[string]struct{}
+	resolvedPaths map[string]string
+	visited       map[string]struct{}
 }
 
 func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
-	if realpath, ok := s.realpaths[path]; ok {
+	if realpath, ok := s.resolvedPaths[path]; ok {
 		return realpath
 	}
 	realpath := fsys.Realpath(path)
-	s.realpaths[path] = realpath
+	s.resolvedPaths[path] = realpath
 	return realpath
 }
 

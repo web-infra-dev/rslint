@@ -146,13 +146,14 @@ func typeCheckFilesystemPathID(prog *compiler.Program, filePath string) string {
 	if prog == nil {
 		return filePath
 	}
+	filePath = tspath.GetNormalizedAbsolutePath(filePath, prog.GetCurrentDirectory())
 	fsys := prog.Host().FS()
 	if fsys != nil {
 		if realPath := fsys.Realpath(filePath); realPath != "" {
 			filePath = tspath.NormalizePath(realPath)
 		}
 	}
-	return string(tspath.ToPath(filePath, prog.GetCurrentDirectory(), prog.UseCaseSensitiveFileNames()))
+	return string(tspath.ToPath(filePath, "", true))
 }
 
 // flattenDiagnosticMessage builds a human-readable message from a

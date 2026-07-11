@@ -200,10 +200,8 @@ func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
 		}},
 	}
 	sourcePath := "/repo/packages/app/a.ts"
-	targetPath := "/repo/link/a.ts"
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap:                  configMap,
-		TargetPathBySourcePath:     map[string]string{sourcePath: targetPath},
 		OwnerConfigDirBySourcePath: map[string]string{sourcePath: "/repo"},
 	})
 
@@ -250,10 +248,10 @@ type caseInsensitiveResolverFS struct {
 
 func (f *caseInsensitiveResolverFS) UseCaseSensitiveFileNames() bool { return false }
 func (f *caseInsensitiveResolverFS) Realpath(filePath string) string {
-	return tspath.NormalizePath(filePath)
+	return strings.ToLower(tspath.NormalizePath(filePath))
 }
 
-func TestLintConfigResolver_SourceMappingsUseFilesystemCaseSemantics(t *testing.T) {
+func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *testing.T) {
 	rslintconfig.RegisterAllRules()
 	fsys := &caseInsensitiveResolverFS{FS: osvfs.FS()}
 	sourcePath := "c:/repo/src/a.ts"
@@ -264,8 +262,7 @@ func TestLintConfigResolver_SourceMappingsUseFilesystemCaseSemantics(t *testing.
 				Rules: rslintconfig.Rules{"no-console": "error"},
 			}},
 		},
-		TargetPathBySourcePath: map[string]string{"C:/REPO/SRC/A.ts": "D:/caller/a.ts"},
-		ConfigPathBySourcePath: map[string]string{"C:/REPO/SRC/A.ts": "C:/Repo/src/a.ts"},
+		ConfigPathBySourcePath: map[string]string{"C:/REPO/SRC/A.ts": "c:/repo/src/a.ts"},
 		OwnerConfigDirBySourcePath: map[string]string{
 			"C:/REPO/SRC/A.ts": "c:/repo",
 		},

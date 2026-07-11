@@ -328,6 +328,7 @@ nilerr
 nilnesserr
 nilnil
 Nkoo
+nocase
 noconfig
 nodesep
 noembed

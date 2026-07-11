@@ -44,7 +44,7 @@ parserOptions: {
 }
 ```
 
-Each canonical tsconfig produces one TypeScript Program, even when multiple rslint configs reference it. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
+Each normalized declared tsconfig path produces one TypeScript Program, even when multiple rslint configs reference that path. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
 
 **The type-check scope is each tsconfig's `include` / `files` minus `exclude` — nothing in your rslint config or on the CLI changes it.** Specifically, the following are **lint-phase concepts** that do **not** affect type-check scope:
 
@@ -57,7 +57,7 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive an AST-only fallback Program, so syntax-only rules still run but type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
+Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive a non-project-backed fallback Program, so syntax-only rules still run but type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
 
 ## Output
 

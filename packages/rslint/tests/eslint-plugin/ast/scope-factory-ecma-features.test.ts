@@ -20,6 +20,10 @@ import { describe, test, expect } from '@rstest/core';
 import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
+import {
+  seedEcmaGlobals,
+  seedGlobals,
+} from '../../../src/eslint-plugin/ast/scope-factory.js';
 
 interface Probe {
   globalScopeType?: string;
@@ -254,5 +258,101 @@ describe("scope-factory: globals: { name: 'off' } restores refs to gs.through", 
     expect(observed.throughNames).toEqual(
       expect.arrayContaining(['Array']) as never,
     );
+  });
+});
+
+describe('scope-factory: global access aliases', () => {
+  interface GlobalProbeVariable {
+    name: string;
+    defs?: unknown[];
+    writeable: boolean;
+    eslintImplicitGlobalSetting?: 'readonly' | 'writable';
+    references: Array<{ resolved?: unknown }>;
+  }
+
+  function makeScopeManager() {
+    const variables: GlobalProbeVariable[] = [];
+    const set = new Map<string, GlobalProbeVariable>();
+    return {
+      variables,
+      set,
+      scopeManager: { globalScope: { variables, set, through: [] } },
+    };
+  }
+
+  test('normalizes every legal writable and readonly alias', () => {
+    const { variables, set, scopeManager } = makeScopeManager();
+
+    seedGlobals(scopeManager, {
+      writableBoolean: true,
+      writableString: 'true',
+      writable: 'writable',
+      writeable: 'writeable',
+      readonlyBoolean: false,
+      readonlyString: 'false',
+      readonly: 'readonly',
+      readable: 'readable',
+      nullReadonly: null,
+      offDisabled: 'off',
+    });
+
+    const expectedModes = {
+      writableBoolean: 'writable',
+      writableString: 'writable',
+      writable: 'writable',
+      writeable: 'writable',
+      readonlyBoolean: 'readonly',
+      readonlyString: 'readonly',
+      readonly: 'readonly',
+      readable: 'readonly',
+      nullReadonly: 'readonly',
+    } as const;
+    for (const [name, mode] of Object.entries(expectedModes)) {
+      const variable = set.get(name);
+      expect(variable?.writeable).toBe(mode === 'writable');
+      expect(variable?.eslintImplicitGlobalSetting).toBe(mode);
+    }
+
+    expect(set.has('offDisabled')).toBe(false);
+    expect(variables).toHaveLength(Object.keys(expectedModes).length);
+    for (const variable of variables) {
+      expect(['readonly', 'writable']).toContain(
+        variable.eslintImplicitGlobalSetting,
+      );
+    }
+  });
+
+  test('null keeps an existing global readonly while off removes it', () => {
+    const { set, scopeManager } = makeScopeManager();
+    seedEcmaGlobals(scopeManager);
+    expect(set.has('Array')).toBe(true);
+    expect(set.has('Object')).toBe(true);
+
+    seedGlobals(scopeManager, { Array: null, Object: 'off' });
+
+    expect(set.get('Array')?.writeable).toBe(false);
+    expect(set.get('Array')?.eslintImplicitGlobalSetting).toBe('readonly');
+    expect(set.has('Object')).toBe(false);
+  });
+
+  test('configured globals never remove or rewrite source declarations', () => {
+    const { variables, set, scopeManager } = makeScopeManager();
+    const lexical = {
+      name: 'Array',
+      defs: [{}],
+      writeable: false,
+      references: [],
+    } satisfies GlobalProbeVariable;
+    variables.push(lexical);
+    set.set('Array', lexical);
+
+    seedGlobals(scopeManager, { Array: 'writable' });
+    expect(set.get('Array')).toBe(lexical);
+    expect(lexical.writeable).toBe(false);
+    expect(lexical).not.toHaveProperty('eslintImplicitGlobalSetting');
+
+    seedGlobals(scopeManager, { Array: 'off' });
+    expect(set.get('Array')).toBe(lexical);
+    expect(variables).toContain(lexical);
   });
 });

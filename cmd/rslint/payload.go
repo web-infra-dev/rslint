@@ -14,6 +14,7 @@ type configPayloadEntry struct {
 	ConfigDirectory string                    `json:"configDirectory"`
 	Entries         rslintconfig.RslintConfig `json:"entries"`
 	TargetFiles     []string                  `json:"targetFiles,omitempty"`
+	ExplicitOnly    bool                      `json:"explicitOnly,omitempty"`
 }
 
 // parsedPayload is the result of parsing the serialized JS-config payload.
@@ -32,10 +33,10 @@ type parsedPayload struct {
 	// legacy single-config mode.
 	OriginalConfigDir map[string]string
 
-	// ConfigTargetFiles restricts a config to explicit target files when the JS
-	// host had to keep a nearest config that directory discovery would have
-	// skipped because of a parent global ignore.
-	ConfigTargetFiles map[string][]string
+	// ConfigTargetScopes carries explicit-file provenance established by the JS
+	// host. Go uses it to preserve lexical ownership and to keep configs that
+	// survived only for an explicit file out of directory discovery.
+	ConfigTargetScopes map[string]rslintconfig.LintDiscoveryScope
 
 	// singleConfig and singleConfigDir are set in legacy single-config mode.
 	SingleConfig    rslintconfig.RslintConfig
@@ -65,7 +66,7 @@ func parseConfigPayload(data []byte, filesystems ...vfs.FS) (*parsedPayload, err
 	if len(multiPayload.Configs) > 0 {
 		configMap := make(map[string]rslintconfig.RslintConfig, len(multiPayload.Configs))
 		originalConfigDir := make(map[string]string, len(multiPayload.Configs))
-		configTargetFiles := make(map[string][]string)
+		configTargetScopes := make(map[string]rslintconfig.LintDiscoveryScope)
 		configDirByPathID := make(map[string]string, len(multiPayload.Configs))
 		configDirByCanonicalID := make(map[string]string, len(multiPayload.Configs))
 		for _, cfg := range multiPayload.Configs {
@@ -77,10 +78,10 @@ func parseConfigPayload(data []byte, filesystems ...vfs.FS) (*parsedPayload, err
 			if len(configDir) > tspath.GetRootLength(configDir) {
 				configDir = tspath.RemoveTrailingDirectorySeparators(configDir)
 			}
-			pathID := filesystemPathID(configDir, fsys)
+			pathID := exactFilesystemPathID(configDir)
 			if previous, exists := configDirByPathID[pathID]; exists {
 				return nil, fmt.Errorf(
-					"duplicate config directories %q and %q are equivalent on this filesystem (normalized as %q)",
+					"duplicate config directories %q and %q normalize to the same path %q",
 					previous,
 					cfg.ConfigDirectory,
 					configDir,
@@ -105,7 +106,7 @@ func parseConfigPayload(data []byte, filesystems ...vfs.FS) (*parsedPayload, err
 			originalConfigDir[configDir] = cfg.ConfigDirectory
 			configDirByPathID[pathID] = cfg.ConfigDirectory
 			configDirByCanonicalID[canonicalID] = cfg.ConfigDirectory
-			if len(cfg.TargetFiles) > 0 {
+			if cfg.TargetFiles != nil || cfg.ExplicitOnly {
 				files := make([]string, 0, len(cfg.TargetFiles))
 				for _, file := range cfg.TargetFiles {
 					if tspath.PathIsAbsolute(file) {
@@ -114,14 +115,18 @@ func parseConfigPayload(data []byte, filesystems ...vfs.FS) (*parsedPayload, err
 						files = append(files, tspath.ResolvePath(configDir, file))
 					}
 				}
-				configTargetFiles[configDir] = files
+				scope := rslintconfig.LintDiscoveryScope{
+					Files:        files,
+					ExplicitOnly: cfg.ExplicitOnly,
+				}
+				configTargetScopes[configDir] = scope
 			}
 		}
 		return &parsedPayload{
-			ConfigMap:         configMap,
-			OriginalConfigDir: originalConfigDir,
-			ConfigTargetFiles: configTargetFiles,
-			IsMultiConfig:     true,
+			ConfigMap:          configMap,
+			OriginalConfigDir:  originalConfigDir,
+			ConfigTargetScopes: configTargetScopes,
+			IsMultiConfig:      true,
 		}, nil
 	}
 

@@ -343,9 +343,11 @@ export async function lint(options: LintOptions): Promise<LintResponse> {
       workingDirectory: options.workingDirectory,
     }),
   );
-  const result = await service.lint(options);
-  await service.close();
-  return result;
+  try {
+    return await service.lint(options);
+  } finally {
+    await service.close();
+  }
 }
 
 export type { LintOptions, LintResponse, Diagnostic } from '../types.js';

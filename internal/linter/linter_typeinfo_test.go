@@ -73,8 +73,38 @@ func TestTypeInfoFiles_FileNotInSet_NilTypeChecker(t *testing.T) {
 		t.Error("TypeChecker should be nil for gap files (not in typeInfoFiles)")
 	}
 
-	// Verify the file was still linted (rule ran, just with nil checker)
+	// Verify the file was still linted (rule ran, just with nil checker).
 	_ = paths
+}
+
+func TestTypeInfoFiles_FileNotInSet_FiltersTypeAwareRule(t *testing.T) {
+	program, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const x = 1;",
+	})
+	typeInfoFiles := map[string]struct{}{"/some/other/file.ts": {}}
+
+	ruleRan := false
+	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+		func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{{
+				Name:             "type-aware-probe",
+				Severity:         rule.SeverityWarning,
+				RequiresTypeInfo: true,
+				Run: func(rule.RuleContext) rule.RuleListeners {
+					ruleRan = true
+					return rule.RuleListeners{}
+				},
+			}}
+		},
+		false,
+		func(rule.RuleDiagnostic) {},
+		typeInfoFiles,
+		nil,
+	)
+
+	if ruleRan {
+		t.Fatal("type-aware rule ran for a file outside typeInfoFiles")
+	}
 }
 
 func TestTypeInfoFiles_Nil_AllGetTypeChecker(t *testing.T) {
@@ -103,7 +133,7 @@ func TestTypeCheck_TypeInfoFilesDoesNotRestrictProgramWideDiagnostics(t *testing
 		"a.ts": "const x: number = 'hello';", // type error
 	})
 
-	// TypeInfoFiles gates lint-rule TypeChecker access only. Program-wide
+	// TypeInfoFiles gates type-aware rule eligibility only. Program-wide
 	// type-check diagnostics are controlled by the Program skip mask.
 	typeInfoFiles := map[string]struct{}{
 		"/some/other/file.ts": {},

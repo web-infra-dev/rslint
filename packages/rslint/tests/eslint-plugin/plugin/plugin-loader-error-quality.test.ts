@@ -148,49 +148,108 @@ export default [
     );
   });
 
-  // G1: worker MUST be able to load `.ts/.mts` config files via the
-  // same fallback strategy the main thread uses. The previous
-  // implementation called `await import(url)` directly — which works
-  // for `.js/.mjs/.cjs` and for `.ts` only on Node ≥ 22.6 (with
-  // native TypeScript support); on Node 20 (the declared support
-  // floor in `engines.node`) any user with a `rslint.config.ts` +
-  // object-form plugins would hit worker init failure even though the host
-  // had successfully loaded the same file via jiti.
-  test('G1: loadPluginsFromConfigFile handles .ts config via the same extension-aware path the host uses', async () => {
+  test('different config files cannot redefine a prefix under one routing key even with disjoint rules', async () => {
     await withTempConfig(
       {
-        'plugin.mjs': `export default {
-  meta: { name: 'ts-cfg-plug' },
-  rules: { 'fires': { meta: { messages: { x: 'ok' } }, create() { return {}; } } },
-};`,
-        'rslint.config.ts': `import plugin from './plugin.mjs';
-export default [
-  {
-    files: ['src/**/*.ts'],
-    // @ts-ignore — type comes from @rslint/core but we don't depend
-    // on it in this fixture; the runner only needs the runtime shape.
-    plugins: { ts: plugin as unknown as Record<string, unknown> },
-  },
-];`,
+        'plugin-a.mjs': `export default { rules: { alpha: { meta: {}, create() { return {}; } } } };`,
+        'plugin-b.mjs': `export default { rules: { beta: { meta: {}, create() { return {}; } } } };`,
+        'rslint.config.mjs': `import plugin from './plugin-a.mjs'; export default [{ plugins: { p: plugin } }];`,
+        'second.config.mjs': `import plugin from './plugin-b.mjs'; export default [{ plugins: { p: plugin } }];`,
       },
-      async (configMjsPath) => {
-        // The fixture writer wrote `rslint.config.ts`; the helper
-        // returns the `.mjs` path. Swap the extension.
-        const tsConfigPath = configMjsPath.replace(/\.mjs$/, '.ts');
-        const loaded = await loadPluginsFromConfigs([
-          {
-            configPath: tsConfigPath,
-            configDirectory: path.dirname(tsConfigPath),
-          },
-        ]);
-        const ld = loaded.get(path.dirname(tsConfigPath));
-        expect(ld).toBeDefined();
-        expect(ld!.plugins).toHaveLength(1);
-        expect(ld!.plugins[0].prefix).toBe('ts');
-        // Sanity: rules were registered. The exact rule object is the
-        // plugin's `fires` definition.
-        expect(ld!.rules.has('ts/fires')).toBe(true);
+      async (configPath) => {
+        const secondConfigPath = path.join(
+          path.dirname(configPath),
+          'second.config.mjs',
+        );
+        let caught: unknown;
+        try {
+          await loadPluginsFromConfigs([
+            { configPath, configDirectory: '/shared-routing-key' },
+            {
+              configPath: secondConfigPath,
+              configDirectory: '/shared-routing-key',
+            },
+          ]);
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught).toBeInstanceOf(PluginLoaderError);
+        expect((caught as PluginLoaderError).configPath).toBe(secondConfigPath);
+        expect((caught as Error).message).toMatch(
+          /Cannot redefine plugin "p".*shared-routing-key/,
+        );
       },
     );
   });
+
+  test('different config files dedupe the same plugin instance under one routing key', async () => {
+    await withTempConfig(
+      {
+        'plugin.mjs': `export default { rules: { check: { meta: {}, create() { return {}; } } } };`,
+        'rslint.config.mjs': `import plugin from './plugin.mjs'; export default [{ plugins: { p: plugin } }];`,
+        'second.config.mjs': `import plugin from './plugin.mjs'; export default [{ plugins: { p: plugin } }];`,
+      },
+      async (configPath) => {
+        const secondConfigPath = path.join(
+          path.dirname(configPath),
+          'second.config.mjs',
+        );
+        const map = await loadPluginsFromConfigs([
+          { configPath, configDirectory: '/shared-routing-key' },
+          {
+            configPath: secondConfigPath,
+            configDirectory: '/shared-routing-key',
+          },
+        ]);
+
+        const loaded = map.get('/shared-routing-key');
+        expect(loaded).toBeDefined();
+        expect(loaded!.plugins).toHaveLength(1);
+        expect([...loaded!.rules.keys()]).toEqual(['p/check']);
+      },
+    );
+  });
+
+  test.each(['ts', 'mts', 'cts'])(
+    'loads object-form plugins from a .%s config through the worker loader',
+    async (extension) => {
+      const configSource =
+        extension === 'cts'
+          ? `const plugin = require('./plugin.cjs');
+const config: Array<Record<string, unknown>> = [{
+  files: ['src/**/*.ts'],
+  plugins: { probe: plugin },
+}];
+module.exports = config;`
+          : `import plugin from './plugin.cjs';
+export default [{
+  files: ['src/**/*.ts'],
+  plugins: { probe: plugin as unknown as Record<string, unknown> },
+}];`;
+
+      await withTempConfig(
+        {
+          'plugin.cjs': `module.exports = {
+  meta: { name: 'ts-config-plugin' },
+  rules: { fires: { meta: { messages: { x: 'ok' } }, create() { return {}; } } },
+};`,
+          [`rslint.config.${extension}`]: configSource,
+        },
+        async (configMjsPath) => {
+          const configPath = configMjsPath.replace(/\.mjs$/, `.${extension}`);
+          const loaded = await loadPluginsFromConfigs([
+            {
+              configPath,
+              configDirectory: path.dirname(configPath),
+            },
+          ]);
+          const pluginSet = loaded.get(path.dirname(configPath));
+          expect(pluginSet).toBeDefined();
+          expect(pluginSet!.plugins).toHaveLength(1);
+          expect(pluginSet!.plugins[0].prefix).toBe('probe');
+          expect(pluginSet!.rules.has('probe/fires')).toBe(true);
+        },
+      );
+    },
+  );
 });

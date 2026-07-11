@@ -415,8 +415,9 @@ func TestIntegration_CLIArrayOverridesConfigString(t *testing.T) {
 	assert.Equal(t, allow[0], "warn")
 }
 
-func TestIntegration_CLIStringOverridesConfigArray(t *testing.T) {
-	// Config has array with options, CLI overrides with plain "off"
+func TestIntegration_CLISeverityOverrideRetainsConfigOptions(t *testing.T) {
+	// A severity-only override retains the earlier options, matching flat config
+	// cascading in ESLint.
 	config := RslintConfig{
 		{
 			Rules: Rules{"no-console": []interface{}{"error", map[string]interface{}{"allow": []interface{}{"warn"}}}},
@@ -430,7 +431,7 @@ func TestIntegration_CLIStringOverridesConfigArray(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
 	assert.Equal(t, merged.Rules["no-console"].Level, "off")
-	assert.Assert(t, merged.Rules["no-console"].Options == nil)
+	assert.Equal(t, len(merged.Rules["no-console"].Options), 1)
 }
 
 func TestIntegration_CLIDoesNotAffectGloballyIgnoredFiles(t *testing.T) {

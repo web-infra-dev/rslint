@@ -330,12 +330,12 @@ describe('Files-driven lint: gap file auto-degrade', () => {
               project: ['./tsconfig.json'],
             },
           },
-          rules: {},
+          rules: { 'no-debugger': 'error' },
           plugins: ['@typescript-eslint'],
         },
       ];`,
-      // Gap file with type error
-      'scripts/build.ts': `const x: number = 'hello';\n`,
+      // Gap file with a syntax-only rule violation and a semantic type error.
+      'scripts/build.ts': `debugger;\nconst x: number = 'hello';\n`,
     });
     try {
       const result = await runRslint(
@@ -348,13 +348,15 @@ describe('Files-driven lint: gap file auto-degrade', () => {
         .split('\n')
         .filter((l) => l.trim());
 
-      // Gap files should NOT get TypeScript semantic diagnostics
+      const gapRuleNames: string[] = [];
       for (const line of lines) {
         const d = JSON.parse(line);
         if (d.filePath.includes('scripts/build.ts')) {
+          gapRuleNames.push(d.ruleName);
           expect(d.ruleName).not.toMatch(/^TypeScript\(/);
         }
       }
+      expect(gapRuleNames).toContain('no-debugger');
     } finally {
       await cleanupTempDir(tempDir);
     }

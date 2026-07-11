@@ -5,41 +5,115 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// FindNearestConfig finds the config whose configDirectory is the nearest
-// ancestor of (or exact match for) filePath. It picks the deepest (longest)
-// matching configDirectory, mirroring ESLint v10's per-file config lookup.
-// Returns the configDirectory and the config, or ("", nil) if no config matches.
-func FindNearestConfig(filePath string, configMap map[string]RslintConfig) (string, RslintConfig) {
-	return FindNearestConfigWithCaseSensitivity(filePath, configMap, true)
+// ConfigOwnerResolver snapshots an already-loaded config catalog and resolves
+// which config object governs a runtime file path. It never discovers, reads,
+// or parses config files. Construction is linear in config count. Each lookup
+// tries lexical ancestors, including verified native case aliases, and consults
+// realpath ancestry only when no lexical owner exists.
+type ConfigOwnerResolver struct {
+	configMap map[string]RslintConfig
+	index     *configDirectoryIndex
 }
 
-// FindNearestConfigWithCaseSensitivity applies the same nearest-ancestor
-// lookup using the filesystem's path comparison semantics.
-func FindNearestConfigWithCaseSensitivity(filePath string, configMap map[string]RslintConfig, useCaseSensitive bool) (string, RslintConfig) {
-	bestDir := ""
-	var bestConfig RslintConfig
-
-	for configDir, cfg := range configMap {
-		if tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
-			if len(configDir) > len(bestDir) {
-				bestDir = configDir
-				bestConfig = cfg
-			}
-		}
+func NewConfigOwnerResolver(configMap map[string]RslintConfig, fsys vfs.FS) *ConfigOwnerResolver {
+	configSnapshot := make(map[string]RslintConfig, len(configMap))
+	for configDir, entries := range configMap {
+		configSnapshot[configDir] = entries
 	}
-
-	return bestDir, bestConfig
+	return &ConfigOwnerResolver{
+		configMap: configSnapshot,
+		index:     newConfigDirectoryIndex(configSnapshot, fsys),
+	}
 }
 
-// FindNearestConfigWithFS applies filesystem case and realpath semantics. It
-// first preserves a caller's lexical config-root alias when one matches, then
-// falls back to physical config roots for targets expressed through another
-// alias of the same directory.
-func FindNearestConfigWithFS(filePath string, configMap map[string]RslintConfig, fsys vfs.FS) (string, RslintConfig) {
-	index := newConfigDirectoryIndex(configMap, fsys)
-	configDir, ok := index.nearestConfig(filePath)
+func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintConfig) {
+	if resolver == nil || resolver.index == nil {
+		return "", nil
+	}
+	configDir, ok := resolver.index.nearestConfig(filePath)
 	if !ok {
 		return "", nil
 	}
-	return configDir, configMap[configDir]
+	return configDir, resolver.configMap[configDir]
+}
+
+// ResolveConfigPathSpace returns the physical path pair used for files and
+// ignores matching. It preserves the file's path relative to the authored
+// config directory, then anchors both paths on the config directory's realpath.
+// Lexical and symlink aliases therefore share one matching space without
+// case-folding distinct path identities.
+func ResolveConfigPathSpace(filePath string, configDir string, fsys vfs.FS) (string, string) {
+	return ResolveConfigPathSpaceWithCanonical(filePath, "", configDir, fsys)
+}
+
+// ResolveConfigPathSpaceWithCanonical is ResolveConfigPathSpace with an
+// optional physical file identity already established by target discovery.
+func ResolveConfigPathSpaceWithCanonical(filePath string, canonicalPath string, configDir string, fsys vfs.FS) (string, string) {
+	filePath = tspath.NormalizePath(filePath)
+	configDir = tspath.NormalizePath(configDir)
+	physicalConfigDir := configDir
+	if fsys != nil {
+		if realPath := fsys.Realpath(configDir); realPath != "" {
+			physicalConfigDir = tspath.NormalizePath(realPath)
+		}
+	}
+
+	return resolveConfigPathSpace(filePath, canonicalPath, configDir, physicalConfigDir, fsys), physicalConfigDir
+}
+
+func resolveConfigPathSpace(
+	filePath string,
+	canonicalPath string,
+	configDir string,
+	physicalConfigDir string,
+	fsys vfs.FS,
+) string {
+	if relative, ok := relativeConfigPath(filePath, configDir, true); ok {
+		return tspath.ResolvePath(physicalConfigDir, relative)
+	}
+	if relative, ok := relativeConfigPath(filePath, configDir, false); ok && fsys != nil {
+		aliasRoot := filePath
+		for remaining := relative; remaining != ""; remaining = tspath.GetDirectoryPath(remaining) {
+			aliasRoot = tspath.GetDirectoryPath(aliasRoot)
+		}
+		if realRoot := fsys.Realpath(aliasRoot); realRoot != "" &&
+			tspath.ComparePaths(
+				tspath.NormalizePath(realRoot),
+				physicalConfigDir,
+				tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
+			) == 0 {
+			return tspath.ResolvePath(physicalConfigDir, relative)
+		}
+	}
+
+	physicalFilePath := ""
+	if canonicalPath != "" {
+		physicalFilePath = tspath.NormalizePath(canonicalPath)
+	}
+	if physicalFilePath == "" {
+		physicalFilePath = filePath
+		if fsys != nil {
+			if realPath := fsys.Realpath(filePath); realPath != "" {
+				physicalFilePath = tspath.NormalizePath(realPath)
+			}
+		}
+	}
+	if relative, ok := relativeConfigPath(physicalFilePath, physicalConfigDir, true); ok {
+		return tspath.ResolvePath(physicalConfigDir, relative)
+	}
+	return physicalFilePath
+}
+
+func relativeConfigPath(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+	options := tspath.ComparePathsOptions{
+		CurrentDirectory:          configDir,
+		UseCaseSensitiveFileNames: useCaseSensitive,
+	}
+	if tspath.ComparePaths(filePath, configDir, options) == 0 {
+		return "", true
+	}
+	if !tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
+		return "", false
+	}
+	return tspath.GetRelativePathFromDirectory(configDir, filePath, options), true
 }

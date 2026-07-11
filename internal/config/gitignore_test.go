@@ -27,7 +27,7 @@ type gitignoreMockFS struct {
 	vfs.FS
 	entries         map[string]vfs.Entries
 	files           map[string]string
-	realpaths       map[string]string
+	resolvedPaths   map[string]string
 	readFileCalls   []string
 	accessedDirs    []string
 	realpathCalls   []string
@@ -47,7 +47,7 @@ func (m *gitignoreMockFS) GetAccessibleEntries(path string) vfs.Entries {
 
 func (m *gitignoreMockFS) Realpath(path string) string {
 	m.realpathCalls = append(m.realpathCalls, path)
-	if realpath, ok := m.realpaths[path]; ok {
+	if realpath, ok := m.resolvedPaths[path]; ok {
 		return realpath
 	}
 	return path
@@ -350,7 +350,7 @@ func TestReadGitignoreAsGlobs_SkipsDescendantSymlinkCycle(t *testing.T) {
 				Symlinks:    map[string]struct{}{},
 			},
 		},
-		realpaths: map[string]string{"/repo/a/loop": "/repo"},
+		resolvedPaths: map[string]string{"/repo/a/loop": "/repo"},
 	}
 
 	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
@@ -372,7 +372,7 @@ func TestReadGitignoreAsGlobs_LegacySymlinkCycleUsesCachedRealpaths(t *testing.T
 			"/repo":   {Directories: []string{"a"}},
 			"/repo/a": {Directories: []string{"loop"}},
 		},
-		realpaths: map[string]string{
+		resolvedPaths: map[string]string{
 			"/repo":        "/repo",
 			"/repo/a":      "/repo/a",
 			"/repo/a/loop": "/repo",

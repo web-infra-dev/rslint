@@ -16,8 +16,8 @@ import (
 )
 
 // programConfigOrders records which rslint configs declared one Program's
-// canonical tsconfig and the declaration order within each config. A shared
-// tsconfig has one Program instance but may have multiple config associations.
+// normalized tsconfig path and the declaration order within each config. A
+// shared path has one Program instance but may have multiple associations.
 type programConfigOrders map[string]int
 
 // lintProgramSet is the unique set of real tsconfig-backed Programs used by a
@@ -28,12 +28,8 @@ type lintProgramSet struct {
 	ConfigOrders []programConfigOrders
 }
 
-func filesystemPathID(filePath string, fsys vfs.FS) string {
-	useCaseSensitive := true
-	if fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
-	}
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", useCaseSensitive))
+func exactFilesystemPathID(filePath string) string {
+	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
 }
 
 func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
@@ -47,7 +43,7 @@ func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 }
 
 func canonicalFilesystemPathID(filePath string, fsys vfs.FS) string {
-	return filesystemPathID(authoritativeFilesystemPath(filePath, fsys), fsys)
+	return exactFilesystemPathID(authoritativeFilesystemPath(filePath, fsys))
 }
 
 func relativePathUnderRoot(filePath string, root string, useCaseSensitive bool) (string, bool) {
@@ -66,44 +62,31 @@ func relativePathUnderRoot(filePath string, root string, useCaseSensitive bool) 
 	return tspath.GetRelativePathFromDirectory(root, filePath, compareOptions), true
 }
 
-// configPathForBoundSource returns the path used for files/ignores matching.
-// Program source aliases are authoritative over the caller's display path. The
-// result is rooted in the physical config directory so a symlinked config root
-// and its real path share one stable matching space.
-func configPathForBoundSource(sourcePath string, target resolvedLintTarget, fsys vfs.FS) string {
-	useCaseSensitive := true
-	if fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
-	}
-	ownerRoot := tspath.NormalizePath(target.OwnerConfigDir)
-	authoritativeRoot := authoritativeFilesystemPath(ownerRoot, fsys)
-
-	if relative, ok := relativePathUnderRoot(sourcePath, ownerRoot, useCaseSensitive); ok {
-		return tspath.ResolvePath(authoritativeRoot, relative)
-	}
-	canonicalSource := authoritativeFilesystemPath(sourcePath, fsys)
-	if relative, ok := relativePathUnderRoot(canonicalSource, authoritativeRoot, useCaseSensitive); ok {
-		return tspath.ResolvePath(authoritativeRoot, relative)
-	}
-	if relative, ok := relativePathUnderRoot(target.Path, ownerRoot, useCaseSensitive); ok {
-		return tspath.ResolvePath(authoritativeRoot, relative)
-	}
-	if relative, ok := relativePathUnderRoot(target.CanonicalPath, authoritativeRoot, useCaseSensitive); ok {
-		return tspath.ResolvePath(authoritativeRoot, relative)
-	}
-	return tspath.NormalizePath(sourcePath)
+// configPathForLintTarget returns the target path used for files/ignores
+// matching. Program source names are deliberately excluded: adding or removing
+// a file from a TypeScript Program must not change its lint configuration.
+func configPathForLintTarget(target resolvedLintTarget, fsys vfs.FS) string {
+	matchPath, _ := rslintconfig.ResolveConfigPathSpaceWithCanonical(
+		target.Path,
+		target.CanonicalPath,
+		target.OwnerConfigDir,
+		fsys,
+	)
+	return matchPath
 }
 
-func storeSourcePathMapping(mapping map[string]string, sourcePath string, value string, fsys vfs.FS) {
+func storeSourcePathMapping(mapping map[string]string, sourcePath string, canonicalSourcePath string, value string) {
 	if mapping == nil {
 		return
 	}
 	normalizedSource := tspath.NormalizePath(sourcePath)
 	mapping[normalizedSource] = value
-	mapping[filesystemPathID(normalizedSource, fsys)] = value
+	if canonicalSourcePath != "" {
+		mapping[exactFilesystemPathID(canonicalSourcePath)] = value
+	}
 }
 
-// createProgramSetForConfigs builds each canonical tsconfig once while
+// createProgramSetForConfigs builds each normalized tsconfig path once while
 // retaining every config that declared it. Config roots are processed in a
 // stable order; target binding later uses the per-config project order rather
 // than map iteration or Program construction order.
@@ -133,7 +116,8 @@ func createProgramSetForConfigs(
 		}
 
 		for order, tsconfigPath := range tsConfigs {
-			tsconfigID := canonicalFilesystemPathID(tsconfigPath, fsys)
+			tsconfigPath = tspath.NormalizePath(tsconfigPath)
+			tsconfigID := exactFilesystemPathID(tsconfigPath)
 			if programIndex, ok := programByTsconfig[tsconfigID]; ok {
 				if _, alreadyAssociated := set.ConfigOrders[programIndex][configDir]; !alreadyAssociated {
 					set.ConfigOrders[programIndex][configDir] = order
@@ -141,10 +125,10 @@ func createProgramSetForConfigs(
 				continue
 			}
 
-			// Build shared Programs from the tsconfig's own directory so the
-			// result does not depend on which rslint config happened to declare
-			// the tsconfig first.
-			programCwd := tspath.GetDirectoryPath(tspath.NormalizePath(tsconfigPath))
+			// Relative paths in a tsconfig are resolved from the declared path,
+			// including when that path is a file symlink. This matches tsc/tsgo;
+			// realpath is only a source-identity fallback during target binding.
+			programCwd := tspath.GetDirectoryPath(tsconfigPath)
 			host := utils.WithParseCache(utils.CreateCompilerHost(programCwd, fsys), parseCache)
 			program, err := utils.CreateProgramLenient(singleThreaded, fsys, programCwd, tsconfigPath, host)
 			if err != nil {
@@ -228,6 +212,22 @@ func parallelGitignoreAndPrograms(
 	return rslintConfig, programs, nil
 }
 
+func configWithGitignore(
+	rslintConfig rslintconfig.RslintConfig,
+	configDir string,
+	fsys vfs.FS,
+) rslintconfig.RslintConfig {
+	gitGlobs := rslintconfig.ReadGitignoreAsGlobs(
+		configDir,
+		fsys,
+		rslintconfig.ExtractConfigIgnores(rslintConfig),
+	)
+	if len(gitGlobs) == 0 {
+		return rslintConfig
+	}
+	return append(rslintconfig.RslintConfig{{Ignores: gitGlobs}}, rslintConfig...)
+}
+
 // createFallbackProgram creates a Program for selected lint targets not
 // included in any existing Program. It uses minimal compiler options sufficient
 // for AST parsing (no type checking).
@@ -263,28 +263,53 @@ type lintTargetPlan struct {
 	Targets []resolvedLintTarget
 }
 
+func configsForLintTargetPlan(
+	configMap map[string]rslintconfig.RslintConfig,
+	plan lintTargetPlan,
+) map[string]rslintconfig.RslintConfig {
+	if len(configMap) == 0 || len(plan.Targets) == 0 {
+		return nil
+	}
+	active := make(map[string]rslintconfig.RslintConfig)
+	for _, target := range plan.Targets {
+		if entries, ok := configMap[target.OwnerConfigDir]; ok {
+			active[target.OwnerConfigDir] = entries
+		}
+	}
+	return active
+}
+
 func resolveLintTargetPlan(
 	configMap map[string]rslintconfig.RslintConfig,
 	rslintConfig rslintconfig.RslintConfig,
 	currentDirectory string,
-	configTargetFiles map[string][]string,
+	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
 	fsys vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
 ) (lintTargetPlan, error) {
 	type targetWithOwner struct {
-		path  string
-		owner string
+		path          string
+		canonicalPath string
+		owner         string
 	}
 	var targetFiles []targetWithOwner
 	if configMap != nil {
-		for _, target := range discoverLintFilesMultiConfig(configMap, configTargetFiles, fsys, allowFiles, allowDirs, singleThreaded) {
-			targetFiles = append(targetFiles, targetWithOwner{path: target.Path, owner: target.ConfigDirectory})
+		for _, target := range discoverLintFilesMultiConfig(configMap, configTargetScopes, fsys, allowFiles, allowDirs, singleThreaded) {
+			targetFiles = append(targetFiles, targetWithOwner{
+				path:          target.Path,
+				canonicalPath: target.CanonicalPath,
+				owner:         target.ConfigDirectory,
+			})
 		}
 	} else {
-		for _, targetPath := range rslintconfig.DiscoverLintFiles(rslintConfig, currentDirectory, fsys, allowFiles, allowDirs, singleThreaded) {
-			targetFiles = append(targetFiles, targetWithOwner{path: targetPath, owner: currentDirectory})
+		for _, target := range rslintconfig.DiscoverLintTargets(rslintConfig, currentDirectory, fsys, allowFiles, allowDirs, singleThreaded) {
+			targetFiles = append(targetFiles, targetWithOwner{
+				path:          target.Path,
+				canonicalPath: target.CanonicalPath,
+				owner:         currentDirectory,
+			})
 		}
 	}
 
@@ -294,22 +319,22 @@ func resolveLintTargetPlan(
 		targetPath := discovered.path
 		ownerConfigDir := discovered.owner
 		canonicalPath := tspath.NormalizePath(targetPath)
-		if fsys != nil {
+		if discovered.canonicalPath != "" {
+			canonicalPath = tspath.NormalizePath(discovered.canonicalPath)
+		}
+		if discovered.canonicalPath == "" && fsys != nil {
 			if realPath := fsys.Realpath(canonicalPath); realPath != "" {
 				canonicalPath = tspath.NormalizePath(realPath)
 			}
 		}
-		canonicalKey := canonicalPath
-		if fsys != nil {
-			canonicalKey = string(tspath.ToPath(canonicalPath, "", fsys.UseCaseSensitiveFileNames()))
-		}
+		canonicalKey := exactFilesystemPathID(canonicalPath)
 		target := resolvedLintTarget{
 			Path:           tspath.NormalizePath(targetPath),
 			CanonicalPath:  canonicalPath,
 			OwnerConfigDir: tspath.NormalizePath(ownerConfigDir),
 		}
 		if existing, exists := seenCanonical[canonicalKey]; exists {
-			if filesystemPathID(existing.OwnerConfigDir, fsys) != filesystemPathID(target.OwnerConfigDir, fsys) {
+			if canonicalFilesystemPathID(existing.OwnerConfigDir, fsys) != canonicalFilesystemPathID(target.OwnerConfigDir, fsys) {
 				return lintTargetPlan{}, fmt.Errorf(
 					"lint target aliases %q and %q resolve to the same file but are governed by different configs %q and %q",
 					existing.Path,
@@ -326,13 +351,13 @@ func resolveLintTargetPlan(
 	return plan, nil
 }
 
-func preferredCallerTargetPaths(plan lintTargetPlan, fsys vfs.FS) map[string]string {
+func preferredCallerTargetPaths(plan lintTargetPlan) map[string]string {
 	if len(plan.Targets) == 0 {
 		return nil
 	}
 	preferred := make(map[string]string, len(plan.Targets))
 	for _, target := range plan.Targets {
-		canonicalID := canonicalFilesystemPathID(target.CanonicalPath, fsys)
+		canonicalID := exactFilesystemPathID(target.CanonicalPath)
 		if _, exists := preferred[canonicalID]; !exists {
 			preferred[canonicalID] = target.Path
 		}
@@ -362,28 +387,24 @@ func aliasPathUnderRoot(path string, canonicalRoot string, lexicalRoot string, u
 }
 
 type programTargetLookup struct {
-	program             *compiler.Program
-	fsys                vfs.FS
-	canonicalIndexBuilt bool
-	canonicalSources    map[string]*ast.SourceFile
+	program      *compiler.Program
+	fsys         vfs.FS
+	sourceLookup *utils.ProgramSourceLookup
+}
+
+func (lookup *programTargetLookup) programSources() *utils.ProgramSourceLookup {
+	if lookup.sourceLookup == nil {
+		lookup.sourceLookup = utils.NewProgramSourceLookup(lookup.program, lookup.fsys)
+	}
+	return lookup.sourceLookup
+}
+
+func (lookup *programTargetLookup) sourceFileForCandidate(candidate string, canonicalTarget string) *ast.SourceFile {
+	return lookup.programSources().SourceFileForCandidate(candidate, canonicalTarget)
 }
 
 func (lookup *programTargetLookup) canonicalSourceFile(canonicalPath string) *ast.SourceFile {
-	if lookup.fsys == nil || canonicalPath == "" {
-		return nil
-	}
-	if !lookup.canonicalIndexBuilt {
-		lookup.canonicalIndexBuilt = true
-		lookup.canonicalSources = make(map[string]*ast.SourceFile)
-		for _, sourceFile := range lookup.program.GetSourceFiles() {
-			canonicalID := canonicalFilesystemPathID(sourceFile.FileName(), lookup.fsys)
-			existing := lookup.canonicalSources[canonicalID]
-			if existing == nil || sourceFile.FileName() < existing.FileName() {
-				lookup.canonicalSources[canonicalID] = sourceFile
-			}
-		}
-	}
-	return lookup.canonicalSources[canonicalFilesystemPathID(canonicalPath, lookup.fsys)]
+	return lookup.programSources().CanonicalSourceFile(canonicalPath)
 }
 
 // sourceFileForTarget first performs bounded target-driven lookups. Only when
@@ -396,44 +417,42 @@ func (lookup *programTargetLookup) sourceFileForTarget(target resolvedLintTarget
 	if program == nil {
 		return nil
 	}
-	// Normal projects hit the lexical target immediately. Keep realpath work
-	// entirely off this hot path; aliases are only derived after both direct
-	// target forms miss.
 	targetPath := tspath.NormalizePath(target.Path)
-	if sourceFile := program.GetSourceFile(targetPath); sourceFile != nil {
-		return sourceFile
-	}
 	canonicalPath := ""
 	if target.CanonicalPath != "" {
 		canonicalPath = tspath.NormalizePath(target.CanonicalPath)
 	}
+	// Normal projects hit the lexical target exactly. Physical validation is
+	// only needed when GetSourceFile returns a differently spelled source.
+	if sourceFile := lookup.sourceFileForCandidate(targetPath, canonicalPath); sourceFile != nil {
+		return sourceFile
+	}
 	if canonicalPath != "" && canonicalPath != targetPath {
-		if sourceFile := program.GetSourceFile(canonicalPath); sourceFile != nil {
+		if sourceFile := lookup.sourceFileForCandidate(canonicalPath, canonicalPath); sourceFile != nil {
 			return sourceFile
 		}
+	}
+	// A physical source index can only resolve a spelling alias. When target
+	// planning found no lexical/canonical difference, the direct miss above is
+	// authoritative and indexing every Program source would add pure realpath IO.
+	if canonicalPath == "" || exactFilesystemPathID(canonicalPath) == exactFilesystemPathID(targetPath) {
+		return nil
 	}
 	if fsys == nil {
 		return nil
 	}
-	if canonicalPath == "" {
-		canonicalPath = targetPath
-	}
-	if canonicalPath == "" {
-		return nil
-	}
 
-	useCaseSensitive := program.UseCaseSensitiveFileNames()
 	lookupAlias := func(candidate string) *ast.SourceFile {
 		if candidate == "" {
 			return nil
 		}
 		candidate = tspath.NormalizePath(candidate)
-		compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
-		if tspath.ComparePaths(candidate, targetPath, compareOptions) == 0 ||
-			tspath.ComparePaths(candidate, canonicalPath, compareOptions) == 0 {
+		candidateID := exactFilesystemPathID(candidate)
+		if candidateID == exactFilesystemPathID(targetPath) ||
+			candidateID == exactFilesystemPathID(canonicalPath) {
 			return nil
 		}
-		return program.GetSourceFile(candidate)
+		return lookup.sourceFileForCandidate(candidate, canonicalPath)
 	}
 
 	ownerRoot := tspath.NormalizePath(target.OwnerConfigDir)
@@ -441,7 +460,7 @@ func (lookup *programTargetLookup) sourceFileForTarget(target resolvedLintTarget
 	if realPath := fsys.Realpath(ownerRoot); realPath != "" {
 		ownerCanonical = tspath.NormalizePath(realPath)
 	}
-	ownerAlias := aliasPathUnderRoot(canonicalPath, ownerCanonical, ownerRoot, useCaseSensitive)
+	ownerAlias := aliasPathUnderRoot(canonicalPath, ownerCanonical, ownerRoot, true)
 	if sourceFile := lookupAlias(ownerAlias); sourceFile != nil {
 		return sourceFile
 	}
@@ -451,14 +470,44 @@ func (lookup *programTargetLookup) sourceFileForTarget(target resolvedLintTarget
 	if realPath := fsys.Realpath(programRoot); realPath != "" {
 		programCanonical = tspath.NormalizePath(realPath)
 	}
-	programAlias := aliasPathUnderRoot(canonicalPath, programCanonical, programRoot, useCaseSensitive)
-	compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
-	if tspath.ComparePaths(programAlias, ownerAlias, compareOptions) != 0 {
+	programAlias := aliasPathUnderRoot(canonicalPath, programCanonical, programRoot, true)
+	if exactFilesystemPathID(programAlias) != exactFilesystemPathID(ownerAlias) {
 		if sourceFile := lookupAlias(programAlias); sourceFile != nil {
 			return sourceFile
 		}
 	}
 	return lookup.canonicalSourceFile(canonicalPath)
+}
+
+func groupFallbackTargets(
+	gaps []resolvedLintTarget,
+	currentDirectory string,
+	useCaseSensitive bool,
+) [][]resolvedLintTarget {
+	if len(gaps) == 0 {
+		return nil
+	}
+
+	groups := make([][]resolvedLintTarget, 0, 1)
+	keysByGroup := make([]map[tspath.Path]struct{}, 0, 1)
+	for _, gap := range gaps {
+		key := tspath.ToPath(gap.Path, currentDirectory, useCaseSensitive)
+		groupIndex := -1
+		for i, keys := range keysByGroup {
+			if _, exists := keys[key]; !exists {
+				groupIndex = i
+				break
+			}
+		}
+		if groupIndex == -1 {
+			groupIndex = len(groups)
+			groups = append(groups, nil)
+			keysByGroup = append(keysByGroup, make(map[tspath.Path]struct{}))
+		}
+		groups[groupIndex] = append(groups[groupIndex], gap)
+		keysByGroup[groupIndex][key] = struct{}{}
+	}
+	return groups
 }
 
 func orderedProgramIndexesForConfig(set lintProgramSet, configDir string) []int {
@@ -521,13 +570,13 @@ func bindLintTargetPlan(
 			}
 			sourcePath := sourceFile.FileName()
 			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.OwnerConfigDir, fsys)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, configPathForBoundSource(sourcePath, target, fsys), fsys)
+			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.OwnerConfigDir)
+			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, configPathForLintTarget(target, fsys))
 			binding.TypeInfoFiles[sourcePath] = struct{}{}
 			binding.TypeInfoFiles[target.Path] = struct{}{}
 			binding.TypeInfoFiles[target.CanonicalPath] = struct{}{}
 			if tspath.NormalizePath(sourcePath) != target.Path {
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.Path, fsys)
+				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
 			}
 			bound = true
 			break
@@ -539,32 +588,38 @@ func bindLintTargetPlan(
 	}
 
 	if len(gaps) > 0 {
-		fallbackFiles := make([]string, 0, len(gaps))
-		for _, gap := range gaps {
-			fallbackFiles = append(fallbackFiles, gap.Path)
+		useCaseSensitive := true
+		if fsys != nil {
+			useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 		}
-		fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, fsys, parseCache)
-		if err != nil {
-			return lintTargetBinding{}, err
-		}
-		if fallback == nil {
-			return lintTargetBinding{}, fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(gaps))
-		}
-		fallbackIndex := len(binding.Programs)
-		binding.Programs = append(binding.Programs, fallback)
-		binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
-		fallbackLookup := programTargetLookup{program: fallback, fsys: fsys}
-		for _, gap := range gaps {
-			sourceFile := fallbackLookup.sourceFileForTarget(gap)
-			if sourceFile == nil {
-				return lintTargetBinding{}, fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
+		for _, fallbackTargets := range groupFallbackTargets(gaps, currentDirectory, useCaseSensitive) {
+			fallbackFiles := make([]string, 0, len(fallbackTargets))
+			for _, gap := range fallbackTargets {
+				fallbackFiles = append(fallbackFiles, gap.Path)
 			}
-			sourcePath := sourceFile.FileName()
-			binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, gap.OwnerConfigDir, fsys)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, configPathForBoundSource(sourcePath, gap, fsys), fsys)
-			if tspath.NormalizePath(sourcePath) != gap.Path {
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.Path, fsys)
+			fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, fsys, parseCache)
+			if err != nil {
+				return lintTargetBinding{}, err
+			}
+			if fallback == nil {
+				return lintTargetBinding{}, fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(fallbackTargets))
+			}
+			fallbackIndex := len(binding.Programs)
+			binding.Programs = append(binding.Programs, fallback)
+			binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
+			fallbackLookup := programTargetLookup{program: fallback, fsys: fsys}
+			for _, gap := range fallbackTargets {
+				sourceFile := fallbackLookup.sourceFileForTarget(gap)
+				if sourceFile == nil {
+					return lintTargetBinding{}, fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
+				}
+				sourcePath := sourceFile.FileName()
+				binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
+				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, gap.CanonicalPath, gap.OwnerConfigDir)
+				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, gap.CanonicalPath, configPathForLintTarget(gap, fsys))
+				if tspath.NormalizePath(sourcePath) != gap.Path {
+					storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.CanonicalPath, gap.Path)
+				}
 			}
 		}
 	}
@@ -583,26 +638,19 @@ func bindLintTargetPlan(
 
 func discoverLintFilesMultiConfig(
 	configMap map[string]rslintconfig.RslintConfig,
-	configTargetFiles map[string][]string,
+	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
 	fs vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
 ) []rslintconfig.DiscoveredLintTarget {
-	var scopes map[string]rslintconfig.LintDiscoveryScope
-	if len(configTargetFiles) > 0 {
-		scopes = make(map[string]rslintconfig.LintDiscoveryScope, len(configTargetFiles))
-		for configDir, targetFiles := range configTargetFiles {
-			scopes[configDir] = rslintconfig.LintDiscoveryScope{Files: targetFiles}
-		}
-	}
-	return rslintconfig.DiscoverLintTargetsMultiConfig(configMap, scopes, fs, allowFiles, allowDirs, singleThreaded)
+	return rslintconfig.DiscoverLintTargetsMultiConfig(configMap, configTargetScopes, fs, allowFiles, allowDirs, singleThreaded)
 }
 
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
 // programs must be excluded from the type-check phase. A program is skipped
 // when it was NOT built from a real tsconfig on disk — i.e. its CompilerOptions
-// carry no ConfigFilePath. That covers the AST-only fallback Program used for
+// carry no ConfigFilePath. That covers the non-project-backed fallback Program used for
 // selected files absent from every tsconfig-backed Program, including projects
 // with no tsconfig at all.
 //
@@ -659,14 +707,8 @@ func collectTargetSyntacticDiagnostics(
 		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
 			continue
 		}
-
-		targets := make(map[string]struct{}, len(targetsByProgram[i]))
-		for _, target := range targetsByProgram[i] {
-			targets[target] = struct{}{}
-		}
-
 		ctx := context.Background()
-		for target := range targets {
+		for _, target := range targetsByProgram[i] {
 			file := program.GetSourceFile(target)
 			if file == nil {
 				continue

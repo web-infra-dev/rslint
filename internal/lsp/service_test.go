@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -113,6 +114,43 @@ func TestHandleDidChange(t *testing.T) {
 
 	if s.documents[uri] != "const x = 2;" {
 		t.Errorf("document content = %q, want %q", s.documents[uri], "const x = 2;")
+	}
+}
+
+func TestHandleDidChangeImmediatelyInvalidatesPluginWork(t *testing.T) {
+	s, queue := newTestServerWithQueue()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	s.documents[uri] = "const oldValue = 1;"
+	s.docGeneration[uri] = 4
+	s.diagnostics[uri] = []rule.RuleDiagnostic{{RuleName: "native/old"}}
+
+	dispatchCtx, cancel := context.WithCancel(context.Background())
+	s.inflightPluginDispatch[uri] = &pluginDispatchHandle{cancel: cancel}
+
+	if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, 2, "const newValue = 2;")); err != nil {
+		t.Fatalf("handleDidChange failed: %v", err)
+	}
+	if s.docGeneration[uri] != 5 {
+		t.Fatalf("document generation = %d, want 5", s.docGeneration[uri])
+	}
+	select {
+	case <-dispatchCtx.Done():
+	default:
+		t.Fatal("didChange did not cancel the previous plugin dispatch")
+	}
+
+	s.mergePluginDiagnostics(pluginLintResult{
+		uri:        uri,
+		generation: 4,
+		diags:      []rule.RuleDiagnostic{{RuleName: "plugin/stale"}},
+	})
+	if _, cached := s.diagnostics[uri]; cached {
+		t.Fatal("didChange retained diagnostics from the previous document version")
+	}
+	select {
+	case <-queue:
+		t.Fatal("stale plugin result published after didChange")
+	default:
 	}
 }
 
@@ -1239,6 +1277,80 @@ func TestHandleConfigUpdate_CommitClearsOldDiagnostics(t *testing.T) {
 	}
 }
 
+func TestHandleConfigUpdate_DistinguishesEmptyAndUnavailableConfigs(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/src/index.ts")
+
+	if err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "empty-config",
+		"configs": []any{map[string]any{
+			"configDirectory": "file:///project",
+			"entries":         []any{},
+		}},
+	}); err != nil {
+		t.Fatalf("commit empty config: %v", err)
+	}
+	if s.isUnavailableConfigForURI(uri) {
+		t.Fatal("a valid empty config was marked unavailable")
+	}
+
+	if err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "unavailable-config",
+		"configs": []any{map[string]any{
+			"configDirectory": "file:///project",
+			"entries":         []any{},
+			"unavailable":     true,
+		}},
+	}); err != nil {
+		t.Fatalf("commit unavailable config boundary: %v", err)
+	}
+	if !s.isUnavailableConfigForURI(uri) {
+		t.Fatal("failed config boundary was not marked unavailable")
+	}
+
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "invalid-unavailable-config",
+		"configs": []any{map[string]any{
+			"configDirectory": "file:///project",
+			"entries":         []any{map[string]any{"rules": map[string]any{"no-debugger": "error"}}},
+			"unavailable":     true,
+		}},
+	})
+	if err == nil {
+		t.Fatal("unavailable config with entries was accepted")
+	}
+	if s.eslintPluginConfigGeneration != "unavailable-config" || !s.isUnavailableConfigForURI(uri) {
+		t.Fatal("rejected update changed the committed config generation")
+	}
+}
+
+func TestHandleConfigUpdate_CommitsNearestConfigIndex(t *testing.T) {
+	s := newTestServer()
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "indexed-generation",
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries":         []any{map[string]any{"rules": map[string]any{"root": "error"}}},
+			},
+			map[string]any{
+				"configDirectory": "file:///project/packages/app",
+				"entries":         []any{map[string]any{"rules": map[string]any{"nested": "error"}}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+	if s.jsConfigOwnerResolver == nil {
+		t.Fatal("config transaction did not build the config-owner index")
+	}
+	key, ok := s.nearestJSConfigKey("file:///project/packages/app/src/index.ts")
+	if !ok || key != "file:///project/packages/app" {
+		t.Fatalf("nearest config = %q, %v; want nested config", key, ok)
+	}
+}
+
 // ======== getConfigForURI tests ========
 
 func TestNearestJSConfigKey_UsesFilesystemCaseSensitivity(t *testing.T) {
@@ -1334,6 +1446,34 @@ func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
 	}
 	if cwd != "/project" {
 		t.Errorf("JS config cwd should be /project, got %q", cwd)
+	}
+}
+
+func TestGetConfigForURI_EmptyRootBoundaryProtectsJSONFallback(t *testing.T) {
+	s := newTestServer()
+	s.jsonConfig = config.RslintConfig{{
+		Rules: map[string]any{"no-debugger": "error"},
+	}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{}
+	s.jsConfigs["file:///project/packages/app"] = config.RslintConfig{{
+		Rules: map[string]any{"no-console": "error"},
+	}}
+
+	rootCfg, rootCwd, rootIsJS := s.getConfigForURI("file:///project/src/index.ts")
+	if len(rootCfg) != 0 || rootCwd != "/project" || !rootIsJS {
+		t.Fatalf("root file must use empty JS boundary: cfg=%v cwd=%q isJS=%v", rootCfg, rootCwd, rootIsJS)
+	}
+
+	nestedCfg, nestedCwd, nestedIsJS := s.getConfigForURI("file:///project/packages/app/src/index.ts")
+	if len(nestedCfg) != 1 || nestedCfg[0].Rules["no-console"] != "error" ||
+		nestedCwd != "/project/packages/app" || !nestedIsJS {
+		t.Fatalf("nested file must use nested JS config: cfg=%v cwd=%q isJS=%v", nestedCfg, nestedCwd, nestedIsJS)
+	}
+
+	outsideCfg, outsideCwd, outsideIsJS := s.getConfigForURI("file:///other/src/index.ts")
+	if len(outsideCfg) != 1 || outsideCfg[0].Rules["no-debugger"] != "error" ||
+		outsideCwd != s.cwd || outsideIsJS {
+		t.Fatalf("file outside JS boundaries must retain JSON fallback: cfg=%v cwd=%q isJS=%v", outsideCfg, outsideCwd, outsideIsJS)
 	}
 }
 
@@ -1973,10 +2113,101 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 	}
 }
 
-func TestLSPFilesystemPathID_UsesFilesystemCaseSensitivity(t *testing.T) {
+func TestLSPFilesystemPathID_UsesCanonicalFilesystemIdentity(t *testing.T) {
 	caseInsensitiveFS := &caseInsensitiveLSPTestFS{mockFS: mockFS{files: map[string]bool{}}}
 	if lspFilesystemPathID("C:/Repo/TSConfig.json", caseInsensitiveFS) != lspFilesystemPathID("c:/repo/tsconfig.json", caseInsensitiveFS) {
 		t.Fatal("case-insensitive filesystem path IDs must ignore casing")
+	}
+}
+
+type exactCaseLSPProgramFS struct {
+	vfs.FS
+	files map[string]string
+}
+
+func (fs *exactCaseLSPProgramFS) UseCaseSensitiveFileNames() bool { return false }
+func (fs *exactCaseLSPProgramFS) FileExists(filePath string) bool {
+	if _, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+		return true
+	}
+	return fs.FS.FileExists(filePath)
+}
+func (fs *exactCaseLSPProgramFS) ReadFile(filePath string) (string, bool) {
+	if content, ok := fs.files[tspath.NormalizePath(filePath)]; ok {
+		return content, true
+	}
+	return fs.FS.ReadFile(filePath)
+}
+func (fs *exactCaseLSPProgramFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if _, ok := fs.files[filePath]; ok {
+		return filePath
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func TestSourceFileForPath_RejectsCaseFoldedDifferentFile(t *testing.T) {
+	upper := "/repo/Source.ts"
+	lower := "/repo/source.ts"
+	fsys := &exactCaseLSPProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			upper: "export const upper = 1;\n",
+			lower: "export const lower = 2;\n",
+		},
+	}
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}, []string{upper}, utils.CreateCompilerHost("/repo", fsys))
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+	if source := program.GetSourceFile(lower); source == nil || source.FileName() != upper {
+		t.Fatalf("fixture must exercise case-folded Program lookup, got %v", source)
+	}
+	if source := sourceFileForPath(program, lower, fsys); source != nil {
+		t.Fatalf("case-distinct target bound to %q", source.FileName())
+	}
+}
+
+func TestSourceFileForPath_FindsProgramFileSymlinkFromRealTarget(t *testing.T) {
+	sharedDir := t.TempDir()
+	repoDir := t.TempDir()
+	realTarget := filepath.Join(sharedDir, "shared.ts")
+	linkedPath := filepath.Join(repoDir, "linked.ts")
+	if err := os.WriteFile(realTarget, []byte("export const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realTarget, linkedPath); err != nil {
+		t.Skipf("file symlink unavailable: %v", err)
+	}
+
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	linkedPath = tspath.NormalizePath(linkedPath)
+	realTarget = tspath.NormalizePath(realTarget)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}, []string{linkedPath}, utils.CreateCompilerHost(repoDir, fsys))
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+	sourceName := ""
+	for _, sourceFile := range program.GetSourceFiles() {
+		if sourceFile.FileName() == linkedPath || sourceFile.FileName() == realTarget {
+			sourceName = sourceFile.FileName()
+			break
+		}
+	}
+	if sourceName == "" {
+		t.Fatal("Program does not contain the symlinked source")
+	}
+	if sourceName == realTarget {
+		t.Skip("compiler canonicalized the file symlink before Program lookup")
+	}
+	if source := sourceFileForPath(program, realTarget, fsys); source == nil || source.FileName() != sourceName {
+		t.Fatalf("real target did not bind to Program source %q: %v", sourceName, source)
 	}
 }
 
@@ -2030,13 +2261,14 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		}
 	}
 
+	sourceURI := toURI(sourcePath)
 	program, hasTypeInfo, err := selectLintProgram(
-		toURI(sourcePath),
+		sourceURI,
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
 		fsys,
-		s.newStandaloneLintProgramLoader(),
+		s.newStandaloneLintProgramLoader(sourceURI),
 	)
 	if err != nil {
 		t.Fatalf("select typed program: %v", err)
@@ -2071,13 +2303,14 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		t.Fatalf("speculative fix polluted Session overlay: got %q", got)
 	}
 
+	gapURI := toURI(gapPath)
 	gapProgram, gapHasTypeInfo, err := selectLintProgram(
-		toURI(gapPath),
+		gapURI,
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
 		fsys,
-		s.newStandaloneLintProgramLoader(),
+		s.newStandaloneLintProgramLoader(gapURI),
 	)
 	if err != nil {
 		t.Fatalf("select gap program: %v", err)
@@ -2118,8 +2351,157 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	if !result.HasSyntaxErrors {
 		t.Fatal("malformed file was not marked as having syntax errors")
 	}
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
+	if len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
+		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Diagnostics)
+	}
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.RuleName == "no-debugger" {
+			t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
+		}
+	}
+	s.diagnostics[uri] = result.Diagnostics
+	response, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: 0, Character: 0},
+			End:   lsproto.Position{Line: 0, Character: uint32(len(malformed))},
+		},
+		Context: &lsproto.CodeActionContext{},
+	})
+	if err != nil {
+		t.Fatalf("get syntax diagnostic code actions: %v", err)
+	}
+	if actions := response.CommandOrCodeActionArray; actions == nil || len(*actions) != 0 {
+		t.Fatalf("syntax diagnostic offered an inapplicable rule action: %+v", actions)
+	}
+}
+
+func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "malformed.js")
+	const malformed = "debugger; const value = ;\n"
+	if err := os.WriteFile(filePath, []byte(malformed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	s.documents[uri] = malformed
+
+	tests := []struct {
+		name   string
+		config config.RslintConfig
+	}{
+		{
+			name: "no matching config entry",
+			config: config.RslintConfig{{
+				Files: []string{"**/*.ts"},
+				Rules: config.Rules{"no-debugger": "error"},
+			}},
+		},
+		{name: "valid empty config", config: config.RslintConfig{}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := s.runConfiguredLintForContent(
+				uri,
+				context.Background(),
+				malformed,
+				test.config,
+				dir,
+				false,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("run lint: %v", err)
+			}
+			if !result.HasSyntaxErrors || len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
+				t.Fatalf("zero-rule target did not report its syntax error: %+v", result)
+			}
+			for _, diagnostic := range result.Diagnostics {
+				if diagnostic.RuleName == "no-debugger" {
+					t.Fatalf("a rule ran outside its files selector: %+v", result.Diagnostics)
+				}
+			}
+		})
+	}
+}
+
+type realpathAliasLSPTestFS struct {
+	vfs.FS
+	aliasRoot string
+	realRoot  string
+}
+
+func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	aliasRoot := tspath.NormalizePath(fs.aliasRoot)
+	if filePath == aliasRoot {
+		return tspath.NormalizePath(fs.realRoot)
+	}
+	if strings.HasPrefix(filePath, aliasRoot+"/") {
+		return tspath.NormalizePath(fs.realRoot) + strings.TrimPrefix(filePath, aliasRoot)
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
+	root := t.TempDir()
+	realRoot := filepath.Join(root, "real-workspace")
+	aliasRoot := filepath.Join(root, "alias-workspace")
+	realFile := filepath.Join(realRoot, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(realFile, []byte("const diskValue = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tsConfigPath := filepath.Join(realRoot, "tsconfig.json")
+	if err := os.WriteFile(tsConfigPath, []byte(`{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = aliasRoot
+	s.fs = &realpathAliasLSPTestFS{
+		FS:        bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		aliasRoot: aliasRoot,
+		realRoot:  realRoot,
+	}
+	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasFile)}).String())
+	realURI := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(realFile)}).String())
+	const openContent = "const editorValue = 2;\n"
+	s.documents[realURI] = "const competingAliasValue = 3;\n"
+	s.documents[uri] = openContent
+
+	editorOverlay := s.currentEditorOverlayFS(uri)
+	for _, filePath := range []string{aliasFile, realFile} {
+		if got, ok := editorOverlay.ReadFile(filePath); !ok || got != openContent {
+			t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
+		}
+	}
+
+	const fixedContent = "debugger;\n"
+	result, err := s.runConfiguredLintForContent(
+		uri,
+		context.Background(),
+		fixedContent,
+		config.RslintConfig{{
+			Files: []string{"src/**/*.ts"},
+			Rules: config.Rules{"no-debugger": "error"},
+		}},
+		aliasRoot,
+		false,
+		[]string{tsConfigPath},
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent failed: %v", err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("canonical program read stale disk content: %+v", result.Diagnostics)
 	}
 }
 
@@ -2169,11 +2551,217 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	}
 }
 
+func TestConfigTransaction_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
+	parent := t.TempDir()
+	realRoot := filepath.Join(parent, "real-root")
+	aliasRoot := filepath.Join(parent, "alias-root")
+	realFile := filepath.Join(realRoot, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const source = "debugger;\n"
+	if err := os.WriteFile(realFile, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = realRoot
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	configURI := (&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasRoot)}).String()
+	fileURI := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(realFile)}).String())
+	if err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "symlink-generation",
+		"configs": []any{map[string]any{
+			"configDirectory": configURI,
+			"entries": []any{map[string]any{
+				"files": []any{"src/**/*.ts"},
+				"rules": map[string]any{"no-debugger": "error"},
+			}},
+		}},
+	}); err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
+	if !isJSConfig || configCwd != aliasRoot {
+		t.Fatalf("physical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
+	}
+	result, err := s.runConfiguredLintForContent(
+		fileURI,
+		context.Background(),
+		source,
+		cfg,
+		configCwd,
+		isJSConfig,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent failed: %v", err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("physical file lost aliased files selector: %+v", result.Diagnostics)
+	}
+}
+
+func TestConfigTransaction_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
+	root := t.TempDir()
+	physicalDir := filepath.Join(root, "physical")
+	physicalSubdir := filepath.Join(physicalDir, "sub")
+	if err := os.MkdirAll(physicalSubdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const source = "console.log('value');\ndebugger;\n"
+	if err := os.WriteFile(filepath.Join(physicalSubdir, "index.ts"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasDir := filepath.Join(root, "link")
+	if err := os.Symlink(physicalSubdir, aliasDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	toURI := func(filePath string) string {
+		return (&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String()
+	}
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = root
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	if err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "lexical-owner-generation",
+		"configs": []any{
+			map[string]any{
+				"configDirectory": toURI(root),
+				"entries": []any{map[string]any{
+					"rules": map[string]any{"no-console": "error"},
+				}},
+			},
+			map[string]any{
+				"configDirectory": toURI(physicalDir),
+				"entries": []any{map[string]any{
+					"rules": map[string]any{"no-debugger": "error"},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	fileURI := lsproto.DocumentUri(toURI(filepath.Join(aliasDir, "index.ts")))
+	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
+	if !isJSConfig || configCwd != root {
+		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
+	}
+	result, err := s.runConfiguredLintForContent(
+		fileURI,
+		context.Background(),
+		source,
+		cfg,
+		configCwd,
+		isJSConfig,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent failed: %v", err)
+	}
+	ruleNames := make(map[string]struct{}, len(result.Diagnostics))
+	for _, diagnostic := range result.Diagnostics {
+		ruleNames[diagnostic.RuleName] = struct{}{}
+	}
+	if _, ok := ruleNames["no-console"]; !ok {
+		t.Fatalf("lexical owner rule missing: %+v", result.Diagnostics)
+	}
+	if _, ok := ruleNames["no-debugger"]; ok {
+		t.Fatalf("physical config replaced lexical owner: %+v", result.Diagnostics)
+	}
+}
+
+func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
+	root := t.TempDir()
+	filePath := filepath.Join(root, ".git", "hooks", "check.ts")
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const source = "var value = 1;\n"
+	if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = root
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	s.documents[uri] = source
+	got := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		source,
+		config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}},
+		root,
+		false,
+		nil,
+	)
+	if got != source {
+		t.Fatalf("fixAll modified a default-excluded file: %q", got)
+	}
+}
+
+func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "template-nested")
+	filePath := filepath.Join(configDir, "orphan.ts")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const source = "export const orphan = (() => { var output = 1; return output; })();\n"
+	if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = root
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	s.documents[uri] = source
+	cfg := config.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: config.Rules{"no-var": "error"},
+	}}
+	result, err := s.runConfiguredLintForContent(uri, context.Background(), source, cfg, configDir, true, nil)
+	if err != nil {
+		t.Fatalf("lint without tsconfig: %v", err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-var" {
+		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Diagnostics)
+	}
+	got := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		source,
+		cfg,
+		configDir,
+		true,
+		nil,
+	)
+	const want = "export const orphan = (() => { let output = 1; return output; })();\n"
+	if got != want {
+		t.Fatalf("fixAll without tsconfig = %q, want %q", got, want)
+	}
+}
+
 type caseInsensitiveLSPTestFS struct {
 	mockFS
 }
 
 func (f *caseInsensitiveLSPTestFS) UseCaseSensitiveFileNames() bool { return false }
+func (f *caseInsensitiveLSPTestFS) Realpath(filePath string) string {
+	return strings.ToLower(tspath.NormalizePath(filePath))
+}
 
 func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.T) {
 	config.RegisterAllRules()
@@ -2263,44 +2851,26 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	})
 }
 
-func TestRunLintWithSession_FilesMissShortCircuits(t *testing.T) {
-	ctx := context.Background()
-	cwd := "/project"
-	cfg := config.RslintConfig{
-		{
-			Files: []string{"**/*.ts"},
-			Rules: config.Rules{"no-debugger": "error"},
-		},
+func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {
+	cfg := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	for _, uri := range []lsproto.DocumentUri{
+		"file:///project/node_modules/pkg/index.ts",
+		"file:///project/.git/hooks/pre-commit.ts",
+	} {
+		t.Run(string(uri), func(t *testing.T) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					t.Fatalf("default-excluded file reached the nil session: %v", recovered)
+				}
+			}()
+
+			diagnostics, err := runLintWithSession(uri, nil, context.Background(), cfg, "/project", false, nil, nil)
+			if err != nil {
+				t.Fatalf("runLintWithSession returned an error: %v", err)
+			}
+			if diagnostics == nil || len(diagnostics) != 0 {
+				t.Fatalf("default-excluded file diagnostics = %+v, want a non-nil empty slice", diagnostics)
+			}
+		})
 	}
-
-	missedURI := lsproto.DocumentUri("file:///project/src/outside.js")
-	matchedURI := lsproto.DocumentUri("file:///project/src/main.ts")
-
-	t.Run("files miss returns empty without touching session", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("runLintWithSession panicked on files miss (early-return missing?): %v", r)
-			}
-		}()
-
-		diags, err := runLintWithSession(missedURI, nil, ctx, cfg, cwd, false, nil, nil)
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-		if diags == nil {
-			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
-		}
-		if len(diags) != 0 {
-			t.Errorf("expected 0 diagnostics for files miss, got %d: %+v", len(diags), diags)
-		}
-	})
-
-	t.Run("files match falls through to session (nil-session panic)", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatal("expected panic when matching file is given a nil session, got none")
-			}
-		}()
-		_, _ = runLintWithSession(matchedURI, nil, ctx, cfg, cwd, false, nil, nil)
-	})
 }

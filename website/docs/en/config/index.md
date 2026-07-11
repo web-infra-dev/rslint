@@ -8,12 +8,14 @@ Rslint looks for config files in the following order:
 
 1. `rslint.config.js`
 2. `rslint.config.mjs`
-3. `rslint.config.ts`
-4. `rslint.config.mts`
+3. `rslint.config.cjs`
+4. `rslint.config.ts`
+5. `rslint.config.mts`
+6. `rslint.config.cts`
 
 ### Config Discovery
 
-When you run `rslint`, it searches for the config file by walking **upward** from the target file or directory to the filesystem root, stopping at the first config found.
+When you run `rslint`, it searches for a config file by walking **upward** from the target file or directory to the filesystem root. It uses the nearest candidate that loads successfully and falls back to an ancestor when a nearer candidate cannot be loaded.
 
 - `rslint src/foo.ts` — searches from `src/` upward
 - `rslint src/` — searches from `src/` upward
@@ -102,9 +104,9 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 Glob selectors specifying which files this config entry applies to. Top-level selectors are ORed. Patterns in a nested array are ANDed, so `files: [['**/*.js', '!**/*.test.js']]` selects JavaScript files except test files. If omitted, the entry cascades across files selected by the config's implicit or explicit selectors.
 
-If `files` is present, it must contain at least one pattern. Use an omitted `files` field for shared/default entries; `files: []` is invalid.
+If `files` is present, its outer array must be non-empty. Use an omitted `files` field for shared/default entries; `files: []` is invalid. A nested empty AND group (`files: [[]]`) is valid and matches vacuously.
 
-Lint targets are selected from the CLI/API target range. Rslint always includes its default extension baseline, unions every explicit `files` pattern, and then removes global ignores and `.gitignore` matches. Entry-level ignores skip that entry during config merging but do not remove the file from the target set. Explicit file arguments can also appear as 0-rule results outside the selector union. Every selected target is parsed, so syntax diagnostics can still be reported when no rules apply.
+Lint targets are selected from the CLI/API target range. Rslint always includes its default extension baseline and adds paths selected by explicit `files` entries unless the same entry's `ignores` excludes them. Global ignores and `.gitignore` then remove targets. An entry-level ignore cannot remove a path selected by the baseline or another entry; it only prevents its own selector and config contribution. An explicitly requested file outside the selector union is still parsed and included in the results, but no lint rules run for it; syntax diagnostics can still be reported.
 
 The implicit default baseline is:
 
@@ -136,7 +138,14 @@ For file exclusion patterns, negation, and `.gitignore` integration, see [Ignori
 
 ### rules
 
-For rule severity levels, option format, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
+- **Type:** `RuleSeverity | [RuleSeverity, ...unknown[]]`
+- **RuleSeverity:** `'off' | 'warn' | 'error' | 0 | 1 | 2`
+
+The numeric levels follow ESLint: `0` disables a rule, `1` reports warnings, and `2` reports errors. Array entries pass every item after the severity to the rule as positional options, so configurations such as `['error', 'always', { exceptRange: true }]` are supported. Invalid severities and rule value shapes are rejected while the configuration is loaded.
+
+When a later matching entry changes only the severity, the rule keeps options from the earlier entry. Supplying any positional option in the later array replaces the earlier options.
+
+For available rules, presets, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
 ### plugins
 
@@ -158,7 +167,7 @@ Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `jsx-a11y`, `prom
 }
 ```
 
-**Object of plugin instances** — community ESLint plugins. Map a prefix key to an imported plugin object, then enable its rules under the `<prefix>/<rule>` namespace. The plugin's JS rules run in a Node worker. Requires a JS/TS config — a live plugin object can't be expressed in JSON.
+**Object of plugin instances** — third-party ESLint plugins. Map a prefix key to an imported plugin object, then enable its rules under the `<prefix>/<rule>` namespace. These JavaScript rules run in the Node plugin worker and are routed through the same per-file flat config as native rules. This form requires a JS/TS config because JSON cannot carry a live plugin object.
 
 ```ts
 import examplePlugin from 'eslint-plugin-example';
@@ -172,7 +181,7 @@ import examplePlugin from 'eslint-plugin-example';
 }
 ```
 
-A single entry uses one form. To combine built-in and community plugins, declare them in separate config entries (merged at lint time). A community prefix may not collide with a built-in plugin name.
+A single entry uses one form. To combine built-in and third-party plugins, declare them in separate config entries; matching entries are merged before linting. A third-party prefix may not collide with a built-in plugin name.
 
 ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are not part of any plugin and can be enabled directly in `rules` without listing anything here. Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
 
@@ -214,26 +223,49 @@ Explicit tsconfig.json paths. Supports glob patterns for monorepos. Files includ
 }
 ```
 
+#### languageOptions.globals
+
+- **Type:** `Record<string, boolean | null | 'true' | 'false' | 'readonly' | 'readable' | 'writable' | 'writeable' | 'off'>`
+
+Declares globals available to matching files. Values are normalized before rules or third-party plugins receive the scope:
+
+- Writable: `true`, `'true'`, `'writable'`, `'writeable'`
+- Read-only: `false`, `null`, `'false'`, `'readonly'`, `'readable'`
+- Disabled: `'off'`
+
+A disabled value removes a declaration inherited from an earlier matching entry, including an ECMAScript built-in in the third-party plugin scope.
+
+```ts
+{
+  languageOptions: {
+    globals: {
+      BUILD_ID: 'readonly',
+      testRuntime: 'writable',
+    },
+  },
+}
+```
+
 ### settings
 
 - **Type:** `Record<string, unknown>`
 
-Shared settings accessible to all rules. Later entries override earlier ones.
+Shared settings accessible to all rules. Ordinary nested objects are merged recursively; later arrays and scalar values replace earlier values.
 
 ## Config Merging
 
 When multiple config entries match a file, they are merged in array order:
 
 1. **Global ignores** — entries containing only `ignores` and an optional `name` remove files from the target set
-2. **Selector union** — the implicit default baseline and explicit `files` patterns decide whether the config selects the file
+2. **Selector union** — the implicit default baseline and effective explicit `files` entries decide whether the config selects the file
 3. **Files matching** — entries whose explicit `files` patterns don't match are skipped; entries without `files` cascade across the selector union
-4. **Entry-level ignores** — matching entries are skipped without removing the target
-5. **Rules** — shallow merge, later entries override earlier ones
+4. **Entry-level ignores** — matching entries do not select or configure the file, but cannot remove a target selected elsewhere
+5. **Rules** — later entries override earlier ones; a severity-only value retains earlier options
 6. **Plugins** — union from all matching entries
-7. **Settings** — shallow merge
-8. **Language options** — parser options merge by field and globals merge by name
+7. **Settings** — ordinary nested objects merge recursively; arrays and scalar values are replaced
+8. **Language options** — ordinary nested objects merge recursively; arrays and scalar values are replaced
 
-If no entry matches a file, no rules run for it. Explicit file arguments may still be reported as 0-rule results unless global ignores or `.gitignore` exclude them.
+If no entry matches a file, no lint rules run for it. An explicitly requested file is still parsed and included in the result unless a global ignore or `.gitignore` excludes it, so parser diagnostics can remain visible without configured rules.
 
 ## JSON Configuration (Deprecated)
 

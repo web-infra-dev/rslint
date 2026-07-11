@@ -1084,6 +1084,46 @@ func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 	}
 }
 
+func TestCollectAllowFileWarnings_KeepsLexicalConfigOwnersSeparate(t *testing.T) {
+	root := t.TempDir()
+	sharedDir := filepath.Join(root, "shared")
+	ownerA := filepath.Join(root, "a")
+	ownerB := filepath.Join(root, "b")
+	for _, dir := range []string{sharedDir, ownerA, ownerB} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(sharedDir, "index.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	for _, owner := range []string{ownerA, ownerB} {
+		if err := os.Symlink(sharedDir, filepath.Join(owner, "link")); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+	}
+
+	ownerA = tspath.NormalizePath(ownerA)
+	ownerB = tspath.NormalizePath(ownerB)
+	targetA := tspath.ResolvePath(ownerA, "link/index.ts")
+	targetB := tspath.ResolvePath(ownerB, "link/index.ts")
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	warnings := collectAllowFileWarnings(
+		[]string{targetA, targetB},
+		map[string]rslintconfig.RslintConfig{
+			ownerA: {{Ignores: []string{"link/**"}}},
+			ownerB: {{}},
+		},
+		nil,
+		root,
+		true,
+		fsys,
+	)
+	if len(warnings) != 1 || warnings[0].Path != targetA || warnings[0].Kind != allowFileIgnored {
+		t.Fatalf("expected only the target owned by config A to be ignored, got %+v", warnings)
+	}
+}
+
 func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, content string) {
@@ -1155,6 +1195,46 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	sort.Strings(diagnosticFiles)
 	if !strings.HasSuffix(diagnosticFiles[0], "/a.ts") || !strings.HasSuffix(diagnosticFiles[1], "/b.js") {
 		t.Fatalf("expected diagnostics on a.ts and b.js, got %+v", diagnostics)
+	}
+}
+
+func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "rslint.json")
+	target := filepath.Join(dir, "ignored.ts")
+	if err := os.WriteFile(configPath, []byte(`[
+		{"ignores":["ignored.ts"]},
+		{
+			"languageOptions":{"parserOptions":{"project":["./missing.json"]}},
+			"rules":{"no-debugger":"error"}
+		}
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	// Deliberately malformed fixture: a global ignore removes it before Program
+	// creation and syntax diagnostics, rather than treating parse failure as an
+	// implicit ignore.
+	if err := os.WriteFile(target, []byte("const = ;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	code, _, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Config:         configPath,
+		AllowFiles:     []string{tspath.NormalizePath(target)},
+		SingleThreaded: true,
+	})
+	if code != 0 {
+		t.Fatalf("plain lint resolved an inactive project: code=%d stderr=%s", code, stderr)
+	}
+
+	code, _, stderr = runLintPipelineForTest(t, dir, lintArgs{
+		Config:         configPath,
+		AllowFiles:     []string{tspath.NormalizePath(target)},
+		SingleThreaded: true,
+		TypeCheck:      true,
+	})
+	if code == 0 || !strings.Contains(stderr, "missing.json") {
+		t.Fatalf("type-check must resolve every configured project: code=%d stderr=%s", code, stderr)
 	}
 }
 
@@ -1502,10 +1582,10 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 		Range: core.NewTextRange(0, 1),
 		Text:  "b",
 	}}
-	unwritablePath := t.TempDir()
+	directoryPath := t.TempDir()
 
 	fixed, err := applyFixPass(map[string][]rule.RuleDiagnostic{
-		unwritablePath: {diagnostic},
+		directoryPath: {diagnostic},
 	})
 	if err == nil {
 		t.Fatal("expected a write error")
@@ -1513,7 +1593,7 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 	if fixed != 0 {
 		t.Fatalf("failed write must not count as a fix, got %d", fixed)
 	}
-	if !strings.Contains(err.Error(), unwritablePath) {
+	if !strings.Contains(err.Error(), directoryPath) {
 		t.Fatalf("write error must identify the target path, got %v", err)
 	}
 }

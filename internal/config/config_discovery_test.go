@@ -2,14 +2,175 @@ package config
 
 import (
 	"testing"
+
+	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-func TestFindNearestConfig_DirectMatch(t *testing.T) {
+type configPathSpaceFS struct {
+	vfs.FS
+	realPaths     map[string]string
+	caseSensitive bool
+}
+
+func (fs *configPathSpaceFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+func (fs *configPathSpaceFS) Realpath(filePath string) string {
+	if realPath := fs.realPaths[filePath]; realPath != "" {
+		return realPath
+	}
+	return filePath
+}
+
+func resolveConfigOwner(filePath string, configMap map[string]RslintConfig) (string, RslintConfig) {
+	return NewConfigOwnerResolver(configMap, nil).Resolve(filePath)
+}
+
+func TestResolveConfigPathSpace(t *testing.T) {
+	t.Run("symlink aliases use the physical config root", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: true,
+			realPaths: map[string]string{
+				"/alias":          "/real",
+				"/alias/src/a.ts": "/real/src/a.ts",
+				"/real/src/a.ts":  "/real/src/a.ts",
+			},
+		}
+		for _, filePath := range []string{"/alias/src/a.ts", "/real/src/a.ts"} {
+			matchFile, matchDir := ResolveConfigPathSpace(filePath, "/alias", fs)
+			if matchFile != "/real/src/a.ts" || matchDir != "/real" {
+				t.Fatalf("ResolveConfigPathSpace(%q) = (%q, %q)", filePath, matchFile, matchDir)
+			}
+		}
+	})
+
+	t.Run("realpath-normalized casing retains one matching space", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: false,
+			realPaths: map[string]string{
+				"C:/Repo":              "C:/Repo",
+				"c:/repo/src/index.ts": "C:/Repo/src/index.ts",
+			},
+		}
+		matchFile, matchDir := ResolveConfigPathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
+		if matchFile != "C:/Repo/src/index.ts" || matchDir != "C:/Repo" {
+			t.Fatalf("case-insensitive path space = (%q, %q)", matchFile, matchDir)
+		}
+	})
+
+	t.Run("distinct physical casing is not collapsed by a global case flag", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: false,
+			realPaths: map[string]string{
+				"C:/Repo":              "C:/Repo",
+				"c:/repo/src/index.ts": "c:/repo/src/index.ts",
+			},
+		}
+		matchFile, matchDir := ResolveConfigPathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
+		if matchFile != "c:/repo/src/index.ts" || matchDir != "C:/Repo" {
+			t.Fatalf("distinct physical roots were collapsed: (%q, %q)", matchFile, matchDir)
+		}
+	})
+
+	t.Run("native case alias retains relative path when the file symlink escapes", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: false,
+			realPaths: map[string]string{
+				"/repo/Project":         "/repo/Project",
+				"/repo/project":         "/repo/Project",
+				"/repo/project/link.ts": "/repo/shared.ts",
+			},
+		}
+		matchFile, matchDir := ResolveConfigPathSpace("/repo/project/link.ts", "/repo/Project", fs)
+		if matchFile != "/repo/Project/link.ts" || matchDir != "/repo/Project" {
+			t.Fatalf("native alias path space = (%q, %q)", matchFile, matchDir)
+		}
+	})
+}
+
+func TestConfigOwnerResolverUsesVerifiedNativeCaseAliasBeforeFileRealpath(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: false,
+		realPaths: map[string]string{
+			"/repo/Project":         "/repo/Project",
+			"/repo/project":         "/repo/Project",
+			"/repo/project/link.ts": "/repo/shared.ts",
+		},
+	}
+	configMap := map[string]RslintConfig{
+		"/repo/Project": {{Rules: Rules{"rule": "error"}}},
+	}
+	dir, cfg := NewConfigOwnerResolver(configMap, fs).Resolve("/repo/project/link.ts")
+	if dir != "/repo/Project" || cfg == nil {
+		t.Fatalf("native case alias did not retain config owner: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestConfigOwnerResolverPrefersLexicalHierarchy(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/alias/pkg": "/real/pkg",
+		},
+	}
+	configMap := map[string]RslintConfig{
+		"/real":      {{Rules: Rules{"root": "error"}}},
+		"/alias/pkg": {{Rules: Rules{"package": "error"}}},
+	}
+	resolver := NewConfigOwnerResolver(configMap, fs)
+
+	dir, cfg := resolver.Resolve("/real/pkg/src/a.ts")
+	if dir != "/real" || cfg == nil {
+		t.Fatalf("physical config replaced lexical owner: dir=%q cfg=%v", dir, cfg)
+	}
+
+	index := newConfigDirectoryIndex(configMap, fs)
+	children := index.childConfigDirs("/real")
+	if len(children) != 0 {
+		t.Fatalf("physical hierarchy created lexical child boundaries: %v", children)
+	}
+}
+
+func TestConfigOwnerResolverUsesPhysicalFallbackWithoutLexicalOwner(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/alias/pkg":         "/real/pkg",
+			"/outside/link/a.ts": "/real/pkg/src/a.ts",
+		},
+	}
+	configMap := map[string]RslintConfig{
+		"/alias/pkg": {{Rules: Rules{"package": "error"}}},
+	}
+
+	dir, cfg := NewConfigOwnerResolver(configMap, fs).Resolve("/outside/link/a.ts")
+	if dir != "/alias/pkg" || cfg == nil {
+		t.Fatalf("physical fallback did not resolve aliased config: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestConfigOwnerResolverKeepsLexicalOwnerAcrossUnrelatedRealpathTree(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/lex/link/a.ts": "/physical/a.ts",
+		},
+	}
+	configMap := map[string]RslintConfig{
+		"/lex":      {{Rules: Rules{"lexical": "error"}}},
+		"/physical": {{Rules: Rules{"physical": "error"}}},
+	}
+
+	dir, cfg := NewConfigOwnerResolver(configMap, fs).Resolve("/lex/link/a.ts")
+	if dir != "/lex" || cfg == nil {
+		t.Fatalf("unrelated physical tree replaced lexical owner: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestConfigOwnerResolver_DirectMatch(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project": {{Rules: Rules{"no-console": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/src/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/src/a.ts", configMap)
 	if dir != "/project" {
 		t.Errorf("Expected dir /project, got %s", dir)
 	}
@@ -19,12 +180,12 @@ func TestFindNearestConfig_DirectMatch(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_Subdirectory(t *testing.T) {
+func TestConfigOwnerResolver_Subdirectory(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/src/deep/nested/file.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/src/deep/nested/file.ts", configMap)
 	if dir != "/project" {
 		t.Errorf("Expected dir /project, got %s", dir)
 	}
@@ -34,13 +195,13 @@ func TestFindNearestConfig_Subdirectory(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_NearestWins(t *testing.T) {
+func TestConfigOwnerResolver_NearestWins(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project":              {{Rules: Rules{"root-rule": "error"}}},
 		"/project/packages/foo": {{Rules: Rules{"foo-rule": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/packages/foo/src/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/packages/foo/src/a.ts", configMap)
 	if dir != "/project/packages/foo" {
 		t.Errorf("Expected nearest config dir /project/packages/foo, got %s", dir)
 	}
@@ -53,12 +214,12 @@ func TestFindNearestConfig_NearestWins(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_NoMatch(t *testing.T) {
+func TestConfigOwnerResolver_NoMatch(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/other/file.ts", configMap)
+	dir, cfg := resolveConfigOwner("/other/file.ts", configMap)
 	if dir != "" {
 		t.Errorf("Expected empty dir, got %s", dir)
 	}
@@ -67,10 +228,10 @@ func TestFindNearestConfig_NoMatch(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_EmptyMap(t *testing.T) {
+func TestConfigOwnerResolver_EmptyMap(t *testing.T) {
 	configMap := map[string]RslintConfig{}
 
-	dir, cfg := FindNearestConfig("/project/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/a.ts", configMap)
 	if dir != "" {
 		t.Errorf("Expected empty dir, got %s", dir)
 	}
@@ -79,13 +240,31 @@ func TestFindNearestConfig_EmptyMap(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_FileInConfigDir(t *testing.T) {
+func TestConfigOwnerResolverSnapshotsDirectorySet(t *testing.T) {
+	configMap := map[string]RslintConfig{
+		"/project": {{Rules: Rules{"root-rule": "error"}}},
+	}
+	resolver := NewConfigOwnerResolver(configMap, nil)
+
+	delete(configMap, "/project")
+	configMap["/other"] = RslintConfig{{Rules: Rules{"other-rule": "error"}}}
+
+	dir, cfg := resolver.Resolve("/project/src/a.ts")
+	if dir != "/project" || cfg == nil {
+		t.Fatalf("resolver changed after caller map mutation: dir=%q cfg=%v", dir, cfg)
+	}
+	if dir, cfg := resolver.Resolve("/other/a.ts"); dir != "" || cfg != nil {
+		t.Fatalf("resolver observed a directory added after construction: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestConfigOwnerResolver_FileInConfigDir(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
 	// File directly in config dir (not in a subdirectory)
-	dir, cfg := FindNearestConfig("/project/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/a.ts", configMap)
 	if dir != "/project" {
 		t.Errorf("Expected dir /project, got %s", dir)
 	}
@@ -95,14 +274,14 @@ func TestFindNearestConfig_FileInConfigDir(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_MultipleConfigsSameDepth(t *testing.T) {
+func TestConfigOwnerResolver_MultipleConfigsSameDepth(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project/packages/foo": {{Rules: Rules{"foo-rule": "error"}}},
 		"/project/packages/bar": {{Rules: Rules{"bar-rule": "error"}}},
 	}
 
 	// File in foo should get foo's config
-	dir, cfg := FindNearestConfig("/project/packages/foo/src/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/packages/foo/src/a.ts", configMap)
 	if dir != "/project/packages/foo" {
 		t.Errorf("Expected /project/packages/foo, got %s", dir)
 	}
@@ -115,7 +294,7 @@ func TestFindNearestConfig_MultipleConfigsSameDepth(t *testing.T) {
 	}
 
 	// File in bar should get bar's config
-	dir, cfg = FindNearestConfig("/project/packages/bar/src/b.ts", configMap)
+	dir, cfg = resolveConfigOwner("/project/packages/bar/src/b.ts", configMap)
 	if dir != "/project/packages/bar" {
 		t.Errorf("Expected /project/packages/bar, got %s", dir)
 	}
@@ -128,13 +307,13 @@ func TestFindNearestConfig_MultipleConfigsSameDepth(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_SimilarPrefixNoFalseMatch(t *testing.T) {
+func TestConfigOwnerResolver_SimilarPrefixNoFalseMatch(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project/src": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
 	// /project/src-other should NOT match /project/src
-	dir, cfg := FindNearestConfig("/project/src-other/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/src-other/a.ts", configMap)
 	if dir != "" {
 		t.Errorf("Expected no match for src-other, got dir %s", dir)
 	}
@@ -143,24 +322,19 @@ func TestFindNearestConfig_SimilarPrefixNoFalseMatch(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfigWithCaseSensitivity_CaseInsensitiveFilesystem(t *testing.T) {
+func TestConfigOwnerResolver_UsesExactCasing(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"C:/Repo":              {{Rules: Rules{"root": "error"}}},
 		"C:/Repo/Packages/App": {{Rules: Rules{"app": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfigWithCaseSensitivity("c:/repo/packages/app/src/a.ts", configMap, false)
-	if dir != "C:/Repo/Packages/App" || cfg == nil {
-		t.Fatalf("expected case-insensitive nearest config, got dir=%q cfg=%v", dir, cfg)
-	}
-
-	dir, cfg = FindNearestConfigWithCaseSensitivity("c:/repo/packages/app/src/a.ts", configMap, true)
+	dir, cfg := resolveConfigOwner("c:/repo/packages/app/src/a.ts", configMap)
 	if dir != "" || cfg != nil {
-		t.Fatalf("case-sensitive lookup should not match different casing, got dir=%q cfg=%v", dir, cfg)
+		t.Fatalf("exact lookup should not match different casing, got dir=%q cfg=%v", dir, cfg)
 	}
 }
 
-func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
+func TestConfigOwnerResolver_NestedConfigDirs(t *testing.T) {
 	// /project/src and /project/src/components both have configs.
 	// File in components should pick the deeper config.
 	configMap := map[string]RslintConfig{
@@ -168,7 +342,7 @@ func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
 		"/project/src/components": {{Rules: Rules{"components-rule": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/src/components/Button.tsx", configMap)
+	dir, cfg := resolveConfigOwner("/project/src/components/Button.tsx", configMap)
 	if dir != "/project/src/components" {
 		t.Errorf("Expected /project/src/components, got %s", dir)
 	}
@@ -181,7 +355,7 @@ func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
 	}
 
 	// File in src (not components) should pick src config
-	dir, cfg = FindNearestConfig("/project/src/utils.ts", configMap)
+	dir, cfg = resolveConfigOwner("/project/src/utils.ts", configMap)
 	if dir != "/project/src" {
 		t.Errorf("Expected /project/src, got %s", dir)
 	}
@@ -190,12 +364,12 @@ func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_RootConfig(t *testing.T) {
+func TestConfigOwnerResolver_RootConfig(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/": {{Rules: Rules{"root-rule": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/any/deep/path/file.ts", configMap)
+	dir, cfg := resolveConfigOwner("/any/deep/path/file.ts", configMap)
 	if dir != "/" {
 		t.Errorf("Expected /, got %s", dir)
 	}
@@ -205,13 +379,13 @@ func TestFindNearestConfig_RootConfig(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_FileAboveAllConfigs(t *testing.T) {
+func TestConfigOwnerResolver_FileAboveAllConfigs(t *testing.T) {
 	// Config only in a subdirectory; file in parent should not match
 	configMap := map[string]RslintConfig{
 		"/project/packages/foo": {{Rules: Rules{"foo-rule": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/root-file.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/root-file.ts", configMap)
 	if dir != "" {
 		t.Errorf("Expected no match, got %s", dir)
 	}
@@ -220,12 +394,12 @@ func TestFindNearestConfig_FileAboveAllConfigs(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_TrailingSlashInKey(t *testing.T) {
+func TestConfigOwnerResolver_TrailingSlashInKey(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"/project/": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/src/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/src/a.ts", configMap)
 	if dir != "/project/" {
 		t.Errorf("Expected /project/, got %s", dir)
 	}
@@ -235,21 +409,21 @@ func TestFindNearestConfig_TrailingSlashInKey(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_EmptyStringKey(t *testing.T) {
+func TestConfigOwnerResolver_EmptyStringKey(t *testing.T) {
 	configMap := map[string]RslintConfig{
 		"": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
 	// Empty string key should not match anything
-	dir, cfg := FindNearestConfig("/project/a.ts", configMap)
+	dir, cfg := resolveConfigOwner("/project/a.ts", configMap)
 	if dir != "" || cfg != nil {
 		t.Errorf("Expected no match for empty key, got dir=%q cfg=%v", dir, cfg)
 	}
 }
 
-func TestFindNearestConfig_NilMap(t *testing.T) {
+func TestConfigOwnerResolver_NilMap(t *testing.T) {
 	// nil map should not panic and should return no match
-	dir, cfg := FindNearestConfig("/project/a.ts", nil)
+	dir, cfg := resolveConfigOwner("/project/a.ts", nil)
 	if dir != "" {
 		t.Errorf("Expected empty dir for nil map, got %s", dir)
 	}
@@ -258,14 +432,14 @@ func TestFindNearestConfig_NilMap(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_FilePathEqualsConfigDir(t *testing.T) {
+func TestConfigOwnerResolver_FilePathEqualsConfigDir(t *testing.T) {
 	// filePath == configDir: StartsWithDirectory returns false,
 	// so the file should NOT match (it's not "inside" the directory)
 	configMap := map[string]RslintConfig{
 		"/project/src": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
-	dir, cfg := FindNearestConfig("/project/src", configMap)
+	dir, cfg := resolveConfigOwner("/project/src", configMap)
 	if dir != "" {
 		t.Errorf("Expected no match when filePath == configDir, got %s", dir)
 	}
@@ -274,14 +448,14 @@ func TestFindNearestConfig_FilePathEqualsConfigDir(t *testing.T) {
 	}
 }
 
-func TestFindNearestConfig_SingleConfigFallback(t *testing.T) {
+func TestConfigOwnerResolver_SingleConfigFallback(t *testing.T) {
 	// Single config that matches — should always work for files under it
 	configMap := map[string]RslintConfig{
 		"/monorepo": {{Rules: Rules{"rule-a": "error"}}},
 	}
 
 	// File deep under config dir
-	dir, cfg := FindNearestConfig("/monorepo/packages/foo/src/deep/file.ts", configMap)
+	dir, cfg := resolveConfigOwner("/monorepo/packages/foo/src/deep/file.ts", configMap)
 	if dir != "/monorepo" {
 		t.Errorf("Expected /monorepo, got %s", dir)
 	}
@@ -291,7 +465,7 @@ func TestFindNearestConfig_SingleConfigFallback(t *testing.T) {
 	}
 
 	// File NOT under config dir
-	_, cfg = FindNearestConfig("/other-repo/file.ts", configMap)
+	_, cfg = resolveConfigOwner("/other-repo/file.ts", configMap)
 	if cfg != nil {
 		t.Error("Expected nil for file outside config dir")
 	}

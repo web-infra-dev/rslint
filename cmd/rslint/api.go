@@ -29,6 +29,18 @@ import (
 // IPCHandler implements the ipc.Handler interface
 type IPCHandler struct{}
 
+type canonicalPathVFS struct {
+	vfs.FS
+	canonicalPaths map[string]string
+}
+
+func (fs *canonicalPathVFS) Realpath(filePath string) string {
+	if canonicalPath := fs.canonicalPaths[exactFilesystemPathID(filePath)]; canonicalPath != "" {
+		return canonicalPath
+	}
+	return fs.FS.Realpath(filePath)
+}
+
 // programCache holds a cached Program instance for AST info requests
 type programCache struct {
 	mu              sync.RWMutex
@@ -94,6 +106,16 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			return tspath.NormalizePath(filePath)
 		}
 		return tspath.ResolvePath(currentDirectory, filePath)
+	}
+	if len(req.CanonicalFiles) > 0 && len(req.CanonicalFiles) != len(req.Files) {
+		return nil, errors.New("canonicalFiles must be parallel to files")
+	}
+	canonicalPaths := make(map[string]string, len(req.CanonicalFiles))
+	for index, canonicalPath := range req.CanonicalFiles {
+		filePath := resolveRequestPath(req.Files[index])
+		canonicalPath = resolveRequestPath(canonicalPath)
+		canonicalPaths[exactFilesystemPathID(filePath)] = canonicalPath
+		canonicalPaths[exactFilesystemPathID(canonicalPath)] = canonicalPath
 	}
 
 	addAllowedFile := func(filePath string) string {
@@ -172,6 +194,9 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
+	if len(canonicalPaths) > 0 {
+		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
+	}
 	var gitignoreGlobs []string
 	if allowedFiles != nil {
 		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobsForFiles(configDirectory, fs, allowedFiles)
@@ -181,21 +206,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(gitignoreGlobs) > 0 {
 		rslintConfig = append(rslintconfig.RslintConfig{{Ignores: gitignoreGlobs}}, rslintConfig...)
 	}
-	// Build unique tsconfig Programs with a request-scoped parse cache.
-	// The cache dies with this request — no RetainOnly sweep here, and none
-	// may be added during Program construction.
-	parseCache := utils.NewParseCache()
-	programSet, err := createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
-	if err != nil {
-		return nil, err
-	}
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          configDirectory,
-		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
+		UseCaseSensitiveFileNames: true,
 	}
 
 	// Resolve the exact lint target set, bind targets to existing Programs, and
-	// append an AST-only fallback Program for selected files absent from every
+	// append a non-project-backed fallback Program for selected files absent from every
 	// Program (the typical lintText/lintFiles in-memory file). Identical to the
 	// CLI via the shared helper. configMap is nil: the --api path is always
 	// single-config (the JS side resolves any multi-config merge into one entry
@@ -205,6 +222,17 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	targetPlan, err := resolveLintTargetPlan(nil, rslintConfig, configDirectory, nil, fs, allowedFiles, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
+	}
+	// A plain API lint only needs type information when at least one target is
+	// selected. Resolve the target plan before project paths so an ignored or
+	// empty request cannot fail on an inactive project declaration.
+	parseCache := utils.NewParseCache()
+	var programSet lintProgramSet
+	if len(targetPlan.Targets) > 0 {
+		programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
+		if err != nil {
+			return nil, err
+		}
 	}
 	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, fs, parseCache, false)
 	if err != nil {
@@ -219,9 +247,9 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		CurrentDirectory:           configDirectory,
 		EnforcePlugins:             true,
 		TypeInfoFiles:              typeInfoFiles,
-		TargetPathBySourcePath:     targetPathBySourcePath,
 		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
 		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
+		SourceMappingsCanonical:    true,
 		FS:                         fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {
@@ -371,10 +399,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Scope:          linter.FileScope{Files: allowedFiles},
 		TargetFiles:    targetsByProgram,
-		// Defense-in-depth alongside the GetRulesForFile gate: RunLinter passes
-		// a nil TypeChecker to rules running on files outside this set (gap /
-		// fallback files), so a non-type-aware rule with optional TypeChecker
-		// usage degrades gracefully. nil ⇒ no fallback ⇒ no gap distinction.
+		// RunLinter repeats the RequiresTypeInfo eligibility check for files
+		// outside this set and withholds the project TypeChecker from them.
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
@@ -387,8 +413,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// GetActiveRulesForFile applies the type-aware gate: when
 			// typeInfoFiles is non-nil and this file is not in it (a gap /
 			// fallback file with no type information), type-aware rules are
-			// filtered out — the only guard against a type-aware rule
-			// dereferencing a nil TypeChecker and crashing the process.
+			// filtered out. RunLinter repeats this check at the execution boundary.
 			// typeInfoFiles==nil ⇒ no fallback ⇒ every linted file has type
 			// info ⇒ nothing to filter. Rules come solely from the resolved
 			// config object (config.rules); --api has no separate rule-options
@@ -434,7 +459,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	var pluginCh <-chan []rule.RuleDiagnostic
 	var cancelPlugin context.CancelFunc
 	if len(req.EslintPlugins) > 0 {
-		wireConfigDirectory := req.ConfigDirectory
+		wireConfigDirectory := req.PluginConfigDirectory
+		if wireConfigDirectory == "" {
+			wireConfigDirectory = req.ConfigDirectory
+		}
 		if wireConfigDirectory == "" {
 			wireConfigDirectory = configDirectory
 		}
@@ -579,7 +607,7 @@ func addEquivalentFileContentPaths(fileContents map[string]string, configDirecto
 
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
+		UseCaseSensitiveFileNames: true,
 	}
 	addAlias := func(alias string, content string) {
 		if alias == "" {

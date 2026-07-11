@@ -95,6 +95,7 @@ export class PluginLintPool {
   >();
   private activeGeneration: string | undefined;
   private activeState: HostGeneration | undefined;
+  private readonly liveStates = new Set<HostGeneration>();
   private readonly shutdowns = new Set<Promise<void>>();
   /**
    * Serializes every lifecycle op (prepare/commit/abort/dispose). Each op
@@ -171,12 +172,14 @@ export class PluginLintPool {
       }
 
       if (descriptors.length === 0) {
-        this.generations.set(generation, {
+        const state: HostGeneration = {
           fingerprint,
           ready: true,
           activeLints: 0,
           retiring: false,
-        });
+        };
+        this.liveStates.add(state);
+        this.generations.set(generation, state);
         ready = true;
         return;
       }
@@ -192,13 +195,15 @@ export class PluginLintPool {
           await replacement.shutdown().catch(() => undefined);
           return;
         }
-        this.generations.set(generation, {
+        const state: HostGeneration = {
           fingerprint,
           host: replacement,
           ready: true,
           activeLints: 0,
           retiring: false,
-        });
+        };
+        this.liveStates.add(state);
+        this.generations.set(generation, state);
         ready = true;
       } catch (err: unknown) {
         // Init failed: either the host module couldn't be loaded (a packaging
@@ -207,12 +212,14 @@ export class PluginLintPool {
         // active host intact. Record an unavailable staged generation so the
         // first valid config can still be committed and serve native rules;
         // later prepares retry instead of caching this failure as ready.
-        this.generations.set(generation, {
+        const state: HostGeneration = {
           fingerprint,
           ready: false,
           activeLints: 0,
           retiring: false,
-        });
+        };
+        this.liveStates.add(state);
+        this.generations.set(generation, state);
         this.logger.error('Failed to initialize ESLint-plugin host', err);
         // Make the failure visible — but ONLY when a config actually mounted
         // plugins (an empty-descriptor host builds no worker and failing is
@@ -416,15 +423,17 @@ export class PluginLintPool {
       : Promise.resolve();
     state.shutdown = shutdown;
     this.shutdowns.add(shutdown);
-    void shutdown.finally(() => this.shutdowns.delete(shutdown));
+    void shutdown.finally(() => {
+      this.shutdowns.delete(shutdown);
+      this.liveStates.delete(state);
+    });
   }
 
   /** Shut down the worker pool. Idempotent. */
   async dispose(): Promise<void> {
     this.disposed = true;
     await this.enqueue(async () => {
-      const states = new Set(this.generations.values());
-      if (this.activeState) states.add(this.activeState);
+      const states = [...this.liveStates];
       this.generations.clear();
       for (const timer of this.generationRetirementTimers.values()) {
         clearTimeout(timer);

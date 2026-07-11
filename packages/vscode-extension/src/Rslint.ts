@@ -22,11 +22,11 @@ import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 import {
-  loadConfigFile,
+  loadConfigFileFresh,
   normalizeConfig,
   collectPluginMeta,
+  filterConfigsByParentIgnores,
   JS_CONFIG_FILES,
 } from '@rslint/core/config-loader';
 import { PluginLintPool } from './PluginLintPool';
@@ -43,20 +43,63 @@ const LOCKFILE_NAMES = [
   'yarn.lock',
 ] as const;
 
+export const JS_CONFIG_SEARCH_GLOB = '**/rslint.config.{js,mjs,cjs,ts,mts,cts}';
+export const JS_CONFIG_SEARCH_EXCLUDE_PATTERN = '**/{node_modules,.git}/**';
+
 /** A loaded + normalized config file with its source path. */
 interface LoadedConfig {
   configPath: string;
+  hierarchyDirectory: string;
   configDirectory: string;
   entries: Record<string, unknown>[];
   sourceFingerprint: string;
+  /** Marks a failed config boundary that must not lint its owned subtree. */
+  unavailable?: boolean;
+}
+
+function isSameOrChildDirectory(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative === '' ||
+    (relative !== '..' &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
+  );
+}
+
+export function selectUnavailableConfigBoundaryDirectories(
+  usableDirectories: readonly string[],
+  unavailableDirectories: readonly string[],
+): string[] {
+  const usable = usableDirectories.map((directory) =>
+    path.normalize(directory),
+  );
+  const unavailable = [
+    ...new Set(
+      unavailableDirectories.map((directory) => path.normalize(directory)),
+    ),
+  ];
+  const withoutUsableAncestor = unavailable.filter(
+    (directory) =>
+      !usable.some((ancestor) => isSameOrChildDirectory(ancestor, directory)),
+  );
+  return withoutUsableAncestor.filter(
+    (directory, index) =>
+      !withoutUsableAncestor.some(
+        (ancestor, ancestorIndex) =>
+          ancestorIndex !== index &&
+          isSameOrChildDirectory(ancestor, directory),
+      ),
+  );
 }
 
 function selectEffectiveConfigFiles(configFiles: readonly Uri[]): Uri[] {
   const selectedByDirectory = new Map<string, { uri: Uri; priority: number }>();
 
   for (const uri of configFiles) {
-    const priority = JS_CONFIG_FILES.indexOf(
-      path.basename(uri.fsPath) as (typeof JS_CONFIG_FILES)[number],
+    const configName = path.basename(uri.fsPath);
+    const priority = JS_CONFIG_FILES.findIndex(
+      (candidateName) => candidateName === configName,
     );
     if (priority < 0) continue;
 
@@ -70,6 +113,18 @@ function selectEffectiveConfigFiles(configFiles: readonly Uri[]): Uri[] {
   return [...selectedByDirectory.values()]
     .map(({ uri }) => uri)
     .sort((a, b) => a.fsPath.localeCompare(b.fsPath));
+}
+
+export function filterEffectiveConfigCatalog<
+  T extends { hierarchyDirectory: string; entries: unknown[] },
+>(configs: T[]): T[] {
+  return filterConfigsByParentIgnores(
+    configs.map((config) => ({
+      configDirectory: config.hierarchyDirectory,
+      entries: config.entries,
+      config,
+    })),
+  ).map(({ config }) => config);
 }
 
 export class Rslint implements Disposable {
@@ -155,7 +210,7 @@ export class Rslint implements Disposable {
       ],
       synchronize: {
         fileEvents: workspace.createFileSystemWatcher(
-          '**/{rslint.config.{ts,mts,js,mjs},rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
+          '**/{rslint.config.{js,mjs,cjs,ts,mts,cts},rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
         ),
       },
       outputChannel: this.outputChannel,
@@ -209,10 +264,7 @@ export class Rslint implements Disposable {
       // first import is running then queues a second, serialized reload instead
       // of being missed between initial load and watcher registration.
       this.configWatcher = workspace.createFileSystemWatcher(
-        new RelativePattern(
-          this.workspaceFolder,
-          '**/rslint.config.{ts,mts,js,mjs}',
-        ),
+        new RelativePattern(this.workspaceFolder, JS_CONFIG_SEARCH_GLOB),
       );
       const reloadConfig = (kind: string) => (uri: Uri) => {
         this.logger.debug(`${kind} changed: ${uri.fsPath}`);
@@ -263,18 +315,18 @@ export class Rslint implements Disposable {
     }
   }
 
-  private loadAndSendConfig(): Promise<void> {
+  private async loadAndSendConfig(): Promise<void> {
     const epoch = this.lifecycleEpoch;
     const client = this.client;
     const pluginLintPool = this.pluginLintPool;
-    if (!client || this.pluginLintPoolDisposed) return Promise.resolve();
-    const reload = this.configReloadChain.then(() =>
-      this.performLoadAndSendConfig(epoch, client, pluginLintPool),
-    );
+    if (!client || this.pluginLintPoolDisposed) return;
+    const reload = this.configReloadChain.then(async () => {
+      await this.performLoadAndSendConfig(epoch, client, pluginLintPool);
+    });
     // Keep future reloads usable after a failed import while still returning
     // this reload's rejection to the caller for logging.
     this.configReloadChain = reload.catch(() => undefined);
-    return reload;
+    await reload;
   }
 
   private isLifecycleCurrent(
@@ -353,11 +405,8 @@ export class Rslint implements Disposable {
   ): Promise<void> {
     if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) return;
     const discoveredConfigFiles = await workspace.findFiles(
-      new RelativePattern(
-        this.workspaceFolder,
-        '**/rslint.config.{js,mjs,ts,mts}',
-      ),
-      '**/node_modules/**',
+      new RelativePattern(this.workspaceFolder, JS_CONFIG_SEARCH_GLOB),
+      JS_CONFIG_SEARCH_EXCLUDE_PATTERN,
     );
     if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) return;
     const configFiles = selectEffectiveConfigFiles(discoveredConfigFiles);
@@ -388,7 +437,7 @@ export class Rslint implements Disposable {
     const results = await Promise.allSettled(
       configFiles.map(async (uri) => {
         const fingerprintBeforeLoad = this.computeFileFingerprint(uri.fsPath);
-        const rawConfig = await this.loadConfigFresh(uri.fsPath);
+        const rawConfig = await loadConfigFileFresh(uri.fsPath);
         const entries = normalizeConfig(rawConfig);
         const sourceFingerprint = this.computeFileFingerprint(uri.fsPath);
         if (sourceFingerprint !== fingerprintBeforeLoad) {
@@ -396,6 +445,7 @@ export class Rslint implements Disposable {
         }
         return {
           configPath: uri.fsPath,
+          hierarchyDirectory: path.dirname(uri.fsPath),
           // URI form, kept byte-identical to the per-file `configKey` Go
           // returns (its `getConfigForURI` cwd) so the worker's per-config
           // dispatch keys match. Also the key Go uses in `s.jsConfigs`.
@@ -407,7 +457,6 @@ export class Rslint implements Disposable {
     );
 
     const loadedConfigs = new Map<string, LoadedConfig>();
-    const failedConfigs: Uri[] = [];
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === 'fulfilled') {
@@ -416,7 +465,6 @@ export class Rslint implements Disposable {
           result.value,
         );
       } else {
-        failedConfigs.push(configFiles[i]);
         this.logger.error(
           `Failed to load JS config: ${configFiles[i].fsPath}`,
           result.reason,
@@ -426,14 +474,13 @@ export class Rslint implements Disposable {
 
     const configs: LoadedConfig[] = [];
     const nextLastGoodConfigs = new Map<string, LoadedConfig>();
-    let usableConfigCount = 0;
+    const unavailableConfigs: Uri[] = [];
     for (const uri of configFiles) {
       const configPath = path.normalize(uri.fsPath);
       const loaded = loadedConfigs.get(configPath);
       if (loaded) {
         configs.push(loaded);
         nextLastGoodConfigs.set(configPath, loaded);
-        usableConfigCount++;
         continue;
       }
 
@@ -441,39 +488,55 @@ export class Rslint implements Disposable {
       if (lastGood) {
         configs.push(lastGood);
         nextLastGoodConfigs.set(configPath, lastGood);
-        usableConfigCount++;
         this.logger.error(
           `Preserving the last good JS config for ${uri.fsPath}`,
         );
         continue;
       }
 
-      // Preserve the CLI's established partial-failure behavior: log and skip
-      // a newly discovered config that has never loaded successfully. Other
-      // valid configs continue to apply, including normal ancestor fallback.
+      unavailableConfigs.push(uri);
     }
-    if (failedConfigs.length > 0 && usableConfigCount === 0) {
-      // No selected JS config has ever loaded successfully. A workspace-level
-      // empty boundary represents an explicit no-lint state; otherwise a lone
-      // broken nested config would incorrectly expose the JSON fallback in the
-      // rest of the workspace.
-      configs.length = 0;
+
+    // A failed candidate without a last-good value still owns its subtree
+    // unless a usable JS ancestor can take over. Keep only the outermost empty
+    // boundary when several unavailable candidates are nested.
+    const boundaryDirectories = selectUnavailableConfigBoundaryDirectories(
+      configs.map((config) => config.hierarchyDirectory),
+      unavailableConfigs.map((uri) => path.dirname(uri.fsPath)),
+    );
+    const unavailableByDirectory = new Map(
+      unavailableConfigs.map((uri) => [
+        path.normalize(path.dirname(uri.fsPath)),
+        uri,
+      ]),
+    );
+    for (const hierarchyDirectory of boundaryDirectories) {
+      const uri = unavailableByDirectory.get(hierarchyDirectory);
+      if (!uri) continue;
       configs.push({
-        configPath: failedConfigs[0].fsPath,
-        configDirectory: this.workspaceFolder.uri.toString(),
+        configPath: uri.fsPath,
+        hierarchyDirectory,
+        configDirectory: Uri.file(hierarchyDirectory).toString(),
         entries: [],
         sourceFingerprint: 'unavailable',
+        unavailable: true,
       });
+    }
+
+    if (boundaryDirectories.length > 0) {
       this.logger.error(
-        'No selected JS config could be loaded; linting is disabled until one loads successfully',
+        'JS configs without a usable ancestor were replaced by empty config boundaries until they load successfully',
       );
-    } else if (failedConfigs.length > 0) {
+    }
+    if (unavailableConfigs.length > boundaryDirectories.length) {
       this.logger.error(
-        'JS configs without a last-good value were skipped; remaining configs stay active',
+        'JS configs covered by an ancestor config or empty boundary were omitted from the catalog',
       );
     }
 
     configs.sort((a, b) => a.configPath.localeCompare(b.configPath));
+    const effectiveConfigs = filterEffectiveConfigCatalog(configs);
+    effectiveConfigs.sort((a, b) => a.configPath.localeCompare(b.configPath));
 
     // Collect the ESLint-plugin metadata once: the worker-pool descriptors
     // (one per config that actually mounts plugins — others stay zero-overhead)
@@ -481,7 +544,7 @@ export class Rslint implements Disposable {
     // placeholder rules. Single pass so the two never disagree about which
     // configs carry plugins.
     const { pluginConfigs: descriptors, eslintPluginEntries } =
-      collectPluginMeta(configs);
+      collectPluginMeta(effectiveConfigs);
 
     // Spin up / refresh the host. Fingerprint over the config files + lockfiles
     // so an edit or dependency install rebuilds the workers.
@@ -490,7 +553,7 @@ export class Rslint implements Disposable {
       descriptors,
       this.computeFingerprint(
         descriptors.map((c) => c.configPath),
-        configs,
+        effectiveConfigs,
       ),
       generation,
     );
@@ -529,15 +592,15 @@ export class Rslint implements Disposable {
       return;
     }
 
-    // Wire shape Go's handleConfigUpdate parses: per-config {configDirectory,
-    // entries} plus the top-level `eslintPlugins` aggregate (same shape the CLI
-    // sends in its init payload). `configPath` is a host-local detail for the
-    // worker descriptors, not the wire.
+    // Wire shape Go's handleConfigUpdate parses: per-config configDirectory,
+    // entries, and an optional unavailable-boundary marker, plus the top-level
+    // `eslintPlugins` aggregate. `configPath` is a host-local worker detail.
     try {
       await this.sendConfigUpdate(client, pluginLintPool, generation, {
-        configs: configs.map((c) => ({
+        configs: effectiveConfigs.map((c) => ({
           configDirectory: c.configDirectory,
           entries: c.entries,
+          unavailable: c.unavailable || undefined,
         })),
         eslintPlugins: eslintPluginEntries,
       });
@@ -547,31 +610,6 @@ export class Rslint implements Disposable {
     }
     this.lastGoodConfigs = nextLastGoodConfigs;
     this.hasSentJSConfig = true;
-  }
-
-  /**
-   * Load a JS/TS config file with ESM cache busting for hot reload.
-   * Appends ?t=timestamp to the file URL so that Node.js treats each
-   * reload as a new module (bypassing ESM cache). For .ts/.mts, if
-   * native import fails (e.g. Electron without strip-types), falls
-   * back to loadConfigFile which uses jiti (no caching issue).
-   */
-  private async loadConfigFresh(configPath: string): Promise<unknown> {
-    const ext = path.extname(configPath);
-    if (ext === '.js' || ext === '.mjs') {
-      const url = `${pathToFileURL(configPath).href}?t=${Date.now()}`;
-      const mod: Record<string, unknown> = await import(url);
-      return mod.default ?? mod;
-    }
-    // .ts/.mts: try native import with cache busting first (Node >= 22.6),
-    // fall back to loadConfigFile (jiti) if native TS import is not supported.
-    try {
-      const url = `${pathToFileURL(configPath).href}?t=${Date.now()}`;
-      const mod: Record<string, unknown> = await import(url);
-      return mod.default ?? mod;
-    } catch {
-      return loadConfigFile(configPath);
-    }
   }
 
   /**
