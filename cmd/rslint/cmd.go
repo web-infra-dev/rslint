@@ -958,6 +958,32 @@ func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]r
 	return cloned
 }
 
+// validateResolvedRuleOptions runs rule-options schema validation over the
+// resolved configuration: every configMap config in multi-config mode (each
+// message suffixed with the owning config directory, since the same rule can
+// be misconfigured differently per config), or the single rslintConfig
+// otherwise. Returns one formatted message per failure.
+func validateResolvedRuleOptions(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig) []string {
+	var messages []string
+	if configMap == nil {
+		for _, optionsError := range rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry) {
+			messages = append(messages, optionsError.Error())
+		}
+		return messages
+	}
+	configDirs := make([]string, 0, len(configMap))
+	for dir := range configMap {
+		configDirs = append(configDirs, dir)
+	}
+	slices.Sort(configDirs)
+	for _, dir := range configDirs {
+		for _, optionsError := range rslintconfig.ValidateRuleOptions(configMap[dir], rslintconfig.GlobalRuleRegistry) {
+			messages = append(messages, fmt.Sprintf("%s (config at %s)", optionsError.Error(), dir))
+		}
+	}
+	return messages
+}
+
 // resolveStartTime returns the start time for timing output.
 // If startTimeMs (epoch millis from the Node.js entry point) is positive,
 // it is used so the reported duration covers end-to-end execution.
@@ -1320,6 +1346,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				rslintConfig = append(rslintConfig, *cliEntry)
 			}
 		}
+	}
+
+	// Validate every configured rule's options against its declared schema —
+	// a separate step after configuration is fully resolved (including --rule
+	// overrides) and before any linting starts, so a bad config fails fast
+	// with every failure reported at once instead of surfacing mid-lint.
+	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
+		for _, message := range messages {
+			fmt.Fprintf(os.Stderr, "error: %s\n", message)
+		}
+		return 1
 	}
 
 	// Use CWD for display paths (not any config directory).

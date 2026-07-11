@@ -131,13 +131,21 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	Run                func(ctx RuleContext, options []any) RuleListeners
+	// Schema validates the rule's resolved options array (ESLint's
+	// context.options — the config array after the severity level) before
+	// linting starts. Rules that take no options should set it to the shared
+	// [EmptyArraySchema]. nil means the rule has not declared a schema yet
+	// (most rules, until migrated one-by-one): its options pass through
+	// unvalidated, exactly as before the schema framework existed.
+	Schema *Schema
+	Run    func(ctx RuleContext, options []any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema:           r.Schema,
 		Run:              r.Run,
 	}
 }
