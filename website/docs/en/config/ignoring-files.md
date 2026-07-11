@@ -98,7 +98,7 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 
 ## .gitignore integration
 
-Rslint automatically reads `.gitignore` files and treats their patterns as additional global ignores. This means files ignored by git (build outputs, coverage reports, etc.) are also ignored by the linter without extra configuration.
+The CLI and JavaScript API automatically read `.gitignore` files and treat their patterns as additional global ignores. This means files ignored by git (build outputs, coverage reports, etc.) are also ignored by those integrations without extra configuration. The LSP does not currently read `.gitignore`; use a config global ignore when editor diagnostics must follow the same exclusion.
 
 - **Nested `.gitignore` files** are supported — each one only affects its own directory subtree
 - **Parent patterns cascade** to child directories (e.g., root `dist/` also ignores `packages/app/dist/`)

@@ -56,15 +56,15 @@ export interface RslintOptions {
   /** Apply rule auto-fixes; results carry `output` (the JS side persists via outputFixes). */
   fix?: boolean;
   /**
-   * In-memory file overlay (path → content) for fully in-memory linting (issue
-   * #1106): put the `tsconfig.json` that `parserOptions.project` names plus any
+   * In-memory file overlay (path → content) for project inputs (issue #1106):
+   * put the `tsconfig.json` that `parserOptions.project` names plus any
    * dependency files here, then lint a buffer with `lintText`. Keys resolve
    * against `cwd` like a linted path (relative or absolute both work); a
    * same-path `lintText` code entry wins. Inside the tsconfig (`files`) and
    * `parserOptions.project`, use relative paths — the TS compiler resolves
    * those, and a bare POSIX-absolute path there has no drive letter on Windows,
-   * so it won't match the overlay. rslint-only — ESLint has no in-memory file
-   * map.
+   * so it won't match the overlay. The overlay permits filesystem fallback and
+   * is not a sandbox. rslint-only — ESLint has no in-memory file map.
    *
    * Give the tsconfig explicit `files`, not a broad `include` glob: a glob is
    * expanded against the real filesystem and would scan `cwd` on disk.

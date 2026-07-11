@@ -4,14 +4,15 @@ Rslint uses a flat config format (an array of config entries), aligned with ESLi
 
 ## Configuration Files
 
-Rslint looks for config files in the following order:
+During automatic discovery, Rslint checks config files in the following order:
 
 1. `rslint.config.js`
 2. `rslint.config.mjs`
-3. `rslint.config.cjs`
-4. `rslint.config.ts`
-5. `rslint.config.mts`
-6. `rslint.config.cts`
+3. `rslint.config.ts`
+4. `rslint.config.mts`
+
+Automatic discovery does not consider `.cjs` or `.cts` config files. They can
+still be selected explicitly with `--config` or API `overrideConfigFile`.
 
 ### Config Discovery
 
@@ -106,7 +107,7 @@ Glob selectors specifying which files this config entry applies to. Top-level se
 
 If `files` is present, its outer array must be non-empty. Use an omitted `files` field for shared/default entries; `files: []` is invalid. A nested empty AND group (`files: [[]]`) is valid and matches vacuously.
 
-Lint targets are selected from the CLI/API target range. Rslint always includes its default extension baseline and adds paths selected by explicit `files` entries unless the same entry's `ignores` excludes them. Global ignores and `.gitignore` then remove targets. An entry-level ignore cannot remove a path selected by the baseline or another entry; it only prevents its own selector and config contribution. An explicitly requested file outside the selector union is still parsed and included in the results, but no lint rules run for it; syntax diagnostics can still be reported.
+Lint targets are selected from the CLI/API target range and are limited to Rslint's supported script extensions. Rslint always includes its default extension baseline and adds other supported candidates selected by explicit `files` entries unless the same entry's `ignores` excludes them. A `files` selector cannot make an unsupported source extension lintable. Global ignores then remove targets; CLI and JavaScript API runs also apply `.gitignore`. An entry-level ignore cannot remove a path selected by the baseline or another entry; it only prevents its own selector and config contribution. Every selected target is parsed even when no config entry contributes rules, so syntax diagnostics can still be reported. This includes default-baseline files found by a directory or no-argument scan and explicitly requested supported files that do not match a config entry's `files`.
 
 The implicit default baseline is:
 
@@ -119,7 +120,7 @@ The implicit default baseline is:
 - `.mts`
 - `.cts`
 
-This is independent of tsconfig's `include`: a file in tsconfig but outside rslint's lint target set will not run lint rules, while a selected file not covered by a tsconfig declared by its governing config still runs syntax-only rules.
+This is independent of tsconfig's `include`: a file in tsconfig but outside rslint's lint target set will not run lint rules, while a selected file not covered by a tsconfig declared by its governing config still runs rules that do not require type information.
 
 ```ts
 {
@@ -211,7 +212,7 @@ Enable TypeScript's project service for automatic tsconfig discovery. This is th
 
 - **Type:** `string | string[]`
 
-Explicit tsconfig.json paths. Supports glob patterns for monorepos. Files included by these tsconfigs receive full type information, enabling type-aware rules (e.g. `@typescript-eslint/no-floating-promises`, `@typescript-eslint/await-thenable`). Files outside all tsconfigs are still linted but only with syntax-level rules.
+Explicit tsconfig.json paths. Supports glob patterns for monorepos. Files included by these tsconfigs receive full type information, enabling type-aware rules (e.g. `@typescript-eslint/no-floating-promises`, `@typescript-eslint/await-thenable`). Files outside all tsconfigs are still linted, but only rules that do not require type information run.
 
 ```ts
 {
@@ -265,7 +266,7 @@ When multiple config entries match a file, they are merged in array order:
 7. **Settings** — ordinary nested objects merge recursively; arrays and scalar values are replaced
 8. **Language options** — ordinary nested objects merge recursively; arrays and scalar values are replaced
 
-If no entry matches a file, no lint rules run for it. An explicitly requested file is still parsed and included in the result unless a global ignore or `.gitignore` excludes it, so parser diagnostics can remain visible without configured rules.
+If no entry matches a selected file, no lint rules run for it, but the file is still parsed and included in the result so parser diagnostics remain visible. This applies to default-baseline files found during directory discovery as well as explicitly requested supported files. Global ignores remove matching targets; CLI and JavaScript API runs apply `.gitignore` as an additional global ignore source.
 
 ## JSON Configuration (Deprecated)
 

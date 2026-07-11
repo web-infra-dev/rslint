@@ -44,9 +44,9 @@ parserOptions: {
 }
 ```
 
-Each normalized declared tsconfig path produces one TypeScript Program, even when multiple rslint configs reference that path. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
+Each normalized declared tsconfig path in the effective loaded config catalog produces one TypeScript Program, even when multiple rslint configs reference that path. Parent global ignores can prevent a nested config from entering that catalog during directory discovery. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
 
-**The type-check scope is each tsconfig's `include` / `files` minus `exclude` — nothing in your rslint config or on the CLI changes it.** Specifically, the following are **lint-phase concepts** that do **not** affect type-check scope:
+**After the effective config catalog is established, each Program's type-check scope is its tsconfig `include` / `files` minus `exclude`.** The following lint-phase concepts do not filter that Program scope:
 
 - rslint config's `files` patterns
 - rslint config's `ignores` patterns (root-level or per-entry)
@@ -57,7 +57,7 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive a non-project-backed fallback Program, so syntax-only rules still run but type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
+Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive a non-project-backed fallback Program, so rules that do not require type information still run while type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
 
 ## Output
 

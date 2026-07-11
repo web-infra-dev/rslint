@@ -180,7 +180,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 ### Detailed Pipeline Steps
 
 1. **Source Text Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays.
-2. **Program Construction**: Plain CLI/API lint resolves its effective targets first and builds `Program` objects only for governing configs that own a selected target. Program-wide type-check modes build every configured project. LSP reuses matching projects from ts-go `project.Session`; a declared custom tsconfig that project service has not loaded is built on demand against an isolated editor overlay.
+2. **Program Construction**: Plain CLI/API lint resolves its effective targets first and builds `Program` objects only for governing configs that own a selected target. Program-wide type-check modes build every project declared by the effective loaded config catalog. LSP reuses matching projects from ts-go `project.Session`; a declared custom tsconfig that project service has not loaded is built on demand against an isolated editor overlay.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes.
 4. **Semantic Analysis**: When needed, the linter acquires a `TypeChecker` from the `Program`.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
@@ -371,7 +371,7 @@ Rslint supports two configuration formats following ESLint flat config semantics
 
 #### JS/TS Configuration (Recommended)
 
-JS/TS config files (`rslint.config.js`, `rslint.config.mjs`, `rslint.config.cjs`, `rslint.config.ts`, `rslint.config.mts`, `rslint.config.cts`) are the recommended approach. They support preset composition via `defineConfig()`:
+Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`:
 
 ```typescript
 import { defineConfig, ts } from '@rslint/core';
@@ -438,13 +438,20 @@ Each entry in the config array supports:
 
 The loading flow differs by config type:
 
-**JS/TS config**:
+**CLI JS/TS config**:
 
 1. `packages/rslint/src/cli/cli.ts` discovers one or more config files
 2. each config is loaded and normalized on the Node side; live third-party plugin objects remain in a Node-side host while their prefixes and rule metadata are extracted
 3. the Node wrapper sends the normalized config list, explicit-file ownership scopes, and third-party rule metadata to Go in the IPC `init` payload
 4. Go parses either a multi-config payload or a legacy single-config payload shape
 5. Go builds a `ConfigOwnerResolver` over those already-loaded objects to route each runtime target; it does not discover or evaluate JS/TS config files
+
+The JavaScript API performs config discovery and lexical-first ownership
+routing in `Rslint.lintFiles()`, groups selected files by resolved config, and
+sends one normalized single-config request per group to Go `--api`. LSP receives
+an already-loaded config catalog from the VS Code extension and routes that
+catalog in Go. No Go integration discovers, parses, or evaluates JS/TS config
+source.
 
 **JSON config**:
 
@@ -462,30 +469,35 @@ Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 4. later rule values override earlier values; a severity-only override retains earlier rule options
 5. settings and language options recursively merge ordinary objects, while later arrays and scalar values replace earlier values
 
-In multi-config mode, `ConfigOwnerResolver.Resolve()` selects the governing
-object before `GetConfigForFile()` merges its entries. This is runtime routing
-over the catalog supplied by Node, not config-file parsing or discovery.
+CLI multi-config mode and LSP use `ConfigOwnerResolver.Resolve()` to select the
+governing object before `GetConfigForFile()` merges its entries. This is runtime
+routing over a catalog supplied by Node, not config-file parsing or discovery.
+The JavaScript API applies equivalent lexical-first routing in Node, groups
+files by resolved config, and sends single-config IPC lint requests. The
+low-level Go IPC handler does not route a multi-config catalog.
+
 Ownership lookup never compares depth across lexical and physical path spaces:
 the nearest exact lexical config wins, a native case alias is accepted only
 after filesystem identity verification, and realpath ancestry is consulted only
 when no lexical owner exists. Directory-walk handoff boundaries are likewise
 built only from the lexical config hierarchy. Canonical paths remain file and
-Program identities, not a second config inheritance tree. CLI target discovery,
-the IPC API, and LSP all use this ordering.
+Program identities, not a second config inheritance tree.
 
 Additional current behaviors:
 
-- `.gitignore` is injected into CLI configs as a global-ignore entry
+- `.gitignore` is injected into CLI and IPC API configs as a global-ignore
+  entry; LSP `.gitignore` integration remains a separate follow-up
 - the VS Code extension preserves last-good JS configs during reloads; a newly
   unavailable config with no usable JS ancestor contributes an empty boundary,
   preventing legacy JSON fallback only in that authored config subtree
 - native and third-party plugin rules are gated by their normalized prefixes for JS/TS configs; third-party rules use Go registry placeholders and execute in the Node plugin worker
-- lint target selection is independent from TypeScript `Program` membership: rslint always starts with `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts`, then unions effective explicit config `files`; global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
-- files passed explicitly on the CLI/API can still appear as 0-rule lint results when no config entry contributes rules; selected files are parsed and can report syntax diagnostics in that state
-- each selected file is governed by its nearest config and can bind only to a tsconfig declared by that config; the first declared project containing the file wins
+- CLI/API lint target selection is independent from TypeScript `Program` membership and considers only rslint-supported script extensions. The `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` default baseline is always selected; explicit config `files` contributes candidates only within the supported set. Global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
+- selected CLI/API targets can still appear as 0-rule lint results when no config entry contributes rules; this applies to default-baseline directory discovery and explicit supported files, and syntax diagnostics remain available in that state
+- under automatic discovery, each selected file is governed by its nearest loadable config; explicit config modes use the selected config directly. In either mode, a target can bind only to a tsconfig declared by its governing config, and the first declared project containing the file wins
 - `files`/`ignores` matching uses the stable target path in the governing config's path space; a Program source alias is used only to locate the AST and type information, so moving a target into or out of a tsconfig cannot change its rule configuration
-- each normalized declared tsconfig path is built once within a Go lint invocation while retaining every config association; file-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected files outside the governing config's Programs receive a non-project-backed fallback Program, and targets whose names collide under a case-insensitive ts-go path key are partitioned across fallback Programs so distinct physical files remain distinct
-- `--type-check` and `--type-check-only` run over every real tsconfig Program and are not constrained by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments; synthetic fallback Programs never participate. `--type-check-only` skips lint-target and `.gitignore` discovery entirely.
+- within each Program-registry build, normalized declared tsconfig paths are deduplicated across config associations; CLI fix passes create a new registry build. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected files outside the governing config's Programs receive a non-project-backed fallback Program, and targets whose names collide under a case-insensitive ts-go path key are partitioned across fallback Programs so distinct physical files remain distinct
+- `--type-check` and `--type-check-only` build every real tsconfig declared by the effective loaded config catalog. Once that catalog is established, program-wide checking is not filtered by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments; synthetic fallback Programs never participate. `--type-check-only` skips lint-target and `.gitignore` discovery entirely.
+- for LSP, an open supported script is a per-file target independent of Program membership. Global config ignores, default-excluded paths, and unavailable config boundaries suppress native rules, plugin rules, and fixes; an available zero-rule config still parses the target and can report syntax diagnostics. LSP does not yet apply `.gitignore`
 
 ### Inline Directives
 
@@ -518,36 +530,43 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
-5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every configured project. Shared declared paths preserve each active config association and declaration order.
-6. **Program Binding**: each target is bound by exact canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
+5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order.
+6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
 7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
 8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
-10. **Fix Passes**: when enabled, fixes are applied, real Programs are rebuilt, and the stable target plan is rebound; target membership stays fixed while a file may move between a real Program and fallback as its import graph changes
+10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
 11. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
 12. **Exit Code**: depends on diagnostics, warnings, and fix outcomes
 
 ### Concurrency Model
 
-The Go side has four parallelism points; each one honors `--singleThreaded`,
-which is the user-facing escape hatch for serial / reproducible execution.
+The main Go workload work groups and pools below honor `--singleThreaded`.
+The flag serializes these workload stages, but IPC transport, diagnostic
+collection, and plugin dispatch may still use infrastructure goroutines.
 
 1. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
    - Schedules per-Program lint work; runs rules in parallel within a Program.
    - `--singleThreaded` collapses the work group to serial execution.
 
-2. **gitignore reading and Program creation** (in `cmd/rslint/cmd.go`)
+2. **Type-check work group** (`runTypeCheckAcrossPrograms`)
+   - Schedules diagnostics for real tsconfig Programs and merges results in
+     stable Program order.
+   - `--singleThreaded` computes Program diagnostics serially.
+
+3. **gitignore reading and Program creation** (in `cmd/rslint/cmd.go`)
    - Plain lint completes `ReadGitignoreAsGlobs` before target discovery, then
      constructs Programs only for configs represented in the target plan.
-   - `--type-check` constructs every configured Program independently from
-     gitignore discovery. `--type-check-only` constructs the same Program set
-     without reading gitignore state because it has no lint-target phase.
+   - `--type-check` constructs every Program from the effective config catalog
+     independently from gitignore discovery. `--type-check-only` constructs the
+     same Program set without reading gitignore state because it has no
+     lint-target phase.
    - In multi-config mode, gitignore reads also fan out across configs in
      parallel; configured Programs are constructed serially in stable config
      and project order (typescript-go's API is invoked one Program at a time).
-   - `--singleThreaded` runs both stages sequentially — no goroutines spawned.
+   - `--singleThreaded` executes these workload tasks serially.
 
-3. **Lint-target directory walker** (`internal/config/file_discovery.go`)
+4. **Lint-target directory walker** (`internal/config/file_discovery.go`)
    - `DiscoverLintTargets` uses a fixed-size worker pool (`walkPool`) that
      walks the directory tree. `DiscoverLintFiles` is the path-only
      compatibility wrapper. Live goroutine count is capped at `workers`, not
@@ -566,12 +585,13 @@ which is the user-facing escape hatch for serial / reproducible execution.
      scheduling-dependent non-determinism that a parallel walker would
      otherwise introduce.
 
-4. **Multi-config target discovery** (`DiscoverLintTargetsMultiConfig`)
-   - Uses host-provided scopes for explicit-file ownership. Explicit files not
-     assigned by a host are routed through the config-directory index before
-     per-config discovery.
-   - Each call is itself bounded by its own worker pool, so total live
-     goroutines remain bounded by `workers`, not `len(configMap) × workers`.
+5. **Program source identity index** (`bindLintTargetPlan`)
+   - Direct lexical Program lookups remain synchronous. If one misses, the
+     binder resolves each unique Program source path once and builds a
+     binding-pass canonical identity index. CLI fix passes rebuild it when they
+     rebind the target plan.
+   - Independent realpath lookups use `core.NewWorkGroup`; `--singleThreaded`
+     runs the same work serially.
 
 Other invariants:
 
@@ -582,10 +602,13 @@ Other invariants:
   physical path; explicit files and file symlinks are resolved individually.
   Canonical identities use exact comparison, and aliases governed by different
   configs are rejected instead of choosing an owner by scan order.
+- Multi-config target discovery processes config roots in stable order. It uses
+  host-provided scopes for explicit-file ownership and invokes the bounded
+  lint-target walker for each config.
 - The Node CLI keeps explicit targets in the caller's lexical path space for
   config ownership. It consults physical ancestry only when lexical discovery
-  finds no config, and loads an ancestor only after a nearer explicit-file
-  config fails.
+  finds no config, and loads an ancestor only after a nearer explicit file or
+  directory config fails.
 - Go applies the same strict lexical-first ordering to the already-loaded config
   catalog. A physically deeper config loaded for another target cannot replace
   an existing lexical owner; physical ancestry is only a fallback for paths
@@ -596,24 +619,24 @@ Other invariants:
   that plan are sent with the request so Go does not repeat the same realpath
   work.
 - LSP uses a different orchestration model and keeps session access on its main
-  dispatch loop. It shares the exact/canonical Program source lookup used by
-  CLI/API binding, including file-symlink aliases and case-folded lookup
-  validation.
+  dispatch loop. Its Program-source lookup follows the same exact lexical and
+  canonical filesystem identity rules as CLI/API binding, including
+  file-symlink aliases and rejection of case-folded nonidentical paths.
 
 #### `--singleThreaded` semantics
 
 `--singleThreaded` is honored in every parallelism point above:
 
-| Point                          | Effect when set                                                                                          |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Linter work group              | Collapsed to serial via `core.NewWorkGroup(true)`.                                                       |
-| gitignore / Program creation   | Plain lint performs target discovery before Program creation; type-check mode runs both stages serially. |
-| Multi-config gitignore fan-out | Replaced by a sequential for-loop.                                                                       |
-| Lint-target walker workers     | Forced to 1 (single goroutine, no concurrency).                                                          |
-| Multi-config target discovery  | Already serial across configs; inner walker also forced to 1.                                            |
+| Point                            | Effect when set                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| Linter work group                | Collapsed to serial via `core.NewWorkGroup(true)`.                                          |
+| Type-check work group            | Program diagnostics are computed serially via `core.NewWorkGroup(true)`.                    |
+| Gitignore / Program construction | Gitignore tasks execute serially; Program construction remains serial and does not overlap. |
+| Lint-target walker workers       | Forced to 1 (single goroutine, no concurrency).                                             |
+| Program source identity index    | Canonical source paths are resolved serially through `core.NewWorkGroup(true)`.             |
 
-End result: with `--singleThreaded`, the Go side spawns no goroutines beyond
-those typescript-go itself creates for syntactic / semantic work.
+These workload stages run serially with `--singleThreaded`; infrastructure
+goroutines remain outside that guarantee.
 
 ## 10. Performance & Memory Considerations
 
@@ -782,21 +805,34 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  JS/TS Configs or JSON Configs                                               │
 │            │                                                                 │
 │            ▼                                                                 │
-│  Config Load / Normalize / Merge                                             │
+│  Config Load / Normalize / Catalog                                           │
+│            │                                                                 │
+│            ├───────────────► CLI --type-check-only                           │
+│            │                          │                                       │
+│            │                          ▼                                       │
+│            │                 Effective-catalog Program Registry              │
+│            │                          │                                       │
+│            │                          ▼                                       │
+│            │                 Program-wide Type Check                         │
+│            │                 (real tsconfigs)                                │
+│            │                          │                                       │
+│            │                          ▼                                       │
+│            │                 CLI formatter / exit code                       │
+│            │                                                                 │
+│            └───────────────► Lint path (CLI / API)                           │
+│                                       │                                      │
+│                                       ▼                                      │
+│  Stable Lint Target Plan (scope + selectors + ignores)                       │
 │            │                                                                 │
 │            ▼                                                                 │
-│  Stable Lint Target Plan (scope + selectors + ignores; skipped by            │
-│  type-check-only)                                                            │
-│            │                                                                 │
-│            ▼                                                                 │
-│  Canonical Program Registry                                                  │
-│  (active governing configs for plain lint; all configs for type-check)       │
+│  Run-scoped Program Registry                                                 │
+│  (active governing configs; effective catalog for CLI --type-check)          │
 │            │                                                                 │
 │            ▼                                                                 │
 │  Bind by Governing Config / Project Order ─────► Non-project Fallback        │
 │                           │                                                  │
 │                           ▼                                                  │
-│  Resolve Enabled Rules Per File                                              │
+│  Resolve / Merge Config and Enabled Rules Per File                           │
 │            │                                                                 │
 │            ▼                                                                 │
 │  Run Rule Initializers -> Register Listeners                                 │
@@ -807,7 +843,8 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │            ▼                                                                 │
 │  RuleDiagnostic / Fix / Suggestion Collection                                │
 │            │                                                                 │
-│            ├───────────────► Program-wide Type Check (real tsconfigs only)    │
+│            ├───────────────► CLI --type-check: Program-wide Type Check       │
+│            │                    (real tsconfigs)                              │
 │            ├───────────────► CLI formatter / exit code                       │
 │            └───────────────► API structured response                         │
 │                                                                              │
@@ -865,7 +902,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection
 - **IPC API**: Length-prefixed JSON message protocol exposed by `cmd/rslint --api` for Node and WASM clients; config path resolution and third-party plugin routing use separate keys when API overrides rebase relative patterns
 - **Listener**: Callback registered by a rule for an AST kind or synthetic listener kind
-- **Nearest Config**: In multi-config mode, the deepest config directory that owns a file
+- **Nearest Config**: In multi-config mode, the governing config selected by lexical-first ownership resolution
 - **Node Kind**: Enumerated AST kind value used by ts-go and by the listener dispatcher to identify node types
 - **Program**: ts-go compilation context, usually tied to a tsconfig or fallback root-file set
 - **Program Registry**: Run-scoped set of Programs keyed by normalized declared tsconfig path, plus the governing configs and project declaration order associated with each Program
