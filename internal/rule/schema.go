@@ -2,41 +2,93 @@ package rule
 
 import (
 	"bytes"
-	"encoding/json"
-	"strconv"
-	"strings"
+	"sync"
 
 	"github.com/dlclark/regexp2"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// CompiledSchema is a compiled JSON Schema for a rule's options array.
-type CompiledSchema struct {
-	schema *jsonschema.Schema
-}
-
-// CompileSchema compiles a rule's options JSON Schema. By convention the
-// schema describes the ESLint-style options array as a tuple: a top-level
-// `{"type": "array", "items": [...]}` — or, for a rule that takes no options,
-// `{"type": "array", "maxItems": 0}` with `items` omitted (draft-04's own
-// metaschema requires a non-empty schemaArray, so `"items": []` is itself
+// Schema is a rule's options JSON Schema, compiled lazily on first use. By
+// convention the schema describes the ESLint-style options array
+// (context.options — the config array after the severity level) as a tuple: a
+// top-level `{"type": "array", "items": [...]}` — or, for a rule that takes no
+// options, `{"type": "array", "maxItems": 0}` with `items` omitted (draft-04's
+// own metaschema requires a non-empty schemaArray, so `"items": []` is itself
 // invalid). See the <rule-name>.schema.json convention.
 //
 // rslint only supports Draft 4 — the draft under which a plain array `items`
 // means positional/tuple validation — so this is a convention for our own
-// authored schema.json files, not a constraint CompileSchema enforces: an
+// authored schema.json files, not a constraint compilation enforces: an
 // explicit `$schema` declaring a newer draft would compile fine, just under
 // that draft's (different) `items` semantics.
 //
-// Each call compiles against its own private jsonschema.Compiler, so a
-// `$ref` in one rule's schema can never resolve into another rule's `$defs`
-// or resources, even if two schemas happen to reuse the same `$id`.
+// Compilation is deferred until the schema is first used ([Schema.Compile] /
+// [Schema.Validate]) and guarded by a sync.Once, so a schema is compiled at
+// most once per process no matter how many goroutines race to use it — and a
+// rule that is never enabled never pays for compiling its schema at all. The
+// once also lets many rules share a single Schema value: [EmptyArraySchema]
+// is referenced by every no-options rule yet compiles a single time.
+type Schema struct {
+	rawJSON []byte
+
+	once   sync.Once
+	schema *jsonschema.Schema
+	err    error
+}
+
+// NewSchema returns a Schema that will compile rawJSON on first use. rawJSON
+// is typically a `//go:embed`-ed <rule-name>.schema.json sitting beside the
+// rule's source.
 //
-// Rules that take no options should reuse [EmptyArraySchema] instead of calling
-// CompileSchema with that boilerplate schema themselves.
-func CompileSchema(schemaJSON []byte) (*CompiledSchema, error) {
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON))
+// Rules that take no options should reference the shared [EmptyArraySchema]
+// instead of constructing their own copy of the same schema.
+func NewSchema(rawJSON []byte) *Schema {
+	return &Schema{rawJSON: rawJSON}
+}
+
+// EmptyArraySchema validates that a rule's resolved options array
+// (context.options) is empty. Rules that take no options should reference
+// this shared schema rather than each carrying their own copy of the same
+// schema.json; the lazy once in [Schema.Compile] means it compiles a single
+// time process-wide regardless of how many rules use it.
+var EmptyArraySchema = NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
+
+// Compile compiles the schema's raw JSON exactly once and returns the
+// memoized result; every subsequent call — from any goroutine — returns the
+// same compiled schema (or the same compile error).
+//
+// Each compilation uses its own private jsonschema.Compiler, so a `$ref` in
+// one rule's schema can never resolve into another rule's `$defs` or
+// resources, even if two schemas happen to reuse the same `$id`.
+func (s *Schema) Compile() (*jsonschema.Schema, error) {
+	s.once.Do(func() {
+		s.schema, s.err = compileSchemaJSON(s.rawJSON)
+	})
+	return s.schema, s.err
+}
+
+// Validate compiles the schema (once) and validates a rule's resolved
+// options array (context.options) against it. It returns the compile error,
+// if any, otherwise any validation error. A nil options slice is validated
+// as an empty options array, not as JSON null.
+//
+// The compiled schema is read-only, so Validate is safe for concurrent use.
+func (s *Schema) Validate(options []any) error {
+	compiled, err := s.Compile()
+	if err != nil {
+		return err
+	}
+	if options == nil {
+		options = []any{}
+	}
+	return compiled.Validate(options)
+}
+
+// compileSchemaJSON does the actual one-time compilation work behind
+// [Schema.Compile].
+func compileSchemaJSON(rawJSON []byte) (*jsonschema.Schema, error) {
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(rawJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -48,39 +100,12 @@ func CompileSchema(schemaJSON []byte) (*CompiledSchema, error) {
 	if err := c.AddResource(resourceURL, doc); err != nil {
 		return nil, err
 	}
-	compiled, err := c.Compile(resourceURL)
-	if err != nil {
-		return nil, err
-	}
-	return &CompiledSchema{schema: compiled}, nil
-}
-
-// MustCompileSchema is like CompileSchema but panics instead of returning an
-// error. Intended for package-level CompiledSchema variables initialized at
-// startup, in the vein of regexp.MustCompile.
-func MustCompileSchema(schemaJSON []byte) *CompiledSchema {
-	s, err := CompileSchema(schemaJSON)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
-// EmptyArraySchema validates that a rule's resolved options array
-// (context.options) is empty. Rules that take no options should reference
-// this shared schema rather than each compiling their own copy of the same
-// schema.json.
-var EmptyArraySchema = MustCompileSchema([]byte(`{"type": "array", "maxItems": 0}`))
-
-// Validate validates the result against the compiled schema. It returns any
-// validation error.
-func (s *CompiledSchema) Validate(options any) error {
-	return s.schema.Validate(options)
+	return c.Compile(resourceURL)
 }
 
 // jsRegexpEngine compiles pattern the way ajv itself does: as a JavaScript
-// RegExp, not a Go RE2 regexp. It's wired into every CompileSchema's
-// Compiler via [jsonschema.Compiler.UseRegexpEngine], so it governs both the
+// RegExp, not a Go RE2 regexp. It's wired into every compilation's Compiler
+// via [jsonschema.Compiler.UseRegexpEngine], so it governs both the
 // "pattern" keyword (a schema author's own regex, compiled once against the
 // schema) and "format": "regex" (asserting that an instance *value* is
 // itself a syntactically valid regex — e.g. a rule option like

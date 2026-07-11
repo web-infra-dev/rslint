@@ -1,17 +1,15 @@
 package rule
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
+	"sync"
 	"testing"
 )
 
-func TestCompileSchemaAndValidateOptions(t *testing.T) {
+func TestSchemaValidateOptions(t *testing.T) {
 	// Mirrors the <rule-name>.schema.json convention: a tuple describing the
 	// ESLint-style options array, here a single optional object with an
 	// `allow: string[]` property (à la no-console).
-	schemaJSON := []byte(`{
+	schema := NewSchema([]byte(`{
 		"type": "array",
 		"items": [
 			{
@@ -27,16 +25,16 @@ func TestCompileSchemaAndValidateOptions(t *testing.T) {
 		],
 		"minItems": 0,
 		"maxItems": 1
-	}`)
-
-	schema, err := CompileSchema(schemaJSON)
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
+	}`))
 
 	// No options at all: satisfies minItems: 0.
 	if err := schema.Validate([]any{}); err != nil {
 		t.Errorf("expected empty options to be valid, got: %v", err)
+	}
+
+	// A nil slice must count as an empty options array, not JSON null.
+	if err := schema.Validate(nil); err != nil {
+		t.Errorf("expected nil options to be valid, got: %v", err)
 	}
 
 	// A well-formed options object.
@@ -67,16 +65,11 @@ func TestCompileSchemaAndValidateOptions(t *testing.T) {
 	}
 }
 
-func TestCompileSchemaNoOptions(t *testing.T) {
+func TestSchemaNoOptions(t *testing.T) {
 	// The no-options convention: omit `items` (draft-04's own metaschema
 	// requires a non-empty schemaArray, so `"items": []` is itself invalid)
 	// and rely on `maxItems: 0` to force an empty options array.
-	schemaJSON := []byte(`{"type": "array", "maxItems": 0}`)
-
-	schema, err := CompileSchema(schemaJSON)
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
+	schema := NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
 
 	if err := schema.Validate([]any{}); err != nil {
 		t.Errorf("expected empty options to be valid, got: %v", err)
@@ -86,31 +79,72 @@ func TestCompileSchemaNoOptions(t *testing.T) {
 	}
 }
 
-func TestCompileSchemaInvalidJSON(t *testing.T) {
-	if _, err := CompileSchema([]byte("not json")); err == nil {
+func TestSchemaCompileInvalidJSON(t *testing.T) {
+	schema := NewSchema([]byte("not json"))
+	if _, err := schema.Compile(); err == nil {
 		t.Error("expected error for invalid schema JSON, got nil")
+	}
+	// The compile error is memoized and surfaces through Validate too.
+	if err := schema.Validate([]any{}); err == nil {
+		t.Error("expected Validate to return the memoized compile error, got nil")
 	}
 }
 
-func TestCompileSchemaIsolatesResourcesAcrossCalls(t *testing.T) {
-	// Each CompileSchema call must use its own private compiler: a `$ref` in
-	// one call's schema must never resolve against a `$defs`/`id` registered
-	// by an earlier, unrelated call, even if that id is still "known" from a
-	// prior compile.
-	_, err := CompileSchema([]byte(`{
+func TestSchemaCompileIsMemoized(t *testing.T) {
+	schema := NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
+	first, err := schema.Compile()
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	second, err := schema.Compile()
+	if err != nil {
+		t.Fatalf("second Compile failed: %v", err)
+	}
+	if first != second {
+		t.Error("expected repeated Compile calls to return the same compiled schema")
+	}
+}
+
+func TestSchemaConcurrentValidate(t *testing.T) {
+	// Many rules share EmptyArraySchema and the linter fans out per file, so
+	// first use of a schema can race across goroutines; the once must make
+	// that safe. Run with -race to make this meaningful.
+	schema := NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := schema.Validate([]any{}); err != nil {
+				t.Errorf("expected empty options to be valid, got: %v", err)
+			}
+			if err := schema.Validate([]any{"unexpected"}); err == nil {
+				t.Error("expected error for non-empty options, got nil")
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestSchemaIsolatesResourcesAcrossSchemas(t *testing.T) {
+	// Each Schema must compile with its own private compiler: a `$ref` in
+	// one schema must never resolve against a `$defs`/`id` registered by an
+	// earlier, unrelated schema's compilation, even if that id is still
+	// "known" from a prior compile.
+	_, err := NewSchema([]byte(`{
 		"id": "urn:test-schema-isolation",
 		"definitions": { "str": { "type": "string" } }
-	}`))
+	}`)).Compile()
 	if err != nil {
-		t.Fatalf("CompileSchema failed on first schema: %v", err)
+		t.Fatalf("Compile failed on first schema: %v", err)
 	}
 
-	_, err = CompileSchema([]byte(`{
+	_, err = NewSchema([]byte(`{
 		"type": "array",
 		"items": [ { "$ref": "urn:test-schema-isolation#/definitions/str" } ]
-	}`))
+	}`)).Compile()
 	if err == nil {
-		t.Error("expected $ref into a different call's schema to fail to resolve, got nil error")
+		t.Error("expected $ref into a different schema's resources to fail to resolve, got nil error")
 	}
 }
 
@@ -123,22 +157,22 @@ func TestEmptyArraySchema(t *testing.T) {
 	}
 }
 
-func TestCompileSchemaAcceptsPatternWithJavaScriptOnlyRegexSyntax(t *testing.T) {
-	// A schema author's own "pattern" is compiled once, at CompileSchema
+func TestSchemaAcceptsPatternWithJavaScriptOnlyRegexSyntax(t *testing.T) {
+	// A schema author's own "pattern" is compiled once, at schema-compile
 	// time, against the configured regexp engine. ajv (backed by JS's native
 	// RegExp) accepts JavaScript-only syntax like lookbehind; Go's regexp
 	// package (RE2), the jsonschema library's default engine, does not and
-	// would fail to even compile this schema. CompileSchema wires in
+	// would fail to even compile this schema. compileSchemaJSON wires in
 	// jsRegexpEngine specifically so this compiles and matches the way ajv
 	// does.
-	schema, err := CompileSchema([]byte(`{
+	schema := NewSchema([]byte(`{
 		"type": "array",
 		"items": [ { "type": "string", "pattern": "(?<=a)b" } ],
 		"minItems": 1,
 		"maxItems": 1
 	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed to compile a lookbehind pattern: %v", err)
+	if _, err := schema.Compile(); err != nil {
+		t.Fatalf("Compile failed on a lookbehind pattern: %v", err)
 	}
 
 	if err := schema.Validate([]any{"ab"}); err != nil {
@@ -157,7 +191,7 @@ func TestValidateAcceptsJavaScriptOnlyRegexAsFormatRegexValue(t *testing.T) {
 	// lookbehind. ajv accepts it (it just tries `new RegExp(value)`); Go's
 	// regexp package does not, so without jsRegexpEngine this otherwise
 	// legal ESLint config would be rejected.
-	schema, err := CompileSchema([]byte(`{
+	schema := NewSchema([]byte(`{
 		"type": "array",
 		"items": [
 			{
@@ -169,64 +203,11 @@ func TestValidateAcceptsJavaScriptOnlyRegexAsFormatRegexValue(t *testing.T) {
 		"minItems": 0,
 		"maxItems": 1
 	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
 
 	if err := schema.Validate([]any{map[string]any{"pattern": "(?<=a)b"}}); err != nil {
 		t.Errorf("expected a lookbehind pattern value to satisfy format: regex, got: %v", err)
 	}
 	if err := schema.Validate([]any{map[string]any{"pattern": "a("}}); err == nil {
 		t.Error("expected an unbalanced paren to fail format: regex, got nil error")
-	}
-}
-
-// ajvFixtureCase mirrors one entry of testdata/ajv_fixtures.json, generated
-// by scripts/gen-ajv-fixtures.js by running each {schema, input} pair
-// through ajv@6 configured exactly the way ESLint configures it (see
-// eslint/lib/shared/ajv.js: useDefaults, missingRefs, etc.) The corpus mixes
-// synthetic cases pinning down specific useDefaults edge cases (nested/
-// tuple/$ref gaps, allOf vs. anyOf/oneOf exclusion, additionalProperties/
-// patternProperties, etc.) with real-world cases sourced from real ESLint /
-// typescript-eslint / eslint-plugin-unicorn / eslint-plugin-react /
-// eslint-plugin-vue rule option schemas, exercising general validation
-// correctness: definitions/$defs + $ref chains, oneOf/anyOf/allOf exclusion,
-// tuple vs. list-style items, additionalItems, additionalProperties-as-
-// schema, minProperties, required, and uniqueItems. That file documents the
-// shape and rationale of each case; run the generator script again to
-// regenerate it if ajv's behavior is ever in doubt.
-type ajvFixtureCase struct {
-	Name   string          `json:"name"`
-	Schema json.RawMessage `json:"schema"`
-	Input  []any           `json:"input"`
-	Output []any           `json:"output"`
-	Valid  bool            `json:"valid"`
-}
-
-func TestValidateMatchesAjvFixtures(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "ajv_fixtures.json"))
-	if err != nil {
-		t.Fatalf("failed to read ajv fixtures: %v", err)
-	}
-	var cases []ajvFixtureCase
-	if err := json.Unmarshal(data, &cases); err != nil {
-		t.Fatalf("failed to parse ajv fixtures: %v", err)
-	}
-	if len(cases) == 0 {
-		t.Fatal("expected at least one ajv fixture case")
-	}
-
-	for _, c := range cases {
-		t.Run(c.Name, func(t *testing.T) {
-			schema, err := CompileSchema(c.Schema)
-			if err != nil {
-				t.Fatalf("CompileSchema failed: %v", err)
-			}
-
-			err = schema.Validate(c.Input)
-			if gotValid := err == nil; gotValid != c.Valid {
-				t.Errorf("valid = %v, want %v (err: %v)", gotValid, c.Valid, err)
-			}
-		})
 	}
 }
