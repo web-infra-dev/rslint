@@ -904,46 +904,6 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	}
 }
 
-func TestProgramTargetLookup_DirectMissWithoutAliasSkipsCanonicalIndex(t *testing.T) {
-	dir := t.TempDir()
-	writeProgramTestFiles(t, dir, map[string]string{
-		"inside.ts":     `export const inside = true;`,
-		"outside.ts":    `export const outside = true;`,
-		"tsconfig.json": `{"files":["inside.ts"]}`,
-	})
-	dir = tspath.NormalizePath(dir)
-	counter := &targetPlanRealpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
-	fsys := bundled.WrapFS(cachedvfs.From(counter))
-	set, err := createProgramSetForConfig(
-		dir,
-		projectConfig("./tsconfig.json"),
-		true,
-		fsys,
-		utils.NewParseCache(),
-	)
-	if err != nil || len(set.Programs) != 1 {
-		t.Fatalf("create Program: programs=%d err=%v", len(set.Programs), err)
-	}
-
-	counter.mu.Lock()
-	counter.calls = make(map[string]int)
-	counter.mu.Unlock()
-	targetPath := tspath.ResolvePath(dir, "outside.ts")
-	lookup := programTargetLookup{program: set.Programs[0], fsys: fsys}
-	if sourceFile := lookup.sourceFileForTarget(resolvedLintTarget{
-		Path:           targetPath,
-		CanonicalPath:  targetPath,
-		OwnerConfigDir: dir,
-	}); sourceFile != nil {
-		t.Fatalf("outside target unexpectedly resolved to %q", sourceFile.FileName())
-	}
-	counter.mu.Lock()
-	defer counter.mu.Unlock()
-	if len(counter.calls) != 0 {
-		t.Fatalf("ordinary Program miss performed realpath IO: %v", counter.calls)
-	}
-}
-
 func TestResolveLintTargetPlan_DirectoryWalkAvoidsPerTargetRealpath(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{

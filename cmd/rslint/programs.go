@@ -46,22 +46,6 @@ func canonicalFilesystemPathID(filePath string, fsys vfs.FS) string {
 	return exactFilesystemPathID(authoritativeFilesystemPath(filePath, fsys))
 }
 
-func relativePathUnderRoot(filePath string, root string, useCaseSensitive bool) (string, bool) {
-	filePath = tspath.NormalizePath(filePath)
-	root = tspath.NormalizePath(root)
-	compareOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          root,
-		UseCaseSensitiveFileNames: useCaseSensitive,
-	}
-	if tspath.ComparePaths(filePath, root, compareOptions) == 0 {
-		return "", true
-	}
-	if !tspath.StartsWithDirectory(filePath, root, useCaseSensitive) {
-		return "", false
-	}
-	return tspath.GetRelativePathFromDirectory(root, filePath, compareOptions), true
-}
-
 // configPathForLintTarget returns the target path used for files/ignores
 // matching. Program source names are deliberately excluded: adding or removing
 // a file from a TypeScript Program must not change its lint configuration.
@@ -375,108 +359,103 @@ type lintTargetBinding struct {
 	OwnerConfigDirBySourcePath map[string]string
 }
 
-func aliasPathUnderRoot(path string, canonicalRoot string, lexicalRoot string, useCaseSensitive bool) string {
-	if path == "" || canonicalRoot == "" || lexicalRoot == "" {
-		return ""
-	}
-	relative, ok := relativePathUnderRoot(path, canonicalRoot, useCaseSensitive)
-	if !ok {
-		return ""
-	}
-	return tspath.ResolvePath(lexicalRoot, relative)
-}
-
-type programTargetLookup struct {
-	program      *compiler.Program
-	fsys         vfs.FS
-	sourceLookup *utils.ProgramSourceLookup
-}
-
-func (lookup *programTargetLookup) programSources() *utils.ProgramSourceLookup {
-	if lookup.sourceLookup == nil {
-		lookup.sourceLookup = utils.NewProgramSourceLookup(lookup.program, lookup.fsys)
-	}
-	return lookup.sourceLookup
-}
-
-func (lookup *programTargetLookup) sourceFileForCandidate(candidate string, canonicalTarget string) *ast.SourceFile {
-	return lookup.programSources().SourceFileForCandidate(candidate, canonicalTarget)
-}
-
-func (lookup *programTargetLookup) canonicalSourceFile(canonicalPath string) *ast.SourceFile {
-	return lookup.programSources().CanonicalSourceFile(canonicalPath)
-}
-
-// sourceFileForTarget first performs bounded target-driven lookups. Only when
-// every lexical/root alias misses does it build one lazy canonical source index
-// for the Program, covering file-level symlinks without imposing graph-wide
-// realpath work on normal projects.
-func (lookup *programTargetLookup) sourceFileForTarget(target resolvedLintTarget) *ast.SourceFile {
-	program := lookup.program
-	fsys := lookup.fsys
-	if program == nil {
+func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
+	if program == nil || targetPath == "" {
 		return nil
 	}
-	targetPath := tspath.NormalizePath(target.Path)
-	canonicalPath := ""
-	if target.CanonicalPath != "" {
-		canonicalPath = tspath.NormalizePath(target.CanonicalPath)
-	}
-	// Normal projects hit the lexical target exactly. Physical validation is
-	// only needed when GetSourceFile returns a differently spelled source.
-	if sourceFile := lookup.sourceFileForCandidate(targetPath, canonicalPath); sourceFile != nil {
-		return sourceFile
-	}
-	if canonicalPath != "" && canonicalPath != targetPath {
-		if sourceFile := lookup.sourceFileForCandidate(canonicalPath, canonicalPath); sourceFile != nil {
-			return sourceFile
-		}
-	}
-	// A physical source index can only resolve a spelling alias. When target
-	// planning found no lexical/canonical difference, the direct miss above is
-	// authoritative and indexing every Program source would add pure realpath IO.
-	if canonicalPath == "" || exactFilesystemPathID(canonicalPath) == exactFilesystemPathID(targetPath) {
+	targetPath = tspath.NormalizePath(targetPath)
+	sourceFile := program.GetSourceFile(targetPath)
+	if sourceFile == nil || exactFilesystemPathID(sourceFile.FileName()) != exactFilesystemPathID(targetPath) {
 		return nil
 	}
-	if fsys == nil {
+	return sourceFile
+}
+
+// programFileIndex joins lint targets to Program sources by exact physical
+// path. It resolves each unique source path once and retains Program membership
+// so project declaration order remains authoritative during lookup.
+type programFileIndex struct {
+	programs         []*compiler.Program
+	fsys             vfs.FS
+	singleThreaded   bool
+	built            bool
+	sourcesByProgram []map[string]*ast.SourceFile
+}
+
+func newProgramFileIndex(programs []*compiler.Program, fsys vfs.FS, singleThreaded bool) *programFileIndex {
+	return &programFileIndex{
+		programs:       programs,
+		fsys:           fsys,
+		singleThreaded: singleThreaded,
+	}
+}
+
+func (index *programFileIndex) sourceFile(programIndex int, canonicalTarget string) *ast.SourceFile {
+	if index == nil || index.fsys == nil || canonicalTarget == "" ||
+		programIndex < 0 || programIndex >= len(index.programs) {
 		return nil
 	}
+	if !index.built {
+		index.build()
+	}
+	return index.sourcesByProgram[programIndex][exactFilesystemPathID(canonicalTarget)]
+}
 
-	lookupAlias := func(candidate string) *ast.SourceFile {
-		if candidate == "" {
-			return nil
+type programSourceMembership struct {
+	programIndex int
+	sourceIndex  int
+	sourceFile   *ast.SourceFile
+}
+
+func (index *programFileIndex) build() {
+	index.built = true
+	index.sourcesByProgram = make([]map[string]*ast.SourceFile, len(index.programs))
+
+	sourceIndexByPath := make(map[string]int)
+	var sourcePaths []string
+	var memberships []programSourceMembership
+	for programIndex, program := range index.programs {
+		if program == nil {
+			continue
 		}
-		candidate = tspath.NormalizePath(candidate)
-		candidateID := exactFilesystemPathID(candidate)
-		if candidateID == exactFilesystemPathID(targetPath) ||
-			candidateID == exactFilesystemPathID(canonicalPath) {
-			return nil
+		for _, sourceFile := range program.GetSourceFiles() {
+			sourcePath := tspath.NormalizePath(sourceFile.FileName())
+			sourcePathID := exactFilesystemPathID(sourcePath)
+			sourceIndex, exists := sourceIndexByPath[sourcePathID]
+			if !exists {
+				sourceIndex = len(sourcePaths)
+				sourceIndexByPath[sourcePathID] = sourceIndex
+				sourcePaths = append(sourcePaths, sourcePath)
+			}
+			memberships = append(memberships, programSourceMembership{
+				programIndex: programIndex,
+				sourceIndex:  sourceIndex,
+				sourceFile:   sourceFile,
+			})
 		}
-		return lookup.sourceFileForCandidate(candidate, canonicalPath)
 	}
 
-	ownerRoot := tspath.NormalizePath(target.OwnerConfigDir)
-	ownerCanonical := ownerRoot
-	if realPath := fsys.Realpath(ownerRoot); realPath != "" {
-		ownerCanonical = tspath.NormalizePath(realPath)
+	canonicalIDs := make([]string, len(sourcePaths))
+	work := core.NewWorkGroup(index.singleThreaded)
+	for i := range sourcePaths {
+		work.Queue(func() {
+			canonicalIDs[i] = canonicalFilesystemPathID(sourcePaths[i], index.fsys)
+		})
 	}
-	ownerAlias := aliasPathUnderRoot(canonicalPath, ownerCanonical, ownerRoot, true)
-	if sourceFile := lookupAlias(ownerAlias); sourceFile != nil {
-		return sourceFile
-	}
+	work.RunAndWait()
 
-	programRoot := tspath.NormalizePath(program.GetCurrentDirectory())
-	programCanonical := programRoot
-	if realPath := fsys.Realpath(programRoot); realPath != "" {
-		programCanonical = tspath.NormalizePath(realPath)
-	}
-	programAlias := aliasPathUnderRoot(canonicalPath, programCanonical, programRoot, true)
-	if exactFilesystemPathID(programAlias) != exactFilesystemPathID(ownerAlias) {
-		if sourceFile := lookupAlias(programAlias); sourceFile != nil {
-			return sourceFile
+	for _, membership := range memberships {
+		sources := index.sourcesByProgram[membership.programIndex]
+		if sources == nil {
+			sources = make(map[string]*ast.SourceFile)
+			index.sourcesByProgram[membership.programIndex] = sources
+		}
+		canonicalID := canonicalIDs[membership.sourceIndex]
+		existing := sources[canonicalID]
+		if existing == nil || membership.sourceFile.FileName() < existing.FileName() {
+			sources[canonicalID] = membership.sourceFile
 		}
 	}
-	return lookup.canonicalSourceFile(canonicalPath)
 }
 
 func groupFallbackTargets(
@@ -552,10 +531,7 @@ func bindLintTargetPlan(
 
 	var gaps []resolvedLintTarget
 	programIndexesByConfig := make(map[string][]int)
-	programLookups := make([]programTargetLookup, len(set.Programs))
-	for i, program := range set.Programs {
-		programLookups[i] = programTargetLookup{program: program, fsys: fsys}
-	}
+	programFiles := newProgramFileIndex(set.Programs, fsys, singleThreaded)
 	for _, target := range plan.Targets {
 		programIndexes, cached := programIndexesByConfig[target.OwnerConfigDir]
 		if !cached {
@@ -564,7 +540,10 @@ func bindLintTargetPlan(
 		}
 		bound := false
 		for _, programIndex := range programIndexes {
-			sourceFile := programLookups[programIndex].sourceFileForTarget(target)
+			sourceFile := exactProgramSourceFile(set.Programs[programIndex], target.Path)
+			if sourceFile == nil {
+				sourceFile = programFiles.sourceFile(programIndex, target.CanonicalPath)
+			}
 			if sourceFile == nil {
 				continue
 			}
@@ -607,9 +586,8 @@ func bindLintTargetPlan(
 			fallbackIndex := len(binding.Programs)
 			binding.Programs = append(binding.Programs, fallback)
 			binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
-			fallbackLookup := programTargetLookup{program: fallback, fsys: fsys}
 			for _, gap := range fallbackTargets {
-				sourceFile := fallbackLookup.sourceFileForTarget(gap)
+				sourceFile := exactProgramSourceFile(fallback, gap.Path)
 				if sourceFile == nil {
 					return lintTargetBinding{}, fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
 				}
