@@ -810,7 +810,8 @@ func TestCachingHost_ReadFileFailureNotCached(t *testing.T) {
 	if sf == nil {
 		t.Fatal("file appeared but GetSourceFile still returns nil (negative caching?)")
 	}
-	if got := fs.readCount(target); got != 2 {
+	// Compiler hosts and vfs use TypeScript-normalized paths on every platform.
+	if got := fs.readCount(opts.FileName); got != 2 {
 		t.Fatalf("failed reads must be retried, reads = %d, want 2", got)
 	}
 }
