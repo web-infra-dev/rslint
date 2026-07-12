@@ -225,7 +225,7 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			// Reproduce a logical shell cwd. On Unix os.Getwd may return this
 			// spelling after runCLI changes to the physical payload directory.
 			t.Setenv("PWD", aliasDir)
-			code, text := runCLIInitForTest(t, nil, map[string]any{
+			code, text := runCLIInitForTest(t, []string{"--no-color"}, map[string]any{
 				"workingDirectory": test.workingDirectory,
 				"configs": []map[string]any{{
 					"configDirectory": realDir,
