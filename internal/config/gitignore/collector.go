@@ -1,14 +1,46 @@
-package config
+package gitignore
 
 import (
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// ReadGitignoreAsGlobs reads .gitignore files relevant to configDir and
+func normalizeGlobPath(path string) string {
+	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
+}
+
+func matchGlob(pattern string, path string) bool {
+	matched, err := doublestar.Match(pattern, path)
+	return err == nil && matched
+}
+
+func isDefaultExcludedDirName(name string, useCaseSensitive bool) bool {
+	for _, excluded := range utils.DefaultExcludeDirNames {
+		if name == excluded || (!useCaseSensitive && strings.EqualFold(name, excluded)) {
+			return true
+		}
+	}
+	return false
+}
+
+// Collect reads the .gitignore files relevant to one lint invocation. A nil
+// targetFiles slice scans descendants of configDir; a non-nil slice reads only
+// the explicit files' ancestor chains. In full-scan mode, isDirectoryBlocked
+// may prune descendants; its argument is a slash-separated directory path
+// relative to configDir. The callback is not used for explicit target files.
+func Collect(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool) []string {
+	if targetFiles == nil {
+		return readGitignoreAsGlobs(configDir, fsys, isDirectoryBlocked)
+	}
+	return readGitignoreAsGlobsForFiles(configDir, fsys, targetFiles)
+}
+
+// readGitignoreAsGlobs reads .gitignore files relevant to configDir and
 // converts their patterns to rslint glob format suitable for use as global
 // ignore patterns.
 //
@@ -19,14 +51,12 @@ import (
 //  2. Descendant .gitignore files: walks DOWN from configDir, collecting
 //     nested .gitignore with directory-scoped prefixes.
 //
-// configIgnores are the user-configured global ignore patterns (from config
-// entries with only ignores), already parsed. Directories that are
-// directory-level blocked by these patterns are skipped during the descendant
-// scan — their .gitignore files are not collected because files in those
-// directories will never be linted (isDirAbsolutelyBlocked guarantees this).
+// isDirectoryBlocked applies the caller's global config ignores. Descendant
+// .gitignore files below a blocked directory are irrelevant because files in
+// that directory cannot be linted.
 //
 // Returns nil if no .gitignore files are found.
-func ReadGitignoreAsGlobs(configDir string, fsys vfs.FS, configIgnores []IgnorePattern) []string {
+func readGitignoreAsGlobs(configDir string, fsys vfs.FS, isDirectoryBlocked func(string) bool) []string {
 	if fsys == nil {
 		return nil
 	}
@@ -37,14 +67,14 @@ func ReadGitignoreAsGlobs(configDir string, fsys vfs.FS, configIgnores []IgnoreP
 	// are interpreted relative to the ancestor .gitignore's directory, then
 	// projected into configDir-relative globs because rslint ignore matching
 	// evaluates paths relative to each configDir.
-	ancestorGlobs, configRootIgnored := collectAncestorGitignoreGlobs(normalizedRoot, fsys)
+	ancestorGlobs, ancestorPruneRules, configRootIgnored := collectAncestorGitignoreGlobs(normalizedRoot, fsys)
 	allGlobs = append(allGlobs, ancestorGlobs...)
 	if configRootIgnored {
 		return allGlobs
 	}
 
 	// Phase 2: collect descendant .gitignore files (walk DOWN from configDir).
-	collectGitignoreGlobs(normalizedRoot, "", fsys, &allGlobs, configIgnores)
+	collectGitignoreGlobs(normalizedRoot, "", fsys, &allGlobs, isDirectoryBlocked, ancestorPruneRules)
 
 	if len(allGlobs) == 0 {
 		return nil
@@ -52,11 +82,11 @@ func ReadGitignoreAsGlobs(configDir string, fsys vfs.FS, configIgnores []IgnoreP
 	return allGlobs
 }
 
-// ReadGitignoreAsGlobsForFiles reads only .gitignore files on the ancestor
+// readGitignoreAsGlobsForFiles reads only .gitignore files on the ancestor
 // chains of explicit target files. This is used by API-style calls where the
-// target set is already known; unlike ReadGitignoreAsGlobs, it does not scan
+// target set is already known; unlike the full collector, it does not scan
 // every descendant of configDir.
-func ReadGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string) []string {
+func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string) []string {
 	if fsys == nil || len(files) == 0 {
 		return nil
 	}
@@ -83,8 +113,17 @@ func ReadGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 
 	var allGlobs []string
 	var pruneRules []gitignorePruneRule
+	var prunedDirs []string
 	for _, dir := range dirs {
+		if isUnderPrunedDir(dir, prunedDirs, fsys.UseCaseSensitiveFileNames()) {
+			continue
+		}
+		if isDescendantSymlinkDir(normalizedConfigDir, dir, fsys) {
+			prunedDirs = append(prunedDirs, dir)
+			continue
+		}
 		if isDirIgnoredByPruneRules(dir, pruneRules, fsys.UseCaseSensitiveFileNames()) {
+			prunedDirs = append(prunedDirs, dir)
 			continue
 		}
 
@@ -107,26 +146,48 @@ func ReadGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 	return allGlobs
 }
 
-// ExtractConfigIgnores collects global ignore patterns from config entries and
-// parses them once into structured form. These are patterns from entries that
-// have only ignores (no files/rules/etc.), representing user-configured
-// directories to exclude from linting. Parsing here (rather than per file/dir)
-// keeps the lint hot path and the directory walks off the string-classification
-// cost.
-func ExtractConfigIgnores(config RslintConfig) []IgnorePattern {
-	var ignores []string
-	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			ignores = append(ignores, entry.Ignores...)
+func isUnderPrunedDir(dir string, prunedDirs []string, useCaseSensitive bool) bool {
+	for _, prunedDir := range prunedDirs {
+		if _, ok := relativeDir(prunedDir, dir, useCaseSensitive); ok {
+			return true
 		}
 	}
-	return ParseIgnorePatterns(ignores)
+	return false
+}
+
+func isDescendantSymlinkDir(configDir string, dir string, fsys vfs.FS) bool {
+	rel, ok := relativeDir(configDir, dir, fsys.UseCaseSensitiveFileNames())
+	if !ok || rel == "" {
+		return false
+	}
+
+	parent := parentDir(dir)
+	name := tspath.GetBaseFileName(dir)
+	entries := fsys.GetAccessibleEntries(parent)
+	if entries.Symlinks != nil {
+		for symlink := range entries.Symlinks {
+			if symlink == name || (!fsys.UseCaseSensitiveFileNames() && strings.EqualFold(symlink, name)) {
+				return true
+			}
+		}
+		return false
+	}
+
+	parentRealPath := fsys.Realpath(parent)
+	dirRealPath := fsys.Realpath(dir)
+	if parentRealPath == "" || dirRealPath == "" {
+		return false
+	}
+	expectedRealPath := tspath.CombinePaths(parentRealPath, name)
+	return tspath.ComparePaths(dirRealPath, expectedRealPath, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
+	}) != 0
 }
 
 // collectAncestorGitignoreGlobs walks UP from configDir to filesystem root,
 // collecting .gitignore patterns from each ancestor directory.
 // Returns patterns in root-first order (outermost ancestor first).
-func collectAncestorGitignoreGlobs(configDir string, fsys vfs.FS) ([]string, bool) {
+func collectAncestorGitignoreGlobs(configDir string, fsys vfs.FS) ([]string, []gitignorePruneRule, bool) {
 	// Collect ancestor dirs (from dir's parent up to root)
 	var ancestors []string
 	current := parentDir(configDir)
@@ -163,7 +224,7 @@ func collectAncestorGitignoreGlobs(configDir string, fsys vfs.FS) ([]string, boo
 			}
 		}
 	}
-	return globs, configRootIgnored
+	return globs, pruneRules, configRootIgnored
 }
 
 type gitignorePruneRule struct {
@@ -196,6 +257,9 @@ func parseGitignorePrunePatterns(content string) []gitignorePrunePattern {
 		if strings.HasPrefix(line, "!") {
 			negated = true
 			line = line[1:]
+		}
+		if containsParentPathComponent(line) {
+			continue
 		}
 		line = strings.TrimSuffix(line, "/")
 		rooted := false
@@ -402,19 +466,13 @@ func filesystemPathDepth(path string) int {
 
 // collectGitignoreGlobs recursively scans for .gitignore files and converts
 // their patterns to globs. Raw patterns from parent .gitignore files are used
-// to prune directories during scanning (avoids entering e.g. target/ with
-// thousands of subdirectories) without confusing "dir contents ignored" with
-// "dir itself ignored".
+// to prune directories during scanning.
 //
-// configIgnores provides additional directory-level pruning from the user's
-// lint config. If isDirAbsolutelyBlocked returns true for a directory against
-// these patterns, the directory is skipped. This is safe because
-// isDirAbsolutelyBlocked is the same predicate used by the linter's
-// GetConfigForFile (via isDirBlockedByIgnores) — if a directory is blocked
-// here, its files will never be linted, so collecting its .gitignore is
-// unnecessary.
-func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern) {
-	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, configIgnores, nil, &gitignoreWalkState{
+// isDirectoryBlocked provides directory-level pruning from the caller's
+// config policy. If it returns true, files below that directory cannot be
+// linted, so nested .gitignore sources there are irrelevant.
+func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule) {
+	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, &gitignoreWalkState{
 		resolvedPaths: make(map[string]string),
 		visited:       make(map[string]struct{}),
 	})
@@ -434,7 +492,7 @@ func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
 	return realpath
 }
 
-func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern, pruneRules []gitignorePruneRule, state *gitignoreWalkState) {
+func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, state *gitignoreWalkState) {
 	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
 		localGlobs := convertGitignoreToGlobs(content, relDir)
@@ -476,23 +534,11 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			childRel = relDir + "/" + dir
 		}
 
-		// Prune directories that are directory-level blocked by config ignores.
-		// isDirAbsolutelyBlocked is the same predicate the linter uses in
-		// GetConfigForFile → isDirBlockedByIgnores. If it returns true here,
-		// the linter will also return nil for any file in this directory,
-		// meaning files here are never linted. Therefore their .gitignore
-		// patterns are irrelevant and we can safely skip collecting them.
-		// Checked first because configIgnores is typically a short list (a few
-		// user-defined patterns), whereas *result grows as we collect more
-		// .gitignore patterns — checking configIgnores first avoids a linear
-		// scan of the longer list for directories blocked by config.
-		if len(configIgnores) > 0 && isDirAbsolutelyBlocked(childRel, configIgnores) {
+		if isDirectoryBlocked != nil && isDirectoryBlocked(childRel) {
 			continue
 		}
 
-		// Prune directories already ignored as directories by collected
-		// gitignore patterns. Critical for performance: without it, scanning
-		// rspack enters target/ (6,277 Rust build dirs, 0 .ts files).
+		// Prune directories already ignored by collected .gitignore patterns.
 		if isDirIgnoredByPruneRules(childAbs, pruneRules, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
@@ -504,7 +550,7 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			state.visited[childRealPath] = struct{}{}
 		}
 
-		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, configIgnores, pruneRules, state)
+		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, state)
 	}
 }
 
@@ -666,6 +712,9 @@ func convertSinglePattern(line string, baseDir string) string {
 		negated = true
 		line = line[1:]
 	}
+	if containsParentPathComponent(line) {
+		return ""
+	}
 
 	// Trailing / means directory-only; for glob purposes, we match dir/**
 	dirOnly := false
@@ -707,11 +756,9 @@ func convertSinglePattern(line string, baseDir string) string {
 
 	// Append /**/* for directory patterns to match all contents.
 	// Use /**/* (file-level) instead of /** (directory-level) because gitignore
-	// directories must stay `!`-reversible: ParseIgnorePattern classifies
-	// `dir/**/*` as dirFileLevelCover (prunable but negation-aware) and `dir/**`
-	// as dirAbsoluteBlock (which `!` can never re-include). gitignore's `!`
-	// override patterns require the former so isFileIgnored's sequential
-	// negation can re-include individual files.
+	// directories must stay `!`-reversible. The config matcher treats
+	// `dir/**/*` as a file-level cover while `dir/**` is an absolute directory
+	// block, so `.gitignore` directory patterns require the former.
 	if dirOnly {
 		if !strings.HasSuffix(glob, "/**/*") {
 			glob = glob + "/**/*"
@@ -722,4 +769,13 @@ func convertSinglePattern(line string, baseDir string) string {
 		glob = "!" + glob
 	}
 	return glob
+}
+
+func containsParentPathComponent(pattern string) bool {
+	for _, component := range strings.Split(strings.ReplaceAll(pattern, "\\", "/"), "/") {
+		if component == ".." {
+			return true
+		}
+	}
+	return false
 }

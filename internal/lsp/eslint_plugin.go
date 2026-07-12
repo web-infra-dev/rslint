@@ -74,7 +74,17 @@ func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *str
 	if s.isUnavailableConfigForURI(uri) {
 		return linter.EslintPluginFileInput{}, false
 	}
-	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	return s.buildPluginFileInputWithConfig(uri, textOverride, rslintConfig, configCwd, isJSConfig)
+}
+
+func (s *Server) buildPluginFileInputWithConfig(
+	uri lsproto.DocumentUri,
+	textOverride *string,
+	rslintConfig config.RslintConfig,
+	configCwd string,
+	isJSConfig bool,
+) (linter.EslintPluginFileInput, bool) {
 	configKey := s.pluginConfigKeyForURI(uri)
 	filePath := uriToPath(uri)
 	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
@@ -137,6 +147,21 @@ func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
 // Must be called from the main dispatch loop (it reads jsConfigs + documents
 // to build the input and the generation map).
 func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) {
+	if s.isUnavailableConfigForURI(uri) {
+		s.cancelInflightPluginDispatch(uri)
+		return
+	}
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
+}
+
+func (s *Server) dispatchPluginLintWithConfig(
+	uri lsproto.DocumentUri,
+	generation uint64,
+	rslintConfig config.RslintConfig,
+	configCwd string,
+	isJSConfig bool,
+) {
 	// Supersede any prior in-flight dispatch for this URI FIRST — before the
 	// no-plugin-work early return below. Even a relint that yields no plugin
 	// rules (the file became globally ignored, or its plugin-rule set dropped to
@@ -145,7 +170,7 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 	// a $/cancelRequest tells the client to stop the worker.
 	s.cancelInflightPluginDispatch(uri)
 
-	input, ok := s.buildPluginFileInput(uri, nil)
+	input, ok := s.buildPluginFileInputWithConfig(uri, nil, rslintConfig, configCwd, isJSConfig)
 	if !ok {
 		return
 	}
@@ -302,7 +327,24 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 //
 // Must be called from the main dispatch loop (it reads jsConfigs + documents).
 func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUri, content string, fix bool, suggestionsMode string) []rule.RuleDiagnostic {
-	input, ok := s.buildPluginFileInput(uri, &content)
+	if s.isUnavailableConfigForURI(uri) {
+		return nil
+	}
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	return s.lintPluginRulesSyncWithConfig(ctx, uri, content, fix, suggestionsMode, rslintConfig, configCwd, isJSConfig)
+}
+
+func (s *Server) lintPluginRulesSyncWithConfig(
+	ctx context.Context,
+	uri lsproto.DocumentUri,
+	content string,
+	fix bool,
+	suggestionsMode string,
+	rslintConfig config.RslintConfig,
+	configCwd string,
+	isJSConfig bool,
+) []rule.RuleDiagnostic {
+	input, ok := s.buildPluginFileInputWithConfig(uri, &content, rslintConfig, configCwd, isJSConfig)
 	if !ok {
 		return nil
 	}

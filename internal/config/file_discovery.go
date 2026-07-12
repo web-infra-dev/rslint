@@ -129,7 +129,7 @@ func discoverLintTargetsWithStopDirs(
 	stopDirs []string,
 	singleThreaded bool,
 ) []DiscoveredLintTarget {
-	globalIgnores := ExtractConfigIgnores(config)
+	globalIgnores := extractConfigIgnores(config)
 	globalIgnores = append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), globalIgnores...)
 	useCaseSensitive := true
 	if fsys != nil {

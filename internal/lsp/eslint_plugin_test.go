@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -306,6 +308,68 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	}
 }
 
+func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpgitignore", RuleNames: []string{"no-foo"}},
+	})
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.ts")
+	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignored.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	s.jsonConfig = config.RslintConfig{{
+		Plugins: []string{"tpgitignore"},
+		Rules:   config.Rules{"tpgitignore/no-foo": "error"},
+	}}
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "foo();\n"
+	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+		t.Fatalf("gitignored file produced plugin input %+v", input)
+	}
+}
+
+func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpsnapshot", RuleNames: []string{"no-foo"}},
+	})
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	s.jsonConfig = config.RslintConfig{{
+		Plugins: []string{"tpsnapshot"},
+		Rules:   config.Rules{"tpsnapshot/no-foo": "error"},
+	}}
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "foo();\n"
+
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configCwd, isJSConfig); !ok {
+		t.Fatal("captured effective config changed after .gitignore update")
+	} else if len(input.Rules) != 1 || input.Rules[0].Name != "tpsnapshot/no-foo" {
+		t.Fatalf("captured effective config produced unexpected input: %+v", input)
+	}
+	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+		t.Fatalf("fresh effective config did not observe .gitignore update: %+v", input)
+	}
+}
+
 func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},
@@ -493,7 +557,8 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		}}}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, original, config.RslintConfig{}, "", true, nil)
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -549,7 +614,8 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	}
 
 	start := time.Now()
-	got := s.computeFixAllContent(context.Background(), uri, original, config.RslintConfig{}, "", true, nil)
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped

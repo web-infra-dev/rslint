@@ -610,7 +610,7 @@ func TestConfigDecode_PreservesNonGlobalIgnoreObjectShape(t *testing.T) {
 		if len(cfg) != 1 || isGlobalIgnoreEntry(cfg[0]) {
 			t.Fatalf("entry with another authored key must not become a global ignore: %#v", cfg)
 		}
-		if ignores := ExtractConfigIgnores(cfg); len(ignores) != 0 {
+		if ignores := extractConfigIgnores(cfg); len(ignores) != 0 {
 			t.Fatalf("entry-level ignore leaked into global ignores: %#v", ignores)
 		}
 	}

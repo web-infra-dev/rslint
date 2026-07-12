@@ -1197,21 +1197,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
-			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
+			// The shared gitignore collector walks UP (ancestor inheritance) and DOWN
 			// (nested .gitignore) from each configDir. Sibling configs are
 			// fully isolated — they never share gitignore patterns.
 			//
-			// Config ignores are passed so that directories which are
-			// directory-level blocked (e.g. **/tests/**) are pruned during
-			// the .gitignore scan. This is safe because isDirAbsolutelyBlocked is
-			// the same predicate used by the linter — blocked dirs' files
-			// are never linted, so their .gitignore patterns are irrelevant.
+			// Directories excluded by global config ignores are pruned during
+			// the .gitignore scan because files below them cannot be linted.
 			//
 			// configMap is not mutated by gitignore workers. Results are collected
 			// and merged on this goroutine before target discovery.
 			type giResult struct {
 				configDir string
-				globs     []string
+				config    rslintconfig.RslintConfig
 			}
 			var (
 				giResults []giResult
@@ -1220,13 +1217,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
 				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
 					giWG.Queue(func() {
-						if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
-							giMu.Lock()
-							giResults = append(giResults, giResult{configDir, globs})
-							giMu.Unlock()
-						}
+						augmented := rslintconfig.ConfigWithGitignore(entries, configDir, fs, nil)
+						giMu.Lock()
+						giResults = append(giResults, giResult{configDir, augmented})
+						giMu.Unlock()
 					})
 				}
 			}
@@ -1240,10 +1235,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// before target discovery, which relies on the augmented configMap.
 			giWG.RunAndWait()
 			for _, r := range giResults {
-				configMap[r.configDir] = append(
-					rslintconfig.RslintConfig{{Ignores: r.globs}},
-					configMap[r.configDir]...,
-				)
+				configMap[r.configDir] = r.config
 			}
 			if programErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
@@ -1261,7 +1253,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
 				)
 			} else {
-				rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1290,7 +1282,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
 			)
 		} else {
-			rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

@@ -670,6 +670,16 @@ type MergedConfig struct {
 	Plugins         map[string]struct{}
 }
 
+func extractConfigIgnores(config RslintConfig) []IgnorePattern {
+	var ignores []string
+	for _, entry := range config {
+		if isGlobalIgnoreEntry(entry) {
+			ignores = append(ignores, entry.Ignores...)
+		}
+	}
+	return ParseIgnorePatterns(ignores)
+}
+
 // IsFileIgnored reports whether filePath is excluded by the config's global
 // `ignores` patterns. It is distinct from GetConfigForFile returning nil,
 // which also covers "no entry matched this file" — callers that need ESLint's
@@ -677,7 +687,7 @@ type MergedConfig struct {
 // this method. Program-wide type-check diagnostics are intentionally governed
 // by tsconfig membership instead.
 func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
-	patterns := ExtractConfigIgnores(config)
+	patterns := extractConfigIgnores(config)
 	if len(patterns) == 0 {
 		return false
 	}
@@ -706,7 +716,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 	// 1. Collect all global ignore patterns and evaluate once.
 	// This allows `!` negation patterns in separate entries to work correctly,
 	// aligned with ESLint v10 which merges all global ignores before evaluating.
-	globalIgnorePatterns := ExtractConfigIgnores(config)
+	globalIgnorePatterns := extractConfigIgnores(config)
 	if len(globalIgnorePatterns) > 0 {
 		// Phase 1: directory-level check. Patterns like `dir/**` block the
 		// directory entirely — `!` negation cannot undo this. Aligned with
