@@ -180,7 +180,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 
 ### Detailed Pipeline Steps
 
-1. **Source Text Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays.
+1. **Source Text Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. CLI runs and individual API requests keep a compiler-host source snapshot keyed by the exact normalized source path. The snapshot stores the first successful text read and its xxh3 hash for the current generation, allowing later Programs to skip both work items. CLI fix writes replace the entire source generation before rebuilding Programs; API snapshots end with the request. LSP does not use this one-shot layer because its `project.Session` already follows document versions and `didChange` updates.
 2. **Program Construction**: Plain CLI/API lint resolves its effective targets first and builds `Program` objects only for governing configs that own a selected target. Program-wide type-check modes build every project declared by the effective loaded config catalog. LSP reuses matching projects from ts-go `project.Session`; a declared custom tsconfig that project service has not loaded is built on demand against an isolated editor overlay.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes.
 4. **Semantic Analysis**: When needed, the linter acquires a `TypeChecker` from the `Program`.
@@ -671,13 +671,16 @@ goroutines remain outside that guarantee.
 - **Parse Cache in LSP**: the LSP server passes a shared `project.ParseCache` into the session to avoid re-parsing from scratch on every change
 - **Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop
 - **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.
-- **Run-Scoped Parse Reuse**: CLI Program rebuilds within one invocation share a parse cache, primarily for multi-pass fixing. The cache is discarded with the run and is neither repository-persistent nor shared across lint requests.
+- **Run/Request-Scoped Source Snapshots**: CLI runs and individual API requests share immutable source text/hash snapshots across their Programs. Keys are the exact compiler-host source names, never real paths, so lexical, overlay, and symlink aliases remain distinct. Failed reads are not cached. The source layer in one cache binds to one filesystem view across its generations; compiler hosts using another view bypass this layer while retaining content-keyed AST reuse.
+- **Generation-Based Fix Invalidation**: after every CLI fix write attempt, the compiler host atomically installs an empty source generation before any Program rebuild. Swapping generations rather than clearing a live map prevents an older in-flight read from repopulating the new generation. The API fix path only returns output and does not mutate or rebuild its overlay, while LSP remains version/didChange-driven.
+- **Run-Scoped Parse Reuse**: CLI Program rebuilds within one invocation and Programs within one API request share the existing content-keyed AST parse cache. Source-generation invalidation does not clear AST entries, so unchanged bytes can reuse their `SourceFile`. The cache is discarded with its run/request and is never repository-persistent or shared across lint requests.
 - **Bounded Multi-Pass Fixing**: `--fix` and LSP `fixAll` intentionally rerun lint after applying edits, but cap the cascade at `maxFixPasses = 10`
 
 ### Memory Management
 
 - **ts-go Owns the Heavy Graphs**: AST nodes, checker state, `Program` graphs, and session state are primarily owned by ts-go; rslint adds listener maps, diagnostics, and config-derived rule lists on top
 - **Short-Lived Per-File Structures**: comment slices, disable managers, and registered listener maps are allocated per file and dropped after traversal; `clear(registeredListeners)` helps release references promptly
+- **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
 - **No Repo-Local Pooling Layer Today**: there is no explicit `sync.Pool`-based object pooling strategy in the main lint path at the moment
