@@ -482,6 +482,7 @@ setsize
 Setstate
 setstate
 shadcn
+shadowable
 shouldnt
 SIGSEGV
 smajobber
@@ -562,6 +563,7 @@ uninitialised
 unional
 uniseg
 unmarshals
+unmodeled
 unpadded
 unpark
 Unparseable
