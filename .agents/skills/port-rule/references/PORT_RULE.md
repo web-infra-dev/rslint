@@ -421,7 +421,7 @@ For a rule with multiple positional options (e.g. `["error", "both", {...}]`), i
 Every new rule declares a JSON Schema for its options on the `Schema` field. The linter validates each configured rule's options against it before linting starts (in the CLI, as a separate fail-fast step right after configuration is resolved), so a misconfigured rule fails with a clear error instead of being silently misread.
 
 - **No options**: set `Schema: rule.EmptyArraySchema`. Always reference the shared value — never author your own copy of the empty-array schema.
-- **With options**: copy ESLint's `meta.schema` into a `<rule-name>.schema.json` file beside the rule source and embed it. When upstream's `meta.schema` is a plain **array** of item schemas, wrap it the way ESLint itself does: `{"type": "array", "items": [<the array>], "minItems": 0, "maxItems": <len>}`. When it's already a full schema **object** (e.g. eqeqeq's top-level `anyOf`), copy it as-is.
+- **With options**: copy ESLint's `meta.schema` into a `<rule-name>.schema.json` file beside the rule source and embed it. When upstream's `meta.schema` is a plain **array** of item schemas, wrap it the way ESLint itself does: `{"type": "array", "items": <the upstream array, used directly as the tuple items>, "minItems": 0, "maxItems": <len>}`. When it's already a full schema **object** (e.g. eqeqeq's top-level `anyOf`), copy it as-is.
 
 ```go
 import _ "embed"
