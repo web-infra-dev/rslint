@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -171,7 +173,7 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
 	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
 
-	code, text := runCLIInitForTest(t, nil, map[string]any{
+	code, text := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"runtime":          map[string]any{"stdoutIsTTY": tty},
 		"configs": []map[string]any{{
@@ -225,7 +227,8 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			// Reproduce a logical shell cwd. On Unix os.Getwd may return this
 			// spelling after runCLI changes to the physical payload directory.
 			t.Setenv("PWD", aliasDir)
-			code, text := runCLIInitForTest(t, []string{"--no-color"}, map[string]any{
+			t.Setenv("NO_COLOR", "1")
+			code, text := runCLIInitForTest(t, map[string]any{
 				"workingDirectory": test.workingDirectory,
 				"configs": []map[string]any{{
 					"configDirectory": realDir,
@@ -245,7 +248,26 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 	}
 }
 
-func runCLIInitForTest(t *testing.T, args []string, payload any) (int, string) {
+func createWorkingDirectoryAlias(t *testing.T, target, alias string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		// Directory symlinks can require Developer Mode or elevated privileges
+		// on Windows, so use an ordinary-user directory junction instead.
+		// cspell:ignore mklink
+		if output, err := exec.Command("cmd.exe", "/d", "/c", "mklink", "/J", alias, target).CombinedOutput(); err != nil {
+			t.Fatalf("create working-directory junction: %v\n%s", err, output)
+		}
+	} else if err := os.Symlink(target, alias); err != nil {
+		t.Fatalf("create working-directory symlink: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(alias); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove working-directory alias: %v", err)
+		}
+	})
+}
+
+func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 	t.Helper()
 
 	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
@@ -300,7 +322,7 @@ func runCLIInitForTest(t *testing.T, args []string, payload any) (int, string) {
 	t.Cleanup(func() { _ = peer.Close() })
 
 	codeCh := make(chan int, 1)
-	go func() { codeCh <- runCLI(args) }()
+	go func() { codeCh <- runCLI(nil) }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
