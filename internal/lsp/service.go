@@ -124,11 +124,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 				if s.backgroundCtx.Err() == nil {
 					log.Printf("[rslint] Failed to register .gitignore watchers: %v", err)
 				}
-				return
 			}
-			// Close the registration window by re-reading ignore state once the
-			// client confirms that every watcher is active.
-			_ = s.RefreshDiagnostics(s.backgroundCtx)
 		}()
 	}
 

@@ -1197,15 +1197,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
-			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
+			// The shared gitignore collector walks UP (ancestor inheritance) and DOWN
 			// (nested .gitignore) from each configDir. Sibling configs are
 			// fully isolated — they never share gitignore patterns.
 			//
-			// Config ignores are passed so that directories which are
-			// directory-level blocked (e.g. **/tests/**) are pruned during
-			// the .gitignore scan. This is safe because isDirAbsolutelyBlocked is
-			// the same predicate used by the linter — blocked dirs' files
-			// are never linted, so their .gitignore patterns are irrelevant.
+			// Directories excluded by global config ignores are pruned during
+			// the .gitignore scan because files below them cannot be linted.
 			//
 			// configMap is not mutated by gitignore workers. Results are collected
 			// and merged on this goroutine before target discovery.

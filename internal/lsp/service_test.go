@@ -2917,6 +2917,7 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 	tests := []struct {
 		name         string
+		configDir    string
 		relative     string
 		config       config.RslintConfig
 		gitignores   map[string]string
@@ -2968,6 +2969,16 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
+			name:      "ancestor ignore blocks nested source",
+			configDir: "packages/app",
+			relative:  "ignored/keep.ts",
+			config:    config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{
+				".gitignore":                      "/packages/app/ignored/\n",
+				"packages/app/ignored/.gitignore": "!keep.ts\n",
+			},
+		},
+		{
 			name:     "pruned nested source does not override root negation",
 			relative: "dist/types/private.ts",
 			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
@@ -3003,7 +3014,14 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
+			workspace := t.TempDir()
+			configDir := workspace
+			if test.configDir != "" {
+				configDir = filepath.Join(workspace, test.configDir)
+				if err := os.MkdirAll(configDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if test.symlinkDir {
 				targetDir := t.TempDir()
 				if test.targetIgnore != "" {
@@ -3011,12 +3029,12 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if err := os.Symlink(targetDir, filepath.Join(dir, "link")); err != nil {
+				if err := os.Symlink(targetDir, filepath.Join(configDir, "link")); err != nil {
 					t.Skipf("directory symlink unavailable: %v", err)
 				}
 			}
 			for relative, content := range test.gitignores {
-				filePath := filepath.Join(dir, relative)
+				filePath := filepath.Join(workspace, relative)
 				if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -3026,7 +3044,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			}
 
 			const malformed = "debugger; const value = ;\n"
-			target := filepath.Join(dir, test.relative)
+			target := filepath.Join(configDir, test.relative)
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -3035,7 +3053,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			}
 
 			s := newTestServer()
-			s.cwd = dir
+			s.cwd = configDir
 			s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 			s.jsonConfig = test.config
 			uri := documentURIFromPath(target)

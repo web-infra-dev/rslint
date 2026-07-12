@@ -14,6 +14,7 @@ import (
 func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 	tests := []struct {
 		name          string
+		configDir     string
 		relative      string
 		globalIgnores []string
 		entryIgnores  []string
@@ -56,6 +57,15 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
+			name:      "ancestor ignore blocks nested source",
+			configDir: "packages/app",
+			relative:  "ignored/keep.ts",
+			gitignores: map[string]string{
+				".gitignore":                      "/packages/app/ignored/\n",
+				"packages/app/ignored/.gitignore": "!keep.ts\n",
+			},
+		},
+		{
 			name:     "pruned nested source does not override root negation",
 			relative: "dist/types/private.ts",
 			gitignores: map[string]string{
@@ -87,7 +97,14 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
+			workspace := t.TempDir()
+			configDir := workspace
+			if test.configDir != "" {
+				configDir = filepath.Join(workspace, test.configDir)
+				if err := os.MkdirAll(configDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if test.symlinkDir {
 				targetDir := t.TempDir()
 				if test.targetIgnore != "" {
@@ -95,12 +112,12 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if err := os.Symlink(targetDir, filepath.Join(dir, "link")); err != nil {
+				if err := os.Symlink(targetDir, filepath.Join(configDir, "link")); err != nil {
 					t.Skipf("directory symlink unavailable: %v", err)
 				}
 			}
 			for relative, content := range test.gitignores {
-				filePath := filepath.Join(dir, relative)
+				filePath := filepath.Join(workspace, relative)
 				if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -109,7 +126,7 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				}
 			}
 
-			target := filepath.Join(dir, test.relative)
+			target := filepath.Join(configDir, test.relative)
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -133,12 +150,12 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			configPath := filepath.Join(dir, "rslint.json")
+			configPath := filepath.Join(configDir, "rslint.json")
 			if err := os.WriteFile(configPath, configJSON, 0o644); err != nil {
 				t.Fatal(err)
 			}
 
-			code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			code, stdout, stderr := runLintPipelineForTest(t, configDir, lintArgs{
 				Config:         configPath,
 				AllowFiles:     []string{tspath.NormalizePath(target)},
 				Format:         "default",
@@ -158,8 +175,8 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 
 			response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
 				Config:           configJSON,
-				ConfigDirectory:  dir,
-				WorkingDirectory: dir,
+				ConfigDirectory:  configDir,
+				WorkingDirectory: configDir,
 				Files:            []string{target},
 			})
 			if err != nil {

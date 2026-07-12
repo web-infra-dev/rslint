@@ -121,6 +121,46 @@ func TestConvertGitignoreToGlobs_TrailingWhitespace(t *testing.T) {
 	assert.Equal(t, globs[1], "**/coverage/**/*")
 }
 
+func TestConvertRepresentativePatterns(t *testing.T) {
+	tests := []struct {
+		line string
+		want string
+	}{
+		{"node_modules/", "**/node_modules/**/*"},
+		{"dist/", "**/dist/**/*"},
+		{"dist-*", "**/dist-*"},
+		{"*.log*", "**/*.log*"},
+		{"*.css.d.ts", "**/*.css.d.ts"},
+		{".vscode/**/*", ".vscode/**/*"},
+		{"!.vscode/settings.json", "!.vscode/settings.json"},
+		{"test-results/", "**/test-results/**/*"},
+		{"output/", "**/output/**/*"},
+		{"**/*.rs.bk", "**/*.rs.bk"},
+		{"report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json", "**/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json"},
+		{"!scripts/node_modules/", "!scripts/node_modules/**/*"},
+		{"!tests/fixtures/*/**/node_modules", "!tests/fixtures/*/**/node_modules"},
+		{"!packages/tool/tests/**/node_modules", "!packages/tool/tests/**/node_modules"},
+		{"!tests/fixtures/cases/output", "!tests/fixtures/cases/output"},
+		{"packages/*/tests/js", "packages/*/tests/js"},
+		{"/github/", "github/**/*"},
+		{"/artifacts/", "artifacts/**/*"},
+		{"npm/**/*.node", "npm/**/*.node"},
+		{"/npm/*", "npm/*"},
+		{"!npm/darwin-arm64/", "!npm/darwin-arm64/**/*"},
+		{"/packages/*/temp", "packages/*/temp"},
+		{"build/Release", "build/Release"},
+		{".env.*", "**/.env.*"},
+		{"!.env.example", "!**/.env.example"},
+		{".vscode/*", ".vscode/*"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.line, func(t *testing.T) {
+			assert.Equal(t, convertSinglePattern(test.line, ""), test.want)
+		})
+	}
+}
+
 // --- Nested .gitignore with baseDir prefix ---
 
 func TestConvertGitignoreToGlobs_NestedBaseDir(t *testing.T) {
@@ -148,14 +188,14 @@ func TestConvertGitignoreToGlobs_NestedWildcard(t *testing.T) {
 	assert.Equal(t, globs[0], "packages/app/**/*.generated.ts")
 }
 
-// --- ReadGitignoreAsGlobs integration tests ---
+// --- Collector integration tests ---
 
 func TestReadGitignoreAsGlobs_RootOnly(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore": "dist/\n*.log\n",
 		"src/a.ts":   "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 	assert.Equal(t, len(globs), 2, "got: %v", globs)
 
 	hasDistGlob := false
@@ -176,7 +216,7 @@ func TestReadGitignoreAsGlobs_NoGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		"src/a.ts": "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 	assert.Assert(t, globs == nil, "should return nil when no .gitignore")
 }
 
@@ -186,7 +226,7 @@ func TestReadGitignoreAsGlobs_Nested(t *testing.T) {
 		"packages/app/.gitignore": "tmp/\n",
 		"src/a.ts":                "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 
 	hasDistGlob := false
 	hasTmpGlob := false
@@ -208,7 +248,7 @@ func TestReadGitignoreAsGlobs_NestedNegation(t *testing.T) {
 		"packages/app/.gitignore": "!dist/\n",
 		"src/a.ts":                "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 
 	hasDistGlob := false
 	hasNegation := false
@@ -225,24 +265,39 @@ func TestReadGitignoreAsGlobs_NestedNegation(t *testing.T) {
 }
 
 func TestReadGitignoreAsGlobs_PrunesGitignoredDirs(t *testing.T) {
-	// Root .gitignore ignores target/. Scanner should NOT enter target/
-	// even to look for nested .gitignore files.
+	// The collector should not enter a directory excluded by a parent pattern.
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                    "target/\n",
-		"src/a.ts":                      "x",
-		"target/deep/nested/.gitignore": "# should not be read\nfoo\n",
+		".gitignore":                     "ignored/\n",
+		"src/a.ts":                       "x",
+		"ignored/deep/nested/.gitignore": "# should not be read\nfoo\n",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 
-	// Positive: root .gitignore should be read
-	assert.Assert(t, len(globs) >= 1, "should have at least root target/ glob")
+	assert.Assert(t, len(globs) >= 1, "should contain the root ignore pattern")
 
-	// Negative: target/deep/nested/.gitignore should NOT be read
+	// The nested ignore source is unreachable and must not be collected.
 	for _, g := range globs {
-		if strings.Contains(g, "target/deep") {
-			t.Errorf("should not read .gitignore inside gitignored target/ dir, but found: %s", g)
+		if strings.Contains(g, "ignored/deep") {
+			t.Errorf("collected a pattern from an excluded directory: %s", g)
 		}
 	}
+}
+
+func TestCollectors_AncestorPatternPrunesDescendantIgnoreSource(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                        "/packages/app/ignored/\n",
+		"packages/app/ignored/.gitignore":   "!keep.ts\n",
+		"packages/app/ignored/keep.ts":      "x",
+		"packages/app/ignored/unrelated.ts": "x",
+	})
+	configDir := tspath.ResolvePath(dir, "packages/app")
+	target := tspath.ResolvePath(configDir, "ignored/keep.ts")
+
+	full := Collect(configDir, osvfs.FS(), nil, nil)
+	explicit := Collect(configDir, osvfs.FS(), []string{target}, nil)
+
+	assert.DeepEqual(t, full, explicit)
+	assert.DeepEqual(t, full, []string{"ignored/**/*"})
 }
 
 func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
@@ -251,7 +306,7 @@ func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
 		"node_modules/pkg/.gitignore": "# should not be read\n",
 		"src/a.ts":                    "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 
 	// Only root .gitignore should be read
 	assert.Equal(t, len(globs), 1)
@@ -271,7 +326,7 @@ func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
 		caseSensitiveFS: false,
 	}
 
-	ReadGitignoreAsGlobs("/repo", mock, nil)
+	readGitignoreAsGlobs("/repo", mock, nil)
 	for _, accessed := range mock.accessedDirs {
 		if strings.EqualFold(accessed, "/repo/node_modules") {
 			t.Fatalf("case-insensitive filesystem must not scan default excluded directory %q", accessed)
@@ -296,7 +351,7 @@ func TestReadGitignoreAsGlobs_ThreeLevelNested(t *testing.T) {
 		"packages/app/sub/.gitignore": "cache/\n",
 		"src/a.ts":                    "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := readGitignoreAsGlobs(dir, osvfs.FS(), nil)
 
 	hasRoot := false
 	hasApp := false
@@ -342,7 +397,7 @@ func TestReadGitignoreAsGlobs_SkipsDescendantSymlinkCycle(t *testing.T) {
 		resolvedPaths: map[string]string{"/repo/a/loop": "/repo"},
 	}
 
-	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+	globs := readGitignoreAsGlobs("/repo", mock, nil)
 
 	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
 	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
@@ -368,7 +423,7 @@ func TestReadGitignoreAsGlobs_LegacySymlinkCycleUsesCachedRealPaths(t *testing.T
 		},
 	}
 
-	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+	globs := readGitignoreAsGlobs("/repo", mock, nil)
 
 	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
 	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
@@ -523,7 +578,7 @@ func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
 				},
 			}
 
-			globs := ReadGitignoreAsGlobs(test.configDir, mock, nil)
+			globs := readGitignoreAsGlobs(test.configDir, mock, nil)
 
 			assert.DeepEqual(t, globs, []string{"**/root-cache/**/*"})
 			assert.DeepEqual(t, mock.readFileCalls, []string{test.rootIgnore, test.configIgnore})

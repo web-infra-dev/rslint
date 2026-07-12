@@ -1,4 +1,4 @@
-package config
+package gitignore_test
 
 import (
 	"os"
@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config"
 	"gotest.tools/v3/assert"
 )
 
@@ -21,40 +22,6 @@ type gitignoreSpyFS struct {
 func (s *gitignoreSpyFS) GetAccessibleEntries(path string) vfs.Entries {
 	s.accessedDirs = append(s.accessedDirs, path)
 	return s.FS.GetAccessibleEntries(path)
-}
-
-type gitignoreMockFS struct {
-	vfs.FS
-	entries         map[string]vfs.Entries
-	files           map[string]string
-	resolvedPaths   map[string]string
-	readFileCalls   []string
-	accessedDirs    []string
-	realpathCalls   []string
-	caseSensitiveFS bool
-}
-
-func (m *gitignoreMockFS) ReadFile(path string) (string, bool) {
-	m.readFileCalls = append(m.readFileCalls, path)
-	content, ok := m.files[path]
-	return content, ok
-}
-
-func (m *gitignoreMockFS) GetAccessibleEntries(path string) vfs.Entries {
-	m.accessedDirs = append(m.accessedDirs, path)
-	return m.entries[path]
-}
-
-func (m *gitignoreMockFS) Realpath(path string) string {
-	m.realpathCalls = append(m.realpathCalls, path)
-	if realpath, ok := m.resolvedPaths[path]; ok {
-		return realpath
-	}
-	return path
-}
-
-func (m *gitignoreMockFS) UseCaseSensitiveFileNames() bool {
-	return m.caseSensitiveFS
 }
 
 func setupGitignoreFixture(t *testing.T, files map[string]string) string {
@@ -72,6 +39,26 @@ func setupGitignoreFixture(t *testing.T, files map[string]string) string {
 	return tspath.NormalizePath(tmpDir)
 }
 
+func collectGitignoreGlobsForTest(configDir string, fsys vfs.FS, configIgnores []string) []string {
+	base := config.RslintConfig{}
+	if configIgnores != nil {
+		base = config.RslintConfig{{Ignores: configIgnores}}
+	}
+	effective := config.ConfigWithGitignore(base, configDir, fsys, nil)
+	if len(effective) == len(base) {
+		return nil
+	}
+	return effective[0].Ignores
+}
+
+func collectGitignoreGlobsForFilesForTest(configDir string, fsys vfs.FS, files []string) []string {
+	effective := config.ConfigWithGitignore(config.RslintConfig{}, configDir, fsys, files)
+	if len(effective) == 0 {
+		return nil
+	}
+	return effective[0].Ignores
+}
+
 func TestConfigWithGitignore_DefaultAndExplicitScopes(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":          "root.ts\n",
@@ -80,13 +67,13 @@ func TestConfigWithGitignore_DefaultAndExplicitScopes(t *testing.T) {
 		"nested/private.ts":   "debugger;\n",
 		"nested/unrelated.ts": "debugger;\n",
 	})
-	base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
-	full := ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
 	assert.Assert(t, full.IsFileIgnored(tspath.ResolvePath(dir, "root.ts"), dir))
 	assert.Assert(t, full.IsFileIgnored(tspath.ResolvePath(dir, "nested/private.ts"), dir))
 
-	explicit := ConfigWithGitignore(
+	explicit := config.ConfigWithGitignore(
 		base,
 		dir,
 		osvfs.FS(),
@@ -95,7 +82,7 @@ func TestConfigWithGitignore_DefaultAndExplicitScopes(t *testing.T) {
 	assert.Assert(t, explicit.IsFileIgnored(tspath.ResolvePath(dir, "root.ts"), dir))
 	assert.Assert(t, !explicit.IsFileIgnored(tspath.ResolvePath(dir, "nested/private.ts"), dir))
 
-	empty := ConfigWithGitignore(base, dir, osvfs.FS(), []string{})
+	empty := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{})
 	assert.Equal(t, len(empty), len(base))
 	assert.Assert(t, base[0].Ignores == nil, "ConfigWithGitignore mutated its input: %v", base)
 }
@@ -108,10 +95,10 @@ func TestConfigWithGitignore_ExplicitMatchesDefaultPruning(t *testing.T) {
 		"dist/types/unrelated-file.ts": "debugger;\n",
 	})
 	target := tspath.ResolvePath(dir, "dist/types/private.ts")
-	base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
-	full := ConfigWithGitignore(base, dir, osvfs.FS(), nil)
-	explicit := ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
+	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+	explicit := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
 	assert.Equal(t, explicit.IsFileIgnored(target, dir), full.IsFileIgnored(target, dir))
 	assert.Assert(t, !explicit.IsFileIgnored(target, dir))
 }
@@ -130,11 +117,11 @@ func TestConfigWithGitignore_RejectsPatternsOutsideSourceScope(t *testing.T) {
 				"unrelated/.gitignore": test.pattern,
 			})
 			target := tspath.ResolvePath(dir, "target.ts")
-			base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
+			base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
-			for _, effective := range []RslintConfig{
-				ConfigWithGitignore(base, dir, osvfs.FS(), nil),
-				ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
+			for _, effective := range []config.RslintConfig{
+				config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
+				config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
 			} {
 				assert.Assert(t, !effective.IsFileIgnored(target, dir))
 			}
@@ -151,7 +138,7 @@ func TestConfigWithGitignore_SymlinkedConfigPathSpace(t *testing.T) {
 	if err := os.Symlink(realRoot, aliasRoot); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
-	base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
 	for _, test := range []struct {
 		name      string
@@ -162,8 +149,8 @@ func TestConfigWithGitignore_SymlinkedConfigPathSpace(t *testing.T) {
 		{name: "physical config and aliased target", configDir: realRoot, target: filepath.Join(aliasRoot, "src/source.ts")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			effective := ConfigWithGitignore(base, test.configDir, osvfs.FS(), []string{test.target})
-			matchFile, matchDir := ResolveConfigPathSpace(test.target, test.configDir, osvfs.FS())
+			effective := config.ConfigWithGitignore(base, test.configDir, osvfs.FS(), []string{test.target})
+			matchFile, matchDir := config.ResolveConfigPathSpace(test.target, test.configDir, osvfs.FS())
 			assert.Assert(t, effective.IsFileIgnored(matchFile, matchDir))
 		})
 	}
@@ -184,8 +171,8 @@ func TestConfigWithGitignore_SymlinkedConfigKeepsLexicalAncestors(t *testing.T) 
 	if err := os.Symlink(realRoot, aliasRoot); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
-	base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
-	matchFile, matchDir := ResolveConfigPathSpace(target, aliasRoot, osvfs.FS())
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	matchFile, matchDir := config.ResolveConfigPathSpace(target, aliasRoot, osvfs.FS())
 
 	t.Run("lexical ancestor applies", func(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(workspace, ".gitignore"), []byte("/alias/src/source.ts\n"), 0o644); err != nil {
@@ -193,8 +180,8 @@ func TestConfigWithGitignore_SymlinkedConfigKeepsLexicalAncestors(t *testing.T) 
 		}
 		defer os.Remove(filepath.Join(workspace, ".gitignore"))
 
-		full := ConfigWithGitignore(base, aliasRoot, osvfs.FS(), nil)
-		explicit := ConfigWithGitignore(base, aliasRoot, osvfs.FS(), []string{target})
+		full := config.ConfigWithGitignore(base, aliasRoot, osvfs.FS(), nil)
+		explicit := config.ConfigWithGitignore(base, aliasRoot, osvfs.FS(), []string{target})
 		assert.Assert(t, full.IsFileIgnored(matchFile, matchDir))
 		assert.Equal(t, explicit.IsFileIgnored(matchFile, matchDir), full.IsFileIgnored(matchFile, matchDir))
 	})
@@ -204,8 +191,8 @@ func TestConfigWithGitignore_SymlinkedConfigKeepsLexicalAncestors(t *testing.T) 
 			t.Fatal(err)
 		}
 
-		full := ConfigWithGitignore(base, aliasRoot, osvfs.FS(), nil)
-		explicit := ConfigWithGitignore(base, aliasRoot, osvfs.FS(), []string{target})
+		full := config.ConfigWithGitignore(base, aliasRoot, osvfs.FS(), nil)
+		explicit := config.ConfigWithGitignore(base, aliasRoot, osvfs.FS(), []string{target})
 		assert.Assert(t, !full.IsFileIgnored(matchFile, matchDir))
 		assert.Equal(t, explicit.IsFileIgnored(matchFile, matchDir), full.IsFileIgnored(matchFile, matchDir))
 	})
@@ -221,24 +208,24 @@ func TestConfigWithGitignore_ExplicitSkipsDescendantSymlinkSource(t *testing.T) 
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
 	target := filepath.Join(dir, "link/source.ts")
-	matchFile, matchDir := ResolveConfigPathSpace(target, dir, osvfs.FS())
-	base := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
+	matchFile, matchDir := config.ResolveConfigPathSpace(target, dir, osvfs.FS())
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
-	full := ConfigWithGitignore(base, dir, osvfs.FS(), nil)
-	explicit := ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
+	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+	explicit := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
 	assert.Equal(t, explicit.IsFileIgnored(matchFile, matchDir), full.IsFileIgnored(matchFile, matchDir))
 	assert.Assert(t, !explicit.IsFileIgnored(matchFile, matchDir))
 }
 
-func TestReadGitignoreAsGlobs_AncestorInheritance(t *testing.T) {
+func TestConfigWithGitignore_AncestorInheritance(t *testing.T) {
 	// Root has .gitignore with dist/. configDir is packages/app (child).
-	// ReadGitignoreAsGlobs should walk UP to find root .gitignore.
+	// A child config should inherit the root .gitignore.
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":            "dist/\n",
 		"packages/app/src/a.ts": "x",
 	})
 	childDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(childDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(childDir, osvfs.FS(), nil)
 
 	hasDistGlob := false
 	for _, g := range globs {
@@ -249,7 +236,7 @@ func TestReadGitignoreAsGlobs_AncestorInheritance(t *testing.T) {
 	assert.Assert(t, hasDistGlob, "child configDir should inherit root .gitignore dist/ pattern")
 }
 
-func TestReadGitignoreAsGlobs_AncestorAnchoredOutsideConfigDoesNotApply(t *testing.T) {
+func TestConfigWithGitignore_AncestorAnchoredOutsideConfigDoesNotApply(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                 "/dist/\n",
 		"dist/root-build.js":         "x",
@@ -259,16 +246,16 @@ func TestReadGitignoreAsGlobs_AncestorAnchoredOutsideConfigDoesNotApply(t *testi
 		"packages/other/dist/app.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	for _, g := range globs {
 		if strings.Contains(g, "dist") {
 			t.Fatalf("root-anchored /dist/ must not become a config-relative dist ignore for nested configs, got %v", globs)
 		}
 	}
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	appDist := tspath.NormalizePath(filepath.Join(appDir, "dist/app.js"))
 	if cfg.GetConfigForFile(appDist, appDir) == nil {
@@ -276,21 +263,21 @@ func TestReadGitignoreAsGlobs_AncestorAnchoredOutsideConfigDoesNotApply(t *testi
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorAnchoredInsideConfigApplies(t *testing.T) {
+func TestConfigWithGitignore_AncestorAnchoredInsideConfigApplies(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "/packages/app/dist/\n",
 		"packages/app/dist/app.js":  "x",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["dist/**/*"], "ancestor pattern anchored into config should become config-relative dist/**/*, got: %v", globs)
 
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	appDist := tspath.NormalizePath(filepath.Join(appDir, "dist/app.js"))
 	if cfg.GetConfigForFile(appDist, appDir) != nil {
@@ -302,32 +289,32 @@ func TestReadGitignoreAsGlobs_AncestorAnchoredInsideConfigApplies(t *testing.T) 
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorWildcardInsideConfigApplies(t *testing.T) {
+func TestConfigWithGitignore_AncestorWildcardInsideConfigApplies(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "/packages/*/dist/\n",
 		"packages/app/dist/app.js":  "x",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["dist/**/*"], "ancestor wildcard path should be projected under configDir, got: %v", globs)
 }
 
-func TestReadGitignoreAsGlobs_AncestorAnchoredParentDirCoversConfig(t *testing.T) {
+func TestConfigWithGitignore_AncestorAnchoredParentDirCoversConfig(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "/packages/\n",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["**/*"], "ancestor pattern covering configDir should project to **/*, got: %v", globs)
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
 	if cfg.GetConfigForFile(srcFile, appDir) != nil {
@@ -335,19 +322,19 @@ func TestReadGitignoreAsGlobs_AncestorAnchoredParentDirCoversConfig(t *testing.T
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorUnrootedParentDirCoversConfig(t *testing.T) {
+func TestConfigWithGitignore_AncestorUnrootedParentDirCoversConfig(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "packages/\n",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["**/*"], "ancestor unrooted packages/ should cover configDir, got: %v", globs)
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
 	if cfg.GetConfigForFile(srcFile, appDir) != nil {
@@ -355,23 +342,23 @@ func TestReadGitignoreAsGlobs_AncestorUnrootedParentDirCoversConfig(t *testing.T
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorIgnoredConfigRootSkipsOwnGitignore(t *testing.T) {
+func TestConfigWithGitignore_AncestorIgnoredConfigRootSkipsOwnGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "packages/\n",
 		"packages/app/.gitignore":   "!src/index.js\n",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	for _, glob := range globs {
 		if strings.HasPrefix(glob, "!") {
 			t.Fatalf("config root ignored by ancestor must not read own negation .gitignore, got: %v", globs)
 		}
 	}
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
 	if cfg.GetConfigForFile(srcFile, appDir) != nil {
@@ -379,23 +366,23 @@ func TestReadGitignoreAsGlobs_AncestorIgnoredConfigRootSkipsOwnGitignore(t *test
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorIgnoredIntermediateSkipsGitignore(t *testing.T) {
+func TestConfigWithGitignore_AncestorIgnoredIntermediateSkipsGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "packages/\n",
 		"packages/.gitignore":       "!app/src/index.js\n",
 		"packages/app/src/index.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	for _, glob := range globs {
 		if strings.HasPrefix(glob, "!") {
 			t.Fatalf("ignored intermediate ancestor must not re-include from its .gitignore, got: %v", globs)
 		}
 	}
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
 	if cfg.GetConfigForFile(srcFile, appDir) != nil {
@@ -403,7 +390,7 @@ func TestReadGitignoreAsGlobs_AncestorIgnoredIntermediateSkipsGitignore(t *testi
 	}
 }
 
-func TestReadGitignoreAsGlobs_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T) {
+func TestConfigWithGitignore_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                                   "packages/*\n!packages/app/\n",
 		"packages/.gitignore":                          "app/src/generated/\n",
@@ -413,13 +400,13 @@ func TestReadGitignoreAsGlobs_AncestorChildWildcardReadsIntermediateGitignore(t 
 		"packages/app/src/not-generated/nested/app.js": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["src/generated/**/*"], "packages/.gitignore should be collected, got: %v", globs)
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	generated := tspath.NormalizePath(filepath.Join(appDir, "src/generated/file.js"))
 	if cfg.GetConfigForFile(generated, appDir) != nil {
@@ -431,7 +418,7 @@ func TestReadGitignoreAsGlobs_AncestorChildWildcardReadsIntermediateGitignore(t 
 	}
 }
 
-func TestReadGitignoreAsGlobsForFiles_ChildWildcardReadsIntermediateGitignore(t *testing.T) {
+func TestConfigWithGitignore_Explicit_ChildWildcardReadsIntermediateGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                         "packages/*\n!packages/app/\n",
 		"packages/.gitignore":                "app/src/generated/\n",
@@ -440,20 +427,20 @@ func TestReadGitignoreAsGlobsForFiles_ChildWildcardReadsIntermediateGitignore(t 
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
 	generated := tspath.NormalizePath(filepath.Join(appDir, "src/generated/file.js"))
 
-	globs := ReadGitignoreAsGlobsForFiles(appDir, osvfs.FS(), []string{generated})
+	globs := collectGitignoreGlobsForFilesForTest(appDir, osvfs.FS(), []string{generated})
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["src/generated/**/*"], "explicit-file gitignore chain should include packages/.gitignore, got: %v", globs)
-	cfg := RslintConfig{
+	cfg := config.RslintConfig{
 		{Ignores: globs},
-		{Rules: Rules{"no-debugger": "error"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 	if cfg.GetConfigForFile(generated, appDir) != nil {
 		t.Fatalf("intermediate .gitignore should ignore explicit generated file; globs=%v", globs)
 	}
 }
 
-func TestReadGitignoreAsGlobs_DescendantChildWildcardReadsIntermediateGitignore(t *testing.T) {
+func TestConfigWithGitignore_DescendantChildWildcardReadsIntermediateGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                         "packages/*\n!packages/app/\n",
 		"packages/.gitignore":                "app/src/generated/\n",
@@ -461,13 +448,13 @@ func TestReadGitignoreAsGlobs_DescendantChildWildcardReadsIntermediateGitignore(
 		"packages/app/src/index.js":          "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 
 	gs := globSet(globs)
 	assert.Assert(t, gs["packages/app/src/generated/**/*"], "root scan should read packages/.gitignore, got: %v", globs)
 }
 
-func TestReadGitignoreAsGlobs_AncestorPlusOwn(t *testing.T) {
+func TestConfigWithGitignore_AncestorPlusOwn(t *testing.T) {
 	// Root has dist/, child has tmp/. Both should be in globs.
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":              "dist/\n",
@@ -475,7 +462,7 @@ func TestReadGitignoreAsGlobs_AncestorPlusOwn(t *testing.T) {
 		"packages/app/src/a.ts":   "x",
 	})
 	childDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(childDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(childDir, osvfs.FS(), nil)
 
 	hasDist := false
 	hasTmp := false
@@ -491,9 +478,9 @@ func TestReadGitignoreAsGlobs_AncestorPlusOwn(t *testing.T) {
 	assert.Assert(t, hasTmp, "should have own tmp/")
 }
 
-func TestReadGitignoreAsGlobs_SiblingIsolation(t *testing.T) {
+func TestConfigWithGitignore_SiblingIsolation(t *testing.T) {
 	// packages/app has tmp/, packages/lib has cache/.
-	// ReadGitignoreAsGlobs for app should NOT include lib's cache/.
+	// The app config should not include the sibling library's cache pattern.
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":              "dist/\n",
 		"packages/app/.gitignore": "tmp/\n",
@@ -502,7 +489,7 @@ func TestReadGitignoreAsGlobs_SiblingIsolation(t *testing.T) {
 		"packages/lib/src/b.ts":   "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	appGlobs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	appGlobs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	for _, g := range appGlobs {
 		if strings.Contains(g, "cache") {
@@ -524,14 +511,14 @@ func TestReadGitignoreAsGlobs_SiblingIsolation(t *testing.T) {
 	assert.Assert(t, hasTmp, "should have own tmp/")
 }
 
-func TestReadGitignoreAsGlobs_DeepAncestor(t *testing.T) {
+func TestConfigWithGitignore_DeepAncestor(t *testing.T) {
 	// .gitignore at root, configDir at packages/app/sub (3 levels deep)
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "dist/\n",
 		"packages/app/sub/src/a.ts": "x",
 	})
 	deepDir := tspath.NormalizePath(filepath.Join(dir, "packages/app/sub"))
-	globs := ReadGitignoreAsGlobs(deepDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(deepDir, osvfs.FS(), nil)
 
 	hasDist := false
 	for _, g := range globs {
@@ -542,7 +529,7 @@ func TestReadGitignoreAsGlobs_DeepAncestor(t *testing.T) {
 	assert.Assert(t, hasDist, "deeply nested configDir should still inherit root .gitignore")
 }
 
-func TestReadGitignoreAsGlobs_MultipleAncestors(t *testing.T) {
+func TestConfigWithGitignore_MultipleAncestors(t *testing.T) {
 	// Root has .gitignore (dist/), packages/ has .gitignore (vendor/),
 	// configDir is packages/app/. Both ancestors should be collected.
 	dir := setupGitignoreFixture(t, map[string]string{
@@ -551,7 +538,7 @@ func TestReadGitignoreAsGlobs_MultipleAncestors(t *testing.T) {
 		"packages/app/src/a.ts": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	hasDist := false
 	hasVendor := false
@@ -567,7 +554,7 @@ func TestReadGitignoreAsGlobs_MultipleAncestors(t *testing.T) {
 	assert.Assert(t, hasVendor, "should inherit intermediate packages/ vendor/")
 }
 
-func TestReadGitignoreAsGlobs_AncestorNegationOverride(t *testing.T) {
+func TestConfigWithGitignore_AncestorNegationOverride(t *testing.T) {
 	// Root ignores dist/, intermediate packages/.gitignore re-includes with !dist/.
 	// configDir at packages/app should see both patterns (sequential evaluation).
 	dir := setupGitignoreFixture(t, map[string]string{
@@ -576,7 +563,7 @@ func TestReadGitignoreAsGlobs_AncestorNegationOverride(t *testing.T) {
 		"packages/app/src/a.ts": "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
-	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)
 
 	hasDist := false
 	hasNegation := false
@@ -592,35 +579,34 @@ func TestReadGitignoreAsGlobs_AncestorNegationOverride(t *testing.T) {
 	assert.Assert(t, hasNegation, "should have intermediate !dist/ negation")
 }
 
-func TestReadGitignoreAsGlobs_EmptyFile(t *testing.T) {
+func TestConfigWithGitignore_EmptyFile(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore": "",
 		"src/a.ts":   "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 	assert.Assert(t, globs == nil, "empty .gitignore → no globs")
 }
 
-func TestReadGitignoreAsGlobs_OnlyComments(t *testing.T) {
+func TestConfigWithGitignore_OnlyComments(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore": "# just a comment\n# another\n",
 		"src/a.ts":   "x",
 	})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 	assert.Assert(t, globs == nil, "comments-only .gitignore → no globs")
 }
 
 // =============================================================================
-// Cross-matrix tests: configIgnores × .gitignore interaction
+// Cross-matrix tests: config ignores × .gitignore interaction
 //
-// These tests verify that passing configIgnores to ReadGitignoreAsGlobs
-// correctly prunes config-ignored directories while preserving all .gitignore
-// patterns from non-ignored directories.
+// These tests verify that global config ignores prune excluded directories
+// while preserving .gitignore patterns from included directories.
 // =============================================================================
 
 // Matrix case: config ignores dir-level (**/tests/**) + nested .gitignore inside tests/
 // Expected: tests/.gitignore NOT collected (pruned), root .gitignore collected.
-// --- Cross-matrix: configIgnores × .gitignore ---
+// --- Cross-matrix: config ignores × .gitignore ---
 //
 // Helper: globSet converts a glob slice to a set for precise assertions.
 func globSet(globs []string) map[string]bool {
@@ -632,7 +618,7 @@ func globSet(globs []string) map[string]bool {
 }
 
 // A1: dir-level config ignore (**/tests/**) prunes tests/.gitignore.
-func TestReadGitignoreAsGlobs_ConfigIgnoresPrunesDir(t *testing.T) {
+func TestConfigWithGitignore_ConfigIgnoresPrunesDir(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":            "dist/\n",
 		"tests/.gitignore":      "snapshots/\n",
@@ -640,7 +626,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoresPrunesDir(t *testing.T) {
 		"tests/unit/a.test.ts":  "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/tests/**"})
 	gs := globSet(globs)
 
 	// Exactly 1 glob: root .gitignore "dist/" → "**/dist/**/*"
@@ -649,14 +635,14 @@ func TestReadGitignoreAsGlobs_ConfigIgnoresPrunesDir(t *testing.T) {
 }
 
 // A2: file-level config ignore (**/tests/**/*) does NOT prune tests/.gitignore.
-func TestReadGitignoreAsGlobs_FileLevelConfigIgnoreDoesNotPrune(t *testing.T) {
+func TestConfigWithGitignore_FileLevelConfigIgnoreDoesNotPrune(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "dist/\n",
 		"tests/.gitignore": "snapshots/\n",
 		"tests/a.test.ts":  "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**/*"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/tests/**/*"})
 	gs := globSet(globs)
 
 	// 2 globs: root dist + tests snapshots (file-level ignore doesn't prune dirs)
@@ -665,15 +651,15 @@ func TestReadGitignoreAsGlobs_FileLevelConfigIgnoreDoesNotPrune(t *testing.T) {
 	assert.Assert(t, gs["tests/**/snapshots/**/*"], "tests snapshots should be collected")
 }
 
-// A3: dir-level + negation — isDirAbsolutelyBlocked skips negation → still prunes.
-func TestReadGitignoreAsGlobs_NegationInConfigIgnoreStillPrunes(t *testing.T) {
+// A3: a directory-level ignore remains prunable when followed by a negation.
+func TestConfigWithGitignore_NegationInConfigIgnoreStillPrunes(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":           "dist/\n",
 		"tests/e2e/.gitignore": "screenshots/\n",
 		"tests/e2e/a.ts":       "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**", "!tests/e2e/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/tests/**", "!tests/e2e/**"})
 
 	// Exactly 1 glob: root dist. tests/e2e/.gitignore NOT collected.
 	assert.Equal(t, len(globs), 1, "should have exactly 1 glob, got: %v", globs)
@@ -681,7 +667,7 @@ func TestReadGitignoreAsGlobs_NegationInConfigIgnoreStillPrunes(t *testing.T) {
 }
 
 // A4: sibling dirs — config ignores tests/, packages/ .gitignore preserved.
-func TestReadGitignoreAsGlobs_SiblingDirPreservesGitignore(t *testing.T) {
+func TestConfigWithGitignore_SiblingDirPreservesGitignore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":              "dist/\n",
 		"packages/foo/.gitignore": "tmp/\n",
@@ -690,7 +676,7 @@ func TestReadGitignoreAsGlobs_SiblingDirPreservesGitignore(t *testing.T) {
 		"tests/a.test.ts":         "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/tests/**"})
 	gs := globSet(globs)
 
 	// Exactly 2 globs: root dist + packages/foo tmp. tests/ pruned.
@@ -700,13 +686,13 @@ func TestReadGitignoreAsGlobs_SiblingDirPreservesGitignore(t *testing.T) {
 }
 
 // A5: nil configIgnores — backward compat, all .gitignore collected.
-func TestReadGitignoreAsGlobs_NilConfigIgnores(t *testing.T) {
+func TestConfigWithGitignore_NilConfigIgnores(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "dist/\n",
 		"tests/.gitignore": "snapshots/\n",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 	gs := globSet(globs)
 
 	assert.Equal(t, len(globs), 2, "should have 2 globs (both collected), got: %v", globs)
@@ -715,7 +701,7 @@ func TestReadGitignoreAsGlobs_NilConfigIgnores(t *testing.T) {
 }
 
 // A6: deeply nested config-ignored dir — all nested .gitignore skipped.
-func TestReadGitignoreAsGlobs_DeepNestedConfigIgnore(t *testing.T) {
+func TestConfigWithGitignore_DeepNestedConfigIgnore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                   "*.log\n",
 		"vendor/.gitignore":            "cache/\n",
@@ -726,7 +712,7 @@ func TestReadGitignoreAsGlobs_DeepNestedConfigIgnore(t *testing.T) {
 		"src/a.ts":                     "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/vendor/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/vendor/**"})
 	gs := globSet(globs)
 
 	// Exactly 2 globs: root *.log + src generated. All 3 vendor .gitignore pruned.
@@ -736,34 +722,34 @@ func TestReadGitignoreAsGlobs_DeepNestedConfigIgnore(t *testing.T) {
 }
 
 // A7: wildcard config ignore (crates/**) — multiple nested .gitignore skipped.
-func TestReadGitignoreAsGlobs_WildcardConfigIgnoreSkipsNested(t *testing.T) {
+func TestConfigWithGitignore_WildcardConfigIgnoreSkipsNested(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                   "dist/\n",
-		"crates/core/.gitignore":       "artifacts/\n",
-		"crates/binding/.gitignore":    "generated/\n",
-		"packages/rspack/.gitignore":   "tmp/\n",
-		"crates/core/src/lib.rs":       "x",
-		"crates/binding/src/lib.rs":    "x",
-		"packages/rspack/src/index.ts": "x",
+		".gitignore":                    "dist/\n",
+		"crates/core/.gitignore":        "artifacts/\n",
+		"crates/binding/.gitignore":     "generated/\n",
+		"packages/example/.gitignore":   "tmp/\n",
+		"crates/core/src/lib.rs":        "x",
+		"crates/binding/src/lib.rs":     "x",
+		"packages/example/src/index.ts": "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"crates/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"crates/**"})
 	gs := globSet(globs)
 
-	// Exactly 2: root dist + packages/rspack tmp. Both crates/ .gitignore pruned.
+	// Exactly 2: root dist + packages/example tmp. Both crates/ .gitignore pruned.
 	assert.Equal(t, len(globs), 2, "should have 2 globs, got: %v", globs)
 	assert.Assert(t, gs["**/dist/**/*"], "root dist")
-	assert.Assert(t, gs["packages/rspack/**/tmp/**/*"], "packages/rspack tmp")
+	assert.Assert(t, gs["packages/example/**/tmp/**/*"], "packages/example tmp")
 }
 
 // A8: empty configIgnores slice (non-nil) — same as nil, no pruning.
-func TestReadGitignoreAsGlobs_EmptyConfigIgnores(t *testing.T) {
+func TestConfigWithGitignore_EmptyConfigIgnores(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "dist/\n",
 		"tests/.gitignore": "snapshots/\n",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{})
 	gs := globSet(globs)
 
 	assert.Equal(t, len(globs), 2, "empty slice = no pruning, got: %v", globs)
@@ -772,14 +758,14 @@ func TestReadGitignoreAsGlobs_EmptyConfigIgnores(t *testing.T) {
 }
 
 // A9: exact path config ignore — only that specific directory blocked.
-func TestReadGitignoreAsGlobs_ExactPathConfigIgnore(t *testing.T) {
+func TestConfigWithGitignore_ExactPathConfigIgnore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":              "dist/\n",
 		"build/output/.gitignore": "cache/\n",
 		"build/tools/.gitignore":  "tmp/\n",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"build/output/**"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"build/output/**"})
 	gs := globSet(globs)
 
 	// 2 globs: root dist + build/tools tmp. build/output cache pruned.
@@ -788,44 +774,8 @@ func TestReadGitignoreAsGlobs_ExactPathConfigIgnore(t *testing.T) {
 	assert.Assert(t, gs["build/tools/**/tmp/**/*"], "build/tools tmp preserved")
 }
 
-// A10: ExtractConfigIgnores only extracts from global-ignore entries.
-// An entry is "global ignore" when it has ONLY ignores — no files, rules, plugins, etc.
-func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
-	config := RslintConfig{
-		{Ignores: []string{"**/tests/**"}},                            // global ignore ✓
-		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},      // has files+rules → NOT global
-		{Ignores: []string{"scripts/**"}},                             // global ignore ✓
-		{Files: []string{}, Ignores: []string{"not-global-empty"}},    // explicit empty files → NOT global (invalid at ingress)
-		{Ignores: []string{"vendor/**"}, Rules: Rules{"r": "error"}},  // has rules → NOT global
-		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}}, // has non-empty files → NOT global
-	}
-
-	ignores := ExtractConfigIgnores(config)
-
-	// Entries 0 and 2 are global ignores. Entries 1, 3, 4, 5 are not.
-	assert.Equal(t, len(ignores), 2, "should extract exactly 2 patterns, got: %v", ignores)
-	assert.Equal(t, ignores[0].Glob, "**/tests/**")
-	assert.Equal(t, ignores[1].Glob, "scripts/**")
-}
-
-// A11: multiple global ignore entries — all patterns combined.
-func TestExtractConfigIgnores_MultipleEntries(t *testing.T) {
-	config := RslintConfig{
-		{Ignores: []string{"**/tests/**", "packages/rspack/compiled/**"}},
-		{Ignores: []string{"crates/**"}},
-	}
-
-	ignores := ExtractConfigIgnores(config)
-	assert.Equal(t, len(ignores), 3, "should combine all patterns, got: %v", ignores)
-	assert.Equal(t, ignores[0].Glob, "**/tests/**")
-	assert.Equal(t, ignores[1].Glob, "packages/rspack/compiled/**")
-	assert.Equal(t, ignores[2].Glob, "crates/**")
-}
-
-// A12: bare config ignore without /** suffix (e.g., "tests" or "dist").
-// isDirAbsolutelyBlocked matches the directory itself and all parents, so this
-// should still prune. Verify via exact glob count.
-func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
+// A12: a bare config ignore without a /** suffix still prunes that directory.
+func TestConfigWithGitignore_BareConfigIgnorePattern(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "*.log\n",
 		"tests/.gitignore": "snapshots/\n",
@@ -834,9 +784,7 @@ func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
 		"src/a.ts":         "x",
 	})
 
-	// Bare "tests" — no trailing /**. isDirAbsolutelyBlocked("tests", ["tests"]) should
-	// match via matchGlob("tests", "tests") → true → blocked.
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"tests"}))
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"tests"})
 	gs := globSet(globs)
 
 	// 2 globs: root *.log + src/generated. tests/ pruned by bare "tests" pattern.
@@ -845,12 +793,9 @@ func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
 	assert.Assert(t, gs["src/**/generated/**/*"], "src generated")
 }
 
-// A13: gitignore and config ignore both target the same directory.
-// collectGitignoreGlobs checks config ignores FIRST (isDirAbsolutelyBlocked),
-// then the collected gitignore patterns (isDirIgnoredByGlobs). If both match,
-// the directory is pruned by whichever check comes first. Verify the result is
-// identical to having only one.
-func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
+// A13: overlapping gitignore and config-ignore patterns have the same result as
+// the gitignore pattern alone.
+func TestConfigWithGitignore_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "dist/\nbuild/\n",
 		"dist/.gitignore":  "cache/\n",
@@ -863,12 +808,10 @@ func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) 
 
 	// dist/ is in both .gitignore and config ignores.
 	// build/ is only in .gitignore.
-	configIgnores := ParseIgnorePatterns([]string{"**/dist/**"})
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	configIgnores := []string{"**/dist/**"}
+	globs := collectGitignoreGlobsForTest(dir, osvfs.FS(), configIgnores)
 	gs := globSet(globs)
 
-	// dist/ pruned by CONFIG IGNORE (isDirAbsolutelyBlocked runs first → **/dist/** matches).
-	// build/ pruned by the collected gitignore glob (isDirIgnoredByGlobs → **/build/**/* matches).
 	// Neither dist/.gitignore nor build/.gitignore collected.
 	// Only root .gitignore (dist/ + build/) and src/.gitignore (generated/) remain.
 	assert.Equal(t, len(globs), 3, "should have 3 globs, got: %v", globs)
@@ -877,14 +820,14 @@ func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) 
 	assert.Assert(t, gs["src/**/generated/**/*"], "src generated")
 
 	// Compare: without config ignores, result should be identical (gitignore already prunes both).
-	globsNoConfig := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globsNoConfig := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 	assert.Equal(t, len(globsNoConfig), len(globs), "overlapping config ignore should not change result vs nil configIgnores")
 }
 
 // Regression: same fixture, with vs without configIgnores.
 // Proves the EXACT effect of configIgnores — the difference must be only patterns
 // from the config-ignored directory (and nothing else changes).
-func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
+func TestConfigWithGitignore_RegressionWithVsWithout(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":            "dist/\n",
 		"src/.gitignore":        "generated/\n",
@@ -895,7 +838,7 @@ func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 	})
 
 	// WITHOUT configIgnores: all 4 .gitignore files collected → 4 patterns.
-	globsWithout := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+	globsWithout := collectGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 	gsWithout := globSet(globsWithout)
 	assert.Equal(t, len(globsWithout), 4, "without configIgnores should collect all 4 patterns, got: %v", globsWithout)
 	assert.Assert(t, gsWithout["**/dist/**/*"])
@@ -904,7 +847,7 @@ func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 	assert.Assert(t, gsWithout["tests/unit/**/coverage/**/*"])
 
 	// WITH configIgnores: tests/ pruned → only 2 patterns (root + src).
-	globsWith := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
+	globsWith := collectGitignoreGlobsForTest(dir, osvfs.FS(), []string{"**/tests/**"})
 	gsWith := globSet(globsWith)
 	assert.Equal(t, len(globsWith), 2, "with configIgnores should collect 2 patterns (tests/ pruned), got: %v", globsWith)
 	assert.Assert(t, gsWith["**/dist/**/*"])
@@ -915,10 +858,9 @@ func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 	assert.Assert(t, !gsWith["tests/unit/**/coverage/**/*"], "tests/unit/ pattern should be pruned")
 }
 
-// Spy test: verify collectGitignoreGlobs does NOT call GetAccessibleEntries
-// on config-ignored directories. This proves the directory is truly skipped
-// at the walk level (not entered then filtered), which is the performance win.
-func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
+// Verify that config-ignored directories are skipped before reading their
+// entries.
+func TestConfigWithGitignore_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                  "dist/\n",
 		"src/a.ts":                    "x",
@@ -930,7 +872,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 	})
 
 	spy := &gitignoreSpyFS{FS: osvfs.FS()}
-	globs := ReadGitignoreAsGlobs(dir, spy, ParseIgnorePatterns([]string{"**/tests/**"}))
+	globs := collectGitignoreGlobsForTest(dir, spy, []string{"**/tests/**"})
 
 	// Output correctness: only root + src patterns.
 	assert.Equal(t, len(globs), 2, "got: %v", globs)
@@ -939,7 +881,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 	for _, accessed := range spy.accessedDirs {
 		rel := strings.TrimPrefix(accessed, dir)
 		if strings.Contains(rel, "tests") {
-			t.Errorf("collectGitignoreGlobs entered config-ignored tests/ directory: GetAccessibleEntries(%s)", accessed)
+			t.Errorf("collector entered config-ignored tests/ directory: GetAccessibleEntries(%s)", accessed)
 		}
 	}
 
@@ -960,7 +902,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 
 // Spy comparison: same fixture WITH vs WITHOUT configIgnores.
 // Proves that configIgnores reduces the number of GetAccessibleEntries calls.
-func TestReadGitignoreAsGlobs_ConfigIgnoreReducesWalkCount(t *testing.T) {
+func TestConfigWithGitignore_ConfigIgnoreReducesWalkCount(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                "*.log\n",
 		"tests/unit/a.ts":           "x",
@@ -973,12 +915,12 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreReducesWalkCount(t *testing.T) {
 
 	// Without configIgnores: walks everything including tests/ subtree.
 	spyWithout := &gitignoreSpyFS{FS: osvfs.FS()}
-	ReadGitignoreAsGlobs(dir, spyWithout, nil)
+	collectGitignoreGlobsForTest(dir, spyWithout, nil)
 	countWithout := len(spyWithout.accessedDirs)
 
 	// With configIgnores: skips tests/ subtree.
 	spyWith := &gitignoreSpyFS{FS: osvfs.FS()}
-	ReadGitignoreAsGlobs(dir, spyWith, ParseIgnorePatterns([]string{"**/tests/**"}))
+	collectGitignoreGlobsForTest(dir, spyWith, []string{"**/tests/**"})
 	countWith := len(spyWith.accessedDirs)
 
 	// With configIgnores should access FEWER directories.

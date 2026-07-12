@@ -599,6 +599,32 @@ func TestHandleLint_ExplicitFileGitignoredIsSkipped(t *testing.T) {
 	}
 }
 
+func TestHandleLint_OverlayGitignoreIsApplied(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.js")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[
+			{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+		]`),
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		FileContents: map[string]string{
+			filepath.Join(dir, ".gitignore"): "source.js\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 || len(response.LintedFiles) != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("overlay .gitignore was not applied: %+v", response)
+	}
+}
+
 func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "ignored", "src", "file.js")

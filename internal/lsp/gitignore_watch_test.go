@@ -120,6 +120,28 @@ func TestLSPGitignoreReloadReadsFreshState(t *testing.T) {
 	if !isIgnored() {
 		t.Fatal("created .gitignore was not applied")
 	}
+	if err := os.WriteFile(gitignorePath, []byte("other.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeChanged}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if isIgnored() {
+		t.Fatal("changed .gitignore content was not applied")
+	}
+	if err := os.WriteFile(gitignorePath, []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeChanged}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !isIgnored() {
+		t.Fatal("second .gitignore content change was not applied")
+	}
 
 	if err := os.Remove(gitignorePath); err != nil {
 		t.Fatal(err)

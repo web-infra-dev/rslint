@@ -186,14 +186,11 @@ func TestDiscoverGapFiles_GitignoreTargetPrunedE2E(t *testing.T) {
 		"target/a.ts":      "x",
 		"target/deep/b.ts": "x",
 	}
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ExtractConfigIgnores(config))
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
 	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
@@ -219,14 +216,11 @@ func TestDiscoverGapFiles_NestedGitignoreNegationE2E(t *testing.T) {
 		"build/top.ts":      "x",
 		"sub/build/keep.ts": "x",
 	}
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ExtractConfigIgnores(config))
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
 	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
