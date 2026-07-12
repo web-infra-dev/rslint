@@ -297,6 +297,25 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 	}
 }
 
+func TestLintSingleFile_TargetsImportedNonRootFile(t *testing.T) {
+	program, paths := createImportedNonRootProgram(t)
+	target := paths["lib.ts"]
+
+	var linted []string
+	LintSingleFile(LintSingleFileOptions{
+		Program: program,
+		File:    target,
+		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
+			linted = append(linted, sf.FileName())
+			return noopRule()
+		},
+	})
+
+	if len(linted) != 1 || linted[0] != target {
+		t.Fatalf("expected only imported lib.ts to be linted, got %v", linted)
+	}
+}
+
 func createImportedNonRootProgram(t *testing.T) (*compiler.Program, map[string]string) {
 	t.Helper()
 	dir := t.TempDir()

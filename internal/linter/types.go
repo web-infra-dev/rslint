@@ -129,7 +129,8 @@ type RunLinterOptions struct {
 // The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
 	Program *compiler.Program
-	File    string
+	// File is the exact source-file name exposed by Program.
+	File string
 	// HasTypeInfo controls whether rules marked RequiresTypeInfo are eligible.
 	// Non-type-aware rules may still use the Program's checker for local analysis.
 	HasTypeInfo     bool
