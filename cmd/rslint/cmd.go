@@ -1211,7 +1211,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// and merged on this goroutine before target discovery.
 			type giResult struct {
 				configDir string
-				globs     []string
+				config    rslintconfig.RslintConfig
 			}
 			var (
 				giResults []giResult
@@ -1220,13 +1220,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
 				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
 					giWG.Queue(func() {
-						if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
-							giMu.Lock()
-							giResults = append(giResults, giResult{configDir, globs})
-							giMu.Unlock()
-						}
+						augmented := rslintconfig.ConfigWithGitignore(entries, configDir, fs, nil)
+						giMu.Lock()
+						giResults = append(giResults, giResult{configDir, augmented})
+						giMu.Unlock()
 					})
 				}
 			}
@@ -1240,10 +1238,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// before target discovery, which relies on the augmented configMap.
 			giWG.RunAndWait()
 			for _, r := range giResults {
-				configMap[r.configDir] = append(
-					rslintconfig.RslintConfig{{Ignores: r.globs}},
-					configMap[r.configDir]...,
-				)
+				configMap[r.configDir] = r.config
 			}
 			if programErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
@@ -1261,7 +1256,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
 				)
 			} else {
-				rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1290,7 +1285,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
 			)
 		} else {
-			rslintConfig = configWithGitignore(rslintConfig, currentDirectory, fs)
+			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

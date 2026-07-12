@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	gitignorecollector "github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"gotest.tools/v3/assert"
 )
 
@@ -63,7 +64,7 @@ func TestRealGitignoreLine_ConvertAndClassify(t *testing.T) {
 		{".vscode/*", ".vscode/*", false, dirNone}, // contains / → rooted; single-level tail → dirNone
 	}
 	for _, c := range cases {
-		gotGlob := convertSinglePattern(c.line, "")
+		gotGlob := gitignorecollector.ConvertPattern(c.line, "")
 		if gotGlob != c.glob {
 			t.Errorf("convertSinglePattern(%q) = %q, want %q", c.line, gotGlob, c.glob)
 			continue

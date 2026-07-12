@@ -33,6 +33,7 @@ import (
 )
 
 const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
+const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
 
 type lintPassResult struct {
 	Diagnostics     []rule.RuleDiagnostic
@@ -113,6 +114,24 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 
 	config.RegisterAllRules()
 
+	if s.watchEnabled && s.outgoingQueue != nil {
+		relativePatterns := ptrIsTrue(
+			s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport,
+		)
+		watchers := gitignoreFileWatchers(s.cwd, relativePatterns)
+		go func() {
+			if err := s.WatchFiles(s.backgroundCtx, gitignoreWatcherID, watchers); err != nil {
+				if s.backgroundCtx.Err() == nil {
+					log.Printf("[rslint] Failed to register .gitignore watchers: %v", err)
+				}
+				return
+			}
+			// Close the registration window by re-reading ignore state once the
+			// client confirms that every watcher is active.
+			_ = s.RefreshDiagnostics(s.backgroundCtx)
+		}()
+	}
+
 	s.session = project.NewSession(&project.SessionInit{
 		BackgroundCtx: s.backgroundCtx,
 		Options: &project.SessionOptions{
@@ -144,6 +163,48 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	}
 
 	return nil
+}
+
+func gitignoreFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
+	workspaceRoot := filepath.Clean(cwd)
+	watchers := []*lsproto.FileSystemWatcher{
+		gitignoreFileWatcher(workspaceRoot, "**/.gitignore", relativePatternSupport),
+	}
+	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
+		watchers = append(watchers, gitignoreFileWatcher(current, ".gitignore", relativePatternSupport))
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return watchers
+}
+
+func gitignoreFileWatcher(baseDir string, pattern string, relativePatternSupport bool) *lsproto.FileSystemWatcher {
+	if relativePatternSupport {
+		uri := fileURIFromPath(baseDir)
+		return &lsproto.FileSystemWatcher{
+			GlobPattern: lsproto.PatternOrRelativePattern{
+				RelativePattern: &lsproto.RelativePattern{
+					BaseUri: lsproto.WorkspaceFolderOrURI{URI: &uri},
+					Pattern: pattern,
+				},
+			},
+		}
+	}
+	absolute := filepath.ToSlash(filepath.Join(baseDir, pattern))
+	return &lsproto.FileSystemWatcher{
+		GlobPattern: lsproto.PatternOrRelativePattern{Pattern: &absolute},
+	}
+}
+
+func fileURIFromPath(filePath string) lsproto.URI {
+	uriPath := filepath.ToSlash(filePath)
+	if len(uriPath) >= 2 && uriPath[1] == ':' {
+		uriPath = "/" + uriPath
+	}
+	return lsproto.URI((&url.URL{Scheme: "file", Path: uriPath}).String())
 }
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
@@ -336,17 +397,28 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	}
 
 	// Check for config file changes that affect rslint.
+	needsConfigReload := false
 	needsTypeInfoRebuild := false
+	needsIgnoreRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
 		if isRslintConfigURI(uri) {
-			// rslint config changed — reload config + typeInfoFiles + relint all.
-			s.reloadConfigAndRelint()
-			return nil
+			needsConfigReload = true
 		}
 		if isTsConfigURI(uri) {
 			needsTypeInfoRebuild = true
 		}
+		if isGitignoreURI(uri) {
+			needsIgnoreRefresh = true
+		}
+	}
+	if needsConfigReload {
+		s.reloadConfigAndRelint()
+		if needsIgnoreRefresh {
+			s.invalidateOpenDocumentDiagnostics()
+			return s.RefreshDiagnostics(ctx)
+		}
+		return nil
 	}
 	if needsTypeInfoRebuild {
 		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
@@ -356,6 +428,10 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			log.Printf("[rslint] Failed to rebuild tsconfig paths: %v", err)
 		}
 	}
+	if needsIgnoreRefresh {
+		s.invalidateOpenDocumentDiagnostics()
+		return s.RefreshDiagnostics(ctx)
+	}
 
 	return nil
 }
@@ -363,6 +439,19 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 // isRslintConfigURI returns true if the URI points to an rslint config file.
 func isRslintConfigURI(uri string) bool {
 	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
+}
+
+func isGitignoreURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".gitignore")
+}
+
+func (s *Server) invalidateOpenDocumentDiagnostics() {
+	for uri := range s.documents {
+		s.docGeneration[uri]++
+		s.cancelInflightPluginDispatch(uri)
+		delete(s.diagnostics, uri)
+	}
 }
 
 // isTsConfigURI returns true if the URI points to a tsconfig/jsconfig file,
@@ -690,7 +779,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 		return empty, nil
 	}
 
-	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	originalContent := s.documents[uri]
 
@@ -777,7 +866,16 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 		// already-expired pluginCtx would still enqueue a (wasted) reverse request
 		// to the client before returning nil.
 		if pluginCtx.Err() == nil {
-			if pluginDiags := s.lintPluginRulesSync(pluginCtx, uri, currentContent, true, linter.SuggestionsModeOff); len(pluginDiags) > 0 {
+			if pluginDiags := s.lintPluginRulesSyncWithConfig(
+				pluginCtx,
+				uri,
+				currentContent,
+				true,
+				linter.SuggestionsModeOff,
+				rslintConfig,
+				configCwd,
+				isJSConfig,
+			); len(pluginDiags) > 0 {
 				ruleDiags = append(ruleDiags, pluginDiags...)
 			}
 		}
@@ -1367,6 +1465,19 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 	return s.jsonConfig, s.cwd, false
 }
 
+// getLintConfigForURI applies the shared .gitignore policy to one explicit
+// editor target without mutating the stored config catalog.
+func (s *Server) getLintConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
+	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	rslintConfig = config.ConfigWithGitignore(
+		rslintConfig,
+		configCwd,
+		s.fs,
+		[]string{uriToPath(uri)},
+	)
+	return rslintConfig, configCwd, isJSConfig
+}
+
 func (s *Server) isUnavailableConfigForURI(uri lsproto.DocumentUri) bool {
 	configKey, ok := s.nearestJSConfigKey(uri)
 	if !ok {
@@ -1469,7 +1580,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	lintResult, err := s.runConfiguredLint(uri, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
 	if err != nil {
@@ -1505,6 +1616,6 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	// thus all editor interaction) until the Node worker replies. Results merge
 	// back via pluginResultCh on the main loop (s.diagnostics is lock-free).
 	if !lintResult.HasSyntaxErrors {
-		s.dispatchPluginLint(uri, generation)
+		s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
 	}
 }

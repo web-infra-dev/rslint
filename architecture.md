@@ -108,6 +108,7 @@ The directory map below folds the high-level module relationships into the packa
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                            | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                         |
 | `internal/api/`                | stdio IPC protocol and service types for JS/WASM integration                                                     | Shared protocol layer for `cmd/rslint --api`; used by `packages/rslint`, `packages/rslint-wasm`, `internal/linter`, and `internal/inspector`                                                                                                                                                                    |
 | `internal/config/`             | Configuration loading, parsing, merging, discovery, and centralized rule registration                            | `RegisterAllRules()` in `config.go` orchestrates registration by iterating each group's `GetAllRules()` slice (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` for each plugin); `rule_registry.go` implements registry/query logic used by `cmd/rslint/programs.go` and `internal/linter` |
+| `internal/config/gitignore/`   | `.gitignore` source discovery and pattern conversion                                                             | Used through `internal/config.ConfigWithGitignore`, which keeps config-entry semantics in the parent package and supplies one effective policy to CLI, IPC API, and LSP                                                                                                                                         |
 | `internal/inspector/`          | AST/type/symbol/signature/flow inspection for Playground                                                         | Auxiliary backend used mainly by website Playground inspect panels; builds rich semantic data from `typescript-go` programs                                                                                                                                                                                     |
 | `internal/linter/`             | Core lint engine, traversal, and fix application                                                                 | Consumes rules from `internal/rule`, file config from `internal/config`, and `Program` / `TypeChecker` data from `typescript-go`; also serves `internal/api` and `internal/lsp`                                                                                                                                 |
 | `internal/lsp/`                | Language Server Protocol implementation                                                                          | Wraps `typescript-go project.Session`, receives config updates from `packages/vscode-extension`, and invokes `internal/linter` on session-backed programs                                                                                                                                                       |
@@ -485,8 +486,14 @@ Program identities, not a second config inheritance tree.
 
 Additional current behaviors:
 
-- `.gitignore` is injected into CLI and IPC API configs as a global-ignore
-  entry; LSP `.gitignore` integration remains a separate follow-up
+- `.gitignore` is injected as a global-ignore entry through the shared
+  `ConfigWithGitignore` policy. CLI, including explicit CLI targets, scans from
+  the config directory; explicit API and LSP requests read only the target
+  files' ancestor chains
+- when the client supports dynamic file-watch registration, LSP watches
+  workspace and inherited ancestor `.gitignore` files; create/change/delete
+  events invalidate open-document diagnostics and request a fresh diagnostic
+  pass
 - the VS Code extension preserves last-good JS configs during reloads; a newly
   unavailable config with no usable JS ancestor contributes an empty boundary,
   preventing legacy JSON fallback only in that authored config subtree
@@ -497,7 +504,7 @@ Additional current behaviors:
 - `files`/`ignores` matching uses the stable target path in the governing config's path space; a Program source alias is used only to locate the AST and type information, so moving a target into or out of a tsconfig cannot change its rule configuration
 - within each Program-registry build, normalized declared tsconfig paths are deduplicated across config associations; CLI fix passes create a new registry build. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected files outside the governing config's Programs receive a non-project-backed fallback Program, and targets whose names collide under a case-insensitive ts-go path key are partitioned across fallback Programs so distinct physical files remain distinct
 - `--type-check` and `--type-check-only` build every real tsconfig declared by the effective loaded config catalog. Once that catalog is established, program-wide checking is not filtered by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments; synthetic fallback Programs never participate. `--type-check-only` skips lint-target and `.gitignore` discovery entirely.
-- for LSP, an open supported script is a per-file target independent of Program membership. Global config ignores, default-excluded paths, and unavailable config boundaries suppress native rules, plugin rules, and fixes; an available zero-rule config still parses the target and can report syntax diagnostics. LSP does not yet apply `.gitignore`
+- for LSP, an open supported script is a per-file target independent of Program membership. Global config ignores, `.gitignore`, default-excluded paths, and unavailable config boundaries suppress native rules, plugin rules, and fixes; an available zero-rule config still parses the target and can report syntax diagnostics
 
 ### Inline Directives
 
@@ -555,7 +562,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    - `--singleThreaded` computes Program diagnostics serially.
 
 3. **gitignore reading and Program creation** (in `cmd/rslint/cmd.go`)
-   - Plain lint completes `ReadGitignoreAsGlobs` before target discovery, then
+   - Plain lint completes `ConfigWithGitignore` before target discovery, then
      constructs Programs only for configs represented in the target plan.
    - `--type-check` constructs every Program from the effective config catalog
      independently from gitignore discovery. `--type-check-only` constructs the

@@ -166,12 +166,10 @@ func parallelGitignoreAndPrograms(
 	singleThreaded bool,
 	parseCache *utils.ParseCache,
 ) (rslintconfig.RslintConfig, lintProgramSet, error) {
-	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
-
 	var (
-		gitGlobs   []string
-		programs   lintProgramSet
-		programErr error
+		configWithIgnores rslintconfig.RslintConfig
+		programs          lintProgramSet
+		programErr        error
 	)
 	// gitignore reading and program creation are independent
 	// (Program creation only reads parserOptions.project, never Ignores),
@@ -179,7 +177,7 @@ func parallelGitignoreAndPrograms(
 	// same way the lint and type-check phases do.
 	wg := core.NewWorkGroup(singleThreaded)
 	wg.Queue(func() {
-		gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
+		configWithIgnores = rslintconfig.ConfigWithGitignore(rslintConfig, configDir, fsys, nil)
 	})
 	wg.Queue(func() {
 		programs, programErr = createProgramSetForConfig(configDir, rslintConfig, singleThreaded, fsys, parseCache)
@@ -189,29 +187,7 @@ func parallelGitignoreAndPrograms(
 	if programErr != nil {
 		return rslintConfig, lintProgramSet{}, programErr
 	}
-	if len(gitGlobs) > 0 {
-		rslintConfig = append(
-			rslintconfig.RslintConfig{{Ignores: gitGlobs}},
-			rslintConfig...,
-		)
-	}
-	return rslintConfig, programs, nil
-}
-
-func configWithGitignore(
-	rslintConfig rslintconfig.RslintConfig,
-	configDir string,
-	fsys vfs.FS,
-) rslintconfig.RslintConfig {
-	gitGlobs := rslintconfig.ReadGitignoreAsGlobs(
-		configDir,
-		fsys,
-		rslintconfig.ExtractConfigIgnores(rslintConfig),
-	)
-	if len(gitGlobs) == 0 {
-		return rslintConfig
-	}
-	return append(rslintconfig.RslintConfig{{Ignores: gitGlobs}}, rslintConfig...)
+	return configWithIgnores, programs, nil
 }
 
 // createFallbackProgram creates a Program for selected lint targets not

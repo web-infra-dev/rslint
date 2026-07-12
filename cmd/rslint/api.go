@@ -197,15 +197,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
 	}
-	var gitignoreGlobs []string
-	if allowedFiles != nil {
-		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobsForFiles(configDirectory, fs, allowedFiles)
-	} else {
-		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobs(configDirectory, fs, rslintconfig.ExtractConfigIgnores(rslintConfig))
-	}
-	if len(gitignoreGlobs) > 0 {
-		rslintConfig = append(rslintconfig.RslintConfig{{Ignores: gitignoreGlobs}}, rslintConfig...)
-	}
+	rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          configDirectory,
 		UseCaseSensitiveFileNames: true,
