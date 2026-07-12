@@ -40,6 +40,13 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			gitignores: map[string]string{".gitignore": "ignored.ts\n"},
 		},
 		{
+			name:          "config negation restores gitignored explicit target",
+			relative:      "dist/important.ts",
+			globalIgnores: []string{"!dist/important.ts"},
+			gitignores:    map[string]string{".gitignore": "dist/\n"},
+			wantLinted:    true,
+		},
+		{
 			name:     "nested negation restores explicit target",
 			relative: "nested/keep.ts",
 			gitignores: map[string]string{
@@ -188,5 +195,78 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				t.Fatalf("API linted=%v, want %v: response=%+v", apiLinted, test.wantLinted, response)
 			}
 		})
+	}
+}
+
+func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
+	workspace := t.TempDir()
+	firstDir := filepath.Join(workspace, "packages", "first")
+	secondDir := filepath.Join(workspace, "packages", "second")
+	firstTarget := filepath.Join(firstDir, "source.ts")
+	secondTarget := filepath.Join(secondDir, "source.ts")
+	for _, target := range []string{firstTarget, secondTarget} {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(firstDir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entry := map[string]any{
+		"files": []string{"**/*.ts"},
+		"rules": map[string]string{"no-debugger": "error"},
+	}
+	payload, err := json.Marshal(map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": firstDir,
+				"entries":         []any{entry},
+				"targetFiles":     []string{firstTarget},
+				"explicitOnly":    true,
+			},
+			map[string]any{
+				"configDirectory": secondDir,
+				"entries":         []any{entry},
+				"targetFiles":     []string{secondTarget},
+				"explicitOnly":    true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadPath := filepath.Join(workspace, "config-payload.json")
+	if err := os.WriteFile(payloadPath, payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdin, err := os.Open(payloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalStdin := os.Stdin
+	os.Stdin = stdin
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = stdin.Close()
+	})
+
+	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+		ConfigStdin:    true,
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 {
+		t.Fatalf("expected the non-ignored config target to fail lint: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "packages/first/source.ts") {
+		t.Fatalf("first config's gitignored target was linted: stdout=%q stderr=%q", stdout, stderr)
+	}
+	if !strings.Contains(stdout, "packages/second/source.ts") {
+		t.Fatalf("second config lost its independently lintable target: stdout=%q stderr=%q", stdout, stderr)
 	}
 }

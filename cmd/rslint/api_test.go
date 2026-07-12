@@ -75,10 +75,10 @@ func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
 
-	// The fixture tsconfig covers exactly the 8 src/*.ts files and
-	// no-unsafe-member-access reports 5 diagnostics across them. Exact counts
-	// catch a partial-lint regression (the "lint all" default silently dropping
-	// files) that a >0 check would miss.
+	// The fixture tsconfig covers 9 src/*.ts files; .gitignore removes one, so 8
+	// are linted and no-unsafe-member-access reports 5 diagnostics across them.
+	// Exact counts catch a partial-lint regression (the "lint all" default
+	// silently dropping files) that a >0 check would miss.
 	if response.FileCount != 8 {
 		t.Fatalf("expected all 8 fixture files linted, got FileCount=%d", response.FileCount)
 	}
@@ -115,9 +115,9 @@ func TestHandleLint_LintedFilesExcludesIgnored(t *testing.T) {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
 
-	// 8 fixture files minus the one ignored entry.
+	// 9 fixture files minus the gitignored fixture and the config-ignored entry.
 	if len(response.LintedFiles) != 7 {
-		t.Fatalf("expected 7 linted files (8 minus the ignored one), got %d: %v", len(response.LintedFiles), response.LintedFiles)
+		t.Fatalf("expected 7 linted files (9 minus two ignored files), got %d: %v", len(response.LintedFiles), response.LintedFiles)
 	}
 	if response.FileCount != 7 {
 		t.Fatalf("expected FileCount=7 (== len(LintedFiles)), got %d", response.FileCount)
@@ -126,6 +126,9 @@ func TestHandleLint_LintedFilesExcludesIgnored(t *testing.T) {
 	for _, f := range response.LintedFiles {
 		if f == "src/index.ts" {
 			t.Fatalf("ignored file src/index.ts must be absent from LintedFiles, got %v", response.LintedFiles)
+		}
+		if f == "src/gitignored.ts" {
+			t.Fatalf("gitignored file src/gitignored.ts must be absent from LintedFiles, got %v", response.LintedFiles)
 		}
 		linted[f] = true
 	}

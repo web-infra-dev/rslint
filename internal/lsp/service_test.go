@@ -920,6 +920,54 @@ func TestHandleConfigUpdate_CommitsGenerationAndInvalidatesPluginWork(t *testing
 	}
 }
 
+func TestHandleConfigUpdate_RefreshesGlobalIgnorePolicy(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "debugger;\n"
+	configDirectory := string(documentURIFromPath(dir))
+
+	apply := func(ignores []string) {
+		t.Helper()
+		entries := []any{map[string]any{"files": []string{"**/*.ts"}}}
+		if ignores != nil {
+			entries = append([]any{map[string]any{"ignores": ignores}}, entries...)
+		}
+		if err := s.handleConfigUpdate(context.Background(), map[string]any{
+			"configs": []any{map[string]any{
+				"configDirectory": configDirectory,
+				"entries":         entries,
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	isIgnored := func() bool {
+		effective, cwd, _ := s.getLintConfigForURI(uri)
+		return effective.IsFileIgnored(target, cwd)
+	}
+
+	apply(nil)
+	if isIgnored() {
+		t.Fatal("file was ignored before the config added an ignore")
+	}
+	apply([]string{"source.ts"})
+	if !isIgnored() {
+		t.Fatal("config reload did not apply the new global ignore")
+	}
+	apply(nil)
+	if isIgnored() {
+		t.Fatal("config reload retained a removed global ignore")
+	}
+}
+
 // TestHandleConfigUpdate_RegistersEslintPlugins pins the ONLY path that
 // registers object-form community plugins in the editor: the configUpdate
 // reverse notification carries the {prefix, ruleNames} metadata aggregate, and
@@ -2948,6 +2996,16 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			relative:   "ignored.ts",
 			config:     config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
 			gitignores: map[string]string{".gitignore": "ignored.ts\n"},
+		},
+		{
+			name:     "config negation restores gitignored explicit target",
+			relative: "dist/important.ts",
+			config: config.RslintConfig{
+				{Ignores: []string{"!dist/important.ts"}},
+				{Rules: config.Rules{"no-debugger": "error"}},
+			},
+			gitignores: map[string]string{".gitignore": "dist/\n"},
+			wantLinted: true,
 		},
 		{
 			name:     "nested negation restores explicit target",
