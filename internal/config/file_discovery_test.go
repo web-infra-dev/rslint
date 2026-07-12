@@ -22,6 +22,49 @@ import (
 
 func strconvI(i int) string { return strconv.Itoa(i) }
 
+type discoveryMockFS struct {
+	vfs.FS
+	entries         map[string]vfs.Entries
+	files           map[string]string
+	resolvedPaths   map[string]string
+	caseSensitiveFS bool
+}
+
+func (m *discoveryMockFS) ReadFile(path string) (string, bool) {
+	content, ok := m.files[path]
+	return content, ok
+}
+
+func (m *discoveryMockFS) GetAccessibleEntries(path string) vfs.Entries {
+	return m.entries[path]
+}
+
+func (m *discoveryMockFS) Realpath(path string) string {
+	if realpath, ok := m.resolvedPaths[path]; ok {
+		return realpath
+	}
+	return path
+}
+
+func (m *discoveryMockFS) UseCaseSensitiveFileNames() bool {
+	return m.caseSensitiveFS
+}
+
+func setupDiscoveryContentFixture(t *testing.T, files map[string]string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	for name, content := range files {
+		path := filepath.Join(tmpDir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	return tspath.NormalizePath(tmpDir)
+}
+
 // setupDiscoveryFixture creates a temp dir with the given file paths and returns
 // the normalized configDir and a map of short name → normalized absolute path.
 func setupDiscoveryFixture(t *testing.T, files []string) (string, map[string]string) {
@@ -215,7 +258,7 @@ func TestDiscoverLintFiles_DefaultBaselineIsIndependentOfConfigEntries(t *testin
 
 func TestDiscoverLintFiles_PreservesUNCRoot(t *testing.T) {
 	const configDir = "//server/share/repo"
-	mock := &gitignoreMockFS{
+	mock := &discoveryMockFS{
 		FS: osvfs.FS(),
 		entries: map[string]vfs.Entries{
 			configDir: {
@@ -397,7 +440,7 @@ func TestDiscoverLintFiles_AllowDirsStartsWalkAtScopedRoot(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 	appDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app"))
-	spy := &gitignoreSpyFS{FS: osvfs.FS()}
+	spy := &spyFS{FS: osvfs.FS()}
 
 	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{appDir}, true)
 
@@ -405,12 +448,12 @@ func TestDiscoverLintFiles_AllowDirsStartsWalkAtScopedRoot(t *testing.T) {
 
 	rootDir := tspath.NormalizePath(configDir)
 	otherDir := tspath.NormalizePath(filepath.Join(configDir, "packages/other"))
-	for _, accessed := range spy.accessedDirs {
+	for _, accessed := range spy.snapshotAccessedDirs() {
 		if accessed == rootDir {
-			t.Fatalf("scoped walk should not open config root %s; accessed=%v", rootDir, spy.accessedDirs)
+			t.Fatalf("scoped walk should not open config root %s", rootDir)
 		}
 		if strings.HasPrefix(accessed, otherDir) {
-			t.Fatalf("scoped walk should not enter sibling %s; accessed=%v", otherDir, spy.accessedDirs)
+			t.Fatalf("scoped walk should not enter sibling %s", otherDir)
 		}
 	}
 }
@@ -1521,7 +1564,7 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 // End-to-end cross-matrix tests: config ignores × .gitignore × gap files × linter
 //
 // These tests simulate the full flow:
-//   1. ReadGitignoreAsGlobs (with configIgnores for pruning)
+//   1. ConfigWithGitignore (with config ignores for pruning)
 //   2. Inject gitignore globs into config
 //   3. DiscoverGapFiles
 //   4. Verify GetConfigForFile (linter's per-file decision) is consistent
@@ -1531,17 +1574,13 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 // GetConfigForFile also returns nil for any file in that dir.
 // =============================================================================
 
-// e2eSetup creates a fixture, runs ReadGitignoreAsGlobs + config injection + DiscoverGapFiles,
+// e2eSetup creates a fixture, applies ConfigWithGitignore, then runs DiscoverGapFiles,
 // and returns gap files + the final config (for GetConfigForFile verification).
 func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, programFiles map[string]struct{}) (string, []string, RslintConfig) {
 	t.Helper()
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	if programFiles == nil {
 		programFiles = map[string]struct{}{}
@@ -1608,15 +1647,11 @@ func TestE2E_NestedGitignoreAffectsProgramFiles(t *testing.T) {
 	}
 
 	// Build programFiles with both files (simulating tsconfig include: ["src"])
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 	indexPath := tspath.NormalizePath(dir + "/packages/foo/src/index.ts")
 	genPathFull := tspath.NormalizePath(dir + "/packages/foo/src/generated/api.ts")
 
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// generated/api.ts is in programFiles but gitignored.
 	// GetConfigForFile should return nil because gitignore patterns are in config.
@@ -1730,7 +1765,7 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 	}
 
 	// Create fixture once and use the same dir for programFiles and e2e flow.
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 	indexPath := tspath.NormalizePath(dir + "/src/index.ts")
 	utilsPath := tspath.NormalizePath(dir + "/src/utils.ts")
 
@@ -1738,11 +1773,7 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 		indexPath: {},
 	}
 
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	gapSet := toSet(gapFiles)
@@ -1798,14 +1829,10 @@ func TestE2E_ConfigIgnoredDirInProgram(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	dir := setupGitignoreFixture(t, files)
+	dir := setupDiscoveryContentFixture(t, files)
 	testFile := tspath.NormalizePath(dir + "/tests/helpers/setup.ts")
 
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// Even though setup.ts is in programFiles, GetConfigForFile should return nil
 	// because tests/ is directory-blocked by config ignores.
@@ -1851,12 +1878,8 @@ func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	dir := setupGitignoreFixture(t, files)
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	dir := setupDiscoveryContentFixture(t, files)
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// Only allow packages/foo/
 	fooDir := tspath.NormalizePath(dir + "/packages/foo")
@@ -1881,12 +1904,8 @@ func TestE2E_AllowFilesWithGitignore(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	dir := setupGitignoreFixture(t, files)
-	configIgnores := ExtractConfigIgnores(config)
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
+	dir := setupDiscoveryContentFixture(t, files)
+	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	srcFile := tspath.NormalizePath(dir + "/src/index.ts")
 	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")

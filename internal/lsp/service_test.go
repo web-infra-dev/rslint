@@ -920,6 +920,54 @@ func TestHandleConfigUpdate_CommitsGenerationAndInvalidatesPluginWork(t *testing
 	}
 }
 
+func TestHandleConfigUpdate_RefreshesGlobalIgnorePolicy(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "debugger;\n"
+	configDirectory := string(documentURIFromPath(dir))
+
+	apply := func(ignores []string) {
+		t.Helper()
+		entries := []any{map[string]any{"files": []string{"**/*.ts"}}}
+		if ignores != nil {
+			entries = append([]any{map[string]any{"ignores": ignores}}, entries...)
+		}
+		if err := s.handleConfigUpdate(context.Background(), map[string]any{
+			"configs": []any{map[string]any{
+				"configDirectory": configDirectory,
+				"entries":         entries,
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	isIgnored := func() bool {
+		effective, cwd, _ := s.getLintConfigForURI(uri)
+		return effective.IsFileIgnored(target, cwd)
+	}
+
+	apply(nil)
+	if isIgnored() {
+		t.Fatal("file was ignored before the config added an ignore")
+	}
+	apply([]string{"source.ts"})
+	if !isIgnored() {
+		t.Fatal("config reload did not apply the new global ignore")
+	}
+	apply(nil)
+	if isIgnored() {
+		t.Fatal("config reload retained a removed global ignore")
+	}
+}
+
 // TestHandleConfigUpdate_RegistersEslintPlugins pins the ONLY path that
 // registers object-form community plugins in the editor: the configUpdate
 // reverse notification carries the {prefix, ruleNames} metadata aggregate, and
@@ -2624,6 +2672,26 @@ func TestConfigTransaction_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("physical file lost aliased files selector: %+v", result.Diagnostics)
 	}
+
+	if err := os.WriteFile(filepath.Join(realRoot, ".gitignore"), []byte("src/index.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(fileURI)
+	result, err = s.runConfiguredLintForContent(
+		fileURI,
+		context.Background(),
+		source,
+		effective,
+		configCwd,
+		isJSConfig,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent with .gitignore failed: %v", err)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("physical file did not inherit aliased config .gitignore: %+v", result.Diagnostics)
+	}
 }
 
 func TestConfigTransaction_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
@@ -2889,6 +2957,181 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 			}
 			if diagnostics == nil || len(diagnostics) != 0 {
 				t.Fatalf("default-excluded file diagnostics = %+v, want a non-nil empty slice", diagnostics)
+			}
+		})
+	}
+}
+
+func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
+	tests := []struct {
+		name         string
+		configDir    string
+		relative     string
+		config       config.RslintConfig
+		gitignores   map[string]string
+		symlinkDir   bool
+		targetIgnore string
+		wantLinted   bool
+	}{
+		{
+			name:     "global config ignore suppresses explicit target",
+			relative: "global.ts",
+			config: config.RslintConfig{
+				{Ignores: []string{"global.ts"}},
+				{Files: []string{"**/*.ts"}, Rules: config.Rules{"no-debugger": "error"}},
+			},
+		},
+		{
+			name:     "entry ignore keeps target but removes rules",
+			relative: "entry.ts",
+			config: config.RslintConfig{{
+				Files:   []string{"**/*.ts"},
+				Ignores: []string{"entry.ts"},
+				Rules:   config.Rules{"no-debugger": "error"},
+			}},
+			wantLinted: true,
+		},
+		{
+			name:       "root gitignore suppresses explicit target",
+			relative:   "ignored.ts",
+			config:     config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{".gitignore": "ignored.ts\n"},
+		},
+		{
+			name:     "config negation restores gitignored explicit target",
+			relative: "dist/important.ts",
+			config: config.RslintConfig{
+				{Ignores: []string{"!dist/important.ts"}},
+				{Rules: config.Rules{"no-debugger": "error"}},
+			},
+			gitignores: map[string]string{".gitignore": "dist/\n"},
+			wantLinted: true,
+		},
+		{
+			name:     "nested negation restores explicit target",
+			relative: "nested/keep.ts",
+			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{
+				".gitignore":        "nested/*.ts\n",
+				"nested/.gitignore": "!keep.ts\n",
+			},
+			wantLinted: true,
+		},
+		{
+			name:     "ignored parent blocks nested source",
+			relative: "blocked/keep.ts",
+			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{
+				".gitignore":         "blocked/\n",
+				"blocked/.gitignore": "!keep.ts\n",
+			},
+		},
+		{
+			name:      "ancestor ignore blocks nested source",
+			configDir: "packages/app",
+			relative:  "ignored/keep.ts",
+			config:    config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{
+				".gitignore":                      "/packages/app/ignored/\n",
+				"packages/app/ignored/.gitignore": "!keep.ts\n",
+			},
+		},
+		{
+			name:     "pruned nested source does not override root negation",
+			relative: "dist/types/private.ts",
+			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{
+				".gitignore":            "dist/\n!dist/types/\n",
+				"dist/types/.gitignore": "private.ts\n",
+			},
+			wantLinted: true,
+		},
+		{
+			name:       "directory symlink remains lintable without ignore",
+			relative:   "link/source.ts",
+			config:     config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			symlinkDir: true,
+			wantLinted: true,
+		},
+		{
+			name:       "directory symlink obeys lexical root gitignore",
+			relative:   "link/source.ts",
+			config:     config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			gitignores: map[string]string{".gitignore": "link/source.ts\n"},
+			symlinkDir: true,
+		},
+		{
+			name:         "directory symlink skips target gitignore source",
+			relative:     "link/source.ts",
+			config:       config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+			symlinkDir:   true,
+			targetIgnore: "source.ts\n",
+			wantLinted:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			configDir := workspace
+			if test.configDir != "" {
+				configDir = filepath.Join(workspace, test.configDir)
+				if err := os.MkdirAll(configDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if test.symlinkDir {
+				targetDir := t.TempDir()
+				if test.targetIgnore != "" {
+					if err := os.WriteFile(filepath.Join(targetDir, ".gitignore"), []byte(test.targetIgnore), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.Symlink(targetDir, filepath.Join(configDir, "link")); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+			}
+			for relative, content := range test.gitignores {
+				filePath := filepath.Join(workspace, relative)
+				if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			const malformed = "debugger; const value = ;\n"
+			target := filepath.Join(configDir, test.relative)
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(target, []byte(malformed), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			s := newTestServer()
+			s.cwd = configDir
+			s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			s.jsonConfig = test.config
+			uri := documentURIFromPath(target)
+			effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+			result, err := s.runConfiguredLintForContent(
+				uri,
+				context.Background(),
+				malformed,
+				effective,
+				configCwd,
+				isJSConfig,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("run lint: %v", err)
+			}
+			gotLinted := result.HasSyntaxErrors && len(result.Diagnostics) > 0 &&
+				strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS")
+			if gotLinted != test.wantLinted {
+				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Diagnostics)
 			}
 		})
 	}

@@ -487,3 +487,34 @@ func TestIsFileIgnored_DirectoryBlockingBeatsNegation(t *testing.T) {
 		t.Error("directory-level block should ignore blocked/keep.ts even with negation")
 	}
 }
+
+func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+		{Ignores: []string{"scripts/**"}},
+		{Files: []string{}, Ignores: []string{"not-global-empty"}},
+		{Ignores: []string{"vendor/**"}, Rules: Rules{"r": "error"}},
+		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}},
+	}
+
+	ignores := extractConfigIgnores(config)
+	if len(ignores) != 2 || ignores[0].Glob != "**/tests/**" || ignores[1].Glob != "scripts/**" {
+		t.Fatalf("extractConfigIgnores() = %#v", ignores)
+	}
+}
+
+func TestExtractConfigIgnores_MultipleEntries(t *testing.T) {
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**", "packages/example/compiled/**"}},
+		{Ignores: []string{"crates/**"}},
+	}
+
+	ignores := extractConfigIgnores(config)
+	if len(ignores) != 3 ||
+		ignores[0].Glob != "**/tests/**" ||
+		ignores[1].Glob != "packages/example/compiled/**" ||
+		ignores[2].Glob != "crates/**" {
+		t.Fatalf("extractConfigIgnores() = %#v", ignores)
+	}
+}

@@ -2,10 +2,17 @@ package lsp
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/project"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -129,6 +136,33 @@ func TestHandleFixAllCodeAction_NonTSFile(t *testing.T) {
 	}
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
 		t.Error("expected empty code actions for non-TS file")
+	}
+}
+
+func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(target, []byte("var value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	s.session = &project.Session{}
+	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}}
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "var value = 1;\n"
+
+	resp, err := s.handleFixAllCodeAction(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
+		t.Fatalf("gitignored file produced fix-all actions: %+v", resp)
 	}
 }
 

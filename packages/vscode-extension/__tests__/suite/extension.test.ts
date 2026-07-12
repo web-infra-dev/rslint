@@ -163,6 +163,37 @@ suite('rslint extension', function () {
     );
   });
 
+  test('.gitignore excludes diagnostics for an opened file', async () => {
+    const doc = await openFixture('gitignored.ts');
+    await vscode.window.showTextDocument(doc);
+
+    const control = await openFixture('disable.ts');
+    await vscode.window.showTextDocument(control);
+    const controlDiagnostics = await waitForDiagnosticsWithMessage(
+      control,
+      'no-unsafe-member-access',
+    );
+    assert.ok(
+      controlDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.source === 'rslint' &&
+          diagnostic.message.includes('no-unsafe-member-access'),
+      ),
+      'Expected the unignored control file to produce an rslint diagnostic',
+    );
+
+    const diagnostics = vscode.languages
+      .getDiagnostics(doc.uri)
+      .filter((diagnostic) => diagnostic.source === 'rslint');
+    assert.strictEqual(
+      diagnostics.length,
+      0,
+      `Expected no diagnostics for a gitignored file, got: ${diagnostics
+        .map((diagnostic) => diagnostic.message)
+        .join(', ')}`,
+    );
+  });
+
   test('code actions - auto fix', async () => {
     const doc = await openFixture('autofix.ts');
     await vscode.window.showTextDocument(doc);
