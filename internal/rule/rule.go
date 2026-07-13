@@ -195,6 +195,16 @@ func (s RuleSuggestion) Fixes() []RuleFix {
 	return s.FixesArr
 }
 
+// DiagnosticOrigin identifies the subsystem that produced a diagnostic.
+// Its zero value is a lint diagnostic so existing rule and plugin producers
+// remain source-compatible; TypeScript producers must opt in explicitly.
+type DiagnosticOrigin uint8
+
+const (
+	DiagnosticOriginLint DiagnosticOrigin = iota
+	DiagnosticOriginTypeScript
+)
+
 type RuleDiagnostic struct {
 	Range    core.TextRange
 	RuleName string
@@ -215,6 +225,7 @@ type RuleDiagnostic struct {
 	// from SourceFile.FileName(), plugin diagnostics from the wire path.
 	FilePath string
 	Severity DiagnosticSeverity
+	Origin   DiagnosticOrigin
 	// PreFormatted indicates that Message.Description already contains
 	// structured formatting (e.g. indented continuation lines from tsc diagnostics).
 	// The renderer will use a simple 2-space indent instead of the │ border style.

@@ -14,8 +14,10 @@ rslint .
 src/index.ts:5:7
   error  @typescript-eslint/no-unused-vars  'foo' is declared but its value is never read.
 
-Found 1 error and 0 warnings (linted 12 files in 42ms using 8 threads)
+Found 1 error and 0 warnings (linted 12 files with 1 rule in 42ms using 8 threads)
 ```
+
+In color-enabled terminals, the complete parenthesized execution details are rendered dim.
 
 With `--type-check`, type errors are also included (see [Type Checking](/guide/type-checking) for details):
 
@@ -30,8 +32,12 @@ src/index.ts:5:7
 src/utils.ts:3:7
   error  TypeScript(TS2322)  Type 'string' is not assignable to type 'number'.
 
-Found 1 lint error, 1 type error and 0 warnings (linted 12 files in 85ms using 8 threads)
+Found 1 lint error, 1 type error and 0 warnings (linted 12 files with 1 rule, type-checked 14 files in 85ms using 8 threads)
 ```
+
+The two file counts can differ because CLI arguments and rslint ignore patterns restrict the lint phase, while type-check follows each tsconfig's program-wide scope.
+
+The machine-readable formats below emit diagnostics only. They do not include the default summary, timing, thread count, or fixed-issue count.
 
 ## jsonline
 

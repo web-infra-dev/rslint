@@ -1,10 +1,8 @@
 // Package term owns the CLI's color-output decision.
 //
 // The decision is made exactly once, at lint-pipeline entry, by
-// ResolveColorEnabled. Nothing else in the process may mutate the resulting
-// color state afterwards; in particular, fatih/color's package-init guess
-// (which keys off the Go process's own stdout — a pipe in IPC mode, never the
-// user's terminal) is unconditionally overwritten by this decision.
+// ResolveColorEnabled. The resulting bool is passed explicitly to the CLI
+// output package; this package neither reads nor mutates formatter globals.
 package term
 
 // ColorInputs carries every signal the color decision consumes. The caller

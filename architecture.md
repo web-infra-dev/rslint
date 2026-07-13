@@ -105,6 +105,7 @@ The directory map below folds the high-level module relationships into the packa
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `website/`                     | Documentation site and Playground UI                                                                             | Uses `packages/rslint-wasm` to run browser linting and `packages/rslint-api` to decode encoded source files; Playground lint requests ultimately reach `internal/linter`, and inspect requests reach `internal/inspector` through `internal/api`                                                                |
 | `cmd/rslint/`                  | Main Go binary entry point with CLI, API, and LSP modes                                                          | Main CLI path is `internal/config -> cmd/rslint/programs.go -> internal/linter`; `--api` is consumed by `packages/rslint` and `packages/rslint-wasm`; `--lsp` is consumed by `packages/vscode-extension`                                                                                                        |
+| `cmd/rslint/internal/output/`  | CLI report model, summary, colors, and stdout formatters                                                         | Consumes final sorted `internal/rule` diagnostics from the CLI pipeline and renders `default`, `jsonline`, `github`, or `gitlab`; it is intentionally private to `cmd/rslint` and is not shared by the structured API or LSP adapters                                                                           |
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                            | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                         |
 | `internal/api/`                | stdio IPC protocol and service types for JS/WASM integration                                                     | Shared protocol layer for `cmd/rslint --api`; used by `packages/rslint`, `packages/rslint-wasm`, `internal/linter`, and `internal/inspector`                                                                                                                                                                    |
 | `internal/config/`             | Configuration loading, parsing, merging, discovery, and centralized rule registration                            | `RegisterAllRules()` in `config.go` orchestrates registration by iterating each group's `GetAllRules()` slice (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` for each plugin); `rule_registry.go` implements registry/query logic used by `cmd/rslint/programs.go` and `internal/linter` |
@@ -188,7 +189,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 6. **AST Traversal**: The linter traverses each file once using a DFS walk.
 7. **Rule Execution**: Listener callbacks inspect nodes and may use syntax only or syntax plus type information.
 8. **Diagnostic Collection**: Findings are reported as `RuleDiagnostic` values, with optional fixes or suggestions.
-9. **Output Generation**: CLI prints results, API returns structured data, and LSP converts them to LSP diagnostics/code actions.
+9. **Output Generation**: CLI builds one report from the final post-fix diagnostics and passes it to `cmd/rslint/internal/output`; API returns structured data, and LSP converts diagnostics to LSP diagnostics/code actions.
 
 ### Error Recovery Strategy
 
@@ -543,8 +544,9 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
-11. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
-12. **Exit Code**: depends on diagnostics, warnings, and fix outcomes
+11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
+12. **Output Formatting**: the CLI-private output subsystem renders `default`, JSON line, GitHub workflow command, or GitLab Code Quality formats. Only `default` emits a summary; machine-readable formats never emit ANSI styling or a summary.
+13. **Exit Code**: depends on the report counts, `--max-warnings`, and fix outcomes
 
 ### Concurrency Model
 

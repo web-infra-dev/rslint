@@ -1,17 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"cmp"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,14 +14,11 @@ import (
 	"runtime/trace"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
-	"github.com/fatih/color"
+	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -34,7 +26,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -76,533 +67,6 @@ type lintArgs struct {
 	// placeholder rules so plugin rule names resolve; the live plugins run
 	// in the Node worker.
 	EslintPlugins []rslintconfig.EslintPluginEntry
-}
-
-// ColorScheme contains all the color functions for different UI elements
-type ColorScheme struct {
-	RuleName    func(format string, a ...interface{}) string
-	FileName    func(format string, a ...interface{}) string
-	ErrorText   func(format string, a ...interface{}) string
-	SuccessText func(format string, a ...interface{}) string
-	DimText     func(format string, a ...interface{}) string
-	BoldText    func(format string, a ...interface{}) string
-	BorderText  func(format string, a ...interface{}) string
-	WarnText    func(format string, a ...interface{}) string
-	// Reset is the trailing SGR reset sequence the summary lines emit (empty
-	// when colors are off) — byte-identical to the inline
-	// color.New().SprintFunc()("") emitters it replaces.
-	Reset string
-}
-
-// newPinnedColor builds a color object pinned to the resolved decision.
-// color.New seeds a per-object noColor switch from the NO_COLOR env at
-// creation time, which would silently override the pipeline-entry decision
-// (e.g. NO_COLOR set but --force-color given) — Enable/DisableColor makes
-// the object follow color.NoColor unconditionally.
-func newPinnedColor(attrs ...color.Attribute) *color.Color {
-	c := color.New(attrs...)
-	if color.NoColor {
-		c.DisableColor()
-	} else {
-		c.EnableColor()
-	}
-	return c
-}
-
-// setupColors builds the SprintfFunc scheme used by the formatters. It is a
-// pure factory: the on/off decision is owned by term.ResolveColorEnabled,
-// applied once at pipeline entry and propagated here via color.NoColor.
-func setupColors() *ColorScheme {
-	return &ColorScheme{
-		RuleName:    newPinnedColor(color.FgHiGreen).SprintfFunc(),
-		FileName:    newPinnedColor(color.FgCyan, color.Italic).SprintfFunc(),
-		ErrorText:   newPinnedColor(color.FgRed, color.Bold).SprintfFunc(),
-		SuccessText: newPinnedColor(color.FgGreen, color.Bold).SprintfFunc(),
-		DimText:     newPinnedColor(color.Faint).SprintfFunc(),
-		BoldText:    newPinnedColor(color.Bold).SprintfFunc(),
-		BorderText:  newPinnedColor(color.Faint).SprintfFunc(),
-		WarnText:    newPinnedColor(color.FgYellow).SprintfFunc(),
-		Reset:       newPinnedColor().SprintFunc()(""),
-	}
-}
-
-// reportSyntacticErrors renders syntax errors with code snippets (like tsc --pretty).
-// Returns true if syntactic errors were found and reported.
-func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) bool {
-	var syntacticErr *utils.SyntacticError
-	if !errors.As(err, &syntacticErr) {
-		return false
-	}
-	rendered := false
-	for _, d := range syntacticErr.Diagnostics {
-		if d.File() == nil {
-			continue
-		}
-		diag := rule.RuleDiagnostic{
-			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
-			SourceFile: d.File(),
-			FilePath:   d.File().FileName(),
-			Range:      d.Loc(),
-			Message:    rule.RuleMessage{Description: d.String()},
-			Severity:   rule.SeverityError,
-		}
-		printDiagnosticDefault(diag, w, comparePathOptions)
-		rendered = true
-	}
-	w.Flush()
-	return rendered
-}
-
-func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string, gitlabState *gitlabReportState) {
-	switch format {
-	case "default":
-		printDiagnosticDefault(d, w, comparePathOptions)
-	case "jsonline":
-		printDiagnosticJsonLine(d, w, comparePathOptions)
-	case "github":
-		printDiagnosticGitHub(d, w, comparePathOptions)
-	case "gitlab":
-		printDiagnosticGitLab(d, w, comparePathOptions, gitlabState)
-	default:
-		panic("not supported format " + format)
-	}
-}
-
-// gitlabReportState tracks the streaming state needed to emit the gitlab
-// format as a single JSON array (one open bracket, comma-separated entries,
-// one close bracket) while diagnostics are still printed one at a time, plus
-// a fingerprint occurrence counter so two diagnostics that would otherwise
-// hash identically (rare) don't collapse into one entry in the GitLab MR
-// widget, which merges issues sharing a fingerprint.
-type gitlabReportState struct {
-	wroteFirst   bool
-	fingerprints map[string]int
-}
-
-func newGitlabReportState() *gitlabReportState {
-	return &gitlabReportState{fingerprints: make(map[string]int)}
-}
-
-// finish closes the JSON array. Must be called exactly once after all
-// diagnostics have been printed.
-func (s *gitlabReportState) finish(w *bufio.Writer) {
-	if s.wroteFirst {
-		w.WriteString("]\n")
-	} else {
-		w.WriteString("[]\n")
-	}
-}
-
-// gitlabFingerprint derives a stable identifier for a diagnostic from its
-// location and content. md5 is used only to derive a short opaque key (no
-// cryptographic resistance is needed), and the seen map breaks ties
-// deterministically instead of the random salt some other gitlab formatters
-// use, which keeps report output reproducible across runs.
-func gitlabFingerprint(seen map[string]int, filePath, ruleName, message string, startLine, startColumn, endLine, endColumn int) string {
-	input := fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d", filePath, ruleName, message, startLine, startColumn, endLine, endColumn)
-	digest := func(s string) string {
-		sum := md5.Sum([]byte(s)) //nolint:gosec // opaque identifier, not a security boundary
-		return hex.EncodeToString(sum[:])
-	}
-
-	fingerprint := digest(input)
-	if n, ok := seen[fingerprint]; ok {
-		seen[fingerprint] = n + 1
-		return digest(input + ":" + strconv.Itoa(n))
-	}
-	seen[fingerprint] = 1
-	return fingerprint
-}
-
-// print as [GitLab Code Quality report](https://docs.gitlab.com/ci/testing/code_quality/)
-// format: a single JSON array of issues, suitable for the `codequality`
-// report artifact consumed by GitLab CI merge request widgets.
-func printDiagnosticGitLab(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, state *gitlabReportState) {
-	diagnosticStart := d.Range.Pos()
-	diagnosticEnd := d.Range.End()
-
-	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
-
-	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
-
-	var severity string
-	switch d.Severity {
-	case rule.SeverityError:
-		severity = "major"
-	case rule.SeverityWarning:
-		severity = "minor"
-	default:
-		severity = "info"
-	}
-
-	type gitlabPosition struct {
-		Line   int `json:"line"`
-		Column int `json:"column"`
-	}
-	type gitlabPositions struct {
-		Begin gitlabPosition `json:"begin"`
-		End   gitlabPosition `json:"end"`
-	}
-	type gitlabLines struct {
-		Begin int `json:"begin"`
-		End   int `json:"end"`
-	}
-	type gitlabLocation struct {
-		Path      string          `json:"path"`
-		Lines     gitlabLines     `json:"lines"`
-		Positions gitlabPositions `json:"positions"`
-	}
-	type gitlabIssue struct {
-		Description string         `json:"description"`
-		CheckName   string         `json:"check_name"`
-		Fingerprint string         `json:"fingerprint"`
-		Severity    string         `json:"severity"`
-		Location    gitlabLocation `json:"location"`
-	}
-
-	beginLine, beginColumn := startLine+1, int(startColumn)+1
-	endLineNum, endColumnNum := endLine+1, int(endColumn)+1
-
-	issue := gitlabIssue{
-		Description: d.Message.Description,
-		CheckName:   d.RuleName,
-		Fingerprint: gitlabFingerprint(state.fingerprints, filePath, d.RuleName, d.Message.Description, beginLine, beginColumn, endLineNum, endColumnNum),
-		Severity:    severity,
-		Location: gitlabLocation{
-			Path: filePath,
-			Lines: gitlabLines{
-				Begin: beginLine,
-				End:   endLineNum,
-			},
-			Positions: gitlabPositions{
-				Begin: gitlabPosition{Line: beginLine, Column: beginColumn},
-				End:   gitlabPosition{Line: endLineNum, Column: endColumnNum},
-			},
-		},
-	}
-
-	jsonBytes, err := json.Marshal(issue)
-	if err != nil {
-		// gitlabIssue contains only strings and ints, so Marshal cannot fail
-		// in practice; skip rather than risk corrupting the JSON array.
-		return
-	}
-
-	if state.wroteFirst {
-		w.WriteByte(',')
-	} else {
-		w.WriteByte('[')
-		state.wroteFirst = true
-	}
-	w.Write(jsonBytes)
-}
-
-// print as [Workflow commands for GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) format
-func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
-	var severity string
-	switch d.Severity {
-	case rule.SeverityError:
-		severity = "error"
-	case rule.SeverityWarning:
-		severity = "warning"
-	default:
-		severity = "notice"
-	}
-
-	diagnosticStart := d.Range.Pos()
-	diagnosticEnd := d.Range.End()
-
-	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
-
-	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
-	output := fmt.Sprintf(
-		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
-		severity,
-		escapeProperty(filePath),
-		startLine+1,
-		endLine+1,
-		int(startColumn)+1,
-		int(endColumn)+1,
-		d.RuleName,
-		escapeData(d.Message.Description),
-	)
-	w.WriteString(output)
-}
-
-func pluralize(count int, singular, plural string) string {
-	if count == 1 {
-		return singular
-	}
-	return plural
-}
-
-func escapeData(str string) string {
-	// https://github.com/biomejs/biome/blob/4416573f4d709047a28407d99381810b7bc7dcc7/crates/biome_diagnostics/src/display_github.rs#L85C4-L85C15
-	str = strings.ReplaceAll(str, "%", "%25")
-	str = strings.ReplaceAll(str, "\r", "%0D")
-	str = strings.ReplaceAll(str, "\n", "%0A")
-	return str
-}
-func escapeProperty(str string) string {
-	// https://github.com/biomejs/biome/blob/4416573f4d709047a28407d99381810b7bc7dcc7/crates/biome_diagnostics/src/display_github.rs#L103
-	str = strings.ReplaceAll(str, "%", "%25")
-	str = strings.ReplaceAll(str, "\r", "%0D")
-	str = strings.ReplaceAll(str, "\n", "%0A")
-	str = strings.ReplaceAll(str, ":", "%3A")
-	str = strings.ReplaceAll(str, ",", "%2C")
-	return str
-}
-
-// print as [jsonline](https://jsonlines.org/) format which can be used for lsp
-func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
-	diagnosticStart := d.Range.Pos()
-	diagnosticEnd := d.Range.End()
-
-	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
-
-	type Location struct {
-		Line   int `json:"line"`
-		Column int `json:"column"`
-	}
-
-	type Range struct {
-		Start Location `json:"start"`
-		End   Location `json:"end"`
-	}
-
-	type Diagnostic struct {
-		RuleName string `json:"ruleName"`
-		Message  string `json:"message"`
-		FilePath string `json:"filePath"`
-		Range    Range  `json:"range"`
-		Severity string `json:"severity"`
-	}
-
-	diagnostic := Diagnostic{
-		RuleName: d.RuleName,
-		Message:  d.Message.Description,
-		FilePath: tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
-		Range: Range{
-			Start: Location{
-				Line:   startLine + 1, // Convert to 1-based indexing
-				Column: int(startColumn) + 1,
-			},
-			End: Location{
-				Line:   endLine + 1,
-				Column: int(endColumn) + 1,
-			},
-		},
-		Severity: d.Severity.String(),
-	}
-
-	jsonBytes, err := json.Marshal(diagnostic)
-	if err != nil {
-		type ErrorObject struct {
-			Error string `json:"error"`
-		}
-		errorObject := ErrorObject{Error: fmt.Sprintf("Failed to marshal diagnostic: %s", err)}
-
-		errorBytes, _ := json.Marshal(errorObject) //nolint:errchkjson
-		w.Write(errorBytes)
-		w.WriteByte('\n')
-		return
-	}
-
-	w.Write(jsonBytes)
-	w.WriteByte('\n')
-}
-
-// print a normal logger
-func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
-	colors := setupColors()
-
-	diagnosticStart := d.Range.Pos()
-	diagnosticEnd := d.Range.End()
-
-	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
-	diagnosticEndline, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
-
-	lineMap := scanner.GetECMALineStarts(d.SourceFile)
-	text := d.SourceFile.Text()
-
-	codeboxStartLine := max(diagnosticStartLine-1, 0)
-	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
-
-	codeboxStart := int(lineMap[codeboxStartLine])
-	var codeboxEnd int
-	if codeboxEndLine == len(lineMap)-1 {
-		codeboxEnd = len(text)
-	} else {
-		codeboxEnd = int(lineMap[codeboxEndLine+1]) - 1
-	}
-
-	// Rule name with conditional coloring
-	w.WriteByte(' ')
-	w.WriteString(colors.RuleName(" %s ", d.RuleName))
-	w.WriteString(" — ")
-
-	// Severity level with conditional coloring
-	severityColor := colors.WarnText
-	if d.Severity == rule.SeverityError {
-		severityColor = colors.ErrorText
-	}
-	w.WriteString(severityColor("[%s] ", d.Severity.String()))
-
-	// Message handling — multi-line continuation:
-	// - PreFormatted (e.g. tsc diagnostics): 2-space indent, message already has indentation
-	// - Lint rules: │ border aligned after rule name
-	messageLineStart := 0
-	for i, char := range d.Message.Description {
-		if char == '\n' {
-			w.WriteString(d.Message.Description[messageLineStart : i+1])
-			messageLineStart = i + 1
-			if d.PreFormatted {
-				w.WriteString("  ")
-			} else {
-				w.WriteString("    ")
-				w.WriteString(colors.BorderText("│"))
-				w.WriteString(strings.Repeat(" ", len(d.RuleName)+1))
-			}
-		}
-	}
-	if messageLineStart <= len(d.Message.Description) {
-		w.WriteString(d.Message.Description[messageLineStart:len(d.Message.Description)])
-	}
-
-	// File path with conditional coloring
-	w.WriteString("\n  ")
-	w.WriteString(colors.BorderText("╭─┴──────────("))
-	w.WriteByte(' ')
-	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
-	location := fmt.Sprintf("%s:%d:%d", filePath, diagnosticStartLine+1, diagnosticStartColumn+1)
-	w.WriteString(colors.FileName("%s", location))
-	w.WriteByte(' ')
-	w.WriteString(colors.BorderText(")─────"))
-	w.WriteByte('\n')
-
-	indentSize := math.MaxInt
-	line := codeboxStartLine
-	lineIndentCalculated := false
-	lastNonSpaceByteIndex := -1
-
-	numLines := codeboxEndLine - codeboxStartLine + 1
-	lineStarts := make([]int, numLines)
-	lineEnds := make([]int, numLines)
-
-	// Iterate by runes to correctly handle multi-byte UTF-8 characters.
-	// Use utf8.DecodeRuneInString to get the true byte width of each rune
-	// (including invalid UTF-8 bytes, which decode as RuneError with size=1).
-	// `for _, char := range str` plus `utf8.RuneLen(char)` is unsafe here
-	// because invalid bytes yield RuneError (U+FFFD) and RuneLen returns 3
-	// (the encoded length of U+FFFD), throwing off the byte counter and
-	// eventually slicing past len(text).
-	codeboxText := text[codeboxStart:codeboxEnd]
-	for i := 0; i < len(codeboxText); {
-		char, size := utf8.DecodeRuneInString(codeboxText[i:])
-		current := codeboxStart + i
-		next := current + size
-		i += size
-
-		if char == '\n' {
-			if line != codeboxEndLine {
-				lineIndentCalculated = false
-				lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
-				lastNonSpaceByteIndex = -1
-				line++
-			}
-			continue
-		}
-
-		if !lineIndentCalculated && !unicode.IsSpace(char) {
-			lineIndentCalculated = true
-			lineStarts[line-codeboxStartLine] = current - int(lineMap[line])
-			indentSize = min(indentSize, lineStarts[line-codeboxStartLine])
-		}
-
-		if lineIndentCalculated && !unicode.IsSpace(char) {
-			lastNonSpaceByteIndex = next
-		}
-	}
-	if line == codeboxEndLine {
-		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
-	}
-	// If no non-space content was seen anywhere in the codebox,
-	// `indentSize` was never updated from the math.MaxInt sentinel.
-	// Clamping to 0 prevents `lineMap[line] + indentSize` from overflowing
-	// int in the render loop below (which would wrap to a large negative
-	// number and slice out of bounds).
-	if indentSize == math.MaxInt {
-		indentSize = 0
-	}
-
-	diagnosticHighlightActive := false
-	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
-	// Fold when codebox spans 5+ lines: show first 2 + "..." + last 2 (same as tsc)
-	shouldFold := codeboxEndLine-codeboxStartLine >= 4
-
-	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
-		// Fold: skip middle lines, show first 2 and last 2
-		if shouldFold && codeboxStartLine+1 < line && line < codeboxEndLine-1 {
-			w.WriteString("  ")
-			w.WriteString(colors.BorderText("│ "))
-			foldDots := strings.Repeat(".", len(lastLineNumber))
-			w.WriteString(colors.DimText("%s", foldDots))
-			w.WriteString(colors.BorderText(" │"))
-			w.WriteByte('\n')
-
-			line = codeboxEndLine - 1
-			// Update highlight state for the jumped-to line
-			diagnosticHighlightActive = diagnosticStart < int(lineMap[line]) && diagnosticEnd >= int(lineMap[line])
-			// Fall through to render this line
-		}
-
-		w.WriteString("  ")
-		w.WriteString(colors.BorderText("│ "))
-		if line == codeboxEndLine {
-			w.WriteString(colors.DimText("%s", lastLineNumber))
-		} else {
-			number := strconv.Itoa(line + 1)
-			if len(number) < len(lastLineNumber) {
-				w.WriteByte(' ')
-			}
-			w.WriteString(colors.DimText("%s", number))
-		}
-		w.WriteString(colors.BorderText(" │"))
-		w.WriteString("  ")
-
-		lineTextStart := int(lineMap[line]) + indentSize
-		underlineStart := max(lineTextStart, int(lineMap[line])+lineStarts[line-codeboxStartLine])
-		underlineEnd := underlineStart
-		lineTextEnd := max(int(lineMap[line])+lineEnds[line-codeboxStartLine], lineTextStart)
-
-		if diagnosticHighlightActive {
-			underlineEnd = lineTextEnd
-		} else if int(lineMap[line]) <= diagnosticStart && (line == len(lineMap)-1 || diagnosticStart < int(lineMap[line+1])) {
-			underlineStart = min(max(lineTextStart, diagnosticStart), lineTextEnd)
-			underlineEnd = lineTextEnd
-			diagnosticHighlightActive = true
-		}
-		if int(lineMap[line]) <= diagnosticEnd && (line == len(lineMap)-1 || diagnosticEnd < int(lineMap[line+1])) {
-			underlineEnd = min(max(underlineStart, diagnosticEnd), lineTextEnd)
-			diagnosticHighlightActive = false
-		}
-
-		if underlineStart != underlineEnd {
-			w.WriteString(text[lineTextStart:underlineStart])
-			w.WriteString(severityColor("%s", text[underlineStart:underlineEnd]))
-			w.WriteString(text[underlineEnd:lineTextEnd])
-		} else if lineTextStart != lineTextEnd {
-			w.WriteString(text[lineTextStart:lineTextEnd])
-		}
-
-		w.WriteByte('\n')
-	}
-	w.WriteString("  ")
-	w.WriteString(colors.BorderText("╰────────────────────────────────"))
-	w.WriteString("\n\n")
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -690,7 +154,7 @@ func deduplicateTypeScriptDiagnostics(
 		callerTargetByCanonicalPath = preferredCallerTargets[0]
 	}
 	if len(diags) == 1 {
-		if strings.HasPrefix(diags[0].RuleName, "TypeScript(TS") {
+		if diags[0].Origin == rule.DiagnosticOriginTypeScript {
 			canonicalID := canonicalFilesystemPathID(diags[0].FilePath, fsys)
 			if callerTarget := callerTargetByCanonicalPath[canonicalID]; callerTarget != "" {
 				diags[0].FilePath = callerTarget
@@ -701,7 +165,7 @@ func deduplicateTypeScriptDiagnostics(
 	bestIndex := make(map[typeScriptDiagnosticDedupeKey]int)
 	keys := make([]typeScriptDiagnosticDedupeKey, len(diags))
 	for i, diagnostic := range diags {
-		if !strings.HasPrefix(diagnostic.RuleName, "TypeScript(TS") {
+		if diagnostic.Origin != rule.DiagnosticOriginTypeScript {
 			continue
 		}
 		key := typeScriptDiagnosticDedupeKey{
@@ -720,7 +184,7 @@ func deduplicateTypeScriptDiagnostics(
 
 	result := diags[:0]
 	for i, diagnostic := range diags {
-		if !strings.HasPrefix(diagnostic.RuleName, "TypeScript(TS") {
+		if diagnostic.Origin != rule.DiagnosticOriginTypeScript {
 			result = append(result, diagnostic)
 			continue
 		}
@@ -1066,23 +530,28 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	traceOut := args.TraceOut
 	cpuprofOut := args.CpuprofOut
 	singleThreaded := args.SingleThreaded
-	format := args.Format
 	quiet := args.Quiet
 	maxWarnings := args.MaxWarnings
 	startTimeMs := args.StartTimeMs
 	ruleFlags := args.RuleFlags
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
+	format := output.FormatDefault
+	if !init {
+		var formatErr error
+		format, formatErr = output.ParseFormat(args.Format)
+		if formatErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", formatErr)
+			return 2
+		}
+	}
 
-	// The single color decision for the whole run. It unconditionally
-	// overwrites fatih/color's package-init value, whose isatty component
-	// keyed off the Go process's own stdout — an IPC pipe in every native
-	// lint run, never the user's terminal (its NO_COLOR/TERM components are
-	// re-derived in the tiers below). Nothing after this line mutates
-	// color.NoColor.
+	// Resolve color against the real output destination. In native CLI runs
+	// the Go process writes to an IPC pipe, so the Node host supplies the TTY
+	// fact for the stdout that ultimately receives forwarded output frames.
 	forceColorEnv, forceColorEnvSet := os.LookupEnv("FORCE_COLOR")
 	_, noColorEnvSet := os.LookupEnv("NO_COLOR")
-	color.NoColor = !term.ResolveColorEnabled(term.ColorInputs{
+	colorEnabled := term.ResolveColorEnabled(term.ColorInputs{
 		NoColorFlag:      args.NoColor,
 		ForceColorFlag:   args.ForceColor,
 		ForceColorEnv:    forceColorEnv,
@@ -1695,168 +1164,64 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
 	})
 
-	// Phase 3: Print diagnostics and count errors/warnings.
-	// allDiags contains: original diagnostics (no fix), or remaining after fix.
-	errorsCount := 0
-	warningsCount := 0
-	typeErrorsCount := 0
-	{
-		w := bufio.NewWriterSize(os.Stdout, 4096*100)
-		var gitlabState *gitlabReportState
-		if format == "gitlab" {
-			gitlabState = newGitlabReportState()
-		}
-		for i, d := range allDiags {
-			switch d.Severity {
-			case rule.SeverityError:
-				errorsCount++
-				if typeCheck && strings.HasPrefix(d.RuleName, "TypeScript(") {
-					typeErrorsCount++
-				}
-			case rule.SeverityWarning:
-				warningsCount++
-			}
+	// Phase 3: Build one report from the final post-fix diagnostics, then let
+	// the CLI output subsystem own format dispatch, colors, and summary text.
+	mode := output.ModeLint
+	if typeCheckOnly {
+		mode = output.ModeTypeCheckOnly
+	} else if typeCheck {
+		mode = output.ModeLintAndTypeCheck
+	}
 
-			if i == 0 {
-				w.WriteByte('\n')
-			}
-			// Only print Error message when quiet is true
-			if quiet && d.Severity != rule.SeverityError {
+	typeCheckedFileCount := 0
+	if typeCheck {
+		// Count non-skipped Program root files (tsconfig include/files), not
+		// transitive declarations, for every summary that includes type-check.
+		seen := make(map[string]struct{})
+		for i, prog := range programs {
+			if i < len(skipTypeCheck) && skipTypeCheck[i] {
 				continue
 			}
-			printDiagnostic(d, w, comparePathOptions, format, gitlabState)
-			if w.Available() < 4096 {
-				w.Flush()
+			for _, fileName := range prog.CommandLine().FileNames() {
+				seen[fileName] = struct{}{}
 			}
 		}
-		if gitlabState != nil {
-			gitlabState.finish(w)
-		}
-		w.Flush()
+		typeCheckedFileCount = len(seen)
 	}
 
-	lintErrorsCount := errorsCount - typeErrorsCount
-
-	colors := setupColors()
-	var errorsColorFunc func(string, ...interface{}) string
-	if errorsCount == 0 {
-		errorsColorFunc = colors.SuccessText
-	} else {
-		errorsColorFunc = colors.ErrorText
-	}
-
-	var warningsColorFunc func(string, ...interface{}) string
-	if warningsCount == 0 {
-		warningsColorFunc = colors.SuccessText
-	} else {
-		warningsColorFunc = colors.WarnText
-	}
-
-	warningsText := pluralize(warningsCount, "warning", "warnings")
-	filesText := pluralize(int(lintedfileCount), "file", "files")
-	rulesCount := len(lintResult.ExecutedRules)
-	rulesText := pluralize(rulesCount, "rule", "rules")
 	threadsCount := 1
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
-	if format == "default" {
-		// Build the errors summary part.
-		// When type-check is enabled and there are type errors, split the display.
-		var errorsSummary string
-		switch {
-		case typeCheckOnly:
-			// Lint phase was skipped; only type errors are possible.
-			errorsSummary = fmt.Sprintf("%s %s",
-				errorsColorFunc("%d", typeErrorsCount),
-				pluralize(typeErrorsCount, "type error", "type errors"),
-			)
-		case typeCheck:
-			errorsSummary = fmt.Sprintf("%s %s, %s %s",
-				errorsColorFunc("%d", lintErrorsCount),
-				pluralize(lintErrorsCount, "lint error", "lint errors"),
-				errorsColorFunc("%d", typeErrorsCount),
-				pluralize(typeErrorsCount, "type error", "type errors"),
-			)
-		default:
-			errorsSummary = fmt.Sprintf("%s %s",
-				errorsColorFunc("%d", errorsCount),
-				pluralize(errorsCount, "error", "errors"),
-			)
-		}
 
-		if typeCheckOnly {
-			// type-check-only: omit lint-file/rule/warning columns since no
-			// lint ran. Report the type-checked file count derived from
-			// non-skipped programs' root files (tsconfig include/files);
-			// transitive .d.ts imports are excluded for user readability.
-			seen := make(map[string]struct{})
-			for i, prog := range programs {
-				if i < len(skipTypeCheck) && skipTypeCheck[i] {
-					continue
-				}
-				for _, fn := range prog.CommandLine().FileNames() {
-					seen[fn] = struct{}{}
-				}
-			}
-			typeCheckedFileCount := len(seen)
-			fmt.Fprintf(
-				os.Stdout,
-				"Found %s %s(type-checked %s %s in %s using %s threads)%s\n",
-				errorsSummary,
-				colors.DimText(""),
-				colors.BoldText("%d", typeCheckedFileCount),
-				pluralize(typeCheckedFileCount, "file", "files"),
-				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-				colors.BoldText("%d", threadsCount),
-				colors.Reset,
-			)
-		} else if fix && fixedCount > 0 {
-			fixText := pluralize(fixedCount, "issue", "issues")
-			fmt.Fprintf(
-				os.Stdout,
-				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads, fixed %s %s)%s\n",
-				errorsSummary,
-				warningsColorFunc("%d", warningsCount),
-				warningsText,
-				colors.DimText(""),
-				colors.BoldText("%d", lintedfileCount),
-				filesText,
-				colors.BoldText("%d", rulesCount),
-				rulesText,
-				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-				colors.BoldText("%d", threadsCount),
-				colors.SuccessText("%d", fixedCount),
-				fixText,
-				colors.Reset,
-			)
-		} else {
-			fmt.Fprintf(
-				os.Stdout,
-				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads)%s\n",
-				errorsSummary,
-				warningsColorFunc("%d", warningsCount),
-				warningsText,
-				colors.DimText(""),
-				colors.BoldText("%d", lintedfileCount),
-				filesText,
-				colors.BoldText("%d", rulesCount),
-				rulesText,
-				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-				colors.BoldText("%d", threadsCount),
-				colors.Reset,
-			)
-		}
+	report := output.NewReport(allDiags, output.Metadata{
+		Mode:             mode,
+		LintedFiles:      int(lintedfileCount),
+		TypeCheckedFiles: typeCheckedFileCount,
+		Rules:            len(lintResult.ExecutedRules),
+		Threads:          threadsCount,
+		FixedIssues:      fixedCount,
+		StartedAt:        timeBefore,
+	})
+	if err := output.Render(os.Stdout, report, output.Options{
+		Format:       format,
+		ComparePaths: comparePathOptions,
+		Quiet:        quiet,
+		ColorEnabled: colorEnabled,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
+		return 1
 	}
+	counts := report.Counts()
 
-	tooManyWarnings := maxWarnings >= 0 && warningsCount > maxWarnings
+	tooManyWarnings := maxWarnings >= 0 && counts.Warnings > maxWarnings
 
-	if errorsCount == 0 && tooManyWarnings {
+	if counts.Errors == 0 && tooManyWarnings {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
 
 	// Exit with non-zero status code if errors were found
-	if errorsCount > 0 || tooManyWarnings {
+	if counts.Errors > 0 || tooManyWarnings {
 		return 1
 	}
 	return 0

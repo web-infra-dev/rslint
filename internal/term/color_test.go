@@ -4,9 +4,8 @@ import "testing"
 
 // TestResolveColorEnabled pins every precedence tier and the tier-vs-tier
 // orderings that differ from the pre-refactor behavior. Inputs are fully
-// explicit per case — no t.Setenv, no process env reads, no mutation of
-// fatih/color globals (writing color.NoColor from a test poisons other tests
-// in the same binary).
+// explicit per case — no t.Setenv calls, process-environment reads, or
+// formatter globals.
 func TestResolveColorEnabled(t *testing.T) {
 	t.Parallel()
 

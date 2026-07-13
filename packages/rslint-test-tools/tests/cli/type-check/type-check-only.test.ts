@@ -115,9 +115,16 @@ describe('--type-check-only basic', () => {
       'a.ts': 'export const ok = 1;\n',
     });
     try {
-      const r = await runRslint(['--type-check-only'], tempDir);
+      const r = await runRslint(
+        ['--type-check-only', '--singleThreaded'],
+        tempDir,
+      );
       expect(r.stdout).toContain('type-checked');
       expect(r.stdout).toContain('type error');
+      expect(r.stdout).toMatch(
+        /Found 0 type errors \(type-checked 1 file in .+ using 1 thread\)\n/,
+      );
+      expect(r.stdout).not.toContain('using 1 threads');
       // The summary line owns "linted N files"; --type-check-only uses a
       // different summary so this phrasing should NOT appear.
       expect(r.stdout).not.toContain('linted');
@@ -254,6 +261,15 @@ describe('--type-check (non-only) does not short-circuit on Phase 2 diagnostics'
       // (non-only) mode — only --type-check-only suppresses it.
       expect(r.stderr).toContain('nonexistent.ts');
       expect(r.stderr).toContain('was not found');
+
+      const summary = await runRslint(
+        ['--type-check', '--singleThreaded', 'nonexistent.ts'],
+        tempDir,
+      );
+      expect(summary.stdout).toMatch(
+        /Found 0 lint errors, 1 type error and 0 warnings \(linted 0 files with 0 rules, type-checked 1 file in .+ using 1 thread\)\n/,
+      );
+      expect(summary.stdout).not.toContain('using 1 threads');
     } finally {
       await cleanupTempDir(tempDir);
     }

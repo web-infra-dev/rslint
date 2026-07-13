@@ -22,9 +22,9 @@ interface Diagnostic {
 /**
  * Run rslint --type-check twice: once with --format jsonline for exact
  * per-file diagnostic parsing, once with the default format for the summary
- * line ("linted N files"). The default format does not emit structured
- * diagnostics, and jsonline suppresses the summary, so both runs are needed
- * for precise assertions.
+ * line ("linted N files, type-checked M files"). The default format does not
+ * emit structured diagnostics, and jsonline suppresses the summary, so both
+ * runs are needed for precise assertions.
  */
 async function lintTypeCheck(
   tempDir: string,
@@ -32,6 +32,7 @@ async function lintTypeCheck(
 ): Promise<{
   diagnostics: Diagnostic[];
   lintedFileCount: number;
+  typeCheckedFileCount: number;
   exitCode: number;
 }> {
   const jsonRun = await runRslint(
@@ -47,15 +48,17 @@ async function lintTypeCheck(
   const summaryRun = await runRslint(['--type-check', ...extraArgs], tempDir);
   const combined = `${summaryRun.stdout}\n${summaryRun.stderr}`;
   const countMatch = combined.match(/linted (\d+) files?/);
-  if (!countMatch) {
+  const typeCheckedCountMatch = combined.match(/type-checked (\d+) files?/);
+  if (!countMatch || !typeCheckedCountMatch) {
     throw new Error(
-      `Could not parse linted-file count from summary output:\nSTDOUT:\n${summaryRun.stdout}\nSTDERR:\n${summaryRun.stderr}`,
+      `Could not parse file counts from summary output:\nSTDOUT:\n${summaryRun.stdout}\nSTDERR:\n${summaryRun.stderr}`,
     );
   }
 
   return {
     diagnostics,
     lintedFileCount: parseInt(countMatch[1]!, 10),
+    typeCheckedFileCount: parseInt(typeCheckedCountMatch[1]!, 10),
     exitCode: jsonRun.exitCode,
   };
 }
@@ -110,6 +113,9 @@ describe('--type-check + config ignores', () => {
       // LintedFileCount counts the lint-rule pass only — ignored files do
       // not contribute. The targets are src/bad.ts and rslint.config.mjs.
       expect(r.lintedFileCount).toBe(2);
+      // TypeCheckedFileCount follows the tsconfig roots, so both TypeScript
+      // files contribute even though one is ignored by the lint phase.
+      expect(r.typeCheckedFileCount).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }

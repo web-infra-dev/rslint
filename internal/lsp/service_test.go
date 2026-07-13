@@ -2421,6 +2421,9 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	if len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
 		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Diagnostics)
 	}
+	if result.Diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
+		t.Fatalf("TypeScript syntax diagnostic has wrong origin: %+v", result.Diagnostics[0])
+	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.RuleName == "no-debugger" {
 			t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
