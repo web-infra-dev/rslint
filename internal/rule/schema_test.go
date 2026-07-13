@@ -390,18 +390,17 @@ func TestValidateFillsTrailingItemCreatesGapWhenEarlierItemHasNoDefault(t *testi
 	}
 }
 
-func TestValidateDefaultsShareStorageAcrossCalls(t *testing.T) {
-	// Deliberate trade-off: applyDefaults inserts the schema's compiled
-	// Default directly rather than deep-copying it, so a compound (map/slice)
-	// default is the *same* underlying value across every call to Validate on
-	// this schema. Mutating one call's result in place can affect another's.
-	// This documents that behavior so it isn't mistaken for a bug later.
+func TestValidateDefaultsDoNotShareStorageAcrossCalls(t *testing.T) {
+	// A compound (map/slice) default must be deep-copied before insertion:
+	// two calls to Validate on the same schema (e.g. from concurrent
+	// goroutines validating distinct options for the same rule) must never
+	// see or mutate each other's copy of the default. Regression test for a
+	// concurrent-map-write crash/data race caused by inserting the schema's
+	// literal default directly instead of a copy.
 	//
 	// A map is used here (rather than a slice) because mutating it via key
-	// assignment always mutates the shared storage directly; a slice default
-	// would only demonstrate this if grown by index-assignment rather than
-	// append, since append past a zero-capacity empty-slice default happens
-	// to reallocate.
+	// assignment always mutates shared storage directly, unlike a slice
+	// grown by append, which can reallocate past a zero-capacity default.
 	schema := NewSchema([]byte(`{
 		"type": "array",
 		"items": [
@@ -428,9 +427,53 @@ func TestValidateDefaultsShareStorageAcrossCalls(t *testing.T) {
 		t.Fatalf("expected valid options, got error: %v", err)
 	}
 	secondConfig := second[0].(map[string]any)["config"].(map[string]any)
-	if mutated, ok := secondConfig["mutated"]; !ok || mutated != true {
-		t.Errorf("expected second call's default to share storage with the first call's mutation, got %#v", secondConfig)
+	if _, ok := secondConfig["mutated"]; ok {
+		t.Errorf("expected second call's default to be independent of the first call's mutation, got %#v", secondConfig)
 	}
+}
+
+func TestValidateConcurrentCompoundDefaultsDoNotRace(t *testing.T) {
+	// Regression test for the crash reported against this schema: many
+	// goroutines validating distinct options concurrently against a schema
+	// with an object-typed default, previously hitting "fatal error:
+	// concurrent map writes" (and, under -race, a reported data race) inside
+	// applyDefaults -> normalizeNumbers because the compound default was
+	// inserted by reference instead of copied.
+	schema := NewSchema([]byte(`{
+		"type": "array",
+		"items": [
+			{
+				"type": "object",
+				"properties": {
+					"config": {
+						"type": "object",
+						"properties": {
+							"level": { "type": "number", "default": 1 }
+						},
+						"default": {}
+					}
+				},
+				"additionalProperties": false
+			}
+		],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+
+	var wg sync.WaitGroup
+	for i := range 64 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			options := []any{map[string]any{}}
+			if err := schema.Validate(options); err != nil {
+				t.Errorf("expected valid options, got error: %v", err)
+			}
+			config := options[0].(map[string]any)["config"].(map[string]any)
+			config["level"] = float64(i) // mutate this call's own copy
+		}(i)
+	}
+	wg.Wait()
 }
 
 func TestValidateHandlesCyclicPureRefWithoutHanging(t *testing.T) {

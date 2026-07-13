@@ -193,6 +193,15 @@ func compileSchemaJSON(rawJSON []byte) (*jsonschema.Schema, any, error) {
 // nested call's own useDefaults processing lands directly in the shared data
 // being validated here.
 //
+// A compound (map/slice) literalDefault is always run through [deepCopyJSON]
+// before it's inserted: the value literalDefault returns is owned by s — the
+// compiled *jsonschema.Schema, shared by every Validate call and every rule
+// that reuses the same Schema (e.g. [EmptyArraySchema]) — so inserting it
+// directly would let this call's own recursion into the newly filled slot
+// (or any later mutation of the validated options) mutate that shared value,
+// racing with any other concurrent Validate call that inserts the same
+// default.
+//
 // For objects, every `allOf` branch's own `properties` also contributes at
 // this level (see [defaultSources]): unlike `anyOf`/`oneOf`/`not`, `allOf`
 // has no ambiguity about which branch(es) apply — all of them must hold —
@@ -215,7 +224,7 @@ func applyDefaults(s *jsonschema.Schema, v any, doc any) any {
 					if !ok {
 						continue
 					}
-					val[key] = normalizeNumbers(def)
+					val[key] = normalizeNumbers(deepCopyJSON(def))
 				}
 				val[key] = applyDefaults(prop, val[key], doc)
 			}
@@ -249,7 +258,7 @@ func applyDefaults(s *jsonschema.Schema, v any, doc any) any {
 				for len(val) < i {
 					val = append(val, nil) // pad any not-yet-visited gap up to i
 				}
-				val = append(val, applyDefaults(item, normalizeNumbers(def), doc))
+				val = append(val, applyDefaults(item, normalizeNumbers(deepCopyJSON(def)), doc))
 			}
 		case *jsonschema.Schema:
 			// List-style items: the same schema governs every element, so
@@ -454,6 +463,41 @@ func (r jsRegexp) String() string {
 
 func (r jsRegexp) MatchString(s string) bool {
 	return utils.Regexp2MatchString(r.re, s)
+}
+
+// deepCopyJSON returns a copy of v in which every nested map[string]any and
+// []any is freshly allocated, so mutating the result can never reach v
+// itself. v is always either decoded JSON (map[string]any/[]any/string/
+// bool/json.Number/nil) or, for *s.Default, a value produced by unmarshaling
+// the schema's own JSON — never a struct or pointer type that would need
+// special handling.
+//
+// applyDefaults must call this on every literalDefault before inserting it
+// into the options being validated: literalDefault's result — s.Default or a
+// value looked up from doc — is owned by the *Schema, which many goroutines
+// share (every rule that reuses a schema, e.g. [EmptyArraySchema], and every
+// concurrent Validate call on the same rule's schema). Inserting it directly
+// would let one goroutine's applyDefaults recursion (or a later mutation of
+// the validated options) write into a map/slice another goroutine is
+// simultaneously reading or writing — a data race, and for a map a possible
+// fatal concurrent-map-write crash.
+func deepCopyJSON(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, v2 := range val {
+			out[k] = deepCopyJSON(v2)
+		}
+		return out
+	case []any:
+		out := make([]any, len(val))
+		for i, v2 := range val {
+			out[i] = deepCopyJSON(v2)
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 // normalizeNumbers mutates v in place, converting any json.Number leaves to
