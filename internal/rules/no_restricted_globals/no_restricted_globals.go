@@ -25,22 +25,7 @@ type options struct {
 	globalObjects     map[string]bool
 }
 
-// normalizeOptionsList mirrors ESLint's `context.options`: rslint's config
-// loader unwraps a single non-array option to a bare value (string or map),
-// so this restores the array shape ESLint's rule body assumes.
-func normalizeOptionsList(opts any) []interface{} {
-	if opts == nil {
-		return nil
-	}
-	if list, ok := opts.([]interface{}); ok {
-		return list
-	}
-	return []interface{}{opts}
-}
-
-func parseOptions(opts any) options {
-	optionsList := normalizeOptionsList(opts)
-
+func parseOptions(optionsList []any) options {
 	isGlobalsObject := false
 	var globalsObjectMap map[string]interface{}
 	if len(optionsList) > 0 {
@@ -108,8 +93,8 @@ func parseOptions(opts any) options {
 
 var NoRestrictedGlobalsRule = rule.Rule{
 	Name: "no-restricted-globals",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
-		opts := parseOptions(rawOptions)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// If no globals are restricted, there's nothing to check.
 		if len(opts.restrictedGlobals) == 0 {
@@ -140,14 +125,12 @@ var NoRestrictedGlobalsRule = rule.Rule{
 
 				// Direct reference to a restricted global identifier.
 				//
-				// NOTE: Unlike ESLint, rslint does not model `languageOptions.globals` /
-				// environment configuration, so we can't distinguish "declared by an
-				// environment/global comment" from "genuinely undeclared" — any
-				// identifier that isn't locally shadowed is treated as a reference to
-				// the global. This is a superset of ESLint's behavior for this branch:
-				// ESLint's own logic doesn't require the name to be a *recognized*
-				// global here either (both its "declared elsewhere" and "through"
-				// branches only require "resolves to global scope"), so this matches.
+				// NOTE: ESLint reports both its "declared elsewhere" and "through"
+				// branches — each only requires that the reference resolves to
+				// global scope, never that the name is a *recognized* global. So a
+				// `languageOptions.globals` entry (ctx.Globals), including `off`,
+				// cannot suppress this rule, and "not locally shadowed" is the
+				// only check needed here.
 				if _, restricted := opts.restrictedGlobals[name]; restricted &&
 					!isInTypeContext(node) && !utils.IsShadowed(node, name) {
 					report(node, name)
