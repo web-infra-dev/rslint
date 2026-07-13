@@ -245,6 +245,10 @@ func TestNoGlobalAssignRule(t *testing.T) {
 
 			// Var with computed property destructuring shadows
 			{Code: `const k = "x"; var {[k]: Object}: any = {}; Object = 1;`},
+
+			// Config `off` un-declares the builtin
+			{Code: `Object = 1;`, Globals: map[string]bool{"Object": false}},
+			{Code: `String = 'test';`, Globals: map[string]bool{"String": false}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{

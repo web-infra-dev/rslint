@@ -289,6 +289,14 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			//   "execScript('code');"               { globals: {} }
 			//   "window.setTimeout('code');"        { globals: {} }
 			//   "self.setTimeout('code');"          { globals: {} }
+
+			// Config `off` un-declares the builtin
+			{Code: `setTimeout("x = 1;");`, Globals: map[string]bool{"setTimeout": false}},
+			{Code: `setInterval("x = 1;");`, Globals: map[string]bool{"setInterval": false}},
+			{Code: `execScript("x = 1;");`, Globals: map[string]bool{"execScript": false}},
+			{Code: `window.setTimeout("x = 1;");`, Globals: map[string]bool{"window": false}},
+			{Code: `globalThis.setTimeout("x = 1;");`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `self.setTimeout("x = 1;");`, Globals: map[string]bool{"self": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Direct calls with string literal ----

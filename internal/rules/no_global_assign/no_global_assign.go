@@ -60,6 +60,10 @@ var NoGlobalAssignRule = rule.Rule{
 					return
 				}
 
+				if declared, ok := ctx.Globals[name]; ok && !declared {
+					return
+				}
+
 				if !utils.IsWriteReference(node) {
 					return
 				}
