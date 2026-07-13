@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -62,6 +63,9 @@ func parseOptions(optionsList []any) options {
 	for _, item := range rawGlobals {
 		switch v := item.(type) {
 		case string:
+			if v == "" {
+				continue
+			}
 			restrictedGlobals[v] = globalEntry{}
 		case map[string]interface{}:
 			name, _ := v["name"].(string)
@@ -246,7 +250,34 @@ func shouldSkip(node *ast.Node) bool {
 		return true
 	}
 
+	// Skip lowercase/hyphenated JSX tag names (`<foo />`, `<foo-bar />`):
+	// these name an intrinsic HTML element, not a variable reference, and
+	// are never added as a scope reference. A capitalized tag name (`<Foo />`)
+	// *is* a reference to a component variable and must not be skipped.
+	if isJsxIntrinsicTagName(node, parent) {
+		return true
+	}
+
 	return false
+}
+
+// isJsxIntrinsicTagName reports whether node is the bare-identifier tag name
+// of a JSX opening/self-closing/closing element that names an intrinsic
+// element (lowercase first letter, or containing a hyphen) rather than a
+// component reference.
+func isJsxIntrinsicTagName(node *ast.Node, parent *ast.Node) bool {
+	var tagName *ast.Node
+	switch parent.Kind {
+	case ast.KindJsxOpeningElement:
+		tagName = parent.AsJsxOpeningElement().TagName
+	case ast.KindJsxSelfClosingElement:
+		tagName = parent.AsJsxSelfClosingElement().TagName
+	case ast.KindJsxClosingElement:
+		tagName = parent.AsJsxClosingElement().TagName
+	default:
+		return false
+	}
+	return tagName == node && scanner.IsIntrinsicJsxName(node.Text())
 }
 
 // isInTypeContext mirrors ESLint's TYPE_NODES check: a restricted-global

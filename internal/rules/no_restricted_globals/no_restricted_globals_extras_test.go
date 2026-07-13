@@ -94,6 +94,36 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{Code: `window.bar()`, Options: map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
 			// ---- Options coverage: nil options is a safe no-op ----
 			{Code: `foo`, Options: nil},
+
+			// ---- #1268: all case/default clauses of a switch share one
+			// CaseBlock scope, so a `let` in a later clause shadows a
+			// reference to the same name in an earlier clause. ----
+			{
+				Code:    `switch (x) { case 0: foo; break; case 1: let foo; }`,
+				Options: []interface{}{"foo"},
+			},
+
+			// ---- #1268: a lowercase/hyphenated JSX tag name (`<foo />`)
+			// names an intrinsic element, not a variable reference — it must
+			// not be checked even when "foo" is restricted. ----
+			{
+				Code:    `const element = <foo />;`,
+				Options: []interface{}{"foo"},
+				Tsx:     true,
+			},
+			{
+				Code:    `const element = <foo-bar></foo-bar>;`,
+				Options: []interface{}{"foo-bar"},
+				Tsx:     true,
+			},
+
+			// ---- #1268: an empty-string entry in `globals` is not a valid
+			// identifier and must be filtered out rather than restricting the
+			// empty property name. ----
+			{
+				Code:    `window[""];`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{""}, "checkGlobalObject": true}},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized global-object receiver ----
@@ -211,6 +241,34 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Code:    `window.foo()`,
 				Options: map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}},
+			},
+
+			// ---- #1268: a default parameter value is evaluated in the
+			// parameter environment, which is a *parent* of the function
+			// body's variable environment — a `var` in the body does not
+			// shadow a reference in a default value. ----
+			{
+				Code:    `function f(a = foo) { var foo; }`,
+				Options: []interface{}{"foo"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 16, EndLine: 1, EndColumn: 19}},
+			},
+
+			// ---- #1268: a capitalized JSX tag name is a real reference to a
+			// component variable and must still be checked. ----
+			{
+				Code:    `const el = <Foo />;`,
+				Options: []interface{}{"Foo"},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 13, EndLine: 1, EndColumn: 16}},
+			},
+
+			// ---- #1268: BigInt computed keys beyond int64 range must still
+			// normalize to their full decimal string, not silently degrade to
+			// raw literal text. ----
+			{
+				Code:    `window[0x10000000000000000n]()`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"18446744073709551616"}, "checkGlobalObject": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}},
 			},
 		},
 	)

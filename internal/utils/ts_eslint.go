@@ -1404,13 +1404,15 @@ func NormalizeNumericLiteral(text string) string {
 // NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
 // representation, matching ESLint's String(node.value) behavior.
 // e.g., "1n" -> "1", "0x1n" -> "1", "0o1n" -> "1", "0b1n" -> "1"
+//
+// Uses big.Int (not strconv.ParseInt) since BigInt literals are arbitrary
+// precision and routinely exceed int64, e.g. 0x10000000000000000n (2^64).
 func NormalizeBigIntLiteral(text string) string {
 	s := strings.TrimSuffix(text, "n")
-	i, err := strconv.ParseInt(s, 0, 64)
-	if err != nil {
-		return s
+	if n, ok := new(big.Int).SetString(s, 0); ok {
+		return n.String()
 	}
-	return strconv.FormatInt(i, 10)
+	return s
 }
 
 // GetStaticExpressionValue returns the static string value of a literal expression,

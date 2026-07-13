@@ -23,6 +23,7 @@ import (
 // they reached the declaration site. For scope walks that should also examine
 // the SourceFile or module boundary, use `IsShadowed` instead.
 func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool {
+	prevChild := node
 	for current := node.Parent; current != nil && current != boundary; current = current.Parent {
 		if ast.IsFunctionLikeDeclaration(current) {
 			if HasShadowingParameter(current, name) {
@@ -33,13 +34,21 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 					return true
 				}
 			}
-			if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
-				return true
+			// See IsShadowed: a reference within the parameter list itself
+			// (e.g. a default value) is not shadowed by a body-level `var`.
+			if !isDirectParameterOf(current, prevChild) {
+				if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
+					return true
+				}
 			}
 		}
 		switch current.Kind {
 		case ast.KindBlock:
 			if HasShadowingDeclaration(current, name) {
+				return true
+			}
+		case ast.KindCaseBlock:
+			if HasShadowingDeclarationInCaseBlock(current, name) {
 				return true
 			}
 		case ast.KindCatchClause:
@@ -69,6 +78,7 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 				return true
 			}
 		}
+		prevChild = current
 	}
 	return false
 }
@@ -106,12 +116,24 @@ func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbo
 	return typeChecker.GetSymbolAtLocation(node)
 }
 
+// isDirectParameterOf reports whether child is one of fn's own Parameter
+// nodes (not merely nested somewhere inside the parameter list).
+func isDirectParameterOf(fn *ast.Node, child *ast.Node) bool {
+	for _, param := range fn.Parameters() {
+		if param == child {
+			return true
+		}
+	}
+	return false
+}
+
 // IsShadowed checks whether the given identifier name is shadowed by a local
 // declaration at the usage site. It walks from node up to the SourceFile,
 // checking every scope boundary for variable/function/class/enum/import
 // declarations, function parameters, catch variables, and hoisted var
 // declarations.
 func IsShadowed(node *ast.Node, name string) bool {
+	prevChild := node
 	current := node.Parent
 	for current != nil {
 		switch current.Kind {
@@ -129,6 +151,11 @@ func IsShadowed(node *ast.Node, name string) bool {
 
 		case ast.KindBlock:
 			if HasShadowingDeclaration(current, name) {
+				return true
+			}
+
+		case ast.KindCaseBlock:
+			if HasShadowingDeclarationInCaseBlock(current, name) {
 				return true
 			}
 
@@ -180,11 +207,18 @@ func IsShadowed(node *ast.Node, name string) bool {
 						return true
 					}
 				}
-				if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
-					return true
+				// A reference inside the parameter list itself (e.g. a default
+				// value `a = foo`) is evaluated in the parameter environment,
+				// which is a *parent* of the body's variable environment — so a
+				// `var` declared in the body does not shadow it.
+				if !isDirectParameterOf(current, prevChild) {
+					if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
+						return true
+					}
 				}
 			}
 		}
+		prevChild = current
 		current = current.Parent
 	}
 	return false
@@ -226,7 +260,44 @@ func HasShadowingDeclaration(node *ast.Node, name string) bool {
 		return false
 	}
 
-	for _, stmt := range block.Statements.Nodes {
+	return hasShadowingDeclarationInStatements(block.Statements.Nodes, name)
+}
+
+// HasShadowingDeclarationInCaseBlock checks whether any case/default clause
+// of a switch statement's CaseBlock declares name. All clauses of a switch
+// share a single lexical scope (the CaseBlock), so a `let`/`const`/class/
+// function declaration in one clause shadows references to that name in
+// every other clause of the same switch, regardless of clause order.
+func HasShadowingDeclarationInCaseBlock(node *ast.Node, name string) bool {
+	if node.Kind != ast.KindCaseBlock {
+		return false
+	}
+
+	caseBlock := node.AsCaseBlock()
+	if caseBlock == nil || caseBlock.Clauses == nil {
+		return false
+	}
+
+	for _, clause := range caseBlock.Clauses.Nodes {
+		if clause == nil {
+			continue
+		}
+		clauseData := clause.AsCaseOrDefaultClause()
+		if clauseData == nil || clauseData.Statements == nil {
+			continue
+		}
+		if hasShadowingDeclarationInStatements(clauseData.Statements.Nodes, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasShadowingDeclarationInStatements checks if a list of statements
+// (typically a Block's or switch clause's body) contains a variable,
+// function, class, enum, or namespace declaration whose name matches name.
+func hasShadowingDeclarationInStatements(statements []*ast.Node, name string) bool {
+	for _, stmt := range statements {
 		if stmt == nil {
 			continue
 		}
