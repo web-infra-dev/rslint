@@ -54,6 +54,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_boolean_cast"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_label"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_semi"
 	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
@@ -239,6 +240,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_concat.NoUselessConcatRule,
 		no_sparse_arrays.NoSparseArraysRule,
 		no_extra_boolean_cast.NoExtraBooleanCastRule,
+		no_extra_semi.NoExtraSemiRule,
 		no_unneeded_ternary.NoUnneededTernaryRule,
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
