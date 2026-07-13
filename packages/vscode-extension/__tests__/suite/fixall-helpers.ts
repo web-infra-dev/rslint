@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 
 export function getFixturesDir(): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', 'fixtures');
@@ -247,22 +248,30 @@ export async function withOnSaveFixAll(
   try {
     const config = vscode.workspace.getConfiguration('editor');
     const previousValue = config.get('codeActionsOnSave');
-    await config.update(
-      'codeActionsOnSave',
+    const configurationChanged = !isDeepStrictEqual(
+      previousValue,
       codeActionsOnSave,
-      vscode.ConfigurationTarget.Workspace,
     );
+    if (configurationChanged) {
+      await config.update(
+        'codeActionsOnSave',
+        codeActionsOnSave,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
 
     try {
       const doc = await vscode.workspace.openTextDocument(tmpFile);
       const editor = await vscode.window.showTextDocument(doc);
       await testFn(doc, editor);
     } finally {
-      await config.update(
-        'codeActionsOnSave',
-        previousValue,
-        vscode.ConfigurationTarget.Workspace,
-      );
+      if (configurationChanged) {
+        await config.update(
+          'codeActionsOnSave',
+          previousValue,
+          vscode.ConfigurationTarget.Workspace,
+        );
+      }
     }
   } finally {
     // Close the editor tab so VSCode sends a synchronous didClose to the LSP,
