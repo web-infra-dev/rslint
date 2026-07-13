@@ -152,6 +152,9 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 	if len(result.ExecutedRules) != 0 {
 		t.Errorf("expected ExecutedRules to be empty when Phase 1 is skipped, got %v", result.ExecutedRules)
 	}
+	if result.ExecutedRules == nil {
+		t.Error("expected ExecutedRules to be a writable, non-nil empty map")
+	}
 }
 
 // TestTypeCheckOnly_BaselineLintWouldFire is a sanity check: with the same

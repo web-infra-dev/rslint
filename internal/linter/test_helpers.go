@@ -110,5 +110,5 @@ func RunLinterInProgram(
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
 		OnDiagnostic:     onDiagnostic,
-	})
+	}).lintedFileCount
 }
