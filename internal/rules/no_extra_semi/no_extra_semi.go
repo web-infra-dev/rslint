@@ -60,16 +60,17 @@ func isFixable(ctx rule.RuleContext, node *ast.Node) bool {
 	}
 
 	var stmts []*ast.Node
-	if parent.Kind == ast.KindSourceFile {
+	switch parent.Kind {
+	case ast.KindSourceFile, ast.KindModuleBlock:
 		stmts = parent.Statements()
-	} else if parent.Kind == ast.KindBlock {
+	case ast.KindBlock:
 		// Only check directives in function bodies (block statements cannot have directives)
 		if parent.Parent != nil && ast.IsFunctionLike(parent.Parent) {
 			stmts = parent.Statements()
 		} else {
 			return true
 		}
-	} else {
+	default:
 		return true
 	}
 
@@ -80,14 +81,8 @@ func isFixable(ctx rule.RuleContext, node *ast.Node) bool {
 			break
 		}
 	}
-	if idx != -1 && idx < len(stmts)-1 {
-		nextStmt := stmts[idx+1]
-		if nextStmt.Kind == ast.KindExpressionStatement {
-			expr := nextStmt.AsExpressionStatement().Expression
-			if expr.Kind == ast.KindStringLiteral {
-				return false
-			}
-		}
+	if idx != -1 && idx < len(stmts)-1 && ast.IsPrologueDirective(stmts[idx+1]) {
+		return false
 	}
 	return true
 }

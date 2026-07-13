@@ -75,6 +75,14 @@ func TestNoExtraSemiExtras(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 20},
 				},
 			},
+			{
+				// Locks in: TSModuleBlock is a directive-prologue position, same as
+				// Program and function bodies, so this must not be autofixed.
+				Code: "namespace Foo { ; 'use strict'; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 17},
+				},
+			},
 		},
 	)
 }
