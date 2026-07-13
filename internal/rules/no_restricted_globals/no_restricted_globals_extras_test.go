@@ -7,11 +7,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// TestNoRestrictedGlobalsExtras locks in branches and edge shapes that the
-// upstream test suite doesn't exercise. Each case carries an inline comment
-// pointing at the specific branch / Dimension 4 row / tsgo AST quirk it
-// covers, so future refactors can't silently regress them without breaking a
-// named lock-in. Upstream migration lives in
+// TestNoRestrictedGlobalsExtras covers branches and edge cases that the
+// upstream ESLint test suite doesn't exercise. Upstream migration lives in
 // no_restricted_globals_upstream_test.go.
 func TestNoRestrictedGlobalsExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -20,11 +17,9 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 		t,
 		&NoRestrictedGlobalsRule,
 		[]rule_tester.ValidTestCase{
-			// ---- Dimension 4: parenthesized / assertion-wrapped receiver ----
 			// ESLint's own astUtils.isSpecificMemberAccess / getStaticPropertyName
-			// also don't see through TSNonNullExpression or TSAsExpression (they
-			// aren't MemberExpressions), so upstream doesn't report these either —
-			// this matches upstream, not a divergence.
+			// don't see through TSNonNullExpression or TSAsExpression (they aren't
+			// MemberExpressions), so these aren't reported either.
 			{
 				Code:    `window!.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
@@ -34,78 +29,77 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
 			},
 
-			// ---- Dimension 4: access/key forms — dynamic (non-static) computed key never matches ----
-			// Locks in the `getStaticPropertyName` falsy branch: a computed member
-			// access whose key can't be resolved statically must not report, even
-			// when the runtime value could coincide with a restricted name.
+			// A computed member access whose key can't be resolved statically must
+			// not report, even when the runtime value could coincide with a
+			// restricted name.
 			{
 				Code:    `let key = "foo"; window[key]();`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
 			},
 
-			// ---- Dimension 4: nesting — var hoists to the enclosing function only ----
+			// var hoists to the enclosing function only, not to nested functions.
 			{
 				Code:    `function outer() { var foo; function inner() { foo; } }`,
 				Options: []interface{}{"foo"},
 			},
 
-			// ---- Dimension 4: graceful degradation — rest element in a binding pattern is a declaration ----
+			// A rest element in a binding pattern declares its name, it doesn't reference it.
 			{
 				Code:    `const {...foo} = obj;`,
 				Options: []interface{}{"foo"},
 			},
 
-			// ---- Real-user: parameter shadowing in a forEach/arrow callback (the rule's canonical `event` motivation) ----
+			// Parameter shadowing in a forEach/arrow callback (the rule's canonical `event` motivation).
 			{
 				Code:    `elements.forEach((event) => { doSomething(event); });`,
 				Options: []interface{}{"event"},
 			},
-			// ---- Real-user: common restricted names collide constantly with plain object keys ----
+			// Common restricted names collide constantly with plain object keys.
 			{
 				Code:    `const config = { name: 'foo', self: 1 };`,
 				Options: []interface{}{"name", "self"},
 			},
-			// ---- Real-user: enum members commonly collide with short/common restricted names ----
+			// Enum members commonly collide with short/common restricted names.
 			{
 				Code:    `enum Test { foo, bar }`,
 				Options: []interface{}{"foo"},
 			},
 
-			// ---- Branch lock-in: restrictedGlobals.length === 0 short-circuits to a no-op ----
+			// No restricted globals configured is a no-op.
 			{
 				Code:    `foo`,
 				Options: []interface{}{},
 			},
 
-			// ---- Branch lock-in: import specifier original (module export) name is not a scope reference ----
+			// The original (module export) name in an import specifier is not a scope reference.
 			{
 				Code:    `import { foo as bar } from 'mod'; bar;`,
 				Options: []interface{}{"foo"},
 			},
-			// ---- Branch lock-in: re-export original name is not a scope reference (only real for `export ... from`) ----
+			// The original name in a re-export alias is not a scope reference (only real for `export ... from`).
 			{
 				Code:    `export { foo as bar } from 'other';`,
 				Options: []interface{}{"foo"},
 			},
 
-			// ---- Options coverage: bare (unwrapped) string, matching the CLI single-option shape ----
+			// Bare (unwrapped) string option, matching the CLI single-option shape.
 			{Code: `bar`, Options: "foo"},
-			// ---- Options coverage: bare (unwrapped) object, matching the CLI single-option shape ----
+			// Bare (unwrapped) object option, matching the CLI single-option shape.
 			{Code: `window.bar()`, Options: map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-			// ---- Options coverage: nil options is a safe no-op ----
+			// nil options is a safe no-op.
 			{Code: `foo`, Options: nil},
 
-			// ---- #1268: all case/default clauses of a switch share one
-			// CaseBlock scope, so a `let` in a later clause shadows a
-			// reference to the same name in an earlier clause. ----
+			// All case/default clauses of a switch share one CaseBlock scope, so a
+			// `let` in a later clause shadows a reference to the same name in an
+			// earlier clause.
 			{
 				Code:    `switch (x) { case 0: foo; break; case 1: let foo; }`,
 				Options: []interface{}{"foo"},
 			},
 
-			// ---- #1268: a lowercase/hyphenated JSX tag name (`<foo />`)
-			// names an intrinsic element, not a variable reference — it must
-			// not be checked even when "foo" is restricted. ----
+			// A lowercase/hyphenated JSX tag name (`<foo />`) names an intrinsic
+			// element, not a variable reference — it must not be checked even when
+			// "foo" is restricted.
 			{
 				Code:    `const element = <foo />;`,
 				Options: []interface{}{"foo"},
@@ -117,16 +111,15 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Tsx:     true,
 			},
 
-			// ---- #1268: an empty-string entry in `globals` is not a valid
-			// identifier and must be filtered out rather than restricting the
-			// empty property name. ----
+			// An empty-string entry in `globals` is not a valid identifier and must
+			// be filtered out rather than restricting the empty property name.
 			{
 				Code:    `window[""];`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{""}, "checkGlobalObject": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Dimension 4: parenthesized global-object receiver ----
+			// Parenthesized global-object receiver.
 			{
 				Code:    `(window).foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
@@ -138,7 +131,7 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 12, EndLine: 1, EndColumn: 15}},
 			},
 
-			// ---- Dimension 4: numeric / template-literal computed keys ----
+			// Numeric / template-literal computed keys.
 			{
 				Code:    `window[0]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"0"}, "checkGlobalObject": true}},
@@ -150,12 +143,9 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
 			},
 
-			// ---- Dimension 4: null/boolean/BigInt computed keys ----
 			// ESLint's astUtils.getStaticStringValue resolves `null`/`true`/`false`
 			// literals (via node.value) and BigInt literals (via node.bigint) to
 			// their string form, so `window[null]` is equivalent to `window["null"]`.
-			// Regression test for a gap found in utils.GetStaticExpressionValue,
-			// which originally only handled string/numeric/template/regex literals.
 			{
 				Code:    `window[null]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"null"}, "checkGlobalObject": true}},
@@ -177,43 +167,43 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
 			},
 
-			// ---- Dimension 4: nesting — a reference outside every declaring function is not shadowed ----
+			// A reference outside every declaring function is not shadowed.
 			{
 				Code:    `function outer() { function inner() { var foo; } } foo;`,
 				Options: []interface{}{"foo"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 52, EndLine: 1, EndColumn: 55}},
 			},
 
-			// ---- Dimension 4: graceful degradation — spread in an object literal reads the value ----
+			// Spread in an object literal reads the value.
 			{
 				Code:    `const obj = {...foo};`,
 				Options: []interface{}{"foo"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 17, EndLine: 1, EndColumn: 20}},
 			},
 
-			// ---- Branch lock-in: isInTypeContext's ExpressionWithTypeArguments case
-			// excludes class `extends` (a value context) but not `implements` /
-			// `interface extends` — upstream itself never tests the `extends`
-			// side of this distinction.
+			// isInTypeContext's ExpressionWithTypeArguments case excludes class
+			// `extends` (a value context) but not `implements` / `interface
+			// extends` — upstream itself never tests the `extends` side of this
+			// distinction.
 			{
 				Code:    `class Derived extends Test {}`,
 				Options: []interface{}{"Test"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 23, EndLine: 1, EndColumn: 27}},
 			},
 
-			// ---- Branch lock-in: last entry wins when the same name is restricted twice ----
+			// Last entry wins when the same name is restricted twice.
 			{
 				Code:    `foo`,
 				Options: []interface{}{"foo", map[string]interface{}{"name": "foo", "message": "second wins"}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "customMessage", Message: "Unexpected use of 'foo'. second wins", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
 			},
 
-			// ---- Intentional divergence: rslint doesn't model ESLint's environment/
-			// languageOptions.globals, so globalThis/self/window (and configured
-			// globalObjects) are always recognized as global-object roots when
-			// checkGlobalObject is enabled — regardless of any declared environment.
-			// See the "SKIP" cases in the upstream file's valid list and the rule
-			// doc's "Differences from ESLint" section.
+			// rslint doesn't model ESLint's environment/languageOptions.globals, so
+			// globalThis/self/window (and configured globalObjects) are always
+			// recognized as global-object roots when checkGlobalObject is enabled,
+			// regardless of any declared environment. See the "SKIP" cases in the
+			// upstream file's valid list and the rule doc's "Differences from
+			// ESLint" section.
 			{
 				Code:    `window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
@@ -230,31 +220,30 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 12, EndLine: 1, EndColumn: 15}},
 			},
 
-			// ---- Options coverage: bare (unwrapped) string matching the CLI single-option shape ----
+			// Bare (unwrapped) string option, matching the CLI single-option shape.
 			{
 				Code:    `foo`,
 				Options: "foo",
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
 			},
-			// ---- Options coverage: bare (unwrapped) object matching the CLI single-option shape ----
+			// Bare (unwrapped) object option, matching the CLI single-option shape.
 			{
 				Code:    `window.foo()`,
 				Options: map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}},
 			},
 
-			// ---- #1268: a default parameter value is evaluated in the
-			// parameter environment, which is a *parent* of the function
-			// body's variable environment — a `var` in the body does not
-			// shadow a reference in a default value. ----
+			// A default parameter value is evaluated in the parameter environment,
+			// which is a *parent* of the function body's variable environment — a
+			// `var` in the body does not shadow a reference in a default value.
 			{
 				Code:    `function f(a = foo) { var foo; }`,
 				Options: []interface{}{"foo"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 16, EndLine: 1, EndColumn: 19}},
 			},
 
-			// ---- #1268: a capitalized JSX tag name is a real reference to a
-			// component variable and must still be checked. ----
+			// A capitalized JSX tag name is a real reference to a component
+			// variable and must still be checked.
 			{
 				Code:    `const el = <Foo />;`,
 				Options: []interface{}{"Foo"},
@@ -262,9 +251,8 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 13, EndLine: 1, EndColumn: 16}},
 			},
 
-			// ---- #1268: BigInt computed keys beyond int64 range must still
-			// normalize to their full decimal string, not silently degrade to
-			// raw literal text. ----
+			// BigInt computed keys beyond int64 range must still normalize to
+			// their full decimal string, not silently degrade to raw literal text.
 			{
 				Code:    `window[0x10000000000000000n]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"18446744073709551616"}, "checkGlobalObject": true}},

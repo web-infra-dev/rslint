@@ -127,14 +127,12 @@ var NoRestrictedGlobalsRule = rule.Rule{
 				}
 				name := node.Text()
 
-				// Direct reference to a restricted global identifier.
-				//
-				// NOTE: ESLint reports both its "declared elsewhere" and "through"
-				// branches — each only requires that the reference resolves to
-				// global scope, never that the name is a *recognized* global. So a
-				// `languageOptions.globals` entry (ctx.Globals), including `off`,
-				// cannot suppress this rule, and "not locally shadowed" is the
-				// only check needed here.
+				// Direct reference to a restricted global identifier. ESLint's own
+				// "declared elsewhere" and "through" branches only require that the
+				// reference resolves to global scope, never that the name is a
+				// recognized global — so a configured global (even one set to
+				// `off`) can't suppress this rule, and "not locally shadowed" is
+				// the only check needed here.
 				if _, restricted := opts.restrictedGlobals[name]; restricted &&
 					!isInTypeContext(node) && !utils.IsShadowed(node, name) {
 					report(node, name)
