@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -171,6 +173,103 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
 	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
 
+	code, text := runCLIInitForTest(t, map[string]any{
+		"workingDirectory": dir,
+		"runtime":          map[string]any{"stdoutIsTTY": tty},
+		"configs": []map[string]any{{
+			"configDirectory": dir,
+			"entries": []map[string]any{{
+				"files":   []string{"**/*.ts"},
+				"rules":   map[string]any{"@typescript-eslint/ban-ts-comment": "error"},
+				"plugins": []string{"@typescript-eslint"},
+			}},
+		}},
+	})
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1 (one lint error)", code)
+	}
+	if !strings.Contains(text, "ban-ts-comment") {
+		t.Fatalf("no diagnostic in forwarded output — lint did not run; output: %q", text)
+	}
+	if gotANSI := strings.Contains(text, "\x1b["); gotANSI != wantANSI {
+		t.Errorf("ANSI in output = %v, want %v (stdoutIsTTY=%v); output: %q", gotANSI, wantANSI, tty, text)
+	}
+}
+
+// TestRunCLI_WorkingDirectoryAliases pins the real CLI seam that made released
+// versions silently lint zero files when launched from a symlinked cwd. Shells
+// preserve the lexical cwd in PWD, while Node reports the physical cwd in the
+// init payload. The second case also drives the payload itself through the
+// alias, covering Windows directory-junction invocation.
+func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
+	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatalf("resolve physical temp directory: %v", err)
+	}
+	realDir := filepath.Join(baseDir, "real")
+	aliasDir := filepath.Join(baseDir, "alias")
+	if err := os.Mkdir(realDir, 0o755); err != nil {
+		t.Fatalf("mkdir real working directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "index.ts"), []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write lint target: %v", err)
+	}
+	createWorkingDirectoryAlias(t, realDir, aliasDir)
+
+	for _, test := range []struct {
+		name             string
+		workingDirectory string
+	}{
+		{name: "physical payload with lexical PWD", workingDirectory: realDir},
+		{name: "lexical payload", workingDirectory: aliasDir},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Reproduce a logical shell cwd. On Unix os.Getwd may return this
+			// spelling after runCLI changes to the physical payload directory.
+			t.Setenv("PWD", aliasDir)
+			t.Setenv("NO_COLOR", "1")
+			code, text := runCLIInitForTest(t, map[string]any{
+				"workingDirectory": test.workingDirectory,
+				"configs": []map[string]any{{
+					"configDirectory": realDir,
+					"entries": []map[string]any{{
+						"files": []string{"**/*.ts"},
+						"rules": map[string]any{"no-debugger": "error"},
+					}},
+				}},
+			})
+			if code != 1 {
+				t.Fatalf("exit code = %d, want 1; output: %q", code, text)
+			}
+			if !strings.Contains(text, "no-debugger") || !strings.Contains(text, "linted 1 file") {
+				t.Fatalf("symlinked working directory did not lint index.ts exactly once; output: %q", text)
+			}
+		})
+	}
+}
+
+func createWorkingDirectoryAlias(t *testing.T, target, alias string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		// Directory symlinks can require Developer Mode or elevated privileges
+		// on Windows, so use an ordinary-user directory junction instead.
+		// cspell:ignore mklink
+		if output, err := exec.Command("cmd.exe", "/d", "/c", "mklink", "/J", alias, target).CombinedOutput(); err != nil {
+			t.Fatalf("create working-directory junction: %v\n%s", err, output)
+		}
+	} else if err := os.Symlink(target, alias); err != nil {
+		t.Fatalf("create working-directory symlink: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(alias); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove working-directory alias: %v", err)
+		}
+	})
+}
+
+func runCLIInitForTest(t *testing.T, payload any) (int, string) {
+	t.Helper()
+
 	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
 	// changes directory to the payload workingDirectory; swap in pipe ends
 	// and restore everything afterwards. t.Chdir into the current directory
@@ -227,18 +326,7 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	_, err = peer.SendRequest(ctx, kindInit, map[string]any{
-		"workingDirectory": dir,
-		"runtime":          map[string]any{"stdoutIsTTY": tty},
-		"configs": []map[string]any{{
-			"configDirectory": dir,
-			"entries": []map[string]any{{
-				"files":   []string{"**/*.ts"},
-				"rules":   map[string]any{"@typescript-eslint/ban-ts-comment": "error"},
-				"plugins": []string{"@typescript-eslint"},
-			}},
-		}},
-	})
+	_, err = peer.SendRequest(ctx, kindInit, payload)
 	if err != nil {
 		t.Fatalf("init request failed: %v", err)
 	}
@@ -255,13 +343,5 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	outMu.Lock()
 	text := out.String()
 	outMu.Unlock()
-	if code != 1 {
-		t.Errorf("exit code = %d, want 1 (one lint error)", code)
-	}
-	if !strings.Contains(text, "ban-ts-comment") {
-		t.Fatalf("no diagnostic in forwarded output — lint did not run; output: %q", text)
-	}
-	if gotANSI := strings.Contains(text, "\x1b["); gotANSI != wantANSI {
-		t.Errorf("ANSI in output = %v, want %v (stdoutIsTTY=%v); output: %q", gotANSI, wantANSI, tty, text)
-	}
+	return code, text
 }

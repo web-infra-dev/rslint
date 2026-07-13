@@ -34,6 +34,14 @@ var NoNewNativeNonconstructorRule = rule.Rule{
 					return
 				}
 
+				// A config `/* global Symbol: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `globalScope.set.get(name)` would be
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
+					return
+				}
+
 				ctx.ReportNode(callee, rule.RuleMessage{
 					Id:          "noNewNonconstructor",
 					Description: fmt.Sprintf("`%s` cannot be called as a constructor.", name),

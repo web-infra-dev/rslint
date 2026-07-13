@@ -498,6 +498,37 @@ func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testin
 	}
 }
 
+func TestHandleLint_SourceSnapshotsAreRequestScoped(t *testing.T) {
+	dir := t.TempDir()
+	virtualFile := filepath.Join(dir, "virtual.ts")
+	config := json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
+	handler := &IPCHandler{}
+
+	request := func(content string) *api.LintResponse {
+		t.Helper()
+		response, err := handler.HandleLint(api.LintRequest{
+			Config:           config,
+			ConfigDirectory:  dir,
+			WorkingDirectory: dir,
+			Files:            []string{virtualFile},
+			FileContents:     map[string]string{virtualFile: content},
+		})
+		if err != nil {
+			t.Fatalf("HandleLint returned error: %v", err)
+		}
+		return response
+	}
+
+	withDebugger := request("debugger;\n")
+	if len(withDebugger.Diagnostics) != 1 || withDebugger.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("first request did not lint its overlay content: %+v", withDebugger.Diagnostics)
+	}
+	clean := request("export const clean = true;\n")
+	if len(clean.Diagnostics) != 0 {
+		t.Fatalf("second request reused the first request's source snapshot: %+v", clean.Diagnostics)
+	}
+}
+
 func TestHandleLint_ExplicitFileEntryIgnoredIsCountedWithNoRules(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "ignored.js")

@@ -16,6 +16,14 @@ var disallowedProps = map[string]struct{}{
 	"propertyIsEnumerable": {},
 }
 
+// isGlobalOff reports whether ctx.Globals explicitly un-declares name via an
+// `off` setting (e.g. `/* global Object: off */`). A name absent from
+// ctx.Globals is not considered off.
+func isGlobalOff(ctx rule.RuleContext, name string) bool {
+	declared, ok := ctx.Globals[name]
+	return ok && !declared
+}
+
 // isAfterOptional walks the member/call chain leftward from node, returning
 // true if any link owns a `?.` token. Parentheses are unwrapped on each step
 // so a chain hidden inside `(...)` (tsgo's stand-in for ESTree's
@@ -98,9 +106,13 @@ var NoPrototypeBuiltinsRule = rule.Rule{
 					Description: fmt.Sprintf("Do not access Object.prototype method '%s' from target object.", propName),
 				}
 
-				// No suggestion when the chain may short-circuit, or when the
-				// global `Object` is shadowed and can't be referenced as-is.
-				if isAfterOptional(node) || utils.IsShadowed(node, "Object") {
+				// No suggestion when the chain may short-circuit, when the
+				// global `Object` is shadowed and can't be referenced as-is,
+				// or when a config `/* global Object: off */` /
+				// `languageOptions.globals` entry un-declares it — ESLint's
+				// `getVariableByName` would find no such variable and skip
+				// its suggestion the same way.
+				if isAfterOptional(node) || utils.IsShadowed(node, "Object") || isGlobalOff(ctx, "Object") {
 					ctx.ReportNode(reportNode, msg)
 					return
 				}

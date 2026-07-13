@@ -22,12 +22,22 @@ var NoNewSymbolRule = rule.Rule{
 				// even when Symbol is locally shadowed by let/const/function/class,
 				// due to declaration merging with lib.d.ts types. IsShadowed
 				// correctly mirrors ESLint's scope-based behavior.
-				if !utils.IsShadowed(expr, "Symbol") {
-					ctx.ReportNode(expr, rule.RuleMessage{
-						Id:          "noNewSymbol",
-						Description: "`Symbol` cannot be called as a constructor.",
-					})
+				if utils.IsShadowed(expr, "Symbol") {
+					return
 				}
+
+				// A config `/* global Symbol: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so `Symbol` no longer resolves to
+				// a known global — ESLint's `globalScope.set.get("Symbol")` would
+				// be undefined and the rule stays silent.
+				if declared, ok := ctx.Globals["Symbol"]; ok && !declared {
+					return
+				}
+
+				ctx.ReportNode(expr, rule.RuleMessage{
+					Id:          "noNewSymbol",
+					Description: "`Symbol` cannot be called as a constructor.",
+				})
 			},
 		}
 	},

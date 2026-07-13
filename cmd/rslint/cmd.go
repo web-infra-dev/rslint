@@ -1579,6 +1579,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	if fix && len(allDiags) > 0 {
 		diagnosticsByFile := groupDiagsByFile(allDiags)
 		passFixed, fixErr := applyFixPass(diagnosticsByFile)
+		// Replace the entire source generation after every write attempt and
+		// before any Program rebuild. os.WriteFile may truncate or partially
+		// mutate a file even when it ultimately returns an error, and whole-
+		// generation invalidation also covers caller/source/symlink aliases.
+		parseCache.InvalidateSourceSnapshots()
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
 			return 1
@@ -1695,6 +1700,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 
 			passFixed, fixErr := applyFixPass(groupDiagsByFile(passDiags))
+			// See the first fix pass above: invalidate before inspecting the
+			// result so a partially successful write can never feed a rebuild.
+			parseCache.InvalidateSourceSnapshots()
 			if fixErr != nil {
 				fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
 				return 1

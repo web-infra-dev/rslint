@@ -68,14 +68,23 @@ func GetStaticStringValue(node *ast.Node) string {
 // `parseInt` or `Number.parseInt` function. It mirrors ESLint's
 // astUtils.isSpecificId / isSpecificMemberAccess shape: outer parentheses and
 // optional chaining are transparent, TS-only assertion wrappers are not.
-func IsGlobalParseIntCallee(callee *ast.Node) bool {
+//
+// globals is the config-declared `languageOptions.globals` / `/* global */`
+// set (ctx.Globals); when it explicitly turns the referenced name `off`,
+// the identifier no longer resolves to a known global and this returns
+// false. Pass nil to skip that check (e.g. for callers whose upstream ESLint
+// rule doesn't consult scope at all).
+func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 	callee = ast.SkipParentheses(callee)
 	if callee == nil {
 		return false
 	}
 
 	if ast.IsIdentifier(callee) {
-		return callee.AsIdentifier().Text == "parseInt" && !IsShadowed(callee, "parseInt")
+		if callee.AsIdentifier().Text != "parseInt" || IsShadowed(callee, "parseInt") {
+			return false
+		}
+		return !isGlobalOff(globals, "parseInt")
 	}
 
 	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
@@ -84,9 +93,19 @@ func IsGlobalParseIntCallee(callee *ast.Node) bool {
 
 	obj := memberAccessObject(callee)
 	obj = ast.SkipParentheses(obj)
-	return obj != nil && ast.IsIdentifier(obj) &&
-		obj.AsIdentifier().Text == "Number" &&
-		!IsShadowed(obj, "Number")
+	if obj == nil || !ast.IsIdentifier(obj) ||
+		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
+		return false
+	}
+	return !isGlobalOff(globals, "Number")
+}
+
+// isGlobalOff reports whether globals explicitly un-declares name via an
+// `off` setting (e.g. `/* global Foo: off */`). A name absent from globals
+// is not considered off — it just falls back to the normal shadow check.
+func isGlobalOff(globals map[string]bool, name string) bool {
+	declared, ok := globals[name]
+	return ok && !declared
 }
 
 func memberAccessObject(node *ast.Node) *ast.Node {

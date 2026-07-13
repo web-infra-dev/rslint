@@ -722,8 +722,9 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	}
 	runLintRulesInProgram(runProgramOptions{
 		Program:          opts.Program,
-		Scope:            FileScope{Files: []string{opts.File}},
 		ExcludePaths:     opts.ExcludePaths,
+		TargetFiles:      []string{opts.File},
+		HasTargetFiles:   true,
 		GetRulesForFile:  getRulesForFile,
 		SyntaxErrorFiles: map[string]struct{}{},
 		// A single file is a single shard — run it on the calling goroutine

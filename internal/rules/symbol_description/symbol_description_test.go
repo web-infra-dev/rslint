@@ -117,6 +117,9 @@ func TestSymbolDescriptionRule(t *testing.T) {
 			{Code: `for (const Symbol = foo; ;) { Symbol(); }`},
 			{Code: `class C { m() { function Symbol() {} Symbol(); } }`},
 			{Code: `const f = () => { class Symbol {} return Symbol(); };`},
+
+			// ---- Config `/* global Symbol: off */` un-declares the builtin ----
+			{Code: `Symbol();`, Globals: map[string]bool{"Symbol": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- From ESLint upstream ----
@@ -380,6 +383,15 @@ func TestSymbolDescriptionRule(t *testing.T) {
 				Code: `Symbol("a"); Symbol();`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expected", Line: 1, Column: 14},
+				},
+			},
+
+			// ---- Config declares Symbol as a writable global — still the builtin. ----
+			{
+				Code:    `Symbol();`,
+				Globals: map[string]bool{"Symbol": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expected", Line: 1, Column: 1},
 				},
 			},
 		},

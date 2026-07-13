@@ -908,8 +908,10 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 		t.Fatalf("rewrite main.ts: %v", err)
 	}
 	// Production fix passes reuse the run-scoped filesystem and parse caches.
-	// ParseCache keys include the exact source text hash, so rewritten content
-	// must still produce a fresh AST and updated import graph.
+	// Replacing the source-snapshot generation before rebuilding makes the new
+	// text/hash visible while retaining content-keyed AST entries for unchanged
+	// files.
+	parseCache.InvalidateSourceSnapshots()
 	rebuilt, err := createProgramSetForConfig(dir, config, true, fsys, parseCache)
 	if err != nil {
 		t.Fatalf("rebuilt createProgramSetForConfig: %v", err)
