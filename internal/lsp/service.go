@@ -1044,6 +1044,7 @@ func lintSingleFile(
 				Range:        diagnostic.Loc(),
 				Message:      rule.RuleMessage{Description: diagnostic.String()},
 				Severity:     rule.SeverityError,
+				Origin:       rule.DiagnosticOriginTypeScript,
 				PreFormatted: true,
 			})
 		}
@@ -1354,7 +1355,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 
 // Helper function to create disable rule actions for diagnostics without fixes
 func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
-	if strings.HasPrefix(ruleDiag.RuleName, "TypeScript(TS") {
+	if ruleDiag.Origin == rule.DiagnosticOriginTypeScript {
 		return nil
 	}
 	var actions []lsproto.CommandOrCodeAction

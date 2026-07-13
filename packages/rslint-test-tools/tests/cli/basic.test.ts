@@ -76,6 +76,42 @@ describe('CLI Configuration Tests', () => {
     expect(result.exitCode).toBe(0);
   });
 
+  test('should prioritize help over an invalid output format', async () => {
+    const result = await runRslint(['--help', '--format', 'stylish']);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain('Usage:');
+    expect(result.stderr).not.toContain('invalid output format');
+  });
+
+  test('should prioritize init over an invalid lint output format', async () => {
+    const tempDir = await createTempDir({});
+    try {
+      const result = await runRslint(
+        ['--init', '--format', 'stylish'],
+        tempDir,
+      );
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).not.toContain('invalid output format');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('should reject an invalid output format before linting', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `throw new Error('config must not be evaluated');`,
+    });
+    try {
+      const result = await runRslint(['--format', 'stylish'], tempDir);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('invalid output format "stylish"');
+      expect(result.stderr).not.toContain('config must not be evaluated');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('should use default config when no config specified', async () => {
     const tempDir = await createTempDir({
       'rslint.json': JSON.stringify([

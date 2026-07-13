@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -23,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -69,8 +69,8 @@ func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, strin
 	return code, string(stdoutBytes), string(stderrBytes)
 }
 
-// TestPrintDiagnosticUTF8 tests that printDiagnosticDefault correctly renders
-// UTF-8 characters (Chinese, Japanese, Korean, Emoji) in diagnostic output.
+// TestPrintDiagnosticUTF8 tests that the default output renderer correctly
+// handles UTF-8 characters (Chinese, Japanese, Korean, Emoji).
 func TestPrintDiagnosticUTF8(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -164,20 +164,11 @@ func TestPrintDiagnosticUTF8(t *testing.T) {
 				Severity: rule.SeverityWarning,
 			}
 
-			// Capture diagnostic output
-			var buf bytes.Buffer
-			writer := bufio.NewWriter(&buf)
-
 			comparePathOptions := tspath.ComparePathsOptions{
 				CurrentDirectory:          tmpDir,
 				UseCaseSensitiveFileNames: true,
 			}
-
-			// Call the actual function
-			printDiagnosticDefault(diagnostic, writer, comparePathOptions)
-			writer.Flush()
-
-			output := buf.String()
+			output := renderDiagnostic(t, diagnostic, comparePathOptions)
 
 			// Verify expected UTF-8 text is present in output
 			if !strings.Contains(output, tc.expectedText) {
@@ -248,9 +239,17 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePathsOptions) string {
 	t.Helper()
 	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	printDiagnosticDefault(d, w, opts)
-	w.Flush()
+	report := output.NewReport([]rule.RuleDiagnostic{d}, output.Metadata{
+		Mode:      output.ModeLint,
+		Threads:   1,
+		StartedAt: time.Now(),
+	})
+	if err := output.Render(&buf, report, output.Options{
+		Format:       output.FormatDefault,
+		ComparePaths: opts,
+	}); err != nil {
+		t.Fatalf("render diagnostic: %v", err)
+	}
 	return buf.String()
 }
 
@@ -619,67 +618,6 @@ func TestSyntacticErrorType(t *testing.T) {
 	}
 }
 
-// TestReportSyntacticErrorsPretty tests that reportSyntacticErrors renders
-// syntax errors with code snippets (like tsc --pretty).
-func TestReportSyntacticErrorsPretty(t *testing.T) {
-	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "tsconfig.json"), []byte(`{"include":["./index.ts"]}`), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "index.ts"), []byte("const x = ;\nconst y = 2;\n"), 0644)
-
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	host := utils.CreateCompilerHost(tmpDir, fs)
-	_, err := utils.CreateProgram(true, fs, tmpDir, "tsconfig.json", host)
-	if err == nil {
-		t.Fatal("Expected error")
-	}
-
-	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          tmpDir,
-		UseCaseSensitiveFileNames: true,
-	}
-
-	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	reported := reportSyntacticErrors(err, w, comparePathOptions)
-	if !reported {
-		t.Fatal("reportSyntacticErrors should return true for SyntacticError")
-	}
-
-	output := buf.String()
-
-	// Should render with code snippet box (like rule diagnostics)
-	if !strings.Contains(output, "╭") || !strings.Contains(output, "╰") {
-		t.Errorf("Should render code snippet box.\nOutput:\n%s", output)
-	}
-	// Should show the source code context
-	if !strings.Contains(output, "const x") {
-		t.Errorf("Should show the error line.\nOutput:\n%s", output)
-	}
-	// Rule name should be the TS error code
-	if !strings.Contains(output, "TS") {
-		t.Errorf("Rule name should contain TS error code.\nOutput:\n%s", output)
-	}
-	// Should show file location
-	if !strings.Contains(output, "index.ts:1:") {
-		t.Errorf("Should show file location.\nOutput:\n%s", output)
-	}
-}
-
-// TestReportSyntacticErrorsNonSyntactic tests that reportSyntacticErrors
-// returns false for non-SyntacticError errors.
-func TestReportSyntacticErrorsNonSyntactic(t *testing.T) {
-	err := errors.New("some other error")
-	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	reported := reportSyntacticErrors(err, w, tspath.ComparePathsOptions{})
-	if reported {
-		t.Fatal("reportSyntacticErrors should return false for non-SyntacticError")
-	}
-	if buf.Len() != 0 {
-		t.Fatal("Should not write anything for non-SyntacticError")
-	}
-}
-
 // ======== groupDiagsByFile tests ========
 
 func TestGroupDiagsByFile_Empty(t *testing.T) {
@@ -832,6 +770,36 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 	}
 	if !strings.Contains(msg, "--fix") {
 		t.Errorf("expected --fix to take priority in the error message, got %q", msg)
+	}
+}
+
+func TestExecuteLintPipelineRejectsInvalidFormatBeforeWork(t *testing.T) {
+	code, stdout, stderr := runLintPipelineForTest(t, t.TempDir(), lintArgs{
+		Format:         "stylish",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("invalid format wrote stdout: %q", stdout)
+	}
+	if !strings.Contains(stderr, `invalid output format "stylish"`) {
+		t.Fatalf("unexpected stderr: %q", stderr)
+	}
+}
+
+func TestExecuteLintPipelineInitIgnoresLintFormat(t *testing.T) {
+	dir := t.TempDir()
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Init:           true,
+		Format:         "stylish",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 0 || strings.Contains(stderr, "invalid output format") {
+		t.Fatalf("init did not retain priority: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
@@ -1220,6 +1188,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 
 	code, _, stderr := runLintPipelineForTest(t, dir, lintArgs{
 		Config:         configPath,
+		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
 	})
@@ -1229,6 +1198,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 
 	code, _, stderr = runLintPipelineForTest(t, dir, lintArgs{
 		Config:         configPath,
+		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
 		TypeCheck:      true,
@@ -1379,10 +1349,10 @@ func findProgramFileForTest(t *testing.T, program *compiler.Program, suffix stri
 // diagnostics still produces a valid (empty) JSON array, not an empty file.
 func TestGitlabReportState_EmptyProducesEmptyArray(t *testing.T) {
 	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	state := newGitlabReportState()
-	state.finish(w)
-	w.Flush()
+	report := output.NewReport(nil, output.Metadata{})
+	if err := output.Render(&buf, report, output.Options{Format: output.FormatGitLab}); err != nil {
+		t.Fatalf("render empty GitLab report: %v", err)
+	}
 
 	if got := buf.String(); got != "[]\n" {
 		t.Errorf("expected %q, got %q", "[]\n", got)
@@ -1406,12 +1376,13 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 	diagError.Message = rule.RuleMessage{Id: "test", Description: "Use const."}
 
 	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	state := newGitlabReportState()
-	printDiagnosticGitLab(diagWarning, w, opts, state)
-	printDiagnosticGitLab(diagError, w, opts, state)
-	state.finish(w)
-	w.Flush()
+	report := output.NewReport([]rule.RuleDiagnostic{diagWarning, diagError}, output.Metadata{})
+	if err := output.Render(&buf, report, output.Options{
+		Format:       output.FormatGitLab,
+		ComparePaths: opts,
+	}); err != nil {
+		t.Fatalf("render GitLab report: %v", err)
+	}
 
 	var issues []struct {
 		Description string `json:"description"`
@@ -1463,27 +1434,6 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 	}
 }
 
-// TestGitlabFingerprint_CollisionsDeterministicallyDistinguished verifies
-// that two diagnostics with identical inputs (same file, rule, message,
-// position) still get distinct fingerprints, since GitLab's MR widget merges
-// issues sharing a fingerprint into a single entry.
-func TestGitlabFingerprint_CollisionsDeterministicallyDistinguished(t *testing.T) {
-	seen := make(map[string]int)
-	a := gitlabFingerprint(seen, "f.ts", "rule", "msg", 1, 1, 1, 5)
-	b := gitlabFingerprint(seen, "f.ts", "rule", "msg", 1, 1, 1, 5)
-	if a == b {
-		t.Errorf("identical inputs should still produce distinct fingerprints, got %q twice", a)
-	}
-
-	// Same inputs in a fresh run should reproduce the same first fingerprint
-	// (no randomness), so report diffs across CI runs stay stable.
-	seen2 := make(map[string]int)
-	a2 := gitlabFingerprint(seen2, "f.ts", "rule", "msg", 1, 1, 1, 5)
-	if a != a2 {
-		t.Errorf("fingerprint should be deterministic, got %q then %q", a, a2)
-	}
-}
-
 func TestRemapDiagnosticTargetPaths(t *testing.T) {
 	diagnostics := []rule.RuleDiagnostic{
 		{FilePath: "/program/link.ts"},
@@ -1514,6 +1464,7 @@ func TestDeduplicateTypeScriptDiagnosticsAcrossPathAliases(t *testing.T) {
 
 	base := rule.RuleDiagnostic{
 		RuleName: "TypeScript(TS1110)",
+		Origin:   rule.DiagnosticOriginTypeScript,
 		Range:    core.NewTextRange(11, 11),
 		Message:  rule.RuleMessage{Description: "Type expected."},
 	}
@@ -1523,6 +1474,7 @@ func TestDeduplicateTypeScriptDiagnosticsAcrossPathAliases(t *testing.T) {
 	aliasDiagnostic.FilePath = aliasPath
 	nonTypeScriptA := base
 	nonTypeScriptA.RuleName = "some-rule"
+	nonTypeScriptA.Origin = rule.DiagnosticOriginLint
 	nonTypeScriptA.FilePath = realPath
 	nonTypeScriptB := nonTypeScriptA
 	nonTypeScriptB.FilePath = aliasPath
@@ -1556,6 +1508,7 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 	}
 	base := rule.RuleDiagnostic{
 		RuleName: "TypeScript(TS1110)",
+		Origin:   rule.DiagnosticOriginTypeScript,
 		Range:    core.NewTextRange(11, 11),
 		Message:  rule.RuleMessage{Description: "Type expected."},
 	}

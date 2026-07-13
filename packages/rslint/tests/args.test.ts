@@ -1,5 +1,10 @@
 import { describe, test, expect } from '@rstest/core';
-import { isJSConfigFile, classifyArgs, parseArgs } from '../src/utils/args.js';
+import {
+  isJSConfigFile,
+  classifyArgs,
+  isOutputFormat,
+  parseArgs,
+} from '../src/utils/args.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -48,6 +53,18 @@ describe('isJSConfigFile', () => {
   test('returns true for explicitly selectable .cjs and .cts configs', () => {
     expect(isJSConfigFile('rslint.config.cjs')).toBe(true);
     expect(isJSConfigFile('rslint.config.cts')).toBe(true);
+  });
+});
+
+describe('isOutputFormat', () => {
+  test('accepts every CLI output protocol', () => {
+    for (const format of ['default', 'jsonline', 'github', 'gitlab']) {
+      expect(isOutputFormat(format)).toBe(true);
+    }
+  });
+
+  test('rejects unknown output protocols', () => {
+    expect(isOutputFormat('stylish')).toBe(false);
   });
 });
 
@@ -152,6 +169,7 @@ describe('parseArgs positionals', () => {
   test('--format jsonline does not pollute positionals', () => {
     const result = parseArgs(['--format', 'jsonline', 'src/a.ts']);
     expect(result.positionals).toEqual(['src/a.ts']);
+    expect(result.format).toBe('jsonline');
   });
 
   test('file before --format', () => {
@@ -192,6 +210,19 @@ describe('parseArgs positionals', () => {
   test('--format=jsonline inline value', () => {
     const result = parseArgs(['--format=jsonline', 'src/a.ts']);
     expect(result.positionals).toEqual(['src/a.ts']);
+    expect(result.format).toBe('jsonline');
+  });
+
+  test('format defaults to null when absent', () => {
+    expect(parseArgs(['src/a.ts']).format).toBeNull();
+  });
+
+  test('help is detected and still forwarded to Go', () => {
+    for (const flag of ['--help', '-h']) {
+      const result = parseArgs([flag, '--format', 'stylish']);
+      expect(result.help).toBe(true);
+      expect(result.rest).toContain(flag);
+    }
   });
 
   test('no positionals with only flags', () => {

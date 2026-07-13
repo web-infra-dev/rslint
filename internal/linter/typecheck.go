@@ -115,6 +115,7 @@ func runTypeCheckForProgram(prog *compiler.Program) []collectedTypeCheckDiagnost
 				SourceFile:   file,
 				FilePath:     file.FileName(),
 				Severity:     rule.SeverityError,
+				Origin:       rule.DiagnosticOriginTypeScript,
 				PreFormatted: true,
 			},
 		})

@@ -693,6 +693,7 @@ func collectTargetSyntacticDiagnostics(
 					Range:        loc,
 					Message:      rule.RuleMessage{Description: diagnostic.String()},
 					Severity:     rule.SeverityError,
+					Origin:       rule.DiagnosticOriginTypeScript,
 					PreFormatted: true,
 				})
 			}

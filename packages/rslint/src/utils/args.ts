@@ -2,6 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs as nodeParseArgs } from 'node:util';
 
+// Keep this list in sync with cmd/rslint/internal/output/format.go.
+export const OUTPUT_FORMATS = [
+  'default',
+  'jsonline',
+  'github',
+  'gitlab',
+] as const;
+
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
+export function isOutputFormat(value: string): value is OutputFormat {
+  return (OUTPUT_FORMATS as readonly string[]).includes(value);
+}
+
 export function isJSConfigFile(filePath: string): boolean {
   return /\.(ts|mts|cts|js|mjs|cjs)$/.test(filePath);
 }
@@ -14,6 +28,7 @@ export function parseArgs(argv: string[]) {
     options: {
       config: { type: 'string', short: 'c' },
       init: { type: 'boolean' },
+      help: { type: 'boolean', short: 'h' },
       // Detected so the JS host can size the ESLint-plugin worker pool to a
       // single worker. NOT skipped below, so it still forwards to Go in
       // `rest` (Go's native pass honors the same flag independently).
@@ -77,7 +92,11 @@ export function parseArgs(argv: string[]) {
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     init: (values.init as boolean) ?? false,
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    help: (values.help as boolean) ?? false,
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     singleThreaded: (values.singleThreaded as boolean) ?? false,
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    format: (values.format as string) ?? null,
     rest,
     positionals,
   };

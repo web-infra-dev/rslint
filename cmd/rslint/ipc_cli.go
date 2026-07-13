@@ -44,7 +44,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/ipc"
@@ -252,12 +251,6 @@ func runCLI(args []string) int {
 	stdoutDrainDone := make(chan struct{})
 	go drainStdoutToIPC(stdoutR, ch, stdoutDrainDone)
 	os.Stdout = stdoutW
-	// fatih/color captured its package-level Output at init, pointing at the
-	// real fd-1 — which in IPC mode is the frame stream. Re-aim it at the
-	// redirect pipe so a stray color.Print-family call degrades to ordinary
-	// forwarded text instead of corrupting the frame protocol. (color.Error
-	// already points at the inherited stderr; leave it.)
-	color.Output = stdoutW
 	// finalizeStdout flushes + restores stdout before the shutdown handshake.
 	finalizeStdout := func() {
 		os.Stdout = origStdout

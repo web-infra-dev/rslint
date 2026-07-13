@@ -43,6 +43,9 @@ func TestTypeCheck_ReportsSemanticErrors(t *testing.T) {
 	for _, d := range diagnostics {
 		if strings.HasPrefix(d.RuleName, "TypeScript(") {
 			found = true
+			if d.Origin != rule.DiagnosticOriginTypeScript {
+				t.Errorf("TypeScript diagnostic has origin %v, want DiagnosticOriginTypeScript", d.Origin)
+			}
 			break
 		}
 	}

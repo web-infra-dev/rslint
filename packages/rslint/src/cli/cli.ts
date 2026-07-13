@@ -5,7 +5,13 @@ import {
   normalizeConfig,
   collectPluginMeta,
 } from '../config/config-loader.js';
-import { parseArgs, classifyArgs, isJSConfigFile } from '../utils/args.js';
+import {
+  OUTPUT_FORMATS,
+  parseArgs,
+  classifyArgs,
+  isJSConfigFile,
+  isOutputFormat,
+} from '../utils/args.js';
 import {
   coalesceCaseAliasedConfigs,
   discoverConfigs,
@@ -239,9 +245,22 @@ export async function run(
 
   // --init: pass through to Go (no config payload — Go writes the default
   // config to disk and prints the "Created …" line, forwarded via `output`).
+  // It intentionally takes priority over unrelated lint flags, matching the
+  // existing fast-path contract.
   if (args.init) {
     const { runEngine } = await import('./engine.js');
     return runEngine({ binPath, goArgs: ['--init'], configs: [], cwd });
+  }
+
+  // Reject an invalid stdout protocol before config discovery/evaluation.
+  // Help retains its existing priority and is forwarded to Go, which owns the
+  // usage text. Go validates format again after the IPC init payload is merged
+  // so direct and older clients receive the same single-error behavior.
+  if (!args.help && args.format !== null && !isOutputFormat(args.format)) {
+    process.stderr.write(
+      `error: invalid output format ${JSON.stringify(args.format)} (expected ${OUTPUT_FORMATS.slice(0, -1).join(', ')}, or ${OUTPUT_FORMATS.at(-1)})\n`,
+    );
+    return 2;
   }
 
   // Validate explicit --config flag

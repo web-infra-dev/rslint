@@ -760,6 +760,9 @@ func TestTypeCheckDeduplicatesSyntaxFromGoverningFallbackAndParentProgram(t *tes
 	if len(diagnostics) != 1 || diagnostics[0].RuleName != "TypeScript(TS1110)" {
 		t.Fatalf("expected one TS1110 diagnostic after cross-phase dedupe, got %+v", diagnostics)
 	}
+	if diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
+		t.Fatalf("deduplicated TypeScript diagnostic lost its origin: %+v", diagnostics[0])
+	}
 }
 
 func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t *testing.T) {
