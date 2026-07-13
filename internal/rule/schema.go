@@ -143,7 +143,10 @@ func compileSchemaJSON(rawJSON []byte) (*jsonschema.Schema, any, error) {
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft4)
 	c.UseRegexpEngine(jsRegexpEngine)
-	const resourceURL = "schema.json"
+	// An absolute URI in a private scheme, so the schema's base URL can never
+	// be confused with (or resolve against) a real file path or another
+	// resource's URL the way a bare relative "schema.json" could.
+	const resourceURL = "rslint:///schema.json"
 	if err := c.AddResource(resourceURL, doc); err != nil {
 		return nil, nil, err
 	}
