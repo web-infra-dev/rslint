@@ -4,12 +4,14 @@ import Mocha from 'mocha';
 import * as vscode from 'vscode';
 
 const extensionId = 'rstack.rslint';
-const typescriptExtensionId = 'vscode.typescript-language-features';
-const typescriptCodeActionCommands = [
-  '_typescript.applyCodeActionCommand',
-  '_typescript.didApplyRefactoring',
-  '_typescript.didOrganizeImports',
-] as const;
+const typescriptCodeActionProbeSource = `interface RslintCodeActionProbe {
+  value: number;
+}
+class RslintCodeActionProbeImpl implements RslintCodeActionProbe {}
+function rslintCodeActionProbeFunction() {
+  return 1 + 2;
+}
+`;
 
 export function run(
   testPath: string,
@@ -52,59 +54,80 @@ async function activateAndRun(
  * register the TypeScript code-action providers. A provider registration while
  * code actions on save are running cancels that save in VS Code 1.128.
  *
- * Wait for the observable registrations from the quick-fix, refactor,
- * organize-imports, and fix-all modules. This is a readiness barrier only:
- * the save assertions themselves remain single-shot.
+ * Probe the public behavior of the quick-fix, refactor, organize-imports, and
+ * fix-all providers on a controlled untitled document. This is a readiness
+ * barrier only: the save assertions themselves remain single-shot.
  */
 async function waitForTypeScriptCodeActionProviders(): Promise<void> {
-  const typescriptExtension = vscode.extensions.getExtension(
-    typescriptExtensionId,
-  );
-  if (!typescriptExtension) {
-    throw new Error(`Extension ${typescriptExtensionId} is unavailable`);
+  const document = await vscode.workspace.openTextDocument({
+    content: typescriptCodeActionProbeSource,
+    language: 'typescript',
+  });
+
+  const quickFixRange = document.lineAt(3).range;
+  const refactorLine = document.lineAt(5);
+  const refactorExpression = '1 + 2';
+  const refactorStart = refactorLine.text.indexOf(refactorExpression);
+  if (refactorStart < 0) {
+    throw new Error('TypeScript code-action probe expression is unavailable');
   }
 
-  const [typescriptFile] = await vscode.workspace.findFiles(
-    '**/*.ts',
-    '**/{node_modules,.git}/**',
-    1,
-  );
-  if (!typescriptFile) {
-    return;
-  }
-
-  const document = await vscode.workspace.openTextDocument(typescriptFile);
-  await typescriptExtension.activate();
+  const emptyRange = new vscode.Range(0, 0, 0, 0);
+  const probes = new Map<
+    string,
+    {
+      kind: vscode.CodeActionKind;
+      range: vscode.Range | vscode.Selection;
+    }
+  >([
+    [
+      'quick fix',
+      { kind: vscode.CodeActionKind.QuickFix, range: quickFixRange },
+    ],
+    [
+      'refactor',
+      {
+        kind: vscode.CodeActionKind.Refactor,
+        range: new vscode.Selection(
+          refactorLine.lineNumber,
+          refactorStart,
+          refactorLine.lineNumber,
+          refactorStart + refactorExpression.length,
+        ),
+      },
+    ],
+    [
+      'organize imports',
+      { kind: vscode.CodeActionKind.SourceOrganizeImports, range: emptyRange },
+    ],
+    [
+      'fix all',
+      { kind: vscode.CodeActionKind.SourceFixAll, range: emptyRange },
+    ],
+  ]);
 
   const timeoutMs = 60_000;
   const deadline = Date.now() + timeoutMs;
   let lastProbeError: unknown;
 
   while (Date.now() < deadline) {
-    // `filterInternal: false` is intentional: the three sentinels are
-    // internal commands whose registration happens in the constructors of
-    // the quick-fix, refactor, and organize-imports providers.
-    const commands = await vscode.commands.getCommands(false);
-    const commandsReady = typescriptCodeActionCommands.every((command) =>
-      commands.includes(command),
-    );
-
-    let fixAllReady = false;
-    if (commandsReady) {
+    for (const [name, probe] of probes) {
       try {
         const actions = await vscode.commands.executeCommand<
           vscode.CodeAction[]
         >(
           'vscode.executeCodeActionProvider',
           document.uri,
-          new vscode.Range(0, 0, 0, 0),
-          'source.fixAll.ts',
+          probe.range,
+          probe.kind.value,
         );
-        fixAllReady =
+        if (
           actions?.some(
-            (action) => action.kind?.value === 'source.fixAll.ts',
-          ) ?? false;
-        lastProbeError = undefined;
+            (action) => action.kind && probe.kind.contains(action.kind),
+          )
+        ) {
+          probes.delete(name);
+        }
       } catch (error) {
         // A provider registering during this non-mutating probe cancels it.
         // Keep waiting for the complete provider set, but fail closed on
@@ -113,20 +136,16 @@ async function waitForTypeScriptCodeActionProviders(): Promise<void> {
       }
     }
 
-    if (commandsReady && fixAllReady) {
+    if (probes.size === 0) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  const commands = await vscode.commands.getCommands(false);
-  const missingCommands = typescriptCodeActionCommands.filter(
-    (command) => !commands.includes(command),
-  );
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for TypeScript code-action providers` +
-      (missingCommands.length > 0
-        ? `; missing commands: ${missingCommands.join(', ')}`
+      (probes.size > 0
+        ? `; missing actions: ${[...probes.keys()].join(', ')}`
         : '') +
       (lastProbeError ? `; last probe error: ${String(lastProbeError)}` : ''),
   );
