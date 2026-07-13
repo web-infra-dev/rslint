@@ -96,7 +96,7 @@ func TestNoRestrictedGlobalsUpstream(t *testing.T) {
 			// it always recognizes globalThis/self/window (and configured
 			// globalObjects) as global-object roots when checkGlobalObject is
 			// true — see the rule doc's "Differences from ESLint" section and the
-			// corresponding invalid cases in the extras file.
+			// "Intentional divergence" cases in the extras file.
 			{
 				Code:    `window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
