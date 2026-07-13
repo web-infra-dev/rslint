@@ -246,6 +246,47 @@ func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
 	}
 }
 
+func TestRunLinter_ExecutedRulesAcrossPrograms(t *testing.T) {
+	programA, pathsA := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	programB, pathsB := createTestProgramWithFiles(t, map[string]string{
+		"b.ts": "const b = 2;",
+	})
+
+	configuredRule := func(name string) ConfiguredRule {
+		return ConfiguredRule{
+			Name:     name,
+			Severity: rule.SeverityWarning,
+			Run:      func(rule.RuleContext) rule.RuleListeners { return nil },
+		}
+	}
+	result, err := RunLinter(RunLinterOptions{
+		Programs:    []*compiler.Program{programA, programB},
+		TargetFiles: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
+		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
+			if file.FileName() == pathsA["a.ts"] {
+				return []ConfiguredRule{configuredRule("shared"), configuredRule("only-a")}
+			}
+			return []ConfiguredRule{configuredRule("shared"), configuredRule("only-b")}
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if result.LintedFileCount != 2 {
+		t.Fatalf("LintedFileCount = %d, want 2", result.LintedFileCount)
+	}
+	want := map[string]struct{}{
+		"shared": {},
+		"only-a": {},
+		"only-b": {},
+	}
+	if !reflect.DeepEqual(result.ExecutedRules, want) {
+		t.Fatalf("ExecutedRules = %v, want %v", result.ExecutedRules, want)
+	}
+}
+
 func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const a = 1;",
@@ -262,5 +303,8 @@ func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
 	}
 	if len(result.ExecutedRules) != 0 {
 		t.Errorf("Expected 0 executed rules, got %d", len(result.ExecutedRules))
+	}
+	if result.ExecutedRules == nil {
+		t.Error("ExecutedRules should be a writable, non-nil empty map")
 	}
 }

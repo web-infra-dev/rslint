@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -73,7 +71,10 @@ type runProgramOptions struct {
 	HasTargetFiles   bool
 	SyntaxErrorFiles map[string]struct{}
 	GetRulesForFile  RuleHandler
-	ExecutedRules    *sync.Map
+	// CollectExecutedRules controls whether runLintRulesInProgram builds the
+	// per-program rule-name set returned in programLintResult. LintSingleFile
+	// leaves this disabled because it does not consume that result.
+	CollectExecutedRules bool
 	// SingleThreaded, when true, lints this program's file shards
 	// sequentially on the calling goroutine instead of in parallel workers.
 	SingleThreaded bool
@@ -82,6 +83,11 @@ type runProgramOptions struct {
 	// and remaining rules receive a nil TypeChecker. nil = no gap distinction.
 	TypeInfoFiles map[string]struct{}
 	OnDiagnostic  DiagnosticHandler
+}
+
+type programLintResult struct {
+	lintedFileCount int32
+	executedRules   map[string]struct{}
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered
@@ -96,13 +102,13 @@ type runProgramOptions struct {
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
 // concern handled by RunLinter directly.
-func runLintRulesInProgram(opts runProgramOptions) int32 {
+func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	if opts.OnDiagnostic == nil {
 		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
 	}
 	getRulesForFile := opts.GetRulesForFile
 	if getRulesForFile == nil {
-		return 0
+		return programLintResult{}
 	}
 
 	// Collect files to lint (applying all filters). Shared with
@@ -110,13 +116,13 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 	// exact same file set as native linting.
 	filesToLint := collectFilesToLint(opts)
 
-	lintedFileCount := int32(len(filesToLint))
+	result := programLintResult{lintedFileCount: int32(len(filesToLint))}
 
 	// Early-out: if every file in this program was filtered, do not pay the
 	// cost of acquiring a TypeChecker (which forces program binding and is
 	// non-trivial when the checker hasn't been created yet).
-	if lintedFileCount == 0 {
-		return 0
+	if result.lintedFileCount == 0 {
+		return result
 	}
 
 	// lintFile lints one file with its already-resolved rules and checker. All per-file state
@@ -390,9 +396,12 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 			file.FileName(),
 			opts.TypeInfoFiles,
 		)
-		if opts.ExecutedRules != nil {
+		if opts.CollectExecutedRules && len(rules) > 0 {
+			if result.executedRules == nil {
+				result.executedRules = make(map[string]struct{}, len(rules))
+			}
 			for _, configuredRule := range rules {
-				opts.ExecutedRules.Store(configuredRule.Name, struct{}{})
+				result.executedRules[configuredRule.Name] = struct{}{}
 			}
 		}
 		rules = filterNativeRules(rules)
@@ -426,7 +435,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 	}
 	wg.RunAndWait()
 
-	return lintedFileCount
+	return result
 }
 
 // filterNativeRules removes Node-dispatched ESLint plugin placeholders from
@@ -506,12 +515,13 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
 	}
 
-	var executedRules sync.Map
-	var lintedFileCount atomic.Int32
+	executedRules := make(map[string]struct{})
+	var lintedFileCount int32
 
 	// Phase 1: lint rules per program (parallel). Skipped when no rule
 	// handler was supplied — see doc above.
 	if opts.GetRulesForFile != nil {
+		programResults := make([]programLintResult, len(opts.Programs))
 		wg := core.NewWorkGroup(opts.SingleThreaded)
 		for i, program := range opts.Programs {
 			var perProgramFilter FileFilter
@@ -529,25 +539,32 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			}
 
 			programOpts := runProgramOptions{
-				Program:          program,
-				Scope:            opts.Scope,
-				ExcludePaths:     opts.ExcludePaths,
-				FileFilter:       filter,
-				TargetFiles:      targetFiles,
-				HasTargetFiles:   opts.TargetFiles != nil,
-				GetRulesForFile:  opts.GetRulesForFile,
-				ExecutedRules:    &executedRules,
-				SyntaxErrorFiles: opts.SyntaxErrorFiles,
-				SingleThreaded:   opts.SingleThreaded,
-				TypeInfoFiles:    opts.TypeInfoFiles,
-				OnDiagnostic:     opts.OnDiagnostic,
+				Program:              program,
+				Scope:                opts.Scope,
+				ExcludePaths:         opts.ExcludePaths,
+				FileFilter:           filter,
+				TargetFiles:          targetFiles,
+				HasTargetFiles:       opts.TargetFiles != nil,
+				GetRulesForFile:      opts.GetRulesForFile,
+				CollectExecutedRules: true,
+				SyntaxErrorFiles:     opts.SyntaxErrorFiles,
+				SingleThreaded:       opts.SingleThreaded,
+				TypeInfoFiles:        opts.TypeInfoFiles,
+				OnDiagnostic:         opts.OnDiagnostic,
 			}
+			programIndex := i
+			programOptions := programOpts
 			wg.Queue(func() {
-				n := runLintRulesInProgram(programOpts)
-				lintedFileCount.Add(n)
+				programResults[programIndex] = runLintRulesInProgram(programOptions)
 			})
 		}
 		wg.RunAndWait()
+		for _, programResult := range programResults {
+			lintedFileCount += programResult.lintedFileCount
+			for name := range programResult.executedRules {
+				executedRules[name] = struct{}{}
+			}
+		}
 	}
 
 	// Phase 2: program-level type-check (tsc-aligned).
@@ -561,8 +578,8 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}
 
 	return &LintResult{
-		LintedFileCount: lintedFileCount.Load(),
-		ExecutedRules:   collectMapKeys(&executedRules),
+		LintedFileCount: lintedFileCount,
+		ExecutedRules:   executedRules,
 	}, nil
 }
 
@@ -768,15 +785,4 @@ func buildOwnedFileSet(program *compiler.Program) map[string]struct{} {
 		owned[fn] = struct{}{}
 	}
 	return owned
-}
-
-func collectMapKeys(m *sync.Map) map[string]struct{} {
-	out := make(map[string]struct{})
-	m.Range(func(k, _ any) bool {
-		if s, ok := k.(string); ok {
-			out[s] = struct{}{}
-		}
-		return true
-	})
-	return out
 }
