@@ -18,13 +18,14 @@ func isProhibitedIdentifier(name string) bool {
 const outerExpressionKinds = ast.OEKParentheses | ast.OEKAssertions
 
 // isGlobalThisOrWindow checks if the node is a reference to the global object:
-// - `this` at global scope (not inside any function-like declaration or class)
-// - non-shadowed `window`
-// - non-shadowed `globalThis`
+//   - `this` at global scope (not inside any function-like declaration or class)
+//   - non-shadowed `window`
+//   - non-shadowed `globalThis`, unless configured `off` (ESLint requires the
+//     `globalThis` variable to exist in scope; `window` has no such check)
 //
 // Skips outer expression wrappers (parentheses, type assertions, non-null assertions)
 // so that `(window).alert()` and `window!.alert()` are handled correctly.
-func isGlobalThisOrWindow(node *ast.Node) bool {
+func isGlobalThisOrWindow(node *ast.Node, globals map[string]bool) bool {
 	node = ast.SkipOuterExpressions(node, outerExpressionKinds)
 	if node == nil {
 		return false
@@ -40,6 +41,11 @@ func isGlobalThisOrWindow(node *ast.Node) bool {
 	}
 	if node.Kind == ast.KindIdentifier {
 		name := node.Text()
+		if name == "globalThis" {
+			if declared, ok := globals["globalThis"]; ok && !declared {
+				return false
+			}
+		}
 		if name == "window" || name == "globalThis" {
 			return !utils.IsShadowed(node, name)
 		}
@@ -78,7 +84,7 @@ var NoAlertRule = rule.Rule{
 					if !ok || !isProhibitedIdentifier(name) {
 						return
 					}
-					if !isGlobalThisOrWindow(utils.AccessExpressionObject(callee)) {
+					if !isGlobalThisOrWindow(utils.AccessExpressionObject(callee), ctx.Globals) {
 						return
 					}
 

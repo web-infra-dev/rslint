@@ -150,6 +150,13 @@ func TestNoAlertRule(t *testing.T) {
 			{Code: `var x = window.alert;`},
 			{Code: `typeof alert;`},
 			{Code: `new alert()`},
+
+			// ================================================================
+			// Config `off` un-declares `globalThis` (only the globalThis
+			// receiver path consults globals in ESLint)
+			// ================================================================
+			{Code: `globalThis.alert("x");`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `globalThis["alert"]("x");`, Globals: map[string]bool{"globalThis": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ================================================================
@@ -551,6 +558,23 @@ func TestNoAlertRule(t *testing.T) {
 			// Type assertion on member callee
 			{
 				Code: `(window.alert as Function)(foo)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 1},
+				},
+			},
+			// Config `off` on `alert` or `window` has no effect in ESLint:
+			// the direct-call path only checks local shadowing, and the
+			// `window` receiver has no existence check (unlike `globalThis`).
+			{
+				Code:    `alert("x");`,
+				Globals: map[string]bool{"alert": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code:    `window.alert("x");`,
+				Globals: map[string]bool{"window": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
