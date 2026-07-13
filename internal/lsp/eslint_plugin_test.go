@@ -370,6 +370,37 @@ func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
 	}
 }
 
+func TestPluginRulesForCurrentGenerationRejectsStalePlaceholders(t *testing.T) {
+	rules := []linter.ConfiguredRule{
+		{Name: "native", IsEslintPluginRule: false},
+		{Name: "current/check", IsEslintPluginRule: true},
+		{Name: "stale/check", IsEslintPluginRule: true},
+	}
+	s := newTestServer()
+
+	// A nil gate is reserved for isolated pre-transaction call sites.
+	if got := s.pluginRulesForCurrentGeneration(rules); len(got) != len(rules) {
+		t.Fatalf("nil generation gate filtered rules: %+v", got)
+	}
+
+	s.eslintPluginRules = eslintPluginRuleSet([]config.EslintPluginEntry{{
+		Prefix:    "current",
+		RuleNames: []string{"check"},
+	}})
+	got := s.pluginRulesForCurrentGeneration(rules)
+	if len(got) != 2 || got[0].Name != "native" || got[1].Name != "current/check" {
+		t.Fatalf("generation gate retained stale plugin rules: %+v", got)
+	}
+
+	// An explicit empty generation must block every process-global plugin
+	// placeholder while preserving native rules.
+	s.eslintPluginRules = eslintPluginRuleSet(nil)
+	got = s.pluginRulesForCurrentGeneration(rules)
+	if len(got) != 1 || got[0].Name != "native" {
+		t.Fatalf("empty generation did not block plugin rules: %+v", got)
+	}
+}
+
 func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},

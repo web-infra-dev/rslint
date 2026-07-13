@@ -59,9 +59,9 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 // rules — exactly the rules the native pass treats as no-op placeholders.
 // Per-file languageOptions / settings come from GetConfigForFile (the same
 // merged config the native pass resolves). configKey is the owning config
-// directory in URI form: that is the string the VS Code extension registered
-// its worker-pool LoadedPlugins under (Uri.file(dir).toString()), and the
-// worker routes tasks to plugins by matching it byte-for-byte.
+// directory's generation-specific routing identity: a legacy configUpdate URI
+// or, for v2 Go discovery, the catalog's absolute filesystem path. The worker
+// routes tasks by matching it byte-for-byte.
 //
 // textOverride forces the text the worker lints: the diagnostics path passes
 // nil (use the s.documents overlay), while the multi-pass fixAll path passes
@@ -113,14 +113,50 @@ func (s *Server) buildPluginFileInputWithConfig(
 
 	// sourceFile=nil: the LSP rebuilds against the overlay Text (the worker
 	// linted that same string). Shared filter/assembly with the CLI (F1).
+	enabledRules = s.pluginRulesForCurrentGeneration(enabledRules)
 	languageOptions, settings := config.PluginMergedMaps(merged)
 	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
 }
 
-// pluginConfigKeyForURI returns the owning config directory in URI form
-// (e.g. "file:///project") — the configKey the Node worker pool routes on.
-// It walks parents exactly like getConfigForURI but yields the URI key rather
-// than the filesystem path getConfigForURI returns for cwd use.
+// eslintPluginRuleSet expands activation metadata into the exact rule names
+// the matching Node generation can execute. It always returns a non-nil map:
+// an activated generation with no community plugins must block placeholders
+// retained in the process-wide registry by older generations.
+func eslintPluginRuleSet(entries []config.EslintPluginEntry) map[string]struct{} {
+	rules := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.Prefix == "" {
+			continue
+		}
+		for _, ruleName := range entry.RuleNames {
+			if ruleName != "" {
+				rules[entry.Prefix+"/"+ruleName] = struct{}{}
+			}
+		}
+	}
+	return rules
+}
+
+func (s *Server) pluginRulesForCurrentGeneration(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
+	if s.eslintPluginRules == nil {
+		return rules
+	}
+	filtered := make([]linter.ConfiguredRule, 0, len(rules))
+	for _, configuredRule := range rules {
+		if !configuredRule.IsEslintPluginRule {
+			filtered = append(filtered, configuredRule)
+			continue
+		}
+		if _, ok := s.eslintPluginRules[configuredRule.Name]; ok {
+			filtered = append(filtered, configuredRule)
+		}
+	}
+	return filtered
+}
+
+// pluginConfigKeyForURI returns the owning config directory's routing identity
+// — a legacy URI or v2 absolute filesystem path. It walks parents exactly like
+// getConfigForURI and preserves the key byte-for-byte for the Node worker.
 //
 // For the JSON-config fallback there is no JS config directory, so the key is
 // empty — the worker has no plugins registered for that path anyway (JSON

@@ -202,10 +202,50 @@ suite('PluginLintPool generations', () => {
     lintAResult.resolve({ results: [] });
     await lintA;
     await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.strictEqual(
+      hostA.shutdownCalls,
+      0,
+      'the predecessor remains rollback-capable until a later commit proves Go accepted b',
+    );
+
+    assert.strictEqual(
+      await pool.prepare(descriptor('c'), 'fingerprint-c', 'c'),
+      true,
+    );
+    const hostC = hosts.get('/c.mjs')!;
+    assert.strictEqual(await pool.commit('c'), true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assert.strictEqual(hostA.shutdownCalls, 1);
 
     await pool.dispose();
     assert.strictEqual(hostB.shutdownCalls, 1);
+    assert.strictEqual(hostC.shutdownCalls, 1);
+  });
+
+  test('abort rolls back an active commit whose response was lost', async () => {
+    const hosts = new Map<string, TestHost>();
+    const pool = new PluginLintPool(testLogger(), async (configs) => {
+      const host = new TestHost();
+      hosts.set(configs[0].configPath, host);
+      return host;
+    });
+
+    await pool.prepare(descriptor('a'), 'fingerprint-a', 'a');
+    await pool.commit('a');
+    await pool.prepare(descriptor('b'), 'fingerprint-b', 'b');
+    await pool.commit('b');
+
+    // Node already switched to b, but Go did not receive/accept the commit
+    // response and compensates with abort. The pool must return to a rather
+    // than leaving both processes on different generations.
+    await pool.abort('b');
+    await pool.lint(request('a'));
+    assert.strictEqual(hosts.get('/a.mjs')!.lintCalls, 1);
+    await assert.rejects(pool.lint(request('b')), /unknown.*generation/);
+    assert.strictEqual(hosts.get('/b.mjs')!.shutdownCalls, 1);
+
+    await pool.dispose();
+    assert.strictEqual(hosts.get('/a.mjs')!.shutdownCalls, 1);
   });
 
   test('default grace retains at most two old WorkerPools', async () => {
@@ -341,5 +381,20 @@ suite('PluginLintPool generations', () => {
 
     await pool.dispose();
     assert.strictEqual(hostA.shutdownCalls, 1);
+  });
+
+  test('a failed first prepare can commit and route an empty degraded generation', async () => {
+    const pool = new PluginLintPool(testLogger(), async () => {
+      throw new Error('broken first plugin');
+    });
+
+    assert.strictEqual(
+      await pool.prepare(descriptor('a'), 'fingerprint-a', 'a'),
+      false,
+    );
+    assert.strictEqual(await pool.commit('a'), true);
+    assert.deepStrictEqual(await pool.lint(request('a')), { results: [] });
+
+    await pool.dispose();
   });
 });

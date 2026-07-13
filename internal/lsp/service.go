@@ -34,6 +34,7 @@ import (
 
 const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
 const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
+const ancestorJSConfigWatcherID project.WatcherID = "rslint-ancestor-js-config"
 
 type lintPassResult struct {
 	Diagnostics     []rule.RuleDiagnostic
@@ -118,11 +119,20 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		relativePatterns := ptrIsTrue(
 			s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport,
 		)
-		watchers := gitignoreFileWatchers(s.cwd, relativePatterns)
+		gitignoreWatchers := gitignoreFileWatchers(s.cwd, relativePatterns)
+		ancestorConfigWatchers := ancestorJSConfigFileWatchers(s.cwd, relativePatterns)
 		go func() {
-			if err := s.WatchFiles(s.backgroundCtx, gitignoreWatcherID, watchers); err != nil {
+			if err := s.WatchFiles(s.backgroundCtx, gitignoreWatcherID, gitignoreWatchers); err != nil {
 				if s.backgroundCtx.Err() == nil {
 					log.Printf("[rslint] Failed to register .gitignore watchers: %v", err)
+				}
+			}
+			if len(ancestorConfigWatchers) == 0 {
+				return
+			}
+			if err := s.WatchFiles(s.backgroundCtx, ancestorJSConfigWatcherID, ancestorConfigWatchers); err != nil {
+				if s.backgroundCtx.Err() == nil {
+					log.Printf("[rslint] Failed to register ancestor JS config watchers: %v", err)
 				}
 			}
 		}()
@@ -163,12 +173,47 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 
 func gitignoreFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
 	workspaceRoot := filepath.Clean(cwd)
-	return []*lsproto.FileSystemWatcher{
-		gitignoreFileWatcher(workspaceRoot, "**/.gitignore", relativePatternSupport),
+	watchers := []*lsproto.FileSystemWatcher{
+		fileSystemWatcher(workspaceRoot, "**/.gitignore", relativePatternSupport),
 	}
+	// Automatic discovery may select a config above the workspace. Exact
+	// watchers on the strict lexical ancestors cover every possible source from
+	// that config directory down to cwd without recursively watching siblings.
+	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
+		watchers = append(watchers, fileSystemWatcher(current, ".gitignore", relativePatternSupport))
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return watchers
 }
 
-func gitignoreFileWatcher(baseDir string, pattern string, relativePatternSupport bool) *lsproto.FileSystemWatcher {
+// ancestorJSConfigFileWatchers covers the strict lexical ancestors that Go's
+// automatic config discovery searches before walking the workspace. The
+// extension already owns a workspace-scoped RelativePattern watcher, so the
+// workspace itself is deliberately excluded to avoid duplicate refreshes.
+// Register every filename separately: creating a higher-priority sibling in an
+// ancestor directory can change the selected config even when another config
+// basename already exists there.
+func ancestorJSConfigFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
+	workspaceRoot := filepath.Clean(cwd)
+	watchers := make([]*lsproto.FileSystemWatcher, 0)
+	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
+		for _, configName := range config.AutoJSConfigFileNames {
+			watchers = append(watchers, fileSystemWatcher(current, configName, relativePatternSupport))
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return watchers
+}
+
+func fileSystemWatcher(baseDir string, pattern string, relativePatternSupport bool) *lsproto.FileSystemWatcher {
 	if relativePatternSupport {
 		uri := fileURIFromPath(baseDir)
 		return &lsproto.FileSystemWatcher{
@@ -355,6 +400,11 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	s.jsConfigKeyByPath = candidateConfigKeyByPath
 	s.jsUnavailableConfigs = candidateUnavailableConfigs
 	s.eslintPluginConfigGeneration = payload.Generation
+	s.eslintPluginRules = eslintPluginRuleSet(payload.EslintPlugins)
+	// A legacy push replaces the catalog outside the v2 transaction protocol;
+	// it must not be treated as a v2 last-good snapshot by a later refresh.
+	s.configDiscoveryV2HasLastGood = false
+	s.configGenerationFS = nil
 	if len(payload.Configs) == 0 {
 		s.jsonConfig = candidateJSONConfig
 		s.rslintConfigPath = candidateJSONConfigPath
@@ -394,6 +444,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	needsConfigReload := false
 	needsTypeInfoRebuild := false
 	needsIgnoreRefresh := false
+	needsJSConfigRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
 		if isRslintConfigURI(uri) {
@@ -405,6 +456,39 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		if isGitignoreURI(uri) {
 			needsIgnoreRefresh = true
 		}
+		if isWorkspaceOrAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
+			needsJSConfigRefresh = true
+		}
+	}
+	if (needsIgnoreRefresh || needsJSConfigRefresh || needsConfigReload) && s.configDiscoveryV2Active {
+		// didChangeWatchedFiles and configRefresh are both blocking methods, so
+		// this direct call stays on the server's serialized dispatch loop and
+		// cannot race an extension-initiated v2 transaction. JSON fallback is
+		// part of the candidate snapshot: never reload it directly while v2 is
+		// active, otherwise a later JS activation failure could leave half of a
+		// rejected generation live.
+		reason := "gitignore-change"
+		if needsJSConfigRefresh || needsConfigReload {
+			reason = "config-change"
+		}
+		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
+			ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+			Reason:          reason,
+		})
+		if err == nil {
+			return nil
+		}
+		// Discovery/activation failure preserves the complete last-good
+		// generation, including its .gitignore view. Recompute diagnostics from
+		// that committed view after an ignore event so invalidated editor
+		// results are republished without leaking the rejected filesystem state. A
+		// config-only failure has no independently live state to invalidate.
+		log.Printf("[rslint] Failed to refresh config catalog after watched %s: %v", reason, err)
+		if needsIgnoreRefresh {
+			s.invalidateOpenDocumentDiagnostics()
+			return s.RefreshDiagnostics(ctx)
+		}
+		return nil
 	}
 	if needsConfigReload {
 		s.reloadConfigAndRelint()
@@ -438,6 +522,36 @@ func isRslintConfigURI(uri string) bool {
 func isGitignoreURI(uri string) bool {
 	idx := strings.LastIndex(uri, "/")
 	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".gitignore")
+}
+
+func isWorkspaceOrAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) bool {
+	if filePath == "" || cwd == "" || fsys == nil {
+		return false
+	}
+	caseSensitive := fsys.UseCaseSensitiveFileNames()
+	baseName := tspath.GetBaseFileName(tspath.NormalizePath(filePath))
+	isAutoConfig := false
+	for _, configName := range config.AutoJSConfigFileNames {
+		if pathStringsEqual(baseName, configName, caseSensitive) {
+			isAutoConfig = true
+			break
+		}
+	}
+	if !isAutoConfig {
+		return false
+	}
+	directory := tspath.GetDirectoryPath(tspath.NormalizePath(filePath))
+	workspace := tspath.NormalizePath(cwd)
+	return pathStringsEqual(directory, workspace, caseSensitive) ||
+		tspath.StartsWithDirectory(directory, workspace, caseSensitive) ||
+		tspath.StartsWithDirectory(workspace, directory, caseSensitive)
+}
+
+func pathStringsEqual(left string, right string, caseSensitive bool) bool {
+	if caseSensitive {
+		return left == right
+	}
+	return strings.EqualFold(left, right)
 }
 
 func (s *Server) invalidateOpenDocumentDiagnostics() {
@@ -499,7 +613,7 @@ func (s *Server) rebuildTsConfigPaths() error {
 	if len(s.jsConfigs) > 0 {
 		byConfig = make(map[string][]string, len(s.jsConfigs))
 		for dir, entries := range s.jsConfigs {
-			configDir := uriToPath(lsproto.DocumentUri(dir))
+			configDir := configRoutingKeyToPath(dir)
 			paths, err := s.resolveTsConfigPaths(entries, configDir)
 			if err != nil {
 				return fmt.Errorf("resolve tsconfig paths for %q: %w", dir, err)
@@ -1451,11 +1565,11 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 // owner for the file.
 // Returns the config entries, the directory to use as cwd for glob matching,
 // and whether the config is from a JS/TS config (for plugin enforcement).
-// For JS configs the cwd is the config's own directory (URI → path);
-// for the JSON fallback it is s.cwd.
+// For JS configs the cwd is the config's own directory (legacy URI or v2 path
+// converted to a path); for the JSON fallback it is s.cwd.
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	if configKey, ok := s.nearestJSConfigKey(uri); ok {
-		return s.jsConfigs[configKey], uriToPath(lsproto.DocumentUri(configKey)), true
+		return s.jsConfigs[configKey], configRoutingKeyToPath(configKey), true
 	}
 	return s.jsonConfig, s.cwd, false
 }
@@ -1464,12 +1578,17 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 // editor target without mutating the stored config catalog.
 func (s *Server) getLintConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
-	rslintConfig = config.ConfigWithGitignore(
-		rslintConfig,
-		configCwd,
-		s.fs,
-		[]string{uriToPath(uri)},
-	)
+	if s.configGenerationFS == nil {
+		// Legacy configUpdate does not have a generation snapshot. Retain its
+		// historical live exact-target policy; v2 configs already carry one
+		// shared frozen matcher prepared and committed with the catalog.
+		rslintConfig = config.ConfigWithGitignore(
+			rslintConfig,
+			configCwd,
+			s.fs,
+			[]string{uriToPath(uri)},
+		)
+	}
 	return rslintConfig, configCwd, isJSConfig
 }
 
@@ -1505,7 +1624,7 @@ func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 	configsByPath := make(map[string]config.RslintConfig, len(s.jsConfigs))
 	configKeyByPath := make(map[string]string, len(s.jsConfigs))
 	for configKey, entries := range s.jsConfigs {
-		configDir := tspath.NormalizePath(uriToPath(lsproto.DocumentUri(configKey)))
+		configDir := tspath.NormalizePath(configRoutingKeyToPath(configKey))
 		if configDir != "" {
 			configsByPath[configDir] = entries
 			configKeyByPath[configDir] = configKey
@@ -1514,6 +1633,19 @@ func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 	configDir, _ := config.NewConfigOwnerResolver(configsByPath, s.fs).Resolve(filePath)
 	configKey := configKeyByPath[configDir]
 	return configKey, configKey != ""
+}
+
+func configRoutingKeyToPath(configKey string) string {
+	// Recognize legacy file:// URIs first (tspath also considers them absolute).
+	// Other absolute keys are v2 filesystem paths and must not be URI-decoded:
+	// literal percent-escapes, #, and ? can all occur in valid file names.
+	if strings.HasPrefix(strings.ToLower(configKey), "file://") {
+		return uriToPath(lsproto.DocumentUri(configKey))
+	}
+	if tspath.PathIsAbsolute(configKey) {
+		return tspath.NormalizePath(configKey)
+	}
+	return uriToPath(lsproto.DocumentUri(configKey))
 }
 
 // tsConfigPathsForURI returns parserOptions.project paths from the config owner

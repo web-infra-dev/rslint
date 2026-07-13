@@ -1039,6 +1039,42 @@ func TestDiscoverLintTargetsMultiConfig_PreservesHostAssignedExplicitOwner(t *te
 	assert.Equal(t, targets[0].ConfigDirectory, rootDir)
 }
 
+func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFiles(t *testing.T) {
+	rootDir, paths := setupDiscoveryFixture(t, []string{
+		"ignored/automatic.ts",
+		"ignored/explicit.ts",
+	})
+	ignoredDir := tspath.NormalizePath(filepath.Join(rootDir, "ignored"))
+	configMap := map[string]RslintConfig{
+		rootDir: {
+			{Ignores: []string{"ignored/**"}},
+			{Rules: Rules{"root": "error"}},
+		},
+		ignoredDir: {{Rules: Rules{"nested": "error"}}},
+	}
+	fsys := osvfs.FS()
+
+	targets := DiscoverLintTargetsMultiConfig(
+		configMap,
+		map[string]LintDiscoveryScope{
+			ignoredDir: {
+				Files:        []string{paths["ignored/explicit.ts"]},
+				ExplicitOnly: true,
+			},
+		},
+		fsys,
+		[]string{paths["ignored/automatic.ts"], paths["ignored/explicit.ts"]},
+		nil,
+		true,
+	)
+
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
+		Path:            paths["ignored/explicit.ts"],
+		CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
+		ConfigDirectory: ignoredDir,
+	}})
+}
+
 func TestDiscoverLintTargetsMultiConfig_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	rootDir, paths := setupDiscoveryFixture(t, []string{
 		"real/other.ts",

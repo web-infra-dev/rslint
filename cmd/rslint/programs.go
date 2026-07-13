@@ -154,15 +154,15 @@ func createProgramSetForConfig(
 // dependency, since Program creation only reads
 // entry.LanguageOptions.ParserOptions.Project (see
 // LoadTsConfigsFromRslintConfig), never entry.Ignores. Calling it before vs.
-// after gitignore globs are prepended is equivalent for TS Program creation.
+// after .gitignore patterns are injected is equivalent for TS Program creation.
 //
-// The returned config is the gitignore-augmented config (gitignore globs
-// prepended when non-empty), suitable for downstream target discovery /
-// GetConfigForFile.
+// The returned config carries the collected .gitignore patterns used by
+// downstream target admission. File-only calls can supply an exact target set.
 func parallelGitignoreAndPrograms(
 	rslintConfig rslintconfig.RslintConfig,
 	configDir string,
 	fsys vfs.FS,
+	targetFiles []string,
 	singleThreaded bool,
 	parseCache *utils.ParseCache,
 ) (rslintconfig.RslintConfig, lintProgramSet, error) {
@@ -171,13 +171,13 @@ func parallelGitignoreAndPrograms(
 		programs          lintProgramSet
 		programErr        error
 	)
-	// gitignore reading and program creation are independent
+	// .gitignore collection and program creation are independent
 	// (Program creation only reads parserOptions.project, never Ignores),
 	// so run them on the shared WorkGroup — which honors --singleThreaded the
 	// same way the lint and type-check phases do.
 	wg := core.NewWorkGroup(singleThreaded)
 	wg.Queue(func() {
-		configWithIgnores = rslintconfig.ConfigWithGitignore(rslintConfig, configDir, fsys, nil)
+		configWithIgnores = rslintconfig.ConfigWithGitignore(rslintConfig, configDir, fsys, targetFiles)
 	})
 	wg.Queue(func() {
 		programs, programErr = createProgramSetForConfig(configDir, rslintConfig, singleThreaded, fsys, parseCache)

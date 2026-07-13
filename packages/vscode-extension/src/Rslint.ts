@@ -23,11 +23,19 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
+  CONFIG_DISCOVERY_PROTOCOL_VERSION,
+  ConfigModuleHost,
   loadConfigFileFresh,
   normalizeConfig,
   collectPluginMeta,
   filterConfigsByParentIgnores,
   JS_CONFIG_FILES,
+  type ActivateConfigsRequest,
+  type ActivateConfigsResponse,
+  type ConfigModuleEslintPluginEntry,
+  type ConfigModulePluginDescriptor,
+  type LoadConfigsRequest,
+  type LoadConfigsResponse,
 } from '@rslint/core/config-loader';
 import { PluginLintPool } from './PluginLintPool';
 import type { EslintPluginLintRequest } from '@rslint/core/eslint-plugin';
@@ -45,12 +53,311 @@ const LOCKFILE_NAMES = [
 
 export const JS_CONFIG_SEARCH_GLOB = `**/{${JS_CONFIG_FILES.join(',')}}`;
 export const JS_CONFIG_SEARCH_EXCLUDE_PATTERN = '**/{node_modules,.git}/**';
-const CONFIG_WATCH_GLOB = `**/{${[
+export const CONFIG_WATCH_GLOB = `**/{${[
+  ...JS_CONFIG_FILES,
+  'rslint.json',
+  'rslint.jsonc',
+  '.gitignore',
+  ...LOCKFILE_NAMES,
+].join(',')}}`;
+export const CONFIG_REFRESH_WATCH_GLOB = `**/{${[
   ...JS_CONFIG_FILES,
   'rslint.json',
   'rslint.jsonc',
   ...LOCKFILE_NAMES,
 ].join(',')}}`;
+
+export type ConfigRefreshReason =
+  | 'initial'
+  | 'config-change'
+  | 'gitignore-change'
+  | 'dependency-change';
+
+interface ConfigRefreshRequest {
+  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
+  reason: ConfigRefreshReason;
+}
+
+export interface ConfigActivationWireResponse {
+  transactionId: string;
+  /** Plugin-lint requests use the discovery transaction as their generation. */
+  generation: string;
+  /** Empty when no matching worker generation could be staged. */
+  eslintPluginEntries: ConfigModuleEslintPluginEntry[];
+  /** False lets Go preserve its last-good catalog instead of committing. */
+  pluginHostReady: boolean;
+}
+
+export interface ConfigTransactionControlRequest {
+  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
+  transactionId: string;
+}
+
+export interface ConfigCommitWireResponse {
+  transactionId: string;
+  generation: string;
+  committed: true;
+}
+
+export interface ConfigAbortWireResponse {
+  transactionId: string;
+  generation: string;
+  aborted: true;
+}
+
+/** Structural seams keep the JSON-RPC transaction adapter independently testable. */
+export interface ConfigModuleHostAdapter {
+  loadConfigs(
+    request: LoadConfigsRequest,
+    signal?: AbortSignal,
+  ): Promise<LoadConfigsResponse>;
+  activateConfigs(
+    request: ActivateConfigsRequest,
+    signal?: AbortSignal,
+    prepare?: (activation: ActivateConfigsResponse) => Promise<void>,
+  ): Promise<ActivateConfigsResponse>;
+  deleteSession(transactionId: string): boolean;
+}
+
+export interface PluginLintPoolAdapter {
+  prepare(
+    descriptors: ConfigModulePluginDescriptor[],
+    fingerprint: string,
+    generation: string,
+  ): Promise<boolean>;
+  commit(generation: string): Promise<boolean>;
+  abort(generation: string): Promise<void>;
+}
+
+export function normalizeConfigTransactionVersion(value: unknown): 0 | 1 | 2 {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return 0;
+  if (value >= 2) return 2;
+  return value === 1 ? 1 : 0;
+}
+
+export function configRefreshReasonForPath(
+  filePath: string,
+): Exclude<ConfigRefreshReason, 'initial'> {
+  const basename = path.basename(filePath);
+  if (basename === '.gitignore') return 'gitignore-change';
+  if ((LOCKFILE_NAMES as readonly string[]).includes(basename)) {
+    return 'dependency-change';
+  }
+  return 'config-change';
+}
+
+export function isConfigSourceChangeDuringTransaction(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  return (
+    candidate.code === 'CONFIG_CHANGED_DURING_LOAD' ||
+    (typeof candidate.message === 'string' &&
+      candidate.message.includes('config changed while'))
+  );
+}
+
+export async function retryConfigRefreshOnSourceChange(
+  initial: () => Promise<void>,
+  retry: () => Promise<void>,
+): Promise<boolean> {
+  try {
+    await initial();
+    return false;
+  } catch (error) {
+    if (!isConfigSourceChangeDuringTransaction(error)) throw error;
+    await retry();
+    return true;
+  }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  if (signal.reason instanceof Error) throw signal.reason;
+  throw new Error('config transaction was cancelled');
+}
+
+function assertTransactionControlRequest(
+  request: ConfigTransactionControlRequest,
+): void {
+  if (!request || typeof request !== 'object') {
+    throw new Error('config transaction request must be an object');
+  }
+  if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
+    throw new Error(
+      `unsupported config transaction protocol ${String(request.protocolVersion)}`,
+    );
+  }
+  if (
+    typeof request.transactionId !== 'string' ||
+    request.transactionId.length === 0
+  ) {
+    throw new Error('config transactionId must be a non-empty string');
+  }
+}
+
+/**
+ * LSP transport adapter for the shared config module host.
+ *
+ * Go owns discovery, ignore semantics, last-good selection and catalog commit.
+ * This adapter only evaluates Go's candidates, stages the matching plugin host,
+ * and mirrors Go's final commit/abort for the same transaction ID.
+ */
+export class LspConfigTransactionAdapter {
+  private readonly transactions = new Set<string>();
+  private disposed = false;
+
+  constructor(
+    private readonly host: ConfigModuleHostAdapter,
+    private readonly pluginLintPool: PluginLintPoolAdapter,
+    private readonly fingerprint: (
+      activation: ActivateConfigsResponse,
+    ) => string,
+  ) {}
+
+  async loadConfigs(
+    request: LoadConfigsRequest,
+    signal?: AbortSignal,
+  ): Promise<LoadConfigsResponse> {
+    this.assertActive();
+    assertTransactionControlRequest(request);
+    throwIfAborted(signal);
+    const transactionId = request.transactionId;
+    this.transactions.add(transactionId);
+    try {
+      // Editor reloads must not reuse the config entry module. Go still sends
+      // the shared envelope, but the LSP transport makes that entry-freshness
+      // invariant explicit for every frontier. Static transitive imports retain
+      // Node's normal module-cache semantics; full graph isolation requires a
+      // separate evaluator realm rather than query-busting only the entry URL.
+      const response = await this.host.loadConfigs(
+        { ...request, loadMode: 'fresh' },
+        signal,
+      );
+      this.assertActive();
+      throwIfAborted(signal);
+      return response;
+    } catch (error) {
+      this.cleanup(transactionId);
+      throw error;
+    }
+  }
+
+  async activateConfigs(
+    request: ActivateConfigsRequest,
+    signal?: AbortSignal,
+  ): Promise<ConfigActivationWireResponse> {
+    this.assertActive();
+    assertTransactionControlRequest(request);
+    throwIfAborted(signal);
+    const generation = request.transactionId;
+    try {
+      let pluginHostReady = false;
+      const activation = await this.host.activateConfigs(
+        request,
+        signal,
+        async (candidate) => {
+          this.assertActive();
+          throwIfAborted(signal);
+          pluginHostReady = await this.pluginLintPool.prepare(
+            candidate.pluginConfigs,
+            this.fingerprint(candidate),
+            generation,
+          );
+          this.assertActive();
+          throwIfAborted(signal);
+        },
+      );
+      this.assertActive();
+      throwIfAborted(signal);
+      return {
+        transactionId: activation.transactionId,
+        generation,
+        // Never ask Go to register/dispatch placeholder rules without the
+        // matching worker generation. On first startup Go may still commit the
+        // ordinary native config as a degraded no-host generation; with a
+        // last-good generation it instead aborts this transaction.
+        eslintPluginEntries: pluginHostReady
+          ? activation.eslintPluginEntries
+          : [],
+        pluginHostReady,
+      };
+    } catch (error) {
+      await this.pluginLintPool.abort(generation).catch(() => undefined);
+      this.cleanup(generation);
+      throw error;
+    }
+  }
+
+  async commitConfigs(
+    request: ConfigTransactionControlRequest,
+  ): Promise<ConfigCommitWireResponse> {
+    this.assertActive();
+    assertTransactionControlRequest(request);
+    const generation = request.transactionId;
+    if (!(await this.pluginLintPool.commit(generation))) {
+      throw new Error(
+        `failed to commit plugin-host generation ${JSON.stringify(generation)}`,
+      );
+    }
+    this.cleanup(generation);
+    return {
+      transactionId: generation,
+      generation,
+      committed: true,
+    };
+  }
+
+  async abortConfigs(
+    request: ConfigTransactionControlRequest,
+  ): Promise<ConfigAbortWireResponse> {
+    assertTransactionControlRequest(request);
+    const generation = request.transactionId;
+    try {
+      await this.pluginLintPool.abort(generation);
+    } finally {
+      this.cleanup(generation);
+    }
+    return {
+      transactionId: generation,
+      generation,
+      aborted: true,
+    };
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const transactionId of this.transactions) {
+      this.host.deleteSession(transactionId);
+    }
+    this.transactions.clear();
+  }
+
+  private cleanup(transactionId: string): void {
+    this.host.deleteSession(transactionId);
+    this.transactions.delete(transactionId);
+  }
+
+  private assertActive(): void {
+    if (this.disposed) {
+      throw new Error('config transaction adapter is disposed');
+    }
+  }
+}
+
+async function withCancellationSignal<T>(
+  token: CancellationToken,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  if (token.isCancellationRequested) controller.abort();
+  const subscription = token.onCancellationRequested(() => controller.abort());
+  try {
+    return await operation(controller.signal);
+  } finally {
+    subscription.dispose();
+  }
+}
 
 /** A loaded + normalized config file with its source path. */
 interface LoadedConfig {
@@ -140,6 +447,12 @@ export class Rslint implements Disposable {
   private readonly workspaceFolder: WorkspaceFolder;
   private readonly lspOutputChannel: OutputChannel | undefined;
   private readonly outputChannel: OutputChannel | undefined;
+  /**
+   * Legacy language-client synchronization watcher. V2 replaces it with the
+   * scoped direct watcher below so one workspace mutation cannot arrive both
+   * as didChangeWatchedFiles and rslint/configRefresh.
+   */
+  private synchronizedConfigWatcher: FileSystemWatcher | undefined;
   private configWatcher: FileSystemWatcher | undefined;
   private dependencyWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
@@ -148,8 +461,10 @@ export class Rslint implements Disposable {
   private hasSentJSConfig = false;
   private lifecycleEpoch = 0;
   private configGeneration = 0;
+  private pluginDependencyRevision = 0;
   private pluginLintPoolDisposed = false;
   private configTransactionVersion = 0;
+  private configTransactionAdapter: LspConfigTransactionAdapter | undefined;
   /**
    * Hosts the in-process WorkerPool that answers Go's reverse
    * `rslint/pluginLint` requests for rules mounted via a config's
@@ -187,6 +502,9 @@ export class Rslint implements Disposable {
     const pluginLintPool = this.pluginLintPool;
     this.hasSentJSConfig = false;
     this.lastGoodConfigs.clear();
+    this.pluginDependencyRevision = 0;
+    this.configTransactionAdapter?.dispose();
+    this.configTransactionAdapter = undefined;
 
     const binPath = await this.getBinaryPath();
     this.logger.info('Rslint binary path:', binPath);
@@ -207,6 +525,8 @@ export class Rslint implements Disposable {
       .get<string>('trace.server', 'off');
     const traceEnabled = traceServer !== 'off';
 
+    this.synchronizedConfigWatcher =
+      workspace.createFileSystemWatcher(CONFIG_WATCH_GLOB);
     const clientOptions: LanguageClientOptions = {
       documentSelector: [
         { scheme: 'file', language: 'typescript' },
@@ -215,7 +535,7 @@ export class Rslint implements Disposable {
         { scheme: 'file', language: 'javascriptreact' },
       ],
       synchronize: {
-        fileEvents: workspace.createFileSystemWatcher(CONFIG_WATCH_GLOB),
+        fileEvents: this.synchronizedConfigWatcher,
       },
       outputChannel: this.outputChannel,
     };
@@ -243,6 +563,40 @@ export class Rslint implements Disposable {
         this.client,
       );
 
+      if (this.configTransactionVersion >= 2) {
+        const adapter = new LspConfigTransactionAdapter(
+          new ConfigModuleHost(),
+          pluginLintPool,
+          (activation) => this.computeActivationFingerprint(activation),
+        );
+        this.configTransactionAdapter = adapter;
+
+        this.client.onRequest(
+          'rslint/loadConfigs',
+          async (params: LoadConfigsRequest, token: CancellationToken) =>
+            withCancellationSignal(token, (signal) =>
+              adapter.loadConfigs(params, signal),
+            ),
+        );
+        this.client.onRequest(
+          'rslint/activateConfigs',
+          async (params: ActivateConfigsRequest, token: CancellationToken) =>
+            withCancellationSignal(token, (signal) =>
+              adapter.activateConfigs(params, signal),
+            ),
+        );
+        this.client.onRequest(
+          'rslint/commitConfigs',
+          async (params: ConfigTransactionControlRequest) =>
+            adapter.commitConfigs(params),
+        );
+        this.client.onRequest(
+          'rslint/abortConfigs',
+          async (params: ConfigTransactionControlRequest) =>
+            adapter.abortConfigs(params),
+        );
+      }
+
       // Answer Go's reverse `rslint/pluginLint` requests: Go lints
       // natively but dispatches rules mounted via a config's object-form
       // `plugins` back to us, where the JS WorkerPool runs them. The generic
@@ -264,45 +618,35 @@ export class Rslint implements Disposable {
         this.logger.info(`LSP trace level set to: ${traceServer}`);
       }
 
-      // Install the watchers before the initial load. A file changed while the
-      // first import is running then queues a second, serialized reload instead
-      // of being missed between initial load and watcher registration.
-      this.configWatcher = workspace.createFileSystemWatcher(
-        new RelativePattern(this.workspaceFolder, JS_CONFIG_SEARCH_GLOB),
-      );
-      const reloadConfig = (kind: string) => (uri: Uri) => {
-        this.logger.debug(`${kind} changed: ${uri.fsPath}`);
-        clearTimeout(this.configReloadTimer);
-        this.configReloadTimer = setTimeout(() => {
-          this.configReloadTimer = undefined;
-          this.loadAndSendConfig().catch((err: unknown) => {
-            this.logger.error('Failed to reload JS config', err);
-          });
-        }, 300);
-      };
-      const reloadJSConfig = reloadConfig('JS config file');
-      this.configWatcher.onDidChange(reloadJSConfig);
-      this.configWatcher.onDidCreate(reloadJSConfig);
-      this.configWatcher.onDidDelete(reloadJSConfig);
-
-      // computeFingerprint includes workspace-root dependency lockfiles because
-      // an install can replace a mounted plugin without changing its config.
-      // The language client's watcher only informs Go; this watcher is what
-      // rebuilds the Node plugin host.
-      this.dependencyWatcher = workspace.createFileSystemWatcher(
-        new RelativePattern(
-          this.workspaceFolder,
-          '{package-lock.json,pnpm-lock.yaml,yarn.lock}',
-        ),
-      );
-      const reloadDependencies = reloadConfig('Dependency lockfile');
-      this.dependencyWatcher.onDidChange(reloadDependencies);
-      this.dependencyWatcher.onDidCreate(reloadDependencies);
-      this.dependencyWatcher.onDidDelete(reloadDependencies);
-
-      // Load JS config and send it to the LSP server. Reloads queued by either
-      // watcher above run after this call through configReloadChain.
-      await this.loadAndSendConfig();
+      if (this.configTransactionVersion >= 2) {
+        this.installConfigRefreshWatcher();
+        // The direct watcher is now live. Stop the language-client forwarding
+        // watcher before initial discovery so later workspace edits have one
+        // and only one transaction owner. Legacy v0/v1 keeps that watcher for
+        // JSON config and .gitignore notifications to Go.
+        this.synchronizedConfigWatcher?.dispose();
+        this.synchronizedConfigWatcher = undefined;
+        // The watcher is live before initial discovery, so a mutation during a
+        // slow module evaluation schedules a second serialized transaction.
+        // A plugin worker is prepared between two config fingerprints. If the
+        // initial source changes in that window, Go correctly aborts the
+        // generation. Retry once from the now-current bytes instead of tearing
+        // down the language client before the already-live watcher can recover.
+        const retried = await retryConfigRefreshOnSourceChange(
+          () => this.requestConfigRefresh('initial'),
+          () => this.requestConfigRefresh('config-change'),
+        );
+        if (retried) {
+          this.logger.warn(
+            'Config changed during initial activation; discovery recovered on retry',
+          );
+        }
+      } else {
+        // Legacy binaries still expect Node to scan the workspace and push one
+        // configUpdate payload. Keep that path byte-for-byte compatible.
+        this.installLegacyConfigWatchers();
+        await this.loadAndSendConfig();
+      }
 
       this.logger.info('Rslint language client started successfully');
     } catch (err: unknown) {
@@ -317,6 +661,106 @@ export class Rslint implements Disposable {
       }
       throw err;
     }
+  }
+
+  private installConfigRefreshWatcher(): void {
+    this.configWatcher = workspace.createFileSystemWatcher(
+      // Go owns the config-scoped .gitignore watcher and refresh transaction.
+      // Keeping it out of this direct v2 watcher prevents one mutation from
+      // starting both a didChangeWatchedFiles and a configRefresh transaction.
+      new RelativePattern(this.workspaceFolder, CONFIG_REFRESH_WATCH_GLOB),
+    );
+    const refreshConfig = (uri: Uri) => {
+      const reason = configRefreshReasonForPath(uri.fsPath);
+      if (reason === 'dependency-change') {
+        // The actual package contents can change while config source bytes stay
+        // identical. Feed a monotonic dependency revision into the staged host
+        // fingerprint so any lockfile mutation forces a worker rebuild.
+        this.pluginDependencyRevision++;
+      }
+      this.logger.debug(`${reason}: ${uri.fsPath}`);
+      clearTimeout(this.configReloadTimer);
+      this.configReloadTimer = setTimeout(() => {
+        this.configReloadTimer = undefined;
+        this.requestConfigRefresh(reason).catch((err: unknown) => {
+          this.logger.error('Failed to refresh config discovery', err);
+        });
+      }, 300);
+    };
+    this.configWatcher.onDidChange(refreshConfig);
+    this.configWatcher.onDidCreate(refreshConfig);
+    this.configWatcher.onDidDelete(refreshConfig);
+  }
+
+  private installLegacyConfigWatchers(): void {
+    // Install the watchers before the initial load. A file changed while the
+    // first import is running then queues a second, serialized reload instead
+    // of being missed between initial load and watcher registration.
+    this.configWatcher = workspace.createFileSystemWatcher(
+      new RelativePattern(this.workspaceFolder, JS_CONFIG_SEARCH_GLOB),
+    );
+    const reloadConfig = (kind: string) => (uri: Uri) => {
+      this.logger.debug(`${kind} changed: ${uri.fsPath}`);
+      clearTimeout(this.configReloadTimer);
+      this.configReloadTimer = setTimeout(() => {
+        this.configReloadTimer = undefined;
+        this.loadAndSendConfig().catch((err: unknown) => {
+          this.logger.error('Failed to reload JS config', err);
+        });
+      }, 300);
+    };
+    const reloadJSConfig = reloadConfig('JS config file');
+    this.configWatcher.onDidChange(reloadJSConfig);
+    this.configWatcher.onDidCreate(reloadJSConfig);
+    this.configWatcher.onDidDelete(reloadJSConfig);
+
+    // computeFingerprint includes workspace-root dependency lockfiles because
+    // an install can replace a mounted plugin without changing its config.
+    // The language client's watcher only informs Go; this watcher is what
+    // rebuilds the Node plugin host.
+    this.dependencyWatcher = workspace.createFileSystemWatcher(
+      new RelativePattern(
+        this.workspaceFolder,
+        '{package-lock.json,pnpm-lock.yaml,yarn.lock}',
+      ),
+    );
+    const reloadDependencies = reloadConfig('Dependency lockfile');
+    this.dependencyWatcher.onDidChange(reloadDependencies);
+    this.dependencyWatcher.onDidCreate(reloadDependencies);
+    this.dependencyWatcher.onDidDelete(reloadDependencies);
+  }
+
+  private async requestConfigRefresh(
+    reason: ConfigRefreshReason,
+  ): Promise<void> {
+    const epoch = this.lifecycleEpoch;
+    const client = this.client;
+    const pluginLintPool = this.pluginLintPool;
+    const adapter = this.configTransactionAdapter;
+    if (
+      !client ||
+      !adapter ||
+      this.configTransactionVersion < 2 ||
+      this.pluginLintPoolDisposed
+    ) {
+      return;
+    }
+    const refresh = this.configReloadChain.then(async () => {
+      if (
+        !this.isLifecycleCurrent(epoch, client, pluginLintPool) ||
+        adapter !== this.configTransactionAdapter ||
+        this.configTransactionVersion < 2
+      ) {
+        return;
+      }
+      const request: ConfigRefreshRequest = {
+        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+        reason,
+      };
+      await client.sendRequest('rslint/configRefresh', request);
+    });
+    this.configReloadChain = refresh.catch(() => undefined);
+    await refresh;
   }
 
   private async loadAndSendConfig(): Promise<void> {
@@ -358,7 +802,7 @@ export class Rslint implements Disposable {
       const capabilities = await client.sendRequest<{
         transactionVersion?: number;
       }>('rslint/configCapabilities');
-      return capabilities.transactionVersion === 1 ? 1 : 0;
+      return normalizeConfigTransactionVersion(capabilities.transactionVersion);
     } catch {
       // An older custom binary does not implement the capability request. Keep
       // its historical notification/single-host protocol instead of hanging on
@@ -642,9 +1086,22 @@ export class Rslint implements Disposable {
     }
   }
 
+  private computeActivationFingerprint(
+    activation: ActivateConfigsResponse,
+  ): string {
+    const sourceFingerprint = this.computeFingerprint(
+      activation.pluginConfigs.map((config) => config.configPath),
+      activation.configs,
+    );
+    return `${sourceFingerprint}|dependency-revision:${this.pluginDependencyRevision}`;
+  }
+
   private computeFingerprint(
     configPaths: string[],
-    configs: readonly LoadedConfig[] = [],
+    configs: ReadonlyArray<{
+      configPath: string;
+      sourceFingerprint: string;
+    }> = [],
   ): string {
     const parts: string[] = [];
     const sourceFingerprintByPath = new Map(
@@ -669,10 +1126,14 @@ export class Rslint implements Disposable {
   public async stop(): Promise<void> {
     this.lifecycleEpoch++;
     clearTimeout(this.configReloadTimer);
+    this.synchronizedConfigWatcher?.dispose();
+    this.synchronizedConfigWatcher = undefined;
     this.configWatcher?.dispose();
     this.configWatcher = undefined;
     this.dependencyWatcher?.dispose();
     this.dependencyWatcher = undefined;
+    this.configTransactionAdapter?.dispose();
+    this.configTransactionAdapter = undefined;
     // Do not await configReloadChain: user config evaluation can contain a
     // non-settling top-level await. The epoch above makes any late completion
     // side-effect free, while resetting the chain keeps a future start usable.
@@ -697,6 +1158,7 @@ export class Rslint implements Disposable {
     this.lastGoodConfigs.clear();
     this.hasSentJSConfig = false;
     this.configTransactionVersion = 0;
+    this.pluginDependencyRevision = 0;
     if (poolResult.status === 'rejected') throw poolResult.reason;
     if (clientResult.status === 'rejected') throw clientResult.reason;
   }
@@ -721,6 +1183,8 @@ export class Rslint implements Disposable {
     clearTimeout(this.configReloadTimer);
     this.configReloadChain = Promise.resolve();
     this.pluginLintPoolDisposed = true;
+    this.configTransactionAdapter?.dispose();
+    this.configTransactionAdapter = undefined;
     void this.pluginLintPool.dispose();
     const client = this.client;
     this.client = undefined;
@@ -730,7 +1194,11 @@ export class Rslint implements Disposable {
       });
     }
     this.configWatcher?.dispose();
+    this.configWatcher = undefined;
+    this.synchronizedConfigWatcher?.dispose();
+    this.synchronizedConfigWatcher = undefined;
     this.dependencyWatcher?.dispose();
+    this.dependencyWatcher = undefined;
     this.lspOutputChannel?.dispose();
   }
 

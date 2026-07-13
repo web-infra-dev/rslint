@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
@@ -28,19 +30,65 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 				return isDirAbsolutelyBlocked(relativePath, configIgnores)
 			}
 		}
-	} else {
-		if fsys != nil && len(targetFiles) > 0 {
-			collectionFiles = make([]string, len(targetFiles))
-			for i, file := range targetFiles {
-				collectionFiles[i] = gitignoreCollectionFilePath(file, configDir, fsys)
-			}
+	} else if fsys != nil && len(targetFiles) > 0 {
+		collectionFiles = make([]string, len(targetFiles))
+		for i, file := range targetFiles {
+			collectionFiles[i] = gitignoreCollectionFilePath(file, configDir, fsys)
 		}
 	}
 	globs := gitignore.CollectWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
 	if len(globs) == 0 {
 		return config
 	}
-	return append(RslintConfig{{Ignores: globs}}, config...)
+	caseInsensitive := fsys != nil && !fsys.UseCaseSensitiveFileNames()
+	gitignoreEntry := ConfigEntry{
+		Ignores:                  globs,
+		gitignoreSemantics:       true,
+		gitignoreCaseInsensitive: caseInsensitive,
+	}
+	effective := make(RslintConfig, 0, len(config)+1)
+	effective = append(effective, gitignoreEntry)
+	effective = append(effective, config...)
+	return effective
+}
+
+// parseCollectedGitignorePatterns projects collected Git patterns onto the
+// flat-config matcher without turning them into irreversible ESLint directory
+// blocks. The synthetic patterns still participate in the same ordered list as
+// authored config ignores, so a later config negation can re-include a target.
+func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []IgnorePattern {
+	patterns := make([]IgnorePattern, 0, len(globs)*2)
+	parse := func(raw string) IgnorePattern {
+		pattern := ParseIgnorePattern(raw)
+		pattern.CaseInsensitive = caseInsensitive
+		return pattern
+	}
+	for _, raw := range globs {
+		negated := strings.HasPrefix(raw, "!")
+		body := strings.TrimPrefix(raw, "!")
+		if body == "" {
+			continue
+		}
+
+		prefix := ""
+		if negated {
+			prefix = "!"
+		}
+		if strings.HasSuffix(body, "/**") && !strings.HasSuffix(body, "/**/*") {
+			patterns = append(patterns, parse(prefix+body+"/*"))
+			continue
+		}
+		if strings.HasSuffix(body, "/**/*") {
+			patterns = append(patterns, parse(raw))
+			continue
+		}
+
+		direct := parse(raw)
+		direct.Kind = dirNone
+		patterns = append(patterns, direct)
+		patterns = append(patterns, parse(prefix+body+"/**/*"))
+	}
+	return patterns
 }
 
 func gitignoreCollectionFilePath(filePath string, configDir string, fsys vfs.FS) string {

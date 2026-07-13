@@ -18,9 +18,9 @@
 //
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
-// dispatch on intent (--help / --init / lint) → (lint) synthesize stdin from
-// the init config payload → run the shared executeLintPipeline → drain
-// output, send `shutdown`, exit.
+// dispatch on intent (--help / --init / lint) → run the shared
+// executeLintPipeline (using either a typed Go-discovered catalog or the legacy
+// serialized config payload) → drain output, send `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
 // disconnect, init/transport error) · 130 interrupted.
@@ -44,7 +44,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -54,10 +58,12 @@ import (
 // The transport (ipc.Channel) owns only response/error/handshake/exit; the
 // kinds below are declared here and travel through the same opaque envelope.
 const (
-	kindInit       ipc.MessageKind = "init"       // Node → Go: handshake payload
-	kindShutdown   ipc.MessageKind = "shutdown"   // Go → Node: lint done
-	kindOutput     ipc.MessageKind = "output"     // Go → Node: forwarded stdout text
-	kindPluginLint ipc.MessageKind = "pluginLint" // Go → Node: run ESLint-plugin rules in a worker
+	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
+	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
+	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text
+	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
+	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
+	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
 )
 
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
@@ -86,6 +92,43 @@ type initPayload struct {
 	// can register placeholder rules for plugin rule names. The live plugin
 	// objects stay in Node (the worker re-imports the config to load them).
 	EslintPlugins []rslintconfig.EslintPluginEntry `json:"eslintPlugins,omitempty"`
+
+	// ConfigDiscovery asks Go to own JS/TS config discovery. Older hosts omit
+	// it and keep sending preloaded Configs above.
+	ConfigDiscovery *configDiscoveryPayload `json:"configDiscovery,omitempty"`
+}
+
+type configDiscoveryPayload struct {
+	Mode               string `json:"mode"`
+	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
+}
+
+type ipcConfigModuleLoader struct {
+	channel *ipc.Channel
+}
+
+func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request rslintconfig.ConfigLoadBatchRequest) (rslintconfig.ConfigLoadBatchResponse, error) {
+	msg, err := loader.channel.SendRequest(ctx, kindLoadConfigs, request)
+	if err != nil {
+		return rslintconfig.ConfigLoadBatchResponse{}, err
+	}
+	var response rslintconfig.ConfigLoadBatchResponse
+	if err := msg.Decode(&response); err != nil {
+		return rslintconfig.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs response: %w", err)
+	}
+	return response, nil
+}
+
+func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, request rslintconfig.ConfigActivationRequest) (rslintconfig.ConfigActivationResponse, error) {
+	msg, err := loader.channel.SendRequest(ctx, kindActivateConfigs, request)
+	if err != nil {
+		return rslintconfig.ConfigActivationResponse{}, err
+	}
+	var response rslintconfig.ConfigActivationResponse
+	if err := msg.Decode(&response); err != nil {
+		return rslintconfig.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs response: %w", err)
+	}
+	return response, nil
 }
 
 // runtimePayload is the IPC-bound subset of runtime knobs that don't have (or
@@ -235,6 +278,41 @@ func runCLI(args []string) int {
 	// expects the binary to load JSON config from disk (ConfigStdin=false).
 	baseArgs.ConfigStdin = len(payload.Configs) > 0
 	baseArgs.EslintPlugins = payload.EslintPlugins
+	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+	// Preserve help/init priority, then reject an invalid payload-authoritative
+	// format before config discovery can execute user JavaScript.
+	if !help && !baseArgs.Init {
+		if _, err := output.ParseFormat(baseArgs.Format); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			_ = ch.Close()
+			return 2
+		}
+	}
+
+	// New hosts send only discovery intent. Go scans the reachable staged
+	// frontier, asks Node to evaluate exact candidates, and converts the final
+	// catalog into the existing multi-config pipeline payload. Help/init and an
+	// explicit JSON --config do not need the JavaScript module host.
+	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil && payload.ConfigDiscovery.Mode != "disabled" {
+		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
+			// Discovery now includes the potentially long Go walk and reverse
+			// Node loads. A signal can cancel either before the mirror goroutine
+			// publishes state.signalled, so consult the source context as well.
+			// Interrupts keep the CLI's documented 130 exit and are not reported
+			// as ordinary configuration failures.
+			interrupted := markCLIInterrupted(lintCtx, state)
+			if !interrupted {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			}
+			shutdownPeer(ch, state)
+			_ = ch.Close()
+			if interrupted {
+				return 130
+			}
+			return 1
+		}
+	}
 
 	// ── stdout redirect (mandatory for every intent) ──────────────────────
 	// The peer holds the real stdout for IPC frames, so any plain-text write
@@ -276,7 +354,7 @@ func runCLI(args []string) int {
 	// ConfigStdin branch reads it unchanged. --init never reads a config
 	// payload (it returns before config load), and the JSON-config path
 	// (ConfigStdin=false) loads from disk itself.
-	if !baseArgs.Init && baseArgs.ConfigStdin {
+	if !baseArgs.Init && baseArgs.ConfigStdin && baseArgs.ConfigPayload == nil {
 		stdinR, stdinW, perr := os.Pipe()
 		if perr != nil {
 			finalizeStdout()
@@ -329,6 +407,17 @@ func runCLI(args []string) int {
 	return exitCode
 }
 
+func markCLIInterrupted(ctx context.Context, state *runCLIState) bool {
+	interrupted := state != nil && state.signalled.Load()
+	if !interrupted && ctx != nil {
+		interrupted = ctx.Err() != nil
+	}
+	if interrupted && state != nil {
+		state.signalled.Store(true)
+	}
+	return interrupted
+}
+
 // shutdownPeer best-effort tells the peer we're done so it drains its worker
 // pool and exits cleanly. Skipped if a signal already fired: the peer sees its
 // own stdin disconnect anyway, and pushing another frame races the closing
@@ -363,6 +452,102 @@ func classifyPaths(paths []string) (files []string, dirs []string) {
 		}
 	}
 	return files, dirs
+}
+
+func discoverCLIConfigCatalog(
+	ctx context.Context,
+	args *lintArgs,
+	payload *initPayload,
+	channel *ipc.Channel,
+) error {
+	if args == nil || payload == nil || payload.ConfigDiscovery == nil {
+		return nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory for config discovery: %w", err)
+	}
+	cwd = tspath.NormalizePath(cwd)
+	request := rslintconfig.ConfigDiscoveryRequest{
+		CWD:            cwd,
+		Directories:    append([]string(nil), args.AllowDirs...),
+		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
+		SingleThreaded: args.SingleThreaded,
+	}
+	for _, filePath := range args.AllowFiles {
+		request.Files = append(request.Files, rslintconfig.DiscoveryFile{
+			Path:     filePath,
+			Explicit: true,
+		})
+	}
+	switch payload.ConfigDiscovery.Mode {
+	case "auto", "":
+		request.Mode = rslintconfig.ConfigDiscoveryAuto
+	case "explicit":
+		request.Mode = rslintconfig.ConfigDiscoveryExplicit
+		request.ExplicitConfigPath = payload.ConfigDiscovery.ExplicitConfigPath
+	default:
+		return fmt.Errorf("unsupported config discovery mode %q", payload.ConfigDiscovery.Mode)
+	}
+
+	catalog, err := rslintconfig.NewConfigDiscoverySession(
+		args.FS,
+		&ipcConfigModuleLoader{channel: channel},
+	).Build(ctx, request)
+	if err != nil {
+		return err
+	}
+	for _, failure := range catalog.Failures {
+		fmt.Fprintf(os.Stderr, "Warning: skipping config %s: %s\n", failure.Path, failure.Message)
+	}
+
+	configDirectories := catalog.ConfigDirectories()
+	// An explicitly selected module is one invocation-wide flat config, even for
+	// targets outside cwd. Keep it on the single-config pipeline so hierarchical
+	// owner lookup cannot accidentally drop such a target.
+	if len(configDirectories) == 1 {
+		configDir := configDirectories[0]
+		if catalog.Sources[configDir].ExplicitConfig {
+			args.ConfigPayload = &parsedPayload{
+				SingleConfig:    append(rslintconfig.RslintConfig(nil), catalog.Configs[configDir]...),
+				SingleConfigDir: configDir,
+				IsMultiConfig:   false,
+			}
+			args.ConfigStdin = true
+			args.EslintPlugins = catalog.EslintPlugins
+			return nil
+		}
+	}
+
+	directPayload := &parsedPayload{
+		ConfigMap:          make(map[string]rslintconfig.RslintConfig, len(catalog.Configs)),
+		OriginalConfigDir:  make(map[string]string, len(catalog.Configs)),
+		ConfigTargetScopes: make(map[string]rslintconfig.LintDiscoveryScope),
+		IsMultiConfig:      true,
+	}
+	for _, configDir := range configDirectories {
+		scope := catalog.Scopes[configDir]
+		source := catalog.Sources[configDir]
+		directPayload.ConfigMap[configDir] = append(
+			rslintconfig.RslintConfig(nil),
+			catalog.Configs[configDir]...,
+		)
+		directPayload.OriginalConfigDir[configDir] = configDir
+		scope.ExplicitOnly = source.ExplicitOnly || scope.ExplicitOnly
+		if scope.Files != nil || scope.ExplicitOnly {
+			scope.Files = append([]string(nil), scope.Files...)
+			directPayload.ConfigTargetScopes[configDir] = scope
+		}
+	}
+	if len(directPayload.ConfigMap) > 0 {
+		args.ConfigPayload = directPayload
+		args.ConfigStdin = true
+	} else {
+		args.ConfigPayload = nil
+		args.ConfigStdin = false
+	}
+	args.EslintPlugins = catalog.EslintPlugins
+	return nil
 }
 
 // startSynthStdinWriter feeds data into w from a background goroutine and

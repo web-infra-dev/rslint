@@ -3,11 +3,11 @@
 /**
  * The `Rslint` class — the ESLint-style programmatic API (issue #1106).
  *
- * It is a thin JS facade over the low-level `lint()` IPC: it owns config
- * resolution (overrideConfig / overrideConfigFile / auto-discovery →
- * normalizeConfig — all in JS, Go `--api` never reads config from disk) and
- * reshapes the wire-level LintResponse into ESLint v10's `LintResult[]`
- * (per-file results, numeric severity, absolute paths, per-result output).
+ * It is a thin JS facade over the low-level `lint()` IPC. Go owns config/file
+ * discovery, ignore semantics, and config ownership; reverse IPC asks this
+ * process to evaluate and normalize only the JavaScript config candidates Go
+ * selected. The facade also reshapes wire-level responses into ESLint v10's
+ * `LintResult[]` (per-file results, numeric severity, absolute paths, output).
  *
  * The Go side is the single long-lived `--api` process held by the underlying
  * service; `close()` tears it down (mirrors RSLintService.close()).
@@ -20,27 +20,23 @@ import picomatch from 'picomatch';
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
 import {
-  collectPluginMeta,
-  loadConfigFile,
+  ConfigModuleHost,
   normalizeConfig,
+  type ActivateConfigsRequest,
+  type ActivateConfigsResponse,
 } from '../config/config-loader.js';
 import {
-  coalesceCaseAliasedConfigs,
-  discoverConfigs,
-  filterConfigsByParentIgnores,
-  findJSConfig,
-  findNativeCaseAliasConfigPath,
-  type ConfigEntry,
-} from '../utils/config-discovery.js';
-import {
-  AncestorPathIndex,
-  createCachedAncestorFinder,
   nativePathIdentity,
   RunPathResolver,
   type ResolvedFilesystemPath,
 } from './path-identity.js';
 import type { RslintConfigEntry } from '../config/define-config.js';
-import type { Diagnostic, Fix, LintResponse } from '../types.js';
+import type {
+  Diagnostic,
+  Fix,
+  LintInboundHandlers,
+  LintResponse,
+} from '../types.js';
 
 export interface RslintOptions {
   /** Base directory for config discovery and relative path resolution. */
@@ -108,22 +104,66 @@ export interface LintResult {
   output?: string; // present only when fix:true changed the file
 }
 
-interface ResolvedConfig {
-  config: Record<string, unknown>[];
-  configPath?: string;
-  configDirectory: string;
-  pluginConfigDirectory: string;
-  routingKey: string;
-}
-
 interface PluginLintHost {
   lint(request: unknown): Promise<unknown>;
   shutdown(): Promise<void>;
 }
 
+/** @internal Resource registry shared by activation and API close tests. */
+export class PluginHostLifecycle {
+  readonly #pendingBuilds = new Set<Promise<unknown>>();
+  readonly #staged = new Set<PluginLintHost>();
+  readonly #active = new Set<PluginLintHost>();
+  readonly #shutdowns = new WeakMap<PluginLintHost, Promise<void>>();
+
+  trackBuild<T>(build: Promise<T>): Promise<T> {
+    this.#pendingBuilds.add(build);
+    void build.then(
+      () => this.#pendingBuilds.delete(build),
+      () => this.#pendingBuilds.delete(build),
+    );
+    return build;
+  }
+
+  stage(host: PluginLintHost): void {
+    this.#staged.add(host);
+  }
+
+  publish(host: PluginLintHost): void {
+    this.#staged.delete(host);
+    this.#active.add(host);
+  }
+
+  shutdown(host: PluginLintHost): Promise<void> {
+    this.#staged.delete(host);
+    this.#active.delete(host);
+    let shutdown = this.#shutdowns.get(host);
+    if (!shutdown) {
+      shutdown = host.shutdown();
+      this.#shutdowns.set(host, shutdown);
+    }
+    return shutdown;
+  }
+
+  async shutdownAll(): Promise<void> {
+    while (this.#pendingBuilds.size > 0) {
+      await Promise.allSettled([...this.#pendingBuilds]);
+    }
+    await Promise.allSettled(
+      [...new Set([...this.#staged, ...this.#active])].map((host) =>
+        this.shutdown(host),
+      ),
+    );
+  }
+}
+
 interface PluginLintSession {
   host: PluginLintHost;
-  eslintPlugins: Array<{ prefix: string; ruleNames: string[] }>;
+}
+
+interface NativeConfigDiscoverySession {
+  handlers: LintInboundHandlers;
+  shutdown(): Promise<void>;
 }
 
 type CreatePluginLintHost = (
@@ -148,26 +188,66 @@ async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
   return factory;
 }
 
+/**
+ * Stage one native-discovery activation without exposing a worker imported
+ * from config bytes that differ from Go's normalized entries.
+ *
+ * @internal Exported from this source module for lifecycle regression tests;
+ * it is intentionally not re-exported from the package root.
+ */
+export async function stageNativeConfigActivation(
+  configHost: ConfigModuleHost,
+  request: ActivateConfigsRequest,
+  getPluginHostFactory: () => Promise<CreatePluginLintHost>,
+  onLog: (record: { level: string; source: string; text: string }) => void,
+  isClosing: () => boolean,
+  lifecycle?: PluginHostLifecycle,
+): Promise<{
+  activation: ActivateConfigsResponse;
+  pluginHost: PluginLintHost | null;
+}> {
+  let pluginHost: PluginLintHost | null = null;
+  try {
+    const activation = await configHost.activateConfigs(
+      request,
+      undefined,
+      async (candidate) => {
+        if (candidate.pluginConfigs.length === 0) return;
+        if (isClosing()) throw new Error('rslint service is closing');
+        const createPluginLintHost = await getPluginHostFactory();
+        if (isClosing()) throw new Error('rslint service is closing');
+        const build = (async () => {
+          const host = await createPluginLintHost(
+            candidate.pluginConfigs,
+            onLog,
+          );
+          lifecycle?.stage(host);
+          return host;
+        })();
+        pluginHost = await (lifecycle?.trackBuild(build) ?? build);
+        if (isClosing()) throw new Error('rslint service is closing');
+      },
+    );
+    // close() can start while the post-prepare fingerprint read is pending.
+    if (isClosing()) throw new Error('rslint service is closing');
+    return { activation, pluginHost };
+  } catch (error) {
+    try {
+      const createdHost = pluginHost as PluginLintHost | null;
+      if (createdHost) {
+        await (lifecycle?.shutdown(createdHost) ?? createdHost.shutdown());
+      }
+    } catch {
+      // Preserve the activation error: the source mismatch is what Go must
+      // receive, while the host has still been asked to terminate.
+    }
+    throw error;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-
-interface LoadedConfigCandidate {
-  status: 'loaded';
-  configPath: string;
-  configDirectory: string;
-  baseConfig: Record<string, unknown>[];
-  resolved: ResolvedConfig;
-}
-
-interface FailedConfigCandidate {
-  status: 'failed';
-  configPath: string;
-  configDirectory: string;
-  error: Error;
-}
-
-type ConfigCandidate = LoadedConfigCandidate | FailedConfigCandidate;
 
 interface ClassifiedLintPatterns {
   literalFilePatterns: string[];
@@ -316,14 +396,6 @@ async function classifyLintPatterns(
   };
 }
 
-function createCachedConfigFinder(): (startDirectory: string) => string | null {
-  const find = createCachedAncestorFinder((directory) => {
-    const configPath = findJSConfig(directory);
-    return configPath ? path.normalize(configPath) : undefined;
-  });
-  return (startDirectory) => find(path.resolve(startDirectory)) ?? null;
-}
-
 export class Rslint {
   readonly #service: RSLintService;
   readonly #cwd: string;
@@ -331,7 +403,7 @@ export class Rslint {
   readonly #overrideConfigFile?: string | true | null;
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
-  readonly #activePluginHosts = new Set<PluginLintHost>();
+  readonly #pluginHosts = new PluginHostLifecycle();
   #normalizedOverrideConfig?: Record<string, unknown>[];
   #closeRequested = false;
   #closePromise?: Promise<void>;
@@ -363,46 +435,46 @@ export class Rslint {
     options: { filePath?: string } = {},
   ): Promise<LintResult[]> {
     const filePath = path.resolve(this.#cwd, options.filePath ?? '__text__.ts');
-    const lexicalDirectory = path.dirname(filePath);
     const pathResolver = new RunPathResolver();
     const resolvedFile =
       await pathResolver.resolveWithAncestorFallback(filePath);
-    const canonicalDirectory = path.dirname(resolvedFile.canonicalPath);
-    const resolved = await this.#resolveConfig(
-      lexicalDirectory,
-      canonicalDirectory,
-    );
-    const { config, configDirectory, pluginConfigDirectory } = resolved;
-    const pluginSession = await this.#createPluginLintSession([resolved]);
+    const overrideConfig = this.#getNormalizedOverrideConfig() ?? [];
+    const usesNativeDiscovery = this.#overrideConfigFile !== true;
+    const discoverySession = usesNativeDiscovery
+      ? this.#createNativeConfigDiscoverySession()
+      : null;
     try {
       const response = await this.#service.lint(
         {
-          config,
-          eslintPlugins: pluginSession?.eslintPlugins,
-          configDirectory,
-          pluginConfigDirectory,
+          config: usesNativeDiscovery ? undefined : overrideConfig,
+          configDiscovery: usesNativeDiscovery
+            ? {
+                mode:
+                  typeof this.#overrideConfigFile === 'string'
+                    ? 'explicit'
+                    : 'auto',
+                explicitConfigPath:
+                  typeof this.#overrideConfigFile === 'string'
+                    ? path.resolve(this.#cwd, this.#overrideConfigFile)
+                    : undefined,
+                explicitFiles: [true],
+                overrideConfig,
+              }
+            : undefined,
+          configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
           workingDirectory: this.#cwd,
           files: [filePath],
+          canonicalFiles: [resolvedFile.canonicalPath],
           // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
           // same-path code entry wins so `lintText` always lints `code`.
           fileContents: { ...this.#resolveOverlay(), [filePath]: code },
           fix: this.#fix,
         },
-        pluginSession
-          ? {
-              pluginLint: async (request) => {
-                const result = await pluginSession.host.lint(request);
-                return result;
-              },
-            }
-          : {},
+        discoverySession?.handlers ?? {},
       );
-      const results = this.#toLintResults(
-        response,
-        configDirectory,
-        [filePath],
-        { [filePath]: code },
-      );
+      const results = this.#toLintResults(response, this.#cwd, [filePath], {
+        [filePath]: code,
+      });
       // ESLint's lintText returns exactly one result — for the linted buffer. An
       // in-memory overlay dependency file (pulled into the program and matching
       // the config) can carry its own diagnostics; keep only the linted file so
@@ -422,7 +494,7 @@ export class Rslint {
       }
       return primary;
     } finally {
-      await this.#shutdownPluginSession(pluginSession);
+      await discoverySession?.shutdown();
     }
   }
 
@@ -498,156 +570,70 @@ export class Rslint {
       }),
     );
 
-    const configByFile = await this.#resolveLintFileConfigs(
-      plannedFiles,
-      scanDirectories,
-      pathResolver,
-    );
-    const groups = new Map<
-      string,
-      {
-        config: Record<string, unknown>[];
-        configPath?: string;
-        configDirectory: string;
-        pluginConfigDirectory: string;
-        routingKey: string;
-        files: string[];
-        canonicalFiles: string[];
-      }
-    >();
-
-    const selectedByCanonicalPath = new Map<
-      string,
-      {
-        file: PlannedLintFile;
-        resolved: ResolvedConfig;
-        ownerCanonicalKey: string;
-      }
-    >();
-    for (const file of [...plannedFiles].sort((left, right) =>
+    // Preserve lexical aliases through discovery. Go owns the final canonical
+    // target plan: aliases under one config are coalesced there, while aliases
+    // governed by different configs must remain visible so it can reject the
+    // ambiguous ownership instead of silently dropping one before discovery.
+    const selectedFiles = [...plannedFiles].sort((left, right) =>
       nativePathIdentity.compare(left.lexicalPath, right.lexicalPath),
-    )) {
-      const resolved = configByFile.get(file.lexicalKey);
-      if (!resolved) continue;
-      const owner = await pathResolver.resolve(resolved.pluginConfigDirectory);
-      const existing = selectedByCanonicalPath.get(file.canonicalKey);
-      if (existing) {
-        if (existing.ownerCanonicalKey !== owner.canonicalKey) {
-          throw new Error(
-            `Lint target aliases ${JSON.stringify(existing.file.lexicalPath)} and ${JSON.stringify(file.lexicalPath)} ` +
-              `resolve to the same file but are governed by different config directories ` +
-              `${JSON.stringify(existing.resolved.pluginConfigDirectory)} and ${JSON.stringify(resolved.pluginConfigDirectory)}`,
-          );
-        }
-        const preferFile =
-          (file.explicit && !existing.file.explicit) ||
-          (file.explicit === existing.file.explicit &&
-            nativePathIdentity.compare(
-              file.lexicalPath,
-              existing.file.lexicalPath,
-            ) < 0);
-        if (preferFile) {
-          selectedByCanonicalPath.set(file.canonicalKey, {
-            file,
-            resolved,
-            ownerCanonicalKey: owner.canonicalKey,
-          });
-        }
-        continue;
-      }
-      selectedByCanonicalPath.set(file.canonicalKey, {
-        file,
-        resolved,
-        ownerCanonicalKey: owner.canonicalKey,
-      });
-    }
-
-    for (const { file, resolved } of selectedByCanonicalPath.values()) {
-      const {
-        config,
-        configPath,
-        configDirectory,
-        pluginConfigDirectory,
-        routingKey,
-      } = resolved;
-      let group = groups.get(routingKey);
-      if (!group) {
-        group = {
-          config,
-          configPath,
-          configDirectory,
-          pluginConfigDirectory,
-          routingKey,
-          files: [],
-          canonicalFiles: [],
-        };
-        groups.set(routingKey, group);
-      }
-      group.files.push(file.lexicalPath);
-      group.canonicalFiles.push(file.canonicalPath);
-    }
-
-    const pluginSession = await this.#createPluginLintSession([
-      ...groups.values(),
-    ]);
+    );
+    const overrideConfig = this.#getNormalizedOverrideConfig() ?? [];
+    const usesNativeDiscovery = this.#overrideConfigFile !== true;
+    const discoverySession = usesNativeDiscovery
+      ? this.#createNativeConfigDiscoverySession()
+      : null;
     try {
-      const results: LintResult[] = [];
-      // Files are inserted in deterministic path order above. Keep that group
-      // order instead of imposing a parent-first config execution dependency.
-      for (const group of groups.values()) {
-        const response = await this.#service.lint(
-          {
-            config: group.config,
-            eslintPlugins: pluginSession?.eslintPlugins,
-            configDirectory: group.configDirectory,
-            pluginConfigDirectory: group.pluginConfigDirectory,
-            workingDirectory: this.#cwd,
-            files: group.files,
-            canonicalFiles: group.canonicalFiles,
-            // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
-            fileContents: this.#resolveOverlay(),
-            fix: this.#fix,
-          },
-          pluginSession
+      const files = selectedFiles.map((file) => file.lexicalPath);
+      const response = await this.#service.lint(
+        {
+          config: usesNativeDiscovery ? undefined : overrideConfig,
+          configDiscovery: usesNativeDiscovery
             ? {
-                pluginLint: async (request) => {
-                  const result = await pluginSession.host.lint(request);
-                  return result;
-                },
+                mode:
+                  typeof this.#overrideConfigFile === 'string'
+                    ? 'explicit'
+                    : 'auto',
+                explicitConfigPath:
+                  typeof this.#overrideConfigFile === 'string'
+                    ? path.resolve(this.#cwd, this.#overrideConfigFile)
+                    : undefined,
+                directories: scanDirectories,
+                explicitFiles: selectedFiles.map((file) => file.explicit),
+                overrideConfig,
               }
-            : {},
-        );
-        const { contents, bomFiles } = await this.#readDiagnosticContents(
-          response,
-          group.configDirectory,
-        );
-        // Seed results from the files Go actually linted (config `ignores`
-        // already excluded) rather than the glob matches. Go preserves each
-        // selected target's path identity even when its Program uses a canonical
-        // or symlinked source path. Fall back to the glob matches if an older
-        // binary omits lintedFiles.
-        const linted = response.lintedFiles
-          ? response.lintedFiles.map((f) =>
-              path.isAbsolute(f)
-                ? path.normalize(f)
-                : path.resolve(group.configDirectory, f),
-            )
-          : group.files;
-        results.push(
-          ...this.#toLintResults(
-            response,
-            group.configDirectory,
-            linted,
-            contents,
-            bomFiles,
-          ),
-        );
-      }
-      return results.sort((a, b) =>
-        nativePathIdentity.compare(a.filePath, b.filePath),
+            : undefined,
+          configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
+          workingDirectory: this.#cwd,
+          files,
+          canonicalFiles: selectedFiles.map((file) => file.canonicalPath),
+          // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
+          fileContents: this.#resolveOverlay(),
+          fix: this.#fix,
+        },
+        discoverySession?.handlers ?? {},
       );
+      const { contents, bomFiles } = await this.#readDiagnosticContents(
+        response,
+        this.#cwd,
+      );
+      // The multi-config native path returns absolute identities. Relative
+      // values remain accepted for low-level/older implementations.
+      const linted = response.lintedFiles
+        ? response.lintedFiles.map((file) =>
+            path.isAbsolute(file)
+              ? path.normalize(file)
+              : path.resolve(this.#cwd, file),
+          )
+        : files;
+      return this.#toLintResults(
+        response,
+        this.#cwd,
+        linted,
+        contents,
+        bomFiles,
+      ).sort((a, b) => nativePathIdentity.compare(a.filePath, b.filePath));
     } finally {
-      await this.#shutdownPluginSession(pluginSession);
+      await discoverySession?.shutdown();
     }
   }
 
@@ -674,24 +660,16 @@ export class Rslint {
 
   async #closeResources(): Promise<void> {
     this.#closeRequested = true;
-    const shutdownActiveHosts = async (): Promise<void> => {
-      await Promise.allSettled(
-        [...this.#activePluginHosts].map(async (host) => {
-          await host.shutdown();
-        }),
-      );
-      this.#activePluginHosts.clear();
-    };
 
-    // Unblock any Go lint request currently awaiting pluginLint before queuing
-    // the service's exit request behind it. A second sweep catches a host whose
-    // initialization raced the first snapshot; such a host also observes
-    // #closeRequested and shuts itself down before becoming active.
-    await shutdownActiveHosts();
+    // Await in-flight builds, then stop both published and post-prepare staged
+    // workers before queuing the service exit behind any active lint request.
+    await this.#pluginHosts.shutdownAll();
     try {
       await this.#service.close();
     } finally {
-      await shutdownActiveHosts();
+      // A second sweep closes a host whose activation crossed the first
+      // snapshot but observed #closeRequested before publication.
+      await this.#pluginHosts.shutdownAll();
     }
   }
 
@@ -713,355 +691,60 @@ export class Rslint {
     return resolved;
   }
 
-  async #createPluginLintSession(
-    resolvedConfigs: ReadonlyArray<ResolvedConfig>,
-  ): Promise<PluginLintSession | null> {
-    const configsByDescriptor = new Map<
-      string,
-      {
-        configPath: string;
-        configDirectory: string;
-        entries: ReadonlyArray<unknown>;
-      }
-    >();
-    for (const resolved of resolvedConfigs) {
-      if (!resolved.configPath) continue;
-      const key = `${nativePathIdentity.key(resolved.configPath)}\0${resolved.pluginConfigDirectory}`;
-      if (!configsByDescriptor.has(key)) {
-        configsByDescriptor.set(key, {
-          configPath: resolved.configPath,
-          configDirectory: resolved.pluginConfigDirectory,
-          entries: resolved.config,
-        });
-      }
-    }
+  #createNativeConfigDiscoverySession(): NativeConfigDiscoverySession {
+    const configHost = new ConfigModuleHost();
+    const transactions = new Set<string>();
+    let pluginSession: PluginLintSession | null = null;
 
-    const { eslintPluginEntries, pluginConfigs } = collectPluginMeta([
-      ...configsByDescriptor.values(),
-    ]);
-    if (pluginConfigs.length === 0) return null;
+    const shutdown = async (): Promise<void> => {
+      await this.#shutdownPluginSession(pluginSession);
+      pluginSession = null;
+      for (const transactionId of transactions) {
+        configHost.deleteSession(transactionId);
+      }
+      transactions.clear();
+    };
 
-    const createPluginLintHost = await loadPluginHostFactory();
-    const host = await createPluginLintHost(pluginConfigs, (record) => {
-      process.stderr.write(`[rslint:plugin] ${record.text}\n`);
-    });
-    if (this.#closeRequested) {
-      await host.shutdown();
-      throw new Error('rslint service is closing');
-    }
-    this.#activePluginHosts.add(host);
-    return { host, eslintPlugins: eslintPluginEntries };
+    return {
+      handlers: {
+        loadConfigs: async (request) => {
+          const response = await configHost.loadConfigs(request);
+          transactions.add(request.transactionId);
+          return response;
+        },
+        activateConfigs: async (request) => {
+          const { activation, pluginHost } = await stageNativeConfigActivation(
+            configHost,
+            request,
+            loadPluginHostFactory,
+            (record) => {
+              process.stderr.write(`[rslint:plugin] ${record.text}\n`);
+            },
+            () => this.#closeRequested,
+            this.#pluginHosts,
+          );
+          if (pluginHost) {
+            if (this.#closeRequested) {
+              await this.#pluginHosts.shutdown(pluginHost);
+              throw new Error('rslint service is closing');
+            }
+            this.#pluginHosts.publish(pluginHost);
+            pluginSession = { host: pluginHost };
+          }
+          return activation;
+        },
+        pluginLint: async (request) =>
+          pluginSession ? pluginSession.host.lint(request) : { results: [] },
+      },
+      shutdown,
+    };
   }
 
   async #shutdownPluginSession(
     session: PluginLintSession | null,
   ): Promise<void> {
     if (!session) return;
-    try {
-      await session.host.shutdown();
-    } finally {
-      this.#activePluginHosts.delete(session.host);
-    }
-  }
-
-  async #loadConfigCandidate(
-    configPath: string,
-    configDirectory: string,
-    candidatesByPath: Map<string, ConfigCandidate>,
-  ): Promise<ConfigCandidate> {
-    const normalizedPath = path.normalize(configPath);
-    const key = nativePathIdentity.key(normalizedPath);
-    const existing = candidatesByPath.get(key);
-    if (existing) return existing;
-
-    const normalizedDirectory = path.normalize(configDirectory);
-    let baseConfig: Record<string, unknown>[];
-    try {
-      baseConfig = normalizeConfig(await loadConfigFile(normalizedPath));
-    } catch (error) {
-      const candidate: FailedConfigCandidate = {
-        status: 'failed',
-        configPath: normalizedPath,
-        configDirectory: normalizedDirectory,
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
-      candidatesByPath.set(key, candidate);
-      return candidate;
-    }
-
-    const candidate: LoadedConfigCandidate = {
-      status: 'loaded',
-      configPath: normalizedPath,
-      configDirectory: normalizedDirectory,
-      baseConfig,
-      resolved: this.#composeConfig(
-        baseConfig,
-        normalizedDirectory,
-        `config:${key}`,
-        normalizedPath,
-      ),
-    };
-    candidatesByPath.set(key, candidate);
-    return candidate;
-  }
-
-  async #resolveLintFileConfigs(
-    files: PlannedLintFile[],
-    scanDirectories: string[],
-    pathResolver: RunPathResolver,
-  ): Promise<Map<string, ResolvedConfig | null>> {
-    const result = new Map<string, ResolvedConfig | null>();
-
-    // Explicit config modes use one config for every target. Go remains the
-    // source of truth for that config's own files/ignores matching.
-    if (this.#overrideConfigFile != null) {
-      const resolved = await this.#resolveConfig(this.#cwd);
-      for (const file of files) result.set(file.lexicalKey, resolved);
-      return result;
-    }
-
-    const findConfigUp = createCachedConfigFinder();
-    const discovered = new Map<
-      string,
-      { configPath: string; configDirectory: string }
-    >();
-    const addDiscovered = (
-      configPath: string,
-      configDirectory = path.dirname(configPath),
-    ): void => {
-      const normalizedPath = path.normalize(configPath);
-      const key = nativePathIdentity.key(normalizedPath);
-      if (!discovered.has(key)) {
-        discovered.set(key, {
-          configPath: normalizedPath,
-          configDirectory: path.normalize(configDirectory),
-        });
-      }
-    };
-
-    if (scanDirectories.length > 0) {
-      const scanned = await discoverConfigs(
-        [],
-        scanDirectories,
-        this.#cwd,
-        null,
-      );
-      for (const [configPath, configDirectory] of scanned) {
-        addDiscovered(configPath, configDirectory);
-      }
-    }
-    for (const file of files) {
-      if (!file.explicit) continue;
-      let configPath = findConfigUp(path.dirname(file.lexicalPath));
-      if (!configPath && file.canonicalKey !== file.lexicalKey) {
-        configPath = findConfigUp(path.dirname(file.canonicalPath));
-      }
-      if (configPath) addDiscovered(configPath);
-    }
-
-    if (discovered.size === 0) {
-      const emptyConfig = this.#composeConfig(
-        [],
-        this.#cwd,
-        `empty:${nativePathIdentity.key(this.#cwd)}`,
-      );
-      for (const file of files) result.set(file.lexicalKey, emptyConfig);
-      return result;
-    }
-
-    const coalescedDiscovered = coalesceCaseAliasedConfigs(
-      new Map(
-        [...discovered.values()].map(({ configPath, configDirectory }) => [
-          configPath,
-          configDirectory,
-        ]),
-      ),
-    ).configs;
-    discovered.clear();
-    for (const [configPath, configDirectory] of coalescedDiscovered) {
-      addDiscovered(configPath, configDirectory);
-    }
-    const discoveredConfigs = new Map(
-      [...discovered.values()].map(({ configPath, configDirectory }) => [
-        configPath,
-        configDirectory,
-      ]),
-    );
-
-    const candidatesByPath = new Map<string, ConfigCandidate>();
-    const loadCandidate = async (
-      configPath: string,
-      configDirectory: string,
-    ): Promise<ConfigCandidate> =>
-      this.#loadConfigCandidate(configPath, configDirectory, candidatesByPath);
-
-    const failedQueue: FailedConfigCandidate[] = [];
-    for (const { configPath, configDirectory } of discovered.values()) {
-      const candidate = await loadCandidate(configPath, configDirectory);
-      if (candidate.status === 'failed') failedQueue.push(candidate);
-    }
-
-    // Only failed configs need their undiscovered ancestors. This keeps an
-    // explicit file target local while still providing normal ancestor
-    // fallback, and config discovery remains proportional to unique dirs.
-    for (let i = 0; i < failedQueue.length; i++) {
-      const failed = failedQueue[i];
-      const ancestorPath = findConfigUp(path.dirname(failed.configDirectory));
-      if (!ancestorPath) continue;
-
-      const normalizedPath = path.normalize(ancestorPath);
-      const configDirectory = path.dirname(normalizedPath);
-      const selectedPath =
-        findNativeCaseAliasConfigPath(
-          normalizedPath,
-          configDirectory,
-          discoveredConfigs,
-        ) ?? normalizedPath;
-      const key = nativePathIdentity.key(selectedPath);
-      if (candidatesByPath.has(key)) continue;
-      discoveredConfigs.set(selectedPath, configDirectory);
-      const ancestor = await loadCandidate(selectedPath, configDirectory);
-      if (ancestor.status === 'failed') failedQueue.push(ancestor);
-    }
-
-    const candidates = [...candidatesByPath.values()];
-    const loadedCandidates = candidates.filter(
-      (candidate): candidate is LoadedConfigCandidate =>
-        candidate.status === 'loaded',
-    );
-    const failedCandidates = candidates.filter(
-      (candidate): candidate is FailedConfigCandidate =>
-        candidate.status === 'failed',
-    );
-    if (loadedCandidates.length === 0) {
-      const first = failedCandidates[0];
-      throw new Error(
-        first
-          ? `Failed to load config ${first.configPath}: ${first.error.message}`
-          : 'No discovered rslint config could be loaded',
-      );
-    }
-    for (const failed of failedCandidates) {
-      console.warn(
-        `[rslint] Skipping config ${failed.configPath}: ${failed.error.message}`,
-      );
-    }
-
-    const candidateIndex = new AncestorPathIndex(
-      candidates.map(
-        (candidate) => [candidate.configDirectory, candidate] as const,
-      ),
-    );
-    const candidateDirectories = await pathResolver.resolveAll(
-      candidates.map((candidate) => candidate.configDirectory),
-    );
-    const canonicalCandidates = new Map<
-      string,
-      { canonicalDirectory: string; candidate: ConfigCandidate }
-    >();
-    for (let index = 0; index < candidates.length; index++) {
-      const candidate = candidates[index];
-      const directory = candidateDirectories[index];
-      if (!canonicalCandidates.has(directory.canonicalKey)) {
-        canonicalCandidates.set(directory.canonicalKey, {
-          canonicalDirectory: directory.canonicalPath,
-          candidate,
-        });
-      } else {
-        const existing = canonicalCandidates.get(directory.canonicalKey);
-        if (existing?.candidate !== candidate) {
-          throw new Error(
-            `Config directories ${JSON.stringify(existing?.candidate.configDirectory)} and ` +
-              `${JSON.stringify(candidate.configDirectory)} resolve to the same filesystem location`,
-          );
-        }
-      }
-    }
-    const canonicalCandidateIndex = new AncestorPathIndex(
-      [...canonicalCandidates.values()].map(
-        ({ canonicalDirectory, candidate }) =>
-          [canonicalDirectory, candidate] as const,
-      ),
-    );
-    const nearestCandidateForFile = (
-      file: PlannedLintFile,
-    ): ConfigCandidate | undefined =>
-      candidateIndex.find(path.dirname(file.lexicalPath)) ??
-      canonicalCandidateIndex.find(path.dirname(file.canonicalPath));
-    const nearestLoadedCandidate = (
-      candidate: ConfigCandidate | undefined,
-    ): LoadedConfigCandidate | undefined => {
-      let current = candidate;
-      while (current) {
-        if (current.status === 'loaded') return current;
-        current = candidateIndex.findParent(current.configDirectory);
-      }
-      return undefined;
-    };
-
-    const configEntries: ConfigEntry[] = loadedCandidates.map((candidate) => ({
-      configDirectory: candidate.configDirectory,
-      // Parent-ignore discovery belongs to the authored file config. The API
-      // override is evaluated later from cwd and must not move this boundary.
-      entries: candidate.baseConfig as RslintConfigEntry[],
-    }));
-
-    const explicitConfigDirs = new Set<string>();
-    for (const file of files) {
-      if (!file.explicit) continue;
-      const loaded = nearestLoadedCandidate(nearestCandidateForFile(file));
-      if (loaded) explicitConfigDirs.add(loaded.configDirectory);
-    }
-
-    const directoryEntries = filterConfigsByParentIgnores(configEntries);
-    const directoryConfigDirs = new Set(
-      directoryEntries.map((entry) =>
-        nativePathIdentity.key(entry.configDirectory),
-      ),
-    );
-    const effectiveEntries = filterConfigsByParentIgnores(
-      configEntries,
-      explicitConfigDirs,
-    );
-    const effectiveConfigDirs = new Set(
-      effectiveEntries.map((entry) =>
-        nativePathIdentity.key(entry.configDirectory),
-      ),
-    );
-
-    const emptyConfig = this.#composeConfig(
-      [],
-      this.#cwd,
-      `empty:${nativePathIdentity.key(this.#cwd)}`,
-    );
-    for (const file of files) {
-      let candidate = nearestCandidateForFile(file);
-      if (!candidate) {
-        result.set(file.lexicalKey, emptyConfig);
-        continue;
-      }
-
-      const allowedDirs = file.explicit
-        ? effectiveConfigDirs
-        : directoryConfigDirs;
-      while (candidate.status === 'failed') {
-        candidate = candidateIndex.findParent(candidate.configDirectory);
-        if (!candidate) break;
-      }
-
-      if (!candidate) {
-        result.set(file.lexicalKey, null);
-        continue;
-      }
-
-      result.set(
-        file.lexicalKey,
-        allowedDirs.has(nativePathIdentity.key(candidate.configDirectory))
-          ? candidate.resolved
-          : null,
-      );
-    }
-    return result;
+    await this.#pluginHosts.shutdown(session.host);
   }
 
   #getNormalizedOverrideConfig(): Record<string, unknown>[] | null {
@@ -1091,105 +774,6 @@ export class Rslint {
     }
     this.#normalizedOverrideConfig = normalizeConfig(override);
     return this.#normalizedOverrideConfig;
-  }
-
-  #composeConfig(
-    base: Record<string, unknown>[],
-    configDirectory: string,
-    routingKey: string,
-    configPath?: string,
-  ): ResolvedConfig {
-    const override = this.#getNormalizedOverrideConfig();
-    if (!override) {
-      return {
-        config: base,
-        configPath,
-        configDirectory,
-        pluginConfigDirectory: configDirectory,
-        routingKey,
-      };
-    }
-
-    // ESLint resolves overrideConfig relative to the selected config's base.
-    // Explicit overrideConfigFile already supplies cwd as configDirectory.
-    return {
-      config: [...base, ...override],
-      configPath,
-      configDirectory,
-      pluginConfigDirectory: configDirectory,
-      routingKey,
-    };
-  }
-
-  async #resolveConfig(
-    fromDir: string,
-    canonicalFromDir = fromDir,
-  ): Promise<ResolvedConfig> {
-    let base: Record<string, unknown>[] = [];
-    let configPath: string | undefined;
-    let configDirectory = this.#cwd;
-    let routingKey = `empty:${nativePathIdentity.key(this.#cwd)}`;
-
-    if (this.#overrideConfigFile === true) {
-      // Only overrideConfig — no file, no discovery.
-      routingKey = `override:${nativePathIdentity.key(this.#cwd)}`;
-    } else if (typeof this.#overrideConfigFile === 'string') {
-      configPath = path.resolve(this.#cwd, this.#overrideConfigFile);
-      base = normalizeConfig(await loadConfigFile(configPath));
-      // Explicit overrideConfigFile follows CLI --config semantics: files,
-      // ignores, and parserOptions.project resolve from invocation cwd.
-      configDirectory = this.#cwd;
-      routingKey = `config:${nativePathIdentity.key(configPath)}`;
-    } else {
-      return this.#resolveAutoConfig(fromDir, canonicalFromDir);
-    }
-
-    return this.#composeConfig(base, configDirectory, routingKey, configPath);
-  }
-
-  async #resolveAutoConfig(
-    fromDir: string,
-    canonicalFromDir: string,
-  ): Promise<ResolvedConfig> {
-    const findConfigUp = createCachedConfigFinder();
-    let configPath = findConfigUp(fromDir);
-    if (!configPath && !nativePathIdentity.equals(fromDir, canonicalFromDir)) {
-      configPath = findConfigUp(canonicalFromDir);
-    }
-    if (!configPath) {
-      return this.#composeConfig(
-        [],
-        this.#cwd,
-        `empty:${nativePathIdentity.key(this.#cwd)}`,
-      );
-    }
-
-    const candidatesByPath = new Map<string, ConfigCandidate>();
-    let nearestFailure: FailedConfigCandidate | undefined;
-    const failures: FailedConfigCandidate[] = [];
-    while (configPath) {
-      const candidate = await this.#loadConfigCandidate(
-        configPath,
-        path.dirname(configPath),
-        candidatesByPath,
-      );
-      if (candidate.status === 'loaded') {
-        for (const failed of failures) {
-          console.warn(
-            `[rslint] Skipping config ${failed.configPath}: ${failed.error.message}`,
-          );
-        }
-        return candidate.resolved;
-      }
-
-      nearestFailure ??= candidate;
-      failures.push(candidate);
-      configPath = findConfigUp(path.dirname(candidate.configDirectory));
-    }
-
-    throw new Error(
-      `Failed to load config ${nearestFailure!.configPath}: ${nearestFailure!.error.message}`,
-    );
   }
 
   async #readDiagnosticContents(

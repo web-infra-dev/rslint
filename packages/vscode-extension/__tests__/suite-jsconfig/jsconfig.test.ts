@@ -208,6 +208,62 @@ suite('rslint JS config support', function () {
     }
   });
 
+  test('one workspace config edit evaluates exactly one v2 transaction', async () => {
+    const root = getWorkspaceRoot();
+    const configPath = path.join(root, 'rslint.config.js');
+    const markerPath = path.join(root, '.rslint-config-refresh-count');
+    const originalConfig = fs.readFileSync(configPath, 'utf8');
+    const doc = await openFixture('index.ts');
+    await vscode.window.showTextDocument(doc);
+    await waitForDiagnostics(doc, (diags) =>
+      diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    );
+
+    const countedConfig = `import fs from 'node:fs';
+fs.appendFileSync(${JSON.stringify(markerPath)}, 'x');
+export default [{
+  files: ['**/*.ts'],
+  languageOptions: {
+    parserOptions: { projectService: false, project: ['./tsconfig.json'] },
+  },
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unsafe-member-access': 'off',
+  },
+  plugins: ['@typescript-eslint'],
+}];
+`;
+
+    const reloaded = waitForDiagnostics(
+      doc,
+      (diags) =>
+        diags.some((d) => d.message.includes('no-explicit-any')) &&
+        !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    );
+
+    try {
+      fs.rmSync(markerPath, { force: true });
+      fs.writeFileSync(configPath, countedConfig, 'utf8');
+      await reloaded;
+      // A duplicate didChangeWatchedFiles transaction used to race the direct
+      // v2 watcher. Let any queued 300ms debounce complete before inspecting
+      // the config module's observable evaluation count.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      assert.strictEqual(
+        fs.readFileSync(markerPath, 'utf8'),
+        'x',
+        'one edit must evaluate one config-discovery transaction',
+      );
+    } finally {
+      const restored = waitForDiagnostics(doc, (diags) =>
+        diags.some((d) => d.message.includes('no-unsafe-member-access')),
+      ).catch(() => undefined);
+      fs.writeFileSync(configPath, originalConfig, 'utf8');
+      await restored;
+      fs.rmSync(markerPath, { force: true });
+    }
+  });
+
   test('deleting JS config should clear diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -420,9 +476,10 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       fs.writeFileSync(rootConfigPath, ignoredRootConfig, 'utf8');
       await Promise.all([parentApplied, nestedCleared]);
 
-      assert.ok(
-        fs.readFileSync(loadMarkerPath, 'utf8').length >= 2,
-        'The ignored nested candidate should still be scanned and loaded',
+      assert.strictEqual(
+        fs.readFileSync(loadMarkerPath, 'utf8'),
+        'x',
+        'The ignored nested candidate must not be evaluated again',
       );
       assert.ok(
         !vscode.languages

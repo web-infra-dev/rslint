@@ -67,6 +67,14 @@ type lintArgs struct {
 	// placeholder rules so plugin rule names resolve; the live plugins run
 	// in the Node worker.
 	EslintPlugins []rslintconfig.EslintPluginEntry
+	// FS is an optional run-scoped filesystem shared with Go config discovery.
+	// Native CLI supplies one cached instance so the later target/program phases
+	// reuse directory entries already read by the staged frontier.
+	FS vfs.FS
+	// ConfigPayload is the in-process result of Go-owned JS/TS discovery. Keeping
+	// it typed avoids serializing the catalog to JSON only for this same process
+	// to read it back through the legacy config-stdin compatibility path.
+	ConfigPayload *parsedPayload
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -313,13 +321,6 @@ func collectAllowFileWarnings(
 		return nil
 	}
 
-	// Reuse owner resolution by directory when many explicit files share a
-	// directory (for example, lint-staged invocations).
-	type cachedConfig struct {
-		cfgDir string
-		cfg    rslintconfig.RslintConfig
-	}
-	dirConfigCache := make(map[string]*cachedConfig)
 	var fsys vfs.FS
 	if len(filesystems) > 0 {
 		fsys = filesystems[0]
@@ -334,18 +335,9 @@ func collectAllowFileWarnings(
 		var cfgDir string
 		var cfg rslintconfig.RslintConfig
 		if configMap != nil {
-			dir := tspath.GetDirectoryPath(f)
-			cacheKey := exactFilesystemPathID(dir)
-			cached, ok := dirConfigCache[cacheKey]
-			if !ok {
-				var foundDir string
-				var foundCfg rslintconfig.RslintConfig
-				foundDir, foundCfg = configOwnerResolver.Resolve(f)
-				cached = &cachedConfig{cfgDir: foundDir, cfg: foundCfg}
-				dirConfigCache[cacheKey] = cached
-			}
-			cfgDir = cached.cfgDir
-			cfg = cached.cfg
+			// Canonical fallback is file-specific: two symlinked files in the
+			// same lexical directory can resolve to different config roots.
+			cfgDir, cfg = configOwnerResolver.Resolve(f)
 		} else {
 			cfgDir = currentDirectory
 			cfg = rslintConfig
@@ -632,7 +624,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 0
 	}
 
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	fs := args.FS
+	if fs == nil {
+		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	}
 
 	// Run-scoped parse cache shared by every Program built in this pipeline
 	// (initial build, gap fallback, --fix rebuilds). It is passed explicitly and
@@ -665,23 +660,27 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	needsLintTargets := !typeCheckOnly
 
 	if configStdin {
-		// Read config JSON from stdin (sent by JS config loader).
-		// Read up to maxConfigSize+1 so we can detect truncation.
-		const maxConfigSize = 50 << 20 // 50 MB
-		data, err := io.ReadAll(io.LimitReader(os.Stdin, maxConfigSize+1))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
-			return 1
-		}
-		if len(data) > maxConfigSize {
-			fmt.Fprintf(os.Stderr, "error: config from stdin exceeds maximum size of %d bytes\n", maxConfigSize)
-			return 1
-		}
+		payload := args.ConfigPayload
+		if payload == nil {
+			// Legacy hosts can still send serialized config JSON through stdin.
+			// Read up to maxConfigSize+1 so we can detect truncation.
+			const maxConfigSize = 50 << 20 // 50 MB
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, maxConfigSize+1))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
+				return 1
+			}
+			if len(data) > maxConfigSize {
+				fmt.Fprintf(os.Stderr, "error: config from stdin exceeds maximum size of %d bytes\n", maxConfigSize)
+				return 1
+			}
 
-		payload, parseErr := parseConfigPayload(data, fs)
-		if parseErr != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", parseErr)
-			return 1
+			var parseErr error
+			payload, parseErr = parseConfigPayload(data, fs)
+			if parseErr != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", parseErr)
+				return 1
+			}
 		}
 
 		if payload.IsMultiConfig {
@@ -697,6 +696,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			//
 			// Directories excluded by global config ignores are pruned during
 			// the .gitignore scan because files below them cannot be linted.
+			// File-only invocations collect only the exact target ancestry for each
+			// provisional owner instead of sweeping the owner's complete subtree.
 			//
 			// configMap is not mutated by gitignore workers. Results are collected
 			// and merged on this goroutine before target discovery.
@@ -708,13 +709,31 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				giResults []giResult
 				giMu      sync.Mutex
 			)
+			fileOnlyTargets := len(allowFiles) > 0 && len(allowDirs) == 0
+			var targetFilesByOwner map[string][]string
+			if needsLintTargets && fileOnlyTargets {
+				targetFilesByOwner = configTargetFilesByOwner(
+					configMap,
+					configTargetScopes,
+					fs,
+					allowFiles,
+					singleThreaded,
+				)
+			}
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
 				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
 				for configDir, entries := range configMap {
 					stopDirs := configResolver.ChildConfigDirs(configDir)
 					giWG.Queue(func() {
-						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, nil, stopDirs)
+						var ownerFiles []string
+						if fileOnlyTargets {
+							ownerFiles = targetFilesByOwner[configDir]
+							if ownerFiles == nil {
+								ownerFiles = []string{}
+							}
+						}
+						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, ownerFiles, stopDirs)
 						giMu.Lock()
 						giResults = append(giResults, giResult{configDir, augmented})
 						giMu.Unlock()
@@ -742,14 +761,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			rslintConfig = payload.SingleConfig
 			currentDirectory = payload.SingleConfigDir
 
+			var exactTargetFiles []string
+			if len(allowFiles) > 0 && len(allowDirs) == 0 {
+				exactTargetFiles = allowFiles
+			}
 			if typeCheckOnly {
 				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
 			} else if buildAllPrograms {
 				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-					rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
+					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
 				)
 			} else {
-				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
+				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -771,14 +794,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = workingDirectory
 		}
 
+		var exactTargetFiles []string
+		if len(allowFiles) > 0 && len(allowDirs) == 0 {
+			exactTargetFiles = allowFiles
+		}
 		if typeCheckOnly {
 			realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
 		} else if buildAllPrograms {
 			rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
+				rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
 			)
 		} else {
-			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
+			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

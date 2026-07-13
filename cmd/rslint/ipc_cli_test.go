@@ -62,6 +62,22 @@ func TestClassifyPaths(t *testing.T) {
 	}
 }
 
+func TestMarkCLIInterruptedUsesCanceledDiscoveryContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	state := &runCLIState{}
+	if !markCLIInterrupted(ctx, state) {
+		t.Fatal("canceled discovery context was not classified as an interrupt")
+	}
+	if !state.signalled.Load() {
+		t.Fatal("canceled discovery context did not publish the signal state")
+	}
+
+	if markCLIInterrupted(context.Background(), &runCLIState{}) {
+		t.Fatal("live discovery context was classified as an interrupt")
+	}
+}
+
 // TestDrainStdoutToIPC_DiscardsOnClosedPeer pins #4: once the channel is
 // closed (peer gone) the drain stops forwarding but keeps reading r — so the
 // lint pipeline never blocks on a full stdout pipe — and exits cleanly on EOF.
@@ -141,6 +157,26 @@ func TestRunCLI_StdoutIsTTYWireToANSI(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			runStdoutTTYCase(t, tc.tty, tc.wantANSI)
 		})
+	}
+}
+
+func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(dir, "rslint.config.mjs"),
+		[]byte("export default [];\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	code, output := runCLIInitForTest(t, map[string]any{
+		"workingDirectory": dir,
+		"format":           "stylish",
+		"configDiscovery":  map[string]any{"mode": "auto"},
+	})
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; output=%q", code, output)
 	}
 }
 

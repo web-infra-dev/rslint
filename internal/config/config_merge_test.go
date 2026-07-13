@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -602,6 +603,8 @@ func TestConfigDecode_PreservesNonGlobalIgnoreObjectShape(t *testing.T) {
 	for _, raw := range []string{
 		`[{"ignores":["dist/**"],"rules":null}]`,
 		`[{"ignores":["dist/**"],"processor":"example"}]`,
+		`[{"ignores":["dist/**"],"plugins":[]}]`,
+		`[{"ignores":["dist/**"],"settings":{}}]`,
 	} {
 		var cfg RslintConfig
 		if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
@@ -613,6 +616,57 @@ func TestConfigDecode_PreservesNonGlobalIgnoreObjectShape(t *testing.T) {
 		if ignores := extractConfigIgnores(cfg); len(ignores) != 0 {
 			t.Fatalf("entry-level ignore leaked into global ignores: %#v", ignores)
 		}
+
+		encoded, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("re-encode %s: %v", raw, err)
+		}
+		var roundTripped RslintConfig
+		if err := json.Unmarshal(encoded, &roundTripped); err != nil {
+			t.Fatalf("round-trip %s via %s: %v", raw, encoded, err)
+		}
+		if len(roundTripped) != 1 || isGlobalIgnoreEntry(roundTripped[0]) {
+			t.Fatalf("round-trip changed entry-local ignore into global ignore: raw=%s encoded=%s decoded=%#v", raw, encoded, roundTripped)
+		}
+	}
+}
+
+func TestConfigJSONRoundTripPreservesGlobalIgnoreObjectShape(t *testing.T) {
+	original := RslintConfig{{Ignores: []string{"coverage/**"}}}
+	encoded, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal global ignore: %v", err)
+	}
+	if strings.Contains(string(encoded), `"rules"`) {
+		t.Fatalf("marshal invented a non-global rules key: %s", encoded)
+	}
+	var decoded RslintConfig
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal global ignore: %v", err)
+	}
+	if len(decoded) != 1 || !isGlobalIgnoreEntry(decoded[0]) {
+		t.Fatalf("round-trip changed global ignore shape: %#v", decoded)
+	}
+}
+
+func TestConfigJSONRoundTripPreservesNonNilEmptyRulesShape(t *testing.T) {
+	original := RslintConfig{{
+		Ignores: []string{"coverage/**"},
+		Rules:   Rules{},
+	}}
+	encoded, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal empty rules entry: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"rules":{}`) {
+		t.Fatalf("marshal dropped an authored empty rules key: %s", encoded)
+	}
+	var decoded RslintConfig
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal empty rules entry: %v", err)
+	}
+	if len(decoded) != 1 || isGlobalIgnoreEntry(decoded[0]) {
+		t.Fatalf("round-trip changed entry-local ignore into global ignore: %#v", decoded)
 	}
 }
 

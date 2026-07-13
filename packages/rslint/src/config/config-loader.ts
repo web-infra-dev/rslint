@@ -4,6 +4,29 @@ import { pathToFileURL } from 'node:url';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
+// Keep the discovery module host on the existing config-loader package surface.
+// config-module-host imports the loader functions below through live ESM
+// bindings; it does not execute them during module initialization, so this
+// re-export cycle is initialization-safe.
+export { ConfigModuleHost } from './config-module-host.js';
+export type { ConfigModuleHostOptions } from './config-module-host.js';
+export {
+  CONFIG_DISCOVERY_PROTOCOL_VERSION,
+  type ActivateConfigsRequest,
+  type ActivateConfigsResponse,
+  type ConfigModuleCandidate,
+  type ConfigModuleEslintPluginEntry,
+  type ConfigModuleLoadMode,
+  type ConfigModuleLoadResult,
+  type ConfigModulePluginDescriptor,
+  type ConfigModuleSessionSummary,
+  type EffectiveConfigModule,
+  type FailedConfigModuleResult,
+  type LoadConfigsRequest,
+  type LoadConfigsResponse,
+  type LoadedConfigModuleResult,
+} from './config-discovery-protocol.js';
+
 export {
   filterConfigsByParentIgnores,
   type ConfigEntry,

@@ -114,11 +114,21 @@ func TestConvertGitignoreToGlobs_CommentsAndBlanks(t *testing.T) {
 	assert.Equal(t, globs[1], "**/*.log")
 }
 
-func TestConvertGitignoreToGlobs_TrailingWhitespace(t *testing.T) {
+func TestConvertGitignoreToGlobs_WhitespaceAndEscaping(t *testing.T) {
 	globs := convertGitignoreToGlobs("  dist/  \n  coverage/\n", "")
 	assert.Equal(t, len(globs), 2)
-	assert.Equal(t, globs[0], "**/dist/**/*")
-	assert.Equal(t, globs[1], "**/coverage/**/*")
+	assert.Equal(t, globs[0], "**/  dist/**/*")
+	assert.Equal(t, globs[1], "**/  coverage/**/*")
+
+	globs = convertGitignoreToGlobs("\\!important.ts\n\\#generated.ts\nname\\ with\\ spaces.ts\ntrailing\\ \nliteral\\*.ts\n{one,two}.ts\n", "")
+	assert.DeepEqual(t, globs, []string{
+		"**/!important.ts",
+		"**/#generated.ts",
+		"**/name with spaces.ts",
+		"**/trailing ",
+		"**/literal[*].ts",
+		"**/[{]one,two[}].ts",
+	})
 }
 
 func TestConvertRepresentativePatterns(t *testing.T) {

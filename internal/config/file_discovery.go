@@ -779,7 +779,8 @@ func patternsIncludeAllDefaultExtensions(patterns []string) bool {
 
 // LintDiscoveryScope records explicit-file provenance supplied by the config
 // host. ExplicitOnly keeps a config loaded solely for an explicit file out of
-// directory discovery.
+// automatic ownership, handoff, and directory-discovery decisions. Files in
+// the scope remain owned by that config.
 type LintDiscoveryScope struct {
 	Files        []string
 	ExplicitOnly bool
@@ -807,12 +808,33 @@ func DiscoverLintTargetsMultiConfig(
 		return nil
 	}
 
-	index := newConfigDirectoryIndex(configMap, fsys)
 	configDirs := make([]string, 0, len(configMap))
 	for configDir := range configMap {
 		configDirs = append(configDirs, configDir)
 	}
 	sort.Strings(configDirs)
+
+	// A config found only because a literal file bypassed its parent's global
+	// ignore is not a general ownership boundary. Build automatic ownership and
+	// subtree handoff decisions from the normally reachable config set; the full
+	// map is still processed below so host-assigned literal files use their
+	// explicit-only config.
+	automaticConfigMap := configMap
+	for _, configDir := range configDirs {
+		if !scopes[configDir].ExplicitOnly {
+			continue
+		}
+		if len(automaticConfigMap) == len(configMap) {
+			automaticConfigMap = make(map[string]RslintConfig, len(configMap)-1)
+			for candidateDir, candidateConfig := range configMap {
+				if !scopes[candidateDir].ExplicitOnly {
+					automaticConfigMap[candidateDir] = candidateConfig
+				}
+			}
+		}
+		break
+	}
+	automaticIndex := newConfigDirectoryIndex(automaticConfigMap, fsys)
 
 	// Explicit files are assigned to their nearest config once. Passing the
 	// complete list to every config makes lint-staged-style invocations
@@ -843,7 +865,7 @@ func DiscoverLintTargetsMultiConfig(
 			}
 		}
 	}
-	filesByConfig := index.assignExplicitFiles(unscopedAllowFiles)
+	filesByConfig := automaticIndex.assignExplicitFiles(unscopedAllowFiles)
 	filesSpecifiedByConfig := make(map[string]bool, len(configDirs))
 	if allowFiles != nil {
 		for _, configDir := range configDirs {
@@ -874,7 +896,7 @@ func DiscoverLintTargetsMultiConfig(
 		}
 		targets := discoverLintTargetsForConfigInMap(
 			configMap,
-			index,
+			automaticIndex,
 			hostAssignedFileOwners,
 			configDir,
 			fsys,

@@ -2,8 +2,6 @@ package config
 
 import (
 	"strings"
-
-	"github.com/bmatcuk/doublestar/v4"
 )
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.
@@ -36,9 +34,10 @@ const (
 // the same string the old []string pipeline matched against, so file-level
 // matching (isFileIgnored) is unchanged.
 type IgnorePattern struct {
-	Glob    string
-	Negated bool
-	Kind    dirKind
+	Glob            string
+	Negated         bool
+	Kind            dirKind
+	CaseInsensitive bool
 }
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
@@ -117,9 +116,9 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 
 	ignored := false
 	for _, p := range patterns {
-		matched := matchGlob(p.Glob, normalizedPath)
+		matched := ignorePatternMatches(p, normalizedPath)
 		if !matched && unixPath != normalizedPath {
-			matched = matchGlob(p.Glob, unixPath)
+			matched = ignorePatternMatches(p, unixPath)
 		}
 		if matched {
 			ignored = !p.Negated
@@ -128,11 +127,20 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 	return ignored
 }
 
+func ignorePatternMatches(pattern IgnorePattern, path string) bool {
+	glob := pattern.Glob
+	if pattern.CaseInsensitive {
+		glob = strings.ToLower(glob)
+		path = strings.ToLower(path)
+	}
+	return matchGlob(glob, path)
+}
+
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).
 func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
 	ignored := false
 	for _, p := range patterns {
-		if matched, err := doublestar.Match(p.Glob, filePath); err == nil && matched {
+		if ignorePatternMatches(p, filePath) {
 			ignored = !p.Negated
 		}
 	}
@@ -150,13 +158,13 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 		if p.Negated || p.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if matchGlob(p.Glob, dirPath) || matchGlob(p.Glob, dirPath+"/x") {
+		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
 			return true
 		}
 		segments := strings.Split(dirPath, "/")
 		for j := 1; j < len(segments); j++ {
 			partial := strings.Join(segments[:j], "/")
-			if matchGlob(p.Glob, partial) || matchGlob(p.Glob, partial+"/x") {
+			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
 				return true
 			}
 		}
@@ -187,7 +195,7 @@ func canPruneDir(dirPath string, patterns []IgnorePattern, neg negReach) bool {
 			continue
 		}
 		// File-level `X/**/*` never matches the bare directory; probe `dir/x`.
-		if matchGlob(p.Glob, dirPath+"/x") {
+		if ignorePatternMatches(p, dirPath+"/x") {
 			return true
 		}
 	}
@@ -216,6 +224,12 @@ func buildNegReach(patterns []IgnorePattern) negReach {
 	for i := range patterns {
 		p := patterns[i]
 		if !p.Negated {
+			continue
+		}
+		if p.CaseInsensitive {
+			// Path-prefix reachability has no case mode. Conservatively disable
+			// file-level pruning; final matching still uses case-folded patterns.
+			out = append(out, negPrefix{unrooted: true})
 			continue
 		}
 		// A negation with no concrete leading segment (`!**/keep`, `!*.log`,

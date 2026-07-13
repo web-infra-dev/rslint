@@ -56,7 +56,41 @@ var astInfoProgramCache = &programCache{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
-	return h.handleLint(context.Background(), req, nil)
+	return h.handleLint(context.Background(), req, nil, nil)
+}
+
+type apiConfigModuleLoader struct {
+	requester api.Requester
+}
+
+func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request rslintconfig.ConfigLoadBatchRequest) (rslintconfig.ConfigLoadBatchResponse, error) {
+	if loader == nil || loader.requester == nil {
+		return rslintconfig.ConfigLoadBatchResponse{}, errors.New("reverse config loading is unavailable")
+	}
+	msg, err := loader.requester.SendRequest(ctx, api.KindLoadConfigs, request)
+	if err != nil {
+		return rslintconfig.ConfigLoadBatchResponse{}, err
+	}
+	var response rslintconfig.ConfigLoadBatchResponse
+	if err := msg.Decode(&response); err != nil {
+		return rslintconfig.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs result: %w", err)
+	}
+	return response, nil
+}
+
+func (loader *apiConfigModuleLoader) ActivateConfigs(ctx context.Context, request rslintconfig.ConfigActivationRequest) (rslintconfig.ConfigActivationResponse, error) {
+	if loader == nil || loader.requester == nil {
+		return rslintconfig.ConfigActivationResponse{}, errors.New("reverse config activation is unavailable")
+	}
+	msg, err := loader.requester.SendRequest(ctx, api.KindActivateConfigs, request)
+	if err != nil {
+		return rslintconfig.ConfigActivationResponse{}, err
+	}
+	var response rslintconfig.ConfigActivationResponse
+	if err := msg.Decode(&response); err != nil {
+		return rslintconfig.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs result: %w", err)
+	}
+	return response, nil
 }
 
 // HandleLintWithContext enables reverse pluginLint requests when IPCHandler is
@@ -77,10 +111,10 @@ func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequ
 			return &result, nil
 		}
 	}
-	return h.handleLint(ctx, req, dispatch)
+	return h.handleLint(ctx, req, dispatch, requester)
 }
 
-func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher) (*api.LintResponse, error) {
+func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher, requester api.Requester) (*api.LintResponse, error) {
 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
@@ -155,28 +189,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		}
 	}
 
-	// Initialize rule registry with all available rules
-	rslintconfig.RegisterAllRules()
-	var requestPluginRules map[string]struct{}
-	if len(req.EslintPlugins) > 0 {
-		entries := make([]rslintconfig.EslintPluginEntry, 0, len(req.EslintPlugins))
-		requestPluginRules = make(map[string]struct{})
-		for _, plugin := range req.EslintPlugins {
-			entries = append(entries, rslintconfig.EslintPluginEntry{
-				Prefix:    plugin.Prefix,
-				RuleNames: plugin.RuleNames,
-			})
-			for _, ruleName := range plugin.RuleNames {
-				requestPluginRules[plugin.Prefix+"/"+ruleName] = struct{}{}
-			}
-		}
-		rslintconfig.RegisterEslintPluginRules(entries)
+	if len(req.Config) > 0 && req.ConfigDiscovery != nil {
+		return nil, errors.New("config and configDiscovery are mutually exclusive")
 	}
 
-	// Config is the JS-resolved final config object (serialized RslintConfig).
-	// --api never reads config from disk or auto-discovers — the JS side does
-	// all of overrideConfig / config-file / discovery / normalize. Empty/absent
-	// means "no config" (zero rules).
+	// Config is the legacy/low-level already-resolved config. High-level native
+	// API callers instead send ConfigDiscovery: Go discovers ownership and asks
+	// the host to evaluate only the staged candidate frontier.
 	var rslintConfig rslintconfig.RslintConfig
 	if len(req.Config) > 0 {
 		if err := json.Unmarshal(req.Config, &rslintConfig); err != nil {
@@ -205,21 +224,187 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
 	}
-	rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
+
+	var (
+		configMap          map[string]rslintconfig.RslintConfig
+		configTargetScopes map[string]rslintconfig.LintDiscoveryScope
+		catalogPlugins     []rslintconfig.EslintPluginEntry
+		originalConfigDir  map[string]string
+	)
+	if discovery := req.ConfigDiscovery; discovery != nil {
+		if requester == nil {
+			return nil, errors.New("configDiscovery requires a bidirectional API host")
+		}
+		if len(discovery.ExplicitFiles) > 0 && len(discovery.ExplicitFiles) != len(req.Files) {
+			return nil, errors.New("configDiscovery.explicitFiles must be parallel to files")
+		}
+
+		discoveryRequest := rslintconfig.ConfigDiscoveryRequest{
+			CWD:                       currentDirectory,
+			Fresh:                     true,
+			LimitDirectoryWalkToFiles: len(discovery.Directories) > 0,
+			ImplicitCWD:               len(req.Files) == 0 && len(discovery.Directories) == 0,
+			SingleThreaded:            false,
+		}
+		switch discovery.Mode {
+		case "", "auto":
+			discoveryRequest.Mode = rslintconfig.ConfigDiscoveryAuto
+		case "explicit":
+			discoveryRequest.Mode = rslintconfig.ConfigDiscoveryExplicit
+			discoveryRequest.ExplicitConfigPath = resolveRequestPath(discovery.ExplicitConfigPath)
+		default:
+			return nil, fmt.Errorf("invalid configDiscovery mode %q", discovery.Mode)
+		}
+		for _, directory := range discovery.Directories {
+			discoveryRequest.Directories = append(discoveryRequest.Directories, resolveRequestPath(directory))
+		}
+		for index, filePath := range req.Files {
+			explicit := true
+			if len(discovery.ExplicitFiles) > 0 {
+				explicit = discovery.ExplicitFiles[index]
+			}
+			canonicalPath := ""
+			if len(req.CanonicalFiles) > 0 {
+				canonicalPath = resolveRequestPath(req.CanonicalFiles[index])
+			}
+			discoveryRequest.Files = append(discoveryRequest.Files, rslintconfig.DiscoveryFile{
+				Path:          resolveRequestPath(filePath),
+				CanonicalPath: canonicalPath,
+				Explicit:      explicit,
+			})
+		}
+
+		catalog, err := rslintconfig.NewConfigDiscoverySession(
+			fs,
+			&apiConfigModuleLoader{requester: requester},
+		).Build(ctx, discoveryRequest)
+		if err != nil {
+			return nil, fmt.Errorf("discover config catalog: %w", err)
+		}
+		if len(catalog.EslintPlugins) > 0 {
+			if capabilityRequester, ok := requester.(api.PeerCapabilityRequester); ok &&
+				!capabilityRequester.PeerSupportsCapability(api.CapabilityReversePluginLint) {
+				return nil, errors.New("API peer does not advertise reversePluginLint capability required by discovered ESLint plugins")
+			}
+		}
+
+		var overrideConfig rslintconfig.RslintConfig
+		if len(discovery.OverrideConfig) > 0 {
+			if err := json.Unmarshal(discovery.OverrideConfig, &overrideConfig); err != nil {
+				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
+			}
+			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
+				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
+			}
+		}
+
+		if len(catalog.Configs) > 0 {
+			configDirectories := catalog.ConfigDirectories()
+			if len(configDirectories) == 1 && catalog.Sources[configDirectories[0]].ExplicitConfig {
+				// overrideConfigFile is invocation-wide. A hierarchical config map
+				// would have no owner for a requested file outside cwd and would
+				// incorrectly drop it, even though explicit flat-config semantics say
+				// the selected module governs the complete supplied target set.
+				configDirectory = configDirectories[0]
+				rslintConfig = append(rslintconfig.RslintConfig(nil), catalog.Configs[configDirectory]...)
+				rslintConfig = append(rslintConfig, overrideConfig...)
+				originalConfigDir = map[string]string{configDirectory: configDirectory}
+			} else {
+				configMap = make(map[string]rslintconfig.RslintConfig, len(catalog.Configs))
+				originalConfigDir = make(map[string]string, len(catalog.Configs))
+			}
+			for ownerDirectory, entries := range catalog.Configs {
+				if configMap == nil {
+					continue
+				}
+				effective := make(rslintconfig.RslintConfig, 0, len(entries)+len(overrideConfig))
+				effective = append(effective, entries...)
+				effective = append(effective, overrideConfig...)
+				configMap[ownerDirectory] = effective
+				originalConfigDir[ownerDirectory] = ownerDirectory
+			}
+			if configMap != nil {
+				configTargetScopes = catalog.Scopes
+				// The API already has an exact target set. Resolve provisional owners
+				// with authored config ignores first, then read only each owner's
+				// target ancestor chains. Every loaded config remains a source boundary,
+				// including one that owns only explicit files.
+				filesByOwner := configTargetFilesByOwner(
+					configMap,
+					configTargetScopes,
+					fs,
+					allowedFiles,
+					false,
+				)
+				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
+				for ownerDirectory, entries := range configMap {
+					ownerFiles := filesByOwner[ownerDirectory]
+					if ownerFiles == nil {
+						ownerFiles = []string{}
+					}
+					configMap[ownerDirectory] = rslintconfig.ConfigWithGitignoreWithBoundaries(
+						entries,
+						ownerDirectory,
+						fs,
+						ownerFiles,
+						configResolver.ChildConfigDirs(ownerDirectory),
+					)
+				}
+			}
+		} else {
+			// No JS candidate is a valid API state: lint with override entries (or
+			// syntax-only with an empty config) rather than falling back to the CLI's
+			// rslint.json lookup.
+			rslintConfig = overrideConfig
+			configDirectory = currentDirectory
+		}
+		catalogPlugins = catalog.EslintPlugins
+	}
+
+	if configMap == nil {
+		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
+	}
+
+	// The registry is process-global, but plugin execution is request-gated by
+	// requestPluginRules below so metadata from an earlier API request cannot
+	// make a later request dispatch stale plugin rules.
+	rslintconfig.RegisterAllRules()
+	pluginEntries := append([]rslintconfig.EslintPluginEntry(nil), catalogPlugins...)
+	for _, plugin := range req.EslintPlugins {
+		pluginEntries = append(pluginEntries, rslintconfig.EslintPluginEntry{
+			Prefix:    plugin.Prefix,
+			RuleNames: append([]string(nil), plugin.RuleNames...),
+		})
+	}
+	var requestPluginRules map[string]struct{}
+	if len(pluginEntries) > 0 {
+		requestPluginRules = make(map[string]struct{})
+		for _, plugin := range pluginEntries {
+			for _, ruleName := range plugin.RuleNames {
+				requestPluginRules[plugin.Prefix+"/"+ruleName] = struct{}{}
+			}
+		}
+		rslintconfig.RegisterEslintPluginRules(pluginEntries)
+	}
+
+	responsePathBase := configDirectory
+	if configMap != nil {
+		responsePathBase = currentDirectory
+	}
 	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          configDirectory,
+		CurrentDirectory:          responsePathBase,
 		UseCaseSensitiveFileNames: true,
 	}
 
 	// Resolve the exact lint target set, bind targets to existing Programs, and
-	// append a non-project-backed fallback Program for selected files absent from every
-	// Program (the typical lintText/lintFiles in-memory file). Identical to the
-	// CLI via the shared helper. configMap is nil: the --api path is always
-	// single-config (the JS side resolves any multi-config merge into one entry
-	// list).
+	// append a non-project-backed fallback Program for selected files absent from
+	// every Program (the typical lintText/lintFiles in-memory file). Identical to
+	// the CLI via the shared helper. Native discovery can supply a hierarchical
+	// configMap; low-level config and explicit overrideConfigFile requests remain
+	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := resolveLintTargetPlan(nil, rslintConfig, configDirectory, nil, fs, allowedFiles, nil, false)
+	targetPlan, err := resolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
@@ -229,7 +414,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	parseCache := utils.NewParseCache()
 	var programSet lintProgramSet
 	if len(targetPlan.Targets) > 0 {
-		programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
+		if configMap != nil {
+			programSet, err = createProgramSetForConfigs(configsForLintTargetPlan(configMap, targetPlan), false, fs, parseCache)
+		} else {
+			programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +432,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	targetsByProgram := binding.TargetsByProgram
 	targetPathBySourcePath := binding.TargetPathBySourcePath
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
+		ConfigMap:                  configMap,
 		Config:                     rslintConfig,
 		CurrentDirectory:           configDirectory,
 		EnforcePlugins:             true,
@@ -458,19 +648,20 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// native pass and runs in parallel, matching the CLI pipeline.
 	var pluginCh <-chan []rule.RuleDiagnostic
 	var cancelPlugin context.CancelFunc
-	if len(req.EslintPlugins) > 0 {
-		wireConfigDirectory := req.PluginConfigDirectory
-		if wireConfigDirectory == "" {
-			wireConfigDirectory = req.ConfigDirectory
-		}
-		if wireConfigDirectory == "" {
-			wireConfigDirectory = configDirectory
+	if len(pluginEntries) > 0 {
+		if originalConfigDir == nil {
+			wireConfigDirectory := req.PluginConfigDirectory
+			if wireConfigDirectory == "" {
+				wireConfigDirectory = req.ConfigDirectory
+			}
+			if wireConfigDirectory == "" {
+				wireConfigDirectory = configDirectory
+			}
+			originalConfigDir = map[string]string{configDirectory: wireConfigDirectory}
 		}
 		pluginInputs := buildPluginFileInputs(runOpts, pluginConfigResolver{
-			lintResolver: fileConfigResolver,
-			originalConfigDir: map[string]string{
-				configDirectory: wireConfigDirectory,
-			},
+			lintResolver:      fileConfigResolver,
+			originalConfigDir: originalConfigDir,
 		})
 		for i := range pluginInputs {
 			// Programmatic lint supports in-memory overlays. Always send the exact
@@ -589,6 +780,30 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
 	return response, nil
+}
+
+func configTargetFilesByOwner(
+	configMap map[string]rslintconfig.RslintConfig,
+	scopes map[string]rslintconfig.LintDiscoveryScope,
+	fs vfs.FS,
+	allowedFiles []string,
+	singleThreaded bool,
+) map[string][]string {
+	filesByOwner := make(map[string][]string, len(configMap))
+	for _, target := range rslintconfig.DiscoverLintTargetsMultiConfig(
+		configMap,
+		scopes,
+		fs,
+		allowedFiles,
+		nil,
+		singleThreaded,
+	) {
+		filesByOwner[target.ConfigDirectory] = append(
+			filesByOwner[target.ConfigDirectory],
+			target.Path,
+		)
+	}
+	return filesByOwner
 }
 
 func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS) {

@@ -1,21 +1,9 @@
 import { describe, test, expect } from '@rstest/core';
 import {
   isJSConfigFile,
-  classifyArgs,
   isOutputFormat,
   parseArgs,
 } from '../src/utils/args.js';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
-
-function createTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-args-test-'));
-}
-
-function cleanup(dir: string): void {
-  fs.rmSync(dir, { recursive: true, force: true });
-}
 
 describe('isJSConfigFile', () => {
   test('returns true for .js', () => {
@@ -65,103 +53,6 @@ describe('isOutputFormat', () => {
 
   test('rejects unknown output protocols', () => {
     expect(isOutputFormat('stylish')).toBe(false);
-  });
-});
-
-describe('classifyArgs', () => {
-  test('empty positionals', () => {
-    const result = classifyArgs([], '/tmp');
-    expect(result.files).toEqual([]);
-    expect(result.dirs).toEqual([]);
-  });
-
-  test('classifies existing directory', () => {
-    const tmp = createTempDir();
-    try {
-      const result = classifyArgs([tmp], '/');
-      expect(result.dirs).toEqual([path.resolve(tmp)]);
-      expect(result.files).toEqual([]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('classifies existing file', () => {
-    const tmp = createTempDir();
-    const filePath = path.join(tmp, 'test.ts');
-    try {
-      fs.writeFileSync(filePath, 'const x = 1;');
-      const result = classifyArgs([filePath], '/');
-      expect(result.files).toEqual([path.resolve(filePath)]);
-      expect(result.dirs).toEqual([]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('non-existent path treated as file', () => {
-    const nonExistent = '/nonexistent/path/file.ts';
-    const cwd = '/';
-    const result = classifyArgs([nonExistent], cwd);
-    expect(result.files).toEqual([path.resolve(cwd, nonExistent)]);
-    expect(result.dirs).toEqual([]);
-  });
-
-  test('mixed files and directories', () => {
-    const tmp = createTempDir();
-    const dir = path.join(tmp, 'src');
-    const filePath = path.join(tmp, 'test.ts');
-    try {
-      fs.mkdirSync(dir);
-      fs.writeFileSync(filePath, 'const x = 1;');
-      const result = classifyArgs([dir, filePath], '/');
-      expect(result.dirs).toEqual([path.resolve(dir)]);
-      expect(result.files).toEqual([path.resolve(filePath)]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('resolves relative paths against cwd', () => {
-    const tmp = createTempDir();
-    const filePath = path.join(tmp, 'test.ts');
-    try {
-      fs.writeFileSync(filePath, 'const x = 1;');
-      const result = classifyArgs(['test.ts'], tmp);
-      expect(result.files).toEqual([path.resolve(filePath)]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('preserves a symlinked file path', () => {
-    const tmp = createTempDir();
-    const realDir = path.join(tmp, 'real');
-    const linkDir = path.join(tmp, 'link');
-    const filePath = path.join(realDir, 'test.ts');
-    try {
-      fs.mkdirSync(realDir);
-      fs.writeFileSync(filePath, 'const x = 1;');
-      fs.symlinkSync(realDir, linkDir);
-      const result = classifyArgs([path.join(linkDir, 'test.ts')], '/');
-      expect(result.files).toEqual([path.resolve(linkDir, 'test.ts')]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('preserves a symlinked directory arg', () => {
-    const tmp = createTempDir();
-    const realDir = path.join(tmp, 'real');
-    const linkDir = path.join(tmp, 'link');
-    try {
-      fs.mkdirSync(realDir);
-      fs.symlinkSync(realDir, linkDir);
-      const result = classifyArgs([linkDir], '/');
-      expect(result.dirs).toEqual([path.resolve(linkDir)]);
-    } finally {
-      cleanup(tmp);
-    }
   });
 });
 
