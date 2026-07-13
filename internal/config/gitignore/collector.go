@@ -81,14 +81,10 @@ func readGitignoreAsGlobsWithBoundaries(configDir string, fsys vfs.FS, isDirecto
 	return allGlobs
 }
 
-// readGitignoreAsGlobsForFiles reads only .gitignore files on each directory
-// chain from configDir to an explicit target. This is used by API-style calls
-// where the target set is already known; unlike the full collector, it does
-// not scan every descendant of configDir.
-func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string) []string {
-	return readGitignoreAsGlobsForFilesWithBoundaries(configDir, fsys, files, nil)
-}
-
+// readGitignoreAsGlobsForFilesWithBoundaries reads only .gitignore files on
+// each directory chain from configDir to an explicit target. This is used by
+// API-style calls where the target set is already known; unlike the full
+// collector, it does not scan every descendant of configDir.
 func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []string {
 	if fsys == nil || len(files) == 0 {
 		return nil
