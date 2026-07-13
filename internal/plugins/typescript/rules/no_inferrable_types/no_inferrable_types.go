@@ -212,7 +212,8 @@ func matchesTypeAnnotation(typeNode *ast.Node, expectedType string) bool {
 
 var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 	Name: "no-inferrable-types",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		checkDeclaration := func(reportNode *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, hasQuestionToken bool, hasExclamationToken bool) {

@@ -45,8 +45,9 @@ describe('isJSConfigFile', () => {
     expect(isJSConfigFile('/project/rslint.config.ts')).toBe(true);
   });
 
-  test('returns false for .cjs', () => {
-    expect(isJSConfigFile('rslint.config.cjs')).toBe(false);
+  test('returns true for explicitly selectable .cjs and .cts configs', () => {
+    expect(isJSConfigFile('rslint.config.cjs')).toBe(true);
+    expect(isJSConfigFile('rslint.config.cts')).toBe(true);
   });
 });
 
@@ -60,9 +61,8 @@ describe('classifyArgs', () => {
   test('classifies existing directory', () => {
     const tmp = createTempDir();
     try {
-      const realTmp = fs.realpathSync(tmp);
       const result = classifyArgs([tmp], '/');
-      expect(result.dirs).toEqual([realTmp]);
+      expect(result.dirs).toEqual([path.resolve(tmp)]);
       expect(result.files).toEqual([]);
     } finally {
       cleanup(tmp);
@@ -74,9 +74,8 @@ describe('classifyArgs', () => {
     const filePath = path.join(tmp, 'test.ts');
     try {
       fs.writeFileSync(filePath, 'const x = 1;');
-      const realFile = fs.realpathSync(filePath);
       const result = classifyArgs([filePath], '/');
-      expect(result.files).toEqual([realFile]);
+      expect(result.files).toEqual([path.resolve(filePath)]);
       expect(result.dirs).toEqual([]);
     } finally {
       cleanup(tmp);
@@ -98,11 +97,9 @@ describe('classifyArgs', () => {
     try {
       fs.mkdirSync(dir);
       fs.writeFileSync(filePath, 'const x = 1;');
-      const realDir = fs.realpathSync(dir);
-      const realFile = fs.realpathSync(filePath);
       const result = classifyArgs([dir, filePath], '/');
-      expect(result.dirs).toEqual([realDir]);
-      expect(result.files).toEqual([realFile]);
+      expect(result.dirs).toEqual([path.resolve(dir)]);
+      expect(result.files).toEqual([path.resolve(filePath)]);
     } finally {
       cleanup(tmp);
     }
@@ -113,15 +110,14 @@ describe('classifyArgs', () => {
     const filePath = path.join(tmp, 'test.ts');
     try {
       fs.writeFileSync(filePath, 'const x = 1;');
-      const realFile = fs.realpathSync(filePath);
       const result = classifyArgs(['test.ts'], tmp);
-      expect(result.files).toEqual([realFile]);
+      expect(result.files).toEqual([path.resolve(filePath)]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('resolves symlinks in path', () => {
+  test('preserves a symlinked file path', () => {
     const tmp = createTempDir();
     const realDir = path.join(tmp, 'real');
     const linkDir = path.join(tmp, 'link');
@@ -131,13 +127,13 @@ describe('classifyArgs', () => {
       fs.writeFileSync(filePath, 'const x = 1;');
       fs.symlinkSync(realDir, linkDir);
       const result = classifyArgs([path.join(linkDir, 'test.ts')], '/');
-      expect(result.files).toEqual([fs.realpathSync(filePath)]);
+      expect(result.files).toEqual([path.resolve(linkDir, 'test.ts')]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('resolves symlinked directory arg', () => {
+  test('preserves a symlinked directory arg', () => {
     const tmp = createTempDir();
     const realDir = path.join(tmp, 'real');
     const linkDir = path.join(tmp, 'link');
@@ -145,7 +141,7 @@ describe('classifyArgs', () => {
       fs.mkdirSync(realDir);
       fs.symlinkSync(realDir, linkDir);
       const result = classifyArgs([linkDir], '/');
-      expect(result.dirs).toEqual([fs.realpathSync(realDir)]);
+      expect(result.dirs).toEqual([path.resolve(linkDir)]);
     } finally {
       cleanup(tmp);
     }

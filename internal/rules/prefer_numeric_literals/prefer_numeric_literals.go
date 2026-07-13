@@ -34,7 +34,7 @@ func useLiteralMessage(system string, functionName string) rule.RuleMessage {
 // https://eslint.org/docs/latest/rules/prefer-numeric-literals
 var PreferNumericLiteralsRule = rule.Rule{
 	Name: "prefer-numeric-literals",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -55,7 +55,11 @@ var PreferNumericLiteralsRule = rule.Rule{
 					return
 				}
 
-				if !utils.IsGlobalParseIntCallee(call.Expression) {
+				// nil: this rule's upstream ESLint check (isSpecificId /
+				// isSpecificMemberAccess) doesn't consult scope at all, so a
+				// config `off` setting has no bearing here — only the
+				// existing shadow check applies.
+				if !utils.IsGlobalParseIntCallee(call.Expression, nil) {
 					return
 				}
 

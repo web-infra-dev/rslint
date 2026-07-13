@@ -78,7 +78,8 @@ type options struct {
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/no-instanceof-builtins.md
 var NoInstanceofBuiltinsRule = rule.Rule{
 	Name: "unicorn/no-instanceof-builtins",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

@@ -96,6 +96,9 @@ func TestNoNewFuncRule(t *testing.T) {
 
 			// --- Tagged template (not a call) ---
 			{Code: "Function`code`"},
+
+			// --- Config `/* global Function: off */` un-declares the builtin ---
+			{Code: `new Function("code");`, Globals: map[string]bool{"Function": false}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -320,6 +323,13 @@ func TestNoNewFuncRule(t *testing.T) {
 			{
 				Code:   `function f() { for (let Function of []) {} var x = new Function("code"); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 52}},
+			},
+
+			// Config declares Function as a writable global — still the builtin.
+			{
+				Code:    `new Function("code");`,
+				Globals: map[string]bool{"Function": true},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
 		},
 	)

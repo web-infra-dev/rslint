@@ -14,7 +14,8 @@ type NoEmptyFunctionOptions struct {
 
 var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 	Name: "no-empty-function",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := NoEmptyFunctionOptions{
 			Allow: []string{},
 		}
@@ -96,7 +97,7 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 				if fn.Body.Kind != ast.KindBlock {
 					return false // Expression body, not empty
 				}
-			return isBlockBodyEmpty(fn.Body)
+				return isBlockBodyEmpty(fn.Body)
 			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor == nil || constructor.Body == nil {

@@ -63,3 +63,25 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 		}
 	})
 }
+
+func TestAddDefaultLibraryGlobals(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	fs := NewOverlayVFSForFile(filePath, "export {}; const top = 1; const localOnly = 1;")
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err, "couldn't create program")
+
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+	globals := map[string]bool{}
+	AddDefaultLibraryGlobals(globals, program, typeChecker)
+
+	for _, name := range []string{"Object", "Promise", "top"} {
+		if !globals[name] {
+			t.Errorf("expected %q to be collected from the active default libraries", name)
+		}
+	}
+	if globals["localOnly"] {
+		t.Error("module-local declaration was collected as a default-library global")
+	}
+}

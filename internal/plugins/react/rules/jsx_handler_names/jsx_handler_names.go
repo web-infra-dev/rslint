@@ -126,7 +126,7 @@ func parseOptions(raw any) options {
 }
 
 // stripWhitespace removes every character that JS's `\s` regex matches,
-// mirroring upstream's `propValue.replace(/\s*/g, '')`. The set is JS
+// mirroring upstream's `propValue.replace(/\s*/g, ”)`. The set is JS
 // WhiteSpace + LineTerminator per ECMA-262: ASCII whitespace, U+00A0
 // NBSP, U+FEFF ZWNBSP, U+2028 / U+2029 line/paragraph separators, and
 // Unicode "Space_Separator" (Zs) code points.
@@ -164,7 +164,7 @@ func isJSWhitespace(r rune) bool {
 	return unicode.IsSpace(r)
 }
 
-// stripThisOrBindBase mirrors upstream's `.replace(/^this\.|.*::/, '')`
+// stripThisOrBindBase mirrors upstream's `.replace(/^this\.|.*::/, ”)`
 // (single, non-global). Alternatives are tried at the same position in
 // declaration order: an anchored leading `this.` wins over a `::` rewrite,
 // matching JS's left-to-right alternation semantics.
@@ -225,7 +225,8 @@ func isPlainMemberAccess(node *ast.Node) bool {
 
 var JsxHandlerNamesRule = rule.Rule{
 	Name: "react/jsx-handler-names",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
@@ -361,4 +362,3 @@ var JsxHandlerNamesRule = rule.Rule{
 		}
 	},
 }
-

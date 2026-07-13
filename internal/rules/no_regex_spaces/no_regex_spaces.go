@@ -20,7 +20,7 @@ var (
 // https://eslint.org/docs/latest/rules/no-regex-spaces
 var NoRegexSpacesRule = rule.Rule{
 	Name: "no-regex-spaces",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 
 		reportAndMaybeFix := func(reportNode *ast.Node, pattern, rawPattern string, rawPatternStart int, flags utils.RegexFlags) {

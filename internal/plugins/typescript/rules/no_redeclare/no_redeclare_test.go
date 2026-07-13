@@ -68,7 +68,21 @@ func TestNoRedeclareRule(t *testing.T) {
 			// In a module (any file with a top-level `export`), top-level
 			// declarations are module-scoped and do not merge with lib globals.
 			{Code: "export {};\nvar Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: "export {};\nvar top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 			{Code: "import {} from './foo';\nvar Array = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
+
+			// ====================================================================
+			// ctx.Globals: an explicit `off` setting (config `Object: "off"` /
+			// `/* globals Object:off */`) un-declares the builtin, so the
+			// declaration no longer collides — even for globals resolved from
+			// the TypeScript default libraries (lib.dom etc.).
+			// ====================================================================
+			{Code: "var Object = 0;", Globals: map[string]bool{"Object": false}},
+			{Code: "/* globals Object:off */ var Object = 0;"},
+			{Code: "var document = 0;", Globals: map[string]bool{"document": false}},
+			{Code: "/* globals top:off */ var top = 0;"},
+			// A final inline `off` wins over a config-declared global.
+			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]bool{"a": true}},
 
 			// ====================================================================
 			// TypeScript declaration merging (default ignoreDeclarationMerge: true).
@@ -246,8 +260,8 @@ func TestNoRedeclareRule(t *testing.T) {
 			// interfaces in different declaration spaces. ESLint, which does
 			// name-level matching, flags these. We intentionally don't.
 			// ====================================================================
-			{Code: "type NodeListOf = 1;"},                      // lib.dom
-			{Code: "type HTMLElement = 1;"},                     // lib.dom
+			{Code: "type NodeListOf = 1;"},  // lib.dom
+			{Code: "type HTMLElement = 1;"}, // lib.dom
 			{Code: "type Array = 1;", Options: map[string]interface{}{"builtinGlobals": true}}, // lib.es5 core interface
 			// Extending a lib interface with a same-named user interface is
 			// the idiomatic TS pattern (ImportMeta augmentation, etc.) — it
@@ -502,6 +516,13 @@ func TestNoRedeclareRule(t *testing.T) {
 				},
 				Options: map[string]interface{}{"builtinGlobals": true},
 			},
+			{
+				Code: "export {};\n/*globals top */ var top = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
+			},
 			// Default options already enable builtinGlobals.
 			{
 				Code: "var Number = 0;",
@@ -514,6 +535,37 @@ func TestNoRedeclareRule(t *testing.T) {
 				Code: "var Promise = 0;",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+				},
+			},
+			{
+				Code: "/*globals Array */",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
+			},
+			{
+				Code: "export {};\n/*globals Array */",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
+			},
+			// ctx.Globals: a config-declared global collides like a builtin.
+			{
+				Code:    "var app = 0;",
+				Globals: map[string]bool{"app": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Message: "'app' is already defined as a built-in global variable.", Line: 1, Column: 5},
+				},
+			},
+			// ctx.Globals: an inline comment re-declares a builtin the config
+			// turned off — the comment then collides with the declaration.
+			{
+				Code:    "/* globals Object */ var Object = 0;",
+				Globals: map[string]bool{"Object": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 12},
 				},
 			},
 			// ====================================================================

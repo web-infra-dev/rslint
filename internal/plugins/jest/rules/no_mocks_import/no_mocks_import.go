@@ -30,7 +30,7 @@ func isStringNode(node *ast.Node) bool {
 
 var NoMocksImportRule = rule.Rule{
 	Name: "jest/no-mocks-import",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				if isMocksImportPath(node.AsImportDeclaration().ModuleSpecifier.Text()) {

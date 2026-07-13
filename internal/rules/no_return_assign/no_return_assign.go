@@ -41,7 +41,8 @@ func parseMode(options any) string {
 // https://eslint.org/docs/latest/rules/no-return-assign
 var NoReturnAssignRule = rule.Rule{
 	Name: "no-return-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		always := parseMode(options) == "always"
 
 		return rule.RuleListeners{

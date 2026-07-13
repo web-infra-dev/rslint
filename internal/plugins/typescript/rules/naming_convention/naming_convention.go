@@ -279,18 +279,18 @@ type matchRegex struct {
 }
 
 type normalizedSelector struct {
-	selector          selectorKind
-	modifiers         modifierKind
-	types             typeModifierKind
-	filter            *matchRegex
-	format            []predefinedFormat // nil means "no format check" (format: null)
-	formatNull        bool
-	custom            *matchRegex
-	leadingUnderscore underscoreOption
+	selector           selectorKind
+	modifiers          modifierKind
+	types              typeModifierKind
+	filter             *matchRegex
+	format             []predefinedFormat // nil means "no format check" (format: null)
+	formatNull         bool
+	custom             *matchRegex
+	leadingUnderscore  underscoreOption
 	trailingUnderscore underscoreOption
-	prefix            []string
-	suffix            []string
-	modifierWeight    int
+	prefix             []string
+	suffix             []string
+	modifierWeight     int
 }
 
 // ---- Format checking functions ----
@@ -452,8 +452,8 @@ func parseOptions(rawOpts any) []normalizedSelector {
 	case []interface{}:
 		optsList = v
 	case map[string]interface{}:
-		// Single selector object (e.g., when CLI --rule passes one option element,
-		// parseArrayRuleConfig unwraps the single-element array).
+		// Single selector object (e.g., when the config has one option element,
+		// LegacyUnwrapOptions collapses the single-element options array).
 		optsList = []interface{}{v}
 	default:
 		return getDefaultConfig()
@@ -483,9 +483,9 @@ func parseOptions(rawOpts any) []normalizedSelector {
 func getDefaultConfig() []normalizedSelector {
 	return parseOptions([]interface{}{
 		map[string]interface{}{
-			"selector":          "default",
-			"format":            []interface{}{"camelCase"},
-			"leadingUnderscore": "allow",
+			"selector":           "default",
+			"format":             []interface{}{"camelCase"},
+			"leadingUnderscore":  "allow",
 			"trailingUnderscore": "allow",
 		},
 		map[string]interface{}{
@@ -493,9 +493,9 @@ func getDefaultConfig() []normalizedSelector {
 			"format":   []interface{}{"camelCase", "PascalCase"},
 		},
 		map[string]interface{}{
-			"selector":          "variable",
-			"format":            []interface{}{"camelCase", "UPPER_CASE"},
-			"leadingUnderscore": "allow",
+			"selector":           "variable",
+			"format":             []interface{}{"camelCase", "UPPER_CASE"},
+			"leadingUnderscore":  "allow",
 			"trailingUnderscore": "allow",
 		},
 		map[string]interface{}{
@@ -618,18 +618,18 @@ func parseOneSelector(optMap map[string]interface{}) []normalizedSelector {
 		}
 		weight := calculateWeight(mods, selectorTypes, filter, sk)
 		result = append(result, normalizedSelector{
-			selector:          sk,
-			modifiers:         mods,
-			types:             selectorTypes,
-			filter:            filter,
-			format:            formats,
-			formatNull:        formatNull,
-			custom:            custom,
-			leadingUnderscore: leadingUnderscore,
+			selector:           sk,
+			modifiers:          mods,
+			types:              selectorTypes,
+			filter:             filter,
+			format:             formats,
+			formatNull:         formatNull,
+			custom:             custom,
+			leadingUnderscore:  leadingUnderscore,
 			trailingUnderscore: trailingUnderscore,
-			prefix:            prefix,
-			suffix:            suffix,
-			modifierWeight:    weight,
+			prefix:             prefix,
+			suffix:             suffix,
+			modifierWeight:     weight,
 		})
 	}
 	return result
@@ -1000,7 +1000,6 @@ func validateUnderscore(position string, processedName string, typeName string, 
 }
 
 // ---- Type checking helpers ----
-
 
 func isCorrectType(ch *checker.Checker, node *ast.Node, types typeModifierKind) bool {
 	if types == 0 || ch == nil {
@@ -2060,7 +2059,8 @@ func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
 
 // ---- Main run function ----
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.LegacyUnwrapOptions(_options)
 	selectors := parseOptions(options)
 
 	if len(selectors) == 0 {
@@ -2078,31 +2078,31 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	}
 
 	return rule.RuleListeners{
-		ast.KindVariableStatement:            handleNode,
-		ast.KindForOfStatement:               handleNode,
-		ast.KindForInStatement:               handleNode,
-		ast.KindForStatement:                 handleNode,
-		ast.KindFunctionDeclaration:          handleNode,
-		ast.KindFunctionExpression:           handleNode,
-		ast.KindParameter:                    handleNode,
-		ast.KindClassDeclaration:             handleNode,
-		ast.KindClassExpression:              handleNode,
-		ast.KindInterfaceDeclaration:         handleNode,
-		ast.KindTypeAliasDeclaration:         handleNode,
-		ast.KindEnumDeclaration:              handleNode,
-		ast.KindEnumMember:                   handleNode,
-		ast.KindTypeParameter:                handleNode,
-		ast.KindPropertyDeclaration:          handleNode,
-		ast.KindMethodDeclaration:            handleNode,
-		ast.KindGetAccessor:                  handleNode,
-		ast.KindSetAccessor:                  handleNode,
-		ast.KindPropertySignature:            handleNode,
-		ast.KindMethodSignature:              handleNode,
-		ast.KindPropertyAssignment:           handleNode,
-		ast.KindShorthandPropertyAssignment:  handleNode,
-		ast.KindImportClause:                 handleNode,
-		ast.KindImportSpecifier:              handleNode,
-		ast.KindNamespaceImport:              handleNode,
+		ast.KindVariableStatement:           handleNode,
+		ast.KindForOfStatement:              handleNode,
+		ast.KindForInStatement:              handleNode,
+		ast.KindForStatement:                handleNode,
+		ast.KindFunctionDeclaration:         handleNode,
+		ast.KindFunctionExpression:          handleNode,
+		ast.KindParameter:                   handleNode,
+		ast.KindClassDeclaration:            handleNode,
+		ast.KindClassExpression:             handleNode,
+		ast.KindInterfaceDeclaration:        handleNode,
+		ast.KindTypeAliasDeclaration:        handleNode,
+		ast.KindEnumDeclaration:             handleNode,
+		ast.KindEnumMember:                  handleNode,
+		ast.KindTypeParameter:               handleNode,
+		ast.KindPropertyDeclaration:         handleNode,
+		ast.KindMethodDeclaration:           handleNode,
+		ast.KindGetAccessor:                 handleNode,
+		ast.KindSetAccessor:                 handleNode,
+		ast.KindPropertySignature:           handleNode,
+		ast.KindMethodSignature:             handleNode,
+		ast.KindPropertyAssignment:          handleNode,
+		ast.KindShorthandPropertyAssignment: handleNode,
+		ast.KindImportClause:                handleNode,
+		ast.KindImportSpecifier:             handleNode,
+		ast.KindNamespaceImport:             handleNode,
 	}
 }
 
@@ -2151,4 +2151,3 @@ func validateIdentifier(ctx rule.RuleContext, id identifierInfo, selectors []nor
 		return
 	}
 }
-

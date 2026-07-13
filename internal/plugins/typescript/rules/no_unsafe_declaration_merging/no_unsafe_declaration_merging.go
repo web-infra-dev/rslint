@@ -34,7 +34,7 @@ func nearestLocalsContainer(node *ast.Node) *ast.Node {
 var NoUnsafeDeclarationMergingRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-declaration-merging",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// reportIfUnsafeMerge mirrors upstream's scope-manager probe in
 		// behavior while using tsgo's TypeChecker as the symbol source.
 		//

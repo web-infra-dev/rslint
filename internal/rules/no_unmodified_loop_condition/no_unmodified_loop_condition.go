@@ -293,7 +293,7 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 var NoUnmodifiedLoopConditionRule = rule.Rule{
 	Name:             "no-unmodified-loop-condition",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
 		// gap files / inferred-project files, but if a future caller bypasses
 		// the filter we still want to no-op rather than nil-deref.

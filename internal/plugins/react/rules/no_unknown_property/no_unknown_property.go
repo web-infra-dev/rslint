@@ -544,7 +544,8 @@ func isValidHTMLTagInJSX(parent *ast.Node) bool {
 
 // runRule is the rule entrypoint. Registers a single JsxAttribute listener
 // and walks the decision tree from upstream's `JSXAttribute(node)` handler.
-func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
+func runRule(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.LegacyUnwrapOptions(_options)
 	ignore := map[string]bool{}
 	requireDataLowercase := false
 	if optsMap := utils.GetOptionsMap(options); optsMap != nil {

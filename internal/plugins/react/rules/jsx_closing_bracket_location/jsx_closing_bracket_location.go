@@ -114,7 +114,8 @@ func leadingWhitespace(text string, lineStart int) string {
 // multiline elements.
 var JsxClosingBracketLocationRule = rule.Rule{
 	Name: "react/jsx-closing-bracket-location",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {

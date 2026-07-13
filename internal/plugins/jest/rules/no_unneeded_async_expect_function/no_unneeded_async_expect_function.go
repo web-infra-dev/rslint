@@ -89,7 +89,7 @@ func hasPromiseExpectModifier(jestFnCall *jestUtils.ParsedJestFnCall) bool {
 
 var NoUnneededAsyncExpectFunctionRule = rule.Rule{
 	Name: "jest/no-unneeded-async-expect-function",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)

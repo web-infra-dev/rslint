@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
   waitForDiagnostics,
+  waitForContentChange,
   findFixAllAction,
-  prewarmOnSaveFixAll,
   requestFixAll,
   withTmpFile,
   withOnSaveFixAll,
@@ -12,14 +12,6 @@ import {
 
 suite('rslint fixAll - error flows', function () {
   this.timeout(120000);
-
-  // Prime the on-save fixAll pipeline once before the first test that
-  // exercises it. The helper is process-wide idempotent — if another
-  // suite has already warmed it, this resolves immediately.
-  suiteSetup(async function () {
-    this.timeout(120000);
-    await prewarmOnSaveFixAll();
-  });
 
   test('fixAll on file with syntax errors does not crash', async () => {
     const brokenContent = 'const x: string = \nfunction (\nexport { \n';
@@ -63,25 +55,24 @@ suite('rslint fixAll - error flows', function () {
         "const pVal: string = 'x';\nconst pRes = (pVal as string).trim();\n",
       );
       const probeDiags = await waitForDiagnostics(doc);
-      if (
-        !probeDiags.some((d) =>
+      assert.ok(
+        probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
-        )
-      ) {
-        return;
-      }
-      await doc.save();
-      const probeStart = Date.now();
-      while (
-        doc.getText().includes('pVal as string') &&
-        Date.now() - probeStart < 20000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
+        ),
+        `Expected fixable diagnostic before syntax-error save. Got: ${probeDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
+      assert.ok(await doc.save(), 'Syntax-error probe should save');
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('pVal as string'),
+        60000,
+      );
 
       const brokenContent = 'const x = \nfunction {\nexport {\n';
       await replaceAll(editor, brokenContent);
-      await doc.save();
+      assert.ok(await doc.save(), 'Broken document should save');
 
       await new Promise((r) => setTimeout(r, 3000));
 

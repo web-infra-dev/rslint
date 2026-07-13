@@ -25,7 +25,7 @@ var msg = rule.RuleMessage{
 
 var NoNewFuncRule = rule.Rule{
 	Name: "no-new-func",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// isGlobalFunction checks whether an identifier resolves to the
 		// built-in Function (from lib.d.ts), not a user-declared one.
 		//
@@ -37,6 +37,13 @@ var NoNewFuncRule = rule.Rule{
 		//   2. IsShadowed — catches top-level shadowing that TypeChecker misses
 		isGlobalFunction := func(id *ast.Node) bool {
 			if utils.IsShadowed(id, "Function") {
+				return false
+			}
+			// A config `/* global Function: off */` / `languageOptions.globals`
+			// entry un-declares the builtin, so `Function` no longer resolves
+			// to a known global — ESLint's `globalScope.set.get("Function")`
+			// would be undefined and the rule stays silent.
+			if declared, ok := ctx.Globals["Function"]; ok && !declared {
 				return false
 			}
 			if ctx.TypeChecker != nil {

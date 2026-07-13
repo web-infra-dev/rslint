@@ -9,7 +9,7 @@ import (
 // https://eslint.org/docs/latest/rules/symbol-description
 var SymbolDescriptionRule = rule.Rule{
 	Name: "symbol-description",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -53,6 +53,13 @@ var SymbolDescriptionRule = rule.Rule{
 // without regressing the ESLint-aligned behavior.
 func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 	if utils.IsShadowed(callee, "Symbol") {
+		return true
+	}
+	// A config `/* global Symbol: off */` / `languageOptions.globals` entry
+	// un-declares the builtin, so it no longer resolves to a known global —
+	// ESLint's `getVariableByName` would return undefined and the rule stays
+	// silent.
+	if declared, ok := ctx.Globals["Symbol"]; ok && !declared {
 		return true
 	}
 	if ctx.TypeChecker == nil || ctx.Program == nil {

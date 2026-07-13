@@ -15,14 +15,14 @@
 //     case-insensitive string `"true"` and the explicit `{true}`.
 //  2. The element must be focusable per upstream's `isFocusable(type, attrs)`:
 //     - If `isInteractiveElement(type, attrs)` is true → focusable iff
-//       `tabIndex === undefined || tabIndex >= 0`. Inherently interactive
-//       elements (button, input, textarea, select, anchor-with-href, ...)
-//       skip the rule only when an explicit `tabIndex={-2}`-or-smaller (or
-//       any non-numeric resolved value that isn't `null`) removes them from
-//       focus order.
+//     `tabIndex === undefined || tabIndex >= 0`. Inherently interactive
+//     elements (button, input, textarea, select, anchor-with-href, ...)
+//     skip the rule only when an explicit `tabIndex={-2}`-or-smaller (or
+//     any non-numeric resolved value that isn't `null`) removes them from
+//     focus order.
 //     - Otherwise → focusable iff `tabIndex >= 0`. Non-interactive tags
-//       become focusable only when an explicit `tabIndex` of `0` or greater
-//       is added.
+//     become focusable only when an explicit `tabIndex` of `0` or greater
+//     is added.
 //
 // `aria-hidden=false` short-circuits step 1 and never reports, regardless of
 // focusability. Nested elements are NOT walked — the rule operates per JSX
@@ -45,7 +45,7 @@ const errorMessage = `aria-hidden="true" must not be set on focusable elements.`
 
 var NoAriaHiddenOnFocusableRule = rule.Rule{
 	Name: "jsx-a11y/no-aria-hidden-on-focusable",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 
 		check := func(node *ast.Node) {

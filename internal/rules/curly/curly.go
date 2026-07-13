@@ -86,7 +86,8 @@ type curlyChecker struct {
 // https://eslint.org/docs/latest/rules/curly
 var CurlyRule = rule.Rule{
 	Name: "curly",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		c := &curlyChecker{
 			ctx:     ctx,
 			sf:      ctx.SourceFile,

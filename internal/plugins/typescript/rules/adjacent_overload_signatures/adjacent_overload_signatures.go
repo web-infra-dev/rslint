@@ -182,7 +182,7 @@ func checkBodyForOverloadMethods(ctx rule.RuleContext, node *ast.Node) {
 
 var AdjacentOverloadSignaturesRule = rule.CreateRule(rule.Rule{
 	Name: "adjacent-overload-signatures",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Check the source file at the beginning
 		checkBodyForOverloadMethods(ctx, &ctx.SourceFile.Node)
 

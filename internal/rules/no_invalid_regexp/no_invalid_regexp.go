@@ -25,7 +25,8 @@ var validFlags = map[byte]bool{
 // https://eslint.org/docs/latest/rules/no-invalid-regexp
 var NoInvalidRegexpRule = rule.Rule{
 	Name: "no-invalid-regexp",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		report := func(node *ast.Node, msg string) {

@@ -14,6 +14,7 @@ rslint [options] [files/directories...]
 | `-c, --config <path>` | Specify which config file to use                                                               |
 | `--fix`               | Automatically fix problems                                                                     |
 | `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
+| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
 | `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
 | `--quiet`             | Report errors only, suppress warnings                                                          |
 | `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
@@ -44,7 +45,9 @@ When no arguments are given, rslint scopes linting to the current working direct
 
 ### Config Discovery
 
-For each target file or directory, rslint searches for `rslint.config.{js,mjs,ts,mts}` starting from that location and walking upward to the filesystem root. The first config found is used.
+For each target file or directory, rslint searches for `rslint.config.{js,mjs,ts,mts}` starting from that location and walking upward to the filesystem root. The nearest successfully loaded config is used. If a discovered config cannot be loaded, rslint warns and tries its next ancestor; the command fails when none of the discovered candidates can be loaded.
+
+`.cjs` and `.cts` config files are not discovered automatically, but remain supported when passed explicitly with `--config` or `-c`.
 
 In monorepo setups, rslint automatically discovers nested configs and applies the nearest one to each file:
 
@@ -106,3 +109,4 @@ rslint src/ --rule 'no-console: off' --format github
 | ---- | ------------------------------------------------- |
 | `0`  | No errors (warnings may be present)               |
 | `1`  | Errors found, or warnings exceed `--max-warnings` |
+| `2`  | Invalid command-line usage or flag combinations   |

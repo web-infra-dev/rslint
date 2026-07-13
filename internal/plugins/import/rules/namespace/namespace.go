@@ -19,7 +19,8 @@ type ruleOptions struct {
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/namespace.js
 var NamespaceRule = rule.Rule{
 	Name: "import/namespace",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		namespaces := collectNamespaces(ctx)
 

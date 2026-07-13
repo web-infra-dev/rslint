@@ -18,63 +18,51 @@ import (
 // gitignore-converted forms and the wildcard-mid-path `!` re-includes that
 // rspack actually ships. Every assertion is exact; no loose matches.
 
-// --- Real gitignore lines, exact converted glob + classification ---
+// --- Converted gitignore globs, exact classification ---
 //
-// convertSinglePattern is the production gitignore→glob converter. Pinning its
-// output for real lines guards the Kind boundary that drives directory pruning:
-// a `dir/` (→ fileLevelCover, prunable) vs a rooted nested path `a/b` (→
-// absoluteBlock) vs a single-level `dir/*` (→ dirNone, NOT prunable).
-func TestRealGitignoreLine_ConvertAndClassify(t *testing.T) {
+// Conversion itself is covered in the gitignore package. These assertions pin
+// the config-side Kind boundary that drives directory pruning.
+func TestConvertedGitignoreGlob_Classify(t *testing.T) {
 	cases := []struct {
-		line    string // raw .gitignore line (root .gitignore, baseDir="")
-		glob    string // expected convertSinglePattern output
+		glob    string
 		negated bool
 		kind    dirKind
 	}{
-		// rsbuild
-		{"node_modules/", "**/node_modules/**/*", false, dirFileLevelCover},
-		{"dist/", "**/dist/**/*", false, dirFileLevelCover},
-		{"dist-*", "**/dist-*", false, dirAbsoluteBlock}, // glob name, not a dir cover
-		{"*.log*", "**/*.log*", false, dirAbsoluteBlock}, // file pattern
-		{"*.css.d.ts", "**/*.css.d.ts", false, dirAbsoluteBlock},
-		{".vscode/**/*", ".vscode/**/*", false, dirFileLevelCover},                   // contains / → rooted (no **/ prefix)
-		{"!.vscode/settings.json", "!.vscode/settings.json", true, dirAbsoluteBlock}, // rooted negation
-		{"test-results/", "**/test-results/**/*", false, dirFileLevelCover},
-		// rspack — rooted + nested + bracket + the wildcard-mid-path negations
-		{"target/", "**/target/**/*", false, dirFileLevelCover},
-		{"**/*.rs.bk", "**/*.rs.bk", false, dirAbsoluteBlock},
-		{"report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json", "**/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json", false, dirAbsoluteBlock},
-		{"!scripts/node_modules/", "!scripts/node_modules/**/*", true, dirFileLevelCover}, // rooted (has /) dir negation
-		{"!tests/rspack-test/*/**/node_modules", "!tests/rspack-test/*/**/node_modules", true, dirAbsoluteBlock},
-		{"!packages/rspack-cli/tests/**/node_modules", "!packages/rspack-cli/tests/**/node_modules", true, dirAbsoluteBlock},
-		{"!tests/rspack-test/configCases/target", "!tests/rspack-test/configCases/target", true, dirAbsoluteBlock},
-		{"packages/*/tests/js", "packages/*/tests/js", false, dirAbsoluteBlock}, // rooted nested, no dir suffix
-		{"/github/", "github/**/*", false, dirFileLevelCover},                   // rooted dir
-		{"/artifacts/", "artifacts/**/*", false, dirFileLevelCover},
-		{"npm/**/*.node", "npm/**/*.node", false, dirAbsoluteBlock}, // rooted ext filter under dir
-		{"/npm/*", "npm/*", false, dirNone},                         // rooted single-level → NOT a subtree cover
-		{"!npm/darwin-arm64/", "!npm/darwin-arm64/**/*", true, dirFileLevelCover},
-		{"/packages/*/temp", "packages/*/temp", false, dirAbsoluteBlock},
-		// rslint self — nested-rooted dir name (build/Release) stays absolute
-		{"build/Release", "build/Release", false, dirAbsoluteBlock},
-		{".env.*", "**/.env.*", false, dirAbsoluteBlock},
-		{"!.env.example", "!**/.env.example", true, dirAbsoluteBlock},
-		// create-rstack
-		{".vscode/*", ".vscode/*", false, dirNone}, // contains / → rooted; single-level tail → dirNone
+		{"**/node_modules/**/*", false, dirFileLevelCover},
+		{"**/dist/**/*", false, dirFileLevelCover},
+		{"**/dist-*", false, dirAbsoluteBlock},
+		{"**/*.log*", false, dirAbsoluteBlock},
+		{"**/*.css.d.ts", false, dirAbsoluteBlock},
+		{".vscode/**/*", false, dirFileLevelCover},
+		{"!.vscode/settings.json", true, dirAbsoluteBlock},
+		{"**/test-results/**/*", false, dirFileLevelCover},
+		{"**/output/**/*", false, dirFileLevelCover},
+		{"**/*.rs.bk", false, dirAbsoluteBlock},
+		{"**/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json", false, dirAbsoluteBlock},
+		{"!scripts/node_modules/**/*", true, dirFileLevelCover},
+		{"!tests/fixtures/*/**/node_modules", true, dirAbsoluteBlock},
+		{"!packages/tool/tests/**/node_modules", true, dirAbsoluteBlock},
+		{"!tests/fixtures/cases/output", true, dirAbsoluteBlock},
+		{"packages/*/tests/js", false, dirAbsoluteBlock},
+		{"github/**/*", false, dirFileLevelCover},
+		{"artifacts/**/*", false, dirFileLevelCover},
+		{"npm/**/*.node", false, dirAbsoluteBlock},
+		{"npm/*", false, dirNone},
+		{"!npm/darwin-arm64/**/*", true, dirFileLevelCover},
+		{"packages/*/temp", false, dirAbsoluteBlock},
+		{"build/Release", false, dirAbsoluteBlock},
+		{"**/.env.*", false, dirAbsoluteBlock},
+		{"!**/.env.example", true, dirAbsoluteBlock},
+		{".vscode/*", false, dirNone},
 	}
 	for _, c := range cases {
-		gotGlob := convertSinglePattern(c.line, "")
-		if gotGlob != c.glob {
-			t.Errorf("convertSinglePattern(%q) = %q, want %q", c.line, gotGlob, c.glob)
-			continue
-		}
 		// ParseIgnorePattern strips the leading `!` into Negated; its Glob is the
 		// `!`-free matcher. Derive the expected stripped glob from c.glob.
 		wantStrippedGlob := strings.TrimPrefix(c.glob, "!")
-		p := ParseIgnorePattern(gotGlob)
+		p := ParseIgnorePattern(c.glob)
 		if p.Glob != wantStrippedGlob || p.Negated != c.negated || p.Kind != c.kind {
 			t.Errorf("ParseIgnorePattern(%q) = {Glob:%q Negated:%v Kind:%d}, want {Glob:%q Negated:%v Kind:%d}",
-				gotGlob, p.Glob, p.Negated, p.Kind, wantStrippedGlob, c.negated, c.kind)
+				c.glob, p.Glob, p.Negated, p.Kind, wantStrippedGlob, c.negated, c.kind)
 		}
 	}
 }

@@ -86,6 +86,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
+	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
@@ -224,6 +225,7 @@ func GetAllRules() []rule.Rule {
 		no_octal_escape.NoOctalEscapeRule,
 		no_param_reassign.NoParamReassignRule,
 		no_proto.NoProtoRule,
+		no_redeclare.NoRedeclareRule,
 		radix.RadixRule,
 		no_regex_spaces.NoRegexSpacesRule,
 		no_return_assign.NoReturnAssignRule,

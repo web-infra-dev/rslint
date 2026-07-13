@@ -50,7 +50,7 @@ func classDisplayName(node *ast.Node) string {
 
 var NoRedundantShouldComponentUpdateRule = rule.Rule{
 	Name: "react/no-redundant-should-component-update",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 
 		check := func(node *ast.Node) {

@@ -58,6 +58,10 @@ func TestNoNewSymbolRule(t *testing.T) {
 			// Hoisting: var/function declarations hoist to top of scope
 			{Code: `new Symbol(); var Symbol = 1;`},
 			{Code: `new Symbol(); function Symbol() {}`},
+
+			// Config `/* global Symbol: off */` un-declares the builtin, so it
+			// no longer resolves to a known global.
+			{Code: `new Symbol();`, Globals: map[string]bool{"Symbol": false}},
 		},
 		// Invalid cases — Symbol refers to the global built-in
 		[]rule_tester.InvalidTestCase{
@@ -168,6 +172,15 @@ func TestNoNewSymbolRule(t *testing.T) {
 				Code: "{ let Symbol = 1; new Symbol(); } new Symbol();",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNewSymbol", Line: 1, Column: 39},
+				},
+			},
+
+			// Config declares Symbol as a writable global — still the builtin.
+			{
+				Code:    `new Symbol();`,
+				Globals: map[string]bool{"Symbol": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noNewSymbol", Line: 1, Column: 5},
 				},
 			},
 		},

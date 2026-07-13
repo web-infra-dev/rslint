@@ -55,6 +55,35 @@ func TestConstructorSuperRule(t *testing.T) {
 
 			// Multiple branches with returns
 			{Code: `class A extends B { constructor() { if (a) { return; } else { return; } } }`},
+
+			// If-else with super in both branches followed by other statements
+			// (regression: trailing statements must not be required to also call super())
+			{Code: `class A extends B { constructor() { if (a) { super(); } else { super(); } b(); } }`},
+			{Code: `class A extends B { constructor() { if (a) { c(); super(); d(); } else { super(); } e(); } }`},
+
+			// Switch with super in all cases followed by other statements
+			{Code: `class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); break; } b(); } }`},
+
+			// Always-truthy loops that call super() before the only exit
+			{Code: `class A extends B { constructor() { while (true) { super(); break; } } }`},
+			{Code: `class A extends B { constructor() { for (;;) { super(); break; } } }`},
+			{Code: `class A extends B { constructor() { label: while (true) { super(); break label; } } }`},
+
+			// do-while always runs its body at least once, regardless of the
+			// condition, but only counts as a clean single call if it breaks
+			// out immediately afterward (otherwise it's a duplicate - see
+			// invalid cases below)
+			{Code: `class A extends B { constructor() { do { super(); break; } while (true); } }`},
+			{Code: `class A extends B { constructor() { do { super(); break; } while (false); } }`},
+
+			// try/finally: finally always runs, so super() there satisfies the
+			// requirement regardless of what the try/catch do
+			{Code: `class A extends B { constructor() { try { super(); } finally {} } }`},
+			{Code: `class A extends B { constructor() { try { a(); } catch (e) { } finally { super(); } } }`},
+
+			// try without catch: an exception before super() propagates out of
+			// the constructor, which is an acceptable terminating path
+			{Code: `class A extends B { constructor() { try { super(); } finally { b(); } } }`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -162,6 +191,57 @@ func TestConstructorSuperRule(t *testing.T) {
 				},
 			},
 
+			// super() inside a loop without a guaranteed break right after it
+			// can be revisited on a later iteration - a duplicate, regardless
+			// of whether the loop's condition provably allows only one pass
+			{
+				Code: `class A extends B { constructor() { while (true) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 52},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { while (true) { super(); continue; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 52},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { do { super(); } while (true); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { do { super(); } while (false); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { for (;;) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 48},
+				},
+			},
+
+			// finally always runs after the try block, so a second super()
+			// call there duplicates the try block's call
+			{
+				Code: `class A extends B { constructor() { try { super(); } finally { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 64},
+				},
+			},
+			// a trailing super() after a try that already satisfied the
+			// requirement is a duplicate too
+			{
+				Code: `class A extends B { constructor() { try { super(); } finally { } super(); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 66},
+				},
+			},
+
 			// Invalid extends expressions with super() call
 			{
 				Code: `class A extends (B = 5) { constructor() { super(); } }`,
@@ -229,6 +309,40 @@ func TestConstructorSuperRule(t *testing.T) {
 				Code: `class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); break; } super(); } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "duplicate", Line: 1, Column: 101},
+				},
+			},
+
+			// Loops that may exit without ever calling super()
+			{
+				Code: `class A extends B { constructor() { while (true) { if (a) break; super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSome", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { for (var x of y) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSome", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { for (var i = 0; i < 10; i++) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSome", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { while (a) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSome", Line: 1, Column: 21},
+				},
+			},
+
+			// try/catch without finally: catch must independently call super() too
+			{
+				Code: `class A extends B { constructor() { try { super(); } catch (e) {} } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSome", Line: 1, Column: 21},
 				},
 			},
 

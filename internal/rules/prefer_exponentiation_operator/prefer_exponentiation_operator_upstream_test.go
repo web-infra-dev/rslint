@@ -315,7 +315,7 @@ func expectedErrors(code string) []rule_tester.InvalidTestCaseError {
 		if node == nil {
 			return
 		}
-		if node.Kind == ast.KindCallExpression && isMathPowCall(node) {
+		if node.Kind == ast.KindCallExpression && isMathPowCall(node, nil) {
 			rng := utils.TrimNodeTextRange(sf, node)
 			line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.Pos())
 			endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.End())

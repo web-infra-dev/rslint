@@ -8,9 +8,15 @@ import (
 // https://eslint.org/docs/latest/rules/no-sparse-arrays
 var NoSparseArraysRule = rule.Rule{
 	Name: "no-sparse-arrays",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindArrayLiteralExpression: func(node *ast.Node) {
+				// Array literals used as destructuring assignment targets (e.g. `[, a] = b`)
+				// are parsed as ArrayLiteralExpression too, but omitted elements there are
+				// valid ES6 syntax for skipping items, not sparse array literals.
+				if ast.IsAssignmentTarget(node) {
+					return
+				}
 				for _, v := range node.AsArrayLiteralExpression().Elements.Nodes {
 					if v.Kind == ast.KindOmittedExpression {
 						ctx.ReportNode(node, rule.RuleMessage{

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -121,6 +122,99 @@ func IsUseIdentifier(node *ast.Node) bool {
 	return IsReactCalleeNamed(node, "use")
 }
 
+// IsManualUseMemoCallee reports whether `node` is a direct `useMemo` or
+// `React.useMemo` callee according to React Compiler's manual memoization
+// input surface. It intentionally does not recognize import aliases or
+// element-access forms; existing React Compiler lint ports rely on the same
+// direct-call contract.
+func IsManualUseMemoCallee(node *ast.Node, typeChecker *checker.Checker) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return isManualMemoIdentifier(node, "useMemo", typeChecker)
+	case ast.KindPropertyAccessExpression:
+		if ast.IsOptionalChain(node) {
+			return false
+		}
+		access := node.AsPropertyAccessExpression()
+		name := access.Name()
+		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useMemo" {
+			return false
+		}
+		obj := ast.SkipParentheses(access.Expression)
+		if obj == nil || obj.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isManualMemoIdentifier(obj, "React", typeChecker)
+	}
+	return false
+}
+
+func isManualMemoIdentifier(id *ast.Node, expected string, typeChecker *checker.Checker) bool {
+	if id == nil || id.Kind != ast.KindIdentifier || id.AsIdentifier().Text != expected {
+		return false
+	}
+	if typeChecker == nil {
+		return true
+	}
+	sym := utils.GetReferenceSymbol(id, typeChecker)
+	if sym == nil || len(sym.Declarations) == 0 {
+		return true
+	}
+	for _, decl := range sym.Declarations {
+		if isManualMemoDeclaration(decl, expected) {
+			return true
+		}
+	}
+	return false
+}
+
+func isManualMemoDeclaration(decl *ast.Node, expected string) bool {
+	if decl == nil {
+		return false
+	}
+	switch decl.Kind {
+	case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier:
+		return true
+	case ast.KindBindingElement:
+		return !isInsideParameter(decl)
+	case ast.KindVariableDeclaration:
+		name := decl.Name()
+		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != expected {
+			return false
+		}
+		initializer := ast.SkipParentheses(decl.AsVariableDeclaration().Initializer)
+		if initializer == nil {
+			return true
+		}
+		if expected == "useMemo" && ast.IsFunctionExpressionOrArrowFunction(initializer) {
+			return false
+		}
+		if expected == "React" && initializer.Kind == ast.KindObjectLiteralExpression {
+			return false
+		}
+		return true
+	case ast.KindParameter, ast.KindFunctionDeclaration:
+		return false
+	}
+	return false
+}
+
+func isInsideParameter(node *ast.Node) bool {
+	for cur := node; cur != nil; cur = cur.Parent {
+		switch cur.Kind {
+		case ast.KindParameter:
+			return true
+		case ast.KindVariableDeclaration:
+			return false
+		}
+	}
+	return false
+}
+
 // IsHookCallee mirrors upstream's `isHook(node)`: the callee is
 // either an Identifier whose name is a hook, or a non-computed member
 // expression `Namespace.useFoo` whose object is a PascalCase
@@ -194,6 +288,146 @@ func AccessChainRootIdentifier(node *ast.Node) *ast.Node {
 		return node
 	}
 	return nil
+}
+
+// ImportSpecifierImportedName returns the module-exported name for an import
+// specifier. For `import {foo as bar}`, this is `foo`; for `import {bar}`,
+// this is `bar`.
+func ImportSpecifierImportedName(spec *ast.ImportSpecifier) string {
+	if spec == nil {
+		return ""
+	}
+	name := spec.Name()
+	if spec.PropertyName != nil {
+		name = spec.PropertyName
+	}
+	return moduleExportNameText(name)
+}
+
+func moduleExportNameText(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return node.Text()
+	}
+	return ""
+}
+
+// AssignmentTargetIdentifier is a binding written by an assignment target.
+// Identifier points at the actual identifier node, while Node is the broader
+// target to report when destructuring defaults need the full assignment node.
+type AssignmentTargetIdentifier struct {
+	Identifier *ast.Node
+	Node       *ast.Node
+	Name       string
+}
+
+// CollectAssignmentTargetIdentifiers returns every identifier written by an
+// assignment target, including nested array/object destructuring targets and
+// default values in destructuring patterns. It only peels parentheses, matching
+// the upstream globals rule's assignment-target handling.
+func CollectAssignmentTargetIdentifiers(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, false)
+	return targets
+}
+
+// CollectAssignmentTargetIdentifiersThroughAssertions is the same assignment
+// target collector, but it also peels TS assertion wrappers before matching the
+// target shape.
+func CollectAssignmentTargetIdentifiersThroughAssertions(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, true)
+	return targets
+}
+
+func collectAssignmentTargetIdentifiersInto(node *ast.Node, targets *[]AssignmentTargetIdentifier, throughAssertions bool) {
+	node = skipAssignmentTargetWrappers(node, throughAssertions)
+	if node == nil {
+		return
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		appendAssignmentTargetIdentifier(targets, node, node)
+	case ast.KindObjectLiteralExpression:
+		obj := node.AsObjectLiteralExpression()
+		if obj == nil || obj.Properties == nil {
+			return
+		}
+		for _, prop := range obj.Properties.Nodes {
+			switch prop.Kind {
+			case ast.KindShorthandPropertyAssignment:
+				shorthand := prop.AsShorthandPropertyAssignment()
+				name := prop.Name()
+				if shorthand != nil && shorthand.ObjectAssignmentInitializer != nil {
+					appendAssignmentTargetIdentifier(targets, name, prop)
+					continue
+				}
+				collectAssignmentTargetIdentifiersInto(name, targets, throughAssertions)
+			case ast.KindPropertyAssignment:
+				assignment := prop.AsPropertyAssignment()
+				if assignment != nil {
+					collectAssignmentTargetIdentifiersInto(assignment.Initializer, targets, throughAssertions)
+				}
+			case ast.KindSpreadAssignment:
+				spread := prop.AsSpreadAssignment()
+				if spread != nil {
+					collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		array := node.AsArrayLiteralExpression()
+		if array == nil || array.Elements == nil {
+			return
+		}
+		for _, elem := range array.Elements.Nodes {
+			collectAssignmentTargetIdentifiersInto(elem, targets, throughAssertions)
+		}
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+			return
+		}
+		left := skipAssignmentTargetWrappers(binary.Left, throughAssertions)
+		if left != nil && left.Kind == ast.KindIdentifier {
+			appendAssignmentTargetIdentifier(targets, left, node)
+			return
+		}
+		collectAssignmentTargetIdentifiersInto(left, targets, throughAssertions)
+	case ast.KindSpreadElement:
+		spread := node.AsSpreadElement()
+		if spread != nil {
+			collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+		}
+	}
+}
+
+func skipAssignmentTargetWrappers(node *ast.Node, throughAssertions bool) *ast.Node {
+	if throughAssertions {
+		return utils.SkipAssertionsAndParens(node)
+	}
+	return ast.SkipParentheses(node)
+}
+
+func appendAssignmentTargetIdentifier(targets *[]AssignmentTargetIdentifier, id, reportNode *ast.Node) {
+	if id == nil || id.Kind != ast.KindIdentifier {
+		return
+	}
+	name := id.AsIdentifier().Text
+	if name == "" {
+		return
+	}
+	if reportNode == nil {
+		reportNode = id
+	}
+	*targets = append(*targets, AssignmentTargetIdentifier{
+		Identifier: id,
+		Node:       reportNode,
+		Name:       name,
+	})
 }
 
 // ContainsNode reports whether `descendant` is inside `ancestor` in the same

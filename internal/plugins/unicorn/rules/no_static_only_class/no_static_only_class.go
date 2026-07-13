@@ -494,7 +494,7 @@ func getHeritageClauses(node *ast.Node) *ast.NodeList {
 
 var NoStaticOnlyClassRule = rule.Rule{
 	Name: "unicorn/no-static-only-class",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			// Skip classes that extend another class — the static members
 			// might be supplementing inherited instance members.

@@ -137,7 +137,8 @@ func hasRequireDeclaration(stmt *ast.Node) bool {
 
 var NoRequireImportsRule = rule.CreateRule(rule.Rule{
 	Name: "no-require-imports",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := NoRequireImportsOptions{
 			Allow:         []string{},
 			AllowAsImport: false,

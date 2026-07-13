@@ -136,8 +136,8 @@ func isInsideLoopOfFunction(node *ast.Node, fn *ast.Node) bool {
 var (
 	getFunctionName         = react_hooksutil.GetFunctionName
 	isComponentOrHookFn     = react_hooksutil.IsComponentOrHookFn
-	isInsideComponentOrHook    = react_hooksutil.IsInsideComponentOrHook
-	isClassMember              = react_hooksutil.IsClassMember
+	isInsideComponentOrHook = react_hooksutil.IsInsideComponentOrHook
+	isClassMember           = react_hooksutil.IsClassMember
 )
 
 // isConditionalAncestor reports whether the position of `child` within `parent`
@@ -811,7 +811,7 @@ var _ core.TextRange
 // honored, mirroring upstream's `hasFlowSuppression` byte-for-byte.
 var RulesOfHooksRule = rule.Rule{
 	Name: "react-hooks/rules-of-hooks",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		additionalRe := getAdditionalEffectHooks(ctx.Settings)
 		sf := ctx.SourceFile
 		registry := collectEffectEventBindings(sf)

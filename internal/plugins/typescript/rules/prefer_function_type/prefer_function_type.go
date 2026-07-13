@@ -89,7 +89,7 @@ func collectCommentsForward(text string, start, limit int) []core.TextRange {
 	return result
 }
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	sourceText := ctx.SourceFile.Text()
 	lineStarts := ctx.SourceFile.ECMALineMap()
 

@@ -26,8 +26,13 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
-	TSConfig string                 `json:"tsConfig"`
-	Tsx      bool                   `json:"tsx"`
+	// Globals simulates a config-declared `languageOptions.globals` (name →
+	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
+	// `/* global */` comments in Code are picked up automatically by the
+	// linter and merged with this — no separate field needed for those.
+	Globals  map[string]bool `json:"globals"`
+	TSConfig string          `json:"tsConfig"`
+	Tsx      bool            `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
@@ -55,9 +60,14 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
-	TSConfig string                 `json:"tsConfig"`
-	Options  any                    `json:"options"`
-	Tsx      bool                   `json:"tsx"`
+	// Globals simulates a config-declared `languageOptions.globals` (name →
+	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
+	// `/* global */` comments in Code are picked up automatically by the
+	// linter and merged with this — no separate field needed for those.
+	Globals  map[string]bool `json:"globals"`
+	TSConfig string          `json:"tsConfig"`
+	Options  any             `json:"options"`
+	Tsx      bool            `json:"tsx"`
 }
 
 // TestSuite represents a complete test suite that can be loaded from JSON
@@ -116,7 +126,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, settings map[string]interface{}, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, options any, settings map[string]interface{}, globals map[string]bool, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
@@ -144,9 +154,10 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					{
 						Name:     "test",
 						Settings: settings,
+						Globals:  globals,
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
-							return r.Run(ctx, options)
+							return r.Run(ctx, rule.NormalizeOptions(options))
 						},
 					},
 				}
@@ -179,7 +190,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				fileName = testCase.FileName
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.TSConfig, fileName)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.Globals, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -212,7 +223,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			}
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.TSConfig, fileName)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.Globals, testCase.TSConfig, fileName)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

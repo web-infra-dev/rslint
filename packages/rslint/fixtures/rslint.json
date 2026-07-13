@@ -1,7 +1,6 @@
 [
   {
     "language": "javascript",
-    "files": [],
     "languageOptions": {
       "parserOptions": {
         "projectService": false,

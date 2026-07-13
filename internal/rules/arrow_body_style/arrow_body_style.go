@@ -151,7 +151,8 @@ func findClosingParenRange(objNode *ast.Node, sf *ast.SourceFile) (int, int, boo
 
 var ArrowBodyStyleRule = rule.Rule{
 	Name: "arrow-body-style",
-	Run: func(ctx rule.RuleContext, opts any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 		always := o.style == styleAlways
 		asNeeded := o.style == styleAsNeeded

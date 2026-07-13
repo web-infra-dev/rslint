@@ -12,7 +12,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-params
 var MaxParamsRule = rule.Rule{
 	Name: "max-params",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {

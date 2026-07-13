@@ -240,11 +240,11 @@ func (c *Channel) readLoop() {
 }
 
 // dispatch routes one decoded frame. Two KNOWN LIMITATIONS are left as-is
-// because current usage never exercises them (verified: the Go side registers
-// no notification handlers and receives at most one synchronous `init` request
-// per run). Revisit if this channel ever carries high-frequency or
-// order-sensitive INBOUND traffic (a future Go-side reverse request, or a
-// streamed inbound notification):
+// because current inbound request traffic is limited to initialization and no
+// notifications are registered. Third-party plugin reverse RPC adds response
+// frames, which are routed inline and do not use the asynchronous handler path
+// described below. Revisit if this channel carries high-frequency or
+// order-sensitive inbound requests or notifications:
 //
 //  1. Inbound concurrency is UNBOUNDED — every notification/request gets its
 //     own goroutine (the async dispatch below is intentional: it lets an

@@ -39,7 +39,8 @@ type options struct {
 // https://eslint.org/docs/latest/rules/prefer-regex-literals
 var PreferRegexLiteralsRule = rule.Rule{
 	Name: "prefer-regex-literals",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {
@@ -370,10 +371,14 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 
 	switch callee.Kind {
 	case ast.KindIdentifier:
-		if callee.AsIdentifier().Text != "RegExp" {
+		if callee.AsIdentifier().Text != "RegExp" || utils.IsShadowed(callee, "RegExp") {
 			return false
 		}
-		return !utils.IsShadowed(callee, "RegExp")
+		// A config `/* global RegExp: off */` / `languageOptions.globals` entry
+		// un-declares the builtin, so it no longer resolves to a known global —
+		// ESLint's `getVariableByName(scope, "RegExp")` would be undefined and
+		// the rule stays silent.
+		return !isGlobalOff(ctx, "RegExp")
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
 		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
@@ -382,7 +387,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		if access.Name().AsIdentifier().Text != "RegExp" {
 			return false
 		}
-		return isKnownGlobalObject(access.Expression)
+		return isKnownGlobalObject(ctx, access.Expression)
 	case ast.KindElementAccessExpression:
 		access := callee.AsElementAccessExpression()
 		if access == nil || access.ArgumentExpression == nil {
@@ -392,13 +397,18 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		if !ok || value != "RegExp" {
 			return false
 		}
-		return isKnownGlobalObject(access.Expression)
+		return isKnownGlobalObject(ctx, access.Expression)
 	}
 
 	return false
 }
 
-func isKnownGlobalObject(node *ast.Node) bool {
+func isGlobalOff(ctx rule.RuleContext, name string) bool {
+	declared, ok := ctx.Globals[name]
+	return ok && !declared
+}
+
+func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
@@ -406,7 +416,7 @@ func isKnownGlobalObject(node *ast.Node) bool {
 	name := node.AsIdentifier().Text
 	switch name {
 	case "globalThis", "window", "self", "global":
-		return !utils.IsShadowed(node, name)
+		return !utils.IsShadowed(node, name) && !isGlobalOff(ctx, name)
 	default:
 		return false
 	}

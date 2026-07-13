@@ -32,7 +32,7 @@ func callbackBody(fn *ast.Node) *ast.Node {
 
 var NoReturnInFinallyRule = rule.Rule{
 	Name: "promise/no-return-in-finally",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !promiseutil.IsMemberCall(node, "finally") {

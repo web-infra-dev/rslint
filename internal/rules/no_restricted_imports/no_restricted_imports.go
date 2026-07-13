@@ -433,7 +433,8 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 
 var NoRestrictedImportsRule = rule.Rule{
 	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		groupedPaths, patternGroups := parseOptions(options)
 
 		if len(groupedPaths) == 0 && len(patternGroups) == 0 {

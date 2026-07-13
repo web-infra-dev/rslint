@@ -115,8 +115,8 @@ func isWhitespace(r rune) bool {
 }
 
 // customMessageFor mirrors upstream's getCustomMessage. Upstream short-circuits
-// any falsy value (including the empty string ` Banned: '' `) at the
-// `!bannedType` check and returns ''. So the rule for every shape collapses to:
+// any falsy value (including the empty string ` Banned: ” `) at the
+// `!bannedType` check and returns ”. So the rule for every shape collapses to:
 // non-empty Message → " " + Message; otherwise "".
 func customMessageFor(cfg bannedTypeConfig) string {
 	if cfg.Message == "" {
@@ -127,7 +127,8 @@ func customMessageFor(cfg bannedTypeConfig) string {
 
 var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
 	Name: "no-restricted-types",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		bannedTypes := map[string]bannedTypeConfig{}
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if types, ok := optsMap["types"].(map[string]interface{}); ok {

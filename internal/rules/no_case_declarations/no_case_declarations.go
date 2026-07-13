@@ -8,7 +8,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-case-declarations
 var NoCaseDeclarationsRule = rule.Rule{
 	Name: "no-case-declarations",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkClause := func(node *ast.Node) {
 			clause := node.AsCaseOrDefaultClause()
 			if clause == nil || clause.Statements == nil {

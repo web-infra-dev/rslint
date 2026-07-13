@@ -14,7 +14,8 @@ var globalObjects = []string{"window", "global", "globalThis"}
 // https://eslint.org/docs/latest/rules/no-eval
 var NoEvalRule = rule.Rule{
 	Name: "no-eval",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		allowIndirect := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {
@@ -76,7 +77,7 @@ var NoEvalRule = rule.Rule{
 
 				// Check for window.eval, global.eval, globalThis.eval
 				// and chained forms like window.window.eval
-				if isGlobalObjectChain(obj, ctx.TypeChecker) {
+				if isGlobalObjectChain(obj, ctx.TypeChecker, ctx.Globals) {
 					ctx.ReportNode(name, msg)
 				}
 			},
@@ -105,7 +106,7 @@ var NoEvalRule = rule.Rule{
 					return
 				}
 
-				if isGlobalObjectChain(obj, ctx.TypeChecker) {
+				if isGlobalObjectChain(obj, ctx.TypeChecker, ctx.Globals) {
 					ctx.ReportNode(argExpr, msg)
 				}
 			},
@@ -139,6 +140,16 @@ var NoEvalRule = rule.Rule{
 					return
 				}
 
+				// A config `/* global eval: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `getVariableByName(globalScope, "eval")`
+				// would be undefined and this non-call-reference check stays
+				// silent (direct `eval(...)` calls are unaffected — see the
+				// CallExpression listener above, which never consults scope).
+				if declared, ok := ctx.Globals["eval"]; ok && !declared {
+					return
+				}
+
 				// Non-call reference to eval (e.g., var x = eval, func(eval))
 				ctx.ReportNode(node, msg)
 			},
@@ -150,14 +161,21 @@ var NoEvalRule = rule.Rule{
 // potentially through chaining (e.g., window.window).
 // When TypeChecker is available, it verifies the root identifier actually resolves
 // to a known global (e.g., window from lib.dom.d.ts) rather than a local variable.
-func isGlobalObjectChain(node *ast.Node, tc *checker.Checker) bool {
+// globals is ctx.Globals; a config `/* global window: off */` / `languageOptions.globals`
+// entry un-declares the name, so it no longer counts as a global object reference —
+// mirrors ESLint's `getVariableByName(globalScope, name)` returning undefined.
+func isGlobalObjectChain(node *ast.Node, tc *checker.Checker, globals map[string]bool) bool {
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return false
 	}
 
 	if ast.IsIdentifier(node) {
-		if !slices.Contains(globalObjects, node.AsIdentifier().Text) {
+		name := node.AsIdentifier().Text
+		if !slices.Contains(globalObjects, name) {
+			return false
+		}
+		if declared, ok := globals[name]; ok && !declared {
 			return false
 		}
 		// When TypeChecker is available, verify the identifier is actually declared
@@ -176,7 +194,7 @@ func isGlobalObjectChain(node *ast.Node, tc *checker.Checker) bool {
 		prop := node.AsPropertyAccessExpression()
 		name := prop.Name()
 		if name != nil && slices.Contains(globalObjects, name.Text()) {
-			return isGlobalObjectChain(prop.Expression, tc)
+			return isGlobalObjectChain(prop.Expression, tc, globals)
 		}
 	}
 
@@ -185,7 +203,7 @@ func isGlobalObjectChain(node *ast.Node, tc *checker.Checker) bool {
 		elem := node.AsElementAccessExpression()
 		argText := utils.GetStaticStringValue(elem.ArgumentExpression)
 		if slices.Contains(globalObjects, argText) {
-			return isGlobalObjectChain(ast.SkipParentheses(elem.Expression), tc)
+			return isGlobalObjectChain(ast.SkipParentheses(elem.Expression), tc, globals)
 		}
 	}
 

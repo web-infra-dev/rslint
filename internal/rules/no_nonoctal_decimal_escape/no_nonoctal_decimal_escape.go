@@ -12,7 +12,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-nonoctal-decimal-escape
 var NoNonoctalDecimalEscapeRule = rule.Rule{
 	Name: "no-nonoctal-decimal-escape",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)

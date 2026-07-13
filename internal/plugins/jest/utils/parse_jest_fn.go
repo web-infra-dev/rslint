@@ -37,6 +37,7 @@ const (
 	ExpectParseReasonNone            = ""
 	ExpectParseReasonMatcherNotFound = "matcher-not-found"
 	ExpectParseReasonModifierUnknown = "modifier-unknown"
+	jestGlobalsModule                = "@jest/globals"
 )
 
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
@@ -248,41 +249,114 @@ func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *a
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
-	hasNonJestImportSpecifier := false
+	hasLocalNonJestDeclaration := false
 	for _, decl := range symbol.Declarations {
-		if decl == nil || decl.Kind != ast.KindImportSpecifier {
+		if decl == nil {
 			continue
 		}
 
-		importDecl := FindImportDeclaration(decl)
-		if importDecl == nil || importDecl.ModuleSpecifier == nil {
-			continue
-		}
-		if importDecl.ModuleSpecifier.Text() != "@jest/globals" {
-			hasNonJestImportSpecifier = true
-			continue
+		if name, originalNode, ok := resolveJestGlobalsImportSpecifier(decl); ok {
+			return name, originalNode, JEST_IMPORT_MODE
 		}
 
-		spec := decl.AsImportSpecifier()
-		if spec == nil || spec.IsTypeOnly {
-			continue
+		if name, originalNode, ok := resolveJestGlobalsRequireBinding(decl); ok {
+			return name, originalNode, JEST_IMPORT_MODE
 		}
 
-		if spec.PropertyName != nil {
-			return spec.PropertyName.Text(), spec.PropertyName, JEST_IMPORT_MODE
-		}
-
-		name := spec.Name()
-		if name != nil {
-			return name.Text(), name, JEST_IMPORT_MODE
+		if ctx.SourceFile != nil && ast.GetSourceFileOfNode(decl) == ctx.SourceFile {
+			hasLocalNonJestDeclaration = true
 		}
 	}
 
-	if hasNonJestImportSpecifier {
+	if hasLocalNonJestDeclaration {
 		return "", nil, JEST_GLOBAL_MODE
 	}
 
 	return localName, localNode, JEST_GLOBAL_MODE
+}
+
+func resolveJestGlobalsImportSpecifier(decl *ast.Node) (string, *ast.Node, bool) {
+	if decl == nil || decl.Kind != ast.KindImportSpecifier {
+		return "", nil, false
+	}
+
+	importDecl := FindImportDeclaration(decl)
+	if importDecl == nil || importDecl.ModuleSpecifier == nil || importDecl.ModuleSpecifier.Text() != jestGlobalsModule {
+		return "", nil, false
+	}
+
+	spec := decl.AsImportSpecifier()
+	if spec == nil || spec.IsTypeOnly {
+		return "", nil, false
+	}
+
+	if spec.PropertyName != nil {
+		return spec.PropertyName.Text(), spec.PropertyName, true
+	}
+
+	name := spec.Name()
+	if name == nil {
+		return "", nil, false
+	}
+
+	return name.Text(), name, true
+}
+
+func resolveJestGlobalsRequireBinding(decl *ast.Node) (string, *ast.Node, bool) {
+	if decl == nil || decl.Kind != ast.KindBindingElement {
+		return "", nil, false
+	}
+
+	varDecl := internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
+	if varDecl == nil || !isJestGlobalsRequireCall(varDecl.AsVariableDeclaration().Initializer) {
+		return "", nil, false
+	}
+
+	binding := decl.AsBindingElement()
+	if binding == nil {
+		return "", nil, false
+	}
+
+	nameNode := binding.Name()
+	if binding.PropertyName != nil {
+		if name := getPropertyName(binding.PropertyName); name != "" {
+			return name, binding.PropertyName, true
+		}
+	}
+
+	if nameNode != nil {
+		if name := getPropertyName(nameNode); name != "" {
+			return name, nameNode, true
+		}
+	}
+
+	return "", nil, false
+}
+
+func isJestGlobalsRequireCall(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsRequireCall(node, true /*requireStringLiteralLikeArgument*/) {
+		return false
+	}
+
+	args := node.Arguments()
+	if len(args) == 0 || args[0] == nil {
+		return false
+	}
+
+	specifier := ast.SkipParentheses(args[0])
+	if specifier == nil {
+		return false
+	}
+
+	switch specifier.Kind {
+	case ast.KindStringLiteral:
+		return specifier.AsStringLiteral().Text == jestGlobalsModule
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return specifier.AsNoSubstitutionTemplateLiteral().Text == jestGlobalsModule
+	default:
+		return false
+	}
 }
 
 func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
@@ -295,6 +369,11 @@ func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
 // ResolveFirstIdentifier walks the left side of a call/member chain and returns
 // the first identifier it finds, if any.
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+
+	node = ast.SkipParentheses(node)
 	if node == nil {
 		return nil
 	}
@@ -327,7 +406,11 @@ func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
 	// 	- CallExpression: describe.each(...)(...)
 	// 	- TaggedTemplateExpression: describe[`each`](...)(...)
 	//  - PropertyAccessExpression: describe["each"](...)(...)
-	switch callExpr.Expression.Kind {
+	expr := ast.SkipParentheses(callExpr.Expression)
+	if expr == nil {
+		return true
+	}
+	switch expr.Kind {
 	case ast.KindCallExpression, ast.KindTaggedTemplateExpression:
 		return false
 	default:
@@ -336,7 +419,11 @@ func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
 }
 
 func isInvalidTaggedTemplateCall(callExpr *ast.CallExpression, members []string) bool {
-	if callExpr == nil || callExpr.Expression == nil || callExpr.Expression.Kind != ast.KindTaggedTemplateExpression {
+	if callExpr == nil || callExpr.Expression == nil {
+		return false
+	}
+	expr := ast.SkipParentheses(callExpr.Expression)
+	if expr == nil || expr.Kind != ast.KindTaggedTemplateExpression {
 		return false
 	}
 

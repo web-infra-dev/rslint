@@ -9,7 +9,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-console
 var NoConsoleRule = rule.Rule{
 	Name: "no-console",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		reportIfConsole := func(node *ast.Node, consoleIdent *ast.Node, propertyName string) {

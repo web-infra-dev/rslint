@@ -72,19 +72,23 @@ func RunLinterInProgram(
 	if onDiagnostic == nil {
 		onDiagnostic = func(rule.RuleDiagnostic) {}
 	}
+	// Preserve the adapter's historical lenient behavior so rule tests can
+	// exercise parser-recovered ASTs. Production callers supply the actual set.
+	syntaxErrorFiles := map[string]struct{}{}
 	if typeCheck {
 		// Route through RunLinter so the new program-level type-check phase
 		// runs. The returned LintResult.LintedFileCount equals what
 		// runLintRulesInProgram would have returned for this single program.
 		res, _ := RunLinter(RunLinterOptions{
-			Programs:        []*compiler.Program{program},
-			SingleThreaded:  true,
-			Scope:           FileScope{Files: allowFiles, Dirs: allowDirs},
-			ExcludePaths:    excludes,
-			GetRulesForFile: getRulesForFile,
-			TypeInfoFiles:   typeInfoFiles,
-			TypeCheck:       true,
-			OnDiagnostic:    onDiagnostic,
+			Programs:         []*compiler.Program{program},
+			SingleThreaded:   true,
+			Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
+			ExcludePaths:     excludes,
+			GetRulesForFile:  getRulesForFile,
+			TypeInfoFiles:    typeInfoFiles,
+			SyntaxErrorFiles: syntaxErrorFiles,
+			TypeCheck:        true,
+			OnDiagnostic:     onDiagnostic,
 			PerProgramFilter: func() []FileFilter {
 				if ff == nil {
 					return nil
@@ -98,12 +102,13 @@ func RunLinterInProgram(
 		return res.LintedFileCount
 	}
 	return runLintRulesInProgram(runProgramOptions{
-		Program:         program,
-		Scope:           FileScope{Files: allowFiles, Dirs: allowDirs},
-		ExcludePaths:    excludes,
-		FileFilter:      ff,
-		GetRulesForFile: getRulesForFile,
-		TypeInfoFiles:   typeInfoFiles,
-		OnDiagnostic:    onDiagnostic,
+		Program:          program,
+		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
+		ExcludePaths:     excludes,
+		FileFilter:       ff,
+		GetRulesForFile:  getRulesForFile,
+		TypeInfoFiles:    typeInfoFiles,
+		SyntaxErrorFiles: syntaxErrorFiles,
+		OnDiagnostic:     onDiagnostic,
 	})
 }

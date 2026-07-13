@@ -74,7 +74,7 @@ func TestRequiresTypeInfo_Propagation(t *testing.T) {
 	r := rule.CreateRule(rule.Rule{
 		Name:             "test-rule",
 		RequiresTypeInfo: true,
-		Run:              func(ctx rule.RuleContext, options any) rule.RuleListeners { return nil },
+		Run:              func(ctx rule.RuleContext, options []any) rule.RuleListeners { return nil },
 	})
 
 	if r.Name != "@typescript-eslint/test-rule" {

@@ -9,7 +9,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-new-symbol
 var NoNewSymbolRule = rule.Rule{
 	Name: "no-new-symbol",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				expr := node.Expression()
@@ -22,12 +22,22 @@ var NoNewSymbolRule = rule.Rule{
 				// even when Symbol is locally shadowed by let/const/function/class,
 				// due to declaration merging with lib.d.ts types. IsShadowed
 				// correctly mirrors ESLint's scope-based behavior.
-				if !utils.IsShadowed(expr, "Symbol") {
-					ctx.ReportNode(expr, rule.RuleMessage{
-						Id:          "noNewSymbol",
-						Description: "`Symbol` cannot be called as a constructor.",
-					})
+				if utils.IsShadowed(expr, "Symbol") {
+					return
 				}
+
+				// A config `/* global Symbol: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so `Symbol` no longer resolves to
+				// a known global — ESLint's `globalScope.set.get("Symbol")` would
+				// be undefined and the rule stays silent.
+				if declared, ok := ctx.Globals["Symbol"]; ok && !declared {
+					return
+				}
+
+				ctx.ReportNode(expr, rule.RuleMessage{
+					Id:          "noNewSymbol",
+					Description: "`Symbol` cannot be called as a constructor.",
+				})
 			},
 		}
 	},

@@ -9,7 +9,7 @@ import (
 
 var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 	Name: "no-duplicate-enum-values",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				enumDecl := node.AsEnumDeclaration()

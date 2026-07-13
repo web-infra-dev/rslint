@@ -24,7 +24,7 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// Custom component with non-matching attribute name
 		{
 			Code:    `<Foo other="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}}},
 			Tsx:     true,
 		},
 		// Settings cases — includeFromSettings defaults to false
@@ -91,7 +91,7 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// Legacy option redefines "a" with only "to" — "href" is replaced, not appended
 		{
 			Code:    `<a href="javascript:"></a>`,
-			Options: []interface{}{map[string]interface{}{"name": "a", "props": []interface{}{"to"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "a", "props": []interface{}{"to"}}}},
 			Tsx:     true,
 		},
 
@@ -146,19 +146,19 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// Malformed legacy option: missing props
 		{
 			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo"}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo"}}},
 			Tsx:     true,
 		},
 		// Malformed legacy option: missing name
 		{
 			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"props": []interface{}{"href"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"props": []interface{}{"href"}}}},
 			Tsx:     true,
 		},
 		// Malformed legacy option: props is string instead of array
 		{
 			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": "href"}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": "href"}}},
 			Tsx:     true,
 		},
 	}, []rule_tester.InvalidTestCase{
@@ -182,20 +182,20 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// With component passed by options
 		{
 			Code:    `<Foo to="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 6}},
 			Tsx:     true,
 		},
 		{
 			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 6}},
 			Tsx:     true,
 		},
 		// Default "a" is still checked even when custom components are specified
 		{
 			Code:    `<a href="javascript:void(0)"></a>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to", "href"}}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 4}},
 			Tsx:     true,
 		},
@@ -328,7 +328,7 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// Options via JSON path (map format — matches config.go single-option unwrap)
 		{
 			Code:    `<Foo to="javascript:"></Foo>`,
-			Options: []interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": []interface{}{"to"}}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 6}},
 			Tsx:     true,
 		},
@@ -360,7 +360,7 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		// Legacy option redefines "a" with ["href", "to"] — "to" now fires too
 		{
 			Code:    `<a to="javascript:"></a>`,
-			Options: []interface{}{map[string]interface{}{"name": "a", "props": []interface{}{"href", "to"}}},
+			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "a", "props": []interface{}{"href", "to"}}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 4}},
 			Tsx:     true,
 		},

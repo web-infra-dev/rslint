@@ -32,7 +32,8 @@ import (
 
 var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		engine := core.NewEngine(options)
 		if !engine.IsActive() {
 			return rule.RuleListeners{}

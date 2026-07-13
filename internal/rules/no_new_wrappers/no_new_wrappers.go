@@ -17,7 +17,7 @@ var wrapperObjects = map[string]bool{
 
 var NoNewWrappersRule = rule.Rule{
 	Name: "no-new-wrappers",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpr := node.AsNewExpression()
@@ -38,6 +38,14 @@ var NoNewWrappersRule = rule.Rule{
 				// If the name is shadowed by a local declaration, it's not the
 				// global built-in — skip reporting.
 				if utils.IsShadowed(callee, name) {
+					return
+				}
+
+				// A config `/* global String: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `getVariableByName` would return
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
 					return
 				}
 

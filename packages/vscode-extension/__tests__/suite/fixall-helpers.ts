@@ -115,45 +115,17 @@ export function findFixAllAction(
   );
 }
 
-/**
- * Wraps `vscode.commands.executeCommand('vscode.executeCodeActionProvider', ...)`
- * with retry-on-cancellation. The Code-Action provider's command receives an
- * ambient cancellation token under the hood; on a freshly-started extension
- * host (CI cold start) external events such as Settings Sync state
- * transitions or async ConfigurationService initialization can fire that
- * token mid-call, surfacing as a synthetic `Canceled` error whose stack is
- * entirely inside `extensionHostProcess.js`. The call is otherwise a pure
- * read of the diagnostic state, so a bounded retry with linear backoff is
- * safe and recovers transparently.
- *
- * Only `Canceled` / `Cancellation` errors are retried — any other failure
- * propagates immediately so genuine bugs surface fast.
- */
-export async function executeCodeActionProviderWithRetry(
+export async function executeCodeActionProvider(
   uri: vscode.Uri,
   range: vscode.Range,
   kind?: string,
-  retries = 3,
 ): Promise<vscode.CodeAction[]> {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      const args: unknown[] = ['vscode.executeCodeActionProvider', uri, range];
-      if (kind !== undefined) args.push(kind);
-      const result = await vscode.commands.executeCommand<vscode.CodeAction[]>(
-        ...(args as [string, vscode.Uri, vscode.Range, ...unknown[]]),
-      );
-      return result ?? [];
-    } catch (err) {
-      const isLast = attempt === retries - 1;
-      const message = err instanceof Error ? err.message : String(err);
-      const isCancellation = /cancel/i.test(message);
-      if (isLast || !isCancellation) throw err;
-      // Linear backoff: 200ms, 400ms, ...
-      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
-    }
-  }
-  // Unreachable: the loop either returns or throws.
-  return [];
+  const args: unknown[] = ['vscode.executeCodeActionProvider', uri, range];
+  if (kind !== undefined) args.push(kind);
+  const result = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+    ...(args as [string, vscode.Uri, vscode.Range, ...unknown[]]),
+  );
+  return result ?? [];
 }
 
 export async function requestFixAll(
@@ -162,7 +134,7 @@ export async function requestFixAll(
     'rslint',
   ),
 ): Promise<vscode.CodeAction[]> {
-  return executeCodeActionProviderWithRetry(
+  return executeCodeActionProvider(
     doc.uri,
     new vscode.Range(0, 0, doc.lineCount, 0),
     kind.value,
@@ -255,53 +227,14 @@ export async function replaceAll(
   assert.ok(ok, 'editor.edit should succeed');
 }
 
-/**
- * Run the on-save fixAll pipeline once with a tiny no-wrapper-object-types fixture so
- * subsequent tests that rely on `editor.codeActionsOnSave: { 'source.fixAll.rslint': 'explicit' }`
- * skip the first-trigger cold-start cost (VS Code wiring up the on-save
- * code-actions handler, the LSP `textDocument/codeAction` round-trip, the
- * workspace edit application). Best-effort: if no-wrapper-object-types doesn't fire (rule
- * disabled / config not loaded yet) we silently no-op rather than failing
- * the suite — actual coverage lives in the real tests.
- *
- * Call from a suite-level `before()` of any suite whose first test
- * exercises on-save fixAll. Idempotent across the entire test process via
- * a module-level promise cache: the first call kicks off the warm-up; all
- * subsequent calls (from any suite) await the same promise and return
- * immediately once it resolves. Safe to wire up in every suite that uses
- * `withOnSaveFixAll` without paying duplicate cost.
- */
-let prewarmPromise: Promise<void> | undefined;
-export function prewarmOnSaveFixAll(): Promise<void> {
-  if (prewarmPromise) return prewarmPromise;
-  prewarmPromise = withOnSaveFixAll(async (doc, editor) => {
-    await replaceAll(
-      editor,
-      "const _prewarmOnSave: String = 'x';\nexport { _prewarmOnSave };\n",
-    );
-    const diags = await waitForDiagnostics(doc);
-    if (!diags.some((d) => d.message.includes('no-wrapper-object-types')))
-      return;
-    await doc.save();
-    try {
-      await waitForContentChange(
-        doc,
-        (content) => !content.includes(': String'),
-        60000,
-      );
-    } catch {
-      // Pre-warm is best-effort: if the fixAll didn't apply within 60s the
-      // actual test will surface a clearer assertion error.
-    }
-  });
-  return prewarmPromise;
-}
-
 export async function withOnSaveFixAll(
   testFn: (
     doc: vscode.TextDocument,
     editor: vscode.TextEditor,
   ) => Promise<void>,
+  codeActionsOnSave: Record<string, 'always' | 'explicit' | 'never'> = {
+    'source.fixAll.rslint': 'explicit',
+  },
 ): Promise<void> {
   const fixturesDir = getFixturesDir();
   const tmpFile = path.join(
@@ -316,7 +249,7 @@ export async function withOnSaveFixAll(
     const previousValue = config.get('codeActionsOnSave');
     await config.update(
       'codeActionsOnSave',
-      { 'source.fixAll.rslint': 'explicit' },
+      codeActionsOnSave,
       vscode.ConfigurationTarget.Workspace,
     );
 

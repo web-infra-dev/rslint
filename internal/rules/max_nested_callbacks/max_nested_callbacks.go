@@ -12,7 +12,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-nested-callbacks
 var MaxNestedCallbacksRule = rule.Rule{
 	Name: "max-nested-callbacks",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold := parseThreshold(options)
 
 		// `callbackStack` mirrors ESLint's stack of FunctionExpression /

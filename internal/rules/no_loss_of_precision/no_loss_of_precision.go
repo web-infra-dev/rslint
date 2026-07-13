@@ -27,7 +27,7 @@ var (
 // https://eslint.org/docs/latest/rules/no-loss-of-precision
 var NoLossOfPrecisionRule = rule.Rule{
 	Name: "no-loss-of-precision",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
 				// tsgo normalizes NumericLiteral.Text at parse time, so ESLint parity
