@@ -30,26 +30,31 @@ func isDefaultExcludedDirName(name string, useCaseSensitive bool) bool {
 
 // Collect reads the .gitignore files relevant to one lint invocation. A nil
 // targetFiles slice scans descendants of configDir; a non-nil slice reads only
-// the explicit files' ancestor chains. In full-scan mode, isDirectoryBlocked
-// may prune descendants; its argument is a slash-separated directory path
-// relative to configDir. The callback is not used for explicit target files.
+// the directory chains between configDir and the explicit files. In full-scan
+// mode, isDirectoryBlocked may prune descendants; its argument is a
+// slash-separated directory path relative to configDir. The callback is not
+// used for explicit target files.
 func Collect(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool) []string {
+	return CollectWithBoundaries(configDir, fsys, targetFiles, isDirectoryBlocked, nil)
+}
+
+// CollectWithBoundaries is Collect with additional descendant handoff
+// boundaries. A boundary directory and everything below it belongs to another
+// config, so none of its .gitignore files participate in this collection.
+func CollectWithBoundaries(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool, stopDirs []string) []string {
 	if targetFiles == nil {
-		return readGitignoreAsGlobs(configDir, fsys, isDirectoryBlocked)
+		return readGitignoreAsGlobsWithBoundaries(configDir, fsys, isDirectoryBlocked, stopDirs)
 	}
-	return readGitignoreAsGlobsForFiles(configDir, fsys, targetFiles)
+	return readGitignoreAsGlobsForFilesWithBoundaries(configDir, fsys, targetFiles, stopDirs)
 }
 
 // readGitignoreAsGlobs reads .gitignore files relevant to configDir and
 // converts their patterns to rslint glob format suitable for use as global
 // ignore patterns.
 //
-// It collects patterns from two sources:
-//  1. Ancestor .gitignore files: walks UP from configDir to filesystem root,
-//     collecting .gitignore patterns at each level. This implements gitignore
-//     inheritance (root .gitignore affects all subdirectories).
-//  2. Descendant .gitignore files: walks DOWN from configDir, collecting
-//     nested .gitignore with directory-scoped prefixes.
+// It walks DOWN from configDir, collecting its .gitignore and nested
+// .gitignore files with directory-scoped prefixes. configDir is a hard upper
+// boundary: .gitignore files in its parents are never read.
 //
 // isDirectoryBlocked applies the caller's global config ignores. Descendant
 // .gitignore files below a blocked directory are irrelevant because files in
@@ -57,24 +62,18 @@ func Collect(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlo
 //
 // Returns nil if no .gitignore files are found.
 func readGitignoreAsGlobs(configDir string, fsys vfs.FS, isDirectoryBlocked func(string) bool) []string {
+	return readGitignoreAsGlobsWithBoundaries(configDir, fsys, isDirectoryBlocked, nil)
+}
+
+func readGitignoreAsGlobsWithBoundaries(configDir string, fsys vfs.FS, isDirectoryBlocked func(string) bool, stopDirs []string) []string {
 	if fsys == nil {
 		return nil
 	}
 	normalizedRoot := normalizeGlobPath(configDir)
+	boundaries := normalizeCollectionBoundaries(normalizedRoot, stopDirs, fsys.UseCaseSensitiveFileNames())
 	var allGlobs []string
 
-	// Phase 1: collect ancestor .gitignore files (walk UP). Their patterns
-	// are interpreted relative to the ancestor .gitignore's directory, then
-	// projected into configDir-relative globs because rslint ignore matching
-	// evaluates paths relative to each configDir.
-	ancestorGlobs, ancestorPruneRules, configRootIgnored := collectAncestorGitignoreGlobs(normalizedRoot, fsys)
-	allGlobs = append(allGlobs, ancestorGlobs...)
-	if configRootIgnored {
-		return allGlobs
-	}
-
-	// Phase 2: collect descendant .gitignore files (walk DOWN from configDir).
-	collectGitignoreGlobs(normalizedRoot, "", fsys, &allGlobs, isDirectoryBlocked, ancestorPruneRules)
+	collectGitignoreGlobs(normalizedRoot, "", fsys, &allGlobs, isDirectoryBlocked, nil, boundaries)
 
 	if len(allGlobs) == 0 {
 		return nil
@@ -82,26 +81,38 @@ func readGitignoreAsGlobs(configDir string, fsys vfs.FS, isDirectoryBlocked func
 	return allGlobs
 }
 
-// readGitignoreAsGlobsForFiles reads only .gitignore files on the ancestor
-// chains of explicit target files. This is used by API-style calls where the
-// target set is already known; unlike the full collector, it does not scan
-// every descendant of configDir.
+// readGitignoreAsGlobsForFiles reads only .gitignore files on each directory
+// chain from configDir to an explicit target. This is used by API-style calls
+// where the target set is already known; unlike the full collector, it does
+// not scan every descendant of configDir.
 func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string) []string {
+	return readGitignoreAsGlobsForFilesWithBoundaries(configDir, fsys, files, nil)
+}
+
+func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []string {
 	if fsys == nil || len(files) == 0 {
 		return nil
 	}
 
 	normalizedConfigDir := normalizeGlobPath(configDir)
+	useCaseSensitive := fsys.UseCaseSensitiveFileNames()
+	boundaries := normalizeCollectionBoundaries(normalizedConfigDir, stopDirs, useCaseSensitive)
 	dirSet := make(map[string]struct{})
 	for _, file := range files {
-		current := dirOfPath(normalizeGlobPath(file))
-		for current != "" {
-			dirSet[current] = struct{}{}
-			next := parentDir(current)
-			if next == current {
+		targetDir := dirOfPath(normalizeGlobPath(file))
+		rel, ok := relativeDir(normalizedConfigDir, targetDir, useCaseSensitive)
+		if !ok {
+			continue
+		}
+
+		current := normalizedConfigDir
+		dirSet[current] = struct{}{}
+		for _, component := range splitPathComponents(rel) {
+			current = tspath.CombinePaths(current, component)
+			if isCollectionBoundary(current, boundaries, useCaseSensitive) {
 				break
 			}
-			current = next
+			dirSet[current] = struct{}{}
 		}
 	}
 
@@ -115,14 +126,14 @@ func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 	var pruneRules []gitignorePruneRule
 	var prunedDirs []string
 	for _, dir := range dirs {
-		if isUnderPrunedDir(dir, prunedDirs, fsys.UseCaseSensitiveFileNames()) {
+		if isUnderPrunedDir(dir, prunedDirs, useCaseSensitive) {
 			continue
 		}
 		if isDescendantSymlinkDir(normalizedConfigDir, dir, fsys) {
 			prunedDirs = append(prunedDirs, dir)
 			continue
 		}
-		if isDirIgnoredByPruneRules(dir, pruneRules, fsys.UseCaseSensitiveFileNames()) {
+		if isDirIgnoredByPruneRules(dir, pruneRules, useCaseSensitive) {
 			prunedDirs = append(prunedDirs, dir)
 			continue
 		}
@@ -131,11 +142,8 @@ func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 		if !ok {
 			continue
 		}
-		if rel, ok := relativeDir(normalizedConfigDir, dir, fsys.UseCaseSensitiveFileNames()); ok {
-			allGlobs = append(allGlobs, convertGitignoreToGlobs(content, rel)...)
-		} else {
-			allGlobs = append(allGlobs, convertAncestorGitignoreToGlobs(content, dir, normalizedConfigDir, fsys.UseCaseSensitiveFileNames())...)
-		}
+		rel, _ := relativeDir(normalizedConfigDir, dir, useCaseSensitive)
+		allGlobs = append(allGlobs, convertGitignoreToGlobs(content, rel)...)
 		if rule, ok := newGitignorePruneRule(dir, content); ok {
 			pruneRules = append(pruneRules, rule)
 		}
@@ -144,6 +152,30 @@ func readGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 		return nil
 	}
 	return allGlobs
+}
+
+func normalizeCollectionBoundaries(configDir string, stopDirs []string, useCaseSensitive bool) []string {
+	boundaries := make([]string, 0, len(stopDirs))
+	for _, stopDir := range stopDirs {
+		stopDir = normalizeGlobPath(stopDir)
+		rel, ok := relativeDir(configDir, stopDir, useCaseSensitive)
+		if !ok || rel == "" {
+			continue
+		}
+		boundaries = append(boundaries, stopDir)
+	}
+	return boundaries
+}
+
+func isCollectionBoundary(dir string, boundaries []string, useCaseSensitive bool) bool {
+	for _, boundary := range boundaries {
+		if tspath.ComparePaths(dir, boundary, tspath.ComparePathsOptions{
+			UseCaseSensitiveFileNames: useCaseSensitive,
+		}) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isUnderPrunedDir(dir string, prunedDirs []string, useCaseSensitive bool) bool {
@@ -182,49 +214,6 @@ func isDescendantSymlinkDir(configDir string, dir string, fsys vfs.FS) bool {
 	return tspath.ComparePaths(dirRealPath, expectedRealPath, tspath.ComparePathsOptions{
 		UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
 	}) != 0
-}
-
-// collectAncestorGitignoreGlobs walks UP from configDir to filesystem root,
-// collecting .gitignore patterns from each ancestor directory.
-// Returns patterns in root-first order (outermost ancestor first).
-func collectAncestorGitignoreGlobs(configDir string, fsys vfs.FS) ([]string, []gitignorePruneRule, bool) {
-	// Collect ancestor dirs (from dir's parent up to root)
-	var ancestors []string
-	current := parentDir(configDir)
-	for current != "" && current != configDir {
-		ancestors = append(ancestors, current)
-		next := parentDir(current)
-		if next == current {
-			break
-		}
-		current = next
-	}
-
-	// Reverse to get root-first order
-	for i, j := 0, len(ancestors)-1; i < j; i, j = i+1, j-1 {
-		ancestors[i], ancestors[j] = ancestors[j], ancestors[i]
-	}
-
-	// Read .gitignore from each ancestor
-	var globs []string
-	var pruneRules []gitignorePruneRule
-	configRootIgnored := false
-	for _, ancestor := range ancestors {
-		if isDirIgnoredByPruneRules(ancestor, pruneRules, fsys.UseCaseSensitiveFileNames()) {
-			configRootIgnored = true
-			break
-		}
-		gitignorePath := tspath.CombinePaths(ancestor, ".gitignore")
-		if content, ok := fsys.ReadFile(gitignorePath); ok {
-			converted := convertAncestorGitignoreToGlobs(content, ancestor, configDir, fsys.UseCaseSensitiveFileNames())
-			globs = append(globs, converted...)
-			if rule, ok := newGitignorePruneRule(ancestor, content); ok {
-				pruneRules = append(pruneRules, rule)
-				configRootIgnored = isDirIgnoredByPruneRules(configDir, pruneRules, fsys.UseCaseSensitiveFileNames())
-			}
-		}
-	}
-	return globs, pruneRules, configRootIgnored
 }
 
 type gitignorePruneRule struct {
@@ -471,8 +460,8 @@ func filesystemPathDepth(path string) int {
 // isDirectoryBlocked provides directory-level pruning from the caller's
 // config policy. If it returns true, files below that directory cannot be
 // linted, so nested .gitignore sources there are irrelevant.
-func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule) {
-	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, &gitignoreWalkState{
+func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string) {
+	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, boundaries, &gitignoreWalkState{
 		resolvedPaths: make(map[string]string),
 		visited:       make(map[string]struct{}),
 	})
@@ -492,7 +481,7 @@ func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
 	return realpath
 }
 
-func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, state *gitignoreWalkState) {
+func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, state *gitignoreWalkState) {
 	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
 		localGlobs := convertGitignoreToGlobs(content, relDir)
@@ -514,6 +503,9 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 		}
 
 		childAbs := tspath.CombinePaths(absDir, dir)
+		if isCollectionBoundary(childAbs, boundaries, fsys.UseCaseSensitiveFileNames()) {
+			continue
+		}
 		childRealPath := ""
 		if entries.Symlinks != nil {
 			if _, isSymlink := entries.Symlinks[dir]; isSymlink {
@@ -550,7 +542,7 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			state.visited[childRealPath] = struct{}{}
 		}
 
-		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, state)
+		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, boundaries, state)
 	}
 }
 
@@ -596,102 +588,6 @@ func normalizeGitignoreLine(line string) (string, bool) {
 		return "", false
 	}
 	return line, true
-}
-
-func convertAncestorGitignoreToGlobs(content string, ancestorDir string, configDir string, useCaseSensitive bool) []string {
-	configRel, ok := relativeDir(ancestorDir, configDir, useCaseSensitive)
-	if !ok {
-		return nil
-	}
-
-	var globs []string
-	for _, line := range strings.Split(content, "\n") {
-		line, ok := normalizeGitignoreLine(line)
-		if !ok {
-			continue
-		}
-		glob := convertAncestorSinglePattern(line, configRel)
-		if glob != "" {
-			globs = append(globs, glob)
-		}
-	}
-	return globs
-}
-
-func convertAncestorSinglePattern(line string, configRel string) string {
-	negated := false
-	body := line
-	if strings.HasPrefix(body, "!") {
-		negated = true
-		body = body[1:]
-	}
-	body = strings.TrimSuffix(body, "/")
-
-	rooted := strings.HasPrefix(body, "/") || strings.Contains(body, "/")
-	if !rooted {
-		glob := convertSinglePattern(line, "")
-		if configRel != "" && unrootedPatternCoversConfigRel(body, configRel) {
-			if negated {
-				return "!**/*"
-			}
-			return "**/*"
-		}
-		return glob
-	}
-
-	glob := convertSinglePattern(line, "")
-	if glob == "" || configRel == "" {
-		return glob
-	}
-	if negated {
-		glob = strings.TrimPrefix(glob, "!")
-	}
-
-	relGlob, ok := stripAncestorConfigPrefix(glob, configRel)
-	if !ok {
-		return ""
-	}
-	if negated {
-		return "!" + relGlob
-	}
-	return relGlob
-}
-
-func unrootedPatternCoversConfigRel(pattern string, configRel string) bool {
-	for _, part := range splitPathComponents(configRel) {
-		if matchGlob(pattern, part) {
-			return true
-		}
-	}
-	return false
-}
-
-func stripAncestorConfigPrefix(glob string, configRel string) (string, bool) {
-	globParts := splitPathComponents(glob)
-	configParts := splitPathComponents(configRel)
-	if len(globParts) == 0 || len(configParts) == 0 {
-		return glob, true
-	}
-
-	pi := 0
-	for _, configPart := range configParts {
-		if pi >= len(globParts) {
-			return "**/*", true
-		}
-		part := globParts[pi]
-		if part == "**" {
-			return strings.Join(globParts[pi:], "/"), true
-		}
-		if !matchGlob(part, configPart) {
-			return "", false
-		}
-		pi++
-	}
-
-	if pi >= len(globParts) {
-		return "**/*", true
-	}
-	return strings.Join(globParts[pi:], "/"), true
 }
 
 func splitPathComponents(p string) []string {

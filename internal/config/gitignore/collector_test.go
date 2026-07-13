@@ -283,9 +283,9 @@ func TestReadGitignoreAsGlobs_PrunesGitignoredDirs(t *testing.T) {
 	}
 }
 
-func TestCollectors_AncestorPatternPrunesDescendantIgnoreSource(t *testing.T) {
+func TestCollectors_ConfigRootPatternPrunesDescendantIgnoreSource(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                        "/packages/app/ignored/\n",
+		"packages/app/.gitignore":           "/ignored/\n",
 		"packages/app/ignored/.gitignore":   "!keep.ts\n",
 		"packages/app/ignored/keep.ts":      "x",
 		"packages/app/ignored/unrelated.ts": "x",
@@ -484,7 +484,7 @@ func TestConvertGitignoreToGlobs_DirOnlySuffixDedup(t *testing.T) {
 	assert.Equal(t, nested[0], "pkg/app/src/**/*")
 }
 
-// --- Ancestor inheritance tests ---
+// --- Path boundary helpers ---
 
 func TestParentDirStopsAtFilesystemRoot(t *testing.T) {
 	tests := []struct {
@@ -554,7 +554,7 @@ func TestSortByPathDepthTreatsUNCShareAsRoot(t *testing.T) {
 	})
 }
 
-func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
+func TestReadGitignoreAsGlobs_StopsAtConfigDirAcrossFilesystemRoots(t *testing.T) {
 	tests := []struct {
 		name         string
 		configDir    string
@@ -571,7 +571,8 @@ func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
 			mock := &gitignoreMockFS{
 				FS: osvfs.FS(),
 				files: map[string]string{
-					test.rootIgnore: "root-cache/\n",
+					test.rootIgnore:   "root-cache/\n",
+					test.configIgnore: "local-cache/\n",
 				},
 				entries: map[string]vfs.Entries{
 					test.configDir: {Symlinks: map[string]struct{}{}},
@@ -580,52 +581,139 @@ func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
 
 			globs := readGitignoreAsGlobs(test.configDir, mock, nil)
 
-			assert.DeepEqual(t, globs, []string{"**/root-cache/**/*"})
-			assert.DeepEqual(t, mock.readFileCalls, []string{test.rootIgnore, test.configIgnore})
+			assert.DeepEqual(t, globs, []string{"**/local-cache/**/*"})
+			assert.DeepEqual(t, mock.readFileCalls, []string{test.configIgnore})
 		})
 	}
 }
 
-func TestConvertAncestorGitignoreToGlobs_IsVolumeAndShareAware(t *testing.T) {
+func TestExplicitCollectorNeverAccessesOutsideConfigDir(t *testing.T) {
+	t.Run("outside target only", func(t *testing.T) {
+		mock := &gitignoreMockFS{
+			FS: osvfs.FS(),
+			files: map[string]string{
+				"/.gitignore":         "global-cache/\n",
+				"/outside/.gitignore": "outside-cache/\n",
+			},
+			caseSensitiveFS: true,
+		}
+
+		globs := Collect("/repo", mock, []string{"/outside/source.ts"}, nil)
+		assert.Assert(t, globs == nil, "outside target produced %v", globs)
+		assert.Assert(t, len(mock.readFileCalls) == 0, "outside target triggered reads: %v", mock.readFileCalls)
+		assert.Assert(t, len(mock.accessedDirs) == 0, "outside target triggered directory access: %v", mock.accessedDirs)
+		assert.Assert(t, len(mock.realpathCalls) == 0, "outside target triggered realpath: %v", mock.realpathCalls)
+	})
+
+	t.Run("mixed targets collect only the valid chain", func(t *testing.T) {
+		mock := &gitignoreMockFS{
+			FS: osvfs.FS(),
+			files: map[string]string{
+				"/repo/.gitignore":     "root-cache/\n",
+				"/repo/src/.gitignore": "generated.ts\n",
+				"/outside/.gitignore":  "outside-cache/\n",
+			},
+			entries: map[string]vfs.Entries{
+				"/repo": {Symlinks: map[string]struct{}{}},
+			},
+			caseSensitiveFS: true,
+		}
+
+		globs := Collect("/repo", mock, []string{
+			"/outside/source.ts",
+			"/repo/src/source.ts",
+		}, nil)
+		assert.DeepEqual(t, globs, []string{
+			"**/root-cache/**/*",
+			"src/**/generated.ts",
+		})
+		assert.DeepEqual(t, mock.readFileCalls, []string{
+			"/repo/.gitignore",
+			"/repo/src/.gitignore",
+		})
+		assert.DeepEqual(t, mock.accessedDirs, []string{"/repo"})
+		assert.Assert(t, len(mock.realpathCalls) == 0, "mixed targets triggered unexpected realpath: %v", mock.realpathCalls)
+	})
+}
+
+func TestCollectionBoundariesAreVolumeAndCaseAware(t *testing.T) {
 	tests := []struct {
-		name      string
-		ancestor  string
-		configDir string
-		content   string
-		expected  []string
+		name             string
+		configDir        string
+		stopDir          string
+		candidate        string
+		useCaseSensitive bool
 	}{
-		{
-			name:      "same drive preserves config base",
-			ancestor:  "C:/repo",
-			configDir: "C:/repo/packages/app",
-			content:   "/packages/app/dist/\n",
-			expected:  []string{"dist/**/*"},
-		},
-		{
-			name:      "same share preserves config base",
-			ancestor:  "//server/share/repo",
-			configDir: "//server/share/repo/packages/app",
-			content:   "/packages/app/dist/\n",
-			expected:  []string{"dist/**/*"},
-		},
-		{
-			name:      "other drive is not ancestor",
-			ancestor:  "D:/repo",
-			configDir: "C:/repo/packages/app",
-			content:   "dist/\n",
-		},
-		{
-			name:      "other share is not ancestor",
-			ancestor:  "//server/other/repo",
-			configDir: "//server/share/repo/packages/app",
-			content:   "dist/\n",
-		},
+		{name: "posix", configDir: "/repo", stopDir: "/repo/packages/app", candidate: "/repo/packages/app", useCaseSensitive: true},
+		{name: "case insensitive", configDir: "/Repo", stopDir: "/repo/Packages/App", candidate: "/REPO/packages/app"},
+		{name: "drive", configDir: "C:/Repo", stopDir: "c:/repo/Packages/App", candidate: "C:/REPO/packages/app"},
+		{name: "unc", configDir: "//server/share/repo", stopDir: "//SERVER/SHARE/REPO/packages/app", candidate: "//server/share/repo/PACKAGES/APP"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := convertAncestorGitignoreToGlobs(test.content, test.ancestor, test.configDir, true)
-			assert.DeepEqual(t, actual, test.expected)
+			boundaries := normalizeCollectionBoundaries(test.configDir, []string{test.stopDir}, test.useCaseSensitive)
+			assert.Equal(t, len(boundaries), 1)
+			assert.Assert(t, isCollectionBoundary(test.candidate, boundaries, test.useCaseSensitive))
 		})
+	}
+
+	assert.Assert(t, len(normalizeCollectionBoundaries("/repo", []string{"/other/app", "/repo"}, true)) == 0)
+}
+
+func TestCollectors_StopAtChildConfigBoundary(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":                    "root-cache/\n",
+			"/repo/packages/.gitignore":           "package-cache/\n",
+			"/repo/packages/app/.gitignore":       "child-cache/\n",
+			"/repo/packages/app/src/.gitignore":   "generated.ts\n",
+			"/repo/packages/other/.gitignore":     "other-cache/\n",
+			"/repo/packages/other/src/.gitignore": "other-generated.ts\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo":                    {Directories: []string{"packages"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages":           {Directories: []string{"app", "other"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages/app":       {Directories: []string{"src"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages/app/src":   {Symlinks: map[string]struct{}{}},
+			"/repo/packages/other":     {Directories: []string{"src"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages/other/src": {Symlinks: map[string]struct{}{}},
+		},
+		caseSensitiveFS: true,
+	}
+	boundary := "/repo/packages/app"
+
+	full := CollectWithBoundaries("/repo", mock, nil, nil, []string{boundary})
+	assert.DeepEqual(t, full, []string{
+		"**/root-cache/**/*",
+		"packages/**/package-cache/**/*",
+		"packages/other/**/other-cache/**/*",
+		"packages/other/src/**/other-generated.ts",
+	})
+	for _, path := range append(append([]string(nil), mock.readFileCalls...), mock.accessedDirs...) {
+		if _, ok := relativeDir(boundary, path, true); ok {
+			t.Fatalf("collector crossed child config boundary: %q", path)
+		}
+	}
+
+	mock.readFileCalls = nil
+	mock.accessedDirs = nil
+	mock.realpathCalls = nil
+	explicit := CollectWithBoundaries(
+		"/repo",
+		mock,
+		[]string{"/repo/packages/app/src/file.ts"},
+		nil,
+		[]string{boundary},
+	)
+	assert.DeepEqual(t, explicit, []string{
+		"**/root-cache/**/*",
+		"packages/**/package-cache/**/*",
+	})
+	for _, path := range append(append(append([]string(nil), mock.readFileCalls...), mock.accessedDirs...), mock.realpathCalls...) {
+		if _, ok := relativeDir(boundary, path, true); ok {
+			t.Fatalf("explicit collector crossed child config boundary: %q", path)
+		}
 	}
 }

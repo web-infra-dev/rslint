@@ -16,36 +16,21 @@ import (
 
 func TestGitignoreFileWatchers(t *testing.T) {
 	watchers := gitignoreFileWatchers("/workspace/packages/app", true)
-	if len(watchers) != 4 {
-		t.Fatalf("watcher count=%d, want recursive plus three ancestors", len(watchers))
+	if len(watchers) != 1 {
+		t.Fatalf("watcher count=%d, want one config-scoped recursive watcher", len(watchers))
 	}
 	recursive := watchers[0].GlobPattern.RelativePattern
 	if recursive == nil || recursive.BaseUri.URI == nil || string(*recursive.BaseUri.URI) != "file:///workspace/packages/app" || recursive.Pattern != "**/.gitignore" {
 		t.Fatalf("recursive watcher=%+v", watchers[0])
 	}
-	wantBases := []string{"file:///workspace/packages", "file:///workspace", "file:///"}
-	for i, want := range wantBases {
-		relative := watchers[i+1].GlobPattern.RelativePattern
-		if relative == nil || relative.BaseUri.URI == nil || string(*relative.BaseUri.URI) != want || relative.Pattern != ".gitignore" {
-			t.Fatalf("ancestor watcher %d=%+v, want base %q", i, relative, want)
-		}
-	}
-
 	withoutRelativePatterns := gitignoreFileWatchers("/workspace/packages/app", false)
-	if len(withoutRelativePatterns) != 4 {
+	if len(withoutRelativePatterns) != 1 {
 		t.Fatalf("watchers without relative-pattern support=%+v", withoutRelativePatterns)
 	}
-	wantAbsolute := []string{
-		"/workspace/packages/app/**/.gitignore",
-		"/workspace/packages/.gitignore",
-		"/workspace/.gitignore",
-		"/.gitignore",
-	}
-	for i, want := range wantAbsolute {
-		pattern := withoutRelativePatterns[i].GlobPattern.Pattern
-		if pattern == nil || *pattern != want {
-			t.Fatalf("absolute watcher %d=%+v, want %q", i, withoutRelativePatterns[i], want)
-		}
+	pattern := withoutRelativePatterns[0].GlobPattern.Pattern
+	want := "/workspace/packages/app/**/.gitignore"
+	if pattern == nil || *pattern != want {
+		t.Fatalf("absolute watcher=%+v, want %q", withoutRelativePatterns[0], want)
 	}
 }
 

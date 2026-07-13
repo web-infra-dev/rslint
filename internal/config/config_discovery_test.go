@@ -129,6 +129,28 @@ func TestConfigOwnerResolverPrefersLexicalHierarchy(t *testing.T) {
 	}
 }
 
+func TestConfigOwnerResolverChildConfigDirs(t *testing.T) {
+	resolver := NewConfigOwnerResolver(map[string]RslintConfig{
+		"/repo":                  nil,
+		"/repo/packages/app":     nil,
+		"/repo/packages/lib":     nil,
+		"/repo/packages/app/e2e": nil,
+	}, nil)
+
+	children := resolver.ChildConfigDirs("/repo")
+	if len(children) != 2 || children[0] != "/repo/packages/app" || children[1] != "/repo/packages/lib" {
+		t.Fatalf("root child boundaries = %v", children)
+	}
+	if deep := resolver.ChildConfigDirs("/repo/packages/app"); len(deep) != 1 || deep[0] != "/repo/packages/app/e2e" {
+		t.Fatalf("nested child boundaries = %v", deep)
+	}
+
+	children[0] = "/mutated"
+	if fresh := resolver.ChildConfigDirs("/repo"); fresh[0] != "/repo/packages/app" {
+		t.Fatalf("ChildConfigDirs exposed resolver state: %v", fresh)
+	}
+}
+
 func TestConfigOwnerResolverUsesPhysicalFallbackWithoutLexicalOwner(t *testing.T) {
 	fs := &configPathSpaceFS{
 		caseSensitive: true,

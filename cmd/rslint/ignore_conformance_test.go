@@ -64,13 +64,14 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
-			name:      "ancestor ignore blocks nested source",
+			name:      "parent ignore does not affect nested config",
 			configDir: "packages/app",
 			relative:  "ignored/keep.ts",
 			gitignores: map[string]string{
 				".gitignore":                      "/packages/app/ignored/\n",
 				"packages/app/ignored/.gitignore": "!keep.ts\n",
 			},
+			wantLinted: true,
 		},
 		{
 			name:     "pruned nested source does not override root negation",
@@ -268,5 +269,93 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "packages/second/source.ts") {
 		t.Fatalf("second config lost its independently lintable target: stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
+	workspace := t.TempDir()
+	childDir := filepath.Join(workspace, "packages", "app")
+	parentOwnedTarget := filepath.Join(childDir, "parent-owned.ts")
+	parentIgnoredTarget := filepath.Join(childDir, "parent-ignored.ts")
+	childOwnedTarget := filepath.Join(childDir, "child-owned.ts")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{parentOwnedTarget, parentIgnoredTarget, childOwnedTarget} {
+		if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".gitignore"), []byte("child-owned.ts\nparent-ignored.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(childDir, ".gitignore"), []byte("parent-owned.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entry := map[string]any{
+		"files": []string{"**/*.ts"},
+		"rules": map[string]string{"no-debugger": "error"},
+	}
+	payload, err := json.Marshal(map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": workspace,
+				"entries":         []any{entry},
+				"targetFiles":     []string{parentOwnedTarget, parentIgnoredTarget},
+				"explicitOnly":    true,
+			},
+			map[string]any{
+				"configDirectory": childDir,
+				"entries":         []any{entry},
+				"targetFiles":     []string{childOwnedTarget},
+				"explicitOnly":    true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadPath := filepath.Join(workspace, "config-payload.json")
+	if err := os.WriteFile(payloadPath, payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name           string
+		singleThreaded bool
+	}{
+		{name: "single threaded", singleThreaded: true},
+		{name: "concurrent"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stdin, err := os.Open(payloadPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			originalStdin := os.Stdin
+			os.Stdin = stdin
+			t.Cleanup(func() {
+				os.Stdin = originalStdin
+				_ = stdin.Close()
+			})
+
+			code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+				ConfigStdin:    true,
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: test.singleThreaded,
+			})
+			if code != 1 {
+				t.Fatalf("expected both boundary targets to fail lint: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			for _, targetName := range []string{"parent-owned.ts", "child-owned.ts"} {
+				if !strings.Contains(stdout, targetName) {
+					t.Fatalf("%s was polluted by another config's .gitignore: stdout=%q stderr=%q", targetName, stdout, stderr)
+				}
+			}
+			if strings.Contains(stdout, "parent-ignored.ts") {
+				t.Fatalf("parent-owned .gitignore did not apply before child boundary: stdout=%q stderr=%q", stdout, stderr)
+			}
+		})
 	}
 }
