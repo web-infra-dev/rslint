@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -183,6 +184,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		}
 		if err := rslintconfig.ValidateConfig(rslintConfig); err != nil {
 			return nil, fmt.Errorf("invalid config: %w", err)
+		}
+		if optionsErrs := rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry); len(optionsErrs) > 0 {
+			msgs := make([]string, len(optionsErrs))
+			for i, optionsErr := range optionsErrs {
+				msgs[i] = optionsErr.Error()
+			}
+			return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(msgs, "\n"))
 		}
 	}
 	configDirectory := req.ConfigDirectory

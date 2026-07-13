@@ -302,6 +302,13 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 		if err := config.ValidateConfig(cfg.Entries); err != nil {
 			return fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
 		}
+		if optionsErrs := config.ValidateRuleOptions(cfg.Entries, config.GlobalRuleRegistry); len(optionsErrs) > 0 {
+			msgs := make([]string, len(optionsErrs))
+			for i, optionsErr := range optionsErrs {
+				msgs[i] = optionsErr.Error()
+			}
+			return fmt.Errorf("invalid rule options for %q:\n%s", cfg.ConfigDirectory, strings.Join(msgs, "\n"))
+		}
 	}
 
 	// Resolve every declared project before touching live config state. A bad
