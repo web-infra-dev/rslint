@@ -11,7 +11,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-empty
 var NoEmptyRule = rule.Rule{
 	Name: "no-empty",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

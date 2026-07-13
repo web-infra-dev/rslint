@@ -21,8 +21,8 @@ func parseOptions(raw any) options {
 		return opts
 	}
 
-	optArray, ok := raw.([]interface{})
-	if !ok || len(optArray) == 0 {
+	optArray := rule.NormalizeOptions(raw)
+	if len(optArray) == 0 {
 		return opts
 	}
 
@@ -95,7 +95,8 @@ func maybeResetCountForFunctionLike(node *ast.Node, ctx rule.RuleContext, count 
 
 var MaxExpectsRule = rule.Rule{
 	Name: "jest/max-expects",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		count := 0
 

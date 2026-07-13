@@ -3,6 +3,9 @@ import { defineConfig } from '@rstest/core';
 export default defineConfig({
   testEnvironment: 'node',
   globals: true,
+  // The self-hosted Windows runner can stall under concurrent main CI. Keep
+  // ordinary async tests from tripping Rstest's 5s default.
+  testTimeout: 30_000,
   // The eslint-plugin worker tests spawn the built `dist/eslint-plugin/
   // lint-worker.js` (worker_threads can't run TS); this setup file points the
   // pool at it via setWorkerEntryForTests(). Run `pnpm build` once before testing.

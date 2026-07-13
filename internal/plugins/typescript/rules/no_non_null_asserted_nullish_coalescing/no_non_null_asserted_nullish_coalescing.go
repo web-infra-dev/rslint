@@ -79,7 +79,7 @@ func checkAssignmentsBefore(identName string, node *ast.Node, scope *ast.Node) b
 
 var NoNonNullAssertedNullishCoalescingRule = rule.CreateRule(rule.Rule{
 	Name: "no-non-null-asserted-nullish-coalescing",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noNonNullAssertedNullishCoalescing",
 			Description: "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",

@@ -10,13 +10,15 @@ You are an expert Software Engineer tasked with porting ESLint rules to `rslint`
 
 Your job is porting the **rule's semantics** — given equivalent input, produce equivalent diagnostics. You are **not** responsible for re-implementing ESLint framework concepts that rslint deliberately does not expose. Examples:
 
-- `/*global ...*/` / `/*eslint ...*/` directive comments
-- `languageOptions.globals` / `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
+- `/*eslint ...*/` directive comments
+- `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
 - `env: 'browser' | 'node' | ...`
 
-When an upstream test case depends on one of these:
+Note: `languageOptions.globals` and `/*global ...*/` comments are automatically parsed by rslint and exposed through `ctx.Globals`. When porting rules that reference global variables, do not skip these test cases; instead, check `ctx.Globals` (e.g., `ctx.Globals[name]`).
 
-- **Don't** reimplement the concept inside your rule (e.g., parsing `/*global*/` comments yourself).
+When an upstream test case depends on other unsupported concepts (like `env` or `/*eslint*/` configurations):
+
+- **Don't** reimplement the concept inside your rule.
 - **Don't** list the gap under the rule's "Differences from ESLint" section — framework gaps apply to every rule, not yours.
 - **Do** mark the upstream case `skip: true` with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
 
@@ -336,7 +338,7 @@ See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you fi
 var MyRuleRule = rule.CreateRule(rule.Rule{
     Name:             "my-rule",
     RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
@@ -348,7 +350,7 @@ var MyRuleRule = rule.CreateRule(rule.Rule{
 // For typescript-eslint rules that do NOT use TypeChecker:
 var MyOtherRule = rule.CreateRule(rule.Rule{
     Name: "my-other-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 })
@@ -356,7 +358,7 @@ var MyOtherRule = rule.CreateRule(rule.Rule{
 // For ESLint Core rules:
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 }
@@ -392,10 +394,15 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
 
 ```go
-func parseOptions(options any) Options {
+Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+    opts := parseOptions(options)
+    // ...
+}
+
+func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
     optsMap := utils.GetOptionsMap(options)
     if optsMap != nil {
@@ -405,19 +412,9 @@ func parseOptions(options any) Options {
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
 
-**Anti-pattern — do not write this:**
-
-```go
-// ❌ WRONG — only matches when len(remaining) > 1 in config.go;
-//    misses every single-option config and every CLI invocation.
-if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-    if optsJSON, err := json.Marshal(arr[0]); err == nil {
-        _ = json.Unmarshal(optsJSON, &opts)
-    }
-}
-```
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
 
 ### Alignment Audit
 
@@ -661,17 +658,13 @@ Follow this **strict order** — each step depends on the previous one:
    go test -count=1 ./internal/plugins/<plugin>/rules/<rule_name>
    ```
 
-   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also rerun every rule that consumes it. When in doubt about the blast radius, rerun the whole plugin or the whole tree:
+   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also run tests for the changed package and the direct consumer packages that import or call the changed API. Keep the scope related to the changed Go code; do not run whole-plugin or whole-tree Go tests as part of the port-rule workflow.
 
    ```bash
-   # When you extracted a helper to or modified <plugin>util/:
-   go test -count=1 ./internal/plugins/<plugin>/...
-
-   # When you touched internal/utils/ (cross-plugin shared):
-   go test -count=1 ./internal/...
+   go test -count=1 <changed-package-dir> <direct-consumer-package-dir>
    ```
 
-   Extracting / renaming a helper is a silent-regression hotspot; running the narrower `./rules/<rule_name>` in isolation is not enough.
+   Extracting / renaming a helper is a silent-regression hotspot; running only the new rule package is not enough when another package consumes the helper. Identify direct consumers with `rg` / `git grep`, run their package tests, and do not fall back to `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, or `pnpm run test:go`.
 
 3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
 
@@ -750,12 +743,26 @@ Follow this **strict order** — each step depends on the previous one:
    # Spell check (catches typos in comments and strings)
    pnpm -w run check-spell
 
-   # Format and Go lint checks
-   pnpm format:check && pnpm lint:go
+   # Format check
+   pnpm format:check
+
+   # Go lint (packages containing changed Go files only)
+   changed_go_dirs="$(
+     {
+       git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.go'
+       git diff --name-only --diff-filter=ACMR --cached -- '*.go'
+       git diff --name-only --diff-filter=ACMR -- '*.go'
+       git ls-files --others --exclude-standard -- '*.go'
+     } | sort -u | grep -E '^(cmd|internal)/' | while IFS= read -r file; do dirname "$file"; done | sort -u
+   )"
+   if [ -n "$changed_go_dirs" ]; then
+     printf '%s\n' "$changed_go_dirs" | xargs golangci-lint run --new-from-rev=origin/main --timeout=10m
+   fi
    ```
 
    These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red.
-   - **Unknown-word failures from `check-spell`**: add the word to `scripts/dictionary.txt` (repo convention for ESLint-ecosystem identifiers that aren't real English). Use the original case.
+   - **Go lint scope**: lint only packages containing changed `.go` files under `cmd/` and `internal/` during port-rule pre-commit verification, with `--new-from-rev=origin/main` so only issues introduced by the branch are reported. Do not run `pnpm lint:go` here; it lints the full `cmd/` and `internal/` trees and is reserved for explicit full-tree checks / CI. Do not pass changed files from multiple directories to one `golangci-lint run` invocation; named file arguments must all be in one directory and can also produce typecheck false positives when a file depends on sibling files.
+   - **Unknown-word failures from `check-spell`**: inspect each reported word in context before changing anything. Fix misspellings, invented words, or other accidental text in the source. Add a word to `scripts/dictionary.txt` only when it is intentional: a valid standard word, ESLint ecosystem identifier, Go module/package name, API name, or similar technical token. Use the original case. Do not add `cspell` ignore comments in Markdown files; they can cause documentation compilation failures.
    - **Format failures**: auto-fix (`pnpm format && pnpm format:go`); never silence.
    - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
 

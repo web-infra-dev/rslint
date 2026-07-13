@@ -1,28 +1,28 @@
 {
   "name": "@rslint/core",
-  "version": "0.6.3",
+  "version": "0.6.5",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",
       "default": "./dist/index.js"
     },
-    "./browser": {
-      "@typescript/source": "./src/browser.ts",
-      "default": "./dist/browser.js"
-    },
     "./service": {
-      "@typescript/source": "./src/service.ts",
+      "@typescript/source": "./src/service/service.ts",
       "default": "./dist/service.js"
     },
+    "./internal": {
+      "@typescript/source": "./src/internal/node.ts",
+      "default": "./dist/internal.js"
+    },
     "./config-loader": {
-      "@typescript/source": "./src/config-loader.ts",
+      "@typescript/source": "./src/config/config-loader.ts",
       "default": "./dist/config-loader.js"
     },
     "./eslint-plugin": {
       "@typescript/source": "./src/eslint-plugin/index.ts",
       "default": "./dist/eslint-plugin/index.js"
     },
-    "./bin": "./bin/rslint.cjs",
+    "./bin": "./bin/rslint.js",
     "./package.json": "./package.json"
   },
   "type": "module",
@@ -40,11 +40,11 @@
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs",
+    "bin/rslint.js",
     "dist/"
   ],
   "bin": {
-    "rslint": "./bin/rslint.cjs"
+    "rslint": "./bin/rslint.js"
   },
   "publishConfig": {
     "access": "public"
@@ -56,9 +56,7 @@
     "rslint",
     "linter",
     "typescript",
-    "go",
-    "browser",
-    "webworker"
+    "go"
   ],
   "devDependencies": {
     "@eslint/plugin-kit": "0.7.2",
@@ -73,7 +71,7 @@
     "eslint-visitor-keys": "5.0.1",
     "espree": "11.2.0",
     "esquery": "1.7.0",
-    "globals": "17.6.0",
+    "globals": "17.7.0",
     "tinyglobby": "0.2.15",
     "typescript": "5.9.3"
   },

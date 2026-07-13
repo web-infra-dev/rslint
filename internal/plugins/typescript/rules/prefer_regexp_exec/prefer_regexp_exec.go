@@ -3,7 +3,6 @@ package prefer_regexp_exec
 import (
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
@@ -67,7 +66,6 @@ func isNodeParenthesized(node *ast.Node) bool {
 	return parent != nil && parent.Expression == node
 }
 
-
 func getWrappedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	if sourceFile == nil || node == nil {
 		return ""
@@ -120,7 +118,7 @@ func regExpFlagInfo(ctx rule.RuleContext, args []*ast.Node) (known bool, global 
 		patternArg := unwrapExpression(args[0])
 		switch patternArg.Kind {
 		case ast.KindStringLiteral:
-			if _, err := regexp2.Compile(patternArg.AsStringLiteral().Text, regexp2.ECMAScript); err != nil {
+			if _, ok := buildRegexLiteralFromString(patternArg.AsStringLiteral().Text); !ok {
 				return false, false
 			}
 			patternKnown = true
@@ -300,10 +298,6 @@ func isStringLikeReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 }
 
 func buildRegexLiteralFromString(pattern string) (string, bool) {
-	// Validate using ECMAScript semantics (not Go regexp/RE2).
-	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript); err != nil {
-		return "", false
-	}
 	var b strings.Builder
 	b.WriteByte('/')
 	for _, ch := range pattern {
@@ -319,7 +313,11 @@ func buildRegexLiteralFromString(pattern string) (string, bool) {
 		}
 	}
 	b.WriteByte('/')
-	return b.String(), true
+	literal := b.String()
+	if !utils.IsValidRegexLiteral(literal) {
+		return "", false
+	}
+	return literal, true
 }
 
 func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, receiver *ast.Node, arg *ast.Node, argumentTypes int) (string, bool) {
@@ -358,7 +356,7 @@ func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, 
 var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-regexp-exec",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call, ok := isStringMatchCall(node)
@@ -398,7 +396,7 @@ var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if arg.Kind == ast.KindStringLiteral {
-					if _, err := regexp2.Compile(arg.AsStringLiteral().Text, regexp2.ECMAScript); err != nil {
+					if _, ok := buildRegexLiteralFromString(arg.AsStringLiteral().Text); !ok {
 						return
 					}
 				}

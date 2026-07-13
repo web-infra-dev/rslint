@@ -31,7 +31,7 @@ function rules(diagnostics: Diagnostic[]): string[] {
   return diagnostics.map((d) => d.ruleName);
 }
 
-describe('Monorepo multi-config: ownership dedup', () => {
+describe('Monorepo multi-config: target dedup', () => {
   test('B1: root+child configs, each has own tsconfig — no duplicate violations', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       'rslint.config.mjs': `export default [{ files: ["*.ts"], rules: { "no-console": "error" } }];`,

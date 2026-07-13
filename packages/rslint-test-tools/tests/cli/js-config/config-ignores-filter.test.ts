@@ -83,7 +83,7 @@ describe('Config discovery: parent global ignores filter nested configs', () => 
   test('nested config in globally ignored directory should not be used', async () => {
     const { diagnostics, cleanup } = await lintAndParse({
       'tsconfig.json': TS_CONFIG,
-      'rslint.config.mjs': rootConfig(['__tests__/**']),
+      'rslint.config.mjs': rootConfig(['__tests__/**/*']),
       '__tests__/fixtures/rslint.config.mjs': nestedConfig('no-console'),
       'src/index.ts': `const x: any = 1;\n`,
       '__tests__/fixtures/src/test.ts': `console.log('test');\nconst a: any = 1;\n`,
@@ -311,6 +311,64 @@ describe('Config discovery: parent global ignores filter nested configs', () => 
       expect(testRules).toContain('no-console');
       // Root's no-debugger should NOT apply (different config)
       expect(testRules).not.toContain('no-debugger');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test('mixed explicit files keep nearest config even when parent also loads', async () => {
+    const { diagnostics, cleanup } = await lintAndParse(
+      {
+        'rslint.config.mjs': `export default [
+        { ignores: ['__tests__/**'] },
+        { files: ['**/*.ts'], rules: { 'no-debugger': 'error' } },
+      ];`,
+        '__tests__/fixtures/rslint.config.mjs': nestedConfig('no-console'),
+        'src/index.ts': `debugger;\nconsole.log('root');\n`,
+        '__tests__/fixtures/src/test.ts': `debugger;\nconsole.log('test');\n`,
+      },
+      ['src/index.ts', '__tests__/fixtures/src/test.ts'],
+    );
+    try {
+      const rootRules = ruleNames(diagsFor(diagnostics, 'src/index.ts'));
+      expect(rootRules).toContain('no-debugger');
+
+      const testRules = ruleNames(
+        diagsFor(diagnostics, '__tests__/fixtures/src/test.ts'),
+      );
+      expect(testRules).toContain('no-console');
+      expect(testRules).not.toContain('no-debugger');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test('explicit file in ignored dir does not reopen directory scanning', async () => {
+    const { diagnostics, cleanup } = await lintAndParse(
+      {
+        'rslint.config.mjs': `export default [
+        { ignores: ['__tests__/**'] },
+        { files: ['**/*.ts'], rules: { 'no-debugger': 'error' } },
+      ];`,
+        '__tests__/fixtures/rslint.config.mjs': nestedConfig('no-console'),
+        'src/index.ts': `debugger;\n`,
+        '__tests__/fixtures/src/test.ts': `console.log('test');\n`,
+        '__tests__/fixtures/src/other.ts': `console.log('other');\n`,
+      },
+      ['.', '__tests__/fixtures/src/test.ts'],
+    );
+    try {
+      expect(ruleNames(diagsFor(diagnostics, 'src/index.ts'))).toContain(
+        'no-debugger',
+      );
+
+      const testRules = ruleNames(
+        diagsFor(diagnostics, '__tests__/fixtures/src/test.ts'),
+      );
+      expect(testRules).toContain('no-console');
+      expect(diagsFor(diagnostics, '__tests__/fixtures/src/other.ts')).toEqual(
+        [],
+      );
     } finally {
       await cleanup();
     }

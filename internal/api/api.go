@@ -1,8 +1,6 @@
-// Package api is the single-direction programmatic IPC service used by
-// `--api` mode (consumed by packages/rslint-wasm and packages/rslint-api).
-// The peer (a Node parent or a wasm host) sends lint/applyFixes/getAstInfo
-// requests; this service answers them. It does NOT dispatch tasks back to
-// the peer — that bidirectional path is internal/ipc.Channel.
+// Package api is the programmatic IPC service used by `--api` mode (consumed
+// by packages/rslint-wasm and packages/rslint-api). Most requests flow from
+// the host to Go; lint may also dispatch plugin work back to a capable host.
 //
 // Framing is shared with internal/ipc (the single source of the
 // length-prefixed-JSON wire format); this package only owns the
@@ -10,13 +8,15 @@
 package api
 
 import (
-	"bufio"
+	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -52,93 +52,103 @@ func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
 const (
 	// KindLint is sent from JS to Go to request linting.
 	KindLint ipc.MessageKind = "lint"
-	// KindApplyFixes is sent from JS to Go to request applying fixes.
-	KindApplyFixes ipc.MessageKind = "applyFixes"
 	// KindGetAstInfo is sent from JS to Go to request AST info at a position.
 	KindGetAstInfo ipc.MessageKind = "getAstInfo"
+	// KindPluginLint is sent from Go to JS to run community ESLint plugin rules.
+	KindPluginLint ipc.MessageKind = "pluginLint"
 )
 
 // Version is the IPC protocol version.
-const Version = "1.0.0"
+const Version = "2.0.0"
+
+const CapabilityReversePluginLint = "reversePluginLint"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
-	Version string `json:"version"`
+	Version      string   `json:"version"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // HandshakeResponse represents a handshake response
 type HandshakeResponse struct {
-	Version string `json:"version"`
-	OK      bool   `json:"ok"`
+	Version      string   `json:"version"`
+	OK           bool     `json:"ok"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string `json:"files,omitempty"`
-	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string   `json:"format,omitempty"`
-	WorkingDirectory string   `json:"workingDirectory,omitempty"`
-	// Supports both string level and array [level, options] format
-	RuleOptions               map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents              map[string]string      `json:"fileContents,omitempty"`              // Map of file paths to their contents for VFS
-	LanguageOptions           *LanguageOptions       `json:"languageOptions,omitempty"`           // Override languageOptions from config file
-	IncludeEncodedSourceFiles bool                   `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+	Files []string `json:"files,omitempty"`
+	// CanonicalFiles is parallel to Files when the host already resolved physical
+	// identity. Go uses these paths for this request instead of repeating realpath
+	// calls; omitted by lower-level clients that have no pre-resolved identity.
+	CanonicalFiles []string `json:"canonicalFiles,omitempty"`
+	// Final resolved config — a serialized RslintConfig (RslintConfigEntry[]).
+	// The JS side does ALL of overrideConfig / config-file / auto-discovery /
+	// normalize and hands Go only this object; --api never reads config from
+	// disk. Empty/absent means "no config" (zero rules). Rules AND
+	// languageOptions live in the config entries — there is no separate
+	// ruleOptions / languageOptions override surface.
+	Config json.RawMessage `json:"config,omitempty"`
+	// Anchor directory for resolving the config's relative
+	// files / ignores / parserOptions.project. Defaults to the working dir.
+	ConfigDirectory string `json:"configDirectory,omitempty"`
+	// PluginConfigDirectory is the opaque worker routing key for community
+	// plugins. It can differ from ConfigDirectory when overrideConfig rebases
+	// authored path patterns to the API cwd.
+	PluginConfigDirectory string            `json:"pluginConfigDirectory,omitempty"`
+	WorkingDirectory      string            `json:"workingDirectory,omitempty"`
+	FileContents          map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	// EslintPlugins carries the names Go must register as Node-dispatched rule
+	// placeholders. The live plugin implementations remain in the JS host.
+	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
+	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
+	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is
+	// computed but NOT written to disk — the JS side (Rslint.outputFixes) writes
+	// it. Diagnostics describe the original input; callers can lint Output again
+	// when they need post-fix diagnostics.
+	Fix                       bool `json:"fix,omitempty"`
+	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
 
-// LanguageOptions contains language-specific configuration options
-type LanguageOptions struct {
-	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
-}
-
-// ProjectPaths represents project paths that can be either a single string or an array of strings
-type ProjectPaths []string
-
-// UnmarshalJSON implements custom JSON unmarshaling to support both string and string[] formats
-func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
-	// Try to unmarshal as string first
-	var singlePath string
-	if err := json.Unmarshal(data, &singlePath); err == nil {
-		*p = []string{singlePath}
-		return nil
-	}
-
-	// If that fails, try to unmarshal as array of strings
-	var paths []string
-	if err := json.Unmarshal(data, &paths); err != nil {
-		return err
-	}
-	*p = paths
-	return nil
-}
-
-// ParserOptions contains parser-specific configuration
-type ParserOptions struct {
-	ProjectService bool         `json:"projectService"`
-	Project        ProjectPaths `json:"project,omitempty"`
+// EslintPluginEntry is the wire metadata for one object-form ESLint plugin.
+// Prefix is the config mount name; RuleNames are names relative to the prefix.
+type EslintPluginEntry struct {
+	Prefix    string   `json:"prefix"`
+	RuleNames []string `json:"ruleNames"`
 }
 type ByteArray []byte
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics        []Diagnostic         `json:"diagnostics"`
-	ErrorCount         int                  `json:"errorCount"`
-	FileCount          int                  `json:"fileCount"`
-	RuleCount          int                  `json:"ruleCount"`
+	Diagnostics []Diagnostic `json:"diagnostics"`
+	// ErrorCount / WarningCount are split by severity (ESLint semantics):
+	// ErrorCount counts only error-severity diagnostics, NOT the total.
+	ErrorCount   int `json:"errorCount"`
+	WarningCount int `json:"warningCount"`
+	// FixableErrorCount / FixableWarningCount count diagnostics that carry an
+	// auto-fix, split by severity (ESLint LintResult.fixable*Count).
+	FixableErrorCount   int `json:"fixableErrorCount"`
+	FixableWarningCount int `json:"fixableWarningCount"`
+	FileCount           int `json:"fileCount"`
+	RuleCount           int `json:"ruleCount"`
+	// LintedFiles lists the files actually linted (config `ignores` excluded),
+	// using each caller-visible target path relative to the config directory.
+	// This is the same path space as Diagnostic.FilePath and Output. The JS side
+	// seeds one LintResult per entry, so ignored glob matches yield no phantom
+	// results. Present for lintFiles; lintText seeds its own explicit path.
+	//
+	// MUST NOT be omitempty: an all-ignored lint produces an empty (non-nil)
+	// slice that has to serialize as `[]`, distinct from an old binary that
+	// omits the field entirely. The JS glob-fallback keys on the field's
+	// ABSENCE, so collapsing empty→absent would re-seed phantom empty results.
+	LintedFiles []string `json:"lintedFiles"`
+	// Output holds the fixed source per file, present only when Fix was
+	// requested and at least one fix applied (ESLint LintResult.output, but
+	// keyed by file path since one lint covers many files). The JS side writes
+	// these back via Rslint.outputFixes.
+	Output             map[string]string    `json:"output,omitempty"`
 	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
-}
-
-// ApplyFixesRequest represents a request to apply fixes from JS to Go
-type ApplyFixesRequest struct {
-	FileContent string       `json:"fileContent"` // Current content of the file
-	Diagnostics []Diagnostic `json:"diagnostics"` // Diagnostics with fixes to apply
-}
-
-// ApplyFixesResponse represents a response after applying fixes
-type ApplyFixesResponse struct {
-	FixedContent   []string `json:"fixedContent"`   // The content after applying fixes (array of intermediate versions)
-	WasFixed       bool     `json:"wasFixed"`       // Whether any fixes were actually applied
-	AppliedCount   int      `json:"appliedCount"`   // Number of fixes that were applied
-	UnappliedCount int      `json:"unappliedCount"` // Number of fixes that couldn't be applied
 }
 
 // Position represents a position in a file
@@ -155,13 +165,14 @@ type Range struct {
 
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
-	RuleName  string `json:"ruleName"`
-	Message   string `json:"message"`
-	FilePath  string `json:"filePath"`
-	Range     Range  `json:"range"`
-	Severity  string `json:"severity,omitempty"`
-	MessageId string `json:"messageId"`
-	Fixes     []Fix  `json:"fixes,omitempty"`
+	RuleName    string       `json:"ruleName"`
+	Message     string       `json:"message"`
+	FilePath    string       `json:"filePath"`
+	Range       Range        `json:"range"`
+	Severity    string       `json:"severity,omitempty"`
+	MessageId   string       `json:"messageId"`
+	Fixes       []Fix        `json:"fixes,omitempty"`
+	Suggestions []Suggestion `json:"suggestions,omitempty"`
 }
 
 // Fix represents a single fix that can be applied
@@ -171,151 +182,334 @@ type Fix struct {
 	EndPos   int    `json:"endPos"`   // Character position in the file content
 }
 
+// Suggestion is an optional, user-selected fix (ESLint's "suggestions"):
+// unlike Fixes, which `fix: true` applies automatically, a suggestion is
+// surfaced for the editor/user to choose. Data exposes the messageId's
+// placeholder values (ESLint v10 suggestion.data).
+type Suggestion struct {
+	MessageId string            `json:"messageId"`
+	Message   string            `json:"message"`
+	Data      map[string]string `json:"data,omitempty"`
+	Fixes     []Fix             `json:"fixes,omitempty"`
+}
+
 // Handler defines the interface for handling IPC messages
 type Handler interface {
 	HandleLint(req LintRequest) (*LintResponse, error)
-	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
 	HandleGetAstInfo(req GetAstInfoRequest) (*GetAstInfoResponse, error)
 }
 
-// Service manages the single-direction IPC communication for `--api` mode.
-// Framing is delegated to internal/ipc (the shared wire format).
+// Requester is the reverse-RPC capability exposed to a bidirectional lint
+// handler. ipc.Channel implements it directly.
+type Requester interface {
+	SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error)
+}
+
+// BidirectionalHandler is an optional extension to Handler. Existing handlers
+// continue to receive HandleLint; handlers that implement this interface also
+// receive the request context and reverse-RPC transport.
+type BidirectionalHandler interface {
+	HandleLintWithContext(ctx context.Context, req LintRequest, requester Requester) (*LintResponse, error)
+}
+
+// Service manages bidirectional IPC communication for `--api` mode. Framing,
+// request multiplexing, and the continuously running read loop are delegated
+// to internal/ipc.Channel.
 type Service struct {
-	reader  *bufio.Reader
-	writer  io.Writer
 	handler Handler
-	writeMu sync.Mutex
+	channel *ipc.Channel
+	reader  *observedReader
+
+	// Preserve the old service's one-at-a-time inbound handling. Channel keeps
+	// reading while this lock is held, so reverse responses are still routed and
+	// a lint handler can synchronously await pluginLint without deadlocking.
+	handlerMu        sync.Mutex
+	handshakeOK      bool
+	peerCapabilities map[string]struct{}
+
+	exitMu        sync.Mutex
+	exitRequestID int
+	exitRequested bool
+	exitAck       chan struct{}
+	exitAckOnce   sync.Once
 }
 
 // NewService creates a new IPC service
 func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
-	return &Service{
-		reader:  bufio.NewReader(reader),
-		writer:  writer,
+	s := &Service{
 		handler: handler,
+		reader:  &observedReader{reader: reader},
+		exitAck: make(chan struct{}),
 	}
+	observedWriter := &frameObserverWriter{
+		writer:        writer,
+		remaining:     -1,
+		shouldCapture: s.exitHasBeenRequested,
+		onFrame:       s.observeOutboundFrame,
+	}
+	s.channel = ipc.NewChannel(s.reader, observedWriter)
+	s.channel.SetInboundHandler(s.handleInbound)
+	return s
 }
 
 // Start starts the IPC service
 func (s *Service) Start() error {
-	for {
-		msg, err := ipc.ReadFrame(s.reader)
+	s.channel.Start()
+	select {
+	case <-s.exitAck:
+		// The complete exit response frame has reached the underlying writer.
+		// Closing earlier can race Channel's asynchronous inbound handler and
+		// suppress the ack that legacy Node/browser clients await.
+		_ = s.channel.Close()
+		return nil
+	case <-s.channel.Done():
+		err := s.reader.Err()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
 			return err
 		}
+		return errors.New("api: IPC transport closed unexpectedly")
+	}
+}
 
-		switch msg.Kind {
-		case ipc.KindHandshake:
-			s.handleHandshake(msg)
-		case KindLint:
-			s.handleLint(msg)
-		case KindApplyFixes:
-			s.handleApplyFixes(msg)
-		case KindGetAstInfo:
-			s.handleGetAstInfo(msg)
-		case ipc.KindExit:
-			s.handleExit(msg)
-			return nil
-		default:
-			s.sendError(msg.ID, fmt.Sprintf("unknown message kind: %s", msg.Kind))
+func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, error) {
+	s.handlerMu.Lock()
+	defer s.handlerMu.Unlock()
+
+	switch msg.Kind {
+	case ipc.KindHandshake:
+		var req HandshakeRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse handshake request: %w", err)
+		}
+		s.handshakeOK = req.Version == Version
+		s.peerCapabilities = make(map[string]struct{}, len(req.Capabilities))
+		for _, capability := range req.Capabilities {
+			s.peerCapabilities[capability] = struct{}{}
+		}
+		var capabilities []string
+		if _, ok := s.handler.(BidirectionalHandler); ok {
+			capabilities = []string{CapabilityReversePluginLint}
+		}
+		return HandshakeResponse{
+			Version:      Version,
+			OK:           s.handshakeOK,
+			Capabilities: capabilities,
+		}, nil
+
+	case KindLint:
+		if !s.handshakeOK {
+			return nil, fmt.Errorf("API protocol handshake required (expected version %s)", Version)
+		}
+		var req LintRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse lint request: %w", err)
+		}
+		handler, bidirectional := s.handler.(BidirectionalHandler)
+		if len(req.EslintPlugins) > 0 {
+			if !bidirectional {
+				return nil, errors.New("API handler does not support reversePluginLint requests")
+			}
+			if _, ok := s.peerCapabilities[CapabilityReversePluginLint]; !ok {
+				return nil, errors.New("API peer does not advertise reversePluginLint capability")
+			}
+		}
+		if bidirectional {
+			return handler.HandleLintWithContext(ctx, req, s.channel)
+		}
+		return s.handler.HandleLint(req)
+
+	case KindGetAstInfo:
+		if !s.handshakeOK {
+			return nil, fmt.Errorf("API protocol handshake required (expected version %s)", Version)
+		}
+		var req GetAstInfoRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse get ast info request: %w", err)
+		}
+		return s.handler.HandleGetAstInfo(req)
+
+	case ipc.KindExit:
+		s.exitMu.Lock()
+		if !s.exitRequested {
+			s.exitRequested = true
+			s.exitRequestID = msg.ID
+		}
+		s.exitMu.Unlock()
+		return struct{}{}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown message kind: %s", msg.Kind)
+	}
+}
+
+func (s *Service) observeOutboundFrame(msg *ipc.Message) {
+	if msg.Kind != ipc.KindResponse && msg.Kind != ipc.KindError {
+		return
+	}
+	s.exitMu.Lock()
+	isExitAck := s.exitRequested && msg.ID == s.exitRequestID
+	s.exitMu.Unlock()
+	if isExitAck {
+		s.exitAckOnce.Do(func() { close(s.exitAck) })
+	}
+}
+
+func (s *Service) exitHasBeenRequested() bool {
+	s.exitMu.Lock()
+	defer s.exitMu.Unlock()
+	return s.exitRequested
+}
+
+// observedReader records the terminal read error so Service.Start can retain
+// the legacy clean-EOF behavior while Channel owns frame decoding. It tracks
+// only frame byte counts (never payload copies), allowing it to distinguish a
+// clean frame-boundary EOF from a truncated frame.
+type observedReader struct {
+	reader    io.Reader
+	mu        sync.Mutex
+	err       error
+	header    [4]byte
+	headerLen int
+	remaining uint32
+	inBody    bool
+}
+
+func (r *observedReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.mu.Lock()
+	r.observe(p[:n])
+	if err != nil {
+		if errors.Is(err, io.EOF) && (r.headerLen != 0 || r.inBody) {
+			r.err = io.ErrUnexpectedEOF
+		} else {
+			r.err = err
+		}
+	}
+	r.mu.Unlock()
+	return n, err
+}
+
+func (r *observedReader) observe(data []byte) {
+	for len(data) > 0 {
+		if !r.inBody {
+			n := min(4-r.headerLen, len(data))
+			copy(r.header[r.headerLen:], data[:n])
+			r.headerLen += n
+			data = data[n:]
+			if r.headerLen < 4 {
+				continue
+			}
+			r.remaining = binary.LittleEndian.Uint32(r.header[:])
+			r.headerLen = 0
+			if r.remaining == 0 {
+				continue
+			}
+			r.inBody = true
+		}
+
+		n := len(data)
+		if uint64(n) > uint64(r.remaining) {
+			n = int(r.remaining)
+		}
+		r.remaining -= uint32(n)
+		data = data[n:]
+		if r.remaining == 0 {
+			r.inBody = false
 		}
 	}
 }
 
-// handleHandshake handles handshake messages
-func (s *Service) handleHandshake(msg *ipc.Message) {
-	var req HandshakeRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse handshake request: %v", err))
-		return
-	}
-
-	s.sendResponse(msg.ID, HandshakeResponse{
-		Version: Version,
-		OK:      true,
-	})
+func (r *observedReader) Err() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.err
 }
 
-// Handle exit message
-func (s *Service) handleExit(msg *ipc.Message) {
-	s.sendResponse(msg.ID, nil)
+// frameObserverWriter observes complete outbound frames after their bytes have
+// been accepted by the real writer. It normally tracks lengths only; after an
+// exit request arrives it captures response bodies until the matching ack is
+// seen. Channel serializes all calls into it.
+type frameObserverWriter struct {
+	writer        io.Writer
+	shouldCapture func() bool
+	onFrame       func(*ipc.Message)
+	mu            sync.Mutex
+	header        [4]byte
+	headerLen     int
+	remaining     int
+	capture       bool
+	body          []byte
 }
 
-// handleLint handles lint messages
-func (s *Service) handleLint(msg *ipc.Message) {
-	var req LintRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
-		return
+func (w *frameObserverWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	if n != len(p) && err == nil {
+		err = io.ErrShortWrite
 	}
-	resp, err := s.handler.HandleLint(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
+	if n <= 0 {
+		return n, err
 	}
 
-	s.sendResponse(msg.ID, resp)
+	w.mu.Lock()
+	var completed []*ipc.Message
+	data := p[:n]
+	for len(data) > 0 {
+		if w.remaining < 0 {
+			headerBytes := min(4-w.headerLen, len(data))
+			copy(w.header[w.headerLen:], data[:headerBytes])
+			w.headerLen += headerBytes
+			data = data[headerBytes:]
+			if w.headerLen < 4 {
+				continue
+			}
+			w.remaining = int(binary.LittleEndian.Uint32(w.header[:]))
+			w.headerLen = 0
+			w.capture = w.shouldCapture()
+			if w.capture {
+				w.body = make([]byte, 0, w.remaining)
+			}
+		}
+
+		bodyBytes := min(w.remaining, len(data))
+		if w.capture {
+			w.body = append(w.body, data[:bodyBytes]...)
+		}
+		w.remaining -= bodyBytes
+		data = data[bodyBytes:]
+		if w.remaining == 0 {
+			if w.capture {
+				var msg ipc.Message
+				if json.Unmarshal(w.body, &msg) == nil {
+					completed = append(completed, &msg)
+				}
+			}
+			w.remaining = -1
+			w.capture = false
+			w.body = nil
+		}
+	}
+	w.mu.Unlock()
+
+	if err == nil {
+		for _, msg := range completed {
+			w.onFrame(msg)
+		}
+	}
+	return n, err
 }
 
-// handleApplyFixes handles apply fixes messages
-func (s *Service) handleApplyFixes(msg *ipc.Message) {
-	var req ApplyFixesRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse apply fixes request: %v", err))
-		return
+// Preserve Channel's write-deadline support when the underlying writer is an
+// *os.File or net.Conn. Channel intentionally ignores unsupported deadlines.
+func (w *frameObserverWriter) SetWriteDeadline(deadline time.Time) error {
+	if writer, ok := w.writer.(interface {
+		SetWriteDeadline(deadline time.Time) error
+	}); ok {
+		return writer.SetWriteDeadline(deadline)
 	}
-
-	resp, err := s.handler.HandleApplyFixes(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
-	}
-
-	s.sendResponse(msg.ID, resp)
-}
-
-// handleGetAstInfo handles get AST info messages
-func (s *Service) handleGetAstInfo(msg *ipc.Message) {
-	var req GetAstInfoRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse get ast info request: %v", err))
-		return
-	}
-
-	resp, err := s.handler.HandleGetAstInfo(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
-	}
-
-	s.sendResponse(msg.ID, resp)
-}
-
-// sendResponse sends a response message
-func (s *Service) sendResponse(id int, data interface{}) {
-	msg, err := ipc.NewMessage(ipc.KindResponse, id, data)
-	if err != nil {
-		s.sendError(id, fmt.Sprintf("failed to marshal response: %v", err))
-		return
-	}
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	if err := ipc.WriteFrame(s.writer, msg); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to send response: %v\n", err)
-	}
-}
-
-// sendError sends an error message
-func (s *Service) sendError(id int, message string) {
-	msg, _ := ipc.NewMessage(ipc.KindError, id, ipc.ErrorResponseData{Message: message})
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	if err := ipc.WriteFrame(s.writer, msg); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to send error: %v\n", err)
-	}
+	return nil
 }
 
 // IsIPCMode returns true if the process is in IPC mode

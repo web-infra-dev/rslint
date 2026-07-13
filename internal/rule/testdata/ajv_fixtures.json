@@ -1,0 +1,4447 @@
+[
+  {
+    "name": "object_property_defaults_fill_missing_keys",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "strict": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "strict": false
+      }
+    ],
+    "output": [
+      {
+        "strict": false,
+        "allow": []
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "object_property_defaults_fill_all_when_empty",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "strict": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "allow": [],
+        "strict": true
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "no_options_provided_first_tuple_item_filled_from_default",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [],
+    "output": [
+      {
+        "allow": []
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "multiple_trailing_tuple_items_filled_from_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string",
+          "default": "a"
+        },
+        {
+          "type": "number",
+          "default": 1
+        },
+        {
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "input": ["given"],
+    "output": ["given", 1, true],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "later_tuple_item_default_fills_creating_gap",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number",
+          "default": 42
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 2
+    },
+    "input": [],
+    "output": [null, 42],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/type",
+        "params": {
+          "type": "string"
+        },
+        "message": "should be string",
+        "schema": "string",
+        "parentSchema": {
+          "type": "string"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested_object_in_object_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "outer": {
+              "type": "object",
+              "properties": {
+                "inner": {
+                  "type": "string",
+                  "default": "fallback"
+                }
+              },
+              "additionalProperties": false,
+              "default": {}
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "outer": {
+          "inner": "fallback"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "nested_object_in_tuple_item_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "string",
+              "default": "warn"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "input": ["first", {}],
+    "output": [
+      "first",
+      {
+        "level": "warn"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "existing_property_is_not_overwritten",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": ["x"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["y"]
+      }
+    ],
+    "output": [
+      {
+        "allow": ["y"]
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "explicit_null_is_not_overwritten_by_default",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": ["array", "null"],
+              "default": ["x"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": null
+      }
+    ],
+    "output": [
+      {
+        "allow": null
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "oneOf_default_not_applied_inside_composite_rule",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "a"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "b"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf",
+        "params": {
+          "passingSchemas": [0, 1]
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "default": "a"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "const": "b"
+              }
+            },
+            "additionalProperties": false
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "a"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "b"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "data": {}
+      }
+    ]
+  },
+  {
+    "name": "list_style_items_default_applied_per_element",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "foo": {
+                "type": "string",
+                "default": "d"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      [
+        {},
+        {
+          "foo": "x"
+        }
+      ]
+    ],
+    "output": [
+      [
+        {
+          "foo": "d"
+        },
+        {
+          "foo": "x"
+        }
+      ]
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "list_style_items_does_not_grow_array_to_satisfy_minItems",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "default": "d"
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [["a"]],
+    "output": [["a"]],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "minItems",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/minItems",
+        "params": {
+          "limit": 2
+        },
+        "message": "should NOT have fewer than 2 items",
+        "schema": 2,
+        "parentSchema": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "default": "d"
+          }
+        },
+        "data": ["a"]
+      }
+    ]
+  },
+  {
+    "name": "top_level_list_style_items_default_applied",
+    "schema": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "includeBoth": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "input": [{}],
+    "output": [
+      {
+        "includeBoth": true
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "no_defaults_needed_output_unchanged",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "output": [
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "empty_options_array_with_no_items_schema_stays_empty",
+    "schema": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "input": [],
+    "output": [],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "defaults_still_applied_when_result_is_invalid",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "unknown": true
+      }
+    ],
+    "output": [
+      {
+        "unknown": true,
+        "allow": []
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "additionalProperties",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/additionalProperties",
+        "params": {
+          "additionalProperty": "unknown"
+        },
+        "message": "should NOT have additional properties",
+        "schema": false,
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": {
+          "unknown": true,
+          "allow": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "numeric_default_type",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "max": {
+              "type": "number",
+              "default": 3.5
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "max": 3.5
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_absent_ref_targets_own_default_not_pulled_through",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/inner"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_tuple_item_absent_ref_targets_own_default_not_pulled_through",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "$ref": "#/definitions/inner"
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [],
+    "output": [],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_tuple_item_present_as_empty_object_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "$ref": "#/definitions/inner"
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "a": 1
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_present_as_empty_object_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/inner"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": {}
+      }
+    ],
+    "output": [
+      {
+        "foo": {
+          "a": 1
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_multi_hop_chain_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "a": {
+          "$ref": "#/definitions/b"
+        },
+        "b": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "string",
+              "default": "hi"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/a"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": {}
+      }
+    ],
+    "output": [
+      {
+        "foo": {
+          "x": "hi"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_present_ref_target_is_array_with_tuple_default",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "innerArr": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number",
+              "default": 42
+            }
+          ],
+          "minItems": 0,
+          "maxItems": 2
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/innerArr"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": []
+      }
+    ],
+    "output": [
+      {
+        "foo": [null, 42]
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0].foo[0]",
+        "schemaPath": "#/definitions/innerArr/items/0/type",
+        "params": {
+          "type": "string"
+        },
+        "message": "should be string",
+        "schema": "string",
+        "parentSchema": {
+          "type": "string"
+        }
+      }
+    ]
+  },
+  {
+    "name": "ref_to_oneOf_default_still_not_applied",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "directiveConfig": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "default": true
+            },
+            {
+              "type": "string",
+              "enum": ["allow-with-description"]
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "ts-check": {
+              "$ref": "#/definitions/directiveConfig"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "allOf_single_branch_default_applied",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "allof-default"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "mode": "allof-default"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "allOf_multiple_branches_each_contribute_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "properties": {
+                "a": {
+                  "type": "string",
+                  "default": "a-default"
+                }
+              }
+            },
+            {
+              "properties": {
+                "b": {
+                  "type": "string",
+                  "default": "b-default"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "a": "a-default",
+        "b": "b-default"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "anyOf_branch_default_still_not_applied",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "anyOf": [
+            {
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "anyof-default"
+                }
+              }
+            },
+            {
+              "properties": {
+                "other": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "additionalProperties_schema_default_does_not_create_new_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "known": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "default": "ap-default"
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "known": "x"
+      }
+    ],
+    "output": [
+      {
+        "known": "x"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "additionalProperties_schema_fills_nested_default_for_existing_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "known": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "inner": {
+                "type": "string",
+                "default": "inner-default"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "known": "x",
+        "extra": {}
+      }
+    ],
+    "output": [
+      {
+        "known": "x",
+        "extra": {
+          "inner": "inner-default"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "patternProperties_fills_nested_default_for_existing_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^opt_": {
+              "type": "object",
+              "properties": {
+                "inner": {
+                  "type": "string",
+                  "default": "pp-default"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "opt_x": {}
+      }
+    ],
+    "output": [
+      {
+        "opt_x": {
+          "inner": "pp-default"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_sibling_default_applied_using_literal_value_not_ref_target",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "foo": {
+          "type": "string",
+          "default": "ref-target-default"
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/foo",
+              "default": "sibling-default"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "foo": "sibling-default"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "comma_dangle_bare_enum_value",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "valueWithIgnore": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": ["always"],
+    "output": ["always"],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/comma-dangle"
+  },
+  {
+    "name": "comma_dangle_object_form",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "valueWithIgnore": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": [
+      {
+        "arrays": "always",
+        "functions": "ignore"
+      }
+    ],
+    "output": [
+      {
+        "arrays": "always",
+        "functions": "ignore"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/comma-dangle"
+  },
+  {
+    "name": "comma_dangle_invalid_enum_value",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "valueWithIgnore": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": ["sometimes"],
+    "output": ["sometimes"],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/value/enum",
+        "params": {
+          "allowedValues": [
+            "always-multiline",
+            "always",
+            "never",
+            "only-multiline"
+          ]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always-multiline", "always", "never", "only-multiline"],
+        "parentSchema": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "data": "sometimes"
+      },
+      {
+        "keyword": "type",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf/1/type",
+        "params": {
+          "type": "object"
+        },
+        "message": "should be object",
+        "schema": "object",
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "arrays": {
+              "$ref": "#/definitions/valueWithIgnore"
+            },
+            "objects": {
+              "$ref": "#/definitions/valueWithIgnore"
+            },
+            "imports": {
+              "$ref": "#/definitions/valueWithIgnore"
+            },
+            "exports": {
+              "$ref": "#/definitions/valueWithIgnore"
+            },
+            "functions": {
+              "$ref": "#/definitions/valueWithIgnore"
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": "sometimes"
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "$ref": "#/definitions/value"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "arrays": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "objects": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "imports": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "exports": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "functions": {
+                "$ref": "#/definitions/valueWithIgnore"
+              }
+            },
+            "additionalProperties": false
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "data": "sometimes"
+      }
+    ],
+    "source": "eslint-core/comma-dangle"
+  },
+  {
+    "name": "comma_dangle_functions_rejects_ignore_is_valid_but_arrays_bad_value_invalid",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "valueWithIgnore": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": [
+      {
+        "arrays": "sometimes"
+      }
+    ],
+    "output": [
+      {
+        "arrays": "sometimes"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/value/enum",
+        "params": {
+          "allowedValues": [
+            "always-multiline",
+            "always",
+            "never",
+            "only-multiline"
+          ]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always-multiline", "always", "never", "only-multiline"],
+        "parentSchema": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "data": {
+          "arrays": "sometimes"
+        }
+      },
+      {
+        "keyword": "enum",
+        "dataPath": "[0].arrays",
+        "schemaPath": "#/definitions/valueWithIgnore/enum",
+        "params": {
+          "allowedValues": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": [
+          "always-multiline",
+          "always",
+          "ignore",
+          "never",
+          "only-multiline"
+        ],
+        "parentSchema": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        },
+        "data": "sometimes"
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "$ref": "#/definitions/value"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "arrays": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "objects": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "imports": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "exports": {
+                "$ref": "#/definitions/valueWithIgnore"
+              },
+              "functions": {
+                "$ref": "#/definitions/valueWithIgnore"
+              }
+            },
+            "additionalProperties": false
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "data": {
+          "arrays": "sometimes"
+        }
+      }
+    ],
+    "source": "eslint-core/comma-dangle"
+  },
+  {
+    "name": "comma_dangle_too_many_items_rejected_by_additionalItems",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
+        },
+        "valueWithIgnore": {
+          "enum": [
+            "always-multiline",
+            "always",
+            "ignore",
+            "never",
+            "only-multiline"
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "arrays": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "objects": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "imports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "exports": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                },
+                "functions": {
+                  "$ref": "#/definitions/valueWithIgnore"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": ["always", "never"],
+    "output": ["always", "never"],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "additionalItems",
+        "dataPath": "",
+        "schemaPath": "#/additionalItems",
+        "params": {
+          "limit": 1
+        },
+        "message": "should NOT have more than 1 items",
+        "schema": false,
+        "parentSchema": {
+          "definitions": {
+            "value": {
+              "enum": ["always-multiline", "always", "never", "only-multiline"]
+            },
+            "valueWithIgnore": {
+              "enum": [
+                "always-multiline",
+                "always",
+                "ignore",
+                "never",
+                "only-multiline"
+              ]
+            }
+          },
+          "type": "array",
+          "items": [
+            {
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/value"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "arrays": {
+                      "$ref": "#/definitions/valueWithIgnore"
+                    },
+                    "objects": {
+                      "$ref": "#/definitions/valueWithIgnore"
+                    },
+                    "imports": {
+                      "$ref": "#/definitions/valueWithIgnore"
+                    },
+                    "exports": {
+                      "$ref": "#/definitions/valueWithIgnore"
+                    },
+                    "functions": {
+                      "$ref": "#/definitions/valueWithIgnore"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          ],
+          "additionalItems": false
+        },
+        "data": ["always", "never"]
+      }
+    ],
+    "source": "eslint-core/comma-dangle"
+  },
+  {
+    "name": "func_names_both_items_valid",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always", "as-needed", "never"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/value"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generators": {
+              "$ref": "#/definitions/value"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": [
+      "always",
+      {
+        "generators": "never"
+      }
+    ],
+    "output": [
+      "always",
+      {
+        "generators": "never"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/func-names"
+  },
+  {
+    "name": "func_names_first_item_invalid_enum",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always", "as-needed", "never"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/value"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generators": {
+              "$ref": "#/definitions/value"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": ["sometimes"],
+    "output": ["sometimes"],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/value/enum",
+        "params": {
+          "allowedValues": ["always", "as-needed", "never"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always", "as-needed", "never"],
+        "parentSchema": {
+          "enum": ["always", "as-needed", "never"]
+        },
+        "data": "sometimes"
+      }
+    ],
+    "source": "eslint-core/func-names"
+  },
+  {
+    "name": "func_names_extra_third_item_rejected",
+    "schema": {
+      "definitions": {
+        "value": {
+          "enum": ["always", "as-needed", "never"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/value"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generators": {
+              "$ref": "#/definitions/value"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "additionalItems": false
+    },
+    "input": ["always", {}, "oops"],
+    "output": ["always", {}, "oops"],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "additionalItems",
+        "dataPath": "",
+        "schemaPath": "#/additionalItems",
+        "params": {
+          "limit": 2
+        },
+        "message": "should NOT have more than 2 items",
+        "schema": false,
+        "parentSchema": {
+          "definitions": {
+            "value": {
+              "enum": ["always", "as-needed", "never"]
+            }
+          },
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/value"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "generators": {
+                  "$ref": "#/definitions/value"
+                }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "additionalItems": false
+        },
+        "data": ["always", {}, "oops"]
+      }
+    ],
+    "source": "eslint-core/func-names"
+  },
+  {
+    "name": "array_element_newline_bare_string",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "oneOf": [
+            {
+              "enum": ["always", "never", "consistent"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "multiline": {
+                  "type": "boolean"
+                },
+                "minItems": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ArrayExpression": {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                "ArrayPattern": {
+                  "$ref": "#/definitions/basicConfig"
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          ]
+        }
+      ]
+    },
+    "input": ["always"],
+    "output": ["always"],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/array-element-newline"
+  },
+  {
+    "name": "array_element_newline_per_node_object",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "oneOf": [
+            {
+              "enum": ["always", "never", "consistent"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "multiline": {
+                  "type": "boolean"
+                },
+                "minItems": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ArrayExpression": {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                "ArrayPattern": {
+                  "$ref": "#/definitions/basicConfig"
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          ]
+        }
+      ]
+    },
+    "input": [
+      {
+        "ArrayExpression": "always",
+        "ArrayPattern": {
+          "multiline": true
+        }
+      }
+    ],
+    "output": [
+      {
+        "ArrayExpression": "always",
+        "ArrayPattern": {
+          "multiline": true
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/array-element-newline"
+  },
+  {
+    "name": "array_element_newline_empty_object_matches_basicConfig_not_minProperties",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "oneOf": [
+            {
+              "enum": ["always", "never", "consistent"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "multiline": {
+                  "type": "boolean"
+                },
+                "minItems": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ArrayExpression": {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                "ArrayPattern": {
+                  "$ref": "#/definitions/basicConfig"
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          ]
+        }
+      ]
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/array-element-newline"
+  },
+  {
+    "name": "array_element_newline_unrelated_key_rejected_by_additionalProperties",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "oneOf": [
+            {
+              "enum": ["always", "never", "consistent"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "multiline": {
+                  "type": "boolean"
+                },
+                "minItems": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ArrayExpression": {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                "ArrayPattern": {
+                  "$ref": "#/definitions/basicConfig"
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          ]
+        }
+      ]
+    },
+    "input": [
+      {
+        "NotAKey": "always"
+      }
+    ],
+    "output": [
+      {
+        "NotAKey": "always"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/basicConfig/oneOf/0/enum",
+        "params": {
+          "allowedValues": ["always", "never", "consistent"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always", "never", "consistent"],
+        "parentSchema": {
+          "enum": ["always", "never", "consistent"]
+        },
+        "data": {
+          "NotAKey": "always"
+        }
+      },
+      {
+        "keyword": "additionalProperties",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/basicConfig/oneOf/1/additionalProperties",
+        "params": {
+          "additionalProperty": "NotAKey"
+        },
+        "message": "should NOT have additional properties",
+        "schema": false,
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "multiline": {
+              "type": "boolean"
+            },
+            "minItems": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": {
+          "NotAKey": "always"
+        }
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/definitions/basicConfig/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "enum": ["always", "never", "consistent"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "multiline": {
+                "type": "boolean"
+              },
+              "minItems": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "enum": ["always", "never", "consistent"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "multiline": {
+                  "type": "boolean"
+                },
+                "minItems": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "data": {
+          "NotAKey": "always"
+        }
+      },
+      {
+        "keyword": "additionalProperties",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf/1/additionalProperties",
+        "params": {
+          "additionalProperty": "NotAKey"
+        },
+        "message": "should NOT have additional properties",
+        "schema": false,
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "ArrayExpression": {
+              "$ref": "#/definitions/basicConfig"
+            },
+            "ArrayPattern": {
+              "$ref": "#/definitions/basicConfig"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        },
+        "data": {
+          "NotAKey": "always"
+        }
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "$ref": "#/definitions/basicConfig"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ArrayExpression": {
+                "$ref": "#/definitions/basicConfig"
+              },
+              "ArrayPattern": {
+                "$ref": "#/definitions/basicConfig"
+              }
+            },
+            "additionalProperties": false,
+            "minProperties": 1
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ArrayExpression": {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                "ArrayPattern": {
+                  "$ref": "#/definitions/basicConfig"
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          ]
+        },
+        "data": {
+          "NotAKey": "always"
+        }
+      }
+    ],
+    "source": "eslint-core/array-element-newline"
+  },
+  {
+    "name": "padding_line_list_style_multiple_entries",
+    "schema": {
+      "definitions": {
+        "paddingType": {
+          "enum": ["any", "never", "always"]
+        },
+        "statementType": {
+          "anyOf": [
+            {
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "blankLine": {
+            "$ref": "#/definitions/paddingType"
+          },
+          "prev": {
+            "$ref": "#/definitions/statementType"
+          },
+          "next": {
+            "$ref": "#/definitions/statementType"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["blankLine", "prev", "next"]
+      }
+    },
+    "input": [
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": "return"
+      },
+      {
+        "blankLine": "never",
+        "prev": ["if", "block-like"],
+        "next": "*"
+      }
+    ],
+    "output": [
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": "return"
+      },
+      {
+        "blankLine": "never",
+        "prev": ["if", "block-like"],
+        "next": "*"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-core/padding-line-between-statements"
+  },
+  {
+    "name": "padding_line_missing_required_field",
+    "schema": {
+      "definitions": {
+        "paddingType": {
+          "enum": ["any", "never", "always"]
+        },
+        "statementType": {
+          "anyOf": [
+            {
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "blankLine": {
+            "$ref": "#/definitions/paddingType"
+          },
+          "prev": {
+            "$ref": "#/definitions/statementType"
+          },
+          "next": {
+            "$ref": "#/definitions/statementType"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["blankLine", "prev", "next"]
+      }
+    },
+    "input": [
+      {
+        "blankLine": "always",
+        "prev": "*"
+      }
+    ],
+    "output": [
+      {
+        "blankLine": "always",
+        "prev": "*"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "required",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/required",
+        "params": {
+          "missingProperty": "next"
+        },
+        "message": "should have required property 'next'",
+        "schema": {
+          "blankLine": {
+            "$ref": "#/definitions/paddingType"
+          },
+          "prev": {
+            "$ref": "#/definitions/statementType"
+          },
+          "next": {
+            "$ref": "#/definitions/statementType"
+          }
+        },
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "blankLine": {
+              "$ref": "#/definitions/paddingType"
+            },
+            "prev": {
+              "$ref": "#/definitions/statementType"
+            },
+            "next": {
+              "$ref": "#/definitions/statementType"
+            }
+          },
+          "additionalProperties": false,
+          "required": ["blankLine", "prev", "next"]
+        },
+        "data": {
+          "blankLine": "always",
+          "prev": "*"
+        }
+      }
+    ],
+    "source": "eslint-core/padding-line-between-statements"
+  },
+  {
+    "name": "padding_line_statementType_array_must_be_nonempty_and_unique",
+    "schema": {
+      "definitions": {
+        "paddingType": {
+          "enum": ["any", "never", "always"]
+        },
+        "statementType": {
+          "anyOf": [
+            {
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "blankLine": {
+            "$ref": "#/definitions/paddingType"
+          },
+          "prev": {
+            "$ref": "#/definitions/statementType"
+          },
+          "next": {
+            "$ref": "#/definitions/statementType"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["blankLine", "prev", "next"]
+      }
+    },
+    "input": [
+      {
+        "blankLine": "always",
+        "prev": ["if", "if"],
+        "next": "*"
+      }
+    ],
+    "output": [
+      {
+        "blankLine": "always",
+        "prev": ["if", "if"],
+        "next": "*"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].prev",
+        "schemaPath": "#/definitions/statementType/anyOf/0/enum",
+        "params": {
+          "allowedValues": [
+            "*",
+            "block-like",
+            "function",
+            "if",
+            "return",
+            "var"
+          ]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["*", "block-like", "function", "if", "return", "var"],
+        "parentSchema": {
+          "enum": ["*", "block-like", "function", "if", "return", "var"]
+        },
+        "data": ["if", "if"]
+      },
+      {
+        "keyword": "uniqueItems",
+        "dataPath": "[0].prev",
+        "schemaPath": "#/definitions/statementType/anyOf/1/uniqueItems",
+        "params": {
+          "i": 1,
+          "j": 0
+        },
+        "message": "should NOT have duplicate items (items ## 0 and 1 are identical)",
+        "schema": true,
+        "parentSchema": {
+          "type": "array",
+          "items": {
+            "enum": ["*", "block-like", "function", "if", "return", "var"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "data": ["if", "if"]
+      },
+      {
+        "keyword": "anyOf",
+        "dataPath": "[0].prev",
+        "schemaPath": "#/definitions/statementType/anyOf",
+        "params": {},
+        "message": "should match some schema in anyOf",
+        "schema": [
+          {
+            "enum": ["*", "block-like", "function", "if", "return", "var"]
+          },
+          {
+            "type": "array",
+            "items": {
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        ],
+        "parentSchema": {
+          "anyOf": [
+            {
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        },
+        "data": ["if", "if"]
+      }
+    ],
+    "source": "eslint-core/padding-line-between-statements"
+  },
+  {
+    "name": "array_type_valid_both_props",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "arrayOption": {
+              "type": "string",
+              "enum": ["array", "generic", "array-simple"]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            },
+            "readonly": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "default": "generic",
+        "readonly": "array-simple"
+      }
+    ],
+    "output": [
+      {
+        "default": "generic",
+        "readonly": "array-simple"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/array-type"
+  },
+  {
+    "name": "array_type_invalid_enum_value",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "arrayOption": {
+              "type": "string",
+              "enum": ["array", "generic", "array-simple"]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            },
+            "readonly": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "default": "tuple"
+      }
+    ],
+    "output": [
+      {
+        "default": "tuple"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].default",
+        "schemaPath": "#/items/0/$defs/arrayOption/enum",
+        "params": {
+          "allowedValues": ["array", "generic", "array-simple"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["array", "generic", "array-simple"],
+        "parentSchema": {
+          "type": "string",
+          "enum": ["array", "generic", "array-simple"]
+        },
+        "data": "tuple"
+      }
+    ],
+    "source": "@typescript-eslint/array-type"
+  },
+  {
+    "name": "array_type_unknown_property_rejected",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "arrayOption": {
+              "type": "string",
+              "enum": ["array", "generic", "array-simple"]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            },
+            "readonly": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "defaults": "array"
+      }
+    ],
+    "output": [
+      {
+        "defaults": "array"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "additionalProperties",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/additionalProperties",
+        "params": {
+          "additionalProperty": "defaults"
+        },
+        "message": "should NOT have additional properties",
+        "schema": false,
+        "parentSchema": {
+          "type": "object",
+          "$defs": {
+            "arrayOption": {
+              "type": "string",
+              "enum": ["array", "generic", "array-simple"]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            },
+            "readonly": {
+              "$ref": "#/items/0/$defs/arrayOption"
+            }
+          }
+        },
+        "data": {
+          "defaults": "array"
+        }
+      }
+    ],
+    "source": "@typescript-eslint/array-type"
+  },
+  {
+    "name": "ban_ts_comment_empty_object_ts_check_not_defaulted",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "directiveConfigSchema": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "default": true
+                },
+                {
+                  "type": "string",
+                  "enum": ["allow-with-description"]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "descriptionFormat": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "minimumDescriptionLength": {
+              "type": "number"
+            },
+            "ts-check": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-expect-error": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-ignore": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-nocheck": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/ban-ts-comment"
+  },
+  {
+    "name": "ban_ts_comment_ts_check_true_valid",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "directiveConfigSchema": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "default": true
+                },
+                {
+                  "type": "string",
+                  "enum": ["allow-with-description"]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "descriptionFormat": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "minimumDescriptionLength": {
+              "type": "number"
+            },
+            "ts-check": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-expect-error": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-ignore": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-nocheck": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "ts-check": true
+      }
+    ],
+    "output": [
+      {
+        "ts-check": true
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/ban-ts-comment"
+  },
+  {
+    "name": "ban_ts_comment_ts_check_description_object_valid",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "directiveConfigSchema": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "default": true
+                },
+                {
+                  "type": "string",
+                  "enum": ["allow-with-description"]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "descriptionFormat": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "minimumDescriptionLength": {
+              "type": "number"
+            },
+            "ts-check": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-expect-error": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-ignore": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-nocheck": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "ts-expect-error": {
+          "descriptionFormat": "^TODO"
+        }
+      }
+    ],
+    "output": [
+      {
+        "ts-expect-error": {
+          "descriptionFormat": "^TODO"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/ban-ts-comment"
+  },
+  {
+    "name": "ban_ts_comment_ts_check_invalid_string",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "directiveConfigSchema": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "default": true
+                },
+                {
+                  "type": "string",
+                  "enum": ["allow-with-description"]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "descriptionFormat": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "minimumDescriptionLength": {
+              "type": "number"
+            },
+            "ts-check": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-expect-error": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-ignore": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            },
+            "ts-nocheck": {
+              "$ref": "#/items/0/$defs/directiveConfigSchema"
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "ts-check": "nope"
+      }
+    ],
+    "output": [
+      {
+        "ts-check": "nope"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0]['ts-check']",
+        "schemaPath": "#/items/0/$defs/directiveConfigSchema/oneOf/0/type",
+        "params": {
+          "type": "boolean"
+        },
+        "message": "should be boolean",
+        "schema": "boolean",
+        "parentSchema": {
+          "type": "boolean",
+          "default": true
+        },
+        "data": "nope"
+      },
+      {
+        "keyword": "enum",
+        "dataPath": "[0]['ts-check']",
+        "schemaPath": "#/items/0/$defs/directiveConfigSchema/oneOf/1/enum",
+        "params": {
+          "allowedValues": ["allow-with-description"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["allow-with-description"],
+        "parentSchema": {
+          "type": "string",
+          "enum": ["allow-with-description"]
+        },
+        "data": "nope"
+      },
+      {
+        "keyword": "type",
+        "dataPath": "[0]['ts-check']",
+        "schemaPath": "#/items/0/$defs/directiveConfigSchema/oneOf/2/type",
+        "params": {
+          "type": "object"
+        },
+        "message": "should be object",
+        "schema": "object",
+        "parentSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "descriptionFormat": {
+              "type": "string"
+            }
+          }
+        },
+        "data": "nope"
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]['ts-check']",
+        "schemaPath": "#/items/0/$defs/directiveConfigSchema/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "type": "boolean",
+            "default": true
+          },
+          {
+            "type": "string",
+            "enum": ["allow-with-description"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "descriptionFormat": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "default": true
+            },
+            {
+              "type": "string",
+              "enum": ["allow-with-description"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "descriptionFormat": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "data": "nope"
+      }
+    ],
+    "source": "@typescript-eslint/ban-ts-comment"
+  },
+  {
+    "name": "no_restricted_types_dynamic_keys_mixed_ban_configs",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "banConfig": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "enum": [true]
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "fixWith": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "suggest": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "types": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/items/0/$defs/banConfig"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "types": {
+          "Foo": "use Bar instead",
+          "Object": true,
+          "Bad": {
+            "message": "no",
+            "suggest": ["Good"]
+          }
+        }
+      }
+    ],
+    "output": [
+      {
+        "types": {
+          "Foo": "use Bar instead",
+          "Object": true,
+          "Bad": {
+            "message": "no",
+            "suggest": ["Good"]
+          }
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/no-restricted-types"
+  },
+  {
+    "name": "no_restricted_types_invalid_ban_config_value",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "banConfig": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "enum": [true]
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "fixWith": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "suggest": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "types": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/items/0/$defs/banConfig"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "types": {
+          "Foo": 123
+        }
+      }
+    ],
+    "output": [
+      {
+        "types": {
+          "Foo": 123
+        }
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0].types['Foo']",
+        "schemaPath": "#/items/0/$defs/banConfig/oneOf/0/type",
+        "params": {
+          "type": "boolean"
+        },
+        "message": "should be boolean",
+        "schema": "boolean",
+        "parentSchema": {
+          "type": "boolean",
+          "enum": [true]
+        },
+        "data": 123
+      },
+      {
+        "keyword": "enum",
+        "dataPath": "[0].types['Foo']",
+        "schemaPath": "#/items/0/$defs/banConfig/oneOf/0/enum",
+        "params": {
+          "allowedValues": [true]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": [true],
+        "parentSchema": {
+          "type": "boolean",
+          "enum": [true]
+        },
+        "data": 123
+      },
+      {
+        "keyword": "type",
+        "dataPath": "[0].types['Foo']",
+        "schemaPath": "#/items/0/$defs/banConfig/oneOf/1/type",
+        "params": {
+          "type": "string"
+        },
+        "message": "should be string",
+        "schema": "string",
+        "parentSchema": {
+          "type": "string"
+        },
+        "data": 123
+      },
+      {
+        "keyword": "type",
+        "dataPath": "[0].types['Foo']",
+        "schemaPath": "#/items/0/$defs/banConfig/oneOf/2/type",
+        "params": {
+          "type": "object"
+        },
+        "message": "should be object",
+        "schema": "object",
+        "parentSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fixWith": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "suggest": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "data": 123
+      },
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0].types['Foo']",
+        "schemaPath": "#/items/0/$defs/banConfig/oneOf",
+        "params": {
+          "passingSchemas": null
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "type": "boolean",
+            "enum": [true]
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fixWith": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "suggest": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "enum": [true]
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "fixWith": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "suggest": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "data": 123
+      }
+    ],
+    "source": "@typescript-eslint/no-restricted-types"
+  },
+  {
+    "name": "parameter_properties_valid_allow_list",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "modifier": {
+              "type": "string",
+              "enum": [
+                "readonly",
+                "private",
+                "protected",
+                "public",
+                "private readonly",
+                "protected readonly",
+                "public readonly"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "$ref": "#/items/0/$defs/modifier"
+              }
+            },
+            "prefer": {
+              "type": "string",
+              "enum": ["class-property", "parameter-property"]
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["readonly", "private readonly"],
+        "prefer": "class-property"
+      }
+    ],
+    "output": [
+      {
+        "allow": ["readonly", "private readonly"],
+        "prefer": "class-property"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "@typescript-eslint/parameter-properties"
+  },
+  {
+    "name": "parameter_properties_invalid_allow_entry",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "$defs": {
+            "modifier": {
+              "type": "string",
+              "enum": [
+                "readonly",
+                "private",
+                "protected",
+                "public",
+                "private readonly",
+                "protected readonly",
+                "public readonly"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "$ref": "#/items/0/$defs/modifier"
+              }
+            },
+            "prefer": {
+              "type": "string",
+              "enum": ["class-property", "parameter-property"]
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["static"]
+      }
+    ],
+    "output": [
+      {
+        "allow": ["static"]
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].allow[0]",
+        "schemaPath": "#/items/0/$defs/modifier/enum",
+        "params": {
+          "allowedValues": [
+            "readonly",
+            "private",
+            "protected",
+            "public",
+            "private readonly",
+            "protected readonly",
+            "public readonly"
+          ]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": [
+          "readonly",
+          "private",
+          "protected",
+          "public",
+          "private readonly",
+          "protected readonly",
+          "public readonly"
+        ],
+        "parentSchema": {
+          "type": "string",
+          "enum": [
+            "readonly",
+            "private",
+            "protected",
+            "public",
+            "private readonly",
+            "protected readonly",
+            "public readonly"
+          ]
+        },
+        "data": "static"
+      }
+    ],
+    "source": "@typescript-eslint/parameter-properties"
+  },
+  {
+    "name": "import_style_nested_dynamic_keys_valid",
+    "schema": {
+      "type": "array",
+      "additionalItems": false,
+      "items": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "checkImport": {
+              "type": "boolean"
+            },
+            "checkDynamicImport": {
+              "type": "boolean"
+            },
+            "checkExportFrom": {
+              "type": "boolean"
+            },
+            "checkRequire": {
+              "type": "boolean"
+            },
+            "extendDefaultStyles": {
+              "type": "boolean"
+            },
+            "styles": {
+              "$ref": "#/definitions/moduleStyles"
+            }
+          }
+        }
+      ],
+      "definitions": {
+        "moduleStyles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/styles"
+          }
+        },
+        "styles": {
+          "anyOf": [
+            {
+              "enum": [false]
+            },
+            {
+              "$ref": "#/definitions/booleanObject"
+            }
+          ]
+        },
+        "booleanObject": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "input": [
+      {
+        "styles": {
+          "lodash": {
+            "named": true,
+            "default": false
+          },
+          "chalk": false
+        }
+      }
+    ],
+    "output": [
+      {
+        "styles": {
+          "lodash": {
+            "named": true,
+            "default": false
+          },
+          "chalk": false
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-plugin-unicorn/import-style"
+  },
+  {
+    "name": "import_style_nested_dynamic_keys_invalid_leaf_type",
+    "schema": {
+      "type": "array",
+      "additionalItems": false,
+      "items": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "checkImport": {
+              "type": "boolean"
+            },
+            "checkDynamicImport": {
+              "type": "boolean"
+            },
+            "checkExportFrom": {
+              "type": "boolean"
+            },
+            "checkRequire": {
+              "type": "boolean"
+            },
+            "extendDefaultStyles": {
+              "type": "boolean"
+            },
+            "styles": {
+              "$ref": "#/definitions/moduleStyles"
+            }
+          }
+        }
+      ],
+      "definitions": {
+        "moduleStyles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/styles"
+          }
+        },
+        "styles": {
+          "anyOf": [
+            {
+              "enum": [false]
+            },
+            {
+              "$ref": "#/definitions/booleanObject"
+            }
+          ]
+        },
+        "booleanObject": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "input": [
+      {
+        "styles": {
+          "lodash": {
+            "named": "yes"
+          }
+        }
+      }
+    ],
+    "output": [
+      {
+        "styles": {
+          "lodash": {
+            "named": "yes"
+          }
+        }
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].styles['lodash']",
+        "schemaPath": "#/anyOf/0/enum",
+        "params": {
+          "allowedValues": [false]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": [false],
+        "parentSchema": {
+          "enum": [false]
+        },
+        "data": {
+          "named": "yes"
+        }
+      },
+      {
+        "keyword": "type",
+        "dataPath": "[0].styles['lodash']['named']",
+        "schemaPath": "#/definitions/booleanObject/additionalProperties/type",
+        "params": {
+          "type": "boolean"
+        },
+        "message": "should be boolean",
+        "schema": "boolean",
+        "parentSchema": {
+          "type": "boolean"
+        },
+        "data": "yes"
+      },
+      {
+        "keyword": "anyOf",
+        "dataPath": "[0].styles['lodash']",
+        "schemaPath": "#/anyOf",
+        "params": {},
+        "message": "should match some schema in anyOf",
+        "schema": [
+          {
+            "enum": [false]
+          },
+          {
+            "$ref": "#/definitions/booleanObject"
+          }
+        ],
+        "parentSchema": {
+          "anyOf": [
+            {
+              "enum": [false]
+            },
+            {
+              "$ref": "#/definitions/booleanObject"
+            }
+          ]
+        },
+        "data": {
+          "named": "yes"
+        }
+      }
+    ],
+    "source": "eslint-plugin-unicorn/import-style"
+  },
+  {
+    "name": "jsx_curly_spacing_bare_enum_form",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "type": "object",
+          "properties": {
+            "when": {
+              "enum": ["always", "never"]
+            },
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          }
+        },
+        "basicConfigOrBoolean": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "attributes": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    },
+                    "children": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "enum": ["always", "never"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "input": [
+      "always",
+      {
+        "allowMultiline": false
+      }
+    ],
+    "output": [
+      "always",
+      {
+        "allowMultiline": false
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-plugin-react/jsx-curly-spacing"
+  },
+  {
+    "name": "jsx_curly_spacing_object_form_with_nested_attributes_boolean",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "type": "object",
+          "properties": {
+            "when": {
+              "enum": ["always", "never"]
+            },
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          }
+        },
+        "basicConfigOrBoolean": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "attributes": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    },
+                    "children": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "enum": ["always", "never"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "input": [
+      {
+        "when": "never",
+        "attributes": false,
+        "children": {
+          "when": "always"
+        }
+      }
+    ],
+    "output": [
+      {
+        "when": "never",
+        "attributes": false,
+        "children": {
+          "when": "always"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-plugin-react/jsx-curly-spacing"
+  },
+  {
+    "name": "jsx_curly_spacing_invalid_when_value",
+    "schema": {
+      "definitions": {
+        "basicConfig": {
+          "type": "object",
+          "properties": {
+            "when": {
+              "enum": ["always", "never"]
+            },
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          }
+        },
+        "basicConfigOrBoolean": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "attributes": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    },
+                    "children": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "enum": ["always", "never"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "allowMultiline": {
+              "type": "boolean"
+            },
+            "spacing": {
+              "type": "object",
+              "properties": {
+                "objectLiterals": {
+                  "enum": ["always", "never"]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "input": [
+      {
+        "when": "sometimes"
+      }
+    ],
+    "output": [
+      {
+        "when": "sometimes"
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].when",
+        "schemaPath": "#/definitions/basicConfig/properties/when/enum",
+        "params": {
+          "allowedValues": ["always", "never"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always", "never"],
+        "parentSchema": {
+          "enum": ["always", "never"]
+        },
+        "data": "sometimes"
+      },
+      {
+        "keyword": "enum",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/anyOf/1/enum",
+        "params": {
+          "allowedValues": ["always", "never"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always", "never"],
+        "parentSchema": {
+          "enum": ["always", "never"]
+        },
+        "data": {
+          "when": "sometimes"
+        }
+      },
+      {
+        "keyword": "anyOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/anyOf",
+        "params": {},
+        "message": "should match some schema in anyOf",
+        "schema": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/definitions/basicConfig"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "attributes": {
+                    "$ref": "#/definitions/basicConfigOrBoolean"
+                  },
+                  "children": {
+                    "$ref": "#/definitions/basicConfigOrBoolean"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "enum": ["always", "never"]
+          }
+        ],
+        "parentSchema": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/basicConfig"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "attributes": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    },
+                    "children": {
+                      "$ref": "#/definitions/basicConfigOrBoolean"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "enum": ["always", "never"]
+            }
+          ]
+        },
+        "data": {
+          "when": "sometimes"
+        }
+      }
+    ],
+    "source": "eslint-plugin-react/jsx-curly-spacing"
+  },
+  {
+    "name": "html_self_closing_nested_valid",
+    "schema": {
+      "definitions": {
+        "optionValue": {
+          "enum": ["always", "never", "any"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "html": {
+              "type": "object",
+              "properties": {
+                "normal": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "void": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "component": {
+                  "$ref": "#/definitions/optionValue"
+                }
+              },
+              "additionalProperties": false
+            },
+            "svg": {
+              "$ref": "#/definitions/optionValue"
+            },
+            "math": {
+              "$ref": "#/definitions/optionValue"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "html": {
+          "normal": "always",
+          "void": "never"
+        },
+        "svg": "always"
+      }
+    ],
+    "output": [
+      {
+        "html": {
+          "normal": "always",
+          "void": "never"
+        },
+        "svg": "always"
+      }
+    ],
+    "valid": true,
+    "errors": null,
+    "source": "eslint-plugin-vue/html-self-closing"
+  },
+  {
+    "name": "html_self_closing_invalid_nested_enum",
+    "schema": {
+      "definitions": {
+        "optionValue": {
+          "enum": ["always", "never", "any"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "html": {
+              "type": "object",
+              "properties": {
+                "normal": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "void": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "component": {
+                  "$ref": "#/definitions/optionValue"
+                }
+              },
+              "additionalProperties": false
+            },
+            "svg": {
+              "$ref": "#/definitions/optionValue"
+            },
+            "math": {
+              "$ref": "#/definitions/optionValue"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "html": {
+          "normal": "sometimes"
+        }
+      }
+    ],
+    "output": [
+      {
+        "html": {
+          "normal": "sometimes"
+        }
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "enum",
+        "dataPath": "[0].html.normal",
+        "schemaPath": "#/definitions/optionValue/enum",
+        "params": {
+          "allowedValues": ["always", "never", "any"]
+        },
+        "message": "should be equal to one of the allowed values",
+        "schema": ["always", "never", "any"],
+        "parentSchema": {
+          "enum": ["always", "never", "any"]
+        },
+        "data": "sometimes"
+      }
+    ],
+    "source": "eslint-plugin-vue/html-self-closing"
+  },
+  {
+    "name": "html_self_closing_too_many_top_level_items",
+    "schema": {
+      "definitions": {
+        "optionValue": {
+          "enum": ["always", "never", "any"]
+        }
+      },
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "html": {
+              "type": "object",
+              "properties": {
+                "normal": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "void": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "component": {
+                  "$ref": "#/definitions/optionValue"
+                }
+              },
+              "additionalProperties": false
+            },
+            "svg": {
+              "$ref": "#/definitions/optionValue"
+            },
+            "math": {
+              "$ref": "#/definitions/optionValue"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "maxItems": 1
+    },
+    "input": [{}, {}],
+    "output": [{}, {}],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "maxItems",
+        "dataPath": "",
+        "schemaPath": "#/maxItems",
+        "params": {
+          "limit": 1
+        },
+        "message": "should NOT have more than 1 items",
+        "schema": 1,
+        "parentSchema": {
+          "definitions": {
+            "optionValue": {
+              "enum": ["always", "never", "any"]
+            }
+          },
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "html": {
+                  "type": "object",
+                  "properties": {
+                    "normal": {
+                      "$ref": "#/definitions/optionValue"
+                    },
+                    "void": {
+                      "$ref": "#/definitions/optionValue"
+                    },
+                    "component": {
+                      "$ref": "#/definitions/optionValue"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "svg": {
+                  "$ref": "#/definitions/optionValue"
+                },
+                "math": {
+                  "$ref": "#/definitions/optionValue"
+                }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "maxItems": 1
+        },
+        "data": [{}, {}]
+      }
+    ],
+    "source": "eslint-plugin-vue/html-self-closing"
+  }
+]

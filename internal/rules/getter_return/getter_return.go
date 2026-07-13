@@ -99,7 +99,8 @@ func reportGetterReturn(ctx rule.RuleContext, funcNode *ast.Node, reportNode *as
 // GetterReturnRule enforces return statements in getters
 var GetterReturnRule = rule.Rule{
 	Name: "getter-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

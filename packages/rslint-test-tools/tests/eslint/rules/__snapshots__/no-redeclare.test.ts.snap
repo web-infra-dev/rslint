@@ -1,0 +1,1019 @@
+// Rstest Snapshot v1
+
+exports[`no-redeclare > invalid 1`] = `
+{
+  "code": "var a = 3;
+var a = 10;",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 2`] = `
+{
+  "code": "switch(foo) { case a: var b = 3;
+case b: var b = 4}",
+  "diagnostics": [
+    {
+      "message": "'b' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 3`] = `
+{
+  "code": "var a = 3; var a = 10;",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 4`] = `
+{
+  "code": "var a = {}; var a = [];",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 5`] = `
+{
+  "code": "var a; function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 6`] = `
+{
+  "code": "function a() {} function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 7`] = `
+{
+  "code": "var a = function() { }; var a = function() { }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 8`] = `
+{
+  "code": "var a = function() { }; var a = new Date();",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 9`] = `
+{
+  "code": "var a = 3; var a = 10; var a = 15;",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 10`] = `
+{
+  "code": "var a; var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 11`] = `
+{
+  "code": "export var a; var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 12`] = `
+{
+  "code": "class C { static { var a; var a; } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 13`] = `
+{
+  "code": "class C { static { var a; { var a; } } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 14`] = `
+{
+  "code": "class C { static { { var a; } var a; } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 15`] = `
+{
+  "code": "class C { static { { var a; } { var a; } } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 16`] = `
+{
+  "code": "var Object = 0;",
+  "diagnostics": [
+    {
+      "message": "'Object' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 17`] = `
+{
+  "code": "var a;
+var {a = 0, b: Object = 0} = {};",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+    {
+      "message": "'Object' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 18`] = `
+{
+  "code": "var a;
+var {a = 0, b: Object = 0} = {};",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 19`] = `
+{
+  "code": "var globalThis = 0;",
+  "diagnostics": [
+    {
+      "message": "'globalThis' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 20`] = `
+{
+  "code": "var a;
+var {a = 0, b: globalThis = 0} = {};",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+    {
+      "message": "'globalThis' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 21`] = `
+{
+  "code": "/*global b:false*/ var b = 1;",
+  "diagnostics": [
+    {
+      "message": "'b' is already defined by a variable declaration.",
+      "messageId": "redeclaredBySyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 22`] = `
+{
+  "code": "/*global b:true*/ var b = 1;",
+  "diagnostics": [
+    {
+      "message": "'b' is already defined by a variable declaration.",
+      "messageId": "redeclaredBySyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 23`] = `
+{
+  "code": "/*globals Array */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 24`] = `
+{
+  "code": "/*globals parseInt */",
+  "diagnostics": [
+    {
+      "message": "'parseInt' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 25`] = `
+{
+  "code": "/*globals foo, Array */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 26`] = `
+{
+  "code": "/*globals a:readonly, Array:writable */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 27`] = `
+{
+  "code": "/*globals
+Array */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 28`] = `
+{
+  "code": "/*globals foo,
+    Array */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 29`] = `
+{
+  "code": "/*globals a */ /*globals a */",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 30`] = `
+{
+  "code": "/*globals a */",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 31`] = `
+{
+  "code": "var configured = 1;",
+  "diagnostics": [
+    {
+      "message": "'configured' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 32`] = `
+{
+  "code": "/*globals Object */ var Object = 0;",
+  "diagnostics": [
+    {
+      "message": "'Object' is already defined by a variable declaration.",
+      "messageId": "redeclaredBySyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 33`] = `
+{
+  "code": "export {};
+/*globals Array */",
+  "diagnostics": [
+    {
+      "message": "'Array' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 34`] = `
+{
+  "code": "function f() {
+  var a;
+  var a;
+}",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 35`] = `
+{
+  "code": "function f(a) { var a; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 36`] = `
+{
+  "code": "function f() { var a; if (test) { var a; } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 37`] = `
+{
+  "code": "for (var a, a;;);",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

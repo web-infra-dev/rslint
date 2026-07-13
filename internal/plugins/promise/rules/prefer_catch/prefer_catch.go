@@ -19,7 +19,7 @@ func buildPreferCatchToThenMessage() rule.RuleMessage {
 
 var PreferCatchRule = rule.Rule{
 	Name: "promise/prefer-catch",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpr := node.AsCallExpression()

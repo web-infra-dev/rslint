@@ -9,7 +9,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-self-compare
 var NoSelfCompareRule = rule.Rule{
 	Name: "no-self-compare",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				bin := node.AsBinaryExpression()

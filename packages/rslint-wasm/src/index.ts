@@ -1,4 +1,4 @@
-import { BrowserRslintService } from '@rslint/core/browser';
+import { BrowserRslintService } from './browser.js';
 import { RSLintService, Diagnostic } from '@rslint/core/service';
 declare const WEB_WORKER_SOURCE_CODE: string;
 async function initialize(options: { wasmURL: string }) {

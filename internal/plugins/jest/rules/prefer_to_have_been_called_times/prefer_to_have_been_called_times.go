@@ -76,7 +76,7 @@ func unwrapMockCallsAccessProperty(arg *ast.Node) *ast.Node {
 
 var PreferToHaveBeenCalledTimesRule = rule.Rule{
 	Name: "jest/prefer-to-have-been-called-times",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)

@@ -139,7 +139,7 @@ func isImportSpecifierFromReact(ctx rule.RuleContext, ident *ast.Node) bool {
 
 var NoArrayIndexKeyRule = rule.Rule{
 	Name: "react/no-array-index-key",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 
 		// indexParamNames is a stack of identifier names introduced as the

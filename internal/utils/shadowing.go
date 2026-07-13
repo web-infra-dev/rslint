@@ -10,11 +10,13 @@ import (
 //
 // Scopes examined:
 //   - Function-like parameter lists (covers all 7 function-like kinds).
+//   - Function expression names and hoisted `var` declarations in function bodies.
 //   - Block-scoped declarations (var/let/const/function/class inside a Block).
 //   - Catch-clause variable bindings (including destructured patterns).
 //   - For-statement `let`/`const` init (scoped to the loop).
 //   - For-in / for-of `let`/`const` init (scoped to the loop).
 //   - Class declaration/expression names (scoped to the class body).
+//   - Enum declaration names.
 //
 // Use this when a rule tracks a specific declaration (e.g. a parameter, class,
 // or function name) and needs to ignore references that were shadowed before
@@ -24,6 +26,14 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 	for current := node.Parent; current != nil && current != boundary; current = current.Parent {
 		if ast.IsFunctionLikeDeclaration(current) {
 			if HasShadowingParameter(current, name) {
+				return true
+			}
+			if current.Kind == ast.KindFunctionDeclaration || current.Kind == ast.KindFunctionExpression {
+				if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
+					return true
+				}
+			}
+			if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
 				return true
 			}
 		}
@@ -54,7 +64,7 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 				HasVarDeclListWithName(stmt.Initializer, name) {
 				return true
 			}
-		case ast.KindClassDeclaration, ast.KindClassExpression:
+		case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindEnumDeclaration:
 			if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
 				return true
 			}
@@ -64,10 +74,9 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 }
 
 // GetReferenceSymbol returns the variable symbol for the given identifier.
-// When the identifier is the key of a shorthand property assignment in a
-// destructuring pattern (e.g., `({foo} = bar)`), it returns the value-binding
-// symbol rather than the property symbol that `GetSymbolAtLocation` would
-// otherwise produce.
+// When the identifier is a shorthand property name or a local export specifier
+// name, it returns the local value-binding symbol rather than the property or
+// export symbol that `GetSymbolAtLocation` would otherwise produce.
 func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbol {
 	if node == nil || typeChecker == nil {
 		return nil
@@ -77,6 +86,19 @@ func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbo
 		shorthand := parent.AsShorthandPropertyAssignment()
 		if shorthand != nil && shorthand.Name() == node {
 			if symbol := typeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+				return symbol
+			}
+		}
+	}
+	if parent != nil && parent.Kind == ast.KindExportSpecifier &&
+		!ast.IsTypeOnlyImportOrExportDeclaration(parent) &&
+		!isReExportSpecifier(parent) {
+		spec := parent.AsExportSpecifier()
+		isLocalName := spec != nil &&
+			((spec.PropertyName != nil && spec.PropertyName == node) ||
+				(spec.PropertyName == nil && spec.Name() == node))
+		if isLocalName {
+			if symbol := typeChecker.GetExportSpecifierLocalTargetSymbol(parent); symbol != nil {
 				return symbol
 			}
 		}

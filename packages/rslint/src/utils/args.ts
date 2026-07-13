@@ -3,7 +3,7 @@ import path from 'node:path';
 import { parseArgs as nodeParseArgs } from 'node:util';
 
 export function isJSConfigFile(filePath: string): boolean {
-  return /\.(ts|mts|js|mjs)$/.test(filePath);
+  return /\.(ts|mts|cts|js|mjs|cjs)$/.test(filePath);
 }
 
 export function parseArgs(argv: string[]) {
@@ -12,7 +12,7 @@ export function parseArgs(argv: string[]) {
     strict: false,
     tokens: true,
     options: {
-      config: { type: 'string' },
+      config: { type: 'string', short: 'c' },
       init: { type: 'boolean' },
       // Detected so the JS host can size the ESLint-plugin worker pool to a
       // single worker. NOT skipped below, so it still forwards to Go in
@@ -85,8 +85,9 @@ export function parseArgs(argv: string[]) {
 
 /**
  * Classify positional args into files and directories.
- * Resolves symlinks so paths are consistent with process.cwd() and
- * TypeScript's SourceFile.FileName() which both return real paths.
+ * Keeps the caller's absolute lexical path. Config discovery and Go target
+ * binding resolve physical identity separately, after lexical ownership has
+ * had the first opportunity to match.
  */
 export function classifyArgs(
   positionals: string[],
@@ -97,11 +98,10 @@ export function classifyArgs(
   for (const arg of positionals) {
     const resolved = path.resolve(cwd, arg);
     try {
-      const real = fs.realpathSync(resolved);
-      if (fs.statSync(real).isDirectory()) {
-        dirs.push(real);
+      if (fs.statSync(resolved).isDirectory()) {
+        dirs.push(resolved);
       } else {
-        files.push(real);
+        files.push(resolved);
       }
     } catch {
       // Non-existent path: treat as file (Go will handle the error)

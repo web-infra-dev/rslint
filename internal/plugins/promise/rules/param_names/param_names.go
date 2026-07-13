@@ -3,7 +3,6 @@ package param_names
 import (
 	"fmt"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -82,25 +81,19 @@ func paramName(param *ast.Node) string {
 	return name.AsIdentifier().Text
 }
 
-// regexMatch wraps regexp2.MatchString, discarding the timeout error.
-func regexMatch(re *regexp2.Regexp, s string) bool {
-	matched, _ := re.MatchString(s)
-	return matched
-}
-
 var ParamNamesRule = rule.Rule{
 	Name: "promise/param-names",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does not).
-		const reOpts = regexp2.ECMAScript | regexp2.Unicode
-		resolveRe, err := regexp2.Compile(opts.ResolvePattern, reOpts)
+		resolveRe, err := utils.CompileRegexp2(opts.ResolvePattern, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return rule.RuleListeners{}
 		}
-		rejectRe, err := regexp2.Compile(opts.RejectPattern, reOpts)
+		rejectRe, err := utils.CompileRegexp2(opts.RejectPattern, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return rule.RuleListeners{}
 		}
@@ -132,11 +125,11 @@ var ParamNamesRule = rule.Rule{
 					return
 				}
 
-				if resolveName := paramName(params[0]); resolveName != "" && !regexMatch(resolveRe, resolveName) {
+				if resolveName := paramName(params[0]); resolveName != "" && !utils.Regexp2MatchString(resolveRe, resolveName) {
 					ctx.ReportNode(params[0], buildResolveParamNamesMessage(opts.ResolvePattern))
 				}
 				if len(params) >= 2 {
-					if rejectName := paramName(params[1]); rejectName != "" && !regexMatch(rejectRe, rejectName) {
+					if rejectName := paramName(params[1]); rejectName != "" && !utils.Regexp2MatchString(rejectRe, rejectName) {
 						ctx.ReportNode(params[1], buildRejectParamNamesMessage(opts.RejectPattern))
 					}
 				}

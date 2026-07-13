@@ -147,30 +147,16 @@ async function handleRequest(event: MessageEvent): Promise<void> {
   }
 
   async function handleInit() {
-    const rslint_config = [
-      {
-        language: 'javascript',
-        files: [],
-        languageOptions: {
-          parserOptions: {
-            projectService: false,
-            project: ['./tsconfig.json'],
-          },
-        },
-        rules: {
-          '@typescript-eslint/no-unsafe-member-access': 'error',
-        },
-        plugins: ['@typescript-eslint'],
-      },
-    ];
     const tsconfig = {
       compilerOptions: {
         strictNullChecks: true,
       },
       include: ['**/*.ts'],
     };
+    // Config is delivered per-request over IPC (data.config → Go HandleLint),
+    // never read from the VFS, so the default volume only seeds the source
+    // file and its tsconfig.
     const inner_fs = memfs.Volume.fromJSON({
-      '/rslint.json': JSON.stringify(rslint_config),
       '/tsconfig.json': JSON.stringify(tsconfig),
       '/index.ts': 'let a:any; a.b = 10',
     });

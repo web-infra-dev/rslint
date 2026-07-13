@@ -16,7 +16,8 @@ type ruleOptions struct {
 // https://eslint.org/docs/latest/rules/no-inner-declarations
 var NoInnerDeclarationsRule = rule.Rule{
 	Name: "no-inner-declarations",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		listeners := rule.RuleListeners{

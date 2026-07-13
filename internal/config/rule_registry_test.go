@@ -1,6 +1,7 @@
 package config
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -338,7 +339,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 			Rules: Rules{
 				"@typescript-eslint/no-explicit-any": "error",
 				"react/jsx-uses-react":               "error",
-				"import/no-self-import":               "error", // import plugin NOT in plugins array
+				"import/no-self-import":              "error", // import plugin NOT in plugins array
 			},
 		},
 	}
@@ -446,7 +447,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 			Files:   []string{"**/*.tsx"},
 			Plugins: []string{"react"},
 			Rules: Rules{
-				"react/jsx-uses-react":             "error",
+				"react/jsx-uses-react":              "error",
 				"@typescript-eslint/ban-ts-comment": "error", // TS rule in react entry
 			},
 		},
@@ -625,6 +626,108 @@ func TestGetActiveRulesForFile_NilTypeInfoFilesNoFiltering(t *testing.T) {
 	if !found {
 		t.Error("Expected require-await when typeInfoFiles is nil (no filtering)")
 	}
+}
+
+func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T) {
+	RegisterAllRules()
+
+	cfg := RslintConfig{
+		{
+			Files: []string{"src/**/*.ts"},
+			LanguageOptions: &LanguageOptions{Raw: map[string]any{
+				"globals": map[string]any{
+					"readonlyGlobal": "readonly",
+					"disabledGlobal": "off",
+				},
+			}},
+			Rules: Rules{
+				"@typescript-eslint/require-await": "error",
+				"no-console":                       "warn",
+			},
+		},
+	}
+	resolver := NewFileConfigResolver(cfg, "/repo", false)
+
+	filePath := "/repo/src/app.ts"
+	cachedRules, cachedMerged := resolver.EnabledRulesForFile(filePath)
+	registryRules, registryMerged := GlobalRuleRegistry.GetEnabledRules(cfg, filePath, "/repo", false)
+	if cachedMerged == nil || registryMerged == nil {
+		t.Fatalf("expected both resolver and registry to return merged config")
+	}
+	if got, want := ruleNameSet(cachedRules), ruleNameSet(registryRules); len(got) != len(want) {
+		t.Fatalf("resolver rules differ from registry rules: got %v want %v", ruleNames(cachedRules), ruleNames(registryRules))
+	} else {
+		for name := range want {
+			if !got[name] {
+				t.Fatalf("resolver rules differ from registry rules: got %v want %v", ruleNames(cachedRules), ruleNames(registryRules))
+			}
+		}
+	}
+	for _, rules := range [][]linter.ConfiguredRule{cachedRules, registryRules} {
+		for _, rule := range rules {
+			if !rule.Globals["readonlyGlobal"] {
+				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
+			}
+			if rule.Globals["disabledGlobal"] {
+				t.Fatalf("expected resolver/registry rule %q to carry disabled global as false", rule.Name)
+			}
+		}
+	}
+
+	uncovered := resolver.ActiveRulesForFile(filePath, map[string]struct{}{})
+	if len(uncovered) != 1 {
+		t.Fatalf("expected only non-type-aware rule for uncovered file, got %v", ruleNames(uncovered))
+	}
+	if uncovered[0].Name != "no-console" {
+		t.Fatalf("expected no-console for uncovered file, got %q", uncovered[0].Name)
+	}
+
+	if ignoredConfig := resolver.ConfigForFile("/repo/test/app.ts"); ignoredConfig != nil {
+		t.Fatalf("expected files-miss path to have no merged config")
+	}
+	filesMissRules, filesMissConfig := resolver.EnabledRulesForFile("/repo/test/app.ts")
+	if filesMissRules != nil || filesMissConfig != nil {
+		t.Fatalf("expected files-miss path to return nil rules/config, got %v %#v", ruleNames(filesMissRules), filesMissConfig)
+	}
+}
+
+func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
+	RegisterAllRules()
+
+	cfg := RslintConfig{
+		{
+			Files: []string{"src/**/*.ts"},
+			Rules: Rules{
+				"@typescript-eslint/require-await": "error",
+				"no-console":                       "warn",
+			},
+		},
+	}
+	resolver := NewFileConfigResolver(cfg, "/repo", false)
+	paths := []string{
+		"/repo/src/a.ts",
+		"/repo/src/b.ts",
+		"/repo/test/a.ts",
+	}
+	typeInfoFiles := map[string]struct{}{
+		"/repo/src/a.ts": {},
+	}
+
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 100 {
+				for _, filePath := range paths {
+					_ = resolver.ConfigForFile(filePath)
+					_, _ = resolver.EnabledRulesForFile(filePath)
+					_ = resolver.ActiveRulesForFile(filePath, typeInfoFiles)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func ruleNames(rules []linter.ConfiguredRule) []string {

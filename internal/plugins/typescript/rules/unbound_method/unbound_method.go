@@ -144,11 +144,9 @@ var supportedGlobalTypes = []string{
 }
 
 func checkMethod(valueDeclaration *ast.Node, ignoreStatic bool) ( /* dangerous */ bool /* firstParamIsThis */, bool) {
-	params := valueDeclaration.Parameters()
-
-	firstParamIsThis := len(params) > 0 && ast.IsParameterDeclaration(params[0]) && ast.IsIdentifier(params[0].Name()) && params[0].Name().Text() == "this"
-
-	thisArgIsVoid := firstParamIsThis && params[0].Type().Kind == ast.KindVoidKeyword
+	thisParam := ast.GetThisParameter(valueDeclaration)
+	firstParamIsThis := thisParam != nil
+	thisArgIsVoid := utils.IsThisVoidParameter(thisParam)
 
 	dangerous := !thisArgIsVoid && (!ignoreStatic || !utils.IncludesModifier(valueDeclaration, ast.KindStaticKeyword))
 
@@ -194,7 +192,8 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Name:             "unbound-method",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(UnboundMethodOptions)
 		if !ok {
 			opts = UnboundMethodOptions{}

@@ -144,7 +144,8 @@ func isExpressionBodyArrowCall(node *ast.Node) bool {
 
 var NoReturnWrapRule = rule.Rule{
 	Name: "promise/no-return-wrap",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {

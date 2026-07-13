@@ -10,7 +10,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-var
 var NoVarRule = rule.Rule{
 	Name: "no-var",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
 				// BlockScoped = Let | Const | Using | AwaitUsing

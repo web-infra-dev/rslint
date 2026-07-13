@@ -26,6 +26,7 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 			{Code: `new RegExp(p, 'u')`},
 			{Code: `RegExp('\\1(a)' + suffix)`},
 			{Code: "new RegExp(`${prefix}\\\\1(a)`)"},
+			{Code: "{ const String = { raw: () => '\\\\1(a)' }; new RegExp(String.raw`\\1(a)`); }"},
 
 			// ---- not the global RegExp ----
 			{Code: `let RegExp; new RegExp('\\1(a)');`},
@@ -64,11 +65,11 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 			{Code: `/\1(?:a)/`},
 			{Code: `/\1(?=a)/`},
 			{Code: `/\1(?!a)/`},
-			{Code: `/^[\1](a)$/`},                  // \N in a character class is octal
+			{Code: `/^[\1](a)$/`}, // \N in a character class is octal
 			{Code: `new RegExp('[\\1](a)')`},
-			{Code: `/\11(a)/`},                     // octal escape \11
-			{Code: `/\k<foo>(a)/`},                 // no named groups → literal "k<foo>a"
-			{Code: `/^(a)\1\2$/`},                  // \1 backref, \2 octal
+			{Code: `/\11(a)/`},     // octal escape \11
+			{Code: `/\k<foo>(a)/`}, // no named groups → literal "k<foo>a"
+			{Code: `/^(a)\1\2$/`},  // \1 backref, \2 octal
 
 			// ---- valid backreferences: correct position, after the group ----
 			{Code: `/(a)\1/`},
@@ -314,6 +315,42 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 				Code: `const r = RegExp, p = '\\1', s = '(a)'; new r(p + s);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward", Line: 1, Column: 41},
+				},
+			},
+			{
+				Code: `new RegExp(true ? '\\1(a)' : '(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `new RegExp(String('\\1(a)'));`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "const RawString = String; new RegExp(RawString.raw`\\1(a)`);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code: `RegExp(/\1(a)/)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `RegExp(/\1(a)/, "")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `const flags = getFlags(); RegExp(/\1(a)/, flags);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 27},
 				},
 			},
 

@@ -2,7 +2,6 @@ package complexity
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -16,7 +15,8 @@ const defaultThreshold = 20
 // https://eslint.org/docs/latest/rules/complexity
 var ComplexityRule = rule.Rule{
 	Name: "complexity",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold, isModified := parseOptions(options)
 
 		// counters maps a "code path owner" node to its complexity counter.
@@ -80,7 +80,7 @@ var ComplexityRule = rule.Rule{
 			}
 			delete(counters, node)
 			if complexity > threshold {
-				name := utils.UpperCaseFirstASCII(getFunctionNameWithKind(node))
+				name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
 				loc := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
 				ctx.ReportRange(loc, makeMessage(name, complexity, threshold))
 			}
@@ -243,184 +243,6 @@ func makeMessage(name string, complexity, threshold int) rule.RuleMessage {
 			name, complexity, threshold,
 		),
 	}
-}
-
-// getFunctionNameWithKind mirrors ESLint's astUtils.getFunctionNameWithKind
-// EXACTLY — used here in preference to utils.GetFunctionNameWithKind because
-// the shared helper resolves names through VariableDeclaration parents
-// (producing strings like "function 'func'" for `var func = function () {}`),
-// while ESLint's complexity rule expects the bare "function" form. Other
-// rslint rules accept the broader name resolution; the complexity rule's test
-// suite locks in ESLint's narrower behavior.
-func getFunctionNameWithKind(node *ast.Node) string {
-	// Constructor short-circuit (matches ESLint). A KindConstructor is always
-	// declared inside a class body in valid TS, so a single unconditional
-	// check covers every case.
-	if node.Kind == ast.KindConstructor {
-		return "constructor"
-	}
-
-	parent := node.Parent
-	if parent == nil {
-		return "function"
-	}
-
-	tokens := []string{}
-
-	// Modifier prefixes (static / private) — only meaningful on class
-	// members. ESLint reads them off MethodDefinition / PropertyDefinition.
-	// Object-method shorthand (`{ foo() {} }`) inherits the "method"
-	// classification but never carries static / private modifiers.
-	isClassMember := isDirectClassMember(node)
-	isClassFieldValue := isClassFieldInitializer(node)
-	if isClassMember || isClassFieldValue {
-		owner := node
-		if isClassFieldValue {
-			owner = parent
-		}
-		if ast.HasSyntacticModifier(owner, ast.ModifierFlagsStatic) {
-			tokens = append(tokens, "static")
-		}
-		if name := owner.Name(); name != nil && name.Kind == ast.KindPrivateIdentifier {
-			tokens = append(tokens, "private")
-		}
-	}
-
-	flags := ast.GetFunctionFlags(node)
-	if flags&ast.FunctionFlagsAsync != 0 {
-		tokens = append(tokens, "async")
-	}
-	if flags&ast.FunctionFlagsGenerator != 0 {
-		tokens = append(tokens, "generator")
-	}
-
-	// Function-kind word. `MethodDeclaration` covers both class methods and
-	// object-method shorthand (`{ foo() {} }`) in tsgo, so it always
-	// classifies as "method". Object methods written with the `key: value`
-	// form (`{ foo: function () {} }` or `{ foo: () => {} }`) reach this
-	// switch as a FunctionExpression / ArrowFunction whose parent is a
-	// PropertyAssignment — also classified as "method" to match ESLint.
-	switch {
-	case node.Kind == ast.KindGetAccessor:
-		tokens = append(tokens, "getter")
-	case node.Kind == ast.KindSetAccessor:
-		tokens = append(tokens, "setter")
-	case node.Kind == ast.KindMethodDeclaration:
-		tokens = append(tokens, "method")
-	case parent.Kind == ast.KindPropertyAssignment:
-		tokens = append(tokens, "method")
-	case isClassFieldValue:
-		tokens = append(tokens, "method")
-	case node.Kind == ast.KindArrowFunction:
-		tokens = append(tokens, "arrow", "function")
-	default:
-		tokens = append(tokens, "function")
-	}
-
-	// Name resolution. ESLint only reads the name from the property key
-	// when the parent is Property / MethodDefinition / PropertyDefinition,
-	// or from `node.id` for plain function declarations / expressions.
-	// Notably, it does NOT walk up to a VariableDeclaration to recover a
-	// variable binding name — `var f = function () {}` reports as
-	// "function" without the "f".
-	//
-	// Object-method shorthand (`{ foo() {} }`) lives in tsgo as a
-	// MethodDeclaration whose parent is the ObjectLiteralExpression itself
-	// (no intermediate Property node), so we read the name off the method
-	// declaration directly when the kind is MethodDeclaration.
-	switch {
-	case parent.Kind == ast.KindPropertyAssignment:
-		// `{ foo: function () {} }` / `{ foo: () => {} }` — name lives on
-		// the property assignment.
-		appendNameFromOwner(&tokens, parent, node)
-	case isClassFieldValue:
-		appendNameFromOwner(&tokens, parent, node)
-	case node.Kind == ast.KindMethodDeclaration ||
-		node.Kind == ast.KindGetAccessor ||
-		node.Kind == ast.KindSetAccessor:
-		// Class methods/accessors AND object-literal method shorthand /
-		// getter / setter — name lives on the node itself in tsgo (no
-		// intermediate Property node).
-		appendNameFromOwner(&tokens, node, node)
-	default:
-		if id := nodeIdentifier(node); id != "" {
-			tokens = append(tokens, fmt.Sprintf("'%s'", id))
-		}
-	}
-
-	return joinTokens(tokens)
-}
-
-// appendNameFromOwner mirrors ESLint's name-resolution preference order
-// inside getFunctionNameWithKind: prefer the property key (private identifier
-// → static-name → empty), and fall back to `node.id` only for nameless
-// FunctionExpressions on a Property.
-func appendNameFromOwner(tokens *[]string, owner *ast.Node, node *ast.Node) {
-	if name := owner.Name(); name != nil {
-		if name.Kind == ast.KindPrivateIdentifier {
-			*tokens = append(*tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
-			return
-		}
-		if s, ok := utils.GetStaticPropertyName(name); ok {
-			*tokens = append(*tokens, fmt.Sprintf("'%s'", s))
-			return
-		}
-	}
-	if id := nodeIdentifier(node); id != "" {
-		*tokens = append(*tokens, fmt.Sprintf("'%s'", id))
-	}
-}
-
-// nodeIdentifier returns the identifier on the function node itself
-// (`node.id` in ESTree), or the empty string when there is none.
-func nodeIdentifier(node *ast.Node) string {
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		if n := node.AsFunctionDeclaration().Name(); n != nil && n.Kind == ast.KindIdentifier {
-			return n.AsIdentifier().Text
-		}
-	case ast.KindFunctionExpression:
-		if n := node.AsFunctionExpression().Name(); n != nil && n.Kind == ast.KindIdentifier {
-			return n.AsIdentifier().Text
-		}
-	}
-	return ""
-}
-
-// isDirectClassMember reports whether the function-like node is a method /
-// accessor whose parent is the enclosing class (not its initializer).
-func isDirectClassMember(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	if parent.Kind != ast.KindClassDeclaration && parent.Kind != ast.KindClassExpression {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		return true
-	}
-	return false
-}
-
-// isClassFieldInitializer reports whether the function-like node is the
-// direct initializer of a class field (e.g. `class C { x = () => {} }`).
-// Mirrors ESLint's `parent.type === "PropertyDefinition" && parent.value === node`.
-func isClassFieldInitializer(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		return parent.AsPropertyDeclaration().Initializer == node
-	}
-	return false
-}
-
-func joinTokens(tokens []string) string {
-	return strings.Join(tokens, " ")
 }
 
 // parseOptions extracts the threshold and modified-variant flag from the

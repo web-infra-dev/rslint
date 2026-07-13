@@ -51,16 +51,16 @@ jobs:
 
       - name: Unit Test
         if: matrix.runner != 'rspack-windows-2022-large'
-        run: go test -count=1 ./internal/...
+        run: go test -count=1 ./cmd/... ./internal/...
 
       - name: Unit Test (Windows)
         if: matrix.runner == 'rspack-windows-2022-large'
         shell: pwsh
         run: |
           # Pre-build shared dependencies to warm the build cache
-          go build ./internal/...
+          go build ./cmd/... ./internal/...
 
-          $packages = go list ./internal/... | Where-Object { $_ -ne "" }
+          $packages = go list ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
           $batchSize = 64
           $batch = @()
 
@@ -104,7 +104,7 @@ jobs:
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
           version: v2.12.2
-          args: --timeout=10m ./cmd/... ./internal/...
+          args: --timeout=15m ./cmd/... ./internal/...
 
       - name: go vet
         run: npm run lint:go

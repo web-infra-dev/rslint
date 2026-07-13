@@ -32,7 +32,7 @@ type scopeInfo struct {
 var RequireAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "require-await",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var currentScope *scopeInfo
 
 		enterFunction := func(node *ast.Node) {
@@ -43,8 +43,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				upper:         currentScope,
 			}
 
-			body := node.Body()
-			if body != nil && (!ast.IsBlock(body) || len(body.AsBlock().Statements.Nodes) > 0) {
+			if utils.HasNonEmptyFunctionBody(node) {
 				currentScope.functionFlags = ast.GetFunctionFlags(node)
 			}
 		}

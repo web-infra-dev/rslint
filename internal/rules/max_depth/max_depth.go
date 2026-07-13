@@ -2,7 +2,6 @@ package max_depth
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -13,7 +12,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-depth
 var MaxDepthRule = rule.Rule{
 	Name: "max-depth",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		maxDepth := parseMaxDepth(options)
 
 		// Stack of depth counters, one per scope-bearing container. The
@@ -120,54 +120,9 @@ func buildTooDeeplyMessage(depth, maxDepth int) rule.RuleMessage {
 	}
 }
 
-// parseMaxDepth resolves the configured maximum depth, mirroring ESLint's
-// `option.maximum || option.max` coercion. The legacy `maximum` key is honored
-// only when truthy (matching JS coercion); otherwise `max` wins. When neither
-// key is present, the default is 4.
+// parseMaxDepth resolves the configured maximum depth. max-depth shares
+// ESLint's legacy `maximum || max` option behavior with several max-* rules.
 func parseMaxDepth(options any) int {
 	const defaultMax = 4
-	if options == nil {
-		return defaultMax
-	}
-	// Number form: `3` or `[3]`.
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return defaultMax
-		}
-		if n, ok := utils.CoerceInt(arr[0]); ok {
-			return n
-		}
-	} else if n, ok := utils.CoerceInt(options); ok {
-		return n
-	}
-	// Object form: `{ max: 3 }` or `[{ max: 3 }]`. Use the shared extractor so
-	// both the array-wrapped (rule_tester / multi-element CLI) and bare-object
-	// (single-option CLI) shapes are handled uniformly.
-	m := utils.GetOptionsMap(options)
-	if m == nil {
-		return defaultMax
-	}
-	_, hasMaximum := m["maximum"]
-	_, hasMax := m["max"]
-	if !hasMaximum && !hasMax {
-		// Matches ESLint: when neither key is present, the option object is
-		// ignored and the default is used.
-		return defaultMax
-	}
-	if hasMaximum {
-		if v, ok := utils.CoerceInt(m["maximum"]); ok && v != 0 {
-			return v
-		}
-	}
-	if hasMax {
-		if v, ok := utils.CoerceInt(m["max"]); ok {
-			return v
-		}
-	}
-	// `option.maximum` is present but coerces to 0 / non-numeric, and
-	// `option.max` is absent or non-numeric: ESLint sets `maxDepth = undefined`
-	// here, which makes every `len > maxDepth` comparison false and effectively
-	// disables the check. MaxInt produces the same observable behavior.
-	return math.MaxInt
+	return utils.ResolveLegacyMaxOption(options, defaultMax)
 }
-

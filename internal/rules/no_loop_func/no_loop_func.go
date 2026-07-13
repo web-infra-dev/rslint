@@ -19,12 +19,7 @@ func BuildUnsafeRefsMessage(varNames string) rule.RuleMessage {
 type RunState struct {
 	Ctx          rule.RuleContext
 	SkippedIIFEs map[*ast.Node]bool
-	// refIndex buckets every value-position identifier (and destructuring
-	// shorthand write target) in the source file by resolved symbol. Populated
-	// lazily on the first forEachReference call and reused for all subsequent
-	// lookups — amortizes what would otherwise be a full-file walk per symbol
-	// into a single pass per rule invocation.
-	refIndex map[*ast.Symbol][]*ast.Node
+	refIndex     *utils.ReferenceIndex
 }
 
 // NewRunState constructs a RunState ready for one source-file pass.
@@ -198,20 +193,8 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 			return
 		}
 
-		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			// Shorthand property assignments dual-purpose the identifier as
-			// the property name AND a value reference to a same-named
-			// variable. GetSymbolAtLocation returns the property symbol;
-			// GetShorthandAssignmentValueSymbol returns the variable symbol.
-			// This applies in BOTH destructuring (`({port} = obj)`, where
-			// the variable is being written) and object literal value
-			// position (`f({port})`, where the variable is being read).
-			var sym *ast.Symbol
-			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
-				sym = s.Ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n.Parent)
-			} else {
-				sym = s.Ctx.TypeChecker.GetSymbolAtLocation(n)
-			}
+		if n.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(n) {
+			sym := utils.GetReferenceSymbol(n, s.Ctx.TypeChecker)
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
@@ -233,62 +216,6 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 		walk(root)
 	}
 	return refs
-}
-
-// isValueReferencePosition reports whether an Identifier node is used as a
-// value reference (readable or writable), as opposed to a property name,
-// object literal key, or member access right-hand side.
-func isValueReferencePosition(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return true
-	}
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		// foo.bar — `bar` is a property name, not a variable.
-		pa := parent.AsPropertyAccessExpression()
-		if pa != nil && pa.Name() == node {
-			return false
-		}
-	case ast.KindQualifiedName:
-		qn := parent.AsQualifiedName()
-		if qn != nil && qn.Right == node {
-			return false
-		}
-	case ast.KindMetaProperty:
-		return false
-	case ast.KindPropertyAssignment:
-		// { key: value } — the `key` side is a property name.
-		pa := parent.AsPropertyAssignment()
-		if pa != nil && pa.Name() == node {
-			return false
-		}
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindPropertyDeclaration, ast.KindPropertySignature,
-		ast.KindMethodSignature, ast.KindEnumMember:
-		// Member/enum key position.
-		if parent.Name() == node {
-			return false
-		}
-	case ast.KindImportSpecifier:
-		is := parent.AsImportSpecifier()
-		if is != nil && is.PropertyName == node {
-			return false
-		}
-	case ast.KindExportSpecifier:
-		es := parent.AsExportSpecifier()
-		if es != nil && es.PropertyName == node {
-			return false
-		}
-	case ast.KindLabeledStatement:
-		if parent.Name() == node {
-			return false
-		}
-	case ast.KindBreakStatement, ast.KindContinueStatement:
-		// break/continue label — not a variable.
-		return false
-	}
-	return true
 }
 
 // isSymbolDeclaredInside reports whether any declaration of `sym` resolves to
@@ -324,20 +251,6 @@ func GetVarDeclListKind(declList *ast.Node) string {
 	return utils.GetVarDeclListKind(declList)
 }
 
-// enclosingVarDeclOfBindingElement walks up through nested BindingElement /
-// BindingPattern layers to the containing VariableDeclaration, or returns nil
-// if the binding does not ultimately belong to a VariableDeclaration.
-func enclosingVarDeclOfBindingElement(bindingElement *ast.Node) *ast.Node {
-	if bindingElement == nil || bindingElement.Kind != ast.KindBindingElement {
-		return nil
-	}
-	parent := ast.WalkUpBindingElementsAndPatterns(bindingElement)
-	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
-		return nil
-	}
-	return parent
-}
-
 // isWriteRef reports whether an identifier participates in a write to its
 // variable. Extends utils.IsWriteReference with the cases ESLint's scope
 // manager marks as writes but we don't otherwise detect: the binding names of
@@ -345,64 +258,7 @@ func enclosingVarDeclOfBindingElement(bindingElement *ast.Node) *ast.Node {
 // by `for (var/let/const ... in/of ...)` iteration, and catch-clause
 // parameters (bound anew per thrown exception).
 func IsWriteRef(node *ast.Node) bool {
-	if utils.IsWriteReference(node) {
-		return true
-	}
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	parent := node.Parent
-	switch parent.Kind {
-	case ast.KindVariableDeclaration:
-		varDecl := parent.AsVariableDeclaration()
-		if varDecl == nil || varDecl.Name() != node {
-			return false
-		}
-		return varDeclIntroducesWrite(parent)
-	case ast.KindBindingElement:
-		be := parent.AsBindingElement()
-		if be == nil || be.Name() != node {
-			return false
-		}
-		varDecl := enclosingVarDeclOfBindingElement(parent)
-		if varDecl == nil {
-			return false
-		}
-		return varDeclIntroducesWrite(varDecl)
-	}
-	return false
-}
-
-// varDeclIntroducesWrite reports whether a VariableDeclaration's binding is
-// written at its introduction: it has an initializer, is the target of a
-// for-in/for-of iteration, or is a catch-clause parameter.
-func varDeclIntroducesWrite(varDecl *ast.Node) bool {
-	vd := varDecl.AsVariableDeclaration()
-	if vd == nil {
-		return false
-	}
-	if vd.Initializer != nil {
-		return true
-	}
-	if isVarDeclInForInOrOf(varDecl) {
-		return true
-	}
-	// `catch (e) {...}` binds `e` per thrown exception.
-	return varDecl.Parent != nil && varDecl.Parent.Kind == ast.KindCatchClause
-}
-
-// isVarDeclInForInOrOf reports whether a VariableDeclaration sits directly
-// inside a for-in/for-of initializer.
-func isVarDeclInForInOrOf(varDecl *ast.Node) bool {
-	if varDecl == nil || varDecl.Parent == nil {
-		return false
-	}
-	declList := varDecl.Parent
-	if declList.Kind != ast.KindVariableDeclarationList || declList.Parent == nil {
-		return false
-	}
-	outer := declList.Parent
-	return outer.Kind == ast.KindForInStatement || outer.Kind == ast.KindForOfStatement
+	return utils.IsVariableWriteReference(node)
 }
 
 // isSafe reports whether a through-reference `ref` to a symbol `sym` is safe
@@ -468,70 +324,14 @@ func (s *RunState) isSafeCore(loopNode *ast.Node, ref ReferenceEntry) bool {
 // getDeclListForSymbolDecl returns the VariableDeclarationList associated with
 // a declaration node, or nil if the declaration is not a variable-like binding.
 func GetDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
-	if decl == nil {
-		return nil
-	}
-	current := decl
-	for current != nil {
-		if current.Kind == ast.KindVariableDeclarationList {
-			return current
-		}
-		if current.Kind == ast.KindVariableDeclaration ||
-			current.Kind == ast.KindBindingElement ||
-			current.Kind == ast.KindObjectBindingPattern ||
-			current.Kind == ast.KindArrayBindingPattern {
-			current = current.Parent
-			continue
-		}
-		return nil
-	}
-	return nil
+	return utils.GetDeclListForSymbolDecl(decl)
 }
 
-// buildRefIndex performs a single pass over the source file and groups every
-// value-position identifier by its resolved symbol. ShorthandPropertyAssignment
-// nodes need special handling because TypeChecker.GetSymbolAtLocation resolves
-// the shorthand key to the property symbol, not the variable symbol — we use
-// GetShorthandAssignmentValueSymbol instead and key by the variable symbol.
-// This is needed BOTH for destructuring shorthand (which is a write) and for
-// object-literal shorthand (which is a read).
 func (s *RunState) buildRefIndex() {
 	if s.refIndex != nil {
 		return
 	}
-	s.refIndex = map[*ast.Symbol][]*ast.Node{}
-	tc := s.Ctx.TypeChecker
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			var sym *ast.Symbol
-			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
-				sym = tc.GetShorthandAssignmentValueSymbol(n.Parent)
-			} else {
-				sym = tc.GetSymbolAtLocation(n)
-			}
-			if sym != nil {
-				s.refIndex[sym] = append(s.refIndex[sym], n)
-			}
-		} else if n.Kind == ast.KindShorthandPropertyAssignment && utils.IsInDestructuringAssignment(n) {
-			// Already handled above via the Identifier branch in most cases,
-			// but keep this explicit indexing for the destructuring write
-			// path where the parent walk may not visit the Identifier directly.
-			if sym := tc.GetShorthandAssignmentValueSymbol(n); sym != nil {
-				if nameNode := n.AsShorthandPropertyAssignment().Name(); nameNode != nil {
-					s.refIndex[sym] = append(s.refIndex[sym], nameNode)
-				}
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(s.Ctx.SourceFile.AsNode())
+	s.refIndex = utils.NewReferenceIndex(s.Ctx.SourceFile, s.Ctx.TypeChecker)
 }
 
 // forEachReference invokes `cb` for every identifier node resolving to `sym`,
@@ -539,11 +339,7 @@ func (s *RunState) buildRefIndex() {
 // is built on first use via buildRefIndex so subsequent calls are O(refs).
 func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
 	s.buildRefIndex()
-	for _, node := range s.refIndex[sym] {
-		if cb(node) {
-			return
-		}
-	}
+	s.refIndex.ForEachReference(sym, cb)
 }
 
 // checkForLoops processes a function-like node: if it is inside a loop and
@@ -608,7 +404,7 @@ func (s *RunState) checkForLoopsCore(node *ast.Node) {
 var NoLoopFuncRule = rule.Rule{
 	Name:             "no-loop-func",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
 		// gap files / inferred-project files, but if a future caller bypasses
 		// the filter we still want to no-op rather than nil-deref.

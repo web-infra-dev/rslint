@@ -2,7 +2,6 @@ package max_nested_callbacks
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -13,7 +12,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-nested-callbacks
 var MaxNestedCallbacksRule = rule.Rule{
 	Name: "max-nested-callbacks",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold := parseThreshold(options)
 
 		// `callbackStack` mirrors ESLint's stack of FunctionExpression /
@@ -86,54 +86,9 @@ func buildExceedMessage(num, threshold int) rule.RuleMessage {
 	}
 }
 
-// parseThreshold resolves the configured maximum nesting depth, mirroring
-// ESLint's `option.maximum || option.max` coercion. The legacy `maximum` key
-// is honored only when truthy (matching JS coercion); otherwise `max` wins.
-// When neither key is present, the default is 10.
+// parseThreshold resolves the configured maximum nesting depth. This rule uses
+// the same legacy `maximum || max` option behavior as other max-* core rules.
 func parseThreshold(options any) int {
 	const defaultMax = 10
-	if options == nil {
-		return defaultMax
-	}
-	// Number form: `3` or `[3]`.
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return defaultMax
-		}
-		if n, ok := utils.CoerceInt(arr[0]); ok {
-			return n
-		}
-	} else if n, ok := utils.CoerceInt(options); ok {
-		return n
-	}
-	// Object form: `{ max: 3 }` or `[{ max: 3 }]`. Use the shared extractor so
-	// both the array-wrapped (rule_tester / multi-element CLI) and bare-object
-	// (single-option CLI) shapes are handled uniformly.
-	m := utils.GetOptionsMap(options)
-	if m == nil {
-		return defaultMax
-	}
-	_, hasMaximum := m["maximum"]
-	_, hasMax := m["max"]
-	if !hasMaximum && !hasMax {
-		// Matches ESLint: when neither key is present, the option object is
-		// ignored and the default is used.
-		return defaultMax
-	}
-	if hasMaximum {
-		if v, ok := utils.CoerceInt(m["maximum"]); ok && v != 0 {
-			return v
-		}
-	}
-	if hasMax {
-		if v, ok := utils.CoerceInt(m["max"]); ok {
-			return v
-		}
-	}
-	// `option.maximum` is present but coerces to 0 / non-numeric, and
-	// `option.max` is absent or non-numeric: ESLint sets `THRESHOLD = undefined`
-	// here, which makes every `length > THRESHOLD` comparison false and
-	// effectively disables the check. MaxInt produces the same observable
-	// behavior.
-	return math.MaxInt
+	return utils.ResolveLegacyMaxOption(options, defaultMax)
 }

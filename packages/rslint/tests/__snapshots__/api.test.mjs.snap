@@ -1,16 +1,5 @@
 // Rstest Snapshot v1
 
-exports[`applyFixes api > apply fixes with real diagnostics 1`] = `
-{
-  "input": "let x: string = "hello";
-const y = x as string;",
-  "output": [
-    "let x: string = "hello";
-const y = x;",
-  ],
-}
-`;
-
 exports[`lint api > diag snapshot 1`] = `
 {
   "diagnostics": [
@@ -29,6 +18,7 @@ exports[`lint api > diag snapshot 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
     {
       "filePath": "src/disable-file.ts",
@@ -45,6 +35,7 @@ exports[`lint api > diag snapshot 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
     {
       "filePath": "src/disable.ts",
@@ -61,6 +52,7 @@ exports[`lint api > diag snapshot 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
     {
       "filePath": "src/index.ts",
@@ -77,6 +69,7 @@ exports[`lint api > diag snapshot 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
     {
       "filePath": "src/index.ts",
@@ -93,11 +86,25 @@ exports[`lint api > diag snapshot 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
   ],
   "errorCount": 5,
   "fileCount": 8,
+  "fixableErrorCount": 0,
+  "fixableWarningCount": 0,
+  "lintedFiles": [
+    "src/autofix.ts",
+    "src/close-test.ts",
+    "src/disable-file.ts",
+    "src/disable.ts",
+    "src/error-transitions.ts",
+    "src/fixall-cascade.ts",
+    "src/fixall.ts",
+    "src/index.ts",
+  ],
   "ruleCount": 1,
+  "warningCount": 0,
 }
 `;
 
@@ -119,10 +126,26 @@ exports[`lint api > virtual file support 1`] = `
         },
       },
       "ruleName": "@typescript-eslint/no-unsafe-member-access",
+      "severity": "error",
     },
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "fixableErrorCount": 0,
+  "fixableWarningCount": 0,
+  "lintedFiles": [
+    "src/virtual.ts",
+  ],
   "ruleCount": 1,
+  "warningCount": 0,
+}
+`;
+
+exports[`lint fix:true > fix:true returns fixed output in-band 1`] = `
+{
+  "input": "let a: Array<string> = [];",
+  "output": {
+    "src/virtual.ts": "let a: string[] = [];",
+  },
 }
 `;

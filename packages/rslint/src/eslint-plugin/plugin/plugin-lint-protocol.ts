@@ -4,7 +4,7 @@
  * sends down (`pluginLint` IPC request OR `rslint/pluginLint`
  * LSP request) and the shape it reads back.
  *
- * Both the CLI host (`packages/rslint/src/engine.ts`) and the LSP host
+ * Both the CLI host (`packages/rslint/src/cli/engine.ts`) and the LSP host
  * (`packages/vscode-extension/src/PluginLintPool.ts`) receive an
  * EslintPluginLintRequest from Go, build per-file LintTasks against the
  * WorkerPool, and project the results back. The boundary logic is
@@ -33,6 +33,8 @@ import type { LintFileResult } from '../linter/ecma-language-plugin.js';
  * doesn't need to re-validate Go's serialization.
  */
 export interface EslintPluginLintRequest {
+  /** LSP config/worker generation. Omitted by the CLI's single-host path. */
+  generation?: string;
   files: ReadonlyArray<{
     path: string;
     /**

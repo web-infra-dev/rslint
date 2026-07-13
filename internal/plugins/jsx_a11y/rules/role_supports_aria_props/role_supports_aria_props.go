@@ -13,13 +13,13 @@
 //  2. Lookup the explicit `role` attribute via case-insensitive
 //     [jsxa11yutil.FindAttributeByName].
 //  3. Compute roleValue:
-//       - If role attribute is present: extract via
-//         [jsxa11yutil.LiteralPropStringValue] (= `getLiteralPropValue`).
-//         Returns "" / no-string for non-literal expressions which fall
-//         through to the typeof-string skip below.
-//       - Otherwise: [jsxa11yutil.GetImplicitRole] returns the implicit role
-//         per the HTML-ARIA table (or "" when the element has no implicit
-//         role).
+//     - If role attribute is present: extract via
+//     [jsxa11yutil.LiteralPropStringValue] (= `getLiteralPropValue`).
+//     Returns "" / no-string for non-literal expressions which fall
+//     through to the typeof-string skip below.
+//     - Otherwise: [jsxa11yutil.GetImplicitRole] returns the implicit role
+//     per the HTML-ARIA table (or "" when the element has no implicit
+//     role).
 //  4. isImplicit = (no explicit role attribute AND implicit role found).
 //     Used only to switch error message phrasing.
 //  5. Skip if roleValue is not a string OR is not a key in
@@ -31,23 +31,23 @@
 //     [jsxa11yutil.AriaRolePropsMap]; the invalid set is every ARIA name in
 //     [jsxa11yutil.AriaPropertyNames] that is NOT in the supported set.
 //  7. For each non-spread JsxAttribute on the element:
-//       - Skip when getPropValue is nullish (= null or undefined).
-//       - Compute the prop's name (raw, no case normalization — matches
-//         upstream's `propName(prop)`).
-//       - Report when the name is in the invalid set. The diagnostic is
-//         attached to the JSXOpeningElement, not the attribute, mirroring
-//         upstream's `context.report({ node, ... })`.
+//     - Skip when getPropValue is nullish (= null or undefined).
+//     - Compute the prop's name (raw, no case normalization — matches
+//     upstream's `propName(prop)`).
+//     - Report when the name is in the invalid set. The diagnostic is
+//     attached to the JSXOpeningElement, not the attribute, mirroring
+//     upstream's `context.report({ node, ... })`.
 //
 // Phase 1 Step 6 — observable divergences from upstream:
 //   - None. The rule is a thin port. Two nuances worth flagging in case a
 //     future maintainer is surprised:
-//     * The membership check on roleValue is case-sensitive against
-//       lowercase aria-query keys (so `role="BUTTON"` skips silently). This
-//       matches upstream — `roles` is a Map<string, def> keyed by lowercase.
-//     * Mixed-case ARIA prop names (e.g. `aria-Checked`) fail the
-//       case-sensitive `invalidAriaPropsForRole.has(name)` lookup and are
-//       silently NOT validated. This matches upstream's
-//       `propName(prop)` (case-preserving) feeding into a lowercase Set.
+//   - The membership check on roleValue is case-sensitive against
+//     lowercase aria-query keys (so `role="BUTTON"` skips silently). This
+//     matches upstream — `roles` is a Map<string, def> keyed by lowercase.
+//   - Mixed-case ARIA prop names (e.g. `aria-Checked`) fail the
+//     case-sensitive `invalidAriaPropsForRole.has(name)` lookup and are
+//     silently NOT validated. This matches upstream's
+//     `propName(prop)` (case-preserving) feeding into a lowercase Set.
 package role_supports_aria_props
 
 import (
@@ -69,7 +69,7 @@ func errorMessage(attr, role, tag string, isImplicit bool) string {
 
 var RoleSupportsAriaPropsRule = rule.Rule{
 	Name: "jsx-a11y/role-supports-aria-props",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			elementType := jsxa11yutil.GetElementType(node, ctx.Settings)
 			if elementType == "" {

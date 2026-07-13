@@ -31,12 +31,15 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
-import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
+import {
+  selectPluginSource,
+  unwrapPluginModule,
+} from '../../config/plugin-source.js';
 
 /**
  * Extension-aware config loader for worker init. Mirrors the strategy
- * `packages/rslint/src/config-loader.ts::loadConfigFile` uses on the
- * main thread so a `.ts`/`.mts` config file loads identically in both
+ * `packages/rslint/src/config/config-loader.ts::loadConfigFile` uses on the
+ * main thread so a `.ts`/`.mts`/`.cts` config file loads identically in both
  * places.
  *
  * The previous implementation directly called `await import(url)` for
@@ -45,7 +48,7 @@ import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
  * `rslint.config.ts` + object-form `plugins` would fail worker init even
  * though the main thread had already loaded the same file via jiti.
  *
- * Resolution order for `.ts`/`.mts`:
+ * Resolution order for `.ts`/`.mts`/`.cts`:
  *
  *   1. `process.features.typescript` (Node ≥ 22.6 with native TS) →
  *      native `import()`.
@@ -64,9 +67,6 @@ import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
  */
 async function importConfigFile(configFilePath: string): Promise<unknown> {
   const ext = path.extname(configFilePath);
-  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
-    return import(pathToFileURL(configFilePath).href);
-  }
   if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
     const useNative = Boolean(
       (process.features as { typescript?: boolean }).typescript,
@@ -102,7 +102,7 @@ async function importConfigFile(configFilePath: string): Promise<unknown> {
     // unwrap.
     return resolved;
   }
-  throw new Error(`Unsupported config file extension: ${ext}`);
+  return import(pathToFileURL(configFilePath).href);
 }
 
 /**
@@ -207,7 +207,7 @@ export async function loadPluginsFromConfigFile(
   // Per entry, the live community plugins come from the object-form
   // `plugins` map (`plugins: { uc: unicornPlugin }`), selected via the
   // shared `selectPluginSource`. This mirrors `normalizeConfig` in
-  // packages/rslint/src/config-loader.ts — both paths must extract plugins
+  // packages/rslint/src/config/config-loader.ts — both paths must extract plugins
   // from the same source, or the worker holds a plugin set that doesn't
   // match what the main thread believed was active. Array-form `plugins`
   // (the native-name whitelist) carries no live objects and yields no
@@ -310,18 +310,18 @@ export async function loadPluginsFromConfigs(
   for (let i = 0; i < configs.length; i++) {
     const dir = configs[i].configDirectory;
     const existing = out.get(dir);
-    // Two ConfigDescriptors can share a `configDirectory` (e.g. the
-    // config-discovery layer surfacing `rslint.config.js` AND
-    // `rslint.config.mjs` in one folder). The map is keyed by
-    // directory, so a plain `out.set` would let the second config
-    // SILENTLY overwrite the first — files in that directory would then
-    // resolve against only the later config's plugins, losing the
-    // earlier ones with no signal. Merge instead (union of plugins +
-    // rules), warning loudly on a genuine same-key rule conflict.
+    // Duplicate descriptors are harmless when they resolve to the same plugin
+    // instances. A different plugin instance under the same prefix and routing
+    // key is invalid even when the two instances expose disjoint rule names.
     out.set(
       dir,
       existing
-        ? mergeLoadedPlugins(existing, loadedList[i], dir)
+        ? mergeLoadedPlugins(
+            existing,
+            loadedList[i],
+            dir,
+            configs[i].configPath,
+          )
         : loadedList[i],
     );
   }
@@ -329,31 +329,48 @@ export async function loadPluginsFromConfigs(
 }
 
 /**
- * Merge two `LoadedPlugins` for the SAME `configDirectory`. Unions the
- * plugin lists and rule maps. On a rule-key collision: same instance →
- * harmless dedup; DIFFERENT instances → a real conflict (two plugins
- * under one prefix in one directory), kept first-wins with a loud
- * stderr warning so it isn't a silent drop.
+ * Merge two `LoadedPlugins` for the SAME `configDirectory`. Plugin prefixes
+ * are routing identities: the same plugin instance is harmless deduplication,
+ * while a different instance under the same prefix is always rejected.
  */
 function mergeLoadedPlugins(
   a: LoadedPlugins,
   b: LoadedPlugins,
   dir: string,
+  configPath: string,
 ): LoadedPlugins {
+  const plugins = [...a.plugins];
+  const pluginsByPrefix = new Map(
+    plugins.map((loaded) => [loaded.prefix, loaded] as const),
+  );
+  for (const loaded of b.plugins) {
+    const existing = pluginsByPrefix.get(loaded.prefix);
+    if (existing) {
+      if (existing.plugin !== loaded.plugin) {
+        throw new PluginLoaderError(
+          configPath,
+          `Cannot redefine plugin "${loaded.prefix}" for routing key "${dir}".`,
+        );
+      }
+      continue;
+    }
+    pluginsByPrefix.set(loaded.prefix, loaded);
+    plugins.push(loaded);
+  }
+
   const rules = new Map(a.rules);
   for (const [key, rule] of b.rules) {
     const existing = rules.get(key);
     if (existing !== undefined && existing !== rule) {
-      process.stderr.write(
-        `[rslint] plugin rule "${key}" is defined by more than one config ` +
-          `in the same directory (${dir}); keeping the first. Deduplicate ` +
-          `the rslint.config.* files for this directory.\n`,
+      throw new PluginLoaderError(
+        configPath,
+        `[rslint] plugin rule "${key}" is defined by different plugin ` +
+          `instances for the same config key (${dir})`,
       );
-      continue;
     }
     rules.set(key, rule);
   }
-  return { plugins: [...a.plugins, ...b.plugins], rules };
+  return { plugins, rules };
 }
 
 function ensureNodeVersion(): void {

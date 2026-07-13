@@ -8,29 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// builtinGlobals contains names of known read-only built-in globals.
-var builtinGlobals = map[string]bool{
-	"AggregateError": true, "Array": true, "ArrayBuffer": true, "AsyncDisposableStack": true,
-	"AsyncIterator": true, "Atomics": true,
-	"BigInt": true, "BigInt64Array": true, "BigUint64Array": true,
-	"Boolean": true, "DataView": true, "Date": true,
-	"decodeURI": true, "decodeURIComponent": true, "DisposableStack": true,
-	"encodeURI": true, "encodeURIComponent": true,
-	"Error": true, "escape": true, "EvalError": true,
-	"FinalizationRegistry": true, "Float32Array": true, "Float64Array": true, "Function": true,
-	"globalThis": true, "Infinity": true, "Int8Array": true,
-	"Int16Array": true, "Int32Array": true, "Intl": true, "isFinite": true,
-	"isNaN": true, "Iterator": true, "JSON": true, "Map": true, "Math": true,
-	"NaN": true, "Number": true, "Object": true, "parseFloat": true,
-	"parseInt": true, "Promise": true, "Proxy": true, "RangeError": true,
-	"ReferenceError": true, "Reflect": true, "RegExp": true,
-	"Set": true, "SharedArrayBuffer": true, "String": true, "SuppressedError": true,
-	"Symbol": true, "SyntaxError": true, "TypeError": true,
-	"Uint8Array": true, "Uint8ClampedArray": true, "Uint16Array": true,
-	"Uint32Array": true, "unescape": true, "URIError": true, "undefined": true,
-	"WeakMap": true, "WeakRef": true, "WeakSet": true,
-}
-
 type options struct {
 	exceptions map[string]bool
 }
@@ -72,13 +49,14 @@ func isWriteThroughTypeAssertion(node *ast.Node) bool {
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
 	Name: "no-global-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
-				if !builtinGlobals[name] || opts.exceptions[name] {
+				if !utils.IsECMAScriptGlobal(name) || opts.exceptions[name] {
 					return
 				}
 

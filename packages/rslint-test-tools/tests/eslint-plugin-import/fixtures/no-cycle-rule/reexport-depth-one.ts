@@ -1,0 +1,1 @@
+export { rootValue } from './consumer';

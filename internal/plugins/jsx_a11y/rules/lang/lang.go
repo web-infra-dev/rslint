@@ -17,7 +17,7 @@ const errorMessage = "lang attribute must have a valid value."
 
 var LangRule = rule.Rule{
 	Name: "jsx-a11y/lang",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				// Upstream: `if (name && name.toUpperCase() !== 'LANG') return;`

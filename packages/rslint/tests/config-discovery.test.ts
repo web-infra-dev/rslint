@@ -1,13 +1,15 @@
 import { describe, test, expect } from '@rstest/core';
 import {
+  coalesceCaseAliasedConfigs,
   discoverConfigs,
   filterConfigsByParentIgnores,
   findJSConfig,
+  findJSConfigForTarget,
   findJSConfigUp,
   findJSConfigsInDir,
   JS_CONFIG_FILES,
 } from '../src/utils/config-discovery.js';
-import type { RslintConfigEntry } from '../src/define-config.js';
+import type { RslintConfigEntry } from '../src/config/define-config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -34,19 +36,18 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('explicit config overrides discovery', async () => {
+  test('explicit config overrides discovery and uses cwd as configDirectory', async () => {
     const tmp = createTempDir();
-    const configFile = path.join(tmp, 'custom.config.js');
+    const cwd = path.join(tmp, 'project');
+    const configDir = path.join(tmp, 'wrapper');
+    const configFile = path.join(configDir, 'custom.config.js');
     try {
+      fs.mkdirSync(cwd);
+      fs.mkdirSync(configDir);
+      fs.writeFileSync(path.join(cwd, 'rslint.config.js'), 'export default []');
       fs.writeFileSync(configFile, 'export default []');
-      const result = await discoverConfigs(
-        ['/some/file.ts'],
-        ['/some/dir'],
-        tmp,
-        configFile,
-      );
-      expect(result.size).toBe(1);
-      expect([...result.keys()][0]).toBe(configFile);
+      const result = await discoverConfigs([], [], cwd, configFile);
+      expect([...result]).toEqual([[configFile, cwd]]);
     } finally {
       cleanup(tmp);
     }
@@ -209,6 +210,104 @@ describe('discoverConfigs', () => {
       cleanup(tmp);
     }
   });
+
+  test('file symlink uses lexical config before physical config', async () => {
+    const tmp = createTempDir();
+    const physicalDir = path.join(tmp, 'physical');
+    const lexicalDir = path.join(tmp, 'lexical');
+    const physicalConfig = path.join(physicalDir, 'rslint.config.js');
+    const lexicalConfig = path.join(lexicalDir, 'rslint.config.js');
+    const physicalFile = path.join(physicalDir, 'index.ts');
+    const lexicalFile = path.join(lexicalDir, 'index.ts');
+    try {
+      fs.mkdirSync(physicalDir);
+      fs.mkdirSync(lexicalDir);
+      fs.writeFileSync(physicalConfig, 'export default []');
+      fs.writeFileSync(lexicalConfig, 'export default []');
+      fs.writeFileSync(physicalFile, 'export {};');
+      fs.symlinkSync(physicalFile, lexicalFile, 'file');
+
+      expect(findJSConfigForTarget(lexicalFile, false)).toBe(lexicalConfig);
+      const result = await discoverConfigs([lexicalFile], [], tmp, null);
+      expect([...result.keys()]).toEqual([lexicalConfig]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('file symlink falls back to physical config without a lexical config', async () => {
+    const tmp = createTempDir();
+    const physicalDir = path.join(tmp, 'physical');
+    const lexicalDir = path.join(tmp, 'lexical');
+    const physicalConfig = path.join(physicalDir, 'rslint.config.js');
+    const physicalFile = path.join(physicalDir, 'index.ts');
+    const lexicalFile = path.join(lexicalDir, 'index.ts');
+    try {
+      fs.mkdirSync(physicalDir);
+      fs.mkdirSync(lexicalDir);
+      fs.writeFileSync(physicalConfig, 'export default []');
+      fs.writeFileSync(physicalFile, 'export {};');
+      fs.symlinkSync(physicalFile, lexicalFile, 'file');
+
+      const canonicalConfig = fs.realpathSync(physicalConfig);
+      expect(findJSConfigForTarget(lexicalFile, false)).toBe(canonicalConfig);
+      const result = await discoverConfigs([lexicalFile], [], tmp, null);
+      expect([...result.keys()]).toEqual([canonicalConfig]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+});
+
+describe('coalesceCaseAliasedConfigs', () => {
+  test('keeps case-distinct config roots when only their config files share a target', () => {
+    const tmp = createTempDir();
+    const upperDir = path.join(tmp, 'Project');
+    const lowerDir = path.join(tmp, 'project');
+    try {
+      fs.mkdirSync(upperDir);
+      try {
+        fs.mkdirSync(lowerDir);
+      } catch {
+        return;
+      }
+      const sharedConfig = path.join(tmp, 'shared.config.mjs');
+      fs.writeFileSync(sharedConfig, 'export default []');
+      const upperConfig = path.join(upperDir, 'rslint.config.mjs');
+      const lowerConfig = path.join(lowerDir, 'rslint.config.mjs');
+      try {
+        fs.symlinkSync(sharedConfig, upperConfig, 'file');
+        fs.symlinkSync(sharedConfig, lowerConfig, 'file');
+      } catch {
+        return;
+      }
+
+      const result = coalesceCaseAliasedConfigs(
+        new Map([
+          [upperConfig, upperDir],
+          [lowerConfig, lowerDir],
+        ]),
+      );
+      expect(result.configs.size).toBe(2);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+});
+
+describe('findJSConfig', () => {
+  test('skips a higher-priority filename that is a directory', () => {
+    const tmp = createTempDir();
+    try {
+      fs.mkdirSync(path.join(tmp, 'rslint.config.js'));
+      const configPath = path.join(tmp, 'rslint.config.mjs');
+      fs.writeFileSync(configPath, 'export default []');
+
+      expect(findJSConfig(tmp)).toBe(configPath);
+    } finally {
+      cleanup(tmp);
+    }
+  });
 });
 
 // --- filterConfigsByParentIgnores ---
@@ -267,16 +366,58 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toEqual([P()]);
   });
 
-  test('empty array-form or object-form plugins still counts as a global ignore', () => {
-    // An ignores-only entry stays "global" even with an empty `plugins`. Since
-    // `plugins` is a union (string[] XOR object), isGlobalIgnoreEntry must treat
-    // both an empty array AND an empty object as "no plugins" — otherwise the
-    // entry would lose global-ignore status and stop blocking nested discovery.
-    for (const emptyPlugins of [{ plugins: [] }, { plugins: {} }]) {
+  test.each([
+    'packages//ignored/**',
+    'packages/./ignored/**',
+    './packages/ignored/**',
+  ])(
+    'normalizes parent ignore pattern %s before hierarchy matching',
+    (pattern) => {
+      const result = filterConfigsByParentIgnores([
+        cfg(P(), globalIgnore(pattern), ruleEntry(['**/*.ts'], {})),
+        cfg(P('packages', 'ignored'), ruleEntry(['**/*.ts'], {})),
+      ]);
+
+      expect(dirs(result)).toEqual([P()]);
+    },
+  );
+
+  test('builds the effective transaction catalog from loaded candidates', () => {
+    const parent = {
+      ...cfg(P(), globalIgnore('generated/**')),
+      configPath: P('rslint.config.js'),
+    };
+    const ignoredNested = {
+      ...cfg(P('generated', 'package'), ruleEntry(['**/*.ts'], {})),
+      configPath: P('generated', 'package', 'rslint.config.js'),
+    };
+    const sibling = {
+      ...cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
+      configPath: P('packages', 'app', 'rslint.config.js'),
+    };
+
+    const result = filterConfigsByParentIgnores([
+      ignoredNested,
+      sibling,
+      parent,
+    ]);
+
+    expect(result).toEqual([parent, sibling]);
+    expect(result).not.toContain(ignoredNested);
+  });
+
+  test('explicit empty config fields make ignores entry-level', () => {
+    for (const emptyField of [
+      { rules: {} },
+      { plugins: [] },
+      { plugins: {} },
+      { settings: {} },
+      { languageOptions: {} },
+    ]) {
       const result = filterConfigsByParentIgnores([
         cfg(
           P(),
-          { ignores: ['__tests__/**'], ...emptyPlugins },
+          { ignores: ['__tests__/**'], ...emptyField },
           ruleEntry(['**/*.ts'], {}),
         ),
         cfg(
@@ -284,8 +425,8 @@ describe('filterConfigsByParentIgnores', () => {
           ruleEntry(['**/*.ts'], { 'no-console': 'error' }),
         ),
       ]);
-      expect(result).toHaveLength(1);
-      expect(dirs(result)).toEqual([P()]);
+      expect(result).toHaveLength(2);
+      expect(dirs(result)).toContain(P('__tests__', 'fixtures'));
     }
   });
 
@@ -408,6 +549,19 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toContain(P('packages', 'lib'));
   });
 
+  test('nearest config boundary replaces ancestor global ignores', () => {
+    const result = filterConfigsByParentIgnores([
+      cfg(
+        P(),
+        globalIgnore('packages/app/generated/**'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app', 'generated'), ruleEntry(['**/*.ts'], {})),
+    ]);
+    expect(dirs(result)).toContain(P('packages', 'app', 'generated'));
+  });
+
   test('global ignore entry with name field is still recognized', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
@@ -436,10 +590,15 @@ describe('filterConfigsByParentIgnores', () => {
       cfg(P('e2e', 'helpers'), ruleEntry(['**/*.ts'], {})),
       cfg(P('packages', 'app', 'dist', 'gen'), ruleEntry(['**/*.ts'], {})),
     ]);
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(4);
     expect(dirs(result)).toContain(P());
     expect(dirs(result)).toContain(P('packages', 'app'));
     expect(dirs(result)).toContain(P('packages', 'lib'));
+    expect(dirs(result)).toContain(P('packages', 'app', 'dist', 'gen'));
+    expect(dirs(result)).not.toContain(
+      P('packages', 'vscode-ext', '__tests__', 'fixtures'),
+    );
+    expect(dirs(result)).not.toContain(P('e2e', 'helpers'));
   });
 
   // --- Glob pattern coverage (picomatch) ---
@@ -487,9 +646,18 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toEqual([P()]);
   });
 
-  test('negation pattern is skipped — does not re-include or accidentally filter', () => {
-    // Negation (!) is skipped at directory level (aligned with ESLint v10).
-    // `vendor/**` filters vendor dirs, `!vendor/keep/**` is ignored.
+  test('directory names starting with .. are still child directories', () => {
+    const result = filterConfigsByParentIgnores([
+      cfg(P(), globalIgnore('..foo/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('..foo'), ruleEntry(['**/*.ts'], {})),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].configDirectory).toBe(P());
+  });
+
+  test('negation cannot re-include a descendant of an ignored directory', () => {
+    // `vendor/**` ignores the parent directory before the descendant negation
+    // can be reached, matching ESLint v10 directory traversal.
     const result = filterConfigsByParentIgnores([
       cfg(
         P(),
@@ -498,13 +666,11 @@ describe('filterConfigsByParentIgnores', () => {
       ),
       cfg(P('vendor', 'lib'), ruleEntry(['**/*.ts'], {})),
       cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
-      // Unrelated dirs should NOT be affected by the negation pattern
+      // Unrelated directories are not affected by the negation pattern.
       cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
-    // vendor/* filtered by positive pattern
     expect(dirs(result)).not.toContain(P('vendor', 'lib'));
     expect(dirs(result)).not.toContain(P('vendor', 'keep'));
-    // Unrelated dirs must NOT be filtered (negation pattern skipped safely)
     expect(dirs(result)).toContain(P('packages', 'app'));
     expect(dirs(result)).toContain(P());
   });
@@ -519,32 +685,50 @@ describe('filterConfigsByParentIgnores', () => {
     expect(result).toHaveLength(3);
   });
 
-  // --- File-level vs directory-level patterns (ESLint v10 aligned) ---
-
-  test('dir/** blocks traversal, dir/**/* does not (ESLint v10 behavior)', () => {
-    // vendor/** = directory-level → filters nested configs
-    // vendor/**/* = file-level → does NOT filter (allows traversal)
+  test('dir/** and dir/**/* both block ignored descendant directories', () => {
     const withDirPattern = filterConfigsByParentIgnores([
       cfg(P(), globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
       cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
-    expect(withDirPattern).toHaveLength(1); // vendor/keep filtered
+    expect(withDirPattern).toHaveLength(1);
 
     const withFilePattern = filterConfigsByParentIgnores([
       cfg(P(), globalIgnore('vendor/**/*'), ruleEntry(['**/*.ts'], {})),
       cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
-    expect(withFilePattern).toHaveLength(2); // vendor/keep NOT filtered
-    expect(dirs(withFilePattern)).toContain(P('vendor', 'keep'));
+    expect(withFilePattern).toHaveLength(1);
   });
 
-  test('dir/* (single-level file glob) does not block traversal', () => {
+  test('dir/* blocks a directly matched child directory', () => {
     const result = filterConfigsByParentIgnores([
       cfg(P(), globalIgnore('vendor/*'), ruleEntry(['**/*.ts'], {})),
       cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
+  });
+
+  test('directory negations keep nested config traversal reachable', () => {
+    const result = filterConfigsByParentIgnores([
+      cfg(
+        P(),
+        globalIgnore('vendor/**/*', '!vendor/**/*/'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'drop'), ruleEntry(['**/*.ts'], {})),
+    ]);
     expect(dirs(result)).toContain(P('vendor', 'keep'));
+    expect(dirs(result)).toContain(P('vendor', 'drop'));
+  });
+
+  test('top-level negation re-includes a directory', () => {
+    const result = filterConfigsByParentIgnores([
+      cfg(P(), globalIgnore('*', '!vendor'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
+    ]);
+    expect(dirs(result)).toContain(P('vendor', 'keep'));
+    expect(dirs(result)).not.toContain(P('packages', 'app'));
   });
 
   // --- Mixed global + entry-level ignores in same config ---
@@ -587,6 +771,23 @@ describe('filterConfigsByParentIgnores', () => {
       cfg(P('vendor', 'lib') + '/', ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
+  });
+
+  test('trailing slash normalization preserves filesystem root', () => {
+    const root = path.parse(path.resolve('/')).root;
+    const child = path.join(root, 'rslint-root-child');
+    const result = filterConfigsByParentIgnores([
+      cfg(
+        root,
+        globalIgnore('rslint-root-child/**'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(child, ruleEntry(['**/*.ts'], {})),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(dirs(result)).toContain(root);
+    expect(dirs(result)).not.toContain(child);
   });
 
   // --- Cross-package ignore isolation ---
@@ -661,8 +862,7 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toContain(P('packages', 'lib'));
   });
 
-  test('uses real filesystem paths for symlink resolution', () => {
-    // Create actual temp dirs to test realpathSync
+  test('filters lexical child configs in ignored directories', () => {
     const tmp = createTempDir();
     const nestedDir = path.join(tmp, 'sub', 'nested');
     fs.mkdirSync(nestedDir, { recursive: true });
@@ -677,9 +877,42 @@ describe('filterConfigsByParentIgnores', () => {
       cleanup(tmp);
     }
   });
+
+  test('does not infer config ancestry through a directory symlink', () => {
+    const tmp = createTempDir();
+    const physicalRoot = path.join(tmp, 'physical');
+    const physicalChild = path.join(physicalRoot, 'child');
+    const aliasRoot = path.join(tmp, 'alias');
+    fs.mkdirSync(physicalChild, { recursive: true });
+    try {
+      fs.symlinkSync(
+        physicalRoot,
+        aliasRoot,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      const result = filterConfigsByParentIgnores([
+        cfg(aliasRoot, globalIgnore('child/**')),
+        cfg(physicalChild, ruleEntry(['**/*.ts'], {})),
+      ]);
+
+      expect(dirs(result)).toContain(aliasRoot);
+      expect(dirs(result)).toContain(physicalChild);
+    } finally {
+      cleanup(tmp);
+    }
+  });
 });
 
 describe('findJSConfig', () => {
+  test('keeps the full config filename priority order', () => {
+    expect(JS_CONFIG_FILES).toEqual([
+      'rslint.config.js',
+      'rslint.config.mjs',
+      'rslint.config.ts',
+      'rslint.config.mts',
+    ]);
+  });
+
   test('finds rslint.config.js in cwd', () => {
     const tmp = createTempDir();
     try {
@@ -701,10 +934,10 @@ describe('findJSConfig', () => {
     }
   });
 
-  test('prefers js over mjs over ts over mts', () => {
+  test('uses the automatic config filename priority', () => {
     const tmp = createTempDir();
     try {
-      // Create all four config files
+      // Create every automatically discoverable config variant.
       for (const name of JS_CONFIG_FILES) {
         fs.writeFileSync(path.join(tmp, name), 'export default []');
       }
@@ -754,6 +987,19 @@ describe('findJSConfig', () => {
       cleanup(tmp);
     }
   });
+
+  test.each(['cjs', 'cts'])(
+    'does not auto-discover .%s configs',
+    (extension) => {
+      const tmp = createTempDir();
+      try {
+        fs.writeFileSync(path.join(tmp, `rslint.config.${extension}`), '');
+        expect(findJSConfig(tmp)).toBe(null);
+      } finally {
+        cleanup(tmp);
+      }
+    },
+  );
 
   test('returns null for non-existent directory', () => {
     const result = findJSConfig('/tmp/definitely-does-not-exist-99999');
@@ -932,8 +1178,8 @@ describe('findJSConfigsInDir', () => {
       expect(result).toEqual(
         [
           path.join(tmp, 'rslint.config.js'),
-          path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
           path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
+          path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
         ].sort(),
       );
     } finally {
@@ -1020,16 +1266,33 @@ describe('findJSConfigsInDir', () => {
     }
   });
 
-  test('finds all config file types', async () => {
+  test('uses config file priority within the same directory', async () => {
     const tmp = createTempDir();
     try {
       for (const name of JS_CONFIG_FILES) {
         fs.writeFileSync(path.join(tmp, name), 'export default []');
       }
-      const result = (await findJSConfigsInDir(tmp)).sort();
-      expect(result).toEqual(
-        JS_CONFIG_FILES.map((name) => path.join(tmp, name)).sort(),
+      const result = await findJSConfigsInDir(tmp);
+      expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('does not follow symlinked directories', async () => {
+    const tmp = createTempDir();
+    const realDir = path.join(tmp, 'real');
+    const linkDir = path.join(tmp, 'link');
+    try {
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(
+        path.join(realDir, 'rslint.config.js'),
+        'export default []',
       );
+      fs.symlinkSync(realDir, linkDir, 'dir');
+
+      const result = await findJSConfigsInDir(tmp);
+      expect(result).toEqual([path.join(realDir, 'rslint.config.js')]);
     } finally {
       cleanup(tmp);
     }

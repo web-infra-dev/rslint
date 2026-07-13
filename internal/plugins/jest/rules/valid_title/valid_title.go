@@ -14,8 +14,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-const jsRegexOpts = regexp2.ECMAScript | regexp2.Unicode
-
 type matcherEntry struct {
 	re *regexp2.Regexp
 	// customText non-empty ⇒ use mustMatchCustom / mustNotMatchCustom
@@ -48,8 +46,8 @@ func firstOptionMap(options any) map[string]interface{} {
 	if options == nil {
 		return nil
 	}
-	arr, ok := options.([]interface{})
-	if !ok || len(arr) == 0 {
+	arr := rule.NormalizeOptions(options)
+	if len(arr) == 0 {
 		return nil
 	}
 	m, ok := arr[0].(map[string]interface{})
@@ -71,19 +69,11 @@ func boolFromMap(m map[string]interface{}, key string, def bool) bool {
 }
 
 func compileRE2(pat string) (*regexp2.Regexp, error) {
-	re, err := regexp2.Compile(pat, jsRegexOpts)
+	re, err := utils.CompileRegexp2(pat, utils.JSUnicodeRegexOptions)
 	if err != nil {
 		return nil, err
 	}
 	return re, nil
-}
-
-func matchRE2(re *regexp2.Regexp, s string) bool {
-	if re == nil {
-		return false
-	}
-	m, err := re.FindStringMatch(s)
-	return err == nil && m != nil
 }
 
 func compileMatcherPatterns(raw interface{}, optionPath string) (matchersByFn, []invalidPattern) {
@@ -390,7 +380,8 @@ func jestEmptyFunctionName(kind jestUtils.JestFnType) string {
 // ValidTitleRule enforces ESLint jest/valid-title.
 var ValidTitleRule = rule.Rule{
 	Name: "jest/valid-title",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		co := parseCompiledOptions(options)
 		if len(co.invalidPatterns) > 0 {
 			for _, bad := range co.invalidPatterns {
@@ -514,13 +505,13 @@ var ValidTitleRule = rule.Rule{
 
 				fnKey := trimFXPrefix(jestFn.Name)
 
-				if me := matcherFor(fnKey, co.mustNotMatch); matchRE2(me.re, title) {
+				if me := matcherFor(fnKey, co.mustNotMatch); utils.Regexp2MatchString(me.re, title) {
 					buildMustNotReport(ctx, arg, unprefixedName, me)
 					return
 				}
 
 				me := matcherFor(fnKey, co.mustMatch)
-				if me.re != nil && !matchRE2(me.re, title) {
+				if me.re != nil && !utils.Regexp2MatchString(me.re, title) {
 					buildMustMatchReport(ctx, arg, unprefixedName, me)
 				}
 			},

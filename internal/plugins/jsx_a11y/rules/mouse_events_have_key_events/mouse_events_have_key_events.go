@@ -140,7 +140,8 @@ func pairAttributeIsMissing(attrs []*ast.Node, pairName string) bool {
 
 var MouseEventsHaveKeyEventsRule = rule.Rule{
 	Name: "jsx-a11y/mouse-events-have-key-events",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node) {

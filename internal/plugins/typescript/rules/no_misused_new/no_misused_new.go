@@ -27,7 +27,7 @@ func check(node *ast.Node) bool {
 
 var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 	Name: "no-misused-new",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindMethodDeclaration: func(node *ast.Node) {
 				parentKind := node.Parent.Kind

@@ -45,7 +45,8 @@ type NoDuplicateTypeConstituentsOptions struct {
 var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-duplicate-type-constituents",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoDuplicateTypeConstituentsOptions)
 		if !ok {
 			opts = NoDuplicateTypeConstituentsOptions{

@@ -1,0 +1,358 @@
+// Rstest Snapshot v1
+
+exports[`no-unassigned-vars > invalid 1`] = `
+{
+  "code": "let status; if (status === "ready") { console.log("Ready!"); }",
+  "diagnostics": [
+    {
+      "message": "'status' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 2`] = `
+{
+  "code": "let value: number | undefined; console.log(value);",
+  "diagnostics": [
+    {
+      "message": "'value' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 3`] = `
+{
+  "code": "let x; let a = x, b; log(x, a, b);",
+  "diagnostics": [
+    {
+      "message": "'x' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+    {
+      "message": "'b' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 4`] = `
+{
+  "code": "const foo = (two) => { let one; if (one === two) {} }",
+  "diagnostics": [
+    {
+      "message": "'one' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 5`] = `
+{
+  "code": "let user; greet(user);",
+  "diagnostics": [
+    {
+      "message": "'user' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 6`] = `
+{
+  "code": "function test() { let error; return error || 'Unknown error'; }",
+  "diagnostics": [
+    {
+      "message": "'error' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 7`] = `
+{
+  "code": "let options; const { debug } = options || {};",
+  "diagnostics": [
+    {
+      "message": "'options' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 8`] = `
+{
+  "code": "let flag; while (!flag) { }",
+  "diagnostics": [
+    {
+      "message": "'flag' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 9`] = `
+{
+  "code": "let config; function init() { return config?.enabled; }",
+  "diagnostics": [
+    {
+      "message": "'config' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 10`] = `
+{
+  "code": "let x: number; log(x);",
+  "diagnostics": [
+    {
+      "message": "'x' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 11`] = `
+{
+  "code": "let x: number | undefined; log(x);",
+  "diagnostics": [
+    {
+      "message": "'x' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 12`] = `
+{
+  "code": "const foo = (two: string): void => { let one: string | undefined; if (one === two) {} }",
+  "diagnostics": [
+    {
+      "message": "'one' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unassigned-vars > invalid 13`] = `
+{
+  "code": "declare module 'module' {
+  let x: string;
+}
+let y: string;
+console.log(y);",
+  "diagnostics": [
+    {
+      "message": "'y' is always 'undefined' because it's never assigned.",
+      "messageId": "unassigned",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-unassigned-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

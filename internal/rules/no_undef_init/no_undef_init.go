@@ -13,7 +13,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-undef-init
 var NoUndefInitRule = rule.Rule{
 	Name: "no-undef-init",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				varDecl := node.AsVariableDeclaration()

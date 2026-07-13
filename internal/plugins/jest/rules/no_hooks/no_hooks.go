@@ -50,8 +50,8 @@ func parseOptions(options any) Options {
 		return opts
 	}
 
-	optArray, isArray := options.([]interface{})
-	if !isArray || len(optArray) == 0 {
+	optArray := rule.NormalizeOptions(options)
+	if len(optArray) == 0 {
 		return opts
 	}
 	optsMap, ok := optArray[0].(map[string]interface{})
@@ -67,7 +67,8 @@ func parseOptions(options any) Options {
 
 var NoHooksRule = rule.Rule{
 	Name: "jest/no-hooks",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

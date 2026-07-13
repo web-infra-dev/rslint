@@ -86,7 +86,8 @@ type stackEntry struct {
 	usesThis  bool
 }
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.LegacyUnwrapOptions(_options)
 	opts := parseOptions(options)
 	var stack *stackEntry
 
@@ -479,7 +480,7 @@ func classFieldFunctionDisplayName(field, node *ast.Node) string {
 		tokens = append(tokens, "generator")
 	}
 	tokens = append(tokens, "method")
-	if name := propertyDisplayName(keyNode); name != "" {
+	if name := utils.GetPropertyDisplayName(keyNode); name != "" {
 		tokens = append(tokens, fmt.Sprintf("'%s'", name))
 	}
 	return strings.Join(tokens, " ")
@@ -594,24 +595,4 @@ func firstOpenParenPos(sf *ast.SourceFile, start, end int) int {
 		s.Scan()
 	}
 	return -1
-}
-
-// propertyDisplayName resolves a property-name node to the string ESLint
-// would emit inside single quotes (or empty when the key is not statically
-// resolvable). Mirrors `GetStaticPropertyName` but also retains the leading
-// `#` of a PrivateIdentifier.
-func propertyDisplayName(name *ast.Node) string {
-	if name == nil {
-		return ""
-	}
-	if name.Kind == ast.KindIdentifier {
-		return name.AsIdentifier().Text
-	}
-	if name.Kind == ast.KindPrivateIdentifier {
-		return name.AsPrivateIdentifier().Text
-	}
-	if s, ok := utils.GetStaticPropertyName(name); ok {
-		return s
-	}
-	return ""
 }

@@ -11,7 +11,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-script-url
 var NoScriptUrlRule = rule.Rule{
 	Name: "no-script-url",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		const jsScheme = "javascript:"
 
 		check := func(node *ast.Node) {

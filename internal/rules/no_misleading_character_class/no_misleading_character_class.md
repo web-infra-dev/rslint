@@ -56,11 +56,12 @@ new RegExp("[\\uD83D\\uDC4D]");  // surrogate pair in string literal
 ## Differences from ESLint
 
 - The scope of recognition for the `RegExp(...)` constructor is limited to
-  calls whose first argument is directly a string literal, template literal
-  (no-substitution) or regex literal, or where the callee is `RegExp` /
-  `globalThis.RegExp` / `window.RegExp` / `self.RegExp` / `global.RegExp`.
-  Patterns constructed through variables, spread arguments, or dynamic
-  expressions are not evaluated.
+  calls where the callee is a recognized global `RegExp` constructor and the
+  pattern or flags are statically known strings. Spread arguments and
+  unresolved runtime expressions are ignored.
+- When a regex literal is passed to `RegExp(...)` with an unresolved second
+  flags argument, rslint does not report on the literal because the runtime
+  flags may override the literal's own flags.
 - Suggestions to add the `u` flag use a simplified heuristic to decide
   whether the pattern remains valid under the flag. Patterns with identity
   escapes on letters (e.g. `/[👍]\a/`) are correctly detected as unfixable;

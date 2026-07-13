@@ -41,7 +41,7 @@ const dangerWithChildrenMessage = "Only set one of `children` or `props.dangerou
 
 var NoDangerWithChildrenRule = rule.Rule{
 	Name: "react/no-danger-with-children",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// resolveObjectLiteralInit walks an Identifier back to its
 		// VariableDeclaration via the TypeChecker and returns the initializer
 		// when it is an object literal. Mirrors upstream's

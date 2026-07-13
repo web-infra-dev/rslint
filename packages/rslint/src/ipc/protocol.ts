@@ -19,7 +19,6 @@
 export type MessageKind =
   // ── shared infrastructure (also consumed by `--api` mode for wasm/rslint-api) ──
   | 'lint'
-  | 'applyFixes'
   | 'getAstInfo'
   | 'response'
   | 'error'

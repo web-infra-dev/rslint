@@ -23,7 +23,8 @@ import (
 // Upstream base rule: eslint/lib/rules/init-declarations.js
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 	Name: "init-declarations",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -99,19 +100,7 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts ini
 		return
 	}
 
-	// Skip `declare const|let|var ...;` (the modifier lives on the wrapping
-	// VariableStatement, not the DeclarationList).
-	if parent.Kind == ast.KindVariableStatement &&
-		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAmbient) {
-		return
-	}
-
-	// Skip declarations contained in any ambient ModuleDeclaration ancestor
-	// (`declare namespace`, `declare module 'm'`, `declare global`). Upstream
-	// tracks this via TSModuleDeclaration enter/exit state; the ancestor walk
-	// is equivalent because `declare` propagates downward through nested
-	// non-declare namespaces in TS scoping.
-	if hasAmbientModuleAncestor(node) {
+	if utils.IsInAmbientContext(node) {
 		return
 	}
 
@@ -202,16 +191,4 @@ func isForLoopParent(parent *ast.Node) bool {
 		return true
 	}
 	return false
-}
-
-// hasAmbientModuleAncestor walks ancestor ModuleDeclarations looking for one
-// with a `declare` modifier. Equivalent to upstream's stateful
-// TSModuleDeclaration enter/exit tracking — `declare` propagates downward
-// through nested non-declare namespaces in TS scoping, so an ancestor walk
-// matches the same set of bindings.
-func hasAmbientModuleAncestor(node *ast.Node) bool {
-	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-		return n.Kind == ast.KindModuleDeclaration &&
-			ast.HasSyntacticModifier(n, ast.ModifierFlagsAmbient)
-	}) != nil
 }

@@ -3,7 +3,6 @@ package no_useless_constructor
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -181,16 +180,10 @@ func reportRange(ctx rule.RuleContext, node *ast.Node, constructor *ast.Construc
 		if p > start && text[p-1] == '(' {
 			p--
 		}
-		for p > start && isAsciiSpace(text[p-1]) {
-			p--
-		}
+		p = utils.SkipTrailingWhitespace(text, start, p)
 		end = p
 	}
 	return core.NewTextRange(start, end)
-}
-
-func isAsciiSpace(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
 // needsLeadingSemicolon reports whether removing `node` outright would cause
@@ -207,61 +200,22 @@ func isAsciiSpace(b byte) bool {
 // or a stray `;` (SemicolonClassElement) all shift the first token away from
 // `[` and therefore are safe.
 func needsLeadingSemicolon(sf *ast.SourceFile, classNode *ast.Node, node *ast.Node) bool {
-	text := sf.Text()
-	nextTokPos := scanner.SkipTrivia(text, node.End())
-	if nextTokPos >= len(text) || text[nextTokPos] != '[' {
+	nextToken, ok := utils.TokenAtOrAfter(sf, node.End())
+	if !ok || nextToken.Kind != ast.KindOpenBracketToken {
 		return false
 	}
-	members := classNode.Members()
-	idx := -1
-	for i, m := range members {
-		if m == node {
-			idx = i
-			break
-		}
-	}
-	if idx <= 0 {
-		return false
-	}
-	prev := members[idx-1]
-	// Only a PropertyDeclaration's initializer can greedily consume the next
-	// `[...]`. Method / accessor / constructor / static-block / index-signature
-	// all terminate at their own boundary, so the class body parser resumes
-	// cleanly for the next member regardless of the final character.
-	if !ast.IsPropertyDeclaration(prev) {
-		return false
-	}
-	i := prev.End() - 1
-	for i > prev.Pos() && isAsciiSpace(text[i]) {
-		i--
-	}
-	if text[i] == ';' {
-		return false
-	}
-	pd := prev.AsPropertyDeclaration()
-	if pd != nil && pd.Initializer != nil {
-		init := pd.Initializer
-		// Postfix `++`/`--` are restricted productions — ASI always fires
-		// after them. Mirrors ESLint's PUNCTUATORS allowlist.
-		if init.Kind == ast.KindPostfixUnaryExpression {
-			return false
-		}
-		// Arrow functions with a block body terminate at their own `}`, so
-		// the following `[...]` cannot member-access into them. Mirrors
-		// ESLint's needsPrecedingSemicolon (the `}` → ObjectExpression /
-		// function-expr / class-expr branches explicitly exclude arrows).
-		if init.Kind == ast.KindArrowFunction {
-			if arrow := init.AsArrowFunction(); arrow != nil && arrow.Body != nil && arrow.Body.Kind == ast.KindBlock {
-				return false
-			}
-		}
-	}
-	return true
+	return utils.NeedsClassMemberLeadingSemicolon(
+		sf,
+		classNode,
+		node,
+		nextToken,
+		utils.ClassMemberLeadingSemicolonOptions{IncludePropertiesWithoutInitializers: true},
+	)
 }
 
 var NoUselessConstructorRule = rule.Rule{
 	Name: "no-useless-constructor",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {
 				constructor := node.AsConstructorDeclaration()

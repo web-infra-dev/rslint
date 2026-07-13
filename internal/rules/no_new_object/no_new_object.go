@@ -8,7 +8,7 @@ import (
 
 var NoNewObjectRule = rule.Rule{
 	Name: "no-new-object",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				callee := node.Expression()

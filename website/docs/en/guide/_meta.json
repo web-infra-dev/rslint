@@ -31,6 +31,11 @@
   },
   {
     "type": "file",
+    "name": "js-api",
+    "label": "JavaScript API"
+  },
+  {
+    "type": "file",
     "name": "output-formats",
     "label": "Output Formats"
   },

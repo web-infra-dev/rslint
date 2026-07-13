@@ -134,12 +134,14 @@ func isRethrownError(ctx rule.RuleContext, expr *ast.Node) bool {
 var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 	Name:             "only-throw-error",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(OnlyThrowErrorOptions)
 		if !ok {
 			opts = OnlyThrowErrorOptions{}
-			// When options come from JSON (API/TS tests), they arrive as []interface{}
-			if optionsArray, arrayOk := options.([]interface{}); arrayOk && len(optionsArray) > 0 {
+			// When options come from JSON (API/TS tests), they arrive as []interface{};
+			// NormalizeOptions also re-wraps config.rules' unwrapped single option.
+			if optionsArray := rule.NormalizeOptions(options); len(optionsArray) > 0 {
 				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
 					json.Unmarshal(optsJSON, &opts)
 				}

@@ -47,7 +47,7 @@ type filterExpressionData struct {
 var PreferFindRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-find",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

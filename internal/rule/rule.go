@@ -59,6 +59,47 @@ func ParseSeverity(level string) DiagnosticSeverity {
 	}
 }
 
+// NormalizeOptions returns a rule's options in ESLint context.options form
+// ([]any). config.parseArrayRuleConfig never collapses RuleConfig.Options, but
+// LegacyUnwrapOptions (the compatibility shim for pre-migration `parseOptions
+// any` bodies) does — a rule that round-trips through it and then wants the
+// eslint-format array back (e.g. reads optArray[0]) would silently miss a
+// single-option config otherwise. Re-wrapping a bare value lets every caller
+// read options[0] uniformly, whether the option arrived wrapped (multi-option
+// or an explicit array) or unwrapped (a single option).
+//
+// It returns an empty (non-nil) slice when no options were configured, so both
+// native rules (which key on `len == 0 → defaults`) and the eslint-plugin host
+// (which serializes context.options to JSON and needs `[]`, not `null`) share a
+// single normalization path.
+func NormalizeOptions(raw any) []any {
+	if raw == nil {
+		return []any{}
+	}
+	if arr, ok := raw.([]interface{}); ok {
+		return arr
+	}
+	return []any{raw}
+}
+
+// LegacyUnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
+// array (Run's []any parameter — ESLint's context.options, the config array
+// after the severity level) back to the single bare value most existing rule
+// implementations parse. Empty → nil; a single element → that element;
+// otherwise the slice itself. This is the compatibility shim old
+// `parseOptions(options any)` bodies call so they don't need to change beyond
+// their Run signature.
+func LegacyUnwrapOptions(options []any) any {
+	switch len(options) {
+	case 0:
+		return nil
+	case 1:
+		return options[0]
+	default:
+		return options
+	}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000
@@ -90,7 +131,7 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	Run                func(ctx RuleContext, options any) RuleListeners
+	Run                func(ctx RuleContext, options []any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
@@ -188,8 +229,23 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 }
 
 type RuleContext struct {
-	SourceFile                 *ast.SourceFile
-	Settings                   map[string]interface{}
+	SourceFile *ast.SourceFile
+	Settings   map[string]interface{}
+	// ConfigGlobals contains only globals from the effective
+	// `languageOptions.globals` configuration, before inline comments are
+	// applied. A false value is an explicit "off" setting.
+	ConfigGlobals map[string]bool
+	// InlineGlobals contains `/* global */` declaration metadata in first-name
+	// source order. Rules can use its exact name ranges without scanning source
+	// text again. Treat the slice and its nested ranges as read-only.
+	InlineGlobals []InlineGlobal
+	// Globals is the fully resolved set of declared global names for this
+	// file — config `languageOptions.globals` merged with inline
+	// `/* global */` comments, computed once per file by the linter (see
+	// DisableManager, built the same way). Rules should read this instead of
+	// parsing comments or config themselves. Nil only when neither source
+	// mentions any globals; a name maps to false when its final setting is "off".
+	Globals                    map[string]bool
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager

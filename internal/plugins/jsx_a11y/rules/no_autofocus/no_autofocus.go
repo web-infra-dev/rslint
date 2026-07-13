@@ -56,7 +56,8 @@ func parseOptions(raw any) options {
 
 var NoAutofocusRule = rule.Rule{
 	Name: "jsx-a11y/no-autofocus",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

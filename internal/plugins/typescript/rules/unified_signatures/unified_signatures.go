@@ -12,7 +12,8 @@ type UnifiedSignaturesOptions struct {
 
 var UnifiedSignaturesRule = rule.CreateRule(rule.Rule{
 	Name: "unified-signatures",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := UnifiedSignaturesOptions{
 			IgnoreDifferentlyNamedParameters:  false,
 			IgnoreOverloadsWithDifferentJSDoc: false,

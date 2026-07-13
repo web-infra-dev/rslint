@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -95,6 +97,23 @@ func TestMergePluginDiagnostics_MergesAndPublishes(t *testing.T) {
 	// plugin `1` at bytes [21,22] → line 1, char [13,14] (é is 2 bytes / 1 UTF-16 unit).
 	if r := params.Diagnostics[1].Range; r.Start.Line != 1 || r.Start.Character != 13 || r.End.Line != 1 || r.End.Character != 14 {
 		t.Errorf("plugin range = L%dC%d..L%dC%d, want L1C13..L1C14", r.Start.Line, r.Start.Character, r.End.Line, r.End.Character)
+	}
+}
+
+func TestPluginDispatchForGeneration_StampsRequest(t *testing.T) {
+	s := newTestServer()
+	var received string
+	s.eslintPluginDispatch = func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		received = req.Generation
+		return &linter.EslintPluginLintResult{}, nil
+	}
+
+	_, err := s.pluginDispatchForGeneration("config-12")(context.Background(), linter.EslintPluginLintRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if received != "config-12" {
+		t.Fatalf("request generation = %q, want config-12", received)
 	}
 }
 
@@ -262,6 +281,156 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 	}
 }
 
+func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tplfiles", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tplfiles"},
+			Rules:   config.Rules{"tplfiles/no-foo": "error"},
+		},
+	}
+	s.documents["file:///proj/matched.ts"] = "foo();"
+	s.documents["file:///proj/outside.js"] = "foo();"
+
+	if in, ok := s.buildPluginFileInput("file:///proj/matched.ts", nil); !ok {
+		t.Fatal("expected matching TS file to produce plugin input")
+	} else if len(in.Rules) != 1 || in.Rules[0].Name != "tplfiles/no-foo" {
+		t.Fatalf("expected tplfiles/no-foo for matching file, got %+v", in.Rules)
+	}
+
+	if in, ok := s.buildPluginFileInput("file:///proj/outside.js", nil); ok {
+		t.Fatalf("files-scope miss must not dispatch plugin lint, got input %+v", in)
+	}
+}
+
+func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpgitignore", RuleNames: []string{"no-foo"}},
+	})
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.ts")
+	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignored.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	s.jsonConfig = config.RslintConfig{{
+		Plugins: []string{"tpgitignore"},
+		Rules:   config.Rules{"tpgitignore/no-foo": "error"},
+	}}
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "foo();\n"
+	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+		t.Fatalf("gitignored file produced plugin input %+v", input)
+	}
+}
+
+func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpsnapshot", RuleNames: []string{"no-foo"}},
+	})
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	s.jsonConfig = config.RslintConfig{{
+		Plugins: []string{"tpsnapshot"},
+		Rules:   config.Rules{"tpsnapshot/no-foo": "error"},
+	}}
+	uri := documentURIFromPath(target)
+	s.documents[uri] = "foo();\n"
+
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configCwd, isJSConfig); !ok {
+		t.Fatal("captured effective config changed after .gitignore update")
+	} else if len(input.Rules) != 1 || input.Rules[0].Name != "tpsnapshot/no-foo" {
+		t.Fatalf("captured effective config produced unexpected input: %+v", input)
+	}
+	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+		t.Fatalf("fresh effective config did not observe .gitignore update: %+v", input)
+	}
+}
+
+func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{{
+		Plugins: []string{"tplexcluded"},
+		Rules:   config.Rules{"tplexcluded/no-foo": "error"},
+	}}
+
+	for _, uri := range []lsproto.DocumentUri{
+		"file:///proj/node_modules/pkg/index.ts",
+		"file:///proj/.git/hooks/pre-commit.ts",
+	} {
+		s.documents[uri] = "foo();"
+		if input, ok := s.buildPluginFileInput(uri, nil); ok {
+			t.Fatalf("default-excluded file %q produced plugin input %+v", uri, input)
+		}
+	}
+}
+
+func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tprootcfg", RuleNames: []string{"no-root"}},
+		{Prefix: "tpnestedcfg", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///Users/John%20Doe/my%20project"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tprootcfg"},
+			Rules:   config.Rules{"tprootcfg/no-root": "error"},
+		},
+	}
+	s.jsConfigs["file:///Users/John%20Doe/my%20project/packages/foo"] = config.RslintConfig{
+		{
+			Files:   []string{"src/**/*.ts"},
+			Plugins: []string{"tpnestedcfg"},
+			Rules:   config.Rules{"tpnestedcfg/no-foo": "error"},
+		},
+	}
+	uri := lsproto.DocumentUri("file:///Users/John%20Doe/my%20project/packages/foo/src/index.ts")
+	s.documents[uri] = "foo();"
+
+	in, ok := s.buildPluginFileInput(uri, nil)
+	if !ok {
+		t.Fatal("expected nested encoded config to produce plugin input")
+	}
+	if in.ConfigKey != "file:///Users/John%20Doe/my%20project/packages/foo" {
+		t.Fatalf("configKey = %q, want encoded nested config URI", in.ConfigKey)
+	}
+	if in.Path != "/Users/John Doe/my project/packages/foo/src/index.ts" {
+		t.Fatalf("path = %q, want decoded filesystem path", in.Path)
+	}
+	if len(in.Rules) != 1 || in.Rules[0].Name != "tpnestedcfg/no-foo" {
+		t.Fatalf("expected only the nested plugin rule, got %+v", in.Rules)
+	}
+}
+
 // TestLintPluginRulesSync_RebuildsWithFixes verifies the synchronous fixAll
 // helper turns a mocked worker result into a RuleDiagnostic carrying the fix
 // (so ApplyRuleFixes can apply it) with the configured severity reattached.
@@ -373,22 +542,23 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Injected native lint: fix the first "1" → "2" wherever it appears. Returns
 	// no fix once the digit is gone (so the loop converges).
 	var nativePasses int
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) ([]rule.RuleDiagnostic, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
 		nativePasses++
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return nil, nil
+			return lintPassResult{}, nil
 		}
-		return []rule.RuleDiagnostic{{
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
 			Range:      core.NewTextRange(idx, idx+1),
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}, nil
+		}}}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, original, config.RslintConfig{}, "", true, nil)
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -429,22 +599,23 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		return nil, ctx.Err()
 	}
 	// Injected native lint: fix the first "1" → "2", nothing once it is gone.
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) ([]rule.RuleDiagnostic, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return nil, nil
+			return lintPassResult{}, nil
 		}
-		return []rule.RuleDiagnostic{{
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
 			Range:      core.NewTextRange(idx, idx+1),
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}, nil
+		}}}, nil
 	}
 
 	start := time.Now()
-	got := s.computeFixAllContent(context.Background(), uri, original, config.RslintConfig{}, "", true, nil)
+	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped
@@ -463,6 +634,30 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	// reverse request to the client per remaining pass.
 	if dispatchCalls != 1 {
 		t.Errorf("expected exactly 1 plugin dispatch (pass 0; later passes skip on expiry), got %d", dispatchCalls)
+	}
+}
+
+func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	const malformed = "const value = ;"
+	s.documents[uri] = malformed
+
+	pluginCalls := 0
+	s.eslintPluginDispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		pluginCalls++
+		return &linter.EslintPluginLintResult{}, nil
+	}
+	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, []string) (lintPassResult, error) {
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
+	}
+
+	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil)
+	if got != malformed {
+		t.Fatalf("syntax-error fixAll changed content to %q", got)
+	}
+	if pluginCalls != 0 {
+		t.Fatalf("syntax-error fixAll dispatched %d plugin passes, want 0", pluginCalls)
 	}
 }
 
@@ -778,8 +973,8 @@ func TestSendCancelRequest_QueuesCancelNotification(t *testing.T) {
 // TestDispatchPluginLint_SupersedeCancelsPrior pins the full supersede path: a
 // newer keystroke's dispatch cancels the prior in-flight one Go-side AND sends
 // the client a $/cancelRequest for its reverse-request id (so the Node worker
-// stops instead of running to completion). Uses the real sendRequest path so the
-// id sink + reqID registration are exercised end to end.
+// stops instead of running to completion). Uses the real sendRequest path so
+// automatic context-to-$/cancelRequest forwarding is exercised end to end.
 func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tpsup", RuleNames: []string{"no-bar"}},
@@ -795,27 +990,18 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
 
-	// First dispatch: real sendRequest mints an id, fills reqID via the sink,
-	// then blocks on a response that never comes.
+	// First dispatch queues a reverse request, then blocks on a response that
+	// never comes.
 	s.dispatchPluginLint(uri, 1)
 
 	var firstID *jsonrpc.ID
-	deadline := time.Now().Add(2 * time.Second)
-	for firstID == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("first dispatch never registered its reverse-request id")
-		}
-		s.inflightPluginDispatchMu.Lock()
-		if h := s.inflightPluginDispatch[uri]; h != nil {
-			firstID = h.reqID
-		}
-		s.inflightPluginDispatchMu.Unlock()
-		time.Sleep(2 * time.Millisecond)
-	}
-
-	// Drain the first rslint/pluginLint request off the queue.
 	select {
-	case <-queue:
+	case msg := <-queue:
+		request := msg.AsRequest()
+		if request.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", request.Method, methodPluginLint)
+		}
+		firstID = request.ID
 	case <-time.After(time.Second):
 		t.Fatal("first reverse request was not sent")
 	}
@@ -843,6 +1029,69 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	}
 }
 
+func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpfilescancel", RuleNames: []string{"no-bar"}},
+	})
+	s, queue := newTestServerWithQueue()
+	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
+	s.backgroundCtx = context.Background()
+	s.pluginReverseTimeout = 500 * time.Millisecond
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{Plugins: []string{"tpfilescancel"}, Rules: config.Rules{"tpfilescancel/no-bar": "error"}},
+	}
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 1
+
+	s.dispatchPluginLint(uri, 1)
+
+	var firstID *jsonrpc.ID
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", req.Method, methodPluginLint)
+		}
+		firstID = req.ID
+	case <-time.After(time.Second):
+		t.Fatal("first reverse request was not sent")
+	}
+
+	// Reconfigure the same open TS file out of the plugin entry's files scope.
+	// The next dispatch has no plugin work, but it still must cancel the stale
+	// in-flight worker from the previous generation.
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.js"},
+			Plugins: []string{"tpfilescancel"},
+			Rules:   config.Rules{"tpfilescancel/no-bar": "error"},
+		},
+	}
+	s.docGeneration[uri] = 2
+	s.dispatchPluginLint(uri, 2)
+
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != lsproto.MethodCancelRequest {
+			t.Fatalf("files-miss dispatch queued %q, want only %q", req.Method, lsproto.MethodCancelRequest)
+		}
+		cp, ok := req.Params.(*lsproto.CancelParams)
+		if !ok || cp.Id.String == nil || *cp.Id.String != firstID.String() {
+			t.Fatalf("cancel targeted %+v, want the prior id %s", req.Params, firstID.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("files-miss dispatch did not cancel the prior reverse request")
+	}
+
+	select {
+	case msg := <-queue:
+		t.Fatalf("files-miss dispatch must not send a new pluginLint request, got %q", msg.AsRequest().Method)
+	default:
+	}
+}
+
 // TestHandleDidClose_CancelsInflightDispatch pins that closing a document with
 // an in-flight plugin dispatch cancels it (Go-side + $/cancelRequest) — the
 // close path has no superseding keystroke to do it.
@@ -864,19 +1113,16 @@ func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
 	s.dispatchPluginLint(uri, 1)
 
 	var firstID *jsonrpc.ID
-	deadline := time.Now().Add(2 * time.Second)
-	for firstID == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("dispatch never registered its reverse-request id")
+	select {
+	case msg := <-queue:
+		request := msg.AsRequest()
+		if request.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", request.Method, methodPluginLint)
 		}
-		s.inflightPluginDispatchMu.Lock()
-		if h := s.inflightPluginDispatch[uri]; h != nil {
-			firstID = h.reqID
-		}
-		s.inflightPluginDispatchMu.Unlock()
-		time.Sleep(2 * time.Millisecond)
+		firstID = request.ID
+	case <-time.After(time.Second):
+		t.Fatal("plugin lint request was not sent")
 	}
-	<-queue // drain the rslint/pluginLint request
 
 	if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},

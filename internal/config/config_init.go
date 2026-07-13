@@ -45,25 +45,25 @@ export default defineConfig([
 
 // jsRecommendedRules contains all rules in js.configs.recommended with their severities.
 var jsRecommendedRules = map[string]string{
-	"constructor-super":            "error",
-	"for-direction":                "error",
-	"getter-return":                "error",
-	"no-async-promise-executor":    "error",
-	"no-case-declarations":         "error",
-	"no-class-assign":              "error",
-	"no-compare-neg-zero":          "error",
-	"no-cond-assign":               "error",
-	"no-const-assign":              "error",
+	"constructor-super":             "error",
+	"for-direction":                 "error",
+	"getter-return":                 "error",
+	"no-async-promise-executor":     "error",
+	"no-case-declarations":          "error",
+	"no-class-assign":               "error",
+	"no-compare-neg-zero":           "error",
+	"no-cond-assign":                "error",
+	"no-const-assign":               "error",
 	"no-constant-binary-expression": "error",
-	"no-constant-condition":        "error",
-	"no-debugger":                  "error",
-	"no-dupe-args":                 "error",
-	"no-dupe-keys":                 "error",
-	"no-duplicate-case":            "error",
-	"no-empty":                     "error",
-	"no-empty-pattern":             "error",
-	"no-loss-of-precision":         "error",
-	"no-sparse-arrays":             "error",
+	"no-constant-condition":         "error",
+	"no-debugger":                   "error",
+	"no-dupe-args":                  "error",
+	"no-dupe-keys":                  "error",
+	"no-duplicate-case":             "error",
+	"no-empty":                      "error",
+	"no-empty-pattern":              "error",
+	"no-loss-of-precision":          "error",
+	"no-sparse-arrays":              "error",
 }
 
 // tsRecommendedRules contains all rules in ts.configs.recommended with their severities.
@@ -79,42 +79,42 @@ var tsRecommendedRules = map[string]string{
 	"no-array-constructor": "off",
 	"no-unused-vars":       "off",
 	// Core rules kept
-	"for-direction":                "error",
-	"no-async-promise-executor":    "error",
-	"no-case-declarations":         "error",
-	"no-compare-neg-zero":          "error",
-	"no-cond-assign":               "error",
+	"for-direction":                 "error",
+	"no-async-promise-executor":     "error",
+	"no-case-declarations":          "error",
+	"no-compare-neg-zero":           "error",
+	"no-cond-assign":                "error",
 	"no-constant-binary-expression": "error",
-	"no-constant-condition":        "error",
-	"no-debugger":                  "error",
-	"no-duplicate-case":            "error",
-	"no-empty":                     "error",
-	"no-empty-pattern":             "error",
-	"no-loss-of-precision":         "error",
-	"no-sparse-arrays":             "error",
+	"no-constant-condition":         "error",
+	"no-debugger":                   "error",
+	"no-duplicate-case":             "error",
+	"no-empty":                      "error",
+	"no-empty-pattern":              "error",
+	"no-loss-of-precision":          "error",
+	"no-sparse-arrays":              "error",
 	// TypeScript plugin rules
-	"@typescript-eslint/ban-ts-comment":                  "error",
-	"@typescript-eslint/no-array-constructor":             "error",
-	"@typescript-eslint/no-duplicate-enum-values":         "error",
-	"@typescript-eslint/no-explicit-any":                  "error",
-	"@typescript-eslint/no-extra-non-null-assertion":      "error",
-	"@typescript-eslint/no-misused-new":                   "error",
-	"@typescript-eslint/no-namespace":                     "error",
+	"@typescript-eslint/ban-ts-comment":                      "error",
+	"@typescript-eslint/no-array-constructor":                "error",
+	"@typescript-eslint/no-duplicate-enum-values":            "error",
+	"@typescript-eslint/no-explicit-any":                     "error",
+	"@typescript-eslint/no-extra-non-null-assertion":         "error",
+	"@typescript-eslint/no-misused-new":                      "error",
+	"@typescript-eslint/no-namespace":                        "error",
 	"@typescript-eslint/no-non-null-asserted-optional-chain": "error",
-	"@typescript-eslint/no-require-imports":               "error",
-	"@typescript-eslint/no-this-alias":                    "error",
-	"@typescript-eslint/no-unused-vars":                   "error",
-	"@typescript-eslint/prefer-as-const":                  "error",
-	"@typescript-eslint/prefer-namespace-keyword":         "error",
-	"@typescript-eslint/triple-slash-reference":           "error",
+	"@typescript-eslint/no-require-imports":                  "error",
+	"@typescript-eslint/no-this-alias":                       "error",
+	"@typescript-eslint/no-unused-vars":                      "error",
+	"@typescript-eslint/prefer-as-const":                     "error",
+	"@typescript-eslint/prefer-namespace-keyword":            "error",
+	"@typescript-eslint/triple-slash-reference":              "error",
 }
 
 // reactRecommendedRules contains all rules in reactPlugin.configs.recommended with their severities.
 var reactRecommendedRules = map[string]string{
-	"react/jsx-uses-react":    "error",
-	"react/jsx-uses-vars":     "error",
+	"react/jsx-uses-react":     "error",
+	"react/jsx-uses-vars":      "error",
 	"react/react-in-jsx-scope": "error",
-	"react/no-unsafe":         "off",
+	"react/no-unsafe":          "off",
 }
 
 // importRecommendedRules is empty — all import plugin recommended rules are not yet implemented.
@@ -136,14 +136,14 @@ func isESMPackage(directory string) bool {
 }
 
 // InitDefaultConfig initializes a default config file in the directory.
-//   - JS/TS config already exists → error
+//   - Automatically discoverable JS/TS config exists → error
 //   - Only JSON/JSONC config exists → migrate to JS/TS config and delete JSON
-//   - Nothing exists → create default JS/TS config
+//   - Otherwise → create a default discoverable JS/TS config
 func InitDefaultConfig(directory string) error {
-	// Check if JS/TS config already exists
+	// Check if an automatically discoverable JS/TS config already exists.
 	existingConfigs := []string{
-		"rslint.config.ts", "rslint.config.mts",
 		"rslint.config.js", "rslint.config.mjs",
+		"rslint.config.ts", "rslint.config.mts",
 	}
 	for _, name := range existingConfigs {
 		p := filepath.Join(directory, name)
@@ -201,10 +201,14 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 		return fmt.Errorf("failed to read %s: %w", jsonFileName, err)
 	}
 
-	var entries RslintConfig
-	if err := utils.ParseJSONC(data, &entries); err != nil {
+	// Migration accepts legacy JSON configs that the lint-time loader now
+	// rejects, such as explicit `files: []`, and drops unsupported/empty
+	// fields while generating the JS/TS config below.
+	legacyEntries, err := parseLegacyConfigEntries(data)
+	if err != nil {
 		return fmt.Errorf("failed to parse %s: %w", jsonFileName, err)
 	}
+	entries := RslintConfig(legacyEntries)
 
 	if len(entries) == 0 {
 		return fmt.Errorf("%s is empty", jsonFileName)
@@ -270,6 +274,36 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 
 	fmt.Printf("Migrated %s → %s\n", jsonFileName, configName)
 	return nil
+}
+
+func parseLegacyConfigEntries(data []byte) ([]ConfigEntry, error) {
+	var rawEntries []json.RawMessage
+	if err := utils.ParseJSONC(data, &rawEntries); err != nil {
+		return nil, err
+	}
+	entries := make([]ConfigEntry, 0, len(rawEntries))
+	for _, rawEntry := range rawEntries {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(rawEntry, &object); err != nil {
+			return nil, err
+		}
+		if rawFiles, ok := object["files"]; ok {
+			var selectors []json.RawMessage
+			if err := json.Unmarshal(rawFiles, &selectors); err == nil && len(selectors) == 0 {
+				delete(object, "files")
+			}
+		}
+		cleaned, err := json.Marshal(object)
+		if err != nil {
+			return nil, err
+		}
+		var entry ConfigEntry
+		if err := json.Unmarshal(cleaned, &entry); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
 
 // extractGlobalIgnores checks if there is exactly one non-global-ignore entry
@@ -438,7 +472,7 @@ func deduplicateRules(userRules Rules, presetRules map[string]string) Rules {
 			remaining[name] = value
 			continue
 		}
-			userSeverity := extractSeverity(value)
+		userSeverity := extractSeverity(value)
 		if userSeverity == "" {
 			// Array form (e.g., ["warn", { ... }]) — always keep
 			remaining[name] = value
@@ -489,8 +523,8 @@ func buildOverrideFields(entry ConfigEntry, remainingRules Rules, hasTS bool) st
 	var fields []string
 
 	// files (skip empty arrays)
-	if len(entry.Files) > 0 {
-		fields = append(fields, "    files: "+formatStringArray(entry.Files))
+	if hasFileSelectors(entry) {
+		fields = append(fields, "    files: "+formatFilesSelectors(entry))
 	}
 
 	// ignores
@@ -550,6 +584,24 @@ func formatStringArray(arr []string) string {
 	}
 	buf.WriteString("    ]")
 	return buf.String()
+}
+
+func formatFilesSelectors(entry ConfigEntry) string {
+	parts := make([]string, 0, len(entry.Files)+len(entry.FilePatternGroups))
+	for _, pattern := range entry.Files {
+		parts = append(parts, "'"+escapeJSString(pattern)+"'")
+	}
+	for _, group := range entry.FilePatternGroups {
+		groupParts := make([]string, len(group))
+		for i, pattern := range group {
+			groupParts[i] = "'" + escapeJSString(pattern) + "'"
+		}
+		parts = append(parts, "["+strings.Join(groupParts, ", ")+"]")
+	}
+	if len(parts) <= 3 {
+		return "[" + strings.Join(parts, ", ") + "]"
+	}
+	return "[\n      " + strings.Join(parts, ",\n      ") + ",\n    ]"
 }
 
 // formatRulesBlock formats the rules as a JS object block.

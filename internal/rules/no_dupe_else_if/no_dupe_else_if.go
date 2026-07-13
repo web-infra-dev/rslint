@@ -11,7 +11,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-dupe-else-if
 var NoDupeElseIfRule = rule.Rule{
 	Name: "no-dupe-else-if",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 		return rule.RuleListeners{
 			ast.KindIfStatement: func(node *ast.Node) {

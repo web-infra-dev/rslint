@@ -20,6 +20,7 @@
 //                        `null` → `undefined`.
 //   prefer-array-some  — autofix rule: rewrites a `.filter` member name
 //                        to `some`.
+//   program-listener   — reports once from a Program listener.
 
 export default {
   meta: { name: 'local-plugin', version: '1.0.0' },
@@ -94,6 +95,22 @@ export default {
                 fix: (fixer) => fixer.replaceText(node.property, 'some'),
               });
             }
+          },
+        };
+      },
+    },
+    'program-listener': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          visited: 'Program listener visited this file.',
+        },
+      },
+      create(context) {
+        return {
+          Program(node) {
+            context.report({ node, messageId: 'visited' });
           },
         };
       },

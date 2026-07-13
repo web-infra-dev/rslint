@@ -4,8 +4,7 @@
     "outDir": ".vscode-test-out",
     "module": "commonjs",
     "moduleResolution": "node",
-    "rootDir": "./__tests__",
-    "noEmit": false,
+    "rootDir": ".",
     "skipLibCheck": true,
     "allowArbitraryExtensions": true,
     "allowImportingTsExtensions": false,
@@ -13,6 +12,6 @@
     "emitDeclarationOnly": false
   },
   "references": [],
-  "include": ["__tests__"],
+  "include": ["__tests__", "src"],
   "exclude": ["__tests__/fixtures-*"]
 }

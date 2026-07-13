@@ -31,9 +31,11 @@ var Hello = require('./Hello');
 - Namespaced JSX tags such as `<a:b />` are skipped.
 - For member-expression tags (`<Foo.Bar>`, `<foo.bar.Baz>`), only the leftmost identifier is checked. `<this.Foo>` is always allowed.
 
-## Differences from ESLint
+## Options
 
-- The `allowGlobals` option is **not supported**. A JSX tag identifier that is not declared in the source file (via `var` / `let` / `const` / `function` / `class` / `enum` / `namespace` / `import` / `declare` / function parameter / catch binding / loop binding) is always reported. To silence a report for an ambient value, add an explicit declaration — e.g. `declare const Foo: any;` or `import Foo from '...';`.
+### `allowGlobals`
+
+When `false` (default), a JSX tag identifier in a module (a file with `import`/`export`) is only recognized if it's declared in the source file (via `var` / `let` / `const` / `function` / `class` / `enum` / `namespace` / `import` / `declare` / function parameter / catch binding / loop binding) — names declared only via config `languageOptions.globals` or `/* global */` comments are still reported. Set `allowGlobals: true` to also allow those. Script files (no `import`/`export`) always consult declared globals, regardless of this option — matching ESLint.
 
 ## Original Documentation
 

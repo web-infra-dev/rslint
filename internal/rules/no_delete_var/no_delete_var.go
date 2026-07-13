@@ -8,7 +8,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-delete-var
 var NoDeleteVarRule = rule.Rule{
 	Name: "no-delete-var",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				// SkipParentheses to match ESTree semantics: ESTree strips ParenthesizedExpression,

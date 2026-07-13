@@ -309,14 +309,12 @@ func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
 func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
 	groupedPaths = make(map[string][]restrictedPathEntry)
 
-	// Handle the case where the config parser unwraps a single-element array,
-	// delivering a map directly instead of [map]. Wrap it back into an array.
-	if obj, ok := options.(map[string]interface{}); ok {
-		options = []interface{}{obj}
-	}
-
-	arr, ok := options.([]interface{})
-	if !ok || len(arr) == 0 {
+	// config.rules unwraps a single configured option to a bare value — a map
+	// for an object option, or a string for a string option such as
+	// ["error","import1"]. NormalizeOptions re-wraps either into eslint
+	// context.options form so each arrives uniformly as arr[0].
+	arr := rule.NormalizeOptions(options)
+	if len(arr) == 0 {
 		return groupedPaths, patternGroups
 	}
 
@@ -435,7 +433,8 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 
 var NoRestrictedImportsRule = rule.Rule{
 	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		groupedPaths, patternGroups := parseOptions(options)
 
 		if len(groupedPaths) == 0 && len(patternGroups) == 0 {
@@ -731,8 +730,7 @@ func reportNameForPath(ctx *rule.RuleContext, node *ast.Node, specifiers []speci
 
 func isRestrictedPattern(importSource string, group *restrictedPatternGroup) bool {
 	if group.regexMatcher != nil {
-		matched, _ := group.regexMatcher.MatchString(importSource)
-		return matched
+		return utils.Regexp2MatchString(group.regexMatcher, importSource)
 	}
 	if group.matcher != nil {
 		return group.matcher.ignores(importSource)
@@ -774,7 +772,7 @@ func reportPathForPatterns(
 
 		// Check restricted import names (by name list or regex pattern)
 		if (len(group.importNames) > 0 && slices.Contains(group.importNames, e.name)) ||
-			(group.importNamePattern != nil && regexp2Match(group.importNamePattern, e.name)) {
+			(group.importNamePattern != nil && utils.Regexp2MatchString(group.importNamePattern, e.name)) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"patternAndImportName", "patternAndImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted from being used by a pattern.", e.name, importSource))
@@ -785,7 +783,7 @@ func reportPathForPatterns(
 				"allowedImportName", "allowedImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only %s %s allowed.",
 					e.name, importSource, formatEnglishList(group.allowImportNames), isOrAre(group.allowImportNames)))
-		} else if group.allowImportNamePattern != nil && !regexp2Match(group.allowImportNamePattern, e.name) {
+		} else if group.allowImportNamePattern != nil && !utils.Regexp2MatchString(group.allowImportNamePattern, e.name) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"allowedImportNamePattern", "allowedImportNamePatternWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only imports that match the pattern '%s' are allowed from '%s'.",
@@ -959,12 +957,6 @@ func formatEnglishList(names []string) string {
 // jsRegexString formats a regex pattern in JavaScript RegExp.toString() notation: /pattern/u.
 func jsRegexString(re *regexp2.Regexp) string {
 	return "/" + re.String() + "/u"
-}
-
-// regexp2Match wraps regexp2.MatchString, discarding the error (timeout).
-func regexp2Match(re *regexp2.Regexp, s string) bool {
-	matched, _ := re.MatchString(s)
-	return matched
 }
 
 func isOrAre(names []string) string {

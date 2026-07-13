@@ -5,6 +5,6 @@
     "moduleResolution": "bundler",
     "module": "preserve"
   },
-  "exclude": ["./tests/typescript-eslint/fixtures/"],
+  "exclude": ["./tests/**/fixtures/**"],
   "references": []
 }

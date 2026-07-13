@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "Rslint",
   "description": "Language support for Rslint",
-  "version": "0.6.3",
+  "version": "0.6.5",
   "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",
@@ -80,7 +80,7 @@
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
     "package": "vsce package",
-    "test": "tsgo -p tsconfig.spec.json && node .vscode-test-out/runTest.js"
+    "test": "tsgo -p tsconfig.spec.emit.json && node .vscode-test-out/__tests__/runTest.js"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",

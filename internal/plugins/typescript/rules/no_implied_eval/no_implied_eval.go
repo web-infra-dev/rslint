@@ -28,7 +28,7 @@ var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "s
 var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 	Name:             "no-implied-eval",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getCalleeName := func(node *ast.Expression) string {
 			if ast.IsIdentifier(node) {
 				return node.AsIdentifier().Text

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "target": "esnext",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@cycles/*": ["no-cycle/*"]
+    },
+    "lib": ["es2015", "es2017", "esnext", "DOM"],
+    "experimentalDecorators": true
+  },
+  "include": ["**/*"]
+}

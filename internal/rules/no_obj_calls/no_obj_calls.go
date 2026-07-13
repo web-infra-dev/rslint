@@ -16,7 +16,7 @@ var nonCallableGlobals = map[string]bool{
 var NoObjCallsRule = rule.Rule{
 	Name:             "no-obj-calls",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// isGlobalSymbol returns true if the symbol comes from lib.d.ts
 		// (none of its declarations are in the current source file).
 		isGlobalSymbol := func(symbol *ast.Symbol) bool {

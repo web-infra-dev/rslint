@@ -39,20 +39,64 @@ func IsCallee(node *ast.Node) bool {
 	return false
 }
 
+// GetStaticStringLiteralValue returns the string value and a presence flag if
+// node is a string literal or a no-substitution template literal. It does not
+// unwrap parentheses or TS assertions; callers choose which wrappers are
+// transparent for their rule.
+func GetStaticStringLiteralValue(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text, true
+	}
+	return "", false
+}
+
 // GetStaticStringValue returns the string value if the node is a string literal
 // or a no-substitution template literal. Returns "" if the value cannot be
 // statically determined.
 func GetStaticStringValue(node *ast.Node) string {
-	if node == nil {
-		return ""
+	value, _ := GetStaticStringLiteralValue(node)
+	return value
+}
+
+// IsGlobalParseIntCallee reports whether callee references the built-in
+// `parseInt` or `Number.parseInt` function. It mirrors ESLint's
+// astUtils.isSpecificId / isSpecificMemberAccess shape: outer parentheses and
+// optional chaining are transparent, TS-only assertion wrappers are not.
+func IsGlobalParseIntCallee(callee *ast.Node) bool {
+	callee = ast.SkipParentheses(callee)
+	if callee == nil {
+		return false
 	}
+
+	if ast.IsIdentifier(callee) {
+		return callee.AsIdentifier().Text == "parseInt" && !IsShadowed(callee, "parseInt")
+	}
+
+	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
+		return false
+	}
+
+	obj := memberAccessObject(callee)
+	obj = ast.SkipParentheses(obj)
+	return obj != nil && ast.IsIdentifier(obj) &&
+		obj.AsIdentifier().Text == "Number" &&
+		!IsShadowed(obj, "Number")
+}
+
+func memberAccessObject(node *ast.Node) *ast.Node {
 	switch node.Kind {
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
+	case ast.KindPropertyAccessExpression:
+		return node.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		return node.AsElementAccessExpression().Expression
 	}
-	return ""
+	return nil
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference
@@ -79,10 +123,19 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 		return true
 	}
 
-	// Re-export specifiers: export { x } from 'mod'
-	// All identifiers are source module names, not local references.
-	if parent.Kind == ast.KindExportSpecifier && isReExportSpecifier(parent) {
-		return true
+	// export { local as exported }: only `local` can read a runtime value.
+	if parent.Kind == ast.KindExportSpecifier {
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || isReExportSpecifier(parent) {
+			return true
+		}
+		es := parent.AsExportSpecifier()
+		if es == nil {
+			return false
+		}
+		if es.PropertyName != nil {
+			return es.PropertyName != node
+		}
+		return es.Name() != node
 	}
 
 	// ast.IsDeclarationName covers: variable, function, class, parameter,
@@ -90,10 +143,6 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	if ast.IsDeclarationName(node) {
 		// ShorthandPropertyAssignment { x } — x IS a reference to the variable.
 		if parent.Kind == ast.KindShorthandPropertyAssignment {
-			return false
-		}
-		// export { x } (no rename, local) — x IS a reference to the local/global variable.
-		if parent.Kind == ast.KindExportSpecifier && parent.AsExportSpecifier().PropertyName == nil {
 			return false
 		}
 		return true
@@ -123,6 +172,13 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	}
 
 	return false
+}
+
+// IsInAmbientContext reports whether node was parsed inside an ambient
+// context. TypeScript-Go propagates this through declaration files and
+// `declare` contexts via NodeFlagsAmbient.
+func IsInAmbientContext(node *ast.Node) bool {
+	return node != nil && node.Flags&ast.NodeFlagsAmbient != 0
 }
 
 // CouldBeError reports whether a node could plausibly evaluate to an Error

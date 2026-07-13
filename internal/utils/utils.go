@@ -2,6 +2,7 @@ package utils
 
 import (
 	"iter"
+	"math"
 	"slices"
 	"strings"
 	"unicode"
@@ -15,6 +16,17 @@ import (
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+}
+
+// BracedNodeInnerRange returns the span between a braced node's opening and
+// closing braces. Callers should pass Block-like nodes whose trimmed text starts
+// with "{" and ends with "}".
+func BracedNodeInnerRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	nodeRange := TrimNodeTextRange(sourceFile, node)
+	if nodeRange.End() <= nodeRange.Pos()+1 {
+		return core.NewTextRange(nodeRange.Pos(), nodeRange.Pos())
+	}
+	return core.NewTextRange(nodeRange.Pos()+1, nodeRange.End()-1)
 }
 
 // GetVarKeywordRange returns the range of the kind keyword (`var`/`let`/`const`/
@@ -92,6 +104,47 @@ func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool
 		return true
 	}
 	return false
+}
+
+// HasCommentInsideNode reports whether node contains a real line or block
+// comment. It walks parser-owned tokens, so comment-like text inside strings,
+// templates, or regex literals is ignored.
+func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	if sourceFile == nil || node == nil {
+		return false
+	}
+	nodeRange := TrimNodeTextRange(sourceFile, node)
+	hasComment := false
+	ForEachComment(node, func(comment *ast.CommentRange) {
+		if comment.Pos() >= nodeRange.Pos() && comment.End() <= nodeRange.End() {
+			hasComment = true
+		}
+	}, sourceFile)
+	return hasComment
+}
+
+// HasCommentInSpan reports whether any parsed comment overlaps the half-open
+// source span [start, end). Unlike HasCommentsInRange, this scans the whole
+// file's comment table, so callers can use it for ESLint-style
+// commentsExistBetween checks over arbitrary token gaps.
+func HasCommentInSpan(sourceFile *ast.SourceFile, start int, end int) bool {
+	if sourceFile == nil || start >= end {
+		return false
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(sourceFile.Text()) {
+		end = len(sourceFile.Text())
+	}
+
+	found := false
+	ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
+		if comment.Pos() < end && comment.End() > start {
+			found = true
+		}
+	}, sourceFile)
+	return found
 }
 
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
@@ -254,6 +307,17 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	})
 }
 
+// IsThisVoidParameter reports whether param is TypeScript's synthetic
+// `this: void` parameter. It delegates the `this` shape check to tsgo so
+// callers do not need to duplicate identifier/name assumptions.
+func IsThisVoidParameter(param *ast.Node) bool {
+	if param == nil || !ast.IsThisParameter(param) {
+		return false
+	}
+	t := param.Type()
+	return t != nil && t.Kind == ast.KindVoidKeyword
+}
+
 // Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
 func IsStrWhiteSpace(r rune) bool {
 	// This is different than stringutil.IsWhiteSpaceLike.
@@ -319,7 +383,7 @@ var ExcludePaths = []string{"/node_modules/", "bundled:"}
 
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
-// exclusions, used by DiscoverGapFiles and the no-tsconfig fallback.
+// exclusions used by lint target discovery and fallback Program roots.
 // Aligned with JS-side SCAN_EXCLUDE_DIRS: new Set(['node_modules', '.git']).
 var DefaultExcludeDirNames = []string{"node_modules", ".git"}
 
@@ -368,6 +432,49 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	}
 
 	return optsMap
+}
+
+// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape.
+// It handles number forms (`3` / `[3]`) plus object forms (`{max: 3}` /
+// `[{maximum: 3}]`). `maximum` wins only when it coerces to a non-zero number;
+// otherwise `max` is used. If either key is present but neither yields a
+// numeric threshold, ESLint ends up comparing against `undefined`, which never
+// reports; MaxInt gives the same observable behavior in Go.
+func ResolveLegacyMaxOption(options any, defaultMax int) int {
+	if options == nil {
+		return defaultMax
+	}
+	if arr, ok := options.([]interface{}); ok {
+		if len(arr) == 0 {
+			return defaultMax
+		}
+		if n, ok := CoerceInt(arr[0]); ok {
+			return n
+		}
+	} else if n, ok := CoerceInt(options); ok {
+		return n
+	}
+
+	m := GetOptionsMap(options)
+	if m == nil {
+		return defaultMax
+	}
+	_, hasMaximum := m["maximum"]
+	_, hasMax := m["max"]
+	if !hasMaximum && !hasMax {
+		return defaultMax
+	}
+	if hasMaximum {
+		if n, ok := CoerceInt(m["maximum"]); ok && n != 0 {
+			return n
+		}
+	}
+	if hasMax {
+		if n, ok := CoerceInt(m["max"]); ok {
+			return n
+		}
+	}
+	return math.MaxInt
 }
 
 // CoerceInt converts a JSON-decoded numeric value to int. JSON numbers come in

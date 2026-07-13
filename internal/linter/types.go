@@ -7,8 +7,14 @@ import (
 )
 
 type ConfiguredRule struct {
-	Name             string
-	Settings         map[string]interface{}
+	Name     string
+	Settings map[string]interface{}
+	// Globals is the config-declared `languageOptions.globals` for this file
+	// (name → declared). The linter merges this with inline `/* global */`
+	// comments (parsed once per file, same as DisableManager) before exposing
+	// the combined result to rules as ctx.Globals — rules never parse either
+	// source themselves. Nil when the config declares none.
+	Globals          map[string]bool
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
@@ -19,7 +25,7 @@ type ConfiguredRule struct {
 	// Options is the raw user-configured rule options (ESLint's
 	// post-severity args). Consumed when dispatching plugin rules to the
 	// Node worker; native rules read options through Run's closure instead.
-	Options any
+	Options []any
 	Run     func(ctx rule.RuleContext) rule.RuleListeners
 }
 
@@ -74,16 +80,20 @@ type LintResult struct {
 //     (substring match against utils.ExcludePaths). Pass an explicit empty
 //     slice to disable the default.
 //   - PerProgramFilter=nil                → no per-program ad-hoc filter
-//     (multi-config ownership / config `ignores`). Entries within the slice
+//     (for example config global ignores). Entries within the slice
 //     may be nil individually.
 //   - GetRulesForFile=nil                 → no lint rules executed
-//   - TypeInfoFiles=nil                   → no gap-file distinction
-//     (all files may run type-aware rules)
+//   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
+//     for syntax errors before resolving or running rules. A non-nil set means
+//     the caller already performed that check and names the invalid files.
+//   - TypeInfoFiles=nil                   → no gap-file distinction. A non-nil
+//     set filters RequiresTypeInfo rules and withholds the TypeChecker for files
+//     outside it. This field never restricts program-wide type-check.
 //   - TypeCheck=false                     → skip the type-check phase
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
-//     gap-file fallback program with synthesized CompilerOptions).
+//     non-project fallback Program with synthesized CompilerOptions).
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
@@ -98,9 +108,16 @@ type RunLinterOptions struct {
 	Scope            FileScope
 	ExcludePaths     []string
 	PerProgramFilter []FileFilter
+	// TargetFiles, when non-nil, enables an exact per-Program lint target plan.
+	// Entries are parallel to Programs; a missing, nil, or empty entry means
+	// that Program has no lint-rule targets. CLI/API use this after resolving
+	// lint targets from config `files`/ignores independently from TypeScript
+	// Program membership. nil preserves the legacy Program scan.
+	TargetFiles [][]string
 
-	GetRulesForFile RuleHandler
-	TypeInfoFiles   map[string]struct{}
+	GetRulesForFile  RuleHandler
+	TypeInfoFiles    map[string]struct{}
+	SyntaxErrorFiles map[string]struct{}
 
 	TypeCheck             bool
 	SkipTypeCheckPrograms []bool
@@ -108,11 +125,14 @@ type RunLinterOptions struct {
 	OnDiagnostic DiagnosticHandler
 }
 
-// LintSingleFileOptions configures a single-file, single-program lint pass.
-// Designed for IDE/LSP per-keystroke usage. Does not run type-check.
+// LintSingleFileOptions configures a single-file, single-program rule pass.
+// The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
-	Program         *compiler.Program
-	File            string
+	Program *compiler.Program
+	File    string
+	// HasTypeInfo controls whether rules marked RequiresTypeInfo are eligible.
+	// Non-type-aware rules may still use the Program's checker for local analysis.
+	HasTypeInfo     bool
 	GetRulesForFile RuleHandler
 	ExcludePaths    []string
 	OnDiagnostic    DiagnosticHandler

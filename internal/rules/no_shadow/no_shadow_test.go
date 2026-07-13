@@ -118,7 +118,8 @@ func TestNoShadowRule(t *testing.T) {
 
 			// ---- builtinGlobals off (default) ----
 			{Code: `function foo() { var Object = 0; }`},
-			// SKIP: `function foo() { var top = 0; }` with globals.browser — requires env.
+			// A declared global does not shadow when `builtinGlobals` is off.
+			{Code: `function foo() { var top = 0; }`, Globals: map[string]bool{"top": true}},
 
 			// Script-mode merging (VALID under script sourceType). Our implementation
 			// always treats the file as a module, so `var Object = 0;` at top level
@@ -601,6 +602,11 @@ function bar() { }`},
 
 			// ---- builtinGlobals ----
 			{Code: `function foo() { var Object = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'Object' is already a global variable."}}},
+			// `top` is not an ECMAScript builtin (it's a browser-env global);
+			// declaring it via config `languageOptions.globals` (or a
+			// `/* global */` comment) makes builtinGlobals catch the shadow.
+			{Code: `function foo() { var top = 0; }`, Globals: map[string]bool{"top": true}, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'top' is already a global variable."}}},
+			{Code: `/* global top */ function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'top' is already a global variable."}}},
 			// SKIP: `function foo() { var top = 0; }` requires browser globals.
 			{Code: `var Object = 0;`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal"}}},
 			// SKIP: `var top = 0;` browser globals.

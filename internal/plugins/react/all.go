@@ -11,12 +11,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_foreign_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_prop_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forward_ref_uses_ref"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_bracket_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_filename_extension"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_first_prop_new_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_fragments"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_handler_names"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_indent"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_indent_props"
@@ -29,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_pascal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
@@ -88,12 +91,14 @@ func GetAllRules() []rule.Rule {
 		forbid_elements.ForbidElementsRule,
 		forbid_foreign_prop_types.ForbidForeignPropTypesRule,
 		forbid_prop_types.ForbidPropTypesRule,
+		forward_ref_uses_ref.ForwardRefUsesRefRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_bracket_location.JsxClosingBracketLocationRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
 		jsx_equals_spacing.JsxEqualsSpacingRule,
 		jsx_filename_extension.JsxFilenameExtensionRule,
 		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
+		jsx_fragments.JsxFragmentsRule,
 		jsx_handler_names.JsxHandlerNamesRule,
 		jsx_indent.JsxIndentRule,
 		jsx_indent_props.JsxIndentPropsRule,
@@ -106,6 +111,7 @@ func GetAllRules() []rule.Rule {
 		jsx_no_undef.JsxNoUndefRule,
 		jsx_pascal_case.JsxPascalCaseRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
+		jsx_props_no_spread_multi.JsxPropsNoSpreadMultiRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,

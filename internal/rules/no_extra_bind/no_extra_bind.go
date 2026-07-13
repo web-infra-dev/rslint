@@ -59,7 +59,7 @@ type bindMatch struct {
 // https://eslint.org/docs/latest/rules/no-extra-bind
 var NoExtraBindRule = rule.Rule{
 	Name: "no-extra-bind",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		type scopeInfo struct {
 			match     *bindMatch
 			thisFound bool
@@ -230,14 +230,14 @@ var NoExtraBindRule = rule.Rule{
 			ast.KindFunctionDeclaration:                      enterFunction,
 			rule.ListenerOnExit(ast.KindFunctionDeclaration): exitFunction,
 
-			ast.KindMethodDeclaration:                       enterThisScope,
-			rule.ListenerOnExit(ast.KindMethodDeclaration):  exitThisScope,
-			ast.KindGetAccessor:                             enterThisScope,
-			rule.ListenerOnExit(ast.KindGetAccessor):        exitThisScope,
-			ast.KindSetAccessor:                             enterThisScope,
-			rule.ListenerOnExit(ast.KindSetAccessor):        exitThisScope,
-			ast.KindConstructor:                             enterThisScope,
-			rule.ListenerOnExit(ast.KindConstructor):        exitThisScope,
+			ast.KindMethodDeclaration:                      enterThisScope,
+			rule.ListenerOnExit(ast.KindMethodDeclaration): exitThisScope,
+			ast.KindGetAccessor:                            enterThisScope,
+			rule.ListenerOnExit(ast.KindGetAccessor):       exitThisScope,
+			ast.KindSetAccessor:                            enterThisScope,
+			rule.ListenerOnExit(ast.KindSetAccessor):       exitThisScope,
+			ast.KindConstructor:                            enterThisScope,
+			rule.ListenerOnExit(ast.KindConstructor):       exitThisScope,
 
 			ast.KindArrowFunction: func(node *ast.Node) {
 				if m := getBindMatch(node); m != nil {

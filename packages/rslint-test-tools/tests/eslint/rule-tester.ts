@@ -1,9 +1,12 @@
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
-import { lint, type LintResponse } from '@rslint/core';
+import type { RslintConfigEntry } from '@rslint/core';
+import { lint, type LintResponse } from '@rslint/core/internal';
 import assert from 'node:assert';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
+
+type TestLanguageOptions = NonNullable<RslintConfigEntry['languageOptions']>;
 
 interface TsDiagnostic {
   line?: number;
@@ -58,6 +61,7 @@ export type ValidTestCase =
   | {
       code: string;
       options?: Record<string, unknown>;
+      languageOptions?: TestLanguageOptions;
       only?: boolean;
       skip?: boolean;
     };
@@ -66,15 +70,26 @@ export interface InvalidTestCase {
   code: string;
   errors: TsDiagnostic[];
   options?: Record<string, unknown>;
+  languageOptions?: TestLanguageOptions;
   only?: boolean;
   skip?: boolean;
 }
 
 function filterSnapshot(diags: LintResponse & { code?: string }): LintResponse {
+  // Drop fields that are noise or range-unstable for a rule's diagnostic
+  // snapshot: warningCount/fixable*Count are constant or fix-related; fixes &
+  // suggestions carry byte-offset ranges that ⑥ rewrites to UTF-16.
+  const top = diags as unknown as Record<string, unknown>;
+  delete top.warningCount;
+  delete top.fixableErrorCount;
+  delete top.fixableWarningCount;
+  delete top.lintedFiles;
   for (const diag of diags.diagnostics ?? []) {
     const d = diag as unknown as Record<string, unknown>;
     delete d.filePath;
     delete d.fixes;
+    delete d.severity;
+    delete d.suggestions;
   }
   return diags;
 }
@@ -86,8 +101,9 @@ export class RuleTester {
       valid: ValidTestCase[];
       invalid: InvalidTestCase[];
     },
+    testName = ruleName,
   ) {
-    describe(ruleName, () => {
+    describe(testName, () => {
       const cwd = path.resolve(import.meta.dirname);
       const config = path.resolve(cwd, './rslint.config.mjs');
 
@@ -105,29 +121,34 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const options =
             typeof validCase === 'object' ? validCase.options : undefined;
+          const languageOptions =
+            typeof validCase === 'object'
+              ? validCase.languageOptions
+              : undefined;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            undefined,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: { [virtual_entry]: code },
-              ruleOptions: {
-                [ruleName]: options
-                  ? Array.isArray(options)
-                    ? options
-                    : [options]
-                  : [],
-              } as any,
-            });
-          } finally {
-            cleanup();
-          }
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, undefined);
+          const ruleArgs = options
+            ? Array.isArray(options)
+              ? options
+              : [options]
+            : [];
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                ...(languageOptions ? { languageOptions } : {}),
+                rules: {
+                  [ruleName]:
+                    ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
+                },
+              },
+            ] as any,
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: { [virtual_entry]: code },
+          });
 
           assert(
             diags.diagnostics?.length === 0,
@@ -141,30 +162,31 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors, options } = item;
+          const { code, errors, options, languageOptions } = item;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            undefined,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: { [virtual_entry]: code },
-              ruleOptions: {
-                [ruleName]: options
-                  ? Array.isArray(options)
-                    ? options
-                    : [options]
-                  : [],
-              } as any,
-            });
-          } finally {
-            cleanup();
-          }
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, undefined);
+          const ruleArgs = options
+            ? Array.isArray(options)
+              ? options
+              : [options]
+            : [];
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                ...(languageOptions ? { languageOptions } : {}),
+                rules: {
+                  [ruleName]:
+                    ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
+                },
+              },
+            ] as any,
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: { [virtual_entry]: code },
+          });
 
           assert(
             diags.diagnostics?.length > 0,

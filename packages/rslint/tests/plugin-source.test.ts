@@ -2,7 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import {
   selectPluginSource,
   unwrapPluginModule,
-} from '../src/plugin-source.js';
+} from '../src/config/plugin-source.js';
 
 // Single-source contract: the object-form `plugins` is the ONLY live
 // community-plugin source; the array form (native-name whitelist) carries no

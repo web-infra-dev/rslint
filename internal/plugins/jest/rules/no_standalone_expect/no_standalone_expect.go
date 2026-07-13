@@ -41,8 +41,8 @@ func parseOptions(raw any) options {
 		return opts
 	}
 
-	optArray, ok := raw.([]interface{})
-	if !ok || len(optArray) == 0 {
+	optArray := rule.NormalizeOptions(raw)
+	if len(optArray) == 0 {
 		return opts
 	}
 
@@ -155,7 +155,8 @@ func getTemplateScopeRange(node *ast.Node) (int, int, bool) {
 
 var NoStandaloneExpectRule = rule.Rule{
 	Name: "jest/no-standalone-expect",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		scopeStack := make([]scopeEntry, 0, 8)
 

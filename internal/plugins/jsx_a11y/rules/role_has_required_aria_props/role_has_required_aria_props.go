@@ -18,25 +18,25 @@
 //     unknown element names are skipped.
 //  3. Literal-value extraction in priority order — array → string →
 //     bool/number → undef/NoLit:
-//       a. `LiteralPropArrayAsString` handles `<div role={[...]}>`
-//          shapes (upstream's LITERAL_TYPES.ArrayExpression evaluates
-//          elements and `,`-joins via `String([...])`).
-//       b. `LiteralPropStringValue` handles string-typed literal values
-//          including the direct attribute form with HTML entity decoding
-//          (`<div role="&#104;eading">` → "heading"), JsxExpression-wrapped
-//          strings, the `null`-magic-string override, and template-synthesized
-//          strings.
-//       c. `LiteralPropAriaValue` is the fallback for boolean / number /
-//          BigInt literal values (stringified via JS `String()`), and the
-//          short-circuit `NoLit` / `Undef` arms that skip:
-//            - boolean-form attribute `<div role />` returns
-//              `Bool{true}` which stringifies to `"true"` (not a role).
-//            - explicit `{undefined}` → `Undef` → skip.
-//            - non-literal expression (Identifier, Logical, Conditional,
-//              Call, Member, Binary, TS-wrapper, ...) → `NoLit` → skip.
-//          Explicit `{null}` is NOT skipped here: it's handled by
-//          step (b) via the LITERAL_TYPES.Literal override → magic
-//          string `"null"`, which then falls through to step 4.
+//     a. `LiteralPropArrayAsString` handles `<div role={[...]}>`
+//     shapes (upstream's LITERAL_TYPES.ArrayExpression evaluates
+//     elements and `,`-joins via `String([...])`).
+//     b. `LiteralPropStringValue` handles string-typed literal values
+//     including the direct attribute form with HTML entity decoding
+//     (`<div role="&#104;eading">` → "heading"), JsxExpression-wrapped
+//     strings, the `null`-magic-string override, and template-synthesized
+//     strings.
+//     c. `LiteralPropAriaValue` is the fallback for boolean / number /
+//     BigInt literal values (stringified via JS `String()`), and the
+//     short-circuit `NoLit` / `Undef` arms that skip:
+//     - boolean-form attribute `<div role />` returns
+//     `Bool{true}` which stringifies to `"true"` (not a role).
+//     - explicit `{undefined}` → `Undef` → skip.
+//     - non-literal expression (Identifier, Logical, Conditional,
+//     Call, Member, Binary, TS-wrapper, ...) → `NoLit` → skip.
+//     Explicit `{null}` is NOT skipped here: it's handled by
+//     step (b) via the LITERAL_TYPES.Literal override → magic
+//     string `"null"`, which then falls through to step 4.
 //  4. Lowercase and ASCII-space-split the role value. Then filter to the
 //     tokens that exist in aria-query's non-abstract role set.
 //  5. `isSemanticRoleElement(elementType, attributes)` → skip. The
@@ -173,7 +173,7 @@ func isSemanticRoleElement(elementType string, attrs []*ast.Node, roleAttrValue 
 
 var RoleHasRequiredAriaPropsRule = rule.Rule{
 	Name: "jsx-a11y/role-has-required-aria-props",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				// Step 1: name === 'role' (case-insensitive — mirrors

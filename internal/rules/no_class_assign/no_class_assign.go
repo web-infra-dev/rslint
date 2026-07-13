@@ -330,7 +330,7 @@ func findEnclosingScope(node *ast.Node) *ast.Node {
 // NoClassAssignRule disallows reassigning class declarations
 var NoClassAssignRule = rule.Rule{
 	Name: "no-class-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			// Check class declarations
 			ast.KindClassDeclaration: func(node *ast.Node) {

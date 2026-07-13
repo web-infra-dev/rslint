@@ -13,7 +13,7 @@ import (
 // forms like `(new Foo());`.
 var NoNewRule = rule.Rule{
 	Name: "no-new",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				stmt := node.AsExpressionStatement()

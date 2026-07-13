@@ -105,7 +105,8 @@ func parseOptions(raw any) options {
 
 var AnchorIsValidRule = rule.Rule{
 	Name: "jsx-a11y/anchor-is-valid",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		// typeCheck = ['a'].concat(componentOptions). Resolved against the
 		// element's effective name via `jsxa11yutil.GetElementType` so both

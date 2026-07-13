@@ -60,7 +60,7 @@ func buildWrapUpLeftMessage(op string) rule.RuleMessage {
 
 var NoConfusingNonNullAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-confusing-non-null-assertion",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				bin := node.AsBinaryExpression()

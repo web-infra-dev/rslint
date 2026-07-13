@@ -97,7 +97,8 @@ func getWhetherToAwait(affectsErrorHandling bool, option ReturnAwaitOption) whet
 var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "return-await",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(ReturnAwaitOptions)
 		if !ok {
 			opts = ReturnAwaitOptions{}

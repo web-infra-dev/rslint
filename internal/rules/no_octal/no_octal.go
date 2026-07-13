@@ -9,7 +9,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-octal
 var NoOctalRule = rule.Rule{
 	Name: "no-octal",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
 				// tsgo normalizes NumericLiteral.Text at parse time (e.g. "01234" -> "668"),

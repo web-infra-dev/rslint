@@ -127,24 +127,6 @@ func clearUncheckedCalls(unchecked *[]*ast.Node, calls []*ast.Node) {
 	}
 }
 
-func resolveNamedFunctionCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) (*ast.Node, string) {
-	if callExpr == nil || callExpr.Arguments == nil || len(callExpr.Arguments.Nodes) < 2 {
-		return nil, ""
-	}
-
-	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
-	if callback == nil || callback.Kind != ast.KindIdentifier {
-		return nil, ""
-	}
-
-	name := callback.AsIdentifier().Text
-	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
-	if decl == nil || decl.Kind != ast.KindFunctionDeclaration {
-		return nil, name
-	}
-	return decl.AsNode(), name
-}
-
 func trackNamedFunctionTestCall(
 	ctx rule.RuleContext,
 	callNode *ast.Node,
@@ -152,7 +134,7 @@ func trackNamedFunctionTestCall(
 	uncheckedByDecl map[*ast.Node][]*ast.Node,
 	uncheckedByName map[string][]*ast.Node,
 ) {
-	declNode, fnName := resolveNamedFunctionCallback(ctx, callExpr)
+	declNode, fnName := utils.ResolveNamedFunctionCallback(ctx, callExpr)
 	switch {
 	case declNode != nil:
 		uncheckedByDecl[declNode] = append(uncheckedByDecl[declNode], callNode)
@@ -197,7 +179,8 @@ func checkCallExpressionUsed(
 
 var ExpectExpectRule = rule.Rule{
 	Name: "jest/expect-expect",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		assertNames, additionalTestBlocks := parseOptions(options)
 		compiled := compileAssertPatterns(assertNames)
 		var unchecked []*ast.Node

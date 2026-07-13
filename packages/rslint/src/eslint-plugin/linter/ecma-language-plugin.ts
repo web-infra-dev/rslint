@@ -53,6 +53,7 @@ import {
 } from './context.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
+import type { GlobalsConfig } from '../types.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
 
 /**
@@ -127,7 +128,7 @@ export interface LintFileRequest {
   languageOptions?: {
     ecmaVersion?: number | 'latest';
     sourceType?: 'module' | 'script' | 'commonjs';
-    globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+    globals?: GlobalsConfig;
     parserOptions?: {
       ecmaFeatures?: {
         jsx?: boolean;

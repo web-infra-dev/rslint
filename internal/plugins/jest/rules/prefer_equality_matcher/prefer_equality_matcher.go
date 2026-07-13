@@ -27,20 +27,6 @@ func buildSuggestEqualityMatcherMessage(equalityMatcher string) rule.RuleMessage
 	}
 }
 
-func isBooleanLiteral(node *ast.Node) (value bool, ok bool) {
-	if node == nil {
-		return false, false
-	}
-	switch node.Kind {
-	case ast.KindTrueKeyword:
-		return true, true
-	case ast.KindFalseKeyword:
-		return false, true
-	default:
-		return false, false
-	}
-}
-
 func parseStrictEqualityComparison(node *ast.Node) (left, right *ast.Node, negated bool, ok bool) {
 	if node == nil || node.Kind != ast.KindBinaryExpression {
 		return nil, nil, false, false
@@ -70,7 +56,7 @@ func buildModifierText(jestFnCall *utils.ParsedJestFnCall, addNotModifier bool) 
 
 var PreferEqualityMatcherRule = rule.Rule{
 	Name: "jest/prefer-equality-matcher",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := utils.ParseJestFnCall(node, ctx)
@@ -102,8 +88,8 @@ var PreferEqualityMatcherRule = rule.Rule{
 					return
 				}
 
-				matcherArg := utils.UnwrapBasicTypeAssertions(matcherArgs[0])
-				matcherValue, ok := isBooleanLiteral(matcherArg)
+				matcherArg := matcherArgs[0]
+				matcherValue, ok := utils.IsBooleanLiteral(matcherArg)
 				if !ok {
 					return
 				}
@@ -119,7 +105,7 @@ var PreferEqualityMatcherRule = rule.Rule{
 				leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(left), false)
 				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(right), false)
 				replaceComparison := rule.RuleFixReplace(ctx.SourceFile, comparison, leftText)
-				replaceMatcherArg := rule.RuleFixReplace(ctx.SourceFile, matcherArg, rightText)
+				replaceMatcherArg := rule.RuleFixReplace(ctx.SourceFile, utils.UnwrapBasicTypeAssertions(matcherArg), rightText)
 				modifierRange := core.NewTextRange(expectCall.End(), matcherEntry.Node.Parent.End())
 
 				suggestions := make([]rule.RuleSuggestion, len(suggestedEqualityMatchers))

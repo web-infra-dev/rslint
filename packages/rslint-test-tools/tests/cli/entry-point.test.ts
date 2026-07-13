@@ -15,19 +15,20 @@ interface CliTestResult {
 /**
  * Run the rslint entry point explicitly via `node`, matching how pnpm/.cmd
  * wrappers invoke it on Windows. This ensures the dynamic `import()` inside
- * bin/rslint.cjs is exercised — on Windows, bare `spawn('file.cjs')` may
+ * bin/rslint.js is exercised — on Windows, bare `spawn('file.js')` may
  * bypass Node.js entirely because shebangs are not supported.
  */
 function runRslintViaNode(
   args: string[],
   cwd?: string,
+  env?: NodeJS.ProcessEnv,
 ): Promise<CliTestResult> {
   return new Promise((resolve) => {
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
     const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...cleanEnv, NO_COLOR: '1' },
+      env: { ...cleanEnv, NO_COLOR: '1', ...env },
     });
 
     let stdout = '';
@@ -61,7 +62,7 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
 
-describe('Entry point (bin/rslint.cjs)', () => {
+describe('Entry point (bin/rslint.js)', () => {
   test('should load ESM cli module without ERR_UNSUPPORTED_ESM_URL_SCHEME', async () => {
     const result = await runRslintViaNode(['--help']);
     expect(result.stderr).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
@@ -93,6 +94,34 @@ describe('Entry point (bin/rslint.cjs)', () => {
       expect(result.stderr).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
       expect(result.stdout).toContain('no-debugger');
       expect(result.exitCode).not.toBe(0);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('should lint from a symlinked working directory', async () => {
+    const tempDir = await createTempDir({
+      'real/rslint.config.mjs': `export default [{
+        files: ['**/*.ts'],
+        rules: { 'no-debugger': 'error' },
+      }];`,
+      'real/index.ts': 'debugger;\n',
+    });
+    const realDir = path.join(tempDir, 'real');
+    const aliasDir = path.join(tempDir, 'alias');
+
+    try {
+      await fs.symlink(
+        realDir,
+        aliasDir,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      const result = await runRslintViaNode([], aliasDir, { PWD: aliasDir });
+
+      expect(result.stderr).not.toContain('failed to load config');
+      expect(result.stdout).toContain('no-debugger');
+      expect(result.stdout).toMatch(/linted [1-9]\d* files?/);
+      expect(result.exitCode).toBe(1);
     } finally {
       await cleanupTempDir(tempDir);
     }

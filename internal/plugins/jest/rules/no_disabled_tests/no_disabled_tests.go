@@ -70,7 +70,7 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 
 var NoDisabledTestsRule = rule.Rule{
 	Name: "jest/no-disabled-tests",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if isPendingCall(node, ctx) {

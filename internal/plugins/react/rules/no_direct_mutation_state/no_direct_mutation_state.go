@@ -82,7 +82,7 @@ func isThisStateMember(node *ast.Node) bool {
 
 var NoDirectMutationStateRule = rule.Rule{
 	Name: "react/no-direct-mutation-state",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)

@@ -1,0 +1,4964 @@
+// Rstest Snapshot v1
+
+exports[`prefer-regex-literals > invalid 1`] = `
+{
+  "code": "new RegExp('abc');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 2`] = `
+{
+  "code": "RegExp('abc');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 3`] = `
+{
+  "code": "new RegExp('abc', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 4`] = `
+{
+  "code": "RegExp('abc', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 5`] = `
+{
+  "code": "new RegExp(\`abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 6`] = `
+{
+  "code": "RegExp(\`abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 7`] = `
+{
+  "code": "new RegExp(\`abc\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 8`] = `
+{
+  "code": "RegExp(\`abc\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 9`] = `
+{
+  "code": "new RegExp(String.raw\`abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 10`] = `
+{
+  "code": "new RegExp(String.raw\`abc
+abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 11`] = `
+{
+  "code": "new RegExp(String.raw\`	abc
+abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 12`] = `
+{
+  "code": "RegExp(String.raw\`abc\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 13`] = `
+{
+  "code": "new RegExp(String.raw\`abc\`, String.raw\`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 14`] = `
+{
+  "code": "RegExp(String.raw\`abc\`, String.raw\`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 15`] = `
+{
+  "code": "new RegExp(String['raw']\`a\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 16`] = `
+{
+  "code": "new RegExp('');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 17`] = `
+{
+  "code": "RegExp('', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 18`] = `
+{
+  "code": "new RegExp(String.raw\`\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 19`] = `
+{
+  "code": "new RegExp('a', \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 20`] = `
+{
+  "code": "RegExp(\`a\`, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 21`] = `
+{
+  "code": "RegExp(String.raw\`a\`, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 22`] = `
+{
+  "code": "new RegExp(String.raw\`\\d\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 23`] = `
+{
+  "code": "new RegExp(String.raw\`\\\\d\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 24`] = `
+{
+  "code": "new RegExp(String['raw']\`\\\\d\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 25`] = `
+{
+  "code": "new RegExp(String["raw"]\`\\\\d\`, \`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 26`] = `
+{
+  "code": "RegExp('a', String.raw\`g\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 27`] = `
+{
+  "code": "new globalThis.RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 28`] = `
+{
+  "code": "globalThis.RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 29`] = `
+{
+  "code": "new RegExp(/a/);",
+  "diagnostics": [
+    {
+      "message": "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 30`] = `
+{
+  "code": "new RegExp(/a/, 'u');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 31`] = `
+{
+  "code": "new RegExp(/a/g, '');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 32`] = `
+{
+  "code": "new RegExp(/a/g, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 33`] = `
+{
+  "code": "new RegExp(/a/ig, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 34`] = `
+{
+  "code": "new RegExp(/a/g, 'ig');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 35`] = `
+{
+  "code": "new RegExp(/a/i, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 36`] = `
+{
+  "code": "new RegExp(/a/i, 'i');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 37`] = `
+{
+  "code": "new RegExp(/a/, \`u\`);",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 38`] = `
+{
+  "code": "new RegExp(/a/, \`gi\`);",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 39`] = `
+{
+  "code": "new RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 40`] = `
+{
+  "code": "new RegExp(/a/, String.raw\`u\`);",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 41`] = `
+{
+  "code": "new RegExp(/a/ /* comment */);",
+  "diagnostics": [
+    {
+      "message": "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExp",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 42`] = `
+{
+  "code": "new RegExp(/a/, 'd');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 43`] = `
+{
+  "code": "(a)
+new RegExp(/b/);",
+  "diagnostics": [
+    {
+      "message": "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 44`] = `
+{
+  "code": "(a)
+new RegExp(/b/, 'g');",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 45`] = `
+{
+  "code": "a/RegExp(/foo/);",
+  "diagnostics": [
+    {
+      "message": "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 46`] = `
+{
+  "code": "RegExp(/foo/)in a;",
+  "diagnostics": [
+    {
+      "message": "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExp",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 47`] = `
+{
+  "code": "new RegExp((String?.raw)\`a\`);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 48`] = `
+{
+  "code": "new RegExp('+');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 49`] = `
+{
+  "code": "new RegExp('*');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 50`] = `
+{
+  "code": "RegExp('+');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 51`] = `
+{
+  "code": "RegExp('*');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 52`] = `
+{
+  "code": "new RegExp('+', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 53`] = `
+{
+  "code": "new RegExp('*', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 54`] = `
+{
+  "code": "RegExp('+', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 55`] = `
+{
+  "code": "RegExp('*', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 56`] = `
+{
+  "code": "RegExp('abc', 'u');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 57`] = `
+{
+  "code": "new RegExp('abc', 'd');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 58`] = `
+{
+  "code": "RegExp('abc', 'd');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 59`] = `
+{
+  "code": "RegExp('\\\\\\\\', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 60`] = `
+{
+  "code": "RegExp('\\n', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 61`] = `
+{
+  "code": "RegExp('\\n\\n', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 62`] = `
+{
+  "code": "RegExp('\\t', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 63`] = `
+{
+  "code": "RegExp('\\t\\t', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 64`] = `
+{
+  "code": "RegExp('\\r\\n', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 65`] = `
+{
+  "code": "RegExp('\\u1234', 'g')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 66`] = `
+{
+  "code": "RegExp('\\u{1234}', 'g')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 67`] = `
+{
+  "code": "RegExp('\\u{11111}', 'g')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 68`] = `
+{
+  "code": "RegExp('\\v', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 69`] = `
+{
+  "code": "RegExp('\\v\\v', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 70`] = `
+{
+  "code": "RegExp('\\f', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 71`] = `
+{
+  "code": "RegExp('\\f\\f', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 72`] = `
+{
+  "code": "RegExp('\\\\b', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 73`] = `
+{
+  "code": "RegExp('\\\\b\\\\b', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 74`] = `
+{
+  "code": "new RegExp('\\\\B\\\\b', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 75`] = `
+{
+  "code": "RegExp('\\\\w', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 76`] = `
+{
+  "code": "new globalThis.RegExp('\\\\W', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 77`] = `
+{
+  "code": "RegExp('\\\\s', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 78`] = `
+{
+  "code": "new RegExp('\\\\S', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 79`] = `
+{
+  "code": "globalThis.RegExp('\\\\d', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 80`] = `
+{
+  "code": "globalThis.RegExp('\\\\D', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 81`] = `
+{
+  "code": "globalThis.RegExp('\\\\\\\\\\\\D', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 82`] = `
+{
+  "code": "new RegExp('\\\\D\\\\D', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 83`] = `
+{
+  "code": "new globalThis.RegExp('\\\\0\\\\0', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 84`] = `
+{
+  "code": "new RegExp('\\\\0\\\\0', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 85`] = `
+{
+  "code": "new RegExp('\\0\\0', 'g');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 86`] = `
+{
+  "code": "RegExp('\\\\0\\\\0\\\\0', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 87`] = `
+{
+  "code": "RegExp('\\\\78\\\\126\\\\5934', '')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 88`] = `
+{
+  "code": "new window['RegExp']('\\\\x56\\\\x78\\\\x45', '');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 89`] = `
+{
+  "code": "a in(RegExp('abc'))",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 90`] = `
+{
+  "code": "x = y
+            RegExp("foo").test(x) ? bar() : baz()",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 91`] = `
+{
+  "code": "func(new RegExp(String.raw\`\\w{1, 2\`, 'u'),new RegExp(String.raw\`\\w{1, 2\`, 'u'))",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 79,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 92`] = `
+{
+  "code": "x = y;
+            RegExp("foo").test(x) ? bar() : baz()",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 93`] = `
+{
+  "code": "typeof RegExp("foo")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 94`] = `
+{
+  "code": "RegExp("foo") instanceof RegExp(String.raw\`blahblah\`, 'g') ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', \`ug\`) : false",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 117,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 95`] = `
+{
+  "code": "[   new RegExp(\`someregular\`)]",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 96`] = `
+{
+  "code": "const totallyValidatesEmails = new RegExp("\\\\S+@(\\\\S+\\\\.)+\\\\S+")
+            if (typeof totallyValidatesEmails === 'object') {
+                runSomethingThatExists(Regexp('stuff'))
+            }",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 97`] = `
+{
+  "code": "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 93,
+          "line": 1,
+        },
+        "start": {
+          "column": 77,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 116,
+          "line": 1,
+        },
+        "start": {
+          "column": 96,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 144,
+          "line": 1,
+        },
+        "start": {
+          "column": 122,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 168,
+          "line": 1,
+        },
+        "start": {
+          "column": 151,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 98`] = `
+{
+  "code": "#!/usr/bin/sh
+            RegExp("foo")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 99`] = `
+{
+  "code": "async function abc(){await new RegExp("foo")}",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 100`] = `
+{
+  "code": "function* abc(){yield new RegExp("foo")}",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 101`] = `
+{
+  "code": "function* abc(){yield* new RegExp("foo")}",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 102`] = `
+{
+  "code": "console.log({ ...new RegExp('a') })",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 103`] = `
+{
+  "code": "delete RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 104`] = `
+{
+  "code": "void RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 105`] = `
+{
+  "code": "new RegExp("\\\\S+@(\\\\S+\\\\.)+\\\\S+")**RegExp('a')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 106`] = `
+{
+  "code": "new RegExp("\\\\S+@(\\\\S+\\\\.)+\\\\S+")%RegExp('a')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 107`] = `
+{
+  "code": "a in RegExp('abc')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 108`] = `
+{
+  "code": "
+            /abc/ == new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 109`] = `
+{
+  "code": "
+            /abc/ === new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 110`] = `
+{
+  "code": "
+            /abc/ != new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 111`] = `
+{
+  "code": "
+            /abc/ !== new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 112`] = `
+{
+  "code": "
+            /abc/ > new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 113`] = `
+{
+  "code": "
+            /abc/ < new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 114`] = `
+{
+  "code": "
+            /abc/ >= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 115`] = `
+{
+  "code": "
+            /abc/ <= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 116`] = `
+{
+  "code": "
+            /abc/ << new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 117`] = `
+{
+  "code": "
+            /abc/ >> new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 118`] = `
+{
+  "code": "
+            /abc/ >>> new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 119`] = `
+{
+  "code": "
+            /abc/ ^ new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 120`] = `
+{
+  "code": "
+            /abc/ & new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 121`] = `
+{
+  "code": "
+            /abc/ | new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 122`] = `
+{
+  "code": "
+            null ?? new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 123`] = `
+{
+  "code": "
+            abc *= new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 124`] = `
+{
+  "code": "
+            console.log({a: new RegExp('sup')})
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 2,
+        },
+        "start": {
+          "column": 29,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 125`] = `
+{
+  "code": "
+            console.log(() => {new RegExp('sup')})
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 2,
+        },
+        "start": {
+          "column": 32,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 126`] = `
+{
+  "code": "
+            function abc() {new RegExp('sup')}
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 2,
+        },
+        "start": {
+          "column": 29,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 127`] = `
+{
+  "code": "
+            function abc() {return new RegExp('sup')}
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 2,
+        },
+        "start": {
+          "column": 36,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 128`] = `
+{
+  "code": "
+            abc <<= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 129`] = `
+{
+  "code": "
+            abc >>= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 130`] = `
+{
+  "code": "
+            abc >>>= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 131`] = `
+{
+  "code": "
+            abc ^= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 132`] = `
+{
+  "code": "
+            abc &= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 133`] = `
+{
+  "code": "
+            abc |= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 134`] = `
+{
+  "code": "
+            abc ??= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 135`] = `
+{
+  "code": "
+            abc &&= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 136`] = `
+{
+  "code": "
+            abc ||= new RegExp('cba');
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 137`] = `
+{
+  "code": "
+            abc **= new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 138`] = `
+{
+  "code": "
+            abc /= new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 139`] = `
+{
+  "code": "
+            abc += new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 140`] = `
+{
+  "code": "
+            abc -= new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 141`] = `
+{
+  "code": "
+            abc %= new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 142`] = `
+{
+  "code": "
+            () => new RegExp('blah')
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 143`] = `
+{
+  "code": "a/RegExp("foo")in b",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 144`] = `
+{
+  "code": "a/RegExp("foo")instanceof b",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 145`] = `
+{
+  "code": "do RegExp("foo")
+while (true);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 146`] = `
+{
+  "code": "for(let i;i<5;i++) { break
+new RegExp('search')}",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 147`] = `
+{
+  "code": "for(let i;i<5;i++) { continue
+new RegExp('search')}",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 148`] = `
+{
+  "code": "
+            switch (value) {
+                case "possibility":
+                    console.log('possibility matched')
+                case RegExp('myReg').toString():
+                    console.log('matches a regexp\\' toString value')
+                    break;
+            }
+            ",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 149`] = `
+{
+  "code": "throw new RegExp('abcdefg') // fail with a regular expression",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 150`] = `
+{
+  "code": "for (value of new RegExp('something being searched')) { console.log(value) }",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 151`] = `
+{
+  "code": "(async function(){for await (value of new RegExp('something being searched')) { console.log(value) }})()",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 152`] = `
+{
+  "code": "for (value in new RegExp('something being searched')) { console.log(value) }",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 153`] = `
+{
+  "code": "if (condition1 && condition2) new RegExp('avalue').test(str);",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 154`] = `
+{
+  "code": "debugger
+new RegExp('myReg')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 155`] = `
+{
+  "code": "RegExp("\\\\\\n")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 156`] = `
+{
+  "code": "RegExp("\\\\\\t")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 157`] = `
+{
+  "code": "RegExp("\\\\\\f")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 158`] = `
+{
+  "code": "RegExp("\\\\\\v")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 159`] = `
+{
+  "code": "RegExp("\\\\\\r")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 160`] = `
+{
+  "code": "new RegExp("	")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 161`] = `
+{
+  "code": "new RegExp("/")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 162`] = `
+{
+  "code": "new RegExp("\\.")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 163`] = `
+{
+  "code": "new RegExp("\\\\.")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 164`] = `
+{
+  "code": "new RegExp("\\\\\\n\\\\\\n")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 165`] = `
+{
+  "code": "new RegExp("\\\\\\n\\\\\\f\\\\\\n")",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 166`] = `
+{
+  "code": "new RegExp("\\u000A\\u000A");",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 167`] = `
+{
+  "code": "new RegExp('mysafereg' /* comment explaining its safety */)",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 168`] = `
+{
+  "code": "new RegExp('[[A--B]]', 'v')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 169`] = `
+{
+  "code": "new RegExp('[[A--B]]', 'v')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 170`] = `
+{
+  "code": "new RegExp('[[A&&&]]', 'v')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 171`] = `
+{
+  "code": "new RegExp('a', 'uv')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 172`] = `
+{
+  "code": "new RegExp(/a/, 'v')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 173`] = `
+{
+  "code": "new RegExp(/a/, 'v')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 174`] = `
+{
+  "code": "new RegExp(/a/g, 'v')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 175`] = `
+{
+  "code": "new RegExp(/[[A--B]]/v, 'g')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 176`] = `
+{
+  "code": "new RegExp(/a/u, 'v')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 177`] = `
+{
+  "code": "new RegExp(/a/v, 'u')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 178`] = `
+{
+  "code": "new RegExp(/[[A--B]]/v, 'u')",
+  "diagnostics": [
+    {
+      "message": "Use regular expression literal with flags instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRedundantRegExpWithFlags",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 179`] = `
+{
+  "code": "new RegExp('(?i:foo)bar')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 180`] = `
+{
+  "code": "new RegExp('(?i:foo)bar')",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regex-literals > invalid 181`] = `
+{
+  "code": "var regex = new RegExp('foo', 'u');",
+  "diagnostics": [
+    {
+      "message": "Use a regular expression literal instead of the 'RegExp' constructor.",
+      "messageId": "unexpectedRegExp",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-regex-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

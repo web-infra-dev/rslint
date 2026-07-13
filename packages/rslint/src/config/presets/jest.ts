@@ -1,0 +1,39 @@
+import type { RslintConfigEntry } from '../define-config.js';
+
+// Aligned with official eslint-plugin-jest@29.x recommended.
+// Rules commented out with "not implemented" are in the official preset but not yet available.
+const recommended: RslintConfigEntry = {
+  plugins: ['jest'],
+  rules: {
+    'jest/expect-expect': 'warn',
+    'jest/no-alias-methods': 'error',
+    'jest/no-commented-out-tests': 'warn',
+    'jest/no-conditional-expect': 'error',
+    'jest/no-deprecated-functions': 'error',
+    'jest/no-disabled-tests': 'warn',
+    'jest/no-done-callback': 'error',
+    'jest/no-export': 'error',
+    'jest/no-focused-tests': 'error',
+    'jest/no-identical-title': 'error',
+    // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
+    'jest/no-jasmine-globals': 'error',
+    'jest/no-mocks-import': 'error',
+    'jest/no-standalone-expect': 'error',
+    'jest/no-test-prefixes': 'error',
+    'jest/valid-describe-callback': 'error',
+    'jest/valid-expect': 'error',
+    // 'jest/valid-expect-in-promise': 'error', // not implemented
+    'jest/valid-title': 'error',
+  },
+};
+
+const style: RslintConfigEntry = {
+  plugins: ['jest'],
+  rules: {
+    'jest/prefer-to-be': 'error',
+    'jest/prefer-to-contain': 'error',
+    'jest/prefer-to-have-length': 'error',
+  },
+};
+
+export { recommended, style };

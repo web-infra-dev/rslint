@@ -29,9 +29,10 @@ import (
 // https://eslint.org/docs/latest/rules/no-misleading-character-class
 var NoMisleadingCharacterClassRule = rule.Rule{
 	Name: "no-misleading-character-class",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		eval := newStaticEvalCtx(ctx)
+		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
 		return rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				handleRegexLiteral(ctx, node, opts)
@@ -117,7 +118,7 @@ func handleRegexLiteral(ctx rule.RuleContext, node *ast.Node, opts ruleOptions) 
 	}
 }
 
-func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, opts ruleOptions, eval *staticEvalCtx) {
+func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, opts ruleOptions, eval *utils.StaticStringEvaluator) {
 	callee = ast.SkipParentheses(callee)
 	if !isBuiltinRegExpCallee(ctx, callee) {
 		return
@@ -140,7 +141,7 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	// objects so that flag-stripping patterns (e.g. `const r = /x/u;
 	// new RegExp(r, "")`) aren't re-analyzed under override flags.
 	if patternNode.Kind == ast.KindIdentifier && ctx.TypeChecker != nil {
-		if resolved := resolveBindingInitializer(ctx, patternNode, eval); resolved != nil {
+		if resolved := resolveBindingInitializer(patternNode, eval); resolved != nil {
 			patternNode = resolved
 		}
 	}
@@ -179,7 +180,7 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 		// whole pattern-node loc (matching ESLint's "no granular reports on
 		// templates with expressions" / "no granular reports on identifiers"
 		// behavior).
-		value, ok := eval.evalStaticString(patternNode)
+		value, ok := eval.Eval(patternNode)
 		if !ok {
 			return
 		}
@@ -253,58 +254,32 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bo
 	if args == nil || len(args.Nodes) < 2 {
 		return false
 	}
-	// Confirm node is the first argument (possibly through parens) AND the
-	// flags argument is statically known — otherwise the constructor path
-	// short-circuits and this listener must be the one to report.
+	// Confirm node is the first argument (possibly through parens). An
+	// explicit flags argument overrides the literal's own flags even when it
+	// is dynamic, so the literal listener must not report against stale flags.
 	if first := ast.SkipParentheses(args.Nodes[0]); first != node {
 		return false
 	}
-	flagsNode := ast.SkipParentheses(args.Nodes[1])
-	if flagsNode == nil {
-		return false
-	}
-	return flagsNode.Kind == ast.KindStringLiteral ||
-		flagsNode.Kind == ast.KindNoSubstitutionTemplateLiteral
+	return true
 }
 
 // resolveBindingInitializer attempts to resolve an identifier to its
-// initializer literal when the initializer is a string, template, or regex
-// literal AND the binding is safely constant — either `const`, or `let`/`var`
-// with no write references elsewhere in the file.
+// initializer literal when the initializer is a string or no-substitution
+// template literal AND the binding is safely constant — either `const`, or
+// `let`/`var` with no write references elsewhere in the file.
 //
 // Returns nil if no such binding exists. Requires ctx.TypeChecker != nil.
 // For let/var resolution, also requires `eval` so we can consult its
 // write-reference cache.
-func resolveBindingInitializer(ctx rule.RuleContext, ident *ast.Node, eval *staticEvalCtx) *ast.Node {
-	sym := ctx.TypeChecker.GetSymbolAtLocation(ident)
-	if sym == nil {
+func resolveBindingInitializer(ident *ast.Node, eval *utils.StaticStringEvaluator) *ast.Node {
+	if eval == nil {
 		return nil
 	}
-	if len(sym.Declarations) != 1 {
+	initializer, ok := eval.ResolveIdentifierInitializer(ident)
+	if !ok {
 		return nil
 	}
-	decl := sym.Declarations[0]
-	if decl.Kind != ast.KindVariableDeclaration {
-		return nil
-	}
-	varDecl := decl.AsVariableDeclaration()
-	if varDecl == nil || varDecl.Initializer == nil {
-		return nil
-	}
-	list := decl.Parent
-	if list == nil || list.Kind != ast.KindVariableDeclarationList {
-		return nil
-	}
-	isConst := list.Flags&ast.NodeFlagsConst != 0
-	if !isConst {
-		if eval == nil {
-			return nil
-		}
-		if eval.writeRefs()[sym] {
-			return nil
-		}
-	}
-	init := ast.SkipParentheses(varDecl.Initializer)
+	init := utils.SkipAssertionsAndParens(initializer)
 	if init == nil {
 		return nil
 	}
@@ -363,7 +338,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 	return false
 }
 
-func readFlagsArg(args *ast.NodeList, eval *staticEvalCtx) (flags string, hasFlags bool, known bool) {
+func readFlagsArg(args *ast.NodeList, eval *utils.StaticStringEvaluator) (flags string, hasFlags bool, known bool) {
 	if len(args.Nodes) < 2 {
 		return "", false, true
 	}
@@ -373,7 +348,7 @@ func readFlagsArg(args *ast.NodeList, eval *staticEvalCtx) (flags string, hasFla
 	}
 	// Any expression that statically evaluates to a string — this covers
 	// `"u"`, `` `u` ``, `"u" + ""`, `String.raw\`u\``, and `const F = "u"; ...F`.
-	if value, ok := eval.evalStaticString(node); ok {
+	if value, ok := eval.Eval(node); ok {
 		return value, true, true
 	}
 	return "", true, false
@@ -387,7 +362,7 @@ func readFlagsArg(args *ast.NodeList, eval *staticEvalCtx) (flags string, hasFla
 // sequences should break. They occupy the out-of-range uint32 space so real
 // code units / code points never collide with them.
 const (
-	sentinelBreaker      uint32 = 0xFFFFFF00 // CharacterSet (\d, \p{}, \q{}, nested class, set op)
+	sentinelBreaker       uint32 = 0xFFFFFF00 // CharacterSet (\d, \p{}, \q{}, nested class, set op)
 	sentinelRangeBoundary uint32 = 0xFFFFFFFF // split point between min/max of a CharacterClassRange
 )
 
@@ -799,7 +774,7 @@ func isSurrogateValue(v uint32) bool { return v >= 0xD800 && v <= 0xDFFF }
 func isCombiningCharacter(cp uint32) bool {
 	return cp <= 0x10FFFF && unicode.Is(unicode.M, rune(cp))
 }
-func isEmojiModifier(cp uint32) bool      { return cp >= 0x1F3FB && cp <= 0x1F3FF }
+func isEmojiModifier(cp uint32) bool { return cp >= 0x1F3FB && cp <= 0x1F3FF }
 func isRegionalIndicatorSymbol(cp uint32) bool {
 	return cp >= 0x1F1E6 && cp <= 0x1F1FF
 }

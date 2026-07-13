@@ -17,68 +17,6 @@ func isGenerator(node *ast.Node) bool {
 	return ast.GetFunctionFlags(node)&ast.FunctionFlagsGenerator != 0
 }
 
-func hasNonEmptyBody(node *ast.Node) bool {
-	body := node.Body()
-	if body == nil || body.Kind != ast.KindBlock {
-		return false
-	}
-	block := body.AsBlock()
-	if block == nil || block.Statements == nil {
-		return false
-	}
-	return len(block.Statements.Nodes) > 0
-}
-
-// bodyLikeRange returns the [pos, end) of the "execution scope" of a
-// scope-bearing node. Yield expressions whose position falls inside this
-// range are attributed to this scope; yields outside it (e.g. in a
-// computed property key or a decorator expression) pass through to an
-// outer scope.
-//
-// Required because tsgo performs error-recovery parsing: an illegally
-// placed `yield` (e.g. inside a non-generator function body or in a
-// parameter default value of a non-generator) still produces a
-// KindYieldExpression AST node. Without position-aware attribution, such
-// a yield would bubble up to the nearest enclosing generator on the
-// stack and cause a false negative.
-//
-// For function-like nodes the scope starts at the parameter list, so
-// that yield in parameter default values is attributed here rather than
-// leaking to an outer generator.
-func bodyLikeRange(node *ast.Node) (int, int, bool) {
-	switch node.Kind {
-	case ast.KindFunctionDeclaration,
-		ast.KindFunctionExpression,
-		ast.KindMethodDeclaration,
-		ast.KindArrowFunction,
-		ast.KindGetAccessor,
-		ast.KindSetAccessor,
-		ast.KindConstructor:
-		body := node.Body()
-		if body == nil {
-			return 0, 0, false
-		}
-		pos := body.Pos()
-		if params := node.ParameterList(); params != nil {
-			pos = params.Loc.Pos()
-		}
-		return pos, body.End(), true
-	case ast.KindPropertyDeclaration:
-		init := node.AsPropertyDeclaration().Initializer
-		if init == nil {
-			return 0, 0, false
-		}
-		return init.Pos(), init.End(), true
-	case ast.KindClassStaticBlockDeclaration:
-		body := node.AsClassStaticBlockDeclaration().Body
-		if body == nil {
-			return 0, 0, false
-		}
-		return body.Pos(), body.End(), true
-	}
-	return 0, 0, false
-}
-
 type stackFrame struct {
 	node  *ast.Node
 	count int
@@ -87,7 +25,7 @@ type stackFrame struct {
 // https://eslint.org/docs/latest/rules/require-yield
 var RequireYieldRule = rule.Rule{
 	Name: "require-yield",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		stack := make([]stackFrame, 0, 8)
 
 		enter := func(node *ast.Node) {
@@ -108,7 +46,7 @@ var RequireYieldRule = rule.Rule{
 				top.node.Kind == ast.KindClassStaticBlockDeclaration {
 				return
 			}
-			if isGenerator(top.node) && top.count == 0 && hasNonEmptyBody(top.node) {
+			if isGenerator(top.node) && top.count == 0 && utils.HasNonEmptyFunctionBody(top.node) {
 				ctx.ReportRange(
 					utils.GetFunctionHeadLoc(ctx.SourceFile, top.node),
 					buildMissingYieldMessage(),
@@ -118,7 +56,7 @@ var RequireYieldRule = rule.Rule{
 
 		countYield := func(node *ast.Node) {
 			for i := len(stack) - 1; i >= 0; i-- {
-				bp, be, ok := bodyLikeRange(stack[i].node)
+				bp, be, ok := utils.BodyLikeRange(stack[i].node)
 				if !ok {
 					continue
 				}

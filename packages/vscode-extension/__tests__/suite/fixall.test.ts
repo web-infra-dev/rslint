@@ -104,24 +104,27 @@ suite('rslint fixAll - code actions', function () {
       const fixableDiags = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       );
-      if (fixableDiags.length === 0) return;
+      assert.ok(
+        fixableDiags.length > 0,
+        `Expected a fixable diagnostic. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
+      assert.ok(fixAllAction?.edit, 'fixAll should provide an edit');
+      const applied = await vscode.workspace.applyEdit(fixAllAction.edit);
+      assert.ok(applied, 'fixAll edit should apply successfully');
 
-      if (fixAllAction?.edit) {
-        const applied = await vscode.workspace.applyEdit(fixAllAction.edit);
-        assert.ok(applied, 'fixAll edit should apply successfully');
+      const updatedDiags = await waitForDiagnosticsToChange(
+        doc,
+        initialDiags.length,
+      );
 
-        const updatedDiags = await waitForDiagnosticsToChange(
-          doc,
-          initialDiags.length,
-        );
-
-        assert.ok(
-          updatedDiags.length < initialDiags.length,
-          `Diagnostics should decrease after fixAll. Before: ${initialDiags.length}, After: ${updatedDiags.length}`,
-        );
-      }
+      assert.ok(
+        updatedDiags.length < initialDiags.length,
+        `Diagnostics should decrease after fixAll. Before: ${initialDiags.length}, After: ${updatedDiags.length}`,
+      );
     });
   });
 
@@ -143,34 +146,46 @@ suite('rslint fixAll - code actions', function () {
       const nonFixableBefore = initialDiags.filter((d) =>
         d.message.includes('no-unsafe'),
       );
-      if (fixableBefore.length === 0 || nonFixableBefore.length === 0) return;
+      assert.ok(
+        fixableBefore.length > 0,
+        `Expected a fixable diagnostic. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
+      assert.ok(
+        nonFixableBefore.length > 0,
+        `Expected a non-fixable diagnostic. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
+      assert.ok(fixAllAction?.edit, 'Mixed fixAll should provide an edit');
+      assert.ok(
+        await vscode.workspace.applyEdit(fixAllAction.edit),
+        'Mixed fixAll edit should apply',
+      );
 
-      if (fixAllAction?.edit) {
-        await vscode.workspace.applyEdit(fixAllAction.edit);
+      const updatedDiags = await waitForDiagnosticsToChange(
+        doc,
+        initialDiags.length,
+      );
 
-        const updatedDiags = await waitForDiagnosticsToChange(
-          doc,
-          initialDiags.length,
-        );
+      const fixableAfter = updatedDiags.filter((d) =>
+        d.message.includes('no-unnecessary-type-assertion'),
+      );
+      assert.ok(
+        fixableAfter.length < fixableBefore.length,
+        `Fixable diagnostics should decrease. Before: ${fixableBefore.length}, After: ${fixableAfter.length}`,
+      );
 
-        const fixableAfter = updatedDiags.filter((d) =>
-          d.message.includes('no-unnecessary-type-assertion'),
-        );
-        assert.ok(
-          fixableAfter.length < fixableBefore.length,
-          `Fixable diagnostics should decrease. Before: ${fixableBefore.length}, After: ${fixableAfter.length}`,
-        );
-
-        const nonFixableAfter = updatedDiags.filter((d) =>
-          d.message.includes('no-unsafe'),
-        );
-        assert.ok(
-          nonFixableAfter.length > 0,
-          `Non-fixable diagnostics should remain after fixAll, got ${nonFixableAfter.length}`,
-        );
-      }
+      const nonFixableAfter = updatedDiags.filter((d) =>
+        d.message.includes('no-unsafe'),
+      );
+      assert.ok(
+        nonFixableAfter.length > 0,
+        `Non-fixable diagnostics should remain after fixAll, got ${nonFixableAfter.length}`,
+      );
     });
   });
 
@@ -186,14 +201,15 @@ suite('rslint fixAll - code actions', function () {
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
 
-      assert.ok(fixAllAction, 'fixAll should work even before debounce fires');
-      if (fixAllAction?.edit) {
-        const edits = fixAllAction.edit.get(doc.uri);
-        assert.ok(
-          edits && edits.length > 0,
-          'fixAll should produce edits for newly edited content',
-        );
-      }
+      assert.ok(
+        fixAllAction?.edit,
+        'fixAll should provide an edit even before debounce fires',
+      );
+      const edits = fixAllAction.edit.get(doc.uri);
+      assert.ok(
+        edits && edits.length > 0,
+        'fixAll should produce edits for newly edited content',
+      );
     });
   });
 
@@ -205,7 +221,12 @@ suite('rslint fixAll - code actions', function () {
       const fixableCount = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       ).length;
-      if (fixableCount === 0) return;
+      assert.ok(
+        fixableCount > 0,
+        `Expected a fixable diagnostic before first fixAll. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       const fixAll1 = findFixAllAction(await requestFixAll(doc));
       assert.ok(fixAll1?.edit, 'First fixAll should have edits');
