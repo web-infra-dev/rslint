@@ -472,9 +472,36 @@ func parseOptions(rawOpts any) []normalizedSelector {
 		selectors = append(selectors, parseOneSelector(optMap)...)
 	}
 
-	// Sort by specificity (more specific first)
+	// Sort by specificity (more specific first). Selector-kind specificity
+	// (individual > method/property meta > other meta groups) always takes
+	// precedence over modifierWeight — modifierWeight (modifiers/types/filter)
+	// only breaks ties between selectors that target the exact same selector
+	// kind. Otherwise a `filter` on a broad, earlier selector (e.g. memberLike)
+	// would wrongly outrank a narrower, later one (e.g. property) that has no
+	// filter at all.
 	sort.SliceStable(selectors, func(i, j int) bool {
-		return selectors[i].modifierWeight > selectors[j].modifierWeight
+		a, b := selectors[i], selectors[j]
+		if a.selector == b.selector {
+			return a.modifierWeight > b.modifierWeight
+		}
+
+		aIndividual := bitCount(int(a.selector)) == 1
+		bIndividual := bitCount(int(b.selector)) == 1
+		if aIndividual != bIndividual {
+			return aIndividual
+		}
+
+		// For backward compatibility, method and property have higher
+		// precedence than other meta selectors (matches upstream
+		// @typescript-eslint/eslint-plugin behavior).
+		aMethodOrProperty := a.selector == selectorMethod || a.selector == selectorProperty
+		bMethodOrProperty := b.selector == selectorMethod || b.selector == selectorProperty
+		if aMethodOrProperty != bMethodOrProperty {
+			return aMethodOrProperty
+		}
+
+		// Fewer bits = a narrower/more specific group.
+		return bitCount(int(a.selector)) < bitCount(int(b.selector))
 	})
 
 	return selectors
@@ -616,7 +643,7 @@ func parseOneSelector(optMap map[string]interface{}) []normalizedSelector {
 		if !selectorSupportsTypes(sk) {
 			selectorTypes = 0
 		}
-		weight := calculateWeight(mods, selectorTypes, filter, sk)
+		weight := calculateWeight(mods, selectorTypes, filter)
 		result = append(result, normalizedSelector{
 			selector:           sk,
 			modifiers:          mods,
@@ -669,30 +696,22 @@ func parseMatchRegex(val interface{}) *matchRegex {
 	return nil
 }
 
-func calculateWeight(mods modifierKind, types typeModifierKind, filter *matchRegex, sk selectorKind) int {
+// calculateWeight mirrors the original ESLint rule's modifierWeight
+// calculation. It is used only to break ties between selectors that target
+// the exact same selector kind — selector-kind specificity itself is decided
+// separately (see parseOptions' sort), never by this weight.
+func calculateWeight(mods modifierKind, types typeModifierKind, filter *matchRegex) int {
 	weight := 0
 
-	// Individual selector (bitCount=1) is most specific
-	pc := bitCount(int(sk))
-	if pc == 1 {
-		weight |= 1 << 27
-	} else {
-		// Smaller group = more specific. Invert so fewer bits = higher weight.
-		// Max possible bit count for selectorDefault is ~19, so 20-pc gives us 1-20 range
-		weight |= (20 - pc) << 22
-	}
+	// Raw bitmask value (not bitcount): higher-valued modifiers (e.g.,
+	// unused=2048) take priority over lower-valued ones (e.g.,
+	// destructured=256). Shift types past the modifier bit range so the two
+	// don't collide (both modifierKind and typeModifierKind start at 1<<0).
+	weight |= int(mods)
+	weight |= int(types) << 17
 
-	if mods != 0 {
-		weight |= 1 << 28
-		// Use raw bitmask value (not bitcount) to match the original ESLint rule's
-		// modifierWeight calculation: higher-valued modifiers (e.g., unused=2048)
-		// have higher priority than lower-valued ones (e.g., destructured=256).
-		weight |= int(mods)
-	}
-	if types != 0 {
-		weight |= 1 << 29
-		weight |= int(types)
-	}
+	// Give selectors with a filter the highest priority among same-kind
+	// selectors.
 	if filter != nil {
 		weight |= 1 << 30
 	}

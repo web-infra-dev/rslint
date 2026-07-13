@@ -229,6 +229,27 @@ func TestNamingConventionRule(t *testing.T) {
 				},
 			},
 		},
+
+		// A `filter` on an earlier, less-specific selector (memberLike) must
+		// not defeat a later, more specific selector (property) that has no
+		// filter at all — the more specific selector should still win.
+		{
+			Code: `interface Foo { Uppercase: string; } const obj = { Lowercase: 1 };`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "memberLike",
+					"format":   []interface{}{"camelCase"},
+					"filter": map[string]interface{}{
+						"regex": "^([0-9]+|[A-Za-z]+_[A-Za-z]+)$",
+						"match": false,
+					},
+				},
+				map[string]interface{}{
+					"selector": "property",
+					"format":   nil,
+				},
+			},
+		},
 	}, []rule_tester.InvalidTestCase{
 		// Variable violating camelCase
 		{
