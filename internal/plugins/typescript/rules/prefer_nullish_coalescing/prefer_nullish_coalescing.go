@@ -230,22 +230,22 @@ func isConditionalTest(node *ast.Node) bool {
 
 // isBooleanConstructorContext walks parents to see if this expression is used
 // as the first argument of a global Boolean(...) call.
-func isBooleanConstructorContext(ctx rule.RuleContext, node *ast.Node) bool {
+func isBooleanConstructorContext(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
 	if parent.Kind == ast.KindParenthesizedExpression {
-		return isBooleanConstructorContext(ctx, parent)
+		return isBooleanConstructorContext(parent)
 	}
 	if parent.Kind == ast.KindBinaryExpression {
 		bin := parent.AsBinaryExpression()
 		if isLogicalLikeOperator(bin.OperatorToken.Kind) {
-			return isBooleanConstructorContext(ctx, parent)
+			return isBooleanConstructorContext(parent)
 		}
 		if bin.OperatorToken.Kind == ast.KindCommaToken {
 			if bin.Right == node {
-				return isBooleanConstructorContext(ctx, parent)
+				return isBooleanConstructorContext(parent)
 			}
 			return false
 		}
@@ -253,15 +253,15 @@ func isBooleanConstructorContext(ctx rule.RuleContext, node *ast.Node) bool {
 	if parent.Kind == ast.KindConditionalExpression {
 		ce := parent.AsConditionalExpression()
 		if ce.WhenTrue == node || ce.WhenFalse == node {
-			return isBooleanConstructorContext(ctx, parent)
+			return isBooleanConstructorContext(parent)
 		}
 	}
-	return isBuiltInBooleanCall(ctx, parent, node)
+	return isBuiltInBooleanCall(parent, node)
 }
 
 // isBuiltInBooleanCall reports whether `callNode` is a CallExpression to the
 // global Boolean(...) and `child` (paren-skipped) is its first argument.
-func isBuiltInBooleanCall(ctx rule.RuleContext, callNode *ast.Node, child *ast.Node) bool {
+func isBuiltInBooleanCall(callNode *ast.Node, child *ast.Node) bool {
 	if callNode.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -270,11 +270,7 @@ func isBuiltInBooleanCall(ctx rule.RuleContext, callNode *ast.Node, child *ast.N
 	if callee == nil || callee.Kind != ast.KindIdentifier {
 		return false
 	}
-	name := callee.AsIdentifier().Text
-	if name != "Boolean" {
-		return false
-	}
-	if declared, ok := ctx.Globals["Boolean"]; ok && !declared {
+	if callee.AsIdentifier().Text != "Boolean" {
 		return false
 	}
 	args := call.Arguments
@@ -609,7 +605,7 @@ func isTruthinessCheckEligible(ctx rule.RuleContext, opts *Options, node *ast.No
 	if opts.ignoreConditionalTests && isConditionalTest(node) {
 		return false
 	}
-	if opts.ignoreBooleanCoercion && isBooleanConstructorContext(ctx, node) {
+	if opts.ignoreBooleanCoercion && isBooleanConstructorContext(node) {
 		// Carve-out: a ConditionalExpression whose direct parent is a
 		// CallExpression should still report.
 		//

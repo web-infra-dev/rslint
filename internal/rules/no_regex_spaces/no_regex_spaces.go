@@ -71,9 +71,6 @@ var NoRegexSpacesRule = rule.Rule{
 			if callee == nil || callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "RegExp" {
 				return
 			}
-			if declared, ok := ctx.Globals["RegExp"]; ok && !declared {
-				return
-			}
 			if utils.IsShadowed(callee, "RegExp") {
 				return
 			}

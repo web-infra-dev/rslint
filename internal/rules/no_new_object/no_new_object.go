@@ -23,10 +23,6 @@ var NoNewObjectRule = rule.Rule{
 					return
 				}
 
-				if declared, ok := ctx.Globals["Object"]; ok && !declared {
-					return
-				}
-
 				// If Object is shadowed by a local declaration (var, function, class, import),
 				// it's not the global built-in — skip reporting.
 				if utils.IsShadowed(unwrapped, "Object") {

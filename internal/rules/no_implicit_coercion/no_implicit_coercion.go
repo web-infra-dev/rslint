@@ -100,9 +100,8 @@ var NoImplicitCoercionRule = rule.Rule{
 				innerPue := ast.SkipParentheses(pue.Operand).AsPrefixUnaryExpression()
 				target := ast.SkipParentheses(innerPue.Operand)
 				recommendation := "Boolean(" + utils.TrimmedNodeText(ctx.SourceFile, target) + ")"
-				shouldSuggest := !isGlobalOff(ctx.Globals, "Boolean")
-				shouldFix := !utils.IsShadowed(node, "Boolean") && shouldSuggest
-				report(node, recommendation, shouldSuggest, shouldFix)
+				shouldFix := !utils.IsShadowed(node, "Boolean")
+				report(node, recommendation, true, shouldFix)
 			}
 
 			// ~foo.indexOf(bar) → foo.indexOf(bar) !== -1 (or `>= 0` on an
@@ -124,8 +123,7 @@ var NoImplicitCoercionRule = rule.Rule{
 				operand := ast.SkipParentheses(pue.Operand)
 				if !isNumeric(operand) {
 					recommendation := "Number(" + utils.TrimmedNodeText(ctx.SourceFile, operand) + ")"
-					shouldSuggest := !isGlobalOff(ctx.Globals, "Number")
-					report(node, recommendation, shouldSuggest, false)
+					report(node, recommendation, true, false)
 				}
 			}
 
@@ -137,8 +135,7 @@ var NoImplicitCoercionRule = rule.Rule{
 					operand := ast.SkipParentheses(innerPue.Operand)
 					if innerPue.Operator == ast.KindMinusToken && !isNumeric(operand) {
 						recommendation := "Number(" + utils.TrimmedNodeText(ctx.SourceFile, operand) + ")"
-						shouldSuggest := !isGlobalOff(ctx.Globals, "Number")
-						report(node, recommendation, shouldSuggest, false)
+						report(node, recommendation, true, false)
 					}
 				}
 			}
@@ -158,8 +155,7 @@ var NoImplicitCoercionRule = rule.Rule{
 				if opts.number && !opts.allow.Has("*") && isMultiplyByOne(bin) && !isMultiplyByFractionOfOne(node) {
 					if operand := getNonNumericOperand(bin); operand != nil {
 						recommendation := "Number(" + utils.TrimmedNodeText(ctx.SourceFile, operand) + ")"
-						shouldSuggest := !isGlobalOff(ctx.Globals, "Number")
-						report(node, recommendation, shouldSuggest, false)
+						report(node, recommendation, true, false)
 					}
 				}
 			case ast.KindMinusToken:
@@ -168,8 +164,7 @@ var NoImplicitCoercionRule = rule.Rule{
 					left := ast.SkipParentheses(bin.Left)
 					if isLiteralZero(ast.SkipParentheses(bin.Right)) && !isNumeric(left) {
 						recommendation := "Number(" + utils.TrimmedNodeText(ctx.SourceFile, left) + ")"
-						shouldSuggest := !isGlobalOff(ctx.Globals, "Number")
-						report(node, recommendation, shouldSuggest, false)
+						report(node, recommendation, true, false)
 					}
 				}
 			case ast.KindPlusToken:
@@ -177,16 +172,14 @@ var NoImplicitCoercionRule = rule.Rule{
 				if opts.str && !opts.allow.Has("+") && isConcatWithEmptyString(bin) {
 					operand := ast.SkipParentheses(getNonEmptyOperand(bin))
 					recommendation := "String(" + utils.TrimmedNodeText(ctx.SourceFile, operand) + ")"
-					shouldSuggest := !isGlobalOff(ctx.Globals, "String")
-					report(node, recommendation, shouldSuggest, false)
+					report(node, recommendation, true, false)
 				}
 			case ast.KindPlusEqualsToken:
 				// foo += "" → foo = String(foo).
 				if opts.str && !opts.allow.Has("+") && isEmptyString(ast.SkipParentheses(bin.Right)) {
 					leftText := utils.TrimmedNodeText(ctx.SourceFile, ast.SkipParentheses(bin.Left))
 					recommendation := leftText + " = String(" + leftText + ")"
-					shouldSuggest := !isGlobalOff(ctx.Globals, "String")
-					report(node, recommendation, shouldSuggest, false)
+					report(node, recommendation, true, false)
 				}
 			}
 		}
@@ -217,8 +210,7 @@ var NoImplicitCoercionRule = rule.Rule{
 				return
 			}
 			recommendation := "String(" + utils.TrimmedNodeText(ctx.SourceFile, expr) + ")"
-			shouldSuggest := !isGlobalOff(ctx.Globals, "String")
-			report(node, recommendation, shouldSuggest, false)
+			report(node, recommendation, true, false)
 		}
 
 		return rule.RuleListeners{
@@ -434,9 +426,4 @@ func isLiteralNumberEqual(node *ast.Node, normalized string) bool {
 		return false
 	}
 	return utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) == normalized
-}
-
-func isGlobalOff(globals map[string]bool, name string) bool {
-	declared, ok := globals[name]
-	return ok && !declared
 }

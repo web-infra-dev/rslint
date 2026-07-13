@@ -150,13 +150,6 @@ func TestNoAlertRule(t *testing.T) {
 			{Code: `var x = window.alert;`},
 			{Code: `typeof alert;`},
 			{Code: `new alert()`},
-
-			// Config `off` un-declares the builtin
-			{Code: `alert(foo);`, Globals: map[string]bool{"alert": false}},
-			{Code: `confirm(foo);`, Globals: map[string]bool{"confirm": false}},
-			{Code: `prompt(foo);`, Globals: map[string]bool{"prompt": false}},
-			{Code: `window.alert(foo);`, Globals: map[string]bool{"window": false}},
-			{Code: `globalThis.alert(foo);`, Globals: map[string]bool{"globalThis": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ================================================================

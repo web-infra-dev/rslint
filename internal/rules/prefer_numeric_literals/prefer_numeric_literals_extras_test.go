@@ -50,10 +50,6 @@ func TestPreferNumericLiteralsExtras(t *testing.T) {
 			// N/A: object/property declaration key forms are not inspected by this call-expression rule.
 			// N/A: function/class declaration containers do not create rule-owned traversal state.
 			// N/A: body-absent TS declarations are not parseInt call expressions.
-
-			// Config `off` un-declares the builtin
-			{Code: `parseInt("11", 2);`, Globals: map[string]bool{"parseInt": false}},
-			{Code: `Number.parseInt("11", 2);`, Globals: map[string]bool{"Number": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: deeply parenthesized callee ----

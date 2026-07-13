@@ -123,9 +123,6 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		name := callee.AsIdentifier().Text
 		if name == "RegExp" {
 			// Direct `RegExp` reference — must not be shadowed.
-			if declared, ok := ctx.Globals["RegExp"]; ok && !declared {
-				return false
-			}
 			if utils.IsShadowed(callee, "RegExp") {
 				return false
 			}
@@ -154,12 +151,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		if pae.Name() != nil && pae.Name().Kind == ast.KindIdentifier && pae.Name().AsIdentifier().Text == "RegExp" {
 			if pae.Expression != nil && pae.Expression.Kind == ast.KindIdentifier {
 				name := pae.Expression.AsIdentifier().Text
-				if name == "globalThis" || name == "window" || name == "self" || name == "global" {
-					if declared, ok := ctx.Globals[name]; ok && !declared {
-						return false
-					}
-					return true
-				}
+				return name == "globalThis" || name == "window" || name == "self" || name == "global"
 			}
 		}
 	}

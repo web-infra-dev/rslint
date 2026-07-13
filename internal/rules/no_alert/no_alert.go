@@ -24,7 +24,7 @@ const outerExpressionKinds = ast.OEKParentheses | ast.OEKAssertions
 //
 // Skips outer expression wrappers (parentheses, type assertions, non-null assertions)
 // so that `(window).alert()` and `window!.alert()` are handled correctly.
-func isGlobalThisOrWindow(node *ast.Node, globals map[string]bool) bool {
+func isGlobalThisOrWindow(node *ast.Node) bool {
 	node = ast.SkipOuterExpressions(node, outerExpressionKinds)
 	if node == nil {
 		return false
@@ -41,9 +41,6 @@ func isGlobalThisOrWindow(node *ast.Node, globals map[string]bool) bool {
 	if node.Kind == ast.KindIdentifier {
 		name := node.Text()
 		if name == "window" || name == "globalThis" {
-			if declared, ok := globals[name]; ok && !declared {
-				return false
-			}
 			return !utils.IsShadowed(node, name)
 		}
 	}
@@ -70,9 +67,6 @@ var NoAlertRule = rule.Rule{
 					if !isProhibitedIdentifier(name) {
 						return
 					}
-					if declared, ok := ctx.Globals[name]; ok && !declared {
-						return
-					}
 					if utils.IsShadowed(callee, name) {
 						return
 					}
@@ -84,7 +78,7 @@ var NoAlertRule = rule.Rule{
 					if !ok || !isProhibitedIdentifier(name) {
 						return
 					}
-					if !isGlobalThisOrWindow(utils.AccessExpressionObject(callee), ctx.Globals) {
+					if !isGlobalThisOrWindow(utils.AccessExpressionObject(callee)) {
 						return
 					}
 
