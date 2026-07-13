@@ -77,7 +77,7 @@ func hasNonDefaultLibraryValueDeclaration(ctx rule.RuleContext, symbol *ast.Symb
 
 var NoNativeRule = rule.Rule{
 	Name: "promise/no-native",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if !isPromiseReference(node) || !shouldReportPromiseReference(ctx, node) {
