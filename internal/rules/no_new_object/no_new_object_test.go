@@ -140,6 +140,9 @@ func TestNoNewObjectRule(t *testing.T) {
 			{Code: `function f(Object) { new Object(); }`},
 			{Code: `{ let Object = 1; new Object(); }`},
 			{Code: `for (let Object of arr) { new Object(); }`},
+
+			// Config `off` un-declares the builtin
+			{Code: `new Object();`, Globals: map[string]bool{"Object": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ============================================================

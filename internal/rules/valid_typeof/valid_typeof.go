@@ -123,7 +123,11 @@ var ValidTypeofRule = rule.Rule{
 					ctx.ReportNode(sibling, invalidValueMsg())
 
 				case sibling.Kind == ast.KindIdentifier:
-					if sibling.Text() == "undefined" && !utils.IsShadowed(sibling, "undefined") {
+					isUndefinedOff := false
+					if declared, ok := ctx.Globals["undefined"]; ok && !declared {
+						isUndefinedOff = true
+					}
+					if sibling.Text() == "undefined" && !utils.IsShadowed(sibling, "undefined") && !isUndefinedOff {
 						// Bare `undefined` referencing the global variable:
 						// report with suggestion to use "undefined" string.
 						msg := invalidValueMsg()

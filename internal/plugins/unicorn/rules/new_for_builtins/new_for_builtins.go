@@ -708,6 +708,9 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 	}
 
 	name := node.AsIdentifier().Text
+	if declared, ok := state.ctx.Globals[name]; ok && !declared {
+		return true
+	}
 	if state.ctx.TypeChecker != nil && state.ctx.SourceFile != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
 		if utils.IsSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {

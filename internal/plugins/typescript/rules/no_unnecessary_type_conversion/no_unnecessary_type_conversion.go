@@ -519,6 +519,9 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 			if calleeExpr.Kind == ast.KindIdentifier {
 				name := calleeExpr.AsIdentifier().Text
 				if flag, ok := callExprTypeFlags[name]; ok {
+					if declared, ok := ctx.Globals[name]; ok && !declared {
+						return
+					}
 					if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 						return
 					}

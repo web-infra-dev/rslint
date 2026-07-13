@@ -61,6 +61,13 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 			// N/A: private identifiers are declaration/property names, not global references to `NaN` or `Infinity`.
 			// N/A: spread/rest shapes are only relevant when the identifier inside them is a value read; upstream already covers destructuring write positions.
 			// N/A: overload/abstract/declare body-absent forms do not contain value reads beyond declaration names.
+
+			// Config `off` un-declares the builtin or the replacement `Number` — no report.
+			{Code: `parseInt("10");`, Globals: map[string]bool{"parseInt": false}},
+			{Code: `parseInt("10");`, Globals: map[string]bool{"Number": false}},
+			{Code: `globalThis.parseInt("10");`, Globals: map[string]bool{"parseInt": false}},
+			{Code: `globalThis.parseInt("10");`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `globalThis.parseInt("10");`, Globals: map[string]bool{"Number": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized references are transparent ----

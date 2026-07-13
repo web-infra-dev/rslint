@@ -48,6 +48,10 @@ var NoUndefInitRule = rule.Rule{
 					return
 				}
 
+				if declared, ok := ctx.Globals["undefined"]; ok && !declared {
+					return
+				}
+
 				nameNode := varDecl.Name()
 				if nameNode == nil {
 					return

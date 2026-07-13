@@ -68,6 +68,9 @@ func TestValidTypeofRule(t *testing.T) {
 			// Locally shadowed undefined — not reported without requireStringLiterals
 			{Code: `function f(undefined: string) { typeof foo === undefined }`},
 			{Code: `{ const undefined = "test"; typeof foo === undefined }`},
+
+			// Config `off` un-declares the builtin
+			{Code: `typeof foo === undefined`, Globals: map[string]bool{"undefined": false}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{

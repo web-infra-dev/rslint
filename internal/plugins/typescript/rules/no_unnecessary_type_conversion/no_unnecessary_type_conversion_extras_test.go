@@ -246,6 +246,23 @@ namespace String {
 String;
 export {};
 `},
+
+			// Config `off` un-declares the builtin `String` — no report.
+			{
+				Code: `
+declare const s: string;
+String(s);
+`,
+				Globals: map[string]bool{"String": false},
+			},
+			// Config `off` un-declares the builtin `Number` — no report.
+			{
+				Code: `
+declare const n: number;
+Number(n);
+`,
+				Globals: map[string]bool{"Number": false},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized argument of String() ----

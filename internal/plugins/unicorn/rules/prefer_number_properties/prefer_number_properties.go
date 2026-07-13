@@ -79,15 +79,27 @@ var PreferNumberPropertiesRule = rule.Rule{
 				if !isTrackedGlobalName(name) || utils.IsNonReferenceIdentifier(node) || utils.IsShadowed(node, name) {
 					return
 				}
+				if declared, ok := ctx.Globals[name]; ok && !declared {
+					return
+				}
+				if declared, ok := ctx.Globals["Number"]; ok && !declared {
+					return
+				}
 				report(referenceFromNode(node, name))
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				if ref, ok := globalMemberReference(node); ok {
+				if declared, ok := ctx.Globals["Number"]; ok && !declared {
+					return
+				}
+				if ref, ok := globalMemberReference(ctx, node); ok {
 					report(ref)
 				}
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				if ref, ok := globalMemberReference(node); ok {
+				if declared, ok := ctx.Globals["Number"]; ok && !declared {
+					return
+				}
+				if ref, ok := globalMemberReference(ctx, node); ok {
 					report(ref)
 				}
 			},
@@ -147,9 +159,12 @@ func referenceFromNode(node *ast.Node, name string) globalReference {
 	}
 }
 
-func globalMemberReference(node *ast.Node) (globalReference, bool) {
+func globalMemberReference(ctx rule.RuleContext, node *ast.Node) (globalReference, bool) {
 	propertyName, ok := utils.AccessExpressionStaticName(node)
 	if !ok || !isTrackedGlobalName(propertyName) {
+		return globalReference{}, false
+	}
+	if declared, ok := ctx.Globals[propertyName]; ok && !declared {
 		return globalReference{}, false
 	}
 
@@ -158,6 +173,9 @@ func globalMemberReference(node *ast.Node) (globalReference, bool) {
 		return globalReference{}, false
 	}
 	objectName := object.AsIdentifier().Text
+	if declared, ok := ctx.Globals[objectName]; ok && !declared {
+		return globalReference{}, false
+	}
 	if _, ok := globalObjectNames[objectName]; !ok || utils.IsShadowed(object, objectName) {
 		return globalReference{}, false
 	}

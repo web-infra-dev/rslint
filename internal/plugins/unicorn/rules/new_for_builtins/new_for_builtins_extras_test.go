@@ -106,6 +106,17 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 			jsValid("const value = globalThis?.Map();"),
 			// Locks in upstream enforceCallExpression() arm 1: String wrapper reports without fix.
 			jsValid("const value = String('test');"),
+
+			// Config `off` un-declares the builtin `Array` — no enforce report.
+			rule_tester.ValidTestCase{
+				Code: `const a = Array();`,
+				Globals: map[string]bool{"Array": false},
+			},
+			// Config `off` un-declares the builtin `String` — no disallow report.
+			rule_tester.ValidTestCase{
+				Code: `const s = new String();`,
+				Globals: map[string]bool{"String": false},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized receiver and callee wrappers are transparent ----

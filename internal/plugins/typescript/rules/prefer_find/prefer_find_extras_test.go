@@ -198,6 +198,29 @@ arr.filter(x => x.length > 0)[-Infinity];
 		{Code: `declare const arr: string[]; arr.filter(x => x.length > 0).at(true);`},
 		// `.at(Infinity)` — Number(Infinity) === Infinity, trunc !== 0.
 		{Code: `declare const arr: string[]; arr.filter(x => x.length > 0).at(Infinity);`},
+
+		// Config `off` un-declares the builtin `undefined`/`NaN`/`Infinity` — should not resolve to zero.
+		{
+			Code: `
+declare const arr: string[];
+arr.filter(x => x.length > 0).at(undefined);
+`,
+			Globals: map[string]bool{"undefined": false},
+		},
+		{
+			Code: `
+declare const arr: string[];
+arr.filter(x => x.length > 0).at(NaN);
+`,
+			Globals: map[string]bool{"NaN": false},
+		},
+		{
+			Code: `
+declare const arr: string[];
+arr.filter(x => x.length > 0).at(Infinity);
+`,
+			Globals: map[string]bool{"Infinity": false},
+		},
 		// ---- jsNumberFromString lock-ins (hex / octal / binary STRING args) ----
 		// `.at('0x1')` — JS Number('0x1') === 1 (hex prefix accepted by JS
 		// string coercion). trunc=1 ≠ 0 → must NOT fire. Locks in the

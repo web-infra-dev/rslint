@@ -76,6 +76,9 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{Code: `new RegExp('  ', flags)`},
 			{Code: `new RegExp('[[abc]  ]', flags + 'v')`},
 			{Code: `new RegExp('[[abc]\q{  }]', flags + 'v')`},
+
+			// Config `off` un-declares the builtin
+			{Code: `new RegExp('bar    baz');`, Globals: map[string]bool{"RegExp": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Regex literals ----

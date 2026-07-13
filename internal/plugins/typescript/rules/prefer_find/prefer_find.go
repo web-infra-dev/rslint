@@ -433,12 +433,21 @@ func resolveStaticStringRec(ctx rule.RuleContext, node *ast.Node, seen map[*ast.
 	case ast.KindIdentifier:
 		name := node.AsIdentifier().Text
 		if name == "NaN" && !utils.IsShadowed(node, "NaN") {
+			if declared, ok := ctx.Globals["NaN"]; ok && !declared {
+				return "", false
+			}
 			return "NaN", true
 		}
 		if name == "Infinity" && !utils.IsShadowed(node, "Infinity") {
+			if declared, ok := ctx.Globals["Infinity"]; ok && !declared {
+				return "", false
+			}
 			return "Infinity", true
 		}
 		if name == "undefined" && !utils.IsShadowed(node, "undefined") {
+			if declared, ok := ctx.Globals["undefined"]; ok && !declared {
+				return "", false
+			}
 			return "undefined", true
 		}
 		if init := resolveConstInitializer(ctx, node, seen); init != nil {
@@ -495,9 +504,15 @@ func resolveStaticNumberRec(ctx rule.RuleContext, node *ast.Node, seen map[*ast.
 	case ast.KindIdentifier:
 		name := node.AsIdentifier().Text
 		if name == "NaN" && !utils.IsShadowed(node, "NaN") {
+			if declared, ok := ctx.Globals["NaN"]; ok && !declared {
+				return 0, false
+			}
 			return math.NaN(), true
 		}
 		if name == "Infinity" && !utils.IsShadowed(node, "Infinity") {
+			if declared, ok := ctx.Globals["Infinity"]; ok && !declared {
+				return 0, false
+			}
 			return math.Inf(1), true
 		}
 		if init := resolveConstInitializer(ctx, node, seen); init != nil {

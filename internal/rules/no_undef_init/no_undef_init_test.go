@@ -160,6 +160,9 @@ func TestNoUndefInit(t *testing.T) {
 
 			{Code: `let 变量 = 1;`},
 			{Code: `const café = undefined;`},
+
+			// Config `off` un-declares the builtin
+			{Code: `let a = undefined;`, Globals: map[string]bool{"undefined": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ============================================================

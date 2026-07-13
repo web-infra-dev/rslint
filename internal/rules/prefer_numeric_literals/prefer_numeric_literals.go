@@ -55,11 +55,7 @@ var PreferNumericLiteralsRule = rule.Rule{
 					return
 				}
 
-				// nil: this rule's upstream ESLint check (isSpecificId /
-				// isSpecificMemberAccess) doesn't consult scope at all, so a
-				// config `off` setting has no bearing here — only the
-				// existing shadow check applies.
-				if !utils.IsGlobalParseIntCallee(call.Expression, nil) {
+				if !utils.IsGlobalParseIntCallee(call.Expression, ctx.Globals) {
 					return
 				}
 

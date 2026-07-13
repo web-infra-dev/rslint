@@ -2407,6 +2407,22 @@ const x = Boolean(a ?? b);
 `},
 			},
 		}}},
+
+		// Global Boolean disabled — `||` is reported normally.
+		{Code: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+const x = Boolean(a || b);
+`, Options: optMap("ignoreBooleanCoercion", true), Globals: map[string]bool{"Boolean": false}, Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "preferNullishOverOr",
+			Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "suggestNullish", Output: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+const x = Boolean(a ?? b);
+`},
+			},
+		}}},
 	}
 
 	// ────────────────────── falsy literal types ──────────────────────────

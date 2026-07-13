@@ -1299,6 +1299,31 @@ func TestNoImplicitCoercion(t *testing.T) {
 					},
 				},
 			},
+
+			// Config `off` un-declares the builtin `Boolean` — reports but no suggestions or fixes.
+			{
+				Code: `!!foo;`,
+				Globals: map[string]bool{"Boolean": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "implicitCoercion", Line: 1, Column: 1},
+				},
+			},
+			// Config `off` un-declares the builtin `Number` — reports but no suggestions or fixes.
+			{
+				Code: `+foo;`,
+				Globals: map[string]bool{"Number": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "implicitCoercion", Line: 1, Column: 1},
+				},
+			},
+			// Config `off` un-declares the builtin `String` — reports but no suggestions or fixes.
+			{
+				Code: `"" + foo;`,
+				Globals: map[string]bool{"String": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "implicitCoercion", Line: 1, Column: 1},
+				},
+			},
 		},
 	)
 }
