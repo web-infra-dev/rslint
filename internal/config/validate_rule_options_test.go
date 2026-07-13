@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -135,6 +136,45 @@ func TestValidateRuleOptionsValidatesEachEntryAndDeduplicates(t *testing.T) {
 		if err.RuleName != "with-schema" {
 			t.Errorf("expected all errors to name with-schema, got %q", err.RuleName)
 		}
+	}
+}
+
+func TestValidateRuleOptionsFillsSchemaDefaultsIntoConfig(t *testing.T) {
+	// The useDefaults contract: validation mutates the options in place, and
+	// because the validated options slice aliases the raw config entry value,
+	// the defaults are visible to the per-file config merge afterwards.
+	registry := NewRuleRegistry()
+	registry.Register("with-defaults", rule.Rule{
+		Name: "with-defaults",
+		Schema: rule.NewSchema([]byte(`{
+			"type": "array",
+			"items": [
+				{
+					"type": "object",
+					"properties": {
+						"allow": { "type": "array", "items": { "type": "string" }, "default": [] },
+						"strict": { "type": "boolean", "default": true }
+					},
+					"additionalProperties": false
+				}
+			],
+			"minItems": 0,
+			"maxItems": 1
+		}`)),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			return rule.RuleListeners{}
+		},
+	})
+
+	options := map[string]any{"strict": false}
+	config := configWithRules(Rules{"with-defaults": []any{"error", options}})
+	if errs := ValidateRuleOptions(config, registry); len(errs) != 0 {
+		t.Fatalf("expected no errors, got: %v", errs)
+	}
+
+	want := map[string]any{"allow": []any{}, "strict": false}
+	if !reflect.DeepEqual(options, want) {
+		t.Errorf("expected defaults filled into the config's own options, got %#v, want %#v", options, want)
 	}
 }
 

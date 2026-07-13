@@ -133,9 +133,11 @@ type Rule struct {
 	IsEslintPluginRule bool
 	// Schema validates the rule's resolved options array (ESLint's
 	// context.options — the config array after the severity level) before
-	// linting starts. Rules that take no options should set it to the shared
-	// [EmptyArraySchema]. nil means the rule has not declared a schema yet
-	// (most rules, until migrated one-by-one): its options pass through
+	// linting starts, filling schema-declared `default` values into the
+	// options in place the way ajv's `useDefaults` does for ESLint (see
+	// [Schema.Validate]). Rules that take no options should set it to the
+	// shared [EmptyArraySchema]. nil means the rule has not declared a schema
+	// yet (most rules, until migrated one-by-one): its options pass through
 	// unvalidated, exactly as before the schema framework existed.
 	Schema *Schema
 	Run    func(ctx RuleContext, options []any) RuleListeners

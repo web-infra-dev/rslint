@@ -436,7 +436,7 @@ var MyRule = rule.Rule{
 }
 ```
 
-Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation only accepts or rejects a config — it never fills schema `default` values into the options (a deliberate divergence from ESLint's ajv setup), so `parseOptions` remains the single owner of option defaults.
+Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation also fills schema `default` values into the options in place, matching ajv's `useDefaults` as ESLint configures it (cross-checked against ajv@6 by `TestValidateMatchesAjvFixtures`), so an option object a user partially fills in arrives at the rule with its schema defaults present. Keep `parseOptions` handling defaults anyway: like in ESLint, a default only lands when the user supplied the enclosing options object at all (a grown tuple slot never reaches the rule), and API/LSP entry points don't run the validation step.
 
 ### Alignment Audit
 

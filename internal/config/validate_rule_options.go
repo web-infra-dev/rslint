@@ -40,6 +40,16 @@ func (e RuleOptionsError) Error() string {
 // merged value. The parallel loop leans on [rule.Schema]'s internal
 // sync.Once: racing first uses compile each schema at most once, and a
 // schema shared by many rules (EmptyArraySchema) compiles a single time.
+//
+// Validation is also where schema-declared `default` values are filled in,
+// exactly like ajv's `useDefaults` in ESLint: [rule.Schema.Validate] mutates
+// the options' own maps and slices in place, and because each work item's
+// options slice aliases the raw config entry value it was parsed from
+// (parseRuleConfigValue sub-slices, it never copies), the defaults land in
+// the very options the per-file config merge later hands to rules — no
+// write-back needed. The parallel loop stays race-free because every entry's
+// rule value is its own decoded JSON value, never shared with another
+// entry's.
 func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOptionsError {
 	type workItem struct {
 		entryIndex int
