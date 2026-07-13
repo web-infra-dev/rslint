@@ -158,6 +158,10 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 			{Code: `/(?<日本>a)\k<日本>/u`},
 			// Empty alternative + backref (edge: `(|a)\1` valid because \1 is after group)
 			{Code: `/(|a)\1/`},
+
+			// Config `off` un-declares `RegExp` — the constructor path goes dead
+			{Code: `new RegExp("\\1(a)");`, Globals: map[string]bool{"RegExp": false}},
+			{Code: `RegExp("\\1(a)");`, Globals: map[string]bool{"RegExp": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- full message tests ----
@@ -351,6 +355,16 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 				Code: `const flags = getFlags(); RegExp(/\1(a)/, flags);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward", Line: 1, Column: 27},
+				},
+			},
+			// Config `off` un-declares `RegExp`: the constructor no longer owns
+			// its regex-literal argument, so the literal is checked standalone
+			// with its own flags and reported at its own position.
+			{
+				Code:    `new RegExp(/\1(a)/, "u");`,
+				Globals: map[string]bool{"RegExp": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 1, Column: 12},
 				},
 			},
 

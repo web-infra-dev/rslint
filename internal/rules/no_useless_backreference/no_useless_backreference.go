@@ -119,6 +119,12 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 	if callee == nil {
 		return false
 	}
+	// Config `off` un-declares `RegExp`: the constructor path goes dead and
+	// regex-literal arguments fall back to the plain literal listener, matching
+	// ESLint's ReferenceTracker walk over the global scope.
+	if declared, ok := ctx.Globals["RegExp"]; ok && !declared {
+		return false
+	}
 	if callee.Kind == ast.KindIdentifier {
 		name := callee.AsIdentifier().Text
 		if name == "RegExp" {

@@ -170,6 +170,20 @@ func TestNoImplicitCoercion(t *testing.T) {
 					},
 				},
 			},
+			// Config `off` un-declares `Boolean` — same downgrade to suggestion
+			// (ESLint's `booleanExists` check); the report itself is unaffected.
+			{
+				Code:    `!!foo`,
+				Globals: map[string]bool{"Boolean": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "implicitCoercion", Line: 1, Column: 1,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "useRecommendation", Output: `Boolean(foo)`},
+						},
+					},
+				},
+			},
 			// ~foo.indexOf(x) — no fix, no suggestion (reported only).
 			{
 				Code: `~foo.indexOf(1)`,
