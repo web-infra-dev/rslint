@@ -45,13 +45,11 @@ func shouldReportPromiseReference(ctx rule.RuleContext, node *ast.Node) bool {
 
 	// Value reference.
 	if ctx.TypeChecker != nil {
-		symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
-		if symbol != nil && hasNonDefaultLibraryValueDeclaration(ctx, symbol) {
+		if symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker); symbol != nil &&
+			hasNonDefaultLibraryValueDeclaration(ctx, symbol) {
 			return false
 		}
-		return !utils.IsShadowed(node, promiseName)
 	}
-
 	return !utils.IsShadowed(node, promiseName)
 }
 

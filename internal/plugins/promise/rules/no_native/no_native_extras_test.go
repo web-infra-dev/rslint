@@ -36,6 +36,14 @@ func TestNoNativeExtras(t *testing.T) {
 			{Code: `interface Promise { then(): void } let x: Promise;`},
 			{Code: `import { Promise } from "bluebird"; let x: Promise;`},
 			{Code: `function f<Promise>(x: Promise) { return x; }`},
+			{Code: `interface I { m<Promise>(x: Promise): void }`},
+			{Code: `interface I { <Promise>(x: Promise): void }`},
+			{Code: `interface I { new <Promise>(x: Promise): Promise }`},
+			{Code: `type F = <Promise>(x: Promise) => void;`},
+			{Code: `type C = new <Promise>(x: Promise) => Promise;`},
+			{Code: `type M<T> = { [Promise in keyof T]: Promise };`},
+			{Code: `type U<T> = T extends Array<infer Promise> ? Promise : never;`},
+			{Code: `const C = class Promise { m(): Promise { return this; } };`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -52,6 +60,15 @@ func TestNoNativeExtras(t *testing.T) {
 			{
 				Code:   `function f() { return Promise.resolve(1); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 23, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code:   `/* global Promise */ Promise.resolve();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 22, EndLine: 1, EndColumn: 29}},
+			},
+			{
+				Code:    `Promise.resolve();`,
+				Globals: map[string]bool{"Promise": true},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 1, EndLine: 1, EndColumn: 8}},
 			},
 
 			// ---- typeof operand references the value, so the lib Promise reports ----

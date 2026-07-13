@@ -16,6 +16,14 @@ ruleTester.run('no-native', {} as never, {
     { code: 'function f(Promise) { return Promise.resolve(1); }' },
     // a type reference resolved against a local type declaration
     { code: 'type Promise = string; let x: Promise;' },
+    { code: 'interface I { m<Promise>(x: Promise): void }' },
+    { code: 'type M<T> = { [Promise in keyof T]: Promise };' },
+    {
+      code: 'type U<T> = T extends Array<infer Promise> ? Promise : never;',
+    },
+    {
+      code: 'const C = class Promise { m(): Promise { return this; } };',
+    },
   ],
 
   invalid: [
@@ -25,6 +33,10 @@ ruleTester.run('no-native', {} as never, {
     },
     {
       code: 'Promise.resolve()',
+      errors: [{ message }],
+    },
+    {
+      code: '/* global Promise */ Promise.resolve()',
       errors: [{ message }],
     },
     {

@@ -33,7 +33,11 @@ const x = Promise.reject(new Error('good'))
 In TypeScript, a `Promise` reference is checked against its own namespace: value
 references (including `typeof Promise`) require a local value declaration, and
 type references require a local type declaration. The runtime's native `Promise`
-is always reported.
+is always reported, including when it is configured or declared as a global.
+
+rslint uses project-wide type information, so a value declaration in another
+file (for example, `declare var Promise`) can satisfy a reference that ESLint
+would analyze independently in the current file.
 
 ## Original Documentation
 
