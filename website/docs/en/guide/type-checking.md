@@ -80,7 +80,7 @@ Chained errors indent the TypeScript message chain:
       Type 'number' is not assignable to type 'string'.
 ```
 
-Type errors appear in every output format (`default`, `jsonline`, `github`).
+Type errors appear in every output format (`default`, `jsonline`, `github`, `gitlab`).
 
 ### Summary line
 
@@ -91,11 +91,13 @@ Three templates depending on mode:
 Found 3 errors and 1 warning (linted 42 files with 5 rules in 120ms using 8 threads)
 
 # --type-check
-Found 3 lint errors, 2 type errors and 1 warning (linted 42 files with 5 rules in 120ms using 8 threads)
+Found 3 lint errors, 2 type errors and 1 warning (linted 42 files with 5 rules, type-checked 47 files in 120ms using 8 threads)
 
 # --type-check-only
 Found 2 type errors (type-checked 42 files in 80ms using 8 threads)
 ```
+
+In combined mode, `linted` counts files visited by the lint phase, while `type-checked` counts unique root files across every real tsconfig Program. The counts can differ because lint targets and rslint ignores do not restrict program-wide type-check. In color-enabled terminals, the complete parenthesized execution details are rendered dim.
 
 ### Exit codes
 

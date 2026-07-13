@@ -1174,9 +1174,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	typeCheckedFileCount := 0
-	if typeCheckOnly {
+	if typeCheck {
 		// Count non-skipped Program root files (tsconfig include/files), not
-		// transitive declarations, for the type-check-only summary.
+		// transitive declarations, for every summary that includes type-check.
 		seen := make(map[string]struct{})
 		for i, prog := range programs {
 			if i < len(skipTypeCheck) && skipTypeCheck[i] {

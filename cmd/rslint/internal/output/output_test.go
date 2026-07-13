@@ -97,7 +97,7 @@ func TestSummaryText(t *testing.T) {
 			}, Metadata{
 				Mode: ModeLint, LintedFiles: 1, Rules: 1, Threads: 1, FixedIssues: 1,
 			}),
-			expected: "Found 1 error and 1 warning (linted 1 file with 1 rule in 12ms using 1 threads, fixed 1 issue)\n",
+			expected: "Found 1 error and 1 warning (linted 1 file with 1 rule in 12ms using 1 thread, fixed 1 issue)\n",
 		},
 		{
 			name: "lint and type-check",
@@ -105,9 +105,9 @@ func TestSummaryText(t *testing.T) {
 				{RuleName: "no-debugger", Severity: rule.SeverityError},
 				{RuleName: "TypeScript(TS2322)", Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
 			}, Metadata{
-				Mode: ModeLintAndTypeCheck, LintedFiles: 1, Rules: 0, Threads: 2,
+				Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 2, Rules: 0, Threads: 2,
 			}),
-			expected: "Found 1 lint error, 1 type error and 0 warnings (linted 1 file with 0 rules in 12ms using 2 threads)\n",
+			expected: "Found 1 lint error, 1 type error and 0 warnings (linted 1 file with 0 rules, type-checked 2 files in 12ms using 2 threads)\n",
 		},
 		{
 			name: "type-check only",
@@ -149,6 +149,13 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 			details: "(linted 2 files with 3 rules in 12ms using 4 threads, fixed 5 issues)",
 		},
 		{
+			name: "lint and type-check details",
+			report: NewReport(nil, Metadata{
+				Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 2, Rules: 3, Threads: 1,
+			}),
+			details: "(linted 1 file with 3 rules, type-checked 2 files in 12ms using 1 thread)",
+		},
+		{
 			name: "type-check-only details",
 			report: NewReport(nil, Metadata{
 				Mode: ModeTypeCheckOnly, TypeCheckedFiles: 2, Threads: 4,
@@ -170,6 +177,32 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 				t.Fatalf("details are not one dim span:\n%s", buf.String())
 			}
 		})
+	}
+}
+
+func TestMixedSummaryColorsErrorCountsIndependently(t *testing.T) {
+	report := NewReport([]rule.RuleDiagnostic{
+		{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+	}, Metadata{
+		Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 1, Threads: 1,
+	})
+	colors := newColorScheme(true)
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	renderSummary(w, report, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := buf.String()
+	if want := colors.SuccessText("%d", 0) + " lint errors"; !strings.Contains(got, want) {
+		t.Fatalf("zero lint-error count is not green:\n%s", got)
+	}
+	if want := colors.ErrorText("%d", 1) + " type error"; !strings.Contains(got, want) {
+		t.Fatalf("non-zero type-error count is not red:\n%s", got)
+	}
+	if unwanted := colors.ErrorText("%d", 0) + " lint errors"; strings.Contains(got, unwanted) {
+		t.Fatalf("zero lint-error count is red:\n%s", got)
 	}
 }
 

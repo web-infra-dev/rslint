@@ -45,9 +45,11 @@ func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
 }
 
 func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors colorScheme) {
-	errorColor := colors.ErrorText
-	if report.counts.Errors == 0 {
-		errorColor = colors.SuccessText
+	errorCountText := func(count int) string {
+		if count == 0 {
+			return colors.SuccessText("%d", count)
+		}
+		return colors.ErrorText("%d", count)
 	}
 
 	warningColor := colors.WarnText
@@ -59,41 +61,51 @@ func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors
 	switch report.metadata.Mode {
 	case ModeTypeCheckOnly:
 		errorsSummary = fmt.Sprintf("%s %s",
-			errorColor("%d", report.counts.TypeErrors),
+			errorCountText(report.counts.TypeErrors),
 			pluralize(report.counts.TypeErrors, "type error", "type errors"),
 		)
 	case ModeLintAndTypeCheck:
 		errorsSummary = fmt.Sprintf("%s %s, %s %s",
-			errorColor("%d", report.counts.LintErrors),
+			errorCountText(report.counts.LintErrors),
 			pluralize(report.counts.LintErrors, "lint error", "lint errors"),
-			errorColor("%d", report.counts.TypeErrors),
+			errorCountText(report.counts.TypeErrors),
 			pluralize(report.counts.TypeErrors, "type error", "type errors"),
 		)
 	default:
 		errorsSummary = fmt.Sprintf("%s %s",
-			errorColor("%d", report.counts.Errors),
+			errorCountText(report.counts.Errors),
 			pluralize(report.counts.Errors, "error", "errors"),
 		)
 	}
 
 	if report.metadata.Mode == ModeTypeCheckOnly {
-		details := fmt.Sprintf("(type-checked %d %s in %v using %d threads)",
+		details := fmt.Sprintf("(type-checked %d %s in %v using %d %s)",
 			report.metadata.TypeCheckedFiles,
 			pluralize(report.metadata.TypeCheckedFiles, "file", "files"),
 			elapsed,
 			report.metadata.Threads,
+			pluralize(report.metadata.Threads, "thread", "threads"),
 		)
 		fmt.Fprintf(w, "Found %s %s\n", errorsSummary, colors.DimText("%s", details))
 		return
 	}
 
-	details := fmt.Sprintf("(linted %d %s with %d %s in %v using %d threads",
+	details := fmt.Sprintf("(linted %d %s with %d %s",
 		report.metadata.LintedFiles,
 		pluralize(report.metadata.LintedFiles, "file", "files"),
 		report.metadata.Rules,
 		pluralize(report.metadata.Rules, "rule", "rules"),
+	)
+	if report.metadata.Mode == ModeLintAndTypeCheck {
+		details += fmt.Sprintf(", type-checked %d %s",
+			report.metadata.TypeCheckedFiles,
+			pluralize(report.metadata.TypeCheckedFiles, "file", "files"),
+		)
+	}
+	details += fmt.Sprintf(" in %v using %d %s",
 		elapsed,
 		report.metadata.Threads,
+		pluralize(report.metadata.Threads, "thread", "threads"),
 	)
 	if report.metadata.FixedIssues > 0 {
 		details += fmt.Sprintf(", fixed %d %s",
