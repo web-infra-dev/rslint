@@ -124,7 +124,9 @@ func (s *Schema) validateWithDefaults(options []any) ([]any, error) {
 	if options == nil {
 		options = []any{}
 	}
-	applied := applyDefaults(compiled, options, s.doc).([]any)
+	// applyDefaults returns a value of its input's own kind, so a []any in is
+	// always a []any out (possibly grown by tuple defaults).
+	applied, _ := applyDefaults(compiled, options, s.doc).([]any)
 	if err := compiled.Validate(applied); err != nil {
 		return applied, err
 	}
