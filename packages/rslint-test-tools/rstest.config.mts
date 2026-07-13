@@ -92,6 +92,7 @@ export default defineConfig({
     './tests/eslint/rules/no-ex-assign.test.ts',
     './tests/eslint/rules/no-constant-binary-expression.test.ts',
     './tests/eslint/rules/no-caller.test.ts',
+    './tests/eslint/rules/no-buffer-constructor.test.ts',
 
     './tests/eslint/rules/default-case-last.test.ts',
     './tests/eslint/rules/no-extend-native.test.ts',

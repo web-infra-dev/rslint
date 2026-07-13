@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_bitwise"
+	"github.com/web-infra-dev/rslint/internal/rules/no_buffer_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_caller"
 	"github.com/web-infra-dev/rslint/internal/rules/no_case_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
@@ -169,6 +170,7 @@ func GetAllRules() []rule.Rule {
 		no_await_in_loop.NoAwaitInLoopRule,
 		no_bitwise.NoBitwiseRule,
 		no_caller.NoCallerRule,
+		no_buffer_constructor.NoBufferConstructorRule,
 		no_case_declarations.NoCaseDeclarationsRule,
 		no_class_assign.NoClassAssignRule,
 		no_compare_neg_zero.NoCompareNegZeroRule,
