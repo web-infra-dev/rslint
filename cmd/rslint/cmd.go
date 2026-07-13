@@ -665,10 +665,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			configTargetScopes = payload.ConfigTargetScopes
 
 			// Inject .gitignore patterns as global ignores for each config.
-			// Each config independently reads its own .gitignore tree:
-			// The shared gitignore collector walks UP (ancestor inheritance) and DOWN
-			// (nested .gitignore) from each configDir. Sibling configs are
-			// fully isolated — they never share gitignore patterns.
+			// Each config independently reads from its own directory downward.
+			// Direct child config directories are ownership handoff boundaries, so
+			// parent and child configs never share .gitignore patterns.
 			//
 			// Directories excluded by global config ignores are pruned during
 			// the .gitignore scan because files below them cannot be linted.
@@ -685,9 +684,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			)
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
+				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
 				for configDir, entries := range configMap {
+					stopDirs := configResolver.ChildConfigDirs(configDir)
 					giWG.Queue(func() {
-						augmented := rslintconfig.ConfigWithGitignore(entries, configDir, fs, nil)
+						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, nil, stopDirs)
 						giMu.Lock()
 						giResults = append(giResults, giResult{configDir, augmented})
 						giMu.Unlock()

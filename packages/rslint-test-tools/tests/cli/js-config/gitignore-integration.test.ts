@@ -312,7 +312,7 @@ describe('Gitignore: interaction with config ignores', () => {
 });
 
 describe('Gitignore: monorepo scenarios', () => {
-  test('root .gitignore + multiple package configs', async () => {
+  test('package configs do not inherit root .gitignore', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\ncoverage/\n',
       'rslint.config.mjs': `export default [{ files: ["**/*.ts"], rules: { "no-debugger": "error" } }];`,
@@ -330,8 +330,12 @@ describe('Gitignore: monorepo scenarios', () => {
       expect(
         diagsAt(diagnostics, 'packages/lib/src/utils.ts').length,
       ).toBeGreaterThan(0);
-      expect(diagsAt(diagnostics, 'packages/app/dist').length).toBe(0);
-      expect(diagsAt(diagnostics, 'packages/lib/coverage').length).toBe(0);
+      expect(
+        diagsAt(diagnostics, 'packages/app/dist/bundle.ts').length,
+      ).toBeGreaterThan(0);
+      expect(
+        diagsAt(diagnostics, 'packages/lib/coverage/lcov.ts').length,
+      ).toBeGreaterThan(0);
     } finally {
       await cleanup();
     }
@@ -339,7 +343,6 @@ describe('Gitignore: monorepo scenarios', () => {
 
   test('per-package .gitignore — each scoped to own subtree', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
-      '.gitignore': 'dist/\n',
       'packages/app/.gitignore': 'tmp/\n',
       'packages/lib/.gitignore': 'cache/\n',
       'packages/app/rslint.config.mjs': `export default [{ files: ["**/*.ts"], rules: { "no-console": "error" } }];`,
@@ -648,9 +651,7 @@ describe('Gitignore: tsconfig + gitignore interaction', () => {
 });
 
 describe('Gitignore: monorepo gap file interaction', () => {
-  test('root .gitignore prunes gap file discovery in child config', async () => {
-    // Root .gitignore has build/. Child config's gap file discovery
-    // should NOT find files under build/.
+  test('root .gitignore does not prune child config discovery', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'build/\n',
       'rslint.config.mjs': `export default [{ files: ["*.ts"], rules: { "no-console": "error" } }];`,
@@ -662,8 +663,9 @@ describe('Gitignore: monorepo gap file interaction', () => {
       expect(
         diagsAt(diagnostics, 'packages/app/src/index.ts').length,
       ).toBeGreaterThan(0);
-      // build/ gitignored → not discovered as gap file
-      expect(diagsAt(diagnostics, 'packages/app/build').length).toBe(0);
+      expect(
+        diagsAt(diagnostics, 'packages/app/build/output.ts').length,
+      ).toBeGreaterThan(0);
     } finally {
       await cleanup();
     }

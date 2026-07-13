@@ -163,18 +163,9 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 
 func gitignoreFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
 	workspaceRoot := filepath.Clean(cwd)
-	watchers := []*lsproto.FileSystemWatcher{
+	return []*lsproto.FileSystemWatcher{
 		gitignoreFileWatcher(workspaceRoot, "**/.gitignore", relativePatternSupport),
 	}
-	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
-		watchers = append(watchers, gitignoreFileWatcher(current, ".gitignore", relativePatternSupport))
-		parent := filepath.Dir(current)
-		if parent == current {
-			break
-		}
-		current = parent
-	}
-	return watchers
 }
 
 func gitignoreFileWatcher(baseDir string, pattern string, relativePatternSupport bool) *lsproto.FileSystemWatcher {

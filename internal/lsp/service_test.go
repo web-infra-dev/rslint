@@ -3030,7 +3030,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			},
 		},
 		{
-			name:      "ancestor ignore blocks nested source",
+			name:      "parent ignore does not affect nested config",
 			configDir: "packages/app",
 			relative:  "ignored/keep.ts",
 			config:    config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
@@ -3038,6 +3038,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 				".gitignore":                      "/packages/app/ignored/\n",
 				"packages/app/ignored/.gitignore": "!keep.ts\n",
 			},
+			wantLinted: true,
 		},
 		{
 			name:     "pruned nested source does not override root negation",

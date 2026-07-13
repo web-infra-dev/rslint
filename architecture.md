@@ -488,13 +488,14 @@ Program identities, not a second config inheritance tree.
 Additional current behaviors:
 
 - `.gitignore` is injected as a global-ignore entry through the shared
-  `ConfigWithGitignore` policy. CLI, including explicit CLI targets, scans from
-  the config directory; explicit API and LSP requests read only the target
-  files' ancestor chains
+  `ConfigWithGitignore` policy. The governing config directory is a hard upper
+  boundary: its own and nested `.gitignore` files apply, while parent
+  `.gitignore` files do not. In multi-config CLI mode, direct child config
+  directories are downward ownership handoff boundaries. Explicit API and LSP
+  requests read only the target's directory chain within the governing config
 - when the client supports dynamic file-watch registration, LSP watches
-  workspace and inherited ancestor `.gitignore` files; create/change/delete
-  events invalidate open-document diagnostics and request a fresh diagnostic
-  pass
+  workspace-descendant `.gitignore` files; create/change/delete events
+  invalidate open-document diagnostics and request a fresh diagnostic pass
 - the VS Code extension preserves last-good JS configs during reloads; a newly
   unavailable config with no usable JS ancestor contributes an empty boundary,
   preventing legacy JSON fallback only in that authored config subtree

@@ -98,11 +98,12 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 
 ## .gitignore integration
 
-The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. This means files ignored by git (build outputs, coverage reports, etc.) are also ignored without extra configuration. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
+The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Collection starts at the directory of the governing rslint config and never searches its parents. In a multi-config repository, a child config starts a new `.gitignore` scope, so put package-specific ignores beside that package's config. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
 
-- **Nested `.gitignore` files** are supported — each one only affects its own directory subtree
-- **Parent patterns cascade** to child directories (e.g., root `dist/` also ignores `packages/app/dist/`)
+- **Nested `.gitignore` files** inside one config-owned tree are supported — each one only affects its own directory subtree
+- **Parent patterns cascade** to child directories within that tree (e.g., root `dist/` also ignores `packages/app/dist/` when both use the root config)
 - **Child `.gitignore` can override** parent patterns with `!` negation
+- **Child configs are boundaries** — they do not inherit `.gitignore` files from a parent config directory
 - Config `!` negation can also override `.gitignore` patterns (they are evaluated sequentially in the same global ignores list)
 
 ```text

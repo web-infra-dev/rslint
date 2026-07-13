@@ -699,7 +699,7 @@ func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
 	}
 }
 
-func TestHandleLint_AncestorGitignoredConfigRootBlocksOwnNegation(t *testing.T) {
+func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "file.js")
@@ -729,18 +729,18 @@ func TestHandleLint_AncestorGitignoredConfigRootBlocksOwnNegation(t *testing.T) 
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 0 {
-		t.Fatalf("ancestor-gitignored config root should stay skipped despite own negation, got FileCount=%d", response.FileCount)
+	if response.FileCount != 1 {
+		t.Fatalf("parent .gitignore must not suppress a config-owned file, got FileCount=%d", response.FileCount)
 	}
-	if len(response.LintedFiles) != 0 {
-		t.Fatalf("ancestor-gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	if len(response.LintedFiles) != 1 {
+		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
 	}
-	if len(response.Diagnostics) != 0 {
-		t.Fatalf("expected no diagnostics for ancestor-gitignored file, got %+v", response.Diagnostics)
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
 	}
 }
 
-func TestHandleLint_AncestorGitignoredIntermediateBlocksNegation(t *testing.T) {
+func TestHandleLint_IntermediateParentGitignoreIsNotRead(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "file.js")
@@ -770,18 +770,18 @@ func TestHandleLint_AncestorGitignoredIntermediateBlocksNegation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 0 {
-		t.Fatalf("ancestor-gitignored intermediate dir should stay skipped despite its negation, got FileCount=%d", response.FileCount)
+	if response.FileCount != 1 {
+		t.Fatalf("parent .gitignore files must not suppress a config-owned file, got FileCount=%d", response.FileCount)
 	}
-	if len(response.LintedFiles) != 0 {
-		t.Fatalf("ancestor-gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	if len(response.LintedFiles) != 1 {
+		t.Fatalf("config-owned file must be in LintedFiles, got %v", response.LintedFiles)
 	}
-	if len(response.Diagnostics) != 0 {
-		t.Fatalf("expected no diagnostics for ancestor-gitignored file, got %+v", response.Diagnostics)
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("expected no-debugger for config-owned file, got %+v", response.Diagnostics)
 	}
 }
 
-func TestHandleLint_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T) {
+func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "packages", "app")
 	target := filepath.Join(appDir, "src", "generated", "file.js")
@@ -811,14 +811,14 @@ func TestHandleLint_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	if response.FileCount != 0 {
-		t.Fatalf("intermediate .gitignore should skip generated explicit file, got FileCount=%d", response.FileCount)
+	if response.FileCount != 1 {
+		t.Fatalf("parent intermediate .gitignore must not skip generated explicit file, got FileCount=%d", response.FileCount)
 	}
-	if len(response.LintedFiles) != 0 {
-		t.Fatalf("gitignored generated file must not be in LintedFiles, got %v", response.LintedFiles)
+	if len(response.LintedFiles) != 1 {
+		t.Fatalf("config-owned generated file must be in LintedFiles, got %v", response.LintedFiles)
 	}
-	if len(response.Diagnostics) != 0 {
-		t.Fatalf("expected no diagnostics for gitignored generated file, got %+v", response.Diagnostics)
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("expected no-debugger for config-owned generated file, got %+v", response.Diagnostics)
 	}
 }
 

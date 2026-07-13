@@ -37,6 +37,16 @@ func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintCon
 	return configDir, resolver.configMap[configDir]
 }
 
+// ChildConfigDirs returns the direct lexical child config directories that
+// form ownership handoff boundaries for configDir. The returned slice is a
+// copy and may be used concurrently with resolver lookups.
+func (resolver *ConfigOwnerResolver) ChildConfigDirs(configDir string) []string {
+	if resolver == nil || resolver.index == nil {
+		return nil
+	}
+	return append([]string(nil), resolver.index.childConfigDirs(configDir)...)
+}
+
 // ResolveConfigPathSpace returns the physical path pair used for files and
 // ignores matching. It preserves the file's path relative to the authored
 // config directory, then anchors both paths on the config directory's realpath.
