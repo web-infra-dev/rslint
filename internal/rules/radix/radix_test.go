@@ -27,21 +27,21 @@ func TestRadixRule(t *testing.T) {
 			{Code: `Number.parseInt("10", foo);`},
 
 			// ---- Valid: non-literal radix expressions (ESLint only rejects Literal / bare undefined) ----
-			{Code: `parseInt("10", -1);`},             // UnaryExpression
-			{Code: `parseInt("10", x + 1);`},          // BinaryExpression
-			{Code: `parseInt("10", x ? 10 : 16);`},    // ConditionalExpression
-			{Code: `parseInt("10", Math.floor(x));`},  // CallExpression
-			{Code: "parseInt(\"10\", `10`);"},         // NoSubstitutionTemplateLiteral
-			{Code: `parseInt("10", NaN);`},            // Identifier other than `undefined`
-			{Code: `parseInt("10", Infinity);`},       // Identifier
-			{Code: `parseInt("10", (10));`},           // Parenthesized numeric literal
-			{Code: `parseInt("10", ((10)));`},         // Deeply parenthesized
+			{Code: `parseInt("10", -1);`},            // UnaryExpression
+			{Code: `parseInt("10", x + 1);`},         // BinaryExpression
+			{Code: `parseInt("10", x ? 10 : 16);`},   // ConditionalExpression
+			{Code: `parseInt("10", Math.floor(x));`}, // CallExpression
+			{Code: "parseInt(\"10\", `10`);"},        // NoSubstitutionTemplateLiteral
+			{Code: `parseInt("10", NaN);`},           // Identifier other than `undefined`
+			{Code: `parseInt("10", Infinity);`},      // Identifier
+			{Code: `parseInt("10", (10));`},          // Parenthesized numeric literal
+			{Code: `parseInt("10", ((10)));`},        // Deeply parenthesized
 
 			// ---- Valid: numeric edge cases inside [2, 36] ----
 			{Code: `parseInt("10", 2.0);`},
-			{Code: `parseInt("10", 0b10);`},  // 2
-			{Code: `parseInt("10", 0o10);`},  // 8
-			{Code: `parseInt("10", 0x24);`},  // 36
+			{Code: `parseInt("10", 0b10);`}, // 2
+			{Code: `parseInt("10", 0o10);`}, // 8
+			{Code: `parseInt("10", 0x24);`}, // 36
 
 			// ---- Valid: more than 2 arguments (rule only inspects args[1]) ----
 			{Code: `parseInt("10", 10, extra);`},
@@ -137,10 +137,9 @@ func TestRadixRule(t *testing.T) {
 			{Code: `parseInt("10", foo);`, Options: []any{"always"}},
 			{Code: `parseInt("10", foo);`, Options: []any{"as-needed"}},
 
-			// SKIP: rslint does not support ESLint's `/*global ... */` directive
-			// SKIP: rslint does not support ESLint's `languageOptions.globals` override
-			{Code: `/* globals parseInt:off */ parseInt(foo);`, Skip: true},
-			{Code: `Number.parseInt(foo);`, Skip: true},
+			// ---- Config-declared / `/* global */` comment `off` un-declares the builtin ----
+			{Code: `/* globals parseInt:off */ parseInt(foo);`},
+			{Code: `Number.parseInt(foo);`, Globals: map[string]bool{"Number": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Missing parameters (+ exact message + full range) ----
@@ -831,6 +830,22 @@ func TestRadixRule(t *testing.T) {
 						Column:    1,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "addRadixParameter10", Output: `parseInt("𝟙", 10)`},
+						},
+					},
+				},
+			},
+
+			// ---- Config declares parseInt as a writable global — still the builtin. ----
+			{
+				Code:    `parseInt("10");`,
+				Globals: map[string]bool{"parseInt": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingRadix",
+						Line:      1,
+						Column:    1,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addRadixParameter10", Output: `parseInt("10", 10);`},
 						},
 					},
 				},

@@ -208,6 +208,32 @@ func TestNoPrototypeBuiltinsRule(t *testing.T) {
 					{MessageId: "prototypeBuildIn"},
 				},
 			},
+			// Can't suggest Object.prototype when a config `/* global Object: off */`
+			// / `languageOptions.globals` entry un-declares the builtin — the report
+			// still fires, but without the suggestion.
+			{
+				Code:    `foo.hasOwnProperty('bar');`,
+				Globals: map[string]bool{"Object": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "prototypeBuildIn"},
+				},
+			},
+			// Config declares Object as a writable global — suggestion still offered.
+			{
+				Code:    `foo.hasOwnProperty('bar')`,
+				Globals: map[string]bool{"Object": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prototypeBuildIn",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "callObjectPrototype",
+								Output:    `Object.prototype.hasOwnProperty.call(foo, 'bar')`,
+							},
+						},
+					},
+				},
+			},
 
 			// Optional chaining
 			{

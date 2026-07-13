@@ -101,21 +101,31 @@ func staticAccessObject(node *ast.Node) *ast.Node {
 	return utils.AccessExpressionObject(ast.SkipParentheses(node))
 }
 
-func isGlobalNameReference(node *ast.Node, name string) bool {
+// globals is ctx.Globals; a config `/* global Math: off */` /
+// `languageOptions.globals` entry un-declares the name, so it no longer
+// resolves to a known global — mirrors ESLint's ReferenceTracker finding no
+// global-scope variable to track references through.
+func isGlobalNameReference(node *ast.Node, name string, globals map[string]bool) bool {
 	node = utils.SkipAssertionsAndParens(node)
-	return node != nil &&
-		node.Kind == ast.KindIdentifier &&
-		node.AsIdentifier().Text == name &&
-		!utils.IsShadowed(node, name)
+	if node == nil ||
+		node.Kind != ast.KindIdentifier ||
+		node.AsIdentifier().Text != name ||
+		utils.IsShadowed(node, name) {
+		return false
+	}
+	if declared, ok := globals[name]; ok && !declared {
+		return false
+	}
+	return true
 }
 
-func isGlobalMathExpression(node *ast.Node) bool {
+func isGlobalMathExpression(node *ast.Node, globals map[string]bool) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}
 
-	if isGlobalNameReference(node, "Math") {
+	if isGlobalNameReference(node, "Math", globals) {
 		return true
 	}
 
@@ -128,10 +138,10 @@ func isGlobalMathExpression(node *ast.Node) bool {
 	if object == nil {
 		return false
 	}
-	return isGlobalNameReference(object, "globalThis")
+	return isGlobalNameReference(object, "globalThis", globals)
 }
 
-func isMathPowCall(node *ast.Node) bool {
+func isMathPowCall(node *ast.Node, globals map[string]bool) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
@@ -147,7 +157,7 @@ func isMathPowCall(node *ast.Node) bool {
 	if object == nil {
 		return false
 	}
-	return isGlobalMathExpression(object)
+	return isGlobalMathExpression(object, globals)
 }
 
 func unparenthesized(node *ast.Node) *ast.Node {
@@ -441,7 +451,7 @@ var PreferExponentiationOperatorRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isMathPowCall(node) {
+				if !isMathPowCall(node, ctx.Globals) {
 					return
 				}
 

@@ -45,6 +45,10 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// N/A: object/property declaration key forms are not inspected by this rule.
 			// N/A: class/function nesting boundaries do not create rule-owned state.
 			// N/A: body-absent TS declarations are not RegExp call expressions.
+
+			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
+			{Code: "new RegExp('a');", Globals: map[string]bool{"RegExp": false}},
+			{Code: "new globalThis.RegExp('a');", Globals: map[string]bool{"globalThis": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callee ----
@@ -269,6 +273,21 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "replaceWithLiteral",
 						Output:    "a/ /foo/ in b",
+					}},
+				}},
+			},
+
+			// Config declares RegExp/globalThis as writable globals — still the builtins.
+			{
+				Code:    "new RegExp('a');",
+				Globals: map[string]bool{"RegExp": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedRegExp",
+					Line:      1,
+					Column:    1,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "replaceWithLiteral",
+						Output:    "/a/;",
 					}},
 				}},
 			},

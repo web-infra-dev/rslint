@@ -33,6 +33,10 @@ function b() {
 Shadowing a built-in global (for example `Object`, `Array`) is reported when
 this option is `true`. Default: `false`.
 
+Configured `languageOptions.globals` and active `/* global */` directives
+participate as built-in globals; an explicit `"off"` setting un-declares the
+name, so shadowing it is no longer reported.
+
 ```json
 { "no-shadow": ["error", { "builtinGlobals": true }] }
 ```

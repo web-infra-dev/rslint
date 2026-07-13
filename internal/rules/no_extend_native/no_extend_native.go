@@ -146,6 +146,14 @@ var NoExtendNativeRule = rule.Rule{
 					return
 				}
 
+				// A config `/* global Object: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `globalScope.set.get(name)` would be
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
+					return
+				}
+
 				// Walk up through any wrapping parentheses to find the next significant parent.
 				prototypeAccess := skipParensUp(parent)
 				next := prototypeAccess.Parent
