@@ -270,10 +270,12 @@ type negReach struct {
 
 // negPrefix is one negation's reach: unrooted means "any depth" (conservatively
 // blocks all file-level pruning); literal is the leading wildcard-free path of a
-// rooted negation, used for subtree-overlap checks.
+// rooted negation, used for subtree-overlap checks. caseInsensitive keeps that
+// prefix anchored while applying the same case fold as final gitignore matching.
 type negPrefix struct {
-	unrooted bool
-	literal  string
+	unrooted        bool
+	literal         string
+	caseInsensitive bool
 }
 
 // buildNegReach extracts negation reaches from a parsed ignore set. Patterns
@@ -285,18 +287,15 @@ func buildNegReach(patterns []IgnorePattern) negReach {
 		if !p.Negated {
 			continue
 		}
-		if p.CaseInsensitive {
-			// Path-prefix reachability has no case mode. Conservatively disable
-			// file-level pruning; final matching still uses case-folded patterns.
-			out = append(out, negPrefix{unrooted: true})
-			continue
-		}
 		// A negation with no concrete leading segment (`!**/keep`, `!*.log`,
 		// empty) can re-include at any depth — literalSegmentPrefix returns ""
 		// for those, and we mark them unrooted to conservatively disable
 		// file-level pruning.
 		if lit := literalSegmentPrefix(p.Glob); lit != "" {
-			out = append(out, negPrefix{literal: lit})
+			out = append(out, negPrefix{
+				literal:         lit,
+				caseInsensitive: p.CaseInsensitive,
+			})
 		} else {
 			out = append(out, negPrefix{unrooted: true})
 		}
@@ -308,7 +307,13 @@ func buildNegReach(patterns []IgnorePattern) negReach {
 // subtree (so the directory must not be pruned).
 func (n negReach) overlaps(dirPath string) bool {
 	for _, np := range n.prefixes {
-		if np.unrooted || segPrefixEither(np.literal, dirPath) {
+		literal := np.literal
+		candidate := dirPath
+		if np.caseInsensitive {
+			literal = strings.ToLower(literal)
+			candidate = strings.ToLower(candidate)
+		}
+		if np.unrooted || segPrefixEither(literal, candidate) {
 			return true
 		}
 	}
