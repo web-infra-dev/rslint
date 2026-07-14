@@ -152,9 +152,10 @@ export class PluginLintPool {
    * transactional: a failed replacement leaves the previous host available so
    * the caller can preserve the matching last-good config payload.
    *
-   * Empty `descriptors` needs no host. `lint` already returns an empty result
-   * without one, avoiding a module load and worker-pool allocation when no
-   * object-form community plugins are configured.
+   * Empty `descriptors` needs no host, avoiding a module load and worker-pool
+   * allocation when no object-form community plugins are configured. The
+   * matching activation publishes no plugin metadata, so Go must never issue
+   * a plugin-lint request for that generation without a host.
    */
   async prepare(
     descriptors: ConfigDescriptor[],
@@ -309,11 +310,7 @@ export class PluginLintPool {
     });
   }
 
-  /**
-   * Answer one reverse `rslint/pluginLint` request. If no host is up
-   * (init pending / failed, or never configured) return empty results so Go's
-   * plugin-rule diagnostics simply come back empty rather than erroring.
-   */
+  /** Answer one reverse `rslint/pluginLint` request. */
   async lint(
     req: EslintPluginLintRequest,
     token?: CancellationToken,
@@ -339,7 +336,18 @@ export class PluginLintPool {
     }
     if (!state) return { results: [] };
     const host = state.host;
-    if (!host) return { results: [] };
+    if (!host) {
+      // Generations without a host are valid committed states for native-only or
+      // degraded catalogs, but their activation exposes no plugin metadata.
+      // Reaching this branch therefore means Go and the extension disagree on
+      // the committed lifecycle. Do not turn that protocol failure into a
+      // false-green empty diagnostic set. Cancellation remains benign.
+      if (token?.isCancellationRequested) return { results: [] };
+      const generation = req.generation ?? this.activeGeneration;
+      throw new Error(
+        `LSP pluginLint requested for config generation ${JSON.stringify(generation)} without an activated plugin host`,
+      );
+    }
 
     // Take the lease before yielding. Retirement removes future routing
     // references, but cannot shut this state down until the lease is released.

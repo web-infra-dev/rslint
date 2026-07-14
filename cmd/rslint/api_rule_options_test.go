@@ -59,10 +59,9 @@ func TestHandleLintDiscoveredConfigValidatesRuleOptions(t *testing.T) {
 			for _, candidate := range request.Candidates {
 				loadedIDs[candidate.ID] = struct{}{}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
-					ID:                candidate.ID,
-					Status:            "loaded",
-					Entries:           entries,
-					SourceFingerprint: "invalid-options-fixture",
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: entries,
 				})
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)

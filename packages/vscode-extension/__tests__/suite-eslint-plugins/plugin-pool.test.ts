@@ -383,7 +383,7 @@ suite('PluginLintPool generations', () => {
     assert.strictEqual(hostA.shutdownCalls, 1);
   });
 
-  test('a failed first prepare can commit and route an empty degraded generation', async () => {
+  test('a degraded generation without a host rejects plugin lint instead of returning a false green', async () => {
     const pool = new PluginLintPool(testLogger(), async () => {
       throw new Error('broken first plugin');
     });
@@ -393,8 +393,30 @@ suite('PluginLintPool generations', () => {
       false,
     );
     assert.strictEqual(await pool.commit('a'), true);
-    assert.deepStrictEqual(await pool.lint(request('a')), { results: [] });
+    await assert.rejects(
+      pool.lint(request('a')),
+      /pluginLint requested.*generation "a".*without an activated plugin host/,
+    );
 
     await pool.dispose();
+  });
+
+  test('an empty native-only generation has no host and disposed lint stays benign', async () => {
+    let createCalls = 0;
+    const pool = new PluginLintPool(testLogger(), async () => {
+      createCalls++;
+      return new TestHost();
+    });
+
+    assert.strictEqual(await pool.prepare([], 'fingerprint-a', 'a'), true);
+    assert.strictEqual(await pool.commit('a'), true);
+    assert.strictEqual(createCalls, 0);
+    await assert.rejects(
+      pool.lint(request('a')),
+      /pluginLint requested.*generation "a".*without an activated plugin host/,
+    );
+
+    await pool.dispose();
+    assert.deepStrictEqual(await pool.lint(request('a')), { results: [] });
   });
 });

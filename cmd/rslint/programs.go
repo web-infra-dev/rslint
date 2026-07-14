@@ -146,7 +146,7 @@ func createProgramSetForConfig(
 }
 
 // parallelGitignoreAndPrograms reads gitignore state and builds the Program
-// registry for a single rslint config (single-config and legacy JSON paths).
+// registry for an invocation-wide config (explicit JS/TS and JSON/JSONC).
 //
 // When singleThreaded is true, both run sequentially in the calling goroutine
 // — honoring the user's --singleThreaded flag (no concurrency at all).
@@ -602,6 +602,30 @@ func discoverLintFilesMultiConfig(
 	singleThreaded bool,
 ) []rslintconfig.DiscoveredLintTarget {
 	return rslintconfig.DiscoverLintTargetsMultiConfig(configMap, configTargetScopes, fs, allowFiles, allowDirs, singleThreaded)
+}
+
+func configTargetFilesByOwner(
+	configMap map[string]rslintconfig.RslintConfig,
+	scopes map[string]rslintconfig.LintDiscoveryScope,
+	fs vfs.FS,
+	allowedFiles []string,
+	singleThreaded bool,
+) map[string][]string {
+	filesByOwner := make(map[string][]string, len(configMap))
+	for _, target := range discoverLintFilesMultiConfig(
+		configMap,
+		scopes,
+		fs,
+		allowedFiles,
+		nil,
+		singleThreaded,
+	) {
+		filesByOwner[target.ConfigDirectory] = append(
+			filesByOwner[target.ConfigDirectory],
+			target.Path,
+		)
+	}
+	return filesByOwner
 }
 
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which

@@ -19,8 +19,8 @@
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
-// executeLintPipeline (using either a typed Go-discovered catalog or the legacy
-// serialized config payload) → drain output, send `shutdown`, exit.
+// executeLintPipeline (using either a typed Go-discovered catalog or the
+// native JSON/JSONC loader) → drain output, send `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
 // disconnect, init/transport error) · 130 interrupted.
@@ -33,7 +33,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -50,7 +49,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -71,13 +69,6 @@ const (
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
 // is the wire contract — keep in sync with packages/rslint/src/engine.ts.
 type initPayload struct {
-	// Configs: array of `{configDirectory, entries}`-shaped JSON objects.
-	// Re-marshaled byte-for-byte into the synthesized parseConfigPayload input
-	// so IPC init and the legacy stdin path share identical config semantics.
-	// Empty/nil means "no JS config — load JSON config from disk via
-	// the JSON configuration loader (ConfigStdin=false branch)".
-	Configs []json.RawMessage `json:"configs,omitempty"`
-
 	// Runtime: out-of-band switches without a 1:1 user flag.
 	Runtime runtimePayload `json:"runtime,omitempty"`
 
@@ -90,13 +81,8 @@ type initPayload struct {
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
 
-	// EslintPlugins: per-mounted-plugin {prefix, ruleNames} metadata so Go
-	// can register placeholder rules for plugin rule names. The live plugin
-	// objects stay in Node (the worker re-imports the config to load them).
-	EslintPlugins []rslintconfig.EslintPluginEntry `json:"eslintPlugins,omitempty"`
-
-	// ConfigDiscovery asks Go to own JS/TS config discovery. Older hosts omit
-	// it and keep sending preloaded Configs above.
+	// ConfigDiscovery asks Go to own JS/TS config discovery. It is ignored for
+	// help/init and disabled for the native JSON/JSONC configuration path.
 	ConfigDiscovery *configDiscoveryPayload `json:"configDiscovery,omitempty"`
 }
 
@@ -139,7 +125,8 @@ type runtimePayload struct {
 	// StdoutIsTTY reports whether the peer's real stdout — the terminal the
 	// forwarded lint output lands on — is a TTY. The Go process cannot
 	// observe this itself (its own stdout is the IPC pipe). Absent (false)
-	// with an older peer, which degrades to colorless output.
+	// when unavailable (for example in the wasm fallback), which degrades to
+	// colorless output.
 	StdoutIsTTY    bool `json:"stdoutIsTTY,omitempty"`
 	SingleThreaded bool `json:"singleThreaded,omitempty"`
 }
@@ -174,12 +161,10 @@ func runCLI(args []string) int {
 	)
 	defer lintCtxStop()
 
-	// Capture the real stdin/stdout BEFORE the channel binds to them. After
-	// init we reassign the os.Stdin/os.Stdout globals to in-process pipes
-	// (config payload in, print output out as `output` frames); the channel
-	// keeps the original references internally.
-	origStdin, origStdout := os.Stdin, os.Stdout
-	ch := ipc.NewChannel(origStdin, origStdout)
+	// Capture stdout before redirecting lint output through `output` frames.
+	// The channel keeps the original file handles for its entire lifetime.
+	origStdout := os.Stdout
+	ch := ipc.NewChannel(os.Stdin, origStdout)
 
 	state := &runCLIState{payloadCh: make(chan *initPayload, 1)}
 
@@ -251,8 +236,8 @@ func runCLI(args []string) int {
 		return 2
 	}
 
-	// Apply the payload. Working directory, configs, and the positional file
-	// set are payload-authoritative; the rest supplement flag values.
+	// Apply the payload. Working directory and the positional file set are
+	// payload-authoritative; the rest supplement flag values.
 	if payload.WorkingDirectory != "" {
 		// Hard-fail on chdir: every downstream path (config discovery, scope,
 		// gap-file matching) anchors at process cwd; the wrong dir would
@@ -276,10 +261,6 @@ func runCLI(args []string) int {
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
-	// ConfigStdin reflects whether the peer supplied configs (JS/TS path) or
-	// expects the binary to load JSON config from disk (ConfigStdin=false).
-	baseArgs.ConfigStdin = len(payload.Configs) > 0
-	baseArgs.EslintPlugins = payload.EslintPlugins
 	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
 	// Preserve help/init priority, then reject an invalid payload-authoritative
@@ -292,9 +273,9 @@ func runCLI(args []string) int {
 		}
 	}
 
-	// New hosts send only discovery intent. Go scans the reachable staged
+	// The host sends only discovery intent. Go scans the reachable staged
 	// frontier, asks Node to evaluate exact candidates, and converts the final
-	// catalog into the existing multi-config pipeline payload. Help/init and an
+	// catalog into the shared lint pipeline input. Help/init and an
 	// explicit JSON --config do not need the JavaScript module host.
 	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil && payload.ConfigDiscovery.Mode != "disabled" {
 		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
@@ -348,38 +329,6 @@ func runCLI(args []string) int {
 		shutdownPeer(ch, state)
 		_ = ch.Close()
 		return 0
-	}
-
-	// Synthesize stdin only for the lint flow with peer-supplied configs:
-	// re-marshal the init configs into the shape parseConfigPayload expects
-	// and feed it through an in-process pipe, so executeLintPipeline's
-	// ConfigStdin branch reads it unchanged. --init never reads a config
-	// payload (it returns before config load), and the JSON-config path
-	// (ConfigStdin=false) loads from disk itself.
-	if !baseArgs.Init && baseArgs.ConfigStdin && baseArgs.ConfigPayload == nil {
-		stdinR, stdinW, perr := os.Pipe()
-		if perr != nil {
-			finalizeStdout()
-			_ = ch.Close()
-			fmt.Fprintf(os.Stderr, "rslint: stdin pipe: %v\n", perr)
-			return 2
-		}
-		cfgBytes, mErr := json.Marshal(map[string]any{"configs": payload.Configs})
-		if mErr != nil {
-			finalizeStdout()
-			_ = ch.Close()
-			_ = stdinR.Close()
-			_ = stdinW.Close()
-			fmt.Fprintf(os.Stderr, "rslint: marshal config payload: %v\n", mErr)
-			return 2
-		}
-		writerDone := startSynthStdinWriter(lintCtx, stdinW, cfgBytes)
-		os.Stdin = stdinR
-		defer func() {
-			os.Stdin = origStdin
-			_ = stdinR.Close()
-			<-writerDone // join the writer goroutine before returning
-		}()
 	}
 
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
@@ -506,84 +455,8 @@ func discoverCLIConfigCatalog(
 		return err
 	}
 	printConfigDiscoveryFailures(catalog.Failures)
-
-	configDirectories := catalog.ConfigDirectories()
-	// An explicitly selected module is one invocation-wide flat config, even for
-	// targets outside cwd. Keep it on the single-config pipeline so hierarchical
-	// owner lookup cannot accidentally drop such a target.
-	if len(configDirectories) == 1 {
-		configDir := configDirectories[0]
-		if catalog.Explicit {
-			args.ConfigPayload = &parsedPayload{
-				SingleConfig:    append(rslintconfig.RslintConfig(nil), catalog.Configs[configDir]...),
-				SingleConfigDir: configDir,
-				IsMultiConfig:   false,
-			}
-			args.ConfigStdin = true
-			args.EslintPlugins = catalog.EslintPlugins
-			return nil
-		}
-	}
-
-	directPayload := &parsedPayload{
-		ConfigMap:          make(map[string]rslintconfig.RslintConfig, len(catalog.Configs)),
-		OriginalConfigDir:  make(map[string]string, len(catalog.Configs)),
-		ConfigTargetScopes: make(map[string]rslintconfig.LintDiscoveryScope),
-		IsMultiConfig:      true,
-	}
-	for _, configDir := range configDirectories {
-		scope := catalog.Scopes[configDir]
-		directPayload.ConfigMap[configDir] = append(
-			rslintconfig.RslintConfig(nil),
-			catalog.Configs[configDir]...,
-		)
-		directPayload.OriginalConfigDir[configDir] = configDir
-		if scope.Files != nil || scope.ExplicitOnly {
-			scope.Files = append([]string(nil), scope.Files...)
-			directPayload.ConfigTargetScopes[configDir] = scope
-		}
-	}
-	if len(directPayload.ConfigMap) > 0 {
-		args.ConfigPayload = directPayload
-		args.ConfigStdin = true
-	} else {
-		args.ConfigPayload = nil
-		args.ConfigStdin = false
-	}
-	args.EslintPlugins = catalog.EslintPlugins
+	args.ConfigCatalog = catalog
 	return nil
-}
-
-// startSynthStdinWriter feeds data into w from a background goroutine and
-// returns a channel closed when the writer is fully joined. It bounds two
-// failure modes: a reader that bails before consuming all bytes (a payload
-// larger than the kernel pipe buffer would otherwise block Write forever and
-// leak the goroutine), and ctx firing mid-write (closing w from outside
-// unblocks Write with an error the inner goroutine discards). Returns
-// immediately, so the caller can install os.Stdin = pipe and proceed.
-func startSynthStdinWriter(ctx context.Context, w io.WriteCloser, data []byte) <-chan struct{} {
-	done := make(chan struct{})
-	var closeOnce sync.Once
-	closeW := func() { closeOnce.Do(func() { _ = w.Close() }) }
-	go func() {
-		defer close(done)
-		defer closeW()
-		writeDone := make(chan struct{})
-		go func() {
-			_, _ = w.Write(data)
-			close(writeDone)
-		}()
-		select {
-		case <-writeDone:
-		case <-ctx.Done():
-			// Closing the writer interrupts the in-flight Write; join the
-			// inner goroutine before returning so it no longer references our
-			// closures. The deferred closeW() then no-ops (closeOnce fired).
-			closeW()
-			<-writeDone
-		}
-	}()
-	return done
 }
 
 // stdoutDrainMinFlushBytes is the soft floor for batching IPC `output` frames.

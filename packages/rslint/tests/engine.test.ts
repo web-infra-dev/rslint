@@ -34,7 +34,6 @@ async function runWithSink(sink: PassThrough): Promise<{
   const exitCode = await runEngine({
     binPath: process.execPath,
     goArgs: [FAKE_BIN],
-    configs: [],
     stdout: sink,
     stderr: new PassThrough(),
   });
@@ -78,7 +77,6 @@ describe('runEngine config activation', () => {
       const exitCode = await runEngine({
         binPath: process.execPath,
         goArgs: [CONFIG_RACE_BIN, configPath],
-        configs: [],
         stdout,
         stderr: new PassThrough(),
         createPluginLintHost: async () => {
@@ -97,6 +95,9 @@ describe('runEngine config activation', () => {
 
       expect(exitCode).toBe(0);
       expect(captured).toContain('plugin host was being prepared');
+      expect(captured).toContain(
+        'pluginLint requested without an activated plugin host',
+      );
       expect(lintCalls).toBe(0);
       expect(shutdownCalls).toBe(1);
     } finally {
@@ -120,7 +121,6 @@ describe('runEngine config activation', () => {
       const exitCode = await runEngine({
         binPath: process.execPath,
         goArgs: [EXIT_DURING_CONFIG_ACTIVATION_BIN, configPath],
-        configs: [],
         stdout: new PassThrough(),
         stderr: new PassThrough(),
         createPluginLintHost: async () => {
@@ -179,7 +179,6 @@ describe('runEngine config activation', () => {
       const run = runEngine({
         binPath: process.execPath,
         goArgs: [EXIT_DURING_CONFIG_ACTIVATION_BIN, configPath],
-        configs: [],
         stdout: new PassThrough(),
         stderr: new PassThrough(),
         configModuleHost,

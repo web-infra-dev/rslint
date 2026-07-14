@@ -96,7 +96,7 @@ func (loader *apiConfigModuleLoader) ActivateConfigs(ctx context.Context, reques
 
 // HandleLintWithContext enables reverse pluginLint requests when IPCHandler is
 // hosted by the bidirectional API service. HandleLint remains available for
-// direct/legacy callers that do not need community plugin execution.
+// direct callers that do not need community plugin execution.
 func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
@@ -200,7 +200,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// first request behave differently from every later request.
 	rslintconfig.RegisterAllRules()
 
-	// Config is the legacy/low-level already-resolved config. High-level native
+	// Config is the current low-level already-resolved config. High-level native
 	// API callers instead send ConfigDiscovery: Go discovers ownership and asks
 	// the host to evaluate only the staged candidate frontier.
 	var rslintConfig rslintconfig.RslintConfig
@@ -226,10 +226,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 
 	var (
-		configMap          map[string]rslintconfig.RslintConfig
-		configTargetScopes map[string]rslintconfig.LintDiscoveryScope
-		catalogPlugins     []rslintconfig.EslintPluginEntry
-		originalConfigDir  map[string]string
+		configMap              map[string]rslintconfig.RslintConfig
+		configTargetScopes     map[string]rslintconfig.LintDiscoveryScope
+		catalogPlugins         []rslintconfig.EslintPluginEntry
+		pluginConfigDirByOwner map[string]string
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -313,10 +313,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), catalog.Configs[configDirectory]...)
 				rslintConfig = append(rslintConfig, overrideConfig...)
-				originalConfigDir = map[string]string{configDirectory: configDirectory}
+				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(catalog.Configs))
-				originalConfigDir = make(map[string]string, len(catalog.Configs))
+				pluginConfigDirByOwner = make(map[string]string, len(catalog.Configs))
 			}
 			for ownerDirectory, entries := range catalog.Configs {
 				if configMap == nil {
@@ -326,7 +326,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				effective = append(effective, entries...)
 				effective = append(effective, overrideConfig...)
 				configMap[ownerDirectory] = effective
-				originalConfigDir[ownerDirectory] = ownerDirectory
+				pluginConfigDirByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
 				configTargetScopes = catalog.Scopes
@@ -669,7 +669,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	var pluginCh <-chan []rule.RuleDiagnostic
 	var cancelPlugin context.CancelFunc
 	if len(pluginEntries) > 0 {
-		if originalConfigDir == nil {
+		if pluginConfigDirByOwner == nil {
 			wireConfigDirectory := req.PluginConfigDirectory
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = req.ConfigDirectory
@@ -677,11 +677,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = configDirectory
 			}
-			originalConfigDir = map[string]string{configDirectory: wireConfigDirectory}
+			pluginConfigDirByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
 		pluginInputs := buildPluginFileInputs(runOpts, pluginConfigResolver{
-			lintResolver:      fileConfigResolver,
-			originalConfigDir: originalConfigDir,
+			lintResolver:           fileConfigResolver,
+			pluginConfigDirByOwner: pluginConfigDirByOwner,
 		})
 		for i := range pluginInputs {
 			// Programmatic lint supports in-memory overlays. Always send the exact
@@ -800,30 +800,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
 	return response, nil
-}
-
-func configTargetFilesByOwner(
-	configMap map[string]rslintconfig.RslintConfig,
-	scopes map[string]rslintconfig.LintDiscoveryScope,
-	fs vfs.FS,
-	allowedFiles []string,
-	singleThreaded bool,
-) map[string][]string {
-	filesByOwner := make(map[string][]string, len(configMap))
-	for _, target := range rslintconfig.DiscoverLintTargetsMultiConfig(
-		configMap,
-		scopes,
-		fs,
-		allowedFiles,
-		nil,
-		singleThreaded,
-	) {
-		filesByOwner[target.ConfigDirectory] = append(
-			filesByOwner[target.ConfigDirectory],
-			target.Path,
-		)
-	}
-	return filesByOwner
 }
 
 func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS) {

@@ -151,10 +151,9 @@ func loadedConfigResponse(
 	return loadRequest, discovery.ConfigLoadBatchResponse{
 		TransactionID: loadRequest.TransactionID,
 		Results: []discovery.ConfigLoadResult{{
-			ID:                loadRequest.Candidates[0].ID,
-			Status:            "loaded",
-			Entries:           entries,
-			SourceFingerprint: "test-fingerprint",
+			ID:      loadRequest.Candidates[0].ID,
+			Status:  "loaded",
+			Entries: entries,
 		}},
 	}
 }

@@ -763,34 +763,6 @@ func patternsIncludeAllDefaultExtensions(patterns []string) bool {
 	return true
 }
 
-// LintDiscoveryScope records explicit-file provenance supplied by config
-// discovery. ExplicitOnly keeps a config loaded solely for an explicit file out of
-// automatic ownership, handoff, and directory-discovery decisions. Files in
-// the scope remain owned by that config.
-type LintDiscoveryScope struct {
-	Files        []string
-	ExplicitOnly bool
-}
-
-func configMapForAutomaticTargets(
-	configMap map[string]RslintConfig,
-	scopes map[string]LintDiscoveryScope,
-) map[string]RslintConfig {
-	for configDir := range configMap {
-		if !scopes[configDir].ExplicitOnly {
-			continue
-		}
-		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
-		for candidateDir, candidateConfig := range configMap {
-			if !scopes[candidateDir].ExplicitOnly {
-				automaticConfigMap[candidateDir] = candidateConfig
-			}
-		}
-		return automaticConfigMap
-	}
-	return configMap
-}
-
 // DiscoveredLintTarget preserves the config owner established during the
 // directory walk so later stages do not need to infer ownership from paths.
 type DiscoveredLintTarget struct {

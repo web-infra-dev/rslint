@@ -24,6 +24,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -800,6 +801,104 @@ func TestExecuteLintPipelineInitIgnoresLintFormat(t *testing.T) {
 	})
 	if code != 0 || strings.Contains(stderr, "invalid output format") {
 		t.Fatalf("init did not retain priority: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
+	dir := t.TempDir()
+	target := tspath.NormalizePath(filepath.Join(dir, "index.js"))
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dir, "rslint.json"),
+		[]byte(`[{"rules":{"no-debugger":"error"}}]`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	configDir := tspath.NormalizePath(dir)
+
+	t.Run("explicit empty export remains a JS config", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			ConfigCatalog: &discovery.ConfigCatalog{
+				Configs:  map[string]rslintconfig.RslintConfig{configDir: {}},
+				Explicit: true,
+			},
+			AllowFiles:     []string{target},
+			Format:         "default",
+			NoColor:        true,
+			SingleThreaded: true,
+		})
+		if code != 0 || strings.Contains(stdout, "no-debugger") {
+			t.Fatalf("explicit empty JS config fell back to rslint.json: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+	})
+
+	t.Run("empty automatic catalog uses JSON fallback", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			ConfigCatalog:  &discovery.ConfigCatalog{Configs: map[string]rslintconfig.RslintConfig{}},
+			AllowFiles:     []string{target},
+			Format:         "jsonline",
+			NoColor:        true,
+			SingleThreaded: true,
+		})
+		if code != 1 || !strings.Contains(stdout, "no-debugger") {
+			t.Fatalf("empty automatic catalog did not use rslint.json: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+	})
+
+	t.Run("malformed explicit catalog cannot fall back to JSON", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			ConfigCatalog:  &discovery.ConfigCatalog{Explicit: true},
+			AllowFiles:     []string{target},
+			Format:         "jsonline",
+			NoColor:        true,
+			SingleThreaded: true,
+		})
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "explicit config catalog contains 0 configs") {
+			t.Fatalf("malformed explicit catalog escaped its invariant: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+	})
+}
+
+func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T) {
+	dir := t.TempDir()
+	target := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
+	if err := os.WriteFile(target, []byte("let value: any;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDir := tspath.NormalizePath(dir)
+	for _, test := range []struct {
+		name        string
+		plugins     []string
+		wantFailure bool
+	}{
+		{name: "undeclared plugin rule is gated"},
+		{name: "declared plugin rule runs", plugins: []string{"@typescript-eslint"}, wantFailure: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+				ConfigCatalog: &discovery.ConfigCatalog{
+					Configs: map[string]rslintconfig.RslintConfig{
+						configDir: {{
+							Files:   []string{"**/*.ts"},
+							Plugins: test.plugins,
+							Rules:   rslintconfig.Rules{"@typescript-eslint/no-explicit-any": "error"},
+						}},
+					},
+					Explicit: true,
+				},
+				AllowFiles:     []string{target},
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: true,
+			})
+			gotFailure := code != 0 && strings.Contains(stdout, "@typescript-eslint/no-explicit-any")
+			if gotFailure != test.wantFailure {
+				t.Fatalf("plugin enforcement = %v, want %v: code=%d stdout=%q stderr=%q", gotFailure, test.wantFailure, code, stdout, stderr)
+			}
+		})
 	}
 }
 

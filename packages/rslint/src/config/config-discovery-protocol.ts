@@ -6,8 +6,9 @@
  * Paths in requests identify values selected by Go. Node may native-normalize
  * configPath for local I/O, but configDirectory is an opaque routing identity
  * and must retain its exact spelling. Load responses correlate only by opaque
- * candidate ID. Activation summaries repeat paths for Node-side preparation,
- * but Go never derives discovery ownership from those returned paths.
+ * candidate ID. Activation responses contain only the transaction identity and
+ * plugin metadata consumed by Go; Node-only preparation data never crosses the
+ * transport boundary.
  */
 
 export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 1 as const;
@@ -48,17 +49,11 @@ export interface LoadedConfigModuleResult {
   status: 'loaded';
   /** Serializable normalizeConfig output. Live plugin objects never cross. */
   entries: Record<string, unknown>[];
-  /** `<byte length>:<sha256>` for the config source loaded in this result. */
-  sourceFingerprint: string;
-  /** Per-config metadata; the session summary unions it across effective IDs. */
-  eslintPlugins: ConfigModuleEslintPluginEntry[];
 }
 
 export interface FailedConfigModuleResult {
   id: string;
   status: 'failed';
-  /** Latest source fingerprint observed, when the file could be read. */
-  sourceFingerprint?: string;
   error: {
     message: string;
     code?: string;
@@ -75,31 +70,6 @@ export interface LoadConfigsResponse {
   results: ConfigModuleLoadResult[];
 }
 
-export interface EffectiveConfigModule {
-  id: string;
-  configPath: string;
-  configDirectory: string;
-  entries: Record<string, unknown>[];
-  sourceFingerprint: string;
-}
-
-export interface ConfigModulePluginDescriptor {
-  configPath: string;
-  configDirectory: string;
-}
-
-/**
- * Node-owned state derived only from the effective IDs selected by Go. It can
- * be handed directly to collectPluginMeta/plugin-host preparation while Go
- * keeps ownership of discovery and ignore semantics.
- */
-export interface ConfigModuleSessionSummary {
-  transactionId: string;
-  configs: EffectiveConfigModule[];
-  eslintPluginEntries: ConfigModuleEslintPluginEntry[];
-  pluginConfigs: ConfigModulePluginDescriptor[];
-}
-
 /** Go's final effective-ID selection after ignore/ownership resolution. */
 export interface ActivateConfigsRequest {
   protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
@@ -107,8 +77,8 @@ export interface ActivateConfigsRequest {
   effectiveConfigIds: string[];
 }
 
-/**
- * Go consumes transactionId + eslintPluginEntries. Node adapters additionally
- * use configs/pluginConfigs to prepare the matching plugin-host generation.
- */
-export type ActivateConfigsResponse = ConfigModuleSessionSummary;
+/** Minimal activation payload returned across IPC/JSON-RPC to Go. */
+export interface ActivateConfigsResponse {
+  transactionId: string;
+  eslintPluginEntries: ConfigModuleEslintPluginEntry[];
+}

@@ -161,11 +161,9 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 		plugins := cloneEslintPluginEntries(loader.plugins[path])
 		loader.pluginsByID[candidate.ID] = plugins
 		response.Results = append(response.Results, ConfigLoadResult{
-			ID:                candidate.ID,
-			Status:            "loaded",
-			Entries:           entries,
-			SourceFingerprint: "fixture:" + filepath.Base(path),
-			EslintPlugins:     plugins,
+			ID:      candidate.ID,
+			Status:  "loaded",
+			Entries: entries,
 		})
 	}
 	if loader.mutate != nil {
@@ -176,14 +174,44 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 
 func (loader *fakeConfigModuleLoader) ActivateConfigs(_ context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error) {
 	loader.activations = append(loader.activations, request)
-	sources := make(map[string]configSource, len(request.EffectiveConfigIDs))
-	for _, id := range request.EffectiveConfigIDs {
-		sources[id] = configSource{EslintPlugins: loader.pluginsByID[id]}
-	}
 	return ConfigActivationResponse{
 		TransactionID:       request.TransactionID,
-		EslintPluginEntries: aggregateEffectiveEslintPlugins(sources),
+		EslintPluginEntries: fixtureActivationPlugins(loader.pluginsByID, request.EffectiveConfigIDs),
 	}, nil
+}
+
+func fixtureActivationPlugins(
+	pluginsByID map[string][]rslintconfig.EslintPluginEntry,
+	effectiveIDs []string,
+) []rslintconfig.EslintPluginEntry {
+	byPrefix := make(map[string]map[string]struct{})
+	for _, id := range effectiveIDs {
+		for _, plugin := range pluginsByID[id] {
+			rules := byPrefix[plugin.Prefix]
+			if rules == nil {
+				rules = make(map[string]struct{})
+				byPrefix[plugin.Prefix] = rules
+			}
+			for _, ruleName := range plugin.RuleNames {
+				rules[ruleName] = struct{}{}
+			}
+		}
+	}
+	prefixes := make([]string, 0, len(byPrefix))
+	for prefix := range byPrefix {
+		prefixes = append(prefixes, prefix)
+	}
+	sort.Strings(prefixes)
+	entries := make([]rslintconfig.EslintPluginEntry, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		ruleNames := make([]string, 0, len(byPrefix[prefix]))
+		for ruleName := range byPrefix[prefix] {
+			ruleNames = append(ruleNames, ruleName)
+		}
+		sort.Strings(ruleNames)
+		entries = append(entries, rslintconfig.EslintPluginEntry{Prefix: prefix, RuleNames: ruleNames})
+	}
+	return entries
 }
 
 func TestConfigDiscoveryPriorityDoesNotConsultGitignore(t *testing.T) {
@@ -1293,7 +1321,7 @@ func TestValidateConfigLoadBatchRejectsProtocolViolations(t *testing.T) {
 		},
 	}
 	loaded := func(id string) ConfigLoadResult {
-		return ConfigLoadResult{ID: id, Status: "loaded", Entries: rslintconfig.RslintConfig{}, SourceFingerprint: "fixture:" + id}
+		return ConfigLoadResult{ID: id, Status: "loaded", Entries: rslintconfig.RslintConfig{}}
 	}
 	tests := []struct {
 		name     string
@@ -1306,7 +1334,6 @@ func TestValidateConfigLoadBatchRejectsProtocolViolations(t *testing.T) {
 		{name: "order", response: ConfigLoadBatchResponse{TransactionID: "txn", Results: []ConfigLoadResult{loaded("b"), loaded("a")}}},
 		{name: "status", response: ConfigLoadBatchResponse{TransactionID: "txn", Results: []ConfigLoadResult{{ID: "a", Status: "maybe"}, loaded("b")}}},
 		{name: "loaded with error", response: ConfigLoadBatchResponse{TransactionID: "txn", Results: []ConfigLoadResult{{ID: "a", Status: "loaded", Error: &ConfigModuleError{Message: "bad"}}, loaded("b")}}},
-		{name: "loaded without fingerprint", response: ConfigLoadBatchResponse{TransactionID: "txn", Results: []ConfigLoadResult{{ID: "a", Status: "loaded"}, loaded("b")}}},
 		{name: "failed without error", response: ConfigLoadBatchResponse{TransactionID: "txn", Results: []ConfigLoadResult{{ID: "a", Status: "failed"}, loaded("b")}}},
 	}
 	for _, test := range tests {

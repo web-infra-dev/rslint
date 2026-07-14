@@ -3,7 +3,7 @@
 // Drives the reverse config protocol far enough to make the engine stage a
 // mocked plugin host. The test-side factory rewrites the config while it is
 // being created, so activation must fail and a subsequent pluginLint request
-// must observe no published host.
+// must receive an explicit missing-host error rather than a false-green result.
 
 const path = require('node:path');
 
@@ -68,10 +68,17 @@ function onMessage(msg) {
     return;
   }
   if (msg.kind === 'response' && msg.id === 202) {
+    process.stderr.write('pluginLint unexpectedly succeeded without a host\n');
+    process.exit(2);
+  }
+  if (msg.kind === 'error' && msg.id === 202) {
     send({
       kind: 'output',
       id: 0,
-      data: { stream: 'stdout', text: activationError },
+      data: {
+        stream: 'stdout',
+        text: `${activationError}\n${msg.data?.message ?? ''}`,
+      },
     });
     send({ kind: 'shutdown', id: 203, data: {} });
     return;

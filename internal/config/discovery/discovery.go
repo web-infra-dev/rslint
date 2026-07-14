@@ -25,7 +25,6 @@ type configLoadState struct {
 	candidate     configCandidate
 	entries       rslintconfig.RslintConfig
 	ignoreMatcher rslintconfig.GlobalIgnoreMatcher
-	eslintPlugins []rslintconfig.EslintPluginEntry
 	failure       *ConfigModuleError
 }
 
@@ -664,7 +663,6 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 		}
 		request.Candidates = append(request.Candidates, wireCandidate)
 	}
-	builder.stats.CandidatesFound += len(request.Candidates)
 	builder.stats.ConfigsRequested += len(request.Candidates)
 	response, err := builder.loader.LoadConfigs(builder.ctx, request)
 	if err != nil {
@@ -680,9 +678,8 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 		candidate := group.candidate
 		result := results[wireCandidate.ID]
 		state := &configLoadState{
-			id:            wireCandidate.ID,
-			candidate:     candidate,
-			eslintPlugins: cloneEslintPluginEntries(result.EslintPlugins),
+			id:        wireCandidate.ID,
+			candidate: candidate,
 		}
 		if result.Status == "failed" {
 			failure := *result.Error
@@ -791,9 +788,6 @@ func validateConfigLoadBatch(request ConfigLoadBatchRequest, response ConfigLoad
 		}
 		if result.Status == "loaded" && result.Error != nil {
 			return nil, configDiscoveryProtocolError("loaded candidate %q contains an error", result.ID)
-		}
-		if result.Status == "loaded" && result.SourceFingerprint == "" {
-			return nil, configDiscoveryProtocolError("loaded candidate %q has no source fingerprint", result.ID)
 		}
 		if result.Status == "failed" && (result.Error == nil || result.Error.Message == "") {
 			return nil, configDiscoveryProtocolError("failed candidate %q has no error message", result.ID)
@@ -1028,7 +1022,6 @@ func (builder *configCatalogBuilder) installSource(state *configLoadState, expli
 	builder.sources[directory] = configSource{
 		CandidateID:   state.id,
 		CandidatePath: state.candidate.path,
-		EslintPlugins: cloneEslintPluginEntries(state.eslintPlugins),
 		ExplicitOnly:  explicitOnly,
 	}
 }
@@ -1056,9 +1049,9 @@ func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
 		effectiveIDs = append(effectiveIDs, source.CandidateID)
 	}
 	sort.Strings(effectiveIDs)
-	eslintPlugins := aggregateEffectiveEslintPlugins(builder.sources)
-	if activator, ok := builder.loader.(ConfigModuleActivator); ok && builder.hadCandidates && len(builder.loadStates) > 0 {
-		response, err := activator.ActivateConfigs(builder.ctx, ConfigActivationRequest{
+	var eslintPlugins []rslintconfig.EslintPluginEntry
+	if builder.hadCandidates && len(builder.loadStates) > 0 {
+		response, err := builder.loader.ActivateConfigs(builder.ctx, ConfigActivationRequest{
 			ProtocolVersion:    ConfigDiscoveryProtocolVersion,
 			TransactionID:      builder.transactionID,
 			EffectiveConfigIDs: effectiveIDs,
@@ -1132,37 +1125,6 @@ func cloneEslintPluginEntries(entries []rslintconfig.EslintPluginEntry) []rslint
 		}
 	}
 	return cloned
-}
-
-func aggregateEffectiveEslintPlugins(sources map[string]configSource) []rslintconfig.EslintPluginEntry {
-	byPrefix := make(map[string]map[string]struct{})
-	for _, source := range sources {
-		for _, plugin := range source.EslintPlugins {
-			rules := byPrefix[plugin.Prefix]
-			if rules == nil {
-				rules = make(map[string]struct{})
-				byPrefix[plugin.Prefix] = rules
-			}
-			for _, ruleName := range plugin.RuleNames {
-				rules[ruleName] = struct{}{}
-			}
-		}
-	}
-	prefixes := make([]string, 0, len(byPrefix))
-	for prefix := range byPrefix {
-		prefixes = append(prefixes, prefix)
-	}
-	sort.Strings(prefixes)
-	entries := make([]rslintconfig.EslintPluginEntry, 0, len(prefixes))
-	for _, prefix := range prefixes {
-		ruleNames := make([]string, 0, len(byPrefix[prefix]))
-		for ruleName := range byPrefix[prefix] {
-			ruleNames = append(ruleNames, ruleName)
-		}
-		sort.Strings(ruleNames)
-		entries = append(entries, rslintconfig.EslintPluginEntry{Prefix: prefix, RuleNames: ruleNames})
-	}
-	return entries
 }
 
 func (builder *configCatalogBuilder) allConfigsFailedError() error {

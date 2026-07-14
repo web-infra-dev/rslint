@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,6 +30,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/term"
 )
 
@@ -40,7 +40,6 @@ import (
 type lintArgs struct {
 	Init           bool
 	Config         string
-	ConfigStdin    bool // true → executeLintPipeline reads stdin as a config payload
 	Fix            bool
 	TypeCheck      bool
 	TypeCheckOnly  bool
@@ -53,7 +52,7 @@ type lintArgs struct {
 	// StdoutIsTTY is the TTY fact for the real output destination, reported
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
-	// unknown (old peer, wasm build).
+	// unavailable (for example in the wasm build).
 	StdoutIsTTY bool
 	Quiet       bool
 	MaxWarnings int
@@ -62,19 +61,14 @@ type lintArgs struct {
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
-	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
-	// plugins mounted via the config's object-form `plugins`. Used to register
-	// placeholder rules so plugin rule names resolve; the live plugins run
-	// in the Node worker.
-	EslintPlugins []rslintconfig.EslintPluginEntry
 	// FS is an optional run-scoped filesystem shared with Go config discovery.
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.
 	FS vfs.FS
-	// ConfigPayload is the in-process result of Go-owned JS/TS discovery. Keeping
-	// it typed avoids serializing the catalog to JSON only for this same process
-	// to read it back through the legacy config-stdin compatibility path.
-	ConfigPayload *parsedPayload
+	// ConfigCatalog is the immutable result of Go-owned JS/TS config discovery.
+	// A nil or empty automatic catalog selects the native JSON/JSONC loader;
+	// explicit catalogs remain authoritative even when their config is empty.
+	ConfigCatalog *discovery.ConfigCatalog
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -467,7 +461,6 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.StringVar(&args.Format, "format", "default", "output format")
 	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
 	fs.StringVar(&args.Config, "c", "", "which rslint config to use")
-	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
 	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
 	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")
@@ -541,7 +534,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
 	config := args.Config
-	configStdin := args.ConfigStdin
+	configCatalog := args.ConfigCatalog
+	usesJSConfig := configCatalog != nil && (configCatalog.Explicit || len(configCatalog.Configs) > 0)
 	fix := args.Fix
 	typeCheck := args.TypeCheck
 	typeCheckOnly := args.TypeCheckOnly
@@ -638,18 +632,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	rslintconfig.RegisterAllRules()
 	// Register placeholder rules for mounted ESLint plugins so their rule
 	// names resolve (and route to the Node worker) instead of being dropped.
-	rslintconfig.RegisterEslintPluginRules(args.EslintPlugins)
+	var eslintPlugins []rslintconfig.EslintPluginEntry
+	if usesJSConfig {
+		eslintPlugins = configCatalog.EslintPlugins
+	}
+	rslintconfig.RegisterEslintPluginRules(eslintPlugins)
 	var rslintConfig rslintconfig.RslintConfig
 
-	// configMap holds per-directory configs for multi-config (monorepo) support.
-	// Only populated in the configStdin path; nil otherwise (single-config mode).
+	// configMap holds per-directory configs for automatically discovered JS/TS
+	// configs. Explicit JS/TS and JSON/JSONC configs use rslintConfig instead.
 	var configMap map[string]rslintconfig.RslintConfig
 
-	// originalConfigDir maps each normalized configMap key back to the raw
-	// Go-owned configDirectory routing identity shared with the JS host, so the eslint-plugin wire configKey
-	// round-trips raw (byte-matching the worker's plugin map key). nil outside
-	// multi-config mode (single-config / JSON configs never mount plugins).
-	var originalConfigDir map[string]string
 	var configTargetScopes map[string]rslintconfig.LintDiscoveryScope
 
 	// Program-wide type checking builds every configured project. Plain linting
@@ -659,35 +652,43 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	buildAllPrograms := typeCheck || typeCheckOnly
 	needsLintTargets := !typeCheckOnly
 
-	if configStdin {
-		payload := args.ConfigPayload
-		if payload == nil {
-			// Legacy hosts can still send serialized config JSON through stdin.
-			// Read up to maxConfigSize+1 so we can detect truncation.
-			const maxConfigSize = 50 << 20 // 50 MB
-			data, err := io.ReadAll(io.LimitReader(os.Stdin, maxConfigSize+1))
+	if usesJSConfig {
+		configDirectories := configCatalog.ConfigDirectories()
+		if configCatalog.Explicit {
+			if len(configDirectories) != 1 {
+				fmt.Fprintf(os.Stderr, "error: explicit config catalog contains %d configs, want exactly one\n", len(configDirectories))
+				return 1
+			}
+			currentDirectory = configDirectories[0]
+			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
+
+			var exactTargetFiles []string
+			if len(allowFiles) > 0 && len(allowDirs) == 0 {
+				exactTargetFiles = allowFiles
+			}
+			if typeCheckOnly {
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			} else if buildAllPrograms {
+				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
+					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
+				)
+			} else {
+				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
+			}
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return 1
 			}
-			if len(data) > maxConfigSize {
-				fmt.Fprintf(os.Stderr, "error: config from stdin exceeds maximum size of %d bytes\n", maxConfigSize)
-				return 1
+		} else {
+			configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
+			configTargetScopes = make(map[string]rslintconfig.LintDiscoveryScope, len(configCatalog.Scopes))
+			for _, configDir := range configDirectories {
+				configMap[configDir] = slices.Clone(configCatalog.Configs[configDir])
+				if scope, ok := configCatalog.Scopes[configDir]; ok {
+					scope.Files = slices.Clone(scope.Files)
+					configTargetScopes[configDir] = scope
+				}
 			}
-
-			var parseErr error
-			payload, parseErr = parseConfigPayload(data, fs)
-			if parseErr != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", parseErr)
-				return 1
-			}
-		}
-
-		if payload.IsMultiConfig {
-			// Multi-config format
-			configMap = payload.ConfigMap
-			originalConfigDir = payload.OriginalConfigDir
-			configTargetScopes = payload.ConfigTargetScopes
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads from its own directory downward.
@@ -770,28 +771,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			if programErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
-				return 1
-			}
-		} else {
-			// Legacy single-config format
-			rslintConfig = payload.SingleConfig
-			currentDirectory = payload.SingleConfigDir
-
-			var exactTargetFiles []string
-			if len(allowFiles) > 0 && len(allowDirs) == 0 {
-				exactTargetFiles = allowFiles
-			}
-			if typeCheckOnly {
-				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
-			} else if buildAllPrograms {
-				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
-				)
-			} else {
-				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return 1
 			}
 		}
@@ -974,7 +953,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}()
 
-	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	enforcePlugins := usesJSConfig
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap:                  configMap,
 		Config:                     rslintConfig,
@@ -1039,10 +1018,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
 	// over every file) is skipped so the native-only path pays nothing for the
 	// feature.
-	hasEslintPlugins := len(args.EslintPlugins) > 0
+	hasEslintPlugins := len(eslintPlugins) > 0
 	pluginResolver := pluginConfigResolver{
-		lintResolver:      fileConfigResolver,
-		originalConfigDir: originalConfigDir,
+		lintResolver: fileConfigResolver,
 	}
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
@@ -1179,8 +1157,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			var fixPluginCh <-chan []rule.RuleDiagnostic
 			if hasEslintPlugins {
 				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
-					lintResolver:      fixConfigResolver,
-					originalConfigDir: originalConfigDir,
+					lintResolver: fixConfigResolver,
 				})
 				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
 			}

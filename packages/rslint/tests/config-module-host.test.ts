@@ -6,6 +6,8 @@ import path from 'node:path';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
+  type ActivateConfigsResponse,
+  type ConfigModuleActivationPlan,
   type ConfigModuleCandidate,
   type LoadConfigsRequest,
 } from '../src/config/config-loader.js';
@@ -51,6 +53,30 @@ function request(
     ...(singleThreaded ? { singleThreaded: true } : {}),
     candidates,
   };
+}
+
+async function activateWithPlan(
+  host: ConfigModuleHost,
+  transactionId: string,
+  effectiveConfigIds: string[],
+): Promise<{
+  response: ActivateConfigsResponse;
+  plan: ConfigModuleActivationPlan;
+}> {
+  let plan: ConfigModuleActivationPlan | undefined;
+  const response = await host.activateConfigs(
+    {
+      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+      transactionId,
+      effectiveConfigIds,
+    },
+    undefined,
+    async (candidate) => {
+      plan = candidate;
+    },
+  );
+  if (!plan) throw new Error('activation prepare callback was not called');
+  return { response, plan };
 }
 
 describe('ConfigModuleHost', () => {
@@ -181,9 +207,12 @@ describe('ConfigModuleHost', () => {
           message: expect.stringContaining('must export an array'),
         },
       });
-      for (const result of response.results) {
-        expect(result.sourceFingerprint).toMatch(/^\d+:[a-f0-9]{64}$/);
-      }
+      expect(
+        response.results.every(
+          (result) =>
+            !('sourceFingerprint' in result) && !('eslintPlugins' in result),
+        ),
+      ).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -309,7 +338,7 @@ describe('ConfigModuleHost', () => {
       const firstResult = loaded.results[0];
       if (firstResult.status === 'loaded') firstResult.entries.length = 0;
 
-      const summary = await host.summarizeEffectiveConfigs('tx-summary', [
+      const { plan: summary } = await activateWithPlan(host, 'tx-summary', [
         'second',
         'first',
       ]);
@@ -330,7 +359,7 @@ describe('ConfigModuleHost', () => {
         { prefix: 'nested', ruleNames: ['only'] },
       ]);
 
-      const firstOnly = await host.summarizeEffectiveConfigs('tx-summary', [
+      const { plan: firstOnly } = await activateWithPlan(host, 'tx-summary', [
         'first',
       ]);
       expect(firstOnly.pluginConfigs).toEqual([
@@ -343,14 +372,13 @@ describe('ConfigModuleHost', () => {
         { prefix: 'shared', ruleNames: ['alpha', 'common'] },
       ]);
 
-      const activation = await host.activateConfigs({
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+      const { response: activation } = await activateWithPlan(
+        host,
+        'tx-summary',
+        ['second'],
+      );
+      expect(activation).toEqual({
         transactionId: 'tx-summary',
-        effectiveConfigIds: ['second'],
-      });
-      expect(activation).toMatchObject({
-        transactionId: 'tx-summary',
-        configs: [{ id: 'second' }],
         eslintPluginEntries: [
           { prefix: 'shared', ruleNames: ['beta', 'common'] },
           { prefix: 'nested', ruleNames: ['only'] },
@@ -370,7 +398,11 @@ describe('ConfigModuleHost', () => {
       await host.loadConfigs(request('tx-stale', [config]));
       fs.writeFileSync(config.configPath, '// edited after load\n');
       await expect(
-        host.summarizeEffectiveConfigs('tx-stale', ['stale']),
+        host.activateConfigs({
+          protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+          transactionId: 'tx-stale',
+          effectiveConfigIds: ['stale'],
+        }),
       ).rejects.toThrow('changed while it was being loaded');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -399,8 +431,8 @@ describe('ConfigModuleHost', () => {
       expect(prepared).toBe(true);
       // The caller still owns explicit commit/abort cleanup after a rejected
       // activation; no stale activation was returned from the session.
-      expect(host.hasSession('tx-prepare-race')).toBe(true);
       expect(host.deleteSession('tx-prepare-race')).toBe(true);
+      expect(host.deleteSession('tx-prepare-race')).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -444,11 +476,14 @@ describe('ConfigModuleHost', () => {
       ).rejects.toThrow('duplicate id');
       await host.loadConfigs(request('tx-known', [one]));
       await expect(
-        host.summarizeEffectiveConfigs('tx-known', ['missing']),
+        host.activateConfigs({
+          protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+          transactionId: 'tx-known',
+          effectiveConfigIds: ['missing'],
+        }),
       ).rejects.toThrow('unknown effective config id');
-      expect(host.hasSession('tx-known')).toBe(true);
       expect(host.deleteSession('tx-known')).toBe(true);
-      expect(host.hasSession('tx-known')).toBe(false);
+      expect(host.deleteSession('tx-known')).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

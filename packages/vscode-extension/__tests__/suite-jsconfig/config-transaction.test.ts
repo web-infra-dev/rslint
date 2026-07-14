@@ -4,20 +4,19 @@ import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
+  type ConfigModuleActivationPlan,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
 } from '@rslint/core/config-loader';
 import {
   CONFIG_REFRESH_WATCH_GLOB,
-  LspConfigTransactionAdapter,
   configRefreshReasonForPath,
   createLanguageClientOptions,
   isConfigSourceChangeDuringTransaction,
   recoverConfigDiscoveryOnServerState,
   retryConfigRefreshOnSourceChange,
-  type ConfigModuleHostAdapter,
-  type PluginLintPoolAdapter,
 } from '../../src/Rslint';
+import { LspConfigTransactionAdapter } from '../../src/ConfigTransactionAdapter';
 import { State } from 'vscode-languageclient/node';
 import {
   RelativePattern,
@@ -118,13 +117,13 @@ suite('initial config refresh retry classification', () => {
   });
 });
 
-class TestConfigHost implements ConfigModuleHostAdapter {
+class TestConfigHost {
   readonly loadRequests: LoadConfigsRequest[] = [];
   readonly activationRequests: ActivateConfigsRequest[] = [];
   readonly deletedTransactions: string[] = [];
   loadError: Error | undefined;
   changedDuringPrepare = false;
-  activation: ActivateConfigsResponse = {
+  activation: ConfigModuleActivationPlan = {
     transactionId: 'tx-1',
     configs: [
       {
@@ -153,7 +152,7 @@ class TestConfigHost implements ConfigModuleHostAdapter {
   async activateConfigs(
     request: ActivateConfigsRequest,
     _signal?: AbortSignal,
-    prepare?: (activation: ActivateConfigsResponse) => Promise<void>,
+    prepare?: (activation: ConfigModuleActivationPlan) => Promise<void>,
   ): Promise<ActivateConfigsResponse> {
     this.activationRequests.push(request);
     const activation = {
@@ -166,7 +165,10 @@ class TestConfigHost implements ConfigModuleHostAdapter {
         'config changed while its plugin host was being prepared',
       );
     }
-    return activation;
+    return {
+      transactionId: activation.transactionId,
+      eslintPluginEntries: activation.eslintPluginEntries,
+    };
   }
 
   deleteSession(transactionId: string): boolean {
@@ -175,7 +177,7 @@ class TestConfigHost implements ConfigModuleHostAdapter {
   }
 }
 
-class TestPluginPool implements PluginLintPoolAdapter {
+class TestPluginPool {
   readonly prepareCalls: Array<{
     descriptors: unknown[];
     fingerprint: string;

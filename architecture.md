@@ -449,8 +449,10 @@ config/ownership catalog; it does not collect lint targets or read `.gitignore`.
 Go owns candidate discovery, default exclusions, config hierarchy, authored
 global-ignore reachability, and final effective IDs. Node only executes the
 exact JS/TS modules requested by Go, normalizes their entries, retains live
-third-party plugin objects, and returns serializable entries, source
-fingerprints, and plugin metadata.
+third-party plugin objects, and returns serializable entries. Source
+fingerprints stay in the Node transaction session; after Go selects the final
+effective IDs, activation revalidates those fingerprints and returns only the
+effective plugin metadata.
 
 The package boundary is deliberate: `internal/config/discovery` imports the
 parent `internal/config` model and its narrow authored-global-ignore matcher;
@@ -462,7 +464,8 @@ nonce plus atomic sequence allocates IDs that cannot collide with a stale host
 session after a native-process restart. The returned catalog
 publishes final configs, scopes, failures, effective IDs, plugin metadata, and
 whether the invocation used an explicit config. Candidate fingerprints and
-source-selection scratch remain private to the builder.
+plugin-aggregation scratch remain private to the Node transaction session;
+source-selection scratch remains private to the Go builder.
 
 Automatic discovery uses these rules:
 

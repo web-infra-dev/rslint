@@ -92,12 +92,6 @@ export interface EngineRunOptions {
   binPath: string;
   /** Args forwarded to the Go binary (user CLI flags, --start-time, files). */
   goArgs: string[];
-  /**
-   * Configs sent in the `init` payload (JS/TS-config entries, each shaped
-   * `{configDirectory, configPath?, entries}`). Empty means "no JS config —
-   * let Go load JSON config from disk itself".
-   */
-  configs: unknown[];
   /** Working directory (defaults to process.cwd()). */
   cwd?: string;
   /** Runtime hints forwarded in the `init` payload's `runtime` block. */
@@ -112,17 +106,6 @@ export interface EngineRunOptions {
   stdout?: NodeJS.WritableStream;
   /** stderr sink (default process.stderr). */
   stderr?: NodeJS.WritableStream;
-  /**
-   * ESLint-plugin {prefix, ruleNames} metadata forwarded to Go in the
-   * `init` payload so it registers placeholder rules for plugin rule names.
-   */
-  eslintPluginEntries?: Array<{ prefix: string; ruleNames: string[] }>;
-  /**
-   * Per-config descriptors (configPath + configDirectory) for configs that
-   * mount ESLint plugins; used to init the worker pool that answers Go's
-   * reverse `pluginLint` requests. Empty ⇒ no pool, zero overhead.
-   */
-  pluginConfigs?: Array<{ configPath: string; configDirectory: string }>;
   /** @internal Dependency seam for activation-race and cleanup tests. */
   createPluginLintHost?: CreatePluginLintHost;
   /** @internal Dependency seam for post-prepare lifecycle tests. */
@@ -199,7 +182,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   let pluginHost: PluginLintHost | null = null;
   const configModuleHost = opts.configModuleHost ?? new ConfigModuleHost();
   const configTransactions = new Set<string>();
-  let pluginHostInitialization: Promise<void> | null = null;
   let shuttingDown = false;
   const pendingPluginHostBuilds = new Set<Promise<PluginLintHost | null>>();
   const stagedPluginHosts = new Set<PluginLintHost>();
@@ -268,35 +250,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     const host = await build;
     return host;
   };
-
-  const ensurePluginHost = async (): Promise<void> => {
-    if (pluginHost) return;
-    pluginHostInitialization ??= (async () => {
-      const pluginConfigs = [...(opts.pluginConfigs ?? [])];
-      const createdHost = await buildPluginHost(pluginConfigs);
-      await publishPluginHost(createdHost);
-    })();
-    try {
-      await pluginHostInitialization;
-    } catch (err) {
-      pluginHostInitialization = null;
-      throw err;
-    }
-  };
-
-  // Preserve the legacy preloaded-config path while the reverse-discovery
-  // protocol rolls out. New runs initialize lazily after Go has selected its
-  // effective catalog, avoiding plugin workers for pruned configs.
-  if ((opts.pluginConfigs?.length ?? 0) > 0) {
-    try {
-      await ensurePluginHost();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      stderr.write(`rslint: failed to start ESLint-plugin worker: ${msg}\n`);
-      safeKillGo(child);
-      return 2;
-    }
-  }
 
   // Without our own SIGINT handler Node's default action _exit(130)s
   // immediately, leaving the Go child to discover the disconnect via stdin EOF
@@ -380,11 +333,15 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
           return { ok: true };
         case 'pluginLint':
           // Go dispatched a plugin-lint batch in parallel with native linting.
-          // Answer from the worker pool; an absent pool (no plugins configured)
-          // yields empty results. Never throws — per-file/-rule failures travel
-          // inside the result payload.
-          await ensurePluginHost();
-          return pluginHost ? pluginHost.lint(msg.data) : { results: [] };
+          // Go only dispatches after activation returned plugin metadata, so a
+          // missing published host is a protocol/lifecycle failure. Surface it
+          // instead of returning an empty false-green result.
+          if (!pluginHost) {
+            throw new Error(
+              'engine: pluginLint requested without an activated plugin host',
+            );
+          }
+          return pluginHost.lint(msg.data);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }
@@ -405,8 +362,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         outcome = await raceWithExit(
           ipc.sendRequest('init', {
             ...(opts.extraInit ?? {}),
-            configs: opts.configs,
-            eslintPlugins: opts.eslintPluginEntries,
             runtime: {
               stdoutIsTTY,
               singleThreaded: opts.runtime?.singleThreaded,

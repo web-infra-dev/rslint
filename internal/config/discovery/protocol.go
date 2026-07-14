@@ -37,12 +37,10 @@ type ConfigModuleError struct {
 }
 
 type ConfigLoadResult struct {
-	ID                string                           `json:"id"`
-	Status            string                           `json:"status"`
-	Entries           rslintconfig.RslintConfig        `json:"entries,omitempty"`
-	SourceFingerprint string                           `json:"sourceFingerprint,omitempty"`
-	EslintPlugins     []rslintconfig.EslintPluginEntry `json:"eslintPlugins,omitempty"`
-	Error             *ConfigModuleError               `json:"error,omitempty"`
+	ID      string                    `json:"id"`
+	Status  string                    `json:"status"`
+	Entries rslintconfig.RslintConfig `json:"entries,omitempty"`
+	Error   *ConfigModuleError        `json:"error,omitempty"`
 }
 
 type ConfigLoadBatchResponse struct {
@@ -51,10 +49,11 @@ type ConfigLoadBatchResponse struct {
 }
 
 // ConfigModuleLoader is the only JavaScript-aware boundary in config
-// discovery. Implementations evaluate and normalize modules; Go validates the
-// returned batch envelope and config entries before using them.
+// discovery. Implementations evaluate and normalize modules, then activate the
+// final effective set; Go validates both protocol responses before using them.
 type ConfigModuleLoader interface {
 	LoadConfigs(ctx context.Context, request ConfigLoadBatchRequest) (ConfigLoadBatchResponse, error)
+	ActivateConfigs(ctx context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error)
 }
 
 type ConfigActivationRequest struct {
@@ -66,11 +65,4 @@ type ConfigActivationRequest struct {
 type ConfigActivationResponse struct {
 	TransactionID       string                           `json:"transactionId"`
 	EslintPluginEntries []rslintconfig.EslintPluginEntry `json:"eslintPluginEntries"`
-}
-
-// ConfigModuleActivator is optional. Native adapters implement it by asking
-// the Node host to summarize exactly the effective IDs, which also closes the
-// source-fingerprint race before a plugin host is prepared.
-type ConfigModuleActivator interface {
-	ActivateConfigs(ctx context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error)
 }

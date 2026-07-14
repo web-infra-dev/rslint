@@ -5,6 +5,34 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
+// LintDiscoveryScope records explicit-file provenance supplied by config
+// discovery. ExplicitOnly keeps a config loaded solely for an explicit file out
+// of automatic ownership, handoff, and directory-discovery decisions. Files in
+// the scope remain owned by that config.
+type LintDiscoveryScope struct {
+	Files        []string
+	ExplicitOnly bool
+}
+
+func configMapForAutomaticTargets(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+) map[string]RslintConfig {
+	for configDir := range configMap {
+		if !scopes[configDir].ExplicitOnly {
+			continue
+		}
+		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
+		for candidateDir, candidateConfig := range configMap {
+			if !scopes[candidateDir].ExplicitOnly {
+				automaticConfigMap[candidateDir] = candidateConfig
+			}
+		}
+		return automaticConfigMap
+	}
+	return configMap
+}
+
 // ConfigOwnerResolver snapshots an already-loaded config catalog and resolves
 // which config object governs a runtime file path. It never discovers, reads,
 // or parses config files. Construction is linear in config count. Each lookup

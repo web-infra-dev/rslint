@@ -208,18 +208,15 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	}
 	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
 	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
+	writeFixture("rslint.json", `[{
+  "files": ["**/*.ts"],
+  "rules": {"@typescript-eslint/ban-ts-comment": "error"},
+  "plugins": ["@typescript-eslint"]
+}]`)
 
 	code, text := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"runtime":          map[string]any{"stdoutIsTTY": tty},
-		"configs": []map[string]any{{
-			"configDirectory": dir,
-			"entries": []map[string]any{{
-				"files":   []string{"**/*.ts"},
-				"rules":   map[string]any{"@typescript-eslint/ban-ts-comment": "error"},
-				"plugins": []string{"@typescript-eslint"},
-			}},
-		}},
 	})
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1 (one lint error)", code)
@@ -250,6 +247,13 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(realDir, "index.ts"), []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatalf("write lint target: %v", err)
 	}
+	if err := os.WriteFile(
+		filepath.Join(realDir, "rslint.jsonc"),
+		[]byte("[{\n  // Resolve this config through both physical and alias cwd spellings.\n  \"files\": [\"**/*.ts\"],\n  \"rules\": {\"no-debugger\": \"error\"}\n}]\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write lint config: %v", err)
+	}
 	createWorkingDirectoryAlias(t, realDir, aliasDir)
 
 	for _, test := range []struct {
@@ -266,13 +270,6 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			t.Setenv("NO_COLOR", "1")
 			code, text := runCLIInitForTest(t, map[string]any{
 				"workingDirectory": test.workingDirectory,
-				"configs": []map[string]any{{
-					"configDirectory": realDir,
-					"entries": []map[string]any{{
-						"files": []string{"**/*.ts"},
-						"rules": map[string]any{"no-debugger": "error"},
-					}},
-				}},
 			})
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)

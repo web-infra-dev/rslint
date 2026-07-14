@@ -30,13 +30,13 @@ export async function run(
   // existing fast-path contract.
   if (args.init) {
     const { runEngine } = await import('./engine.js');
-    return runEngine({ binPath, goArgs: ['--init'], configs: [], cwd });
+    return runEngine({ binPath, goArgs: ['--init'], cwd });
   }
 
   // Reject an invalid stdout protocol before config discovery/evaluation.
   // Help retains its existing priority and is forwarded to Go, which owns the
   // usage text. Go validates format again after the IPC init payload is merged
-  // so direct and older clients receive the same single-error behavior.
+  // so every CLI entry path receives the same single-error behavior.
   if (!args.help && args.format !== null && !isOutputFormat(args.format)) {
     process.stderr.write(
       `error: invalid output format ${JSON.stringify(args.format)} (expected ${OUTPUT_FORMATS.slice(0, -1).join(', ')}, or ${OUTPUT_FORMATS.at(-1)})\n`,
@@ -73,7 +73,6 @@ export async function run(
   return runEngine({
     binPath,
     goArgs: jsonGoArgs,
-    configs: [],
     cwd,
     runtime: { singleThreaded: args.singleThreaded },
     extraInit: {

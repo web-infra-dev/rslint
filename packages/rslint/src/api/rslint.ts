@@ -716,7 +716,9 @@ export class Rslint {
     let pluginSession: PluginLintSession | null = null;
 
     const shutdown = async (): Promise<void> => {
-      await this.#shutdownPluginSession(pluginSession);
+      if (pluginSession) {
+        await this.#pluginHosts.shutdown(pluginSession.host);
+      }
       pluginSession = null;
       for (const transactionId of transactions) {
         configHost.deleteSession(transactionId);
@@ -752,18 +754,17 @@ export class Rslint {
           }
           return activation;
         },
-        pluginLint: async (request) =>
-          pluginSession ? pluginSession.host.lint(request) : { results: [] },
+        pluginLint: async (request) => {
+          if (!pluginSession) {
+            throw new Error(
+              'rslint API: pluginLint requested without an activated plugin host',
+            );
+          }
+          return pluginSession.host.lint(request);
+        },
       },
       shutdown,
     };
-  }
-
-  async #shutdownPluginSession(
-    session: PluginLintSession | null,
-  ): Promise<void> {
-    if (!session) return;
-    await this.#pluginHosts.shutdown(session.host);
   }
 
   #getNormalizedOverrideConfig(): Record<string, unknown>[] | null {

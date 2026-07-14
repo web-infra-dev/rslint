@@ -64,7 +64,6 @@ type ConfigDiscoveryRequest struct {
 type configSource struct {
 	CandidateID   string
 	CandidatePath string
-	EslintPlugins []rslintconfig.EslintPluginEntry
 	ExplicitOnly  bool
 }
 
@@ -77,7 +76,6 @@ type ConfigFailure struct {
 
 type ConfigDiscoveryStats struct {
 	DirectoriesVisited int
-	CandidatesFound    int
 	ConfigsRequested   int
 	ConfigsLoaded      int
 	DirectoriesPruned  int

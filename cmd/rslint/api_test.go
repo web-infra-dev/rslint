@@ -1426,9 +1426,8 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 				}
 				loadedIDs[candidate.ID] = struct{}{}
 				result := discovery.ConfigLoadResult{
-					ID:                candidate.ID,
-					Status:            "loaded",
-					SourceFingerprint: "fixture:" + filepath.Base(candidate.ConfigDirectory),
+					ID:     candidate.ID,
+					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
 				case filepath.Clean(rootConfigPath):
@@ -1441,7 +1440,6 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 						return nil, fmt.Errorf("nested configDirectory = %q, want %q", candidate.ConfigDirectory, nestedDir)
 					}
 					result.Entries = nestedEntries
-					result.EslintPlugins = []rslintconfig.EslintPluginEntry{{Prefix: "community", RuleNames: []string{"check"}}}
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
@@ -1586,11 +1584,9 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 					results := make([]discovery.ConfigLoadResult, 0, len(request.Candidates))
 					for _, candidate := range request.Candidates {
 						results = append(results, discovery.ConfigLoadResult{
-							ID:                candidate.ID,
-							Status:            "loaded",
-							Entries:           test.entries,
-							SourceFingerprint: "fixture",
-							EslintPlugins:     test.plugins,
+							ID:      candidate.ID,
+							Status:  "loaded",
+							Entries: test.entries,
 						})
 					}
 					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
@@ -1665,10 +1661,9 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
-					ID:                candidate.ID,
-					Status:            "loaded",
-					Entries:           rootEntries,
-					SourceFingerprint: "fixture:root",
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: rootEntries,
 				})
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
@@ -1727,10 +1722,9 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
 				response.Results = append(response.Results, discovery.ConfigLoadResult{
-					ID:                candidate.ID,
-					Status:            "loaded",
-					Entries:           entries,
-					SourceFingerprint: "fixture:root",
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: entries,
 				})
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
@@ -1803,9 +1797,8 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 			for _, candidate := range request.Candidates {
 				transactionIDs[candidate.ID] = struct{}{}
 				result := discovery.ConfigLoadResult{
-					ID:                candidate.ID,
-					Status:            "loaded",
-					SourceFingerprint: "fixture:" + filepath.Base(candidate.ConfigDirectory),
+					ID:     candidate.ID,
+					Status: "loaded",
 				}
 				switch filepath.Clean(candidate.ConfigPath) {
 				case filepath.Clean(rootConfigPath):
@@ -1888,10 +1881,9 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
 				TransactionID: request.TransactionID,
 				Results: []discovery.ConfigLoadResult{{
-					ID:                request.Candidates[0].ID,
-					Status:            "loaded",
-					Entries:           mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`),
-					SourceFingerprint: "fixture:explicit",
+					ID:      request.Candidates[0].ID,
+					Status:  "loaded",
+					Entries: mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`),
 				}},
 			})
 		case api.KindActivateConfigs:

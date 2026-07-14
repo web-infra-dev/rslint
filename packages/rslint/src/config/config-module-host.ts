@@ -7,7 +7,8 @@ import {
   loadConfigFile,
   loadConfigFileFresh,
   normalizeConfig,
-} from './config-loader.js';
+  type PluginConfigDescriptor,
+} from './config-file-loader.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
@@ -16,7 +17,6 @@ import {
   type ConfigModuleEslintPluginEntry,
   type ConfigModuleLoadMode,
   type ConfigModuleLoadResult,
-  type ConfigModuleSessionSummary,
   type FailedConfigModuleResult,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
@@ -34,6 +34,28 @@ export interface ConfigModuleHostOptions {
   readSource?: ConfigSourceReader;
 }
 
+export interface EffectiveConfigModule {
+  id: string;
+  configPath: string;
+  configDirectory: string;
+  entries: Record<string, unknown>[];
+  sourceFingerprint: string;
+}
+
+export type ConfigModulePluginDescriptor = PluginConfigDescriptor;
+
+/**
+ * Node-local activation data derived from exactly the effective IDs selected
+ * by Go. It is exposed only to the prepare callback and is never serialized
+ * as the activation response.
+ */
+export interface ConfigModuleActivationPlan {
+  transactionId: string;
+  configs: EffectiveConfigModule[];
+  eslintPluginEntries: ConfigModuleEslintPluginEntry[];
+  pluginConfigs: ConfigModulePluginDescriptor[];
+}
+
 interface StoredCandidate {
   candidate: ConfigModuleCandidate;
   result: StoredLoadResult;
@@ -45,7 +67,6 @@ interface StoredLoadedResult {
   /** JSON is the immutable session copy and exactly matches the wire shape. */
   entriesJSON: string;
   sourceFingerprint: string;
-  eslintPlugins: ConfigModuleEslintPluginEntry[];
 }
 
 type StoredLoadResult = StoredLoadedResult | FailedConfigModuleResult;
@@ -145,16 +166,11 @@ function cloneStoredResult(result: StoredLoadResult): ConfigModuleLoadResult {
       id: result.id,
       status: 'loaded',
       entries: cloneEntries(result.entriesJSON),
-      sourceFingerprint: result.sourceFingerprint,
-      eslintPlugins: clonePluginEntries(result.eslintPlugins),
     };
   }
   return {
     id: result.id,
     status: 'failed',
-    ...(result.sourceFingerprint
-      ? { sourceFingerprint: result.sourceFingerprint }
-      : {}),
     error: { ...result.error },
   };
 }
@@ -263,11 +279,11 @@ export class ConfigModuleHost {
    * Sources are fingerprinted here before plugin-host preparation; the
    * protocol-facing activateConfigs performs the matching post-prepare check.
    */
-  async summarizeEffectiveConfigs(
+  async #summarizeEffectiveConfigs(
     transactionId: string,
     effectiveConfigIds: readonly string[],
     signal?: AbortSignal,
-  ): Promise<ConfigModuleSessionSummary> {
+  ): Promise<ConfigModuleActivationPlan> {
     const session = this.#sessions.get(transactionId);
     if (!session) {
       throw protocolError(
@@ -307,28 +323,31 @@ export class ConfigModuleHost {
   async activateConfigs(
     request: ActivateConfigsRequest,
     signal?: AbortSignal,
-    prepare?: (activation: ActivateConfigsResponse) => Promise<void>,
+    prepare?: (plan: ConfigModuleActivationPlan) => Promise<void>,
   ): Promise<ActivateConfigsResponse> {
     this.#validateActivationRequest(request);
-    const activation = await this.summarizeEffectiveConfigs(
+    const plan = await this.#summarizeEffectiveConfigs(
       request.transactionId,
       request.effectiveConfigIds,
       signal,
     );
+    const response: ActivateConfigsResponse = {
+      transactionId: plan.transactionId,
+      eslintPluginEntries: clonePluginEntries(plan.eslintPluginEntries),
+    };
     assertNotAborted(signal);
-    await prepare?.(activation);
+    await prepare?.(plan);
     assertNotAborted(signal);
-    await this.verifyEffectiveConfigs(request, signal);
-    return activation;
+    await this.#verifyEffectiveConfigs(request, signal);
+    return response;
   }
 
   /**
    * Recheck the original source fingerprints for exactly Go's effective IDs.
-   * Adapters normally use activateConfigs' prepare callback so this check is
-   * impossible to omit, while this method remains available to embeddings
-   * whose preparation lifecycle cannot be expressed as one callback.
+   * activateConfigs keeps this check private so adapters cannot accidentally
+   * publish a plugin host without validating its source bytes again.
    */
-  async verifyEffectiveConfigs(
+  async #verifyEffectiveConfigs(
     request: ActivateConfigsRequest,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -352,10 +371,6 @@ export class ConfigModuleHost {
   /** Drop all normalized module state for a committed or aborted transaction. */
   deleteSession(transactionId: string): boolean {
     return this.#sessions.delete(transactionId);
-  }
-
-  hasSession(transactionId: string): boolean {
-    return this.#sessions.has(transactionId);
   }
 
   #validateRequest(request: LoadConfigsRequest): void {
@@ -539,13 +554,12 @@ export class ConfigModuleHost {
     candidate: ConfigModuleCandidate,
     loadMode: ConfigModuleLoadMode,
   ): Promise<StoredLoadResult> {
-    let sourceFingerprint: string | undefined;
     // Preserve the stage at which a candidate failed. Besides making catalog
     // failures actionable, this lets CLI/API/LSP distinguish module-loading
     // failures from a module that evaluated but exported an invalid config.
     let failureCode = 'load';
     try {
-      sourceFingerprint = await this.#fingerprint(candidate.configPath);
+      const sourceFingerprint = await this.#fingerprint(candidate.configPath);
       const rawConfig = await (loadMode === 'fresh'
         ? this.#loadFresh(candidate.configPath)
         : this.#loadCached(candidate.configPath));
@@ -553,38 +567,22 @@ export class ConfigModuleHost {
       const normalized = normalizeConfig(rawConfig);
       // This is the cross-process serialization boundary. Keeping the canonical
       // JSON also prevents a caller mutating a response from corrupting session
-      // state used later by summarizeEffectiveConfigs.
+      // state used later by #summarizeEffectiveConfigs.
       const entriesJSON = JSON.stringify(normalized);
-      const entries = cloneEntries(entriesJSON);
       const afterFingerprint = await this.#fingerprint(candidate.configPath);
       if (sourceFingerprint !== afterFingerprint) {
         throw new ConfigSourceChangedError(candidate.configPath);
       }
-      const { eslintPluginEntries } = collectPluginMeta([
-        {
-          configPath: candidate.configPath,
-          configDirectory: candidate.configDirectory,
-          entries,
-        },
-      ]);
       return {
         id: candidate.id,
         status: 'loaded',
         entriesJSON,
         sourceFingerprint: afterFingerprint,
-        eslintPlugins: clonePluginEntries(eslintPluginEntries),
       };
     } catch (error) {
-      try {
-        sourceFingerprint = await this.#fingerprint(candidate.configPath);
-      } catch {
-        // Keep the original load/read error. An unreadable source has no useful
-        // fingerprint for the coordinator's last-good decision.
-      }
       return {
         id: candidate.id,
         status: 'failed',
-        ...(sourceFingerprint ? { sourceFingerprint } : {}),
         error: errorPayload(error, failureCode),
       };
     }
