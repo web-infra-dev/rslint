@@ -5,14 +5,37 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dlclark/regexp2"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// CompiledSchema is a compiled JSON Schema for a rule's options array.
-type CompiledSchema struct {
+// Schema is a rule's options JSON Schema, compiled lazily on first use. By
+// convention the schema describes the ESLint-style options array
+// (context.options — the config array after the severity level) as a tuple: a
+// top-level `{"type": "array", "items": [...]}` — or, for a rule that takes no
+// options, `{"type": "array", "maxItems": 0}` with `items` omitted (draft-04's
+// own metaschema requires a non-empty schemaArray, so `"items": []` is itself
+// invalid). See the <rule-name>.schema.json convention.
+//
+// rslint only supports Draft 4 — the draft under which a plain array `items`
+// means positional/tuple validation — so this is a convention for our own
+// authored schema.json files, not a constraint compilation enforces: an
+// explicit `$schema` declaring a newer draft would compile fine, just under
+// that draft's (different) `items` semantics.
+//
+// Compilation is deferred until the schema is first used ([Schema.Compile] /
+// [Schema.Validate]) and guarded by a sync.Once, so a schema is compiled at
+// most once per process no matter how many goroutines race to use it — and a
+// rule that is never enabled never pays for compiling its schema at all. The
+// once also lets many rules share a single Schema value: [EmptyArraySchema]
+// is referenced by every no-options rule yet compiles a single time.
+type Schema struct {
+	rawJSON []byte
+
+	once   sync.Once
 	schema *jsonschema.Schema
 	// doc is the schema's own raw decoded document. It exists solely so
 	// [literalDefault] can recover a literal `default` written directly
@@ -20,68 +43,46 @@ type CompiledSchema struct {
 	// never carries, since the underlying library discards every sibling
 	// keyword next to "$ref" for Draft 4.
 	doc any
+	err error
 }
 
-// CompileSchema compiles a rule's options JSON Schema. By convention the
-// schema describes the ESLint-style options array as a tuple: a top-level
-// `{"type": "array", "items": [...]}` — or, for a rule that takes no options,
-// `{"type": "array", "maxItems": 0}` with `items` omitted (draft-04's own
-// metaschema requires a non-empty schemaArray, so `"items": []` is itself
-// invalid). See the <rule-name>.schema.json convention.
+// NewSchema returns a Schema that will compile rawJSON on first use. rawJSON
+// is typically a `//go:embed`-ed <rule-name>.schema.json sitting beside the
+// rule's source.
 //
-// rslint only supports Draft 4 — the draft under which a plain array `items`
-// means positional/tuple validation — so this is a convention for our own
-// authored schema.json files, not a constraint CompileSchema enforces: an
-// explicit `$schema` declaring a newer draft would compile fine, just under
-// that draft's (different) `items` semantics.
-//
-// Each call compiles against its own private jsonschema.Compiler, so a
-// `$ref` in one rule's schema can never resolve into another rule's `$defs`
-// or resources, even if two schemas happen to reuse the same `$id`.
-//
-// Rules that take no options should reuse [EmptyArraySchema] instead of calling
-// CompileSchema with that boilerplate schema themselves.
-func CompileSchema(schemaJSON []byte) (*CompiledSchema, error) {
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON))
-	if err != nil {
-		return nil, err
-	}
-
-	c := jsonschema.NewCompiler()
-	c.DefaultDraft(jsonschema.Draft4)
-	c.UseRegexpEngine(jsRegexpEngine)
-	const resourceURL = "schema.json"
-	if err := c.AddResource(resourceURL, doc); err != nil {
-		return nil, err
-	}
-	compiled, err := c.Compile(resourceURL)
-	if err != nil {
-		return nil, err
-	}
-	return &CompiledSchema{schema: compiled, doc: doc}, nil
-}
-
-// MustCompileSchema is like CompileSchema but panics instead of returning an
-// error. Intended for package-level CompiledSchema variables initialized at
-// startup, in the vein of regexp.MustCompile.
-func MustCompileSchema(schemaJSON []byte) *CompiledSchema {
-	s, err := CompileSchema(schemaJSON)
-	if err != nil {
-		panic(err)
-	}
-	return s
+// Rules that take no options should reference the shared [EmptyArraySchema]
+// instead of constructing their own copy of the same schema.
+func NewSchema(rawJSON []byte) *Schema {
+	return &Schema{rawJSON: rawJSON}
 }
 
 // EmptyArraySchema validates that a rule's resolved options array
 // (context.options) is empty. Rules that take no options should reference
-// this shared schema rather than each compiling their own copy of the same
-// schema.json.
-var EmptyArraySchema = MustCompileSchema([]byte(`{"type": "array", "maxItems": 0}`))
+// this shared schema rather than each carrying their own copy of the same
+// schema.json; the lazy once in [Schema.Compile] means it compiles a single
+// time process-wide regardless of how many rules use it.
+var EmptyArraySchema = NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
 
-// Validate fills in a rule's resolved options array (context.options — the
-// config array after the severity level) with schema-declared defaults, then
-// validates the result against the compiled schema. It returns the options
-// with defaults applied, along with any validation error.
+// Compile compiles the schema's raw JSON exactly once and returns the
+// memoized result; every subsequent call — from any goroutine — returns the
+// same compiled schema (or the same compile error).
+//
+// Each compilation uses its own private jsonschema.Compiler, so a `$ref` in
+// one rule's schema can never resolve into another rule's `$defs` or
+// resources, even if two schemas happen to reuse the same `$id`.
+func (s *Schema) Compile() (*jsonschema.Schema, error) {
+	s.once.Do(func() {
+		s.schema, s.doc, s.err = compileSchemaJSON(s.rawJSON)
+	})
+	return s.schema, s.err
+}
+
+// Validate compiles the schema (once), fills a rule's resolved options array
+// (context.options — the config array after the severity level) with
+// schema-declared defaults, then validates the result against the compiled
+// schema. It returns the compile error, if any, otherwise any validation
+// error. A nil options slice is validated as an empty options array, not as
+// JSON null.
 //
 // Defaults are applied the way ajv's `useDefaults` option does: object
 // `properties` (including keys only matched by `patternProperties` or a
@@ -93,12 +94,69 @@ var EmptyArraySchema = MustCompileSchema([]byte(`{"type": "array", "maxItems": 0
 // `allOf` branch (unambiguous, since all of them must hold) — see
 // [applyDefaults]. Defaults are never applied inside `anyOf`/`oneOf`/`not`,
 // since which branch applies (if any) is genuinely ambiguous.
-func (s *CompiledSchema) Validate(options any) (any, error) {
-	options = applyDefaults(s.schema, options, s.doc)
-	if err := s.schema.Validate(options); err != nil {
+//
+// Like ajv — which fills defaults directly into the instance it validates —
+// the fill mutates the options' own maps and slices in place, so a defaulted
+// property lands in the caller's data. The one exception is a grown array:
+// appending a missing tuple slot's default can't reach the caller's slice
+// header, so the grown options exist only for the validation itself. That,
+// too, matches observable ESLint behavior: ESLint validates a shallow copy
+// (`ruleOptions.slice(1)`) of the very array it later re-slices the rule's
+// runtime options from, so an ajv-grown tuple slot never reaches the rule
+// either — only defaults filled into already-present (shared) objects do.
+//
+// The compiled schema itself is never mutated, so Validate is safe for
+// concurrent use on distinct options values; two goroutines must not
+// Validate the very same options value at once.
+func (s *Schema) Validate(options []any) error {
+	_, err := s.validateWithDefaults(options)
+	return err
+}
+
+// validateWithDefaults is [Schema.Validate] with access to the
+// defaults-applied options value — including a tuple-grown array that
+// in-place mutation alone can't hand back.
+func (s *Schema) validateWithDefaults(options []any) ([]any, error) {
+	compiled, err := s.Compile()
+	if err != nil {
 		return options, err
 	}
-	return options, nil
+	if options == nil {
+		options = []any{}
+	}
+	// applyDefaults returns a value of its input's own kind, so a []any in is
+	// always a []any out (possibly grown by tuple defaults).
+	applied, _ := applyDefaults(compiled, options, s.doc).([]any)
+	if err := compiled.Validate(applied); err != nil {
+		return applied, err
+	}
+	return applied, nil
+}
+
+// compileSchemaJSON does the actual one-time compilation work behind
+// [Schema.Compile], returning both the compiled schema and the raw decoded
+// document it was compiled from (kept for [literalDefault]).
+func compileSchemaJSON(rawJSON []byte) (*jsonschema.Schema, any, error) {
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(rawJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft4)
+	c.UseRegexpEngine(jsRegexpEngine)
+	// An absolute URI in a private scheme, so the schema's base URL can never
+	// be confused with (or resolve against) a real file path or another
+	// resource's URL the way a bare relative "schema.json" could.
+	const resourceURL = "rslint:///schema.json"
+	if err := c.AddResource(resourceURL, doc); err != nil {
+		return nil, nil, err
+	}
+	compiled, err := c.Compile(resourceURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	return compiled, doc, nil
 }
 
 // applyDefaults recursively fills missing object properties and array items
@@ -135,6 +193,15 @@ func (s *CompiledSchema) Validate(options any) (any, error) {
 // nested call's own useDefaults processing lands directly in the shared data
 // being validated here.
 //
+// A compound (map/slice) literalDefault is always run through [deepCopyJSON]
+// before it's inserted: the value literalDefault returns is owned by s — the
+// compiled *jsonschema.Schema, shared by every Validate call and every rule
+// that reuses the same Schema (e.g. [EmptyArraySchema]) — so inserting it
+// directly would let this call's own recursion into the newly filled slot
+// (or any later mutation of the validated options) mutate that shared value,
+// racing with any other concurrent Validate call that inserts the same
+// default.
+//
 // For objects, every `allOf` branch's own `properties` also contributes at
 // this level (see [defaultSources]): unlike `anyOf`/`oneOf`/`not`, `allOf`
 // has no ambiguity about which branch(es) apply — all of them must hold —
@@ -157,7 +224,7 @@ func applyDefaults(s *jsonschema.Schema, v any, doc any) any {
 					if !ok {
 						continue
 					}
-					val[key] = normalizeNumbers(def)
+					val[key] = normalizeNumbers(deepCopyJSON(def))
 				}
 				val[key] = applyDefaults(prop, val[key], doc)
 			}
@@ -191,7 +258,7 @@ func applyDefaults(s *jsonschema.Schema, v any, doc any) any {
 				for len(val) < i {
 					val = append(val, nil) // pad any not-yet-visited gap up to i
 				}
-				val = append(val, applyDefaults(item, normalizeNumbers(def), doc))
+				val = append(val, applyDefaults(item, normalizeNumbers(deepCopyJSON(def)), doc))
 			}
 		case *jsonschema.Schema:
 			// List-style items: the same schema governs every element, so
@@ -274,7 +341,8 @@ func matchAdditionalOrPattern(s *jsonschema.Schema, key string) (*jsonschema.Sch
 // pulled through either way). Since the compiled Schema has already lost
 // this literal value, literalDefault recovers it by walking s's own
 // Location — an absolute URL whose fragment is a JSON Pointer into doc, the
-// document originally decoded by [CompileSchema] — back into the raw JSON.
+// document originally decoded by [compileSchemaJSON] — back into the raw
+// JSON.
 func literalDefault(s *jsonschema.Schema, doc any) (any, bool) {
 	if s.Default != nil {
 		return *s.Default, true
@@ -304,7 +372,7 @@ func locationFragment(location string) string {
 }
 
 // lookupPointer resolves an RFC 6901 JSON Pointer against doc, the document
-// originally decoded by [jsonschema.UnmarshalJSON] in [CompileSchema].
+// originally decoded by [jsonschema.UnmarshalJSON] in [compileSchemaJSON].
 func lookupPointer(doc any, pointer string) (any, bool) {
 	cur := doc
 	if pointer == "" {
@@ -357,8 +425,8 @@ func resolveRef(s *jsonschema.Schema) *jsonschema.Schema {
 }
 
 // jsRegexpEngine compiles pattern the way ajv itself does: as a JavaScript
-// RegExp, not a Go RE2 regexp. It's wired into every CompileSchema's
-// Compiler via [jsonschema.Compiler.UseRegexpEngine], so it governs both the
+// RegExp, not a Go RE2 regexp. It's wired into every compilation's Compiler
+// via [jsonschema.Compiler.UseRegexpEngine], so it governs both the
 // "pattern" keyword (a schema author's own regex, compiled once against the
 // schema) and "format": "regex" (asserting that an instance *value* is
 // itself a syntactically valid regex — e.g. a rule option like
@@ -397,10 +465,45 @@ func (r jsRegexp) MatchString(s string) bool {
 	return utils.Regexp2MatchString(r.re, s)
 }
 
+// deepCopyJSON returns a copy of v in which every nested map[string]any and
+// []any is freshly allocated, so mutating the result can never reach v
+// itself. v is always either decoded JSON (map[string]any/[]any/string/
+// bool/json.Number/nil) or, for *s.Default, a value produced by unmarshaling
+// the schema's own JSON — never a struct or pointer type that would need
+// special handling.
+//
+// applyDefaults must call this on every literalDefault before inserting it
+// into the options being validated: literalDefault's result — s.Default or a
+// value looked up from doc — is owned by the *Schema, which many goroutines
+// share (every rule that reuses a schema, e.g. [EmptyArraySchema], and every
+// concurrent Validate call on the same rule's schema). Inserting it directly
+// would let one goroutine's applyDefaults recursion (or a later mutation of
+// the validated options) write into a map/slice another goroutine is
+// simultaneously reading or writing — a data race, and for a map a possible
+// fatal concurrent-map-write crash.
+func deepCopyJSON(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, v2 := range val {
+			out[k] = deepCopyJSON(v2)
+		}
+		return out
+	case []any:
+		out := make([]any, len(val))
+		for i, v2 := range val {
+			out[i] = deepCopyJSON(v2)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
 // normalizeNumbers mutates v in place, converting any json.Number leaves to
 // float64, and returns it (a bare top-level json.Number is instead returned
 // as a new float64, since a number can't be mutated through its interface
-// value). CompileSchema decodes schema.json — and its "default" values —
+// value). compileSchemaJSON decodes schema.json — and its "default" values —
 // with UseNumber for precision, but the rest of rslint decodes rule options
 // with plain encoding/json, which represents numbers as float64. Without
 // this, a defaulted numeric option would have a different Go type than the
