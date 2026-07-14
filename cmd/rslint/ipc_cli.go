@@ -554,12 +554,6 @@ func discoverCLIConfigCatalog(
 	return nil
 }
 
-func printConfigDiscoveryFailures(failures []discovery.ConfigFailure) {
-	for _, failure := range failures {
-		fmt.Fprintf(os.Stderr, "Warning: skipping config %s: %s\n", failure.Path, failure.Message)
-	}
-}
-
 // startSynthStdinWriter feeds data into w from a background goroutine and
 // returns a channel closed when the writer is fully joined. It bounds two
 // failure modes: a reader that bails before consuming all bytes (a payload

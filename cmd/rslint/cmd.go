@@ -691,8 +691,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads from its own directory downward.
-			// Direct child config directories are ownership handoff boundaries, so
-			// parent and child configs never share .gitignore patterns.
+			// Direct automatically reachable child configs are ownership handoff
+			// boundaries, so parent and child owners never share .gitignore patterns.
+			// A config loaded only for a literal target is a boundary for that scope,
+			// while automatic siblings keep their ancestor's complete ignore chain.
 			//
 			// Directories excluded by global config ignores are pruned during
 			// the .gitignore scan because files below them cannot be linted.
@@ -722,9 +724,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
-				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
+				automaticResolver := rslintconfig.NewConfigOwnerResolverForAutomaticTargets(
+					configMap,
+					configTargetScopes,
+					fs,
+				)
+				completeResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
 				for configDir, entries := range configMap {
-					stopDirs := configResolver.ChildConfigDirs(configDir)
+					scope := configTargetScopes[configDir]
+					resolver := automaticResolver
+					if scope.ExplicitOnly {
+						resolver = completeResolver
+					}
+					stopDirs := resolver.ChildConfigDirs(configDir)
 					giWG.Queue(func() {
 						var ownerFiles []string
 						if fileOnlyTargets {
@@ -732,6 +744,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 							if ownerFiles == nil {
 								ownerFiles = []string{}
 							}
+						} else if scope.ExplicitOnly {
+							// Mixed file+directory invocations must not turn a config
+							// loaded only for a literal into a full subtree scan.
+							ownerFiles = append([]string{}, scope.Files...)
 						}
 						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, ownerFiles, stopDirs)
 						giMu.Lock()

@@ -26,6 +26,18 @@ func NewConfigOwnerResolver(configMap map[string]RslintConfig, fsys vfs.FS) *Con
 	}
 }
 
+// NewConfigOwnerResolverForAutomaticTargets excludes configs that were loaded
+// only for catalog-scoped literal files. Those configs own their literal scope,
+// but they are not ownership handoff or .gitignore source boundaries for files
+// reached through an automatic directory/glob walk.
+func NewConfigOwnerResolverForAutomaticTargets(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+	fsys vfs.FS,
+) *ConfigOwnerResolver {
+	return NewConfigOwnerResolver(configMapForAutomaticTargets(configMap, scopes), fsys)
+}
+
 func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintConfig) {
 	if resolver == nil || resolver.index == nil {
 		return "", nil

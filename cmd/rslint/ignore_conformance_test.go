@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	api "github.com/web-infra-dev/rslint/internal/api"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 func TestCLIAndAPIIgnoreConformance(t *testing.T) {
@@ -269,6 +270,57 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "packages/second/source.ts") {
 		t.Fatalf("second config lost its independently lintable target: stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
+	workspace := t.TempDir()
+	ignoredDir := filepath.Join(workspace, "ignored")
+	explicitTarget := filepath.Join(ignoredDir, "explicit.js")
+	automaticTarget := filepath.Join(ignoredDir, "automatic.js")
+	if err := os.MkdirAll(ignoredDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ignoredDir, ".gitignore"), []byte("automatic.js\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(explicitTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(automaticTarget, []byte("console.log('automatic');\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	payload := &parsedPayload{
+		ConfigMap: map[string]rslintconfig.RslintConfig{
+			workspace:  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
+			ignoredDir: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		},
+		ConfigTargetScopes: map[string]rslintconfig.LintDiscoveryScope{
+			ignoredDir: {
+				Files:        []string{explicitTarget},
+				ExplicitOnly: true,
+			},
+		},
+		IsMultiConfig: true,
+	}
+	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+		ConfigStdin:    true,
+		ConfigPayload:  payload,
+		AllowFiles:     []string{explicitTarget},
+		AllowDirs:      []string{ignoredDir},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 {
+		t.Fatalf("explicit target should fail lint: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "automatic.js") {
+		t.Fatalf("parent-owned target escaped nested .gitignore: stdout=%q stderr=%q", stdout, stderr)
+	}
+	if !strings.Contains(stdout, "explicit.js") || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("explicit-only target lost its config: stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 

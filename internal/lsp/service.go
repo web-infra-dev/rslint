@@ -2,8 +2,6 @@ package lsp
 
 import (
 	"context"
-	stdjson "encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -158,9 +156,8 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	// resolves rule names against it after config merging.
 	config.RegisterAllRules()
 
-	// Try to load JSON config as fallback.
-	// If JS/TS configs exist, the VS Code extension will send them via
-	// rslint/configUpdate notification, which takes priority per-file.
+	// Load the JSON config used before the first JS/TS catalog transaction and
+	// as fallback for files outside every discovered JS/TS config boundary.
 	rslintConfigPath, configFound := findRslintConfig(s.fs, s.cwd)
 	if configFound {
 		s.rslintConfigPath = rslintConfigPath
@@ -261,169 +258,6 @@ func (s *Server) reloadConfig() error {
 	return nil
 }
 
-// loadJSONConfigFallback resolves the complete JSON fallback without mutating
-// live server state. Config-update transactions use it before committing an
-// explicitly empty JS/TS config catalog.
-func (s *Server) loadJSONConfigFallback() (config.RslintConfig, string, []string, error) {
-	if s.fs == nil {
-		return s.jsonConfig, "", nil, nil
-	}
-
-	configPath, found := findRslintConfig(s.fs, s.cwd)
-	if !found {
-		return config.RslintConfig{}, "", nil, nil
-	}
-
-	loader := config.NewConfigLoader(s.fs, s.cwd)
-	rslintConfig, _, err := loader.LoadRslintConfig(configPath)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("load JSON fallback %q: %w", configPath, err)
-	}
-	paths, err := s.resolveTsConfigPaths(rslintConfig, s.cwd)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("resolve tsconfig paths for JSON fallback %q: %w", configPath, err)
-	}
-	return rslintConfig, configPath, paths, nil
-}
-
-func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
-	// params is raw JSON from the custom notification
-	data, err := stdjson.Marshal(params)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config update params: %w", err)
-	}
-
-	var payload struct {
-		Generation string `json:"generation,omitempty"`
-		Configs    []struct {
-			ConfigDirectory string              `json:"configDirectory"`
-			Entries         config.RslintConfig `json:"entries"`
-			Unavailable     bool                `json:"unavailable,omitempty"`
-		} `json:"configs"`
-		// EslintPlugins carries the {prefix, ruleNames} metadata for every
-		// ESLint plugin mounted across all configs, aggregated by the VS Code
-		// extension (same shape the CLI sends as initPayload.EslintPlugins).
-		// The live plugin objects stay in Node (the worker re-imports the
-		// config); Go only needs the names to register placeholder rules that
-		// make `<prefix>/<rule>` resolvable and route to the worker.
-		EslintPlugins []config.EslintPluginEntry `json:"eslintPlugins,omitempty"`
-	}
-	if err := stdjson.Unmarshal(data, &payload); err != nil {
-		return fmt.Errorf("failed to parse config update: %w", err)
-	}
-
-	// Distinguish nil (malformed/missing "configs" field) from an explicitly
-	// empty array (all JS configs were deleted — legitimate clear signal).
-	// Go JSON: {"configs":[]} → non-nil empty slice; null/{}/missing → nil.
-	if payload.Configs == nil {
-		log.Printf("[rslint] Config update has no configs field; keeping existing JS configs intact")
-		return nil
-	}
-	seenConfigDirs := make(map[string]string, len(payload.Configs))
-	for _, cfg := range payload.Configs {
-		if cfg.ConfigDirectory == "" {
-			return errors.New("config update contains an empty configDirectory")
-		}
-		configID := lspFilesystemPathID(uriToPath(lsproto.DocumentUri(cfg.ConfigDirectory)), s.fs)
-		if previous, exists := seenConfigDirs[configID]; exists {
-			return fmt.Errorf(
-				"config update contains duplicate directories %q and %q",
-				previous,
-				cfg.ConfigDirectory,
-			)
-		}
-		seenConfigDirs[configID] = cfg.ConfigDirectory
-		if cfg.Unavailable && len(cfg.Entries) != 0 {
-			return fmt.Errorf("unavailable config %q must not contain entries", cfg.ConfigDirectory)
-		}
-		if err := config.ValidateConfig(cfg.Entries); err != nil {
-			return fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
-		}
-		if err := validateRuleOptionsForConfig(cfg.Entries, cfg.ConfigDirectory); err != nil {
-			return err
-		}
-	}
-
-	// Resolve every declared project before touching live config state. A bad
-	// project path rejects the whole generation, matching the CLI/API and
-	// preserving the previous config atomically.
-	candidateConfigs := make(map[string]config.RslintConfig, len(payload.Configs))
-	candidateTsConfigs := make(map[string][]string, len(payload.Configs))
-	candidateConfigsByPath := make(map[string]config.RslintConfig, len(payload.Configs))
-	candidateConfigKeyByPath := make(map[string]string, len(payload.Configs))
-	candidateUnavailableConfigs := make(map[string]struct{})
-	for _, cfg := range payload.Configs {
-		configDir := uriToPath(lsproto.DocumentUri(cfg.ConfigDirectory))
-		paths, err := s.resolveTsConfigPaths(cfg.Entries, configDir)
-		if err != nil {
-			return fmt.Errorf("resolve tsconfig paths for %q: %w", cfg.ConfigDirectory, err)
-		}
-		candidateConfigs[cfg.ConfigDirectory] = cfg.Entries
-		candidateTsConfigs[cfg.ConfigDirectory] = paths
-		normalizedConfigDir := tspath.NormalizePath(configDir)
-		candidateConfigsByPath[normalizedConfigDir] = cfg.Entries
-		candidateConfigKeyByPath[normalizedConfigDir] = cfg.ConfigDirectory
-		if cfg.Unavailable {
-			candidateUnavailableConfigs[cfg.ConfigDirectory] = struct{}{}
-		}
-	}
-	candidateConfigResolver := config.NewConfigOwnerResolver(candidateConfigsByPath, s.fs)
-
-	candidateJSONConfig := s.jsonConfig
-	candidateJSONConfigPath := s.rslintConfigPath
-	candidateJSONTsConfigs := s.tsConfigPaths
-	if len(payload.Configs) == 0 {
-		candidateJSONConfig, candidateJSONConfigPath, candidateJSONTsConfigs, err = s.loadJSONConfigFallback()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Invalidate work created from the previous config before committing the new
-	// generation. Cancellation is best-effort; docGeneration also prevents an
-	// already-completed old result from being merged after this update.
-	for uri := range s.documents {
-		s.docGeneration[uri]++
-		s.cancelInflightPluginDispatch(uri)
-		delete(s.diagnostics, uri)
-	}
-
-	// Replace all JS configs with the new set (may be empty when all deleted).
-	// Keys are URI strings (e.g. "file:///project") sent from VS Code,
-	// matching the URI format used throughout the LSP protocol.
-	s.jsConfigs = candidateConfigs
-	s.tsConfigPathsByConfig = candidateTsConfigs
-	s.jsConfigOwnerResolver = candidateConfigResolver
-	s.jsConfigKeyByPath = candidateConfigKeyByPath
-	s.jsUnavailableConfigs = candidateUnavailableConfigs
-	s.eslintPluginConfigGeneration = payload.Generation
-	s.eslintPluginRules = eslintPluginRuleSet(payload.EslintPlugins)
-	// A legacy push replaces the catalog outside the v2 transaction protocol;
-	// it must not be treated as a v2 last-good snapshot by a later refresh.
-	s.configDiscoveryV2HasLastGood = false
-	s.configGenerationFS = nil
-	if len(payload.Configs) == 0 {
-		s.jsonConfig = candidateJSONConfig
-		s.rslintConfigPath = candidateJSONConfigPath
-		s.tsConfigPaths = candidateJSONTsConfigs
-	}
-	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
-
-	// Register placeholder rules for mounted ESLint plugins so their rule
-	// names resolve (and route to the Node worker via IsEslintPluginRule)
-	// instead of being silently dropped. Idempotent across config updates;
-	// a same-named native rule always wins (RegisterEslintPluginRules skips it).
-	// RegisterAllRules already ran in handleInitialized, so native rules exist.
-	config.RegisterEslintPluginRules(payload.EslintPlugins)
-
-	// Ask the client to re-pull diagnostics with the updated config.
-	if err := s.RefreshDiagnostics(ctx); err != nil {
-		log.Printf("[rslint] Failed to refresh diagnostics after config update: %v", err)
-	}
-
-	return nil
-}
-
 func validateRuleOptionsForConfig(entries config.RslintConfig, configDirectory string) error {
 	optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
 	if len(optionsErrs) == 0 {
@@ -469,11 +303,11 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			needsAncestorJSConfigRefresh = true
 		}
 	}
-	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryV2Active {
+	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryActive {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
-		// cannot race an extension-initiated v2 transaction. JSON fallback is
-		// part of the candidate snapshot: never reload it directly while v2 is
+		// cannot race an extension-initiated transaction. JSON fallback is part
+		// of the candidate snapshot: never reload it directly while discovery is
 		// active, otherwise a later JS activation failure could leave half of a
 		// rejected generation live.
 		reason := "gitignore-change"
@@ -499,8 +333,8 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		}
 		return nil
 	}
-	if s.configDiscoveryV2Active {
-		// The extension's direct workspace watcher is the sole v2 owner for
+	if s.configDiscoveryActive {
+		// The extension's direct workspace watcher is the sole owner for
 		// workspace/descendant JS configs and JSON fallback. tsgo can also report
 		// those paths through its recursive project watcher; treating that report
 		// as a second refresh would evaluate every fresh module twice. Go-owned
@@ -594,17 +428,7 @@ func isTsConfigURI(uri string) bool {
 // resolveTsConfigPaths resolves parserOptions.project from a config and
 // normalizes paths with realpath for cross-platform consistency.
 func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) ([]string, error) {
-	paths, err := config.ResolveTsConfigPaths(cfg, cwd, s.fs)
-	if err != nil {
-		return nil, err
-	}
-	for i, p := range paths {
-		if realPath := s.fs.Realpath(p); realPath != "" {
-			p = realPath
-		}
-		paths[i] = tspath.NormalizePath(p)
-	}
-	return paths, nil
+	return resolveTsConfigPathsWithFS(cfg, cwd, s.fs)
 }
 
 // rebuildTsConfigPaths resolves parserOptions.project from the current config.
@@ -630,8 +454,7 @@ func (s *Server) rebuildTsConfigPaths() error {
 	if len(s.jsConfigs) > 0 {
 		byConfig = make(map[string][]string, len(s.jsConfigs))
 		for dir, entries := range s.jsConfigs {
-			configDir := configRoutingKeyToPath(dir)
-			paths, err := s.resolveTsConfigPaths(entries, configDir)
+			paths, err := s.resolveTsConfigPaths(entries, dir)
 			if err != nil {
 				return fmt.Errorf("resolve tsconfig paths for %q: %w", dir, err)
 			}
@@ -1577,16 +1400,15 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 	}
 }
 
-// getConfigForURI resolves a file against the JS/TS config catalog supplied by
-// the extension. It falls back to the JSON config when that catalog has no
-// owner for the file.
+// getConfigForURI resolves a file against the committed JS/TS config catalog.
+// It falls back to the JSON config when that catalog has no owner for the file.
 // Returns the config entries, the directory to use as cwd for glob matching,
 // and whether the config is from a JS/TS config (for plugin enforcement).
-// For JS configs the cwd is the config's own directory (legacy URI or v2 path
-// converted to a path); for the JSON fallback it is s.cwd.
+// For JS configs the cwd is the config's own directory; for the JSON fallback
+// it is s.cwd.
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	if configKey, ok := s.nearestJSConfigKey(uri); ok {
-		return s.jsConfigs[configKey], configRoutingKeyToPath(configKey), true
+		return s.jsConfigs[configKey], configKey, true
 	}
 	return s.jsonConfig, s.cwd, false
 }
@@ -1595,10 +1417,10 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 // editor target without mutating the stored config catalog.
 func (s *Server) getLintConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
-	if s.configGenerationFS == nil {
-		// Legacy configUpdate does not have a generation snapshot. Retain its
-		// historical live exact-target policy; v2 configs already carry one
-		// shared frozen matcher prepared and committed with the catalog.
+	if !s.configSnapshotIncludesGitignore {
+		// Before the first transactional snapshot commits, the startup JSON
+		// config still needs the live exact-target policy. Committed snapshots
+		// already contain their frozen .gitignore matcher.
 		rslintConfig = config.ConfigWithGitignore(
 			rslintConfig,
 			configCwd,
@@ -1626,43 +1448,15 @@ func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 		return "", false
 	}
 	filePath := tspath.NormalizePath(uriToPath(uri))
-	if s.jsConfigOwnerResolver != nil {
-		if configDir, _ := s.jsConfigOwnerResolver.Resolve(filePath); configDir != "" {
-			if configKey := s.jsConfigKeyByPath[configDir]; configKey != "" {
-				if _, active := s.jsConfigs[configKey]; active {
-					return configKey, true
-				}
-			}
-		}
+	if s.jsConfigOwnerResolver == nil {
+		return "", false
 	}
-
-	// Compatibility fallback for tests and embedded callers that populate jsConfigs
-	// directly instead of committing a config transaction.
-	configsByPath := make(map[string]config.RslintConfig, len(s.jsConfigs))
-	configKeyByPath := make(map[string]string, len(s.jsConfigs))
-	for configKey, entries := range s.jsConfigs {
-		configDir := tspath.NormalizePath(configRoutingKeyToPath(configKey))
-		if configDir != "" {
-			configsByPath[configDir] = entries
-			configKeyByPath[configDir] = configKey
-		}
+	configDir, _ := s.jsConfigOwnerResolver.Resolve(filePath)
+	if configDir == "" {
+		return "", false
 	}
-	configDir, _ := config.NewConfigOwnerResolver(configsByPath, s.fs).Resolve(filePath)
-	configKey := configKeyByPath[configDir]
-	return configKey, configKey != ""
-}
-
-func configRoutingKeyToPath(configKey string) string {
-	// Recognize legacy file:// URIs first (tspath also considers them absolute).
-	// Other absolute keys are v2 filesystem paths and must not be URI-decoded:
-	// literal percent-escapes, #, and ? can all occur in valid file names.
-	if strings.HasPrefix(strings.ToLower(configKey), "file://") {
-		return uriToPath(lsproto.DocumentUri(configKey))
-	}
-	if tspath.PathIsAbsolute(configKey) {
-		return tspath.NormalizePath(configKey)
-	}
-	return uriToPath(lsproto.DocumentUri(configKey))
+	_, active := s.jsConfigs[configDir]
+	return configDir, active
 }
 
 // tsConfigPathsForURI returns parserOptions.project paths from the config owner

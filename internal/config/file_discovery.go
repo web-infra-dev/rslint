@@ -772,6 +772,25 @@ type LintDiscoveryScope struct {
 	ExplicitOnly bool
 }
 
+func configMapForAutomaticTargets(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+) map[string]RslintConfig {
+	for configDir := range configMap {
+		if !scopes[configDir].ExplicitOnly {
+			continue
+		}
+		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
+		for candidateDir, candidateConfig := range configMap {
+			if !scopes[candidateDir].ExplicitOnly {
+				automaticConfigMap[candidateDir] = candidateConfig
+			}
+		}
+		return automaticConfigMap
+	}
+	return configMap
+}
+
 // DiscoveredLintTarget preserves the config owner established during the
 // directory walk so later stages do not need to infer ownership from paths.
 type DiscoveredLintTarget struct {
@@ -805,21 +824,7 @@ func DiscoverLintTargetsMultiConfig(
 	// subtree handoff decisions from the normally reachable config set; the full
 	// map is still processed below so catalog-scoped literal files use their
 	// explicit-only config.
-	automaticConfigMap := configMap
-	for _, configDir := range configDirs {
-		if !scopes[configDir].ExplicitOnly {
-			continue
-		}
-		if len(automaticConfigMap) == len(configMap) {
-			automaticConfigMap = make(map[string]RslintConfig, len(configMap)-1)
-			for candidateDir, candidateConfig := range configMap {
-				if !scopes[candidateDir].ExplicitOnly {
-					automaticConfigMap[candidateDir] = candidateConfig
-				}
-			}
-		}
-		break
-	}
+	automaticConfigMap := configMapForAutomaticTargets(configMap, scopes)
 	automaticIndex := newConfigDirectoryIndex(automaticConfigMap, fsys)
 
 	// Explicit files are assigned to their nearest config once. Passing the

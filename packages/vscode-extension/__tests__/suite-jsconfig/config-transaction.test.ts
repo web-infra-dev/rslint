@@ -9,17 +9,57 @@ import {
 } from '@rslint/core/config-loader';
 import {
   CONFIG_REFRESH_WATCH_GLOB,
-  CONFIG_WATCH_GLOB,
   LspConfigTransactionAdapter,
   configRefreshReasonForPath,
+  createLanguageClientOptions,
   isConfigSourceChangeDuringTransaction,
-  normalizeConfigTransactionVersion,
+  recoverConfigDiscoveryOnServerState,
   retryConfigRefreshOnSourceChange,
   type ConfigModuleHostAdapter,
   type PluginLintPoolAdapter,
 } from '../../src/Rslint';
+import { State } from 'vscode-languageclient/node';
+import {
+  RelativePattern,
+  Uri,
+  type DocumentFilter,
+  type WorkspaceFolder,
+} from 'vscode';
 
 suite('initial config refresh retry classification', () => {
+  test('isolates each language client and its documents to one workspace', () => {
+    const firstFolder: WorkspaceFolder = {
+      index: 0,
+      name: 'first-root',
+      uri: Uri.file('/workspace/first-root'),
+    };
+    const secondFolder: WorkspaceFolder = {
+      index: 1,
+      name: 'second-root',
+      uri: Uri.file('/workspace/second-root'),
+    };
+    const firstOptions = createLanguageClientOptions(firstFolder, undefined);
+    const secondOptions = createLanguageClientOptions(secondFolder, undefined);
+
+    assert.strictEqual(firstOptions.workspaceFolder, firstFolder);
+    assert.strictEqual(secondOptions.workspaceFolder, secondFolder);
+    for (const [options, folder] of [
+      [firstOptions, firstFolder],
+      [secondOptions, secondFolder],
+    ] as const) {
+      assert.ok(Array.isArray(options.documentSelector));
+      assert.strictEqual(options.documentSelector.length, 4);
+      for (const selector of options.documentSelector as DocumentFilter[]) {
+        assert.ok(selector.pattern instanceof RelativePattern);
+        assert.strictEqual(
+          selector.pattern.baseUri.toString(),
+          folder.uri.toString(),
+        );
+        assert.strictEqual(selector.pattern.pattern, '**/*');
+      }
+    }
+  });
+
   test('recognizes source-change failures without hiding unrelated startup failures', () => {
     assert.strictEqual(
       isConfigSourceChangeDuringTransaction({
@@ -180,28 +220,11 @@ function loadRequest(transactionId = 'tx-1'): LoadConfigsRequest {
 }
 
 suite('LSP config discovery transactions', () => {
-  test('transaction capability versions preserve both legacy protocols', () => {
-    assert.strictEqual(normalizeConfigTransactionVersion(undefined), 0);
-    assert.strictEqual(normalizeConfigTransactionVersion(0), 0);
-    assert.strictEqual(normalizeConfigTransactionVersion(1), 1);
-    assert.strictEqual(normalizeConfigTransactionVersion(2), 2);
-    assert.strictEqual(normalizeConfigTransactionVersion(3), 2);
-    assert.strictEqual(normalizeConfigTransactionVersion(2.5), 0);
-  });
-
-  test('legacy and v2 direct watchers keep one owner for gitignore changes', () => {
-    assert.match(CONFIG_WATCH_GLOB, /rslint\.config\.mjs/);
-    assert.match(CONFIG_WATCH_GLOB, /rslint\.jsonc/);
-    assert.match(CONFIG_WATCH_GLOB, /\.gitignore/);
-    assert.match(CONFIG_WATCH_GLOB, /pnpm-lock\.yaml/);
+  test('the extension watcher leaves gitignore ownership to Go', () => {
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.mjs/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.jsonc/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /pnpm-lock\.yaml/);
     assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /\.gitignore/);
-    assert.strictEqual(
-      configRefreshReasonForPath('/workspace/packages/app/.gitignore'),
-      'gitignore-change',
-    );
     assert.strictEqual(
       configRefreshReasonForPath('/workspace/packages/app/pnpm-lock.yaml'),
       'dependency-change',
@@ -232,7 +255,6 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(activated, {
       transactionId: 'tx-1',
-      generation: 'tx-1',
       eslintPluginEntries: [{ prefix: 'local', ruleNames: ['no-foo'] }],
       pluginHostReady: true,
     });
@@ -250,7 +272,6 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(committed, {
       transactionId: 'tx-1',
-      generation: 'tx-1',
       committed: true,
     });
     assert.deepStrictEqual(pool.commitCalls, ['tx-1']);
@@ -288,11 +309,74 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(aborted, {
       transactionId: 'tx-abort',
-      generation: 'tx-abort',
       aborted: true,
     });
     assert.deepStrictEqual(pool.abortCalls, ['tx-abort']);
     assert.deepStrictEqual(host.deletedTransactions, ['tx-abort']);
+  });
+
+  test('native-server restart aborts orphaned state and accepts a new transaction', async () => {
+    const host = new TestConfigHost();
+    const pool = new TestPluginPool();
+    const adapter = new LspConfigTransactionAdapter(
+      host,
+      pool,
+      () => 'fingerprint-restart',
+    );
+
+    await adapter.loadConfigs(loadRequest('old-process-tx'));
+    await adapter.activateConfigs({
+      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+      transactionId: 'old-process-tx',
+      effectiveConfigIds: ['root'],
+    });
+    await adapter.resetForServerRestart();
+    assert.deepStrictEqual(pool.abortCalls, ['old-process-tx']);
+    assert.deepStrictEqual(host.deletedTransactions, ['old-process-tx']);
+
+    await adapter.loadConfigs(loadRequest('new-process-tx'));
+    const activation = await adapter.activateConfigs({
+      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+      transactionId: 'new-process-tx',
+      effectiveConfigIds: ['root'],
+    });
+    assert.strictEqual(activation.transactionId, 'new-process-tx');
+  });
+
+  test('a later Running state resets orphaned state before requesting an initial catalog', async () => {
+    const host = new TestConfigHost();
+    const pool = new TestPluginPool();
+    const adapter = new LspConfigTransactionAdapter(
+      host,
+      pool,
+      () => 'fingerprint-restart',
+    );
+    await adapter.loadConfigs(loadRequest('orphaned-tx'));
+
+    const events: string[] = [];
+    const recovery = recoverConfigDiscoveryOnServerState(
+      State.Running,
+      async (reason, beforeRequest) => {
+        events.push(`request:${reason}`);
+        await beforeRequest?.(adapter);
+        events.push('send');
+      },
+    );
+    await recovery;
+
+    assert.deepStrictEqual(events, ['request:initial', 'send']);
+    assert.deepStrictEqual(pool.abortCalls, ['orphaned-tx']);
+    assert.deepStrictEqual(host.deletedTransactions, ['orphaned-tx']);
+
+    let stoppedRefresh = false;
+    const ignored = recoverConfigDiscoveryOnServerState(
+      State.Stopped,
+      async () => {
+        stoppedRefresh = true;
+      },
+    );
+    assert.strictEqual(ignored, undefined);
+    assert.strictEqual(stoppedRefresh, false);
   });
 
   test('a failed first plugin prepare can commit a degraded no-host generation', async () => {
@@ -313,7 +397,6 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(activated, {
       transactionId: 'tx-degraded',
-      generation: 'tx-degraded',
       eslintPluginEntries: [],
       pluginHostReady: false,
     });
@@ -380,7 +463,6 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(aborted, {
       transactionId: 'tx-response-lost',
-      generation: 'tx-response-lost',
       aborted: true,
     });
     assert.deepStrictEqual(pool.commitCalls, ['tx-response-lost']);

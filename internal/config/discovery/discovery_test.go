@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1266,6 +1267,18 @@ func TestConfigDiscoveryTransactionIDsAreUniqueAcrossBuilds(t *testing.T) {
 	}
 	if len(seen) != builds {
 		t.Fatalf("unique transaction IDs = %d, want %d", len(seen), builds)
+	}
+}
+
+func TestConfigDiscoveryTransactionIDIncludesProcessNonce(t *testing.T) {
+	id := nextConfigDiscoveryTransactionID()
+	prefix := "config-discovery-" + configDiscoveryProcessNonce + "-"
+	if !strings.HasPrefix(id, prefix) {
+		t.Fatalf("transaction ID %q does not contain process nonce %q", id, configDiscoveryProcessNonce)
+	}
+	sequence, err := strconv.ParseUint(strings.TrimPrefix(id, prefix), 10, 64)
+	if err != nil || sequence == 0 {
+		t.Fatalf("transaction ID %q has invalid sequence: value=%d err=%v", id, sequence, err)
 	}
 }
 

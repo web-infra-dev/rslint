@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sort"
@@ -140,17 +141,33 @@ func (err *ConfigDiscoveryProtocolError) Error() string {
 	return "config loader protocol: " + err.Message
 }
 
-var configDiscoverySequence atomic.Uint64
+var (
+	// A LanguageClient may restart the native LSP process while its extension-side
+	// ConfigModuleHost survives. A process nonce prevents the new process from
+	// colliding with an uncollected session left by the old one; the sequence keeps
+	// concurrent builds within this process deterministic and lock-free.
+	configDiscoveryProcessNonce = rand.Text()
+	configDiscoverySequence     atomic.Uint64
+)
+
+func nextConfigDiscoveryTransactionID() string {
+	return fmt.Sprintf(
+		"config-discovery-%s-%d",
+		configDiscoveryProcessNonce,
+		configDiscoverySequence.Add(1),
+	)
+}
 
 // Build discovers and loads one immutable config catalog. Transaction IDs are
-// process-unique so adapters can stage load/activate/commit as one operation.
-// The operation itself is intentionally stateless; long-lived lifecycle and
-// rollback belong to the CLI/API/LSP adapters that own the transport.
+// unique across concurrent builds and native-process restarts so adapters can
+// stage load/activate/commit as one operation. The operation itself is
+// intentionally stateless; long-lived lifecycle and rollback belong to the
+// CLI/API/LSP adapters that own the transport.
 func Build(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ConfigDiscoveryRequest) (*ConfigCatalog, error) {
 	if fsys == nil {
 		return nil, errors.New("config discovery requires a filesystem")
 	}
-	transactionID := fmt.Sprintf("config-discovery-%d", configDiscoverySequence.Add(1))
+	transactionID := nextConfigDiscoveryTransactionID()
 
 	builder := configCatalogBuilder{
 		ctx:                 ctx,

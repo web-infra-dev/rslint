@@ -36,13 +36,10 @@ type configRefreshRequest struct {
 
 type configRefreshResponse struct {
 	TransactionID string `json:"transactionId"`
-	Generation    string `json:"generation"`
-	ConfigCount   int    `json:"configCount"`
 }
 
 type configActivationWireResponse struct {
 	TransactionID       string                     `json:"transactionId"`
-	Generation          string                     `json:"generation"`
 	EslintPluginEntries []config.EslintPluginEntry `json:"eslintPluginEntries"`
 	PluginHostReady     bool                       `json:"pluginHostReady"`
 }
@@ -54,13 +51,11 @@ type configTransactionControlRequest struct {
 
 type configCommitWireResponse struct {
 	TransactionID string `json:"transactionId"`
-	Generation    string `json:"generation"`
 	Committed     bool   `json:"committed"`
 }
 
 type configAbortWireResponse struct {
 	TransactionID string `json:"transactionId"`
-	Generation    string `json:"generation"`
 	Aborted       bool   `json:"aborted"`
 }
 
@@ -123,20 +118,13 @@ func (loader *lspConfigModuleLoader) ActivateConfigs(
 			request.TransactionID,
 		)
 	}
-	if response.Generation != request.TransactionID {
-		return discovery.ConfigActivationResponse{}, fmt.Errorf(
-			"activateConfigs generation mismatch: got %q, want %q",
-			response.Generation,
-			request.TransactionID,
-		)
-	}
 	if !response.PluginHostReady {
-		if !loader.server.configDiscoveryV2HasLastGood {
+		if !loader.server.configDiscoveryHasLastGood {
 			// On first startup, a valid JS catalog must not take down the entire
 			// language client merely because the optional community-plugin worker
 			// could not initialize. PluginLintPool staged a retryable no-host
 			// generation; commit the native/semantic config atomically with it and
-			// expose no plugin metadata. Once any usable v2 catalog exists, the
+			// expose no plugin metadata. Once any usable catalog exists, the
 			// normal last-good rule applies and a failed replacement aborts.
 			loader.activated = true
 			loader.pluginDegraded = true
@@ -237,11 +225,10 @@ func (loader *lspConfigModuleLoader) commit(ctx context.Context, transactionID s
 	if err := decodeConfigTransactionResult(raw, &response, "commitConfigs"); err != nil {
 		return err
 	}
-	if response.TransactionID != transactionID || response.Generation != transactionID || !response.Committed {
+	if response.TransactionID != transactionID || !response.Committed {
 		return fmt.Errorf(
-			"invalid commitConfigs response: transactionId=%q generation=%q committed=%t",
+			"invalid commitConfigs response: transactionId=%q committed=%t",
 			response.TransactionID,
-			response.Generation,
 			response.Committed,
 		)
 	}
@@ -264,11 +251,10 @@ func (loader *lspConfigModuleLoader) abort(ctx context.Context, transactionID st
 	if err := decodeConfigTransactionResult(raw, &response, "abortConfigs"); err != nil {
 		return err
 	}
-	if response.TransactionID != transactionID || response.Generation != transactionID || !response.Aborted {
+	if response.TransactionID != transactionID || !response.Aborted {
 		return fmt.Errorf(
-			"invalid abortConfigs response: transactionId=%q generation=%q aborted=%t",
+			"invalid abortConfigs response: transactionId=%q aborted=%t",
 			response.TransactionID,
-			response.Generation,
 			response.Aborted,
 		)
 	}
@@ -290,15 +276,13 @@ type lspDiscoveredConfigSnapshot struct {
 	configs             map[string]config.RslintConfig
 	tsConfigPaths       map[string][]string
 	ownerResolver       *config.ConfigOwnerResolver
-	configKeyByPath     map[string]string
 	unavailableConfigs  map[string]struct{}
 	jsonConfig          config.RslintConfig
 	jsonConfigPath      string
 	jsonTsConfigPaths   []string
-	generation          string
+	transactionID       string
 	eslintPluginEntries []config.EslintPluginEntry
 	usableLastGood      bool
-	configGenerationFS  vfs.FS
 }
 
 func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRefreshResponse, error) {
@@ -325,17 +309,17 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 		return configRefreshResponse{}, errors.New("config refresh requires a filesystem")
 	}
 	// Set this before doing fallible discovery: a failed initial transaction is
-	// still proof that the client installed the v2 reverse handlers, and a later
+	// still proof that the client installed the reverse handlers, and a later
 	// config or config-scoped .gitignore event must retry while keeping last-good.
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 
 	// cachedvfs is intentionally scoped to one generation. A long-lived cache
 	// would make file creation/deletion and .gitignore edits invisible to later
 	// refreshes; retaining the committed resolver retains only the last-good
 	// generation's path identity snapshot.
-	generationFS := newConfigGenerationFS(bundled.WrapFS(cachedvfs.From(s.fs)))
+	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
-	catalog, err := discovery.Build(ctx, generationFS, loader, discovery.ConfigDiscoveryRequest{
+	catalog, err := discovery.Build(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
 		CWD:         tspath.NormalizePath(s.cwd),
 		Mode:        discovery.ConfigDiscoveryAuto,
 		ImplicitCWD: true,
@@ -344,7 +328,7 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	recoveredUnavailable := false
 	var unavailableCause error
 	if err != nil {
-		if !errors.Is(err, discovery.ErrAllConfigsFailed) || s.configDiscoveryV2HasLastGood {
+		if !errors.Is(err, discovery.ErrAllConfigsFailed) || s.configDiscoveryHasLastGood {
 			return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, loader.transactionID, err)
 		}
 		// A broken config on first startup must not tear down the language
@@ -370,8 +354,8 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 			Failures:           append([]discovery.ConfigFailure(nil), allFailed.Failures...),
 		}
 		recoveredUnavailable = true
-	} else if s.configDiscoveryV2HasLastGood {
-		if failure, invalidates := s.failureAtCommittedConfigBoundary(generationFS, catalog); invalidates {
+	} else if s.configDiscoveryHasLastGood {
+		if failure, invalidates := s.failureAtCommittedConfigBoundary(snapshotFS, catalog); invalidates {
 			err = fmt.Errorf(
 				"config refresh failed at last-good boundary %q: %s",
 				failure.Directory,
@@ -381,7 +365,7 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 		}
 	}
 
-	snapshot, err := s.prepareDiscoveredConfigSnapshot(generationFS, catalog)
+	snapshot, err := s.prepareDiscoveredConfigSnapshot(snapshotFS, catalog)
 	if err != nil {
 		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, catalog.TransactionID, err)
 	}
@@ -393,11 +377,9 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 			errors.Join(unavailableCause, errors.New("all-config-failed recovery has no valid failure boundary")),
 		)
 	}
-	// Activation/commit can overlap a later filesystem mutation. Freeze the
-	// candidate's observed .gitignore state now; that mutation belongs to the
-	// next transaction and must not alter this generation's target admission.
-	generationFS.freeze()
-	snapshot.configGenerationFS = generationFS
+	// The candidate already contains materialized .gitignore patterns. A later
+	// filesystem mutation belongs to the next transaction and cannot alter this
+	// catalog while Node activation and commit complete.
 	if err := loader.ensureActivated(ctx, catalog); err != nil {
 		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, catalog.TransactionID, err)
 	}
@@ -432,8 +414,6 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	}
 	return configRefreshResponse{
 		TransactionID: catalog.TransactionID,
-		Generation:    catalog.TransactionID,
-		ConfigCount:   len(catalog.Configs),
 	}, nil
 }
 
@@ -454,7 +434,7 @@ func (s *Server) failureAtCommittedConfigBoundary(
 		if _, unavailable := s.jsUnavailableConfigs[configKey]; unavailable {
 			continue
 		}
-		configDir := configRoutingKeyToPath(configKey)
+		configDir := tspath.NormalizePath(configKey)
 		if configDir != "" {
 			committed[lspLexicalPathID(configDir, caseSensitive)] = struct{}{}
 		}
@@ -498,9 +478,8 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	snapshot := &lspDiscoveredConfigSnapshot{
 		configs:            make(map[string]config.RslintConfig, len(catalog.Configs)),
 		tsConfigPaths:      make(map[string][]string, len(catalog.Configs)),
-		configKeyByPath:    make(map[string]string, len(catalog.Configs)),
 		unavailableConfigs: make(map[string]struct{}),
-		generation:         catalog.TransactionID,
+		transactionID:      catalog.TransactionID,
 		// An empty catalog is a successfully committed absence of JavaScript
 		// config, not a usable JavaScript last-good generation. If a broken
 		// config appears later, it must establish an unavailable boundary rather
@@ -531,8 +510,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		}
 		snapshot.configs[configDir] = append(config.RslintConfig(nil), entries...)
 		snapshot.tsConfigPaths[configDir] = paths
-		normalizedDir := tspath.NormalizePath(configDir)
-		snapshot.configKeyByPath[normalizedDir] = configDir
 	}
 
 	// A failed candidate still blocks the JSON fallback when no usable JS
@@ -547,22 +524,25 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		}
 		snapshot.configs[configDir] = config.RslintConfig{}
 		snapshot.tsConfigPaths[configDir] = nil
-		snapshot.configKeyByPath[tspath.NormalizePath(configDir)] = configDir
 		snapshot.unavailableConfigs[configDir] = struct{}{}
 	}
 	// Build all ownership and unavailable boundaries before collecting any
 	// .gitignore source. This prevents a parent config from reading into a child
 	// boundary merely because that child happened to be processed later.
-	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
+	boundaryResolver := config.NewConfigOwnerResolver(snapshot.configs, fsys)
 	for configDir, entries := range snapshot.configs {
 		snapshot.configs[configDir] = config.ConfigWithGitignoreWithBoundaries(
 			entries,
 			configDir,
 			fsys,
 			nil,
-			snapshot.ownerResolver.ChildConfigDirs(configDir),
+			boundaryResolver.ChildConfigDirs(configDir),
 		)
 	}
+	// ConfigOwnerResolver snapshots both the path index and config values. Build
+	// the committed resolver only after ignore injection so Resolve never returns
+	// a pre-snapshot config that differs from snapshot.configs.
+	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
 
 	jsonConfig, jsonPath, jsonTsConfigs, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)
 	if err != nil {
@@ -667,15 +647,14 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.jsConfigs = snapshot.configs
 	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
 	s.jsConfigOwnerResolver = snapshot.ownerResolver
-	s.jsConfigKeyByPath = snapshot.configKeyByPath
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
 	s.jsonConfig = snapshot.jsonConfig
 	s.rslintConfigPath = snapshot.jsonConfigPath
 	s.tsConfigPaths = snapshot.jsonTsConfigPaths
-	s.eslintPluginConfigGeneration = snapshot.generation
+	s.eslintPluginConfigGeneration = snapshot.transactionID
 	s.eslintPluginRules = eslintPluginRuleSet(snapshot.eslintPluginEntries)
-	s.configDiscoveryV2HasLastGood = snapshot.usableLastGood
-	s.configGenerationFS = snapshot.configGenerationFS
+	s.configDiscoveryHasLastGood = snapshot.usableLastGood
+	s.configSnapshotIncludesGitignore = true
 	config.RegisterEslintPluginRules(snapshot.eslintPluginEntries)
 	log.Printf("[rslint] Committed Go-discovered JS/TS config catalog (%d config files)", len(snapshot.configs))
 	if err := s.RefreshDiagnostics(ctx); err != nil {

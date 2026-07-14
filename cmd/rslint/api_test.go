@@ -1772,7 +1772,7 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 	}
 }
 
-func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *testing.T) {
+func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(t *testing.T) {
 	root := t.TempDir()
 	ignoredDir := filepath.Join(root, "ignored")
 	rootConfigPath := filepath.Join(root, "rslint.config.js")
@@ -1789,14 +1789,19 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *t
 
 	rootEntries := mustAPIConfig(t, `[{"ignores":["ignored/rslint.config.js"]},{"rules":{"no-console":"error"}}]`)
 	nestedEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
-	loadedIDs := make(map[string]struct{})
+	loadedIDs := make(map[string]map[string]struct{})
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 		switch kind {
 		case api.KindLoadConfigs:
 			request := payload.(discovery.ConfigLoadBatchRequest)
+			transactionIDs := loadedIDs[request.TransactionID]
+			if transactionIDs == nil {
+				transactionIDs = make(map[string]struct{})
+				loadedIDs[request.TransactionID] = transactionIDs
+			}
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				loadedIDs[candidate.ID] = struct{}{}
+				transactionIDs[candidate.ID] = struct{}{}
 				result := discovery.ConfigLoadResult{
 					ID:                candidate.ID,
 					Status:            "loaded",
@@ -1815,8 +1820,9 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *t
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
 		case api.KindActivateConfigs:
 			request := payload.(discovery.ConfigActivationRequest)
-			if len(request.EffectiveConfigIDs) != len(loadedIDs) {
-				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, loadedIDs)
+			transactionIDs := loadedIDs[request.TransactionID]
+			if len(request.EffectiveConfigIDs) != len(transactionIDs) {
+				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, transactionIDs)
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 				TransactionID: request.TransactionID,
@@ -1826,30 +1832,37 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *t
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-		Files:            []string{explicitTarget, automaticTarget},
-		WorkingDirectory: root,
-		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:          "auto",
-			Directories:   []string{ignoredDir},
-			ExplicitFiles: []bool{true, false},
-		},
-	}, requester)
-	if err != nil {
-		t.Fatalf("HandleLintWithContext: %v", err)
+	run := func(files []string, explicitFiles []bool) *api.LintResponse {
+		t.Helper()
+		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			Files:            files,
+			WorkingDirectory: root,
+			ConfigDiscovery: &api.ConfigDiscoveryRequest{
+				Mode:          "auto",
+				Directories:   []string{ignoredDir},
+				ExplicitFiles: explicitFiles,
+			},
+		}, requester)
+		if err != nil {
+			t.Fatalf("HandleLintWithContext: %v", err)
+		}
+		return response
 	}
-	if response.FileCount != 2 || len(response.Diagnostics) != 2 {
-		t.Fatalf("explicit-only ownership or gitignore boundary diverged: %+v", response)
+
+	automaticOnly := run([]string{automaticTarget}, []bool{false})
+	if automaticOnly.FileCount != 0 || len(automaticOnly.Diagnostics) != 0 {
+		t.Fatalf("parent-owned automatic target ignored by nested .gitignore was linted: %+v", automaticOnly)
 	}
-	diagnostics := make(map[string]string, len(response.Diagnostics))
-	for _, diagnostic := range response.Diagnostics {
-		diagnostics[diagnostic.FilePath] = diagnostic.RuleName
+
+	response := run(
+		[]string{explicitTarget, automaticTarget},
+		[]bool{true, false},
+	)
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 {
+		t.Fatalf("adding a literal changed the automatic target's ignore result: %+v", response)
 	}
-	if diagnostics["ignored/explicit.js"] != "no-debugger" {
+	if response.Diagnostics[0].FilePath != "ignored/explicit.js" || response.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("explicit target did not retain nested owner: %+v", response.Diagnostics)
-	}
-	if diagnostics["ignored/automatic.js"] != "no-console" {
-		t.Fatalf("automatic sibling did not retain parent owner and ignore boundary: %+v", response.Diagnostics)
 	}
 }
 

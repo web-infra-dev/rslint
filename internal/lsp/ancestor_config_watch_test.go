@@ -86,7 +86,7 @@ func TestIsStrictAncestorAutoJSConfigPath(t *testing.T) {
 	}
 }
 
-func TestWorkspaceConfigEventsDoNotDuplicateV2Refresh(t *testing.T) {
+func TestWorkspaceConfigEventsDoNotDuplicateTransactionalRefresh(t *testing.T) {
 	workspace := tspath.NormalizePath(t.TempDir())
 	tests := []string{
 		filepath.Join(workspace, "rslint.config.js"),
@@ -96,7 +96,7 @@ func TestWorkspaceConfigEventsDoNotDuplicateV2Refresh(t *testing.T) {
 	for _, configPath := range tests {
 		t.Run(filepath.Base(configPath), func(t *testing.T) {
 			s, outgoing := newAncestorConfigWatchTestServer(workspace)
-			s.configDiscoveryV2Active = true
+			s.configDiscoveryActive = true
 			s.rslintConfigPath = "/committed/rslint.json"
 			result := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeChanged)
 			select {
@@ -130,7 +130,7 @@ func TestAncestorJSConfigWatcherRefreshesChangedAndDeletedActiveConfig(t *testin
 
 	s, outgoing := newAncestorConfigWatchTestServer(workspace)
 	installLastGoodConfig(s, ancestor)
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 	if err := os.WriteFile(configPath, []byte("export default [{ rules: { 'no-debugger': 'error' } }];\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestAncestorJSConfigWatcherDiscoversNewNearerConfig(t *testing.T) {
 
 	s, outgoing := newAncestorConfigWatchTestServer(workspace)
 	installLastGoodConfig(s, outer)
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 	created := startConfigWatchEvent(s, nearerConfigPath, lsproto.FileChangeTypeCreated)
 
 	outerLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
@@ -246,7 +246,7 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 
 	s, outgoing := newAncestorConfigWatchTestServer(workspace)
 	installLastGoodConfig(s, ancestor)
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 	uri := documentURIFromPath(target)
 	effective, configDir, _ := s.getLintConfigForURI(uri)
 	if effective.IsFileIgnored(target, configDir) {
@@ -280,7 +280,7 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 	}
 }
 
-func TestV2ConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
+func TestConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
 	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
@@ -291,7 +291,7 @@ func TestV2ConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
 
 	s, outgoing := newAncestorConfigWatchTestServer(workspace)
 	installLastGoodConfig(s, workspace)
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
 	s.rslintConfigPath = jsonPath
 	if err := os.WriteFile(jsonPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {

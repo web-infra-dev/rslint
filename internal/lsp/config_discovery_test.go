@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -199,7 +198,6 @@ func activationResponseForRequest(
 	}
 	return activation, configActivationWireResponse{
 		TransactionID:   activation.TransactionID,
-		Generation:      activation.TransactionID,
 		PluginHostReady: pluginHostReady,
 	}
 }
@@ -216,7 +214,6 @@ func commitResponseForRequest(
 	}
 	return configCommitWireResponse{
 		TransactionID: control.TransactionID,
-		Generation:    control.TransactionID,
 		Committed:     committed,
 	}
 }
@@ -229,7 +226,6 @@ func abortResponseForRequest(t *testing.T, request *lsproto.RequestMessage) conf
 	}
 	return configAbortWireResponse{
 		TransactionID: control.TransactionID,
-		Generation:    control.TransactionID,
 		Aborted:       true,
 	}
 }
@@ -260,11 +256,10 @@ func installLastGoodConfig(s *Server, root string) {
 	entries := config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
-	s.jsConfigKeyByPath = map[string]string{root: root}
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
-	s.configDiscoveryV2HasLastGood = true
+	s.configDiscoveryHasLastGood = true
 }
 
 func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
@@ -290,6 +285,11 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	if activationRequest.TransactionID != loadRequest.TransactionID || len(activationRequest.EffectiveConfigIDs) != 1 {
 		t.Fatalf("unexpected activation request: %+v", activationRequest)
 	}
+	const pluginRuleName = "config-refresh-test/no-foo"
+	activationResponse.EslintPluginEntries = []config.EslintPluginEntry{{
+		Prefix:    "config-refresh-test",
+		RuleNames: []string{"no-foo"},
+	}}
 	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
 
 	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
@@ -300,7 +300,7 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	if completed.err != nil {
 		t.Fatalf("configRefresh failed: %v", completed.err)
 	}
-	if completed.response.Generation != loadRequest.TransactionID || completed.response.ConfigCount != 1 {
+	if completed.response.TransactionID != loadRequest.TransactionID || len(s.jsConfigs) != 1 {
 		t.Fatalf("unexpected configRefresh response: %+v", completed.response)
 	}
 	if s.eslintPluginConfigGeneration != loadRequest.TransactionID {
@@ -312,7 +312,14 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	}
 	fileURI := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
 	if got := s.pluginConfigKeyForURI(fileURI); got != root {
-		t.Fatalf("v2 plugin configKey = %q, want exact catalog path %q", got, root)
+		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
+	}
+	if _, active := s.eslintPluginRules[pluginRuleName]; !active {
+		t.Fatalf("committed plugin rule set does not contain %q", pluginRuleName)
+	}
+	registered, ok := config.GlobalRuleRegistry.GetRule(pluginRuleName)
+	if !ok || !registered.IsEslintPluginRule {
+		t.Fatalf("plugin placeholder %q was not registered: %+v", pluginRuleName, registered)
 	}
 }
 
@@ -352,6 +359,10 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 	if !snapshot.configs[root].IsFileIgnored(rootTarget, root) {
 		t.Fatal("root config did not collect its own .gitignore")
+	}
+	resolvedDir, resolvedConfig := snapshot.ownerResolver.Resolve(rootTarget)
+	if resolvedDir != root || !resolvedConfig.IsFileIgnored(rootTarget, root) {
+		t.Fatalf("committed owner resolver returned stale config: dir=%q config=%+v", resolvedDir, resolvedConfig)
 	}
 	if snapshot.configs[root].IsFileIgnored(childTarget, root) {
 		t.Fatal("root config crossed the child config's .gitignore source boundary")
@@ -394,12 +405,15 @@ func TestHandleConfigRefreshInitialPluginHostFailureCommitsNativeCatalog(t *test
 	if completed.err != nil {
 		t.Fatalf("initial degraded plugin configRefresh failed: %v", completed.err)
 	}
-	if !s.configDiscoveryV2HasLastGood || s.eslintPluginConfigGeneration != activationRequest.TransactionID {
-		t.Fatalf("degraded generation was not committed: response=%+v generation=%q hasLastGood=%t", completed.response, s.eslintPluginConfigGeneration, s.configDiscoveryV2HasLastGood)
+	if !s.configDiscoveryHasLastGood || s.eslintPluginConfigGeneration != activationRequest.TransactionID {
+		t.Fatalf("degraded generation was not committed: response=%+v generation=%q hasLastGood=%t", completed.response, s.eslintPluginConfigGeneration, s.configDiscoveryHasLastGood)
 	}
 	entries := s.jsConfigs[root]
 	if value, found := configRuleValue(entries, "no-debugger"); !found || value != "error" {
 		t.Fatalf("native catalog was lost with plugin host: %+v", s.jsConfigs)
+	}
+	if len(s.eslintPluginRules) != 0 {
+		t.Fatalf("degraded plugin host committed unroutable plugin rules: %+v", s.eslintPluginRules)
 	}
 }
 
@@ -431,8 +445,8 @@ func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T
 	if completed.err == nil || !strings.Contains(completed.err.Error(), "could not prepare") {
 		t.Fatalf("configRefresh error = %v, want plugin-host preparation failure", completed.err)
 	}
-	if !s.configDiscoveryV2Active {
-		t.Fatal("valid v2 configRefresh did not enable ancestor watcher retries")
+	if !s.configDiscoveryActive {
+		t.Fatal("valid configRefresh did not enable ancestor watcher retries")
 	}
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed activation replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
@@ -537,10 +551,10 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 	if completed.err != nil {
 		t.Fatalf("initial all-failed configRefresh stopped LSP startup: %v", completed.err)
 	}
-	if completed.response.TransactionID != loadRequest.TransactionID || completed.response.ConfigCount != 0 {
+	if completed.response.TransactionID != loadRequest.TransactionID {
 		t.Fatalf("unexpected recovery response: %+v", completed.response)
 	}
-	if s.configDiscoveryV2HasLastGood {
+	if s.configDiscoveryHasLastGood {
 		t.Fatal("synthetic unavailable snapshot was marked as usable last-good")
 	}
 	inside := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
@@ -600,8 +614,8 @@ func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild
 	if completed.err != nil {
 		t.Fatalf("partial initial configRefresh failed: %v", completed.err)
 	}
-	if completed.response.ConfigCount != 1 || !s.configDiscoveryV2HasLastGood {
-		t.Fatalf("partial recovery state = response %+v, hasLastGood=%t", completed.response, s.configDiscoveryV2HasLastGood)
+	if !s.configDiscoveryHasLastGood {
+		t.Fatalf("partial recovery did not establish last-good: response %+v", completed.response)
 	}
 	rootEntries, exists := s.jsConfigs[root]
 	if !exists || hasPublicConfigContent(rootEntries) {
@@ -736,7 +750,7 @@ func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T
 	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("configRefresh error = %v, want ErrAllConfigsFailed", completed.err)
 	}
-	if s.eslintPluginConfigGeneration != "last-good" || !s.configDiscoveryV2HasLastGood ||
+	if s.eslintPluginConfigGeneration != "last-good" || !s.configDiscoveryHasLastGood ||
 		s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("all-failed refresh replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
@@ -754,7 +768,6 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	installLastGoodConfig(s, root)
 	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
-	s.jsConfigKeyByPath[nested] = nested
 	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
@@ -885,13 +898,13 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	if completed.err != nil {
 		t.Fatalf("empty configRefresh failed: %v", completed.err)
 	}
-	if len(s.jsConfigs) != 0 || completed.response.ConfigCount != 0 {
+	if len(s.jsConfigs) != 0 {
 		t.Fatalf("deleted config remained committed: response=%+v configs=%+v", completed.response, s.jsConfigs)
 	}
 	if s.eslintPluginConfigGeneration != secondActivationRequest.TransactionID {
 		t.Fatalf("empty catalog generation = %q, want %q", s.eslintPluginConfigGeneration, secondActivationRequest.TransactionID)
 	}
-	if s.configDiscoveryV2HasLastGood {
+	if s.configDiscoveryHasLastGood {
 		t.Fatal("empty JavaScript catalog was marked as a usable JavaScript last-good generation")
 	}
 
@@ -914,11 +927,11 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	if completed.err != nil {
 		t.Fatalf("new broken config refresh failed instead of committing an unavailable boundary: %v", completed.err)
 	}
-	if completed.response.TransactionID != thirdLoadRequest.TransactionID || completed.response.ConfigCount != 0 {
+	if completed.response.TransactionID != thirdLoadRequest.TransactionID {
 		t.Fatalf("unavailable recovery response = %+v", completed.response)
 	}
-	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable || s.configDiscoveryV2HasLastGood {
-		t.Fatalf("new broken config state: unavailable=%t hasLastGood=%t", unavailable, s.configDiscoveryV2HasLastGood)
+	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable || s.configDiscoveryHasLastGood {
+		t.Fatalf("new broken config state: unavailable=%t hasLastGood=%t", unavailable, s.configDiscoveryHasLastGood)
 	}
 	entries, _, isJS := s.getConfigForURI(documentURIFromPath(filepath.Join(root, "src", "index.ts")))
 	if !isJS || hasPublicConfigContent(entries) {
@@ -1052,7 +1065,7 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.
 	}
 }
 
-func TestGitignoreWatcherRetriesV2AndPreservesLastGoodOnFailure(t *testing.T) {
+func TestGitignoreWatcherRetriesRefreshAndPreservesLastGoodOnFailure(t *testing.T) {
 	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
@@ -1065,7 +1078,7 @@ func TestGitignoreWatcherRetriesV2AndPreservesLastGoodOnFailure(t *testing.T) {
 	s.cwd = workspace
 	s.fs = bundled.WrapFS(osvfs.FS())
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
-	s.configDiscoveryV2Active = true
+	s.configDiscoveryActive = true
 	installLastGoodConfig(s, workspace)
 	documentURI := documentURIFromPath(filepath.Join(workspace, "src", "index.ts"))
 	s.documents[documentURI] = "debugger;\n"
@@ -1121,34 +1134,14 @@ func TestConfigRefreshProtocolRegistration(t *testing.T) {
 	if !isBlockingMethod(methodConfigRefresh) {
 		t.Fatal("rslint/configRefresh must run on the serialized dispatch loop")
 	}
-	if handlers()[lsproto.Method("rslint/configUpdate")] == nil {
-		t.Fatal("legacy rslint/configUpdate fallback was removed")
+	if handlers()[methodConfigRefresh] == nil {
+		t.Fatal("rslint/configRefresh handler is not registered")
 	}
-
-	s, outgoing := newTestServerWithQueue()
-	id := jsonrpc.NewIDString("config-capabilities-v2")
-	req := &lsproto.RequestMessage{ID: id, Method: lsproto.Method("rslint/configCapabilities")}
-	if err := handlers()[req.Method](s, context.Background(), req); err != nil {
-		t.Fatal(err)
+	if handlers()[lsproto.Method("rslint/configUpdate")] != nil {
+		t.Fatal("deprecated rslint/configUpdate handler is still registered")
 	}
-	select {
-	case message := <-outgoing:
-		response := message.AsResponse()
-		data, err := stdjson.Marshal(response.Result)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var capabilities struct {
-			TransactionVersion int `json:"transactionVersion"`
-		}
-		if err := stdjson.Unmarshal(data, &capabilities); err != nil {
-			t.Fatal(err)
-		}
-		if capabilities.TransactionVersion != 2 {
-			t.Fatalf("transactionVersion = %d, want 2", capabilities.TransactionVersion)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("configCapabilities was not acknowledged")
+	if handlers()[lsproto.Method("rslint/configCapabilities")] != nil {
+		t.Fatal("deprecated rslint/configCapabilities handler is still registered")
 	}
 }
 
@@ -1165,7 +1158,7 @@ func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) 
 	if s.eslintPluginConfigGeneration != "last-good" {
 		t.Fatal("invalid protocol mutated committed generation")
 	}
-	if s.configDiscoveryV2Active {
-		t.Fatal("invalid protocol enabled v2 reverse watcher transactions")
+	if s.configDiscoveryActive {
+		t.Fatal("invalid protocol enabled reverse watcher transactions")
 	}
 }

@@ -2,7 +2,6 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
-import { selectUnavailableConfigBoundaryDirectories } from '../../src/Rslint';
 
 suite('rslint JS config support', function () {
   this.timeout(120_000);
@@ -21,12 +20,8 @@ suite('rslint JS config support', function () {
    *
    * The waiter returns as soon as `predicate` accepts a snapshot — no
    * file edits, no nudges, no sleeps. It relies on the server's own
-   * push channel: `internal/lsp/service.go::handleConfigUpdate` ends
-   * with `s.RefreshDiagnostics(ctx)`, which signals `refreshCh`; the
-   * dispatch loop in `internal/lsp/server.go` consumes that signal and
-   * calls `pushDiagnostics(uri)` for every open document. So the LSP
-   * server already publishes new diagnostics after a config reload —
-   * tests just need to listen for them.
+   * push channel: a committed config-discovery transaction refreshes open
+   * document diagnostics, so tests only need to listen for that publication.
    *
    * Default 60s timeout (vs the older helper's 30s × 20 polling
    * budget) gives headroom for slow CI runners where the JS-config
@@ -83,40 +78,12 @@ suite('rslint JS config support', function () {
     await editor.edit((edit) => edit.delete(new vscode.Range(0, 0, 0, 1)));
   }
 
-  test('unavailable config boundaries preserve JS ownership without hiding valid ancestors', () => {
-    const root = path.resolve('/workspace');
-    const app = path.join(root, 'packages', 'app');
-    const broken = path.join(root, 'packages', 'broken');
-
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([app], [root]),
-      [root],
-      'a valid descendant must not expose JSON through an unavailable root',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([root], [broken]),
-      [],
-      'an unavailable child must fall back to its usable JS ancestor',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([], [broken]),
-      [broken],
-      'a lone unavailable nested config protects only its own subtree',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([], [root, broken]),
-      [root],
-      'an outer empty boundary makes a nested duplicate unnecessary',
-    );
-  });
-
   test('JS config should produce diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // Wait specifically for JS config diagnostics. JSON config may load first
-    // (server-side) before JS config arrives via rslint/configUpdate, so we
-    // must use a predicate to avoid returning early with JSON config results.
+    // Wait specifically for JS config diagnostics. The startup snapshot may
+    // publish JSON fallback results before JS config activation commits.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -135,8 +102,8 @@ suite('rslint JS config support', function () {
     await vscode.window.showTextDocument(doc);
 
     // Wait specifically for JS config diagnostics (no-unsafe-member-access).
-    // JSON config may load first with no-explicit-any, but JS config should
-    // override via rslint/configUpdate notification.
+    // JSON config may load first with no-explicit-any, but the committed JS
+    // config catalog should override it.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -162,8 +129,7 @@ suite('rslint JS config support', function () {
 
     // 2. Subscribe BEFORE writing the new config — eliminates the
     //    "publish fires between write and subscribe" race window. The
-    //    waiter listens; the server pushes after handleConfigUpdate
-    //    via RefreshDiagnostics; we resolve.
+    //    waiter listens; the server pushes after committing the refresh.
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
     const newConfig = `export default [
@@ -208,7 +174,7 @@ suite('rslint JS config support', function () {
     }
   });
 
-  test('one workspace config edit evaluates exactly one v2 transaction', async () => {
+  test('one workspace config edit evaluates exactly one transaction', async () => {
     const root = getWorkspaceRoot();
     const configPath = path.join(root, 'rslint.config.js');
     const markerPath = path.join(root, '.rslint-config-refresh-count');
@@ -246,7 +212,7 @@ export default [{
       fs.writeFileSync(configPath, countedConfig, 'utf8');
       await reloaded;
       // A duplicate didChangeWatchedFiles transaction used to race the direct
-      // v2 watcher. Let any queued 300ms debounce complete before inspecting
+      // watcher. Let any queued 300ms debounce complete before inspecting
       // the config module's observable evaluation count.
       await new Promise((resolve) => setTimeout(resolve, 1500));
       assert.strictEqual(

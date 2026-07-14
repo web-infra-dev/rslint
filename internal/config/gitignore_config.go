@@ -9,17 +9,18 @@ import (
 )
 
 // ConfigWithGitignore prepends the .gitignore patterns that apply to a lint
-// invocation. A nil targetFiles slice scans the config directory, as the CLI
-// path does; a non-nil slice limits collection to the directory chains between
-// configDir and those explicit files, as used by API and LSP requests. The
-// input config is never mutated.
+// invocation. A nil targetFiles slice scans the config-owned subtree, as used
+// by LSP and directory-based CLI discovery. A non-nil slice limits collection
+// to the directory chains between configDir and exact targets, as used by API,
+// file-only CLI, and explicit-only scopes in mixed CLI requests. The input
+// config is never mutated.
 func ConfigWithGitignore(config RslintConfig, configDir string, fsys vfs.FS, targetFiles []string) RslintConfig {
 	return ConfigWithGitignoreWithBoundaries(config, configDir, fsys, targetFiles, nil)
 }
 
 // ConfigWithGitignoreWithBoundaries applies the shared .gitignore policy while
-// excluding descendant directories owned by child configs. A boundary and its
-// subtree are handed off without reading that subtree's .gitignore files.
+// excluding caller-supplied descendant ownership boundaries. A boundary and
+// its subtree are handed off without reading that subtree's .gitignore files.
 func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fsys vfs.FS, targetFiles []string, stopDirs []string) RslintConfig {
 	collectionFiles := targetFiles
 	var isDirectoryBlocked func(string) bool

@@ -283,6 +283,9 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
 		}
+		if len(catalog.Failures) > 0 {
+			printConfigDiscoveryFailures(catalog.Failures)
+		}
 		if len(catalog.EslintPlugins) > 0 {
 			if capabilityRequester, ok := requester.(api.PeerCapabilityRequester); ok &&
 				!capabilityRequester.PeerSupportsCapability(api.CapabilityReversePluginLint) {
@@ -329,8 +332,9 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				configTargetScopes = catalog.Scopes
 				// The API already has an exact target set. Resolve provisional owners
 				// with authored config ignores first, then read only each owner's
-				// target ancestor chains. Every loaded config remains a source boundary,
-				// including one that owns only explicit files.
+				// target ancestor chains. Configs loaded only for explicit files are
+				// boundaries for those literal scopes, not for ancestor-owned automatic
+				// siblings.
 				filesByOwner := configTargetFilesByOwner(
 					configMap,
 					configTargetScopes,
@@ -338,18 +342,30 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 					allowedFiles,
 					false,
 				)
-				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
+				automaticResolver := rslintconfig.NewConfigOwnerResolverForAutomaticTargets(
+					configMap,
+					configTargetScopes,
+					fs,
+				)
+				completeResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
 				for ownerDirectory, entries := range configMap {
 					ownerFiles := filesByOwner[ownerDirectory]
 					if ownerFiles == nil {
 						ownerFiles = []string{}
+					}
+					// An ExplicitOnly config is a boundary only for its literal
+					// scope. Automatic siblings remain owned by the ancestor and
+					// must continue reading nested .gitignore sources below it.
+					resolver := automaticResolver
+					if configTargetScopes[ownerDirectory].ExplicitOnly {
+						resolver = completeResolver
 					}
 					configMap[ownerDirectory] = rslintconfig.ConfigWithGitignoreWithBoundaries(
 						entries,
 						ownerDirectory,
 						fs,
 						ownerFiles,
-						configResolver.ChildConfigDirs(ownerDirectory),
+						resolver.ChildConfigDirs(ownerDirectory),
 					)
 				}
 			}

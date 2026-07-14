@@ -45,7 +45,7 @@ export interface RslintOptions {
   /** Extra config appended after the resolved/discovered config (ESLint's overrideConfig). */
   overrideConfig?: RslintConfigEntry | RslintConfigEntry[] | null;
   /**
-   * `string` — use this config file (no discovery).
+   * `string` — use this JS/TS config module (no discovery).
    * `true`   — use only `overrideConfig` (no file, no discovery).
    * `null`/absent — auto-discover the nearest config (ESLint v10 semantics; no `false`).
    */
