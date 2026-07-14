@@ -39,6 +39,12 @@ type IgnorePattern struct {
 	Glob    string
 	Negated bool
 	Kind    dirKind
+	// valid caches doublestar.ValidatePattern(Glob), computed once here instead
+	// of on every match. doublestar.Match() re-walks the pattern to validate it
+	// on every non-matching call (the common case, since most patterns don't
+	// apply to most files), which dominated profiles of the per-file ignore
+	// check once file collection was parallelized (see matches).
+	valid bool
 }
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
@@ -75,6 +81,7 @@ func ParseIgnorePattern(raw string) IgnorePattern {
 		body = body[1:]
 	}
 	p.Glob = normalizePattern(body)
+	p.valid = doublestar.ValidatePattern(p.Glob)
 	switch {
 	case body == "":
 		p.Kind = dirNone
@@ -105,6 +112,16 @@ func ParseIgnorePatterns(raw []string) []IgnorePattern {
 	return out
 }
 
+// matches reports whether path matches p.Glob. It uses MatchUnvalidated with
+// the validity computed once in ParseIgnorePattern, instead of matchGlob's
+// doublestar.Match (which re-validates the pattern on every call).
+func (p IgnorePattern) matches(path string) bool {
+	if !p.valid {
+		return false
+	}
+	return doublestar.MatchUnvalidated(p.Glob, path)
+}
+
 // isFileIgnored evaluates patterns sequentially (later overrides earlier; `!`
 // re-includes), aligned with ESLint v10. Matches only the cwd-relative path —
 // never the absolute path — so `**/`-prefixed patterns can't hit system dirs.
@@ -117,9 +134,9 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 
 	ignored := false
 	for _, p := range patterns {
-		matched := matchGlob(p.Glob, normalizedPath)
+		matched := p.matches(normalizedPath)
 		if !matched && unixPath != normalizedPath {
-			matched = matchGlob(p.Glob, unixPath)
+			matched = p.matches(unixPath)
 		}
 		if matched {
 			ignored = !p.Negated
@@ -132,7 +149,7 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
 	ignored := false
 	for _, p := range patterns {
-		if matched, err := doublestar.Match(p.Glob, filePath); err == nil && matched {
+		if p.matches(filePath) {
 			ignored = !p.Negated
 		}
 	}
@@ -150,13 +167,13 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 		if p.Negated || p.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if matchGlob(p.Glob, dirPath) || matchGlob(p.Glob, dirPath+"/x") {
+		if p.matches(dirPath) || p.matches(dirPath+"/x") {
 			return true
 		}
 		segments := strings.Split(dirPath, "/")
 		for j := 1; j < len(segments); j++ {
 			partial := strings.Join(segments[:j], "/")
-			if matchGlob(p.Glob, partial) || matchGlob(p.Glob, partial+"/x") {
+			if p.matches(partial) || p.matches(partial+"/x") {
 				return true
 			}
 		}
@@ -187,7 +204,7 @@ func canPruneDir(dirPath string, patterns []IgnorePattern, neg negReach) bool {
 			continue
 		}
 		// File-level `X/**/*` never matches the bare directory; probe `dir/x`.
-		if matchGlob(p.Glob, dirPath+"/x") {
+		if p.matches(dirPath + "/x") {
 			return true
 		}
 	}
