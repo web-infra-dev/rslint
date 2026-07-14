@@ -20,6 +20,11 @@ type FileConfigResolver struct {
 	config         RslintConfig
 	cwd            string
 	enforcePlugins bool
+	// globalIgnorePatterns is parsed once per run instead of per file: the
+	// config's global `ignores` set is fixed for the whole run, so
+	// re-deriving it (string parsing + allocation) on every ConfigForFile
+	// call is pure waste at thousands-of-files scale.
+	globalIgnorePatterns []IgnorePattern
 
 	mu          sync.RWMutex
 	configCache map[string]cachedMergedConfig
@@ -29,11 +34,12 @@ type FileConfigResolver struct {
 // NewFileConfigResolver creates a per-run resolver for one config root.
 func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool) *FileConfigResolver {
 	return &FileConfigResolver{
-		config:         config,
-		cwd:            cwd,
-		enforcePlugins: enforcePlugins,
-		configCache:    make(map[string]cachedMergedConfig),
-		rulesCache:     make(map[string]cachedEnabledRules),
+		config:               config,
+		cwd:                  cwd,
+		enforcePlugins:       enforcePlugins,
+		globalIgnorePatterns: extractConfigIgnores(config),
+		configCache:          make(map[string]cachedMergedConfig),
+		rulesCache:           make(map[string]cachedEnabledRules),
 	}
 }
 
@@ -46,7 +52,7 @@ func (r *FileConfigResolver) ConfigForFile(filePath string) *MergedConfig {
 	}
 	r.mu.RUnlock()
 
-	merged := r.config.GetConfigForFile(filePath, r.cwd)
+	merged := r.config.getConfigForFileWithIgnores(filePath, r.cwd, r.globalIgnorePatterns)
 
 	r.mu.Lock()
 	if cached, ok := r.configCache[filePath]; ok {

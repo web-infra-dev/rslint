@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -704,19 +705,66 @@ func CollectLintTargets(opts RunLinterOptions) []LintTarget {
 			SyntaxErrorFiles: opts.SyntaxErrorFiles,
 			TypeInfoFiles:    opts.TypeInfoFiles,
 		})
-		for _, file := range files {
-			if shouldSkipRulesForSyntax(runProgramOptions{
-				Program:          program,
-				SyntaxErrorFiles: opts.SyntaxErrorFiles,
-			}, file, context.Background()) {
-				continue
-			}
-			rules := filterRulesForTypeInfo(opts.GetRulesForFile(file), file.FileName(), opts.TypeInfoFiles)
-			if len(rules) == 0 {
-				continue
-			}
-			targets = append(targets, LintTarget{File: file, Rules: rules})
+		targets = append(targets, collectLintTargetsForFiles(opts, program, files)...)
+	}
+	return targets
+}
+
+// collectLintTargetsForFiles resolves rules for one program's lint target
+// files in parallel. Unlike the real lint pass, this has no type-checker
+// affinity to preserve, so files are simply chunked evenly across goroutines.
+// This is what turns the serial per-file config/glob resolution — the
+// dominant cost on large repos with many ignore/files patterns — into a
+// wall-clock win before the real, already-parallel lint pass even starts.
+func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program, files []*ast.SourceFile) []LintTarget {
+	if len(files) == 0 {
+		return nil
+	}
+	shardCount := runtime.GOMAXPROCS(0)
+	if opts.SingleThreaded {
+		shardCount = 1
+	} else if shardCount > len(files) {
+		shardCount = len(files)
+	}
+	if shardCount < 1 {
+		shardCount = 1
+	}
+	chunkSize := (len(files) + shardCount - 1) / shardCount
+	shardResults := make([][]LintTarget, shardCount)
+
+	wg := core.NewWorkGroup(opts.SingleThreaded)
+	for shard := range shardCount {
+		start := shard * chunkSize
+		end := min(start+chunkSize, len(files))
+		if start >= end {
+			continue
 		}
+		shardIndex := shard
+		shardFiles := files[start:end]
+		wg.Queue(func() {
+			ctx := context.Background()
+			var result []LintTarget
+			for _, file := range shardFiles {
+				if shouldSkipRulesForSyntax(runProgramOptions{
+					Program:          program,
+					SyntaxErrorFiles: opts.SyntaxErrorFiles,
+				}, file, ctx) {
+					continue
+				}
+				rules := filterRulesForTypeInfo(opts.GetRulesForFile(file), file.FileName(), opts.TypeInfoFiles)
+				if len(rules) == 0 {
+					continue
+				}
+				result = append(result, LintTarget{File: file, Rules: rules})
+			}
+			shardResults[shardIndex] = result
+		})
+	}
+	wg.RunAndWait()
+
+	var targets []LintTarget
+	for _, result := range shardResults {
+		targets = append(targets, result...)
 	}
 	return targets
 }
