@@ -455,13 +455,7 @@ func collectSourceItems(sourceFile *ast.SourceFile, sourceComments []*ast.Commen
 		scan.Scan()
 	}
 
-	seenComments := map[[2]int]bool{}
 	for _, comment := range sourceComments {
-		key := [2]int{comment.Pos(), comment.End()}
-		if seenComments[key] {
-			continue
-		}
-		seenComments[key] = true
 		items = append(items, sourceItem{
 			start:     comment.Pos(),
 			end:       comment.End(),
