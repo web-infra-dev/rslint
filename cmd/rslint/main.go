@@ -24,6 +24,11 @@ func runMain() int {
 		case "--api":
 			// run in API mode for JavaScript API
 			return runAPI()
+		case "--dump-rule-schemas":
+			// hidden: dumps every native rule's options JSON Schema for
+			// packages/rslint/scripts/generate-rule-option-types.mjs; not
+			// part of the public CLI surface (see usage in cmd.go).
+			return runDumpRuleSchemas()
 		}
 	}
 	// Default: unified IPC CLI mode — the Node parent (cli.ts → engine.ts)

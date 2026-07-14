@@ -100,8 +100,15 @@ jobs:
       # subpackages, populated from the napi-build artifacts by move-artifacts
       # above. core's loader resolves them at runtime, so no napi build / Rust is
       # needed here — build:js just bundles the worker (loader + types live in core).
+      # build:types then shells out to the linux-x64 rslint binary
+      # move-artifacts placed at npm/rslint/linux-x64-gnu/rslint (built by the
+      # `build` job, statically linked so it runs on this ubuntu-22.04 runner)
+      # via its hidden --dump-rule-schemas flag — no Go toolchain needed here —
+      # to splice typed rule options into dist/index.d.ts before it's published.
       - name: Build @rslint/core dist
-        run: pnpm --filter @rslint/core build:js
+        run: |
+          pnpm --filter @rslint/core build:js
+          pnpm --filter @rslint/core run build:types
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |

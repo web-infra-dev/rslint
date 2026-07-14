@@ -246,15 +246,19 @@ jobs:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
 
-      # build:js only - skip @rslint/core's build:bin, which invokes `go
-      # build` directly. The host rslint.exe was already built on the
-      # self-hosted Windows runner and downloaded above; this job has no Go
-      # toolchain set up and shouldn't need one.
+      # Skip @rslint/core's build:bin, which invokes `go build` directly -
+      # this job has no Go toolchain set up and shouldn't need one. The host
+      # rslint.exe was already built on the self-hosted Windows runner and
+      # downloaded above into npm/rslint/win32-x64-msvc/, the same path
+      # build:bin would have placed it, so build:types (which shells out to
+      # that binary's hidden --dump-rule-schemas flag, not to Go) can still
+      # run here.
       - name: Build
         shell: bash
         run: |
           pnpm --filter @rslint/api build
           pnpm --filter @rslint/core run build:js
+          pnpm --filter @rslint/core run build:types
           pnpm --filter rslint build
 
       - name: VSCode Test Cache

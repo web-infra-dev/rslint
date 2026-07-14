@@ -6,10 +6,10 @@ import {
 } from '../scripts/generate-rule-option-types.mjs';
 
 describe('collectRuleSchemas', () => {
-  // Exercises the real `go run ./cmd/gen-rule-types` boundary (Go is
-  // already a required toolchain for this package — `build:bin` compiles
-  // the native binary the same way) rather than mocking it, since the
-  // whole point of going through Go's rule registry is that it's the
+  // Exercises the real host `rslint --dump-rule-schemas` boundary (requires
+  // `pnpm build:bin` to have already placed the binary under npm/rslint/ —
+  // see package.json's `build` script chain) rather than mocking it, since
+  // the whole point of going through Go's rule registry is that it's the
   // single source of truth for rule IDs/prefixes and declared schemas.
   test('includes rules with a custom schema and the shared EmptyArraySchema, omits not-yet-migrated rules', () => {
     const rules = collectRuleSchemas();

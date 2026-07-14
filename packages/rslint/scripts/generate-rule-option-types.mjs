@@ -1,23 +1,29 @@
 // scripts/generate-rule-option-types.mjs
 //
-// Dumps every registered native rule's options JSON Schema from Go (via
-// `go run ./cmd/gen-rule-types`, see cmd/gen-rule-types/schemas.go — it
-// walks internal/config.GlobalRuleRegistry, the single source of truth for
-// rule IDs, prefixes, and declared schemas), compiles each schema into a
-// TypeScript type via json-schema-to-typescript, and injects the result
-// into the built `dist/index.d.ts` at the `@__RULE_OPTIONS__` marker inside
-// `RulesRecord` (see src/config/define-config.ts). Rules that haven't
-// declared a schema yet (internal/rule.Rule.Schema == nil) are omitted by
-// the Go side and keep falling back to RulesRecord's untyped index
-// signature.
+// Dumps every registered native rule's options JSON Schema from the host
+// `rslint` binary's hidden `--dump-rule-schemas` flag (see
+// cmd/rslint/dump_rule_schemas.go — it walks internal/config.GlobalRuleRegistry,
+// the single source of truth for rule IDs, prefixes, and declared schemas),
+// compiles each schema into a TypeScript type via json-schema-to-typescript,
+// and injects the result into the built `dist/index.d.ts` at the
+// `@__RULE_OPTIONS__` marker inside `RulesRecord` (see
+// src/config/define-config.ts). Rules that haven't declared a schema yet
+// (internal/rule.Rule.Schema == nil) are omitted by the Go side and keep
+// falling back to RulesRecord's untyped index signature.
+//
+// Requires the host binary already placed by `pnpm build:bin` (see
+// scripts/place-host-build.mjs) — this script does not compile Go itself, so
+// it errors out with a pointer to that command if the binary is missing.
 //
 // Run after `rslib build` (dist/index.d.ts must already exist) as part of
-// `pnpm build` — see the `generate:rule-types` script in package.json.
+// `pnpm build` — see the `build:types` script in package.json.
 import { compile } from 'json-schema-to-typescript';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hostTuple } from '../../../scripts/place-host-build.mjs';
 
 const PACKAGE_ROOT = path.resolve(fileURLToPath(import.meta.url), '../..');
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, '../..');
@@ -25,7 +31,28 @@ const DIST_INDEX_DTS = path.join(PACKAGE_ROOT, 'dist/index.d.ts');
 const MARKER = '/** @__RULE_OPTIONS__ */';
 
 /**
- * Runs `go run ./cmd/gen-rule-types`, which registers every native rule and
+ * Resolves the host `rslint` binary placed by `place-host-build.mjs bin`
+ * (`pnpm build:bin`) under `npm/rslint/<tuple>/`. Throws rather than falling
+ * back to `go run` — the binary is expected to already exist by the time
+ * `build:types` runs in the `build` script chain
+ * (`build:bin && build:js && build:types`), and CI jobs that only
+ * download a prebuilt binary (no Go toolchain, e.g. test-vscode-windows)
+ * rely on that same placement.
+ */
+function resolveHostBinary() {
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const bin = path.join(REPO_ROOT, 'npm', 'rslint', hostTuple(), `rslint${ext}`);
+  if (!existsSync(bin)) {
+    throw new Error(
+      `generate-rule-option-types: host rslint binary not found at ${bin} — ` +
+        'run `pnpm build:bin` first',
+    );
+  }
+  return bin;
+}
+
+/**
+ * Runs `<rslint> --dump-rule-schemas`, which registers every native rule and
  * returns `{name, schema}` for each one that declares an options JSON
  * Schema — including a rule that only references the shared
  * `rule.EmptyArraySchema` (no options, no on-disk `.schema.json` file),
@@ -34,8 +61,7 @@ const MARKER = '/** @__RULE_OPTIONS__ */';
  * @returns {{ name: string, schema: import('json-schema').JSONSchema4 }[]}
  */
 export function collectRuleSchemas() {
-  const output = execFileSync('go', ['run', './cmd/gen-rule-types'], {
-    cwd: REPO_ROOT,
+  const output = execFileSync(resolveHostBinary(), ['--dump-rule-schemas'], {
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
   });

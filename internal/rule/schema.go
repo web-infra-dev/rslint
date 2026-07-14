@@ -65,9 +65,9 @@ var EmptyArraySchema = NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
 
 // RawJSON returns the schema's original, not-yet-compiled JSON — the same bytes
 // passed to NewSchema. Exposed for tooling that needs the schema text
-// itself rather than a compiled validator (e.g. cmd/gen-rule-types, which
-// dumps every registered rule's schema for the TypeScript rule-options
-// generator).
+// itself rather than a compiled validator (e.g. cmd/rslint's hidden
+// --dump-rule-schemas flag, which dumps every registered rule's schema for
+// the TypeScript rule-options generator).
 func (s *Schema) RawJSON() []byte {
 	return s.rawJSON
 }

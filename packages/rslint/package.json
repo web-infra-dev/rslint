@@ -34,9 +34,9 @@
     "build:bin": "node ../../scripts/place-host-build.mjs bin",
     "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
     "build:js": "rslib build",
-    "generate:rule-types": "node ./scripts/generate-rule-option-types.mjs",
+    "build:types": "node ./scripts/generate-rule-option-types.mjs",
     "dev": "rslib build --watch",
-    "build": "pnpm build:bin && pnpm build:js && pnpm generate:rule-types",
+    "build": "pnpm build:bin && pnpm build:js && pnpm build:types",
     "test": "rstest run",
     "test:update": "rstest run -u"
   },

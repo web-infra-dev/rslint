@@ -35,7 +35,13 @@ function isMusl() {
   }
 }
 
-function hostTuple() {
+/**
+ * The `@rslint/native-<tuple>` platform tuple for the host, e.g.
+ * `darwin-arm64`, `linux-x64-musl`, `win32-x64-msvc`. Shared with
+ * packages/rslint/scripts/generate-rule-option-types.mjs, which needs to
+ * find the host `rslint` binary this script places under `npm/rslint/`.
+ */
+export function hostTuple() {
   const { platform, arch } = process;
   if (platform === 'darwin') return `darwin-${arch}`;
   if (platform === 'win32') return `win32-${arch}-msvc`;
@@ -43,33 +49,39 @@ function hostTuple() {
   throw new Error(`unsupported host platform ${platform}-${arch}`);
 }
 
-const what = process.argv[2];
-const tuple = hostTuple();
-const pkgDir = path.join(repoRoot, 'npm', 'rslint', tuple);
-fs.mkdirSync(pkgDir, { recursive: true });
+function main() {
+  const what = process.argv[2];
+  const tuple = hostTuple();
+  const pkgDir = path.join(repoRoot, 'npm', 'rslint', tuple);
+  fs.mkdirSync(pkgDir, { recursive: true });
 
-if (what === 'bin') {
-  const debug = process.argv.includes('--debug');
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const out = path.join(pkgDir, `rslint${ext}`);
-  const args = ['build', '-v'];
-  if (debug) args.push('-gcflags=all=-N -l');
-  args.push('-o', out, './cmd/rslint');
-  execFileSync('go', args, {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    env: debug ? { ...process.env, GOEXPERIMENT: 'noregabi' } : process.env,
-  });
-} else if (what === 'node') {
-  const file = `rslint.${tuple}.node`;
-  const src = path.join(repoRoot, 'crates', 'rslint-native', file);
-  if (!fs.existsSync(src)) {
-    throw new Error(
-      `napi build output not found: ${src}\n` +
-        `run \`pnpm --filter @rslint/native build\` first`,
-    );
+  if (what === 'bin') {
+    const debug = process.argv.includes('--debug');
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const out = path.join(pkgDir, `rslint${ext}`);
+    const args = ['build', '-v'];
+    if (debug) args.push('-gcflags=all=-N -l');
+    args.push('-o', out, './cmd/rslint');
+    execFileSync('go', args, {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      env: debug ? { ...process.env, GOEXPERIMENT: 'noregabi' } : process.env,
+    });
+  } else if (what === 'node') {
+    const file = `rslint.${tuple}.node`;
+    const src = path.join(repoRoot, 'crates', 'rslint-native', file);
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `napi build output not found: ${src}\n` +
+          `run \`pnpm --filter @rslint/native build\` first`,
+      );
+    }
+    fs.copyFileSync(src, path.join(pkgDir, file));
+  } else {
+    throw new Error('usage: place-host-build.mjs <bin|node> [--debug]');
   }
-  fs.copyFileSync(src, path.join(pkgDir, file));
-} else {
-  throw new Error('usage: place-host-build.mjs <bin|node> [--debug]');
+}
+
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
 }
