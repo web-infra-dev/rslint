@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -143,19 +144,28 @@ func TestHasCommentInSpan(t *testing.T) {
 		t.Fatal("source file not found")
 	}
 
+	// HasCommentInSpan takes the file's pre-collected, sorted comment list
+	// (what ctx.Comments holds in production) rather than the source file
+	// itself — mirrors how linter.go builds it once per file.
+	var comments []*ast.CommentRange
+	ForEachComment(sf.AsNode(), func(comment *ast.CommentRange) {
+		comments = append(comments, comment)
+	}, sf)
+	sort.Slice(comments, func(i, j int) bool { return comments[i].Pos() < comments[j].Pos() })
+
 	commentGapStart := strings.Index(src, "1")
 	commentGapEnd := strings.Index(src, "+")
-	if !HasCommentInSpan(sf, commentGapStart, commentGapEnd) {
+	if !HasCommentInSpan(comments, commentGapStart, commentGapEnd) {
 		t.Fatal("expected real block comment in numeric-expression gap")
 	}
 
 	stringStart := strings.Index(src, `"/*`)
 	stringEnd := strings.Index(src, `*/"`) + len(`*/"`)
-	if HasCommentInSpan(sf, stringStart, stringEnd) {
+	if HasCommentInSpan(comments, stringStart, stringEnd) {
 		t.Fatal("string literal comment markers must not count as comments")
 	}
 
-	if HasCommentInSpan(sf, commentGapStart, commentGapStart) {
+	if HasCommentInSpan(comments, commentGapStart, commentGapStart) {
 		t.Fatal("empty span must not contain comments")
 	}
 }

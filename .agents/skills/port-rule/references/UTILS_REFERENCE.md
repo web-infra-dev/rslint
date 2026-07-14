@@ -31,13 +31,24 @@ import "github.com/web-infra-dev/rslint/internal/utils"
 // Get trimmed text range of a node (removes leading/trailing whitespace)
 trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 
-// Get all comments in a range (returns iterator)
+// Get all comments in a range (returns iterator). Scans locally from
+// textRange.Pos() via the scanner — cheap even when called once per node.
 for comment := range utils.GetCommentsInRange(ctx.SourceFile, textRange) {
     // comment is ast.CommentRange
 }
 
-// Check if there are comments in a range
+// Check if there are comments in a range. Same cost profile as
+// GetCommentsInRange above — safe to call per-node.
 hasComments := utils.HasCommentsInRange(ctx.SourceFile, textRange)
+
+// Check if any comment overlaps an arbitrary [start, end) span, e.g. the gap
+// between two tokens that aren't adjacent nodes. Binary-searches the file's
+// already-collected comment list — pass ctx.Comments, don't rebuild it.
+// Prefer this over GetCommentsInRange/HasCommentsInRange when you're calling
+// it once per matching AST node across the whole file (e.g. once per boolean
+// cast, once per label) — see the "Token and Comment Iteration" section below
+// for why that distinction matters.
+hasComment := utils.HasCommentInSpan(ctx.Comments, start, end)
 ```
 
 ### Type Recursion
@@ -181,6 +192,50 @@ utils.ForEachComment(node, func(comment *ast.CommentRange) {
 // Get all children of a node (including tokens)
 children := utils.GetChildren(node, ctx.SourceFile)
 ```
+
+**Performance: don't call `ForEachComment`/`ForEachToken` on the whole file.**
+
+`ForEachToken` walks `node`'s entire subtree down to the token level (recursive
+`GetChildren`), and `ForEachComment` additionally re-scans trivia at every
+token it visits. Called on a small subtree (a single function body, a single
+expression) this is fine. Called on `ctx.SourceFile.AsNode()` — i.e. the whole
+file — it re-tokenizes the entire file, and doing that once per enabled rule
+adds up fast (this dominated a real profile: 17.4% cumulative time, larger
+than several other perf fixes combined, from ~8 rules each independently
+re-deriving the same file-wide comment list).
+
+The linter already walks the whole file once per file — to build the
+directive-comment list for `DisableManager` and inline `/* global */` parsing
+— and hands you the result:
+
+```go
+// ctx.Comments is every comment in the file, in source order, computed once
+// per file by the linter. Use this instead of ForEachComment(ctx.SourceFile.AsNode(), ...).
+for _, comment := range ctx.Comments {
+    // comment is *ast.CommentRange
+}
+```
+
+Rules of thumb:
+
+- Need every comment in the file → iterate `ctx.Comments`. Don't call
+  `ForEachComment` on `ctx.SourceFile.AsNode()` yourself.
+- Need to know whether a comment exists somewhere in a bounded, non-adjacent
+  span (e.g. between two tokens that aren't parent/child) → `utils.HasCommentInSpan(ctx.Comments, start, end)`.
+  It binary-searches the sorted `ctx.Comments` list (O(log k), mirrors
+  ESLint's `TokenStore#commentsExistBetween`) instead of rescanning. This
+  matters most when the check runs once per matching AST node (once per
+  boolean cast, once per label) — a per-node full-file rescan is the
+  expensive pattern to avoid.
+- Need comments strictly inside one specific node's own span, and only call
+  this a handful of times (not once per node across the file) →
+  `utils.HasCommentInsideNode(sourceFile, node)` or `ForEachComment(node, ...)`
+  scoped to that node are fine as-is; the walk is bounded by the node's size,
+  not the file's.
+- Need comments adjacent to a small range you already have the bounds for
+  (not "the whole file") → `utils.GetCommentsInRange`/`HasCommentsInRange`
+  scan locally from `range.Pos()` via the scanner and are cheap to call
+  per-node.
 
 ### Compiler Options
 

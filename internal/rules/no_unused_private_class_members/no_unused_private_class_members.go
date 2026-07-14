@@ -41,7 +41,7 @@ var NoUnusedPrivateClassMembersRule = rule.Rule{
 
 		getSourceItems := func() []sourceItem {
 			if sourceItems == nil {
-				sourceItems = collectSourceItems(ctx.SourceFile)
+				sourceItems = collectSourceItems(ctx.SourceFile, ctx.Comments)
 			}
 			return sourceItems
 		}
@@ -437,7 +437,7 @@ func isSemicolonSafePreviousToken(token sourceItem) bool {
 	}
 }
 
-func collectSourceItems(sourceFile *ast.SourceFile) []sourceItem {
+func collectSourceItems(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange) []sourceItem {
 	text := sourceFile.Text()
 	items := make([]sourceItem, 0)
 
@@ -456,10 +456,10 @@ func collectSourceItems(sourceFile *ast.SourceFile) []sourceItem {
 	}
 
 	seenComments := map[[2]int]bool{}
-	utils.ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
+	for _, comment := range sourceComments {
 		key := [2]int{comment.Pos(), comment.End()}
 		if seenComments[key] {
-			return
+			continue
 		}
 		seenComments[key] = true
 		items = append(items, sourceItem{
@@ -468,7 +468,7 @@ func collectSourceItems(sourceFile *ast.SourceFile) []sourceItem {
 			text:      text[comment.Pos():comment.End()],
 			isComment: true,
 		})
-	}, sourceFile)
+	}
 
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].start != items[j].start {

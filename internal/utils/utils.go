@@ -4,6 +4,7 @@ import (
 	"iter"
 	"math"
 	"slices"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -123,28 +124,23 @@ func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	return hasComment
 }
 
-// HasCommentInSpan reports whether any parsed comment overlaps the half-open
-// source span [start, end). Unlike HasCommentsInRange, this scans the whole
-// file's comment table, so callers can use it for ESLint-style
-// commentsExistBetween checks over arbitrary token gaps.
-func HasCommentInSpan(sourceFile *ast.SourceFile, start int, end int) bool {
-	if sourceFile == nil || start >= end {
+// HasCommentInSpan reports whether any comment in sourceComments overlaps the
+// half-open source span [start, end). sourceComments must be sorted by
+// position — pass ctx.Comments, which the linter already builds
+// once per file. Runs in O(log k) via binary search over the (typically
+// small) comment list, the same technique ESLint's TokenStore uses for
+// commentsExistBetween, instead of re-walking the whole file's token tree on
+// every call.
+func HasCommentInSpan(sourceComments []*ast.CommentRange, start int, end int) bool {
+	if start >= end {
 		return false
 	}
-	if start < 0 {
-		start = 0
-	}
-	if end > len(sourceFile.Text()) {
-		end = len(sourceFile.Text())
-	}
 
-	found := false
-	ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
-		if comment.Pos() < end && comment.End() > start {
-			found = true
-		}
-	}, sourceFile)
-	return found
+	idx := sort.Search(len(sourceComments), func(i int) bool { return sourceComments[i].Pos() >= start })
+	if idx > 0 && sourceComments[idx-1].End() > start {
+		return true
+	}
+	return idx < len(sourceComments) && sourceComments[idx].Pos() < end
 }
 
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {

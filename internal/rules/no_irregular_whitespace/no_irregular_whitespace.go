@@ -243,10 +243,9 @@ func collectExemptRanges(ctx rule.RuleContext, opts irregularWhitespaceOptions, 
 	if opts.skipComments {
 		nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 		text := sf.Text()
-		// Iterate through all comments in the file using ForEachComment.
-		utils.ForEachComment(sf.AsNode(), func(comment *ast.CommentRange) {
+		for _, comment := range ctx.Comments {
 			*ranges = append(*ranges, errorInfo{pos: comment.Pos(), end: comment.End()})
-		}, sf)
+		}
 		// Also check for leading comments at position 0 which ForEachComment may miss.
 		for comment := range scanner.GetLeadingCommentRanges(nodeFactory, text, 0) {
 			*ranges = append(*ranges, errorInfo{pos: comment.Pos(), end: comment.End()})
