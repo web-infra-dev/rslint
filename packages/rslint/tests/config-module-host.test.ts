@@ -268,11 +268,15 @@ describe('ConfigModuleHost', () => {
     const first = candidate(root, 'first');
     const secondDirectory = path.join(root, 'nested');
     fs.mkdirSync(secondDirectory);
+    // Go's canonical path representation uses forward slashes on every OS.
+    // The routing identity must survive the Node module host byte-for-byte;
+    // path.normalize would otherwise rewrite it on Windows only.
+    const secondRoutingDirectory = secondDirectory.replaceAll(path.sep, '/');
     const second = candidate(
       root,
       'second',
       'second.config.js',
-      secondDirectory,
+      secondRoutingDirectory,
     );
     const host = new ConfigModuleHost({
       loadCached: async (configPath) => {

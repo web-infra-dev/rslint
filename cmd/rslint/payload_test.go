@@ -17,7 +17,7 @@ import (
 // TestParseConfigPayload_MultiConfig_OriginalConfigDirPreservesRaw pins the
 // Option-3 invariant at the parse layer: configMap is keyed by the NORMALIZED
 // dir (Go matches normalized file paths against it) while OriginalConfigDir
-// recovers the RAW string the JS host sent, so the eslint-plugin wire configKey
+// recovers the RAW Go-owned routing identity returned by the JS host, so the eslint-plugin wire configKey
 // round-trips raw (byte-matching the worker's plugin map key) instead of Go's
 // normalized form.
 func TestParseConfigPayload_MultiConfig_OriginalConfigDirPreservesRaw(t *testing.T) {

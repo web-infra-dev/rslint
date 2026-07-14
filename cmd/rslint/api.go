@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -63,32 +64,32 @@ type apiConfigModuleLoader struct {
 	requester api.Requester
 }
 
-func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request rslintconfig.ConfigLoadBatchRequest) (rslintconfig.ConfigLoadBatchResponse, error) {
+func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request discovery.ConfigLoadBatchRequest) (discovery.ConfigLoadBatchResponse, error) {
 	if loader == nil || loader.requester == nil {
-		return rslintconfig.ConfigLoadBatchResponse{}, errors.New("reverse config loading is unavailable")
+		return discovery.ConfigLoadBatchResponse{}, errors.New("reverse config loading is unavailable")
 	}
 	msg, err := loader.requester.SendRequest(ctx, api.KindLoadConfigs, request)
 	if err != nil {
-		return rslintconfig.ConfigLoadBatchResponse{}, err
+		return discovery.ConfigLoadBatchResponse{}, err
 	}
-	var response rslintconfig.ConfigLoadBatchResponse
+	var response discovery.ConfigLoadBatchResponse
 	if err := msg.Decode(&response); err != nil {
-		return rslintconfig.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs result: %w", err)
+		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs result: %w", err)
 	}
 	return response, nil
 }
 
-func (loader *apiConfigModuleLoader) ActivateConfigs(ctx context.Context, request rslintconfig.ConfigActivationRequest) (rslintconfig.ConfigActivationResponse, error) {
+func (loader *apiConfigModuleLoader) ActivateConfigs(ctx context.Context, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
 	if loader == nil || loader.requester == nil {
-		return rslintconfig.ConfigActivationResponse{}, errors.New("reverse config activation is unavailable")
+		return discovery.ConfigActivationResponse{}, errors.New("reverse config activation is unavailable")
 	}
 	msg, err := loader.requester.SendRequest(ctx, api.KindActivateConfigs, request)
 	if err != nil {
-		return rslintconfig.ConfigActivationResponse{}, err
+		return discovery.ConfigActivationResponse{}, err
 	}
-	var response rslintconfig.ConfigActivationResponse
+	var response discovery.ConfigActivationResponse
 	if err := msg.Decode(&response); err != nil {
-		return rslintconfig.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs result: %w", err)
+		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs result: %w", err)
 	}
 	return response, nil
 }
@@ -231,53 +232,55 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		catalogPlugins     []rslintconfig.EslintPluginEntry
 		originalConfigDir  map[string]string
 	)
-	if discovery := req.ConfigDiscovery; discovery != nil {
+	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
 			return nil, errors.New("configDiscovery requires a bidirectional API host")
 		}
-		if len(discovery.ExplicitFiles) > 0 && len(discovery.ExplicitFiles) != len(req.Files) {
+		if len(configDiscovery.ExplicitFiles) > 0 && len(configDiscovery.ExplicitFiles) != len(req.Files) {
 			return nil, errors.New("configDiscovery.explicitFiles must be parallel to files")
 		}
 
-		discoveryRequest := rslintconfig.ConfigDiscoveryRequest{
+		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
 			Fresh:                     true,
-			LimitDirectoryWalkToFiles: len(discovery.Directories) > 0,
-			ImplicitCWD:               len(req.Files) == 0 && len(discovery.Directories) == 0,
+			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
+			ImplicitCWD:               len(req.Files) == 0 && len(configDiscovery.Directories) == 0,
 			SingleThreaded:            false,
 		}
-		switch discovery.Mode {
+		switch configDiscovery.Mode {
 		case "", "auto":
-			discoveryRequest.Mode = rslintconfig.ConfigDiscoveryAuto
+			discoveryRequest.Mode = discovery.ConfigDiscoveryAuto
 		case "explicit":
-			discoveryRequest.Mode = rslintconfig.ConfigDiscoveryExplicit
-			discoveryRequest.ExplicitConfigPath = resolveRequestPath(discovery.ExplicitConfigPath)
+			discoveryRequest.Mode = discovery.ConfigDiscoveryExplicit
+			discoveryRequest.ExplicitConfigPath = resolveRequestPath(configDiscovery.ExplicitConfigPath)
 		default:
-			return nil, fmt.Errorf("invalid configDiscovery mode %q", discovery.Mode)
+			return nil, fmt.Errorf("invalid configDiscovery mode %q", configDiscovery.Mode)
 		}
-		for _, directory := range discovery.Directories {
+		for _, directory := range configDiscovery.Directories {
 			discoveryRequest.Directories = append(discoveryRequest.Directories, resolveRequestPath(directory))
 		}
 		for index, filePath := range req.Files {
 			explicit := true
-			if len(discovery.ExplicitFiles) > 0 {
-				explicit = discovery.ExplicitFiles[index]
+			if len(configDiscovery.ExplicitFiles) > 0 {
+				explicit = configDiscovery.ExplicitFiles[index]
 			}
 			canonicalPath := ""
 			if len(req.CanonicalFiles) > 0 {
 				canonicalPath = resolveRequestPath(req.CanonicalFiles[index])
 			}
-			discoveryRequest.Files = append(discoveryRequest.Files, rslintconfig.DiscoveryFile{
+			discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{
 				Path:          resolveRequestPath(filePath),
 				CanonicalPath: canonicalPath,
 				Explicit:      explicit,
 			})
 		}
 
-		catalog, err := rslintconfig.NewConfigDiscoverySession(
+		catalog, err := discovery.Build(
+			ctx,
 			fs,
 			&apiConfigModuleLoader{requester: requester},
-		).Build(ctx, discoveryRequest)
+			discoveryRequest,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
 		}
@@ -289,8 +292,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		}
 
 		var overrideConfig rslintconfig.RslintConfig
-		if len(discovery.OverrideConfig) > 0 {
-			if err := json.Unmarshal(discovery.OverrideConfig, &overrideConfig); err != nil {
+		if len(configDiscovery.OverrideConfig) > 0 {
+			if err := json.Unmarshal(configDiscovery.OverrideConfig, &overrideConfig); err != nil {
 				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
 			}
 			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
@@ -300,7 +303,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 		if len(catalog.Configs) > 0 {
 			configDirectories := catalog.ConfigDirectories()
-			if len(configDirectories) == 1 && catalog.Sources[configDirectories[0]].ExplicitConfig {
+			if len(configDirectories) == 1 && catalog.Explicit {
 				// overrideConfigFile is invocation-wide. A hierarchical config map
 				// would have no owner for a requested file outside cwd and would
 				// incorrectly drop it, even though explicit flat-config semantics say

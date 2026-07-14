@@ -94,7 +94,7 @@ func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []Ign
 func gitignoreCollectionFilePath(filePath string, configDir string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	matchFile, matchDir := ResolveConfigPathSpace(filePath, configDir, fsys)
-	if relative, ok := relativeConfigPath(matchFile, matchDir, true); ok {
+	if relative, ok := RelativePathWithinConfigRoot(matchFile, matchDir, true); ok {
 		return tspath.ResolvePath(configDir, relative)
 	}
 	return filePath

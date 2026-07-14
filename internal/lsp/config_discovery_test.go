@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
 
 type configRefreshTestResult struct {
@@ -77,7 +78,7 @@ func startConfigRefreshForTest(s *Server, reason string) <-chan configRefreshTes
 	result := make(chan configRefreshTestResult, 1)
 	go func() {
 		response, err := s.handleConfigRefresh(context.Background(), map[string]any{
-			"protocolVersion": config.ConfigDiscoveryProtocolVersion,
+			"protocolVersion": discovery.ConfigDiscoveryProtocolVersion,
 			"reason":          reason,
 		})
 		result <- configRefreshTestResult{response: response, err: err}
@@ -139,18 +140,18 @@ func loadedConfigResponse(
 	t *testing.T,
 	request *lsproto.RequestMessage,
 	entries config.RslintConfig,
-) (config.ConfigLoadBatchRequest, config.ConfigLoadBatchResponse) {
+) (discovery.ConfigLoadBatchRequest, discovery.ConfigLoadBatchResponse) {
 	t.Helper()
-	loadRequest, ok := request.Params.(config.ConfigLoadBatchRequest)
+	loadRequest, ok := request.Params.(discovery.ConfigLoadBatchRequest)
 	if !ok {
 		t.Fatalf("loadConfigs params type = %T", request.Params)
 	}
 	if len(loadRequest.Candidates) != 1 {
 		t.Fatalf("loadConfigs candidate count = %d, want 1", len(loadRequest.Candidates))
 	}
-	return loadRequest, config.ConfigLoadBatchResponse{
+	return loadRequest, discovery.ConfigLoadBatchResponse{
 		TransactionID: loadRequest.TransactionID,
-		Results: []config.ConfigLoadResult{{
+		Results: []discovery.ConfigLoadResult{{
 			ID:                loadRequest.Candidates[0].ID,
 			Status:            "loaded",
 			Entries:           entries,
@@ -163,24 +164,24 @@ func failedConfigResponse(
 	t *testing.T,
 	request *lsproto.RequestMessage,
 	message string,
-) (config.ConfigLoadBatchRequest, config.ConfigLoadBatchResponse) {
+) (discovery.ConfigLoadBatchRequest, discovery.ConfigLoadBatchResponse) {
 	t.Helper()
-	loadRequest, ok := request.Params.(config.ConfigLoadBatchRequest)
+	loadRequest, ok := request.Params.(discovery.ConfigLoadBatchRequest)
 	if !ok {
 		t.Fatalf("loadConfigs params type = %T", request.Params)
 	}
-	results := make([]config.ConfigLoadResult, len(loadRequest.Candidates))
+	results := make([]discovery.ConfigLoadResult, len(loadRequest.Candidates))
 	for index, candidate := range loadRequest.Candidates {
-		results[index] = config.ConfigLoadResult{
+		results[index] = discovery.ConfigLoadResult{
 			ID:     candidate.ID,
 			Status: "failed",
-			Error: &config.ConfigModuleError{
+			Error: &discovery.ConfigModuleError{
 				Code:    "load",
 				Message: message,
 			},
 		}
 	}
-	return loadRequest, config.ConfigLoadBatchResponse{
+	return loadRequest, discovery.ConfigLoadBatchResponse{
 		TransactionID: loadRequest.TransactionID,
 		Results:       results,
 	}
@@ -190,9 +191,9 @@ func activationResponseForRequest(
 	t *testing.T,
 	request *lsproto.RequestMessage,
 	pluginHostReady bool,
-) (config.ConfigActivationRequest, configActivationWireResponse) {
+) (discovery.ConfigActivationRequest, configActivationWireResponse) {
 	t.Helper()
-	activation, ok := request.Params.(config.ConfigActivationRequest)
+	activation, ok := request.Params.(discovery.ConfigActivationRequest)
 	if !ok {
 		t.Fatalf("activateConfigs params type = %T", request.Params)
 	}
@@ -276,7 +277,7 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	loadRequest, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
 		Rules: config.Rules{"no-debugger": "error"},
 	}})
-	if loadRequest.LoadMode != config.ConfigModuleLoadFresh {
+	if loadRequest.LoadMode != discovery.ConfigModuleLoadFresh {
 		t.Fatalf("load mode = %q, want fresh", loadRequest.LoadMode)
 	}
 	if got := loadRequest.Candidates[0].ConfigDirectory; got != root {
@@ -336,7 +337,7 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 
 	fsys := bundled.WrapFS(osvfs.FS())
-	catalog := &config.ConfigCatalog{
+	catalog := &discovery.ConfigCatalog{
 		TransactionID: "snapshot-boundaries",
 		Configs: map[string]config.RslintConfig{
 			root:  {{Rules: config.Rules{"no-console": "error"}}},
@@ -595,13 +596,13 @@ func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild
 	// The synthetic parent is a retryable tombstone, not last-good data. A
 	// later failure at that same path must not reject a transaction that could
 	// discover or update usable descendants. The real child remains protected.
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &config.ConfigCatalog{
-		Failures: []config.ConfigFailure{{Directory: root, Message: "still broken"}},
+	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &discovery.ConfigCatalog{
+		Failures: []discovery.ConfigFailure{{Directory: root, Message: "still broken"}},
 	}); invalidates {
 		t.Fatalf("unavailable tombstone invalidated refresh: %+v", failure)
 	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &config.ConfigCatalog{
-		Failures: []config.ConfigFailure{{Directory: nested, Message: "child broke"}},
+	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &discovery.ConfigCatalog{
+		Failures: []discovery.ConfigFailure{{Directory: nested, Message: "child broke"}},
 	}); !invalidates || failure.Directory != nested {
 		t.Fatalf("usable child failure = %+v, invalidates=%t", failure, invalidates)
 	}
@@ -624,14 +625,14 @@ func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	fsy := bundled.WrapFS(osvfs.FS())
-	catalog := &config.ConfigCatalog{
+	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]config.RslintConfig{
 			realRoot: {{}},
 		},
-		Failures: []config.ConfigFailure{{Directory: aliasRoot}},
+		Failures: []discovery.ConfigFailure{{Directory: aliasRoot}},
 	}
-	catalog.Resolver = config.NewConfigOwnerResolver(catalog.Configs, fsy)
-	if owner, _ := catalog.Resolver.Resolve(filepath.Join(aliasRoot, "src", "index.ts")); owner != realRoot {
+	resolver := config.NewConfigOwnerResolver(catalog.Configs, fsy)
+	if owner, _ := resolver.Resolve(filepath.Join(aliasRoot, "src", "index.ts")); owner != realRoot {
 		t.Fatalf("test precondition: canonical resolver owner = %q, want %q", owner, realRoot)
 	}
 	boundaries := unavailableConfigBoundaryDirectories(fsy, catalog)
@@ -656,13 +657,13 @@ func TestFailureAtCommittedConfigBoundaryUsesLexicalIdentity(t *testing.T) {
 	}
 	s.jsUnavailableConfigs = make(map[string]struct{})
 
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &config.ConfigCatalog{
-		Failures: []config.ConfigFailure{{Directory: "/repo/b"}},
+	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
+		Failures: []discovery.ConfigFailure{{Directory: "/repo/b"}},
 	}); invalidates {
 		t.Fatalf("physical-only alias invalidated lexical last-good: %+v", failure)
 	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &config.ConfigCatalog{
-		Failures: []config.ConfigFailure{{Directory: "/repo/a"}},
+	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
+		Failures: []discovery.ConfigFailure{{Directory: "/repo/a"}},
 	}); !invalidates || failure.Directory != "/repo/a" {
 		t.Fatalf("same lexical boundary = %+v, invalidates=%t", failure, invalidates)
 	}
@@ -671,8 +672,8 @@ func TestFailureAtCommittedConfigBoundaryUsesLexicalIdentity(t *testing.T) {
 	s.jsConfigs = map[string]config.RslintConfig{
 		"C:/Repo/App": {{}},
 	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &config.ConfigCatalog{
-		Failures: []config.ConfigFailure{{Directory: "c:/repo/app"}},
+	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
+		Failures: []discovery.ConfigFailure{{Directory: "c:/repo/app"}},
 	}); !invalidates || failure.Directory != "c:/repo/app" {
 		t.Fatalf("native case alias = %+v, invalidates=%t", failure, invalidates)
 	}
@@ -697,7 +698,7 @@ func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T
 	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
 
 	completed := awaitConfigRefreshResult(t, result)
-	if !errors.Is(completed.err, config.ErrAllConfigsFailed) {
+	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("configRefresh error = %v, want ErrAllConfigsFailed", completed.err)
 	}
 	if s.eslintPluginConfigGeneration != "last-good" || !s.configDiscoveryV2HasLastGood ||
@@ -818,16 +819,16 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	// transaction using an explicit empty load frontier before activation.
 	// A non-empty frontier here would prove stale generation cache reuse.
 	secondLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	secondLoadRequest, ok := secondLoad.Params.(config.ConfigLoadBatchRequest)
+	secondLoadRequest, ok := secondLoad.Params.(discovery.ConfigLoadBatchRequest)
 	if !ok {
 		t.Fatalf("empty loadConfigs params type = %T", secondLoad.Params)
 	}
-	if secondLoadRequest.LoadMode != config.ConfigModuleLoadFresh || secondLoadRequest.Candidates == nil || len(secondLoadRequest.Candidates) != 0 {
+	if secondLoadRequest.LoadMode != discovery.ConfigModuleLoadFresh || secondLoadRequest.Candidates == nil || len(secondLoadRequest.Candidates) != 0 {
 		t.Fatalf("empty catalog load request = %+v", secondLoadRequest)
 	}
-	respondToConfigReverseRequest(t, s, secondLoad, config.ConfigLoadBatchResponse{
+	respondToConfigReverseRequest(t, s, secondLoad, discovery.ConfigLoadBatchResponse{
 		TransactionID: secondLoadRequest.TransactionID,
-		Results:       []config.ConfigLoadResult{},
+		Results:       []discovery.ConfigLoadResult{},
 	}, nil)
 
 	secondActivation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
@@ -912,7 +913,7 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 	abort := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
 	respondToConfigReverseRequest(t, s, abort, abortResponseForRequest(t, abort), nil)
 	completed := awaitConfigRefreshResult(t, refresh)
-	if !errors.Is(completed.err, config.ErrAllConfigsFailed) {
+	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("refresh error = %v, want ErrAllConfigsFailed", completed.err)
 	}
 	if s.eslintPluginConfigGeneration != committedGeneration {
@@ -1087,7 +1088,7 @@ func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) 
 	s := newTestServer()
 	s.eslintPluginConfigGeneration = "last-good"
 	_, err := s.handleConfigRefresh(context.Background(), map[string]any{
-		"protocolVersion": config.ConfigDiscoveryProtocolVersion + 1,
+		"protocolVersion": discovery.ConfigDiscoveryProtocolVersion + 1,
 		"reason":          "initial",
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported config refresh protocol") {

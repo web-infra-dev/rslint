@@ -50,6 +50,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
@@ -107,26 +108,26 @@ type ipcConfigModuleLoader struct {
 	channel *ipc.Channel
 }
 
-func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request rslintconfig.ConfigLoadBatchRequest) (rslintconfig.ConfigLoadBatchResponse, error) {
+func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request discovery.ConfigLoadBatchRequest) (discovery.ConfigLoadBatchResponse, error) {
 	msg, err := loader.channel.SendRequest(ctx, kindLoadConfigs, request)
 	if err != nil {
-		return rslintconfig.ConfigLoadBatchResponse{}, err
+		return discovery.ConfigLoadBatchResponse{}, err
 	}
-	var response rslintconfig.ConfigLoadBatchResponse
+	var response discovery.ConfigLoadBatchResponse
 	if err := msg.Decode(&response); err != nil {
-		return rslintconfig.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs response: %w", err)
+		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs response: %w", err)
 	}
 	return response, nil
 }
 
-func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, request rslintconfig.ConfigActivationRequest) (rslintconfig.ConfigActivationResponse, error) {
+func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
 	msg, err := loader.channel.SendRequest(ctx, kindActivateConfigs, request)
 	if err != nil {
-		return rslintconfig.ConfigActivationResponse{}, err
+		return discovery.ConfigActivationResponse{}, err
 	}
-	var response rslintconfig.ConfigActivationResponse
+	var response discovery.ConfigActivationResponse
 	if err := msg.Decode(&response); err != nil {
-		return rslintconfig.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs response: %w", err)
+		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs response: %w", err)
 	}
 	return response, nil
 }
@@ -468,32 +469,34 @@ func discoverCLIConfigCatalog(
 		return fmt.Errorf("get working directory for config discovery: %w", err)
 	}
 	cwd = tspath.NormalizePath(cwd)
-	request := rslintconfig.ConfigDiscoveryRequest{
+	request := discovery.ConfigDiscoveryRequest{
 		CWD:            cwd,
 		Directories:    append([]string(nil), args.AllowDirs...),
 		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
 		SingleThreaded: args.SingleThreaded,
 	}
 	for _, filePath := range args.AllowFiles {
-		request.Files = append(request.Files, rslintconfig.DiscoveryFile{
+		request.Files = append(request.Files, discovery.DiscoveryFile{
 			Path:     filePath,
 			Explicit: true,
 		})
 	}
 	switch payload.ConfigDiscovery.Mode {
 	case "auto", "":
-		request.Mode = rslintconfig.ConfigDiscoveryAuto
+		request.Mode = discovery.ConfigDiscoveryAuto
 	case "explicit":
-		request.Mode = rslintconfig.ConfigDiscoveryExplicit
+		request.Mode = discovery.ConfigDiscoveryExplicit
 		request.ExplicitConfigPath = payload.ConfigDiscovery.ExplicitConfigPath
 	default:
 		return fmt.Errorf("unsupported config discovery mode %q", payload.ConfigDiscovery.Mode)
 	}
 
-	catalog, err := rslintconfig.NewConfigDiscoverySession(
+	catalog, err := discovery.Build(
+		ctx,
 		args.FS,
 		&ipcConfigModuleLoader{channel: channel},
-	).Build(ctx, request)
+		request,
+	)
 	if err != nil {
 		return err
 	}
@@ -507,7 +510,7 @@ func discoverCLIConfigCatalog(
 	// owner lookup cannot accidentally drop such a target.
 	if len(configDirectories) == 1 {
 		configDir := configDirectories[0]
-		if catalog.Sources[configDir].ExplicitConfig {
+		if catalog.Explicit {
 			args.ConfigPayload = &parsedPayload{
 				SingleConfig:    append(rslintconfig.RslintConfig(nil), catalog.Configs[configDir]...),
 				SingleConfigDir: configDir,
@@ -527,13 +530,11 @@ func discoverCLIConfigCatalog(
 	}
 	for _, configDir := range configDirectories {
 		scope := catalog.Scopes[configDir]
-		source := catalog.Sources[configDir]
 		directPayload.ConfigMap[configDir] = append(
 			rslintconfig.RslintConfig(nil),
 			catalog.Configs[configDir]...,
 		)
 		directPayload.OriginalConfigDir[configDir] = configDir
-		scope.ExplicitOnly = source.ExplicitOnly || scope.ExplicitOnly
 		if scope.Files != nil || scope.ExplicitOnly {
 			scope.Files = append([]string(nil), scope.Files...)
 			directPayload.ConfigTargetScopes[configDir] = scope

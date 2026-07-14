@@ -1039,6 +1039,43 @@ func TestDiscoverLintTargetsMultiConfig_PreservesHostAssignedExplicitOwner(t *te
 	assert.Equal(t, targets[0].ConfigDirectory, rootDir)
 }
 
+func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSameOwner(t *testing.T) {
+	rootDir, paths := setupDiscoveryFixture(t, []string{
+		"pkg/automatic.ts",
+		"pkg/explicit.ts",
+	})
+	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
+	fsys := osvfs.FS()
+	configMap := map[string]RslintConfig{
+		rootDir:  {{Rules: Rules{"root": "error"}}},
+		childDir: {{Rules: Rules{"child": "error"}}},
+	}
+
+	targets := DiscoverLintTargetsMultiConfig(
+		configMap,
+		map[string]LintDiscoveryScope{
+			childDir: {Files: []string{paths["pkg/explicit.ts"]}},
+		},
+		fsys,
+		[]string{paths["pkg/automatic.ts"], paths["pkg/explicit.ts"]},
+		nil,
+		true,
+	)
+
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
+		{
+			Path:            paths["pkg/automatic.ts"],
+			CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
+			ConfigDirectory: childDir,
+		},
+		{
+			Path:            paths["pkg/explicit.ts"],
+			CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
+			ConfigDirectory: childDir,
+		},
+	})
+}
+
 func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFiles(t *testing.T) {
 	rootDir, paths := setupDiscoveryFixture(t, []string{
 		"ignored/automatic.ts",

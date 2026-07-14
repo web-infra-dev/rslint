@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -201,7 +202,7 @@ func ancestorJSConfigFileWatchers(cwd string, relativePatternSupport bool) []*ls
 	workspaceRoot := filepath.Clean(cwd)
 	watchers := make([]*lsproto.FileSystemWatcher, 0)
 	for current := filepath.Dir(workspaceRoot); current != workspaceRoot; {
-		for _, configName := range config.AutoJSConfigFileNames {
+		for _, configName := range discovery.AutoJSConfigFileNames {
 			watchers = append(watchers, fileSystemWatcher(current, configName, relativePatternSupport))
 		}
 		parent := filepath.Dir(current)
@@ -472,7 +473,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			reason = "config-change"
 		}
 		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
-			ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 			Reason:          reason,
 		})
 		if err == nil {
@@ -531,7 +532,7 @@ func isWorkspaceOrAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs
 	caseSensitive := fsys.UseCaseSensitiveFileNames()
 	baseName := tspath.GetBaseFileName(tspath.NormalizePath(filePath))
 	isAutoConfig := false
-	for _, configName := range config.AutoJSConfigFileNames {
+	for _, configName := range discovery.AutoJSConfigFileNames {
 		if pathStringsEqual(baseName, configName, caseSensitive) {
 			isAutoConfig = true
 			break

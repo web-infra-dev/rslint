@@ -24,7 +24,7 @@ type parsedPayload struct {
 	ConfigMap map[string]rslintconfig.RslintConfig
 
 	// OriginalConfigDir maps each normalized ConfigMap key back to the raw
-	// configDirectory string the JS host sent. The eslint-plugin wire configKey
+	// Go-owned configDirectory routing identity shared with the JS host. The eslint-plugin wire configKey
 	// uses this RAW form so it is byte-identical to the worker's plugin map key
 	// (the host keys that map on the same raw string); Go's normalized key is
 	// only for its own file matching. This makes the CLI round-trip the routing
@@ -33,8 +33,8 @@ type parsedPayload struct {
 	// legacy single-config mode.
 	OriginalConfigDir map[string]string
 
-	// ConfigTargetScopes carries explicit-file provenance established by the JS
-	// host. Go uses it to preserve lexical ownership and to keep configs that
+	// ConfigTargetScopes carries explicit-file provenance established by Go
+	// config discovery. Go uses it to preserve lexical ownership and to keep configs that
 	// survived only for an explicit file out of directory discovery.
 	ConfigTargetScopes map[string]rslintconfig.LintDiscoveryScope
 

@@ -1,4 +1,4 @@
-package config
+package discovery
 
 import (
 	"context"
@@ -18,17 +18,17 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 type fakeConfigModuleLoader struct {
-	configs       map[string]RslintConfig
-	failures      map[string]ConfigModuleError
-	plugins       map[string][]EslintPluginEntry
-	pluginConfigs map[string]bool
-	batches       []ConfigLoadBatchRequest
-	activations   []ConfigActivationRequest
-	pluginsByID   map[string][]EslintPluginEntry
-	mutate        func(ConfigLoadBatchRequest, ConfigLoadBatchResponse) ConfigLoadBatchResponse
+	configs     map[string]rslintconfig.RslintConfig
+	failures    map[string]ConfigModuleError
+	plugins     map[string][]rslintconfig.EslintPluginEntry
+	batches     []ConfigLoadBatchRequest
+	activations []ConfigActivationRequest
+	pluginsByID map[string][]rslintconfig.EslintPluginEntry
+	mutate      func(ConfigLoadBatchRequest, ConfigLoadBatchResponse) ConfigLoadBatchResponse
 }
 
 type configDiscoveryRealpathFS struct {
@@ -142,7 +142,7 @@ func (fs *configDiscoveryConcurrencyFS) peak() int {
 func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request ConfigLoadBatchRequest) (ConfigLoadBatchResponse, error) {
 	loader.batches = append(loader.batches, request)
 	if loader.pluginsByID == nil {
-		loader.pluginsByID = make(map[string][]EslintPluginEntry)
+		loader.pluginsByID = make(map[string][]rslintconfig.EslintPluginEntry)
 	}
 	response := ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 	for _, candidate := range request.Candidates {
@@ -156,7 +156,7 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 			})
 			continue
 		}
-		entries := append(RslintConfig(nil), loader.configs[path]...)
+		entries := append(rslintconfig.RslintConfig(nil), loader.configs[path]...)
 		plugins := cloneEslintPluginEntries(loader.plugins[path])
 		loader.pluginsByID[candidate.ID] = plugins
 		response.Results = append(response.Results, ConfigLoadResult{
@@ -165,7 +165,6 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 			Entries:           entries,
 			SourceFingerprint: "fixture:" + filepath.Base(path),
 			EslintPlugins:     plugins,
-			HasPluginConfig:   loader.pluginConfigs[path],
 		})
 	}
 	if loader.mutate != nil {
@@ -176,9 +175,9 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 
 func (loader *fakeConfigModuleLoader) ActivateConfigs(_ context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error) {
 	loader.activations = append(loader.activations, request)
-	sources := make(map[string]ConfigSource, len(request.EffectiveConfigIDs))
+	sources := make(map[string]configSource, len(request.EffectiveConfigIDs))
 	for _, id := range request.EffectiveConfigIDs {
-		sources[id] = ConfigSource{EslintPlugins: loader.pluginsByID[id]}
+		sources[id] = configSource{EslintPlugins: loader.pluginsByID[id]}
 	}
 	return ConfigActivationResponse{
 		TransactionID:       request.TransactionID,
@@ -196,8 +195,8 @@ func TestConfigDiscoveryPriorityDoesNotConsultGitignore(t *testing.T) {
 		}
 
 		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{CWD: root, ImplicitCWD: true})
-		if got := catalog.Sources[tspath.NormalizePath(root)].Path; got != tspath.CombinePaths(root, "rslint.config.js") {
-			t.Fatalf("selected %q, want highest-priority .js config", got)
+		if got := catalog.Configs[tspath.NormalizePath(root)][0].Name; got != "rslint.config.js" {
+			t.Fatalf("selected config %q, want highest-priority .js config", got)
 		}
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{tspath.CombinePaths(root, "rslint.config.js")}) {
 			t.Fatalf("unexpected load candidates: %v", got)
@@ -214,8 +213,8 @@ func TestConfigDiscoveryPriorityDoesNotConsultGitignore(t *testing.T) {
 		loader.configs[mjsPath] = namedConfig("lower-priority")
 
 		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{CWD: root, ImplicitCWD: true})
-		if got := catalog.Sources[tspath.NormalizePath(root)].Path; got != jsPath {
-			t.Fatalf("selected %q, want highest-priority .js config", got)
+		if got := catalog.Configs[tspath.NormalizePath(root)][0].Name; got != "selected" {
+			t.Fatalf("selected config %q, want highest-priority .js config", got)
 		}
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{jsPath}) {
 			t.Fatalf("config discovery consulted .gitignore: %v", got)
@@ -233,7 +232,7 @@ func TestConfigDiscoveryDoesNotReadGitignore(t *testing.T) {
 	loader.configs[tspath.CombinePaths(root, "ignored/rslint.config.js")] = namedConfig("nested")
 	fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
 
-	_, err := NewConfigDiscoverySession(fsys, loader).Build(context.Background(), ConfigDiscoveryRequest{
+	_, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -254,15 +253,15 @@ func TestConfigDiscoveryParentGlobalIgnorePrunesNestedConfig(t *testing.T) {
 	ignoredConfig := writeConfigCandidate(t, root, "fixtures/deep/rslint.config.js")
 	visibleConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
 	visibleFile := writeDiscoveryFixture(t, root, "packages/app/index.ts", "export {}\n")
-	loader.configs[rootConfig] = RslintConfig{
+	loader.configs[rootConfig] = rslintconfig.RslintConfig{
 		{Ignores: []string{"fixtures/**"}},
-		{Name: "root", Rules: Rules{}},
+		{Name: "root", Rules: rslintconfig.Rules{}},
 	}
 	loader.configs[ignoredConfig] = namedConfig("ignored")
 	loader.configs[visibleConfig] = namedConfig("visible")
-	loader.plugins[rootConfig] = []EslintPluginEntry{{Prefix: "root-plugin", RuleNames: []string{"a"}}}
-	loader.plugins[ignoredConfig] = []EslintPluginEntry{{Prefix: "leak", RuleNames: []string{"bad"}}}
-	loader.plugins[visibleConfig] = []EslintPluginEntry{{Prefix: "visible-plugin", RuleNames: []string{"b"}}}
+	loader.plugins[rootConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "root-plugin", RuleNames: []string{"a"}}}
+	loader.plugins[ignoredConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "leak", RuleNames: []string{"bad"}}}
+	loader.plugins[visibleConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "visible-plugin", RuleNames: []string{"b"}}}
 
 	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
 		CWD:                       root,
@@ -297,9 +296,9 @@ func TestConfigDiscoveryFileCoverIgnoreKeepsTraversalButFiltersCandidates(t *tes
 		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 		nestedConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
 		writeDiscoveryFixture(t, root, "packages/app/index.ts", "export {}\n")
-		loader.configs[rootConfig] = RslintConfig{
+		loader.configs[rootConfig] = rslintconfig.RslintConfig{
 			{Ignores: []string{"packages/**/*"}},
-			{Name: "root", Rules: Rules{}},
+			{Name: "root", Rules: rslintconfig.Rules{}},
 		}
 		loader.configs[nestedConfig] = namedConfig("must-not-load")
 
@@ -320,9 +319,9 @@ func TestConfigDiscoveryFileCoverIgnoreKeepsTraversalButFiltersCandidates(t *tes
 		loader := newFixtureConfigLoader()
 		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 		nestedConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
-		loader.configs[rootConfig] = RslintConfig{
+		loader.configs[rootConfig] = rslintconfig.RslintConfig{
 			{Ignores: []string{"packages/**/*", "!packages/app/rslint.config.js"}},
-			{Name: "root", Rules: Rules{}},
+			{Name: "root", Rules: rslintconfig.Rules{}},
 		}
 		loader.configs[nestedConfig] = namedConfig("nested")
 
@@ -339,21 +338,92 @@ func TestConfigDiscoveryFileCoverIgnoreKeepsTraversalButFiltersCandidates(t *tes
 		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 		ignoredJS := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
 		selectedMJS := writeConfigCandidate(t, root, "packages/app/rslint.config.mjs")
-		loader.configs[rootConfig] = RslintConfig{
+		loader.configs[rootConfig] = rslintconfig.RslintConfig{
 			{Ignores: []string{"packages/app/rslint.config.js"}},
-			{Name: "root", Rules: Rules{}},
+			{Name: "root", Rules: rslintconfig.Rules{}},
 		}
 		loader.configs[ignoredJS] = namedConfig("must-not-load")
 		loader.configs[selectedMJS] = namedConfig("selected")
 
 		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{CWD: root, Directories: []string{root}})
-		if got := catalog.Sources[tspath.CombinePaths(root, "packages/app")].Path; got != selectedMJS {
-			t.Fatalf("selected config = %q, want %q", got, selectedMJS)
+		if got := catalog.Configs[tspath.CombinePaths(root, "packages/app")][0].Name; got != "selected" {
+			t.Fatalf("selected config = %q, want selected .mjs config", got)
 		}
 		if slices.Contains(requestedConfigPaths(loader), ignoredJS) {
 			t.Fatalf("ignored highest-priority candidate was requested: %v", requestedConfigPaths(loader))
 		}
 	})
+}
+
+func TestConfigDiscoveryAutomaticCandidateWinsSameDirectoryLiteralConflict(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	ignoredJS := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
+	automaticMJS := writeConfigCandidate(t, root, "packages/app/rslint.config.mjs")
+	literal := writeDiscoveryFixture(t, root, "packages/app/index.ts", "export {}\n")
+	appDir := tspath.CombinePaths(root, "packages/app")
+
+	for _, test := range []struct {
+		name         string
+		directory    string
+		includesRoot bool
+	}{
+		{name: "literal activates first", directory: root, includesRoot: true},
+		{name: "automatic activates first", directory: appDir},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for iteration := range 5 {
+				loader := newFixtureConfigLoader()
+				loader.configs[rootConfig] = rslintconfig.RslintConfig{
+					{Ignores: []string{"packages/app/rslint.config.js"}},
+					{Name: "root", Rules: rslintconfig.Rules{}},
+				}
+				loader.configs[ignoredJS] = namedConfig("literal-js")
+				loader.configs[automaticMJS] = namedConfig("automatic-mjs")
+				loader.plugins[rootConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "root-plugin"}}
+				loader.plugins[ignoredJS] = []rslintconfig.EslintPluginEntry{{Prefix: "literal-js-plugin"}}
+				loader.plugins[automaticMJS] = []rslintconfig.EslintPluginEntry{{Prefix: "automatic-mjs-plugin"}}
+
+				catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+					CWD:         root,
+					Directories: []string{test.directory},
+					Files:       []DiscoveryFile{{Path: literal, Explicit: true}},
+				})
+				if got := catalog.Configs[appDir][0].Name; got != "automatic-mjs" {
+					t.Fatalf("iteration %d selected config = %q, want automatic .mjs", iteration, got)
+				}
+				scope := catalog.Scopes[appDir]
+				if scope.ExplicitOnly || !reflect.DeepEqual(scope.Files, []string{literal}) {
+					t.Fatalf("iteration %d mixed scope = %+v", iteration, scope)
+				}
+				wantPlugins := []string{"automatic-mjs-plugin"}
+				if test.includesRoot {
+					wantPlugins = append(wantPlugins, "root-plugin")
+				}
+				if got := pluginPrefixes(catalog.EslintPlugins); !reflect.DeepEqual(got, wantPlugins) {
+					t.Fatalf("iteration %d effective plugins = %v", iteration, got)
+				}
+
+				idByPath := make(map[string]string)
+				for _, batch := range loader.batches {
+					for _, candidate := range batch.Candidates {
+						idByPath[candidate.ConfigPath] = candidate.ID
+					}
+				}
+				wantIDs := []string{idByPath[automaticMJS]}
+				if test.includesRoot {
+					wantIDs = append(wantIDs, idByPath[rootConfig])
+				}
+				sort.Strings(wantIDs)
+				if !reflect.DeepEqual(catalog.EffectiveConfigIDs, wantIDs) {
+					t.Fatalf("iteration %d effective IDs = %v, want %v", iteration, catalog.EffectiveConfigIDs, wantIDs)
+				}
+				if slices.Contains(catalog.EffectiveConfigIDs, idByPath[ignoredJS]) {
+					t.Fatalf("iteration %d activated literal-only candidate: %v", iteration, catalog.EffectiveConfigIDs)
+				}
+			}
+		})
+	}
 }
 
 func TestConfigDiscoveryDirectoryTargetCannotBypassAncestorGlobalIgnore(t *testing.T) {
@@ -362,9 +432,9 @@ func TestConfigDiscoveryDirectoryTargetCannotBypassAncestorGlobalIgnore(t *testi
 	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 	nestedConfig := writeConfigCandidate(t, root, "ignored/deep/rslint.config.js")
 	writeDiscoveryFixture(t, root, "ignored/deep/index.ts", "export {}\n")
-	loader.configs[rootConfig] = RslintConfig{
+	loader.configs[rootConfig] = rslintconfig.RslintConfig{
 		{Ignores: []string{"ignored/**"}},
-		{Name: "root", Rules: Rules{}},
+		{Name: "root", Rules: rslintconfig.Rules{}},
 	}
 	loader.configs[nestedConfig] = namedConfig("must-not-load")
 
@@ -423,7 +493,7 @@ func TestConfigDiscoveryGitignoredDirectoryStillLoadsNearestConfig(t *testing.T)
 			if catalog.Stats.DirectoriesPruned != 0 || catalog.Stats.DirectoriesVisited != 1 {
 				t.Fatalf("gitignore unexpectedly pruned config discovery: %+v", catalog.Stats)
 			}
-			if catalog.Sources[nearestDir].ExplicitOnly {
+			if catalog.Scopes[nearestDir].ExplicitOnly {
 				t.Fatal("directory ancestry owner must remain available to automatic targets")
 			}
 		})
@@ -511,9 +581,9 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
 		nestedConfig := writeConfigCandidate(t, root, "target/deep/rslint.config.js")
 		target := writeDiscoveryFixture(t, root, "target/deep/index.ts", "export {}\n")
-		loader.configs[rootConfig] = RslintConfig{
+		loader.configs[rootConfig] = rslintconfig.RslintConfig{
 			{Ignores: []string{"target/deep/**"}},
-			{Name: "root", Rules: Rules{}},
+			{Name: "root", Rules: rslintconfig.Rules{}},
 		}
 		loader.failures[nestedConfig] = ConfigModuleError{Code: "ERR", Message: "must not load"}
 
@@ -612,9 +682,11 @@ func TestConfigDiscoveryExplicitConfigDoesNotConsultGitignore(t *testing.T) {
 	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
 		t.Fatalf("explicit config should be anchored at cwd: %v", got)
 	}
-	source := catalog.Sources[root]
-	if source.Path != configPath || !source.ExplicitConfig {
-		t.Fatalf("unexpected explicit source: %+v", source)
+	if !catalog.Explicit {
+		t.Fatal("explicit discovery catalog was not marked invocation-wide")
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
+		t.Fatalf("explicit source = %v, want %q", got, configPath)
 	}
 	if got := loader.batches[0].Candidates[0].ConfigDirectory; got != root {
 		t.Fatalf("wire configDirectory = %q, want cwd %q", got, root)
@@ -644,9 +716,6 @@ func TestConfigDiscoveryExplicitFileFindsConfigInsideGitignoredDirectory(t *test
 	}
 	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{ignoredConfig}) {
 		t.Fatalf("gitignored explicit file requested configs: %v", got)
-	}
-	if !catalog.Sources[ignoredDir].ExplicitOnly {
-		t.Fatal("config loaded solely for an explicit target must not trigger a directory walk")
 	}
 	scope, exists := catalog.Scopes[ignoredDir]
 	if !exists || !scope.ExplicitOnly {
@@ -793,9 +862,6 @@ func TestConfigDiscoveryBrokenNearestFallsBackToAncestor(t *testing.T) {
 	if !catalog.Scopes[root].ExplicitOnly {
 		t.Fatal("explicit-only source was not propagated to target scope")
 	}
-	if !catalog.Sources[root].ExplicitOnly {
-		t.Fatal("file-only fallback config should remain explicit-only")
-	}
 }
 
 func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *testing.T) {
@@ -870,7 +936,7 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 			},
 		}
 
-		catalog, err := NewConfigDiscoverySession(fsys, loader).Build(context.Background(), ConfigDiscoveryRequest{
+		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:                       lexicalRoot,
 			Directories:               []string{lexicalRoot},
 			LimitDirectoryWalkToFiles: true,
@@ -941,14 +1007,14 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		loader.configs[aliasAConfig] = namedConfig("owner-a")
 		loader.configs[aliasBConfig] = namedConfig("owner-b")
 
-		catalog, err := NewConfigDiscoverySession(discoveryTestFS(), loader).Build(context.Background(), ConfigDiscoveryRequest{
+		catalog, err := Build(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{aliasA, aliasB},
 		})
 		if catalog != nil {
 			t.Fatalf("ambiguous catalog = %+v, want nil", catalog)
 		}
-		if err == nil || !strings.Contains(err.Error(), "config directories") ||
+		if err == nil || !strings.Contains(err.Error(), "Config directories") ||
 			!strings.Contains(err.Error(), "resolve to the same filesystem location") {
 			t.Fatalf("error = %v, want physical config-directory collision", err)
 		}
@@ -977,7 +1043,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		loader.configs[tspath.CombinePaths(upperAlias, filepath.Base(configPath))] = namedConfig("upper")
 		loader.configs[tspath.CombinePaths(lowerAlias, filepath.Base(configPath))] = namedConfig("lower")
 
-		catalog, err := NewConfigDiscoverySession(fsys, loader).Build(context.Background(), ConfigDiscoveryRequest{
+		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{upperAlias, lowerAlias},
 		})
@@ -1007,7 +1073,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		}
 		fsys := &configDiscoveryCaseSensitivityFS{FS: realpathFS, caseSensitive: false}
 
-		catalog, err := NewConfigDiscoverySession(fsys, loader).Build(context.Background(), ConfigDiscoveryRequest{
+		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{upperRoot, lowerRoot},
 		})
@@ -1056,7 +1122,7 @@ func TestConfigDiscoveryWalksSiblingFrontierConcurrentlyWithStableOutput(t *test
 	parallelLoader := newFixtureConfigLoader()
 	parallelLoader.configs[rootConfig] = namedConfig("root")
 	probeFS := newConfigDiscoveryConcurrencyFS(discoveryTestFS(), aDir, bDir)
-	parallelCatalog, err := NewConfigDiscoverySession(probeFS, parallelLoader).Build(context.Background(), ConfigDiscoveryRequest{
+	parallelCatalog, err := Build(context.Background(), probeFS, parallelLoader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1103,18 +1169,45 @@ func TestConfigDiscoveryEmptyCatalogDoesNotActivateUnknownTransaction(t *testing
 	}
 }
 
-func TestConfigDiscoveryTransactionIDsAreUniqueAcrossSessions(t *testing.T) {
+func TestConfigDiscoveryTransactionIDsAreUniqueAcrossBuilds(t *testing.T) {
 	root := t.TempDir()
-	first, err := NewConfigDiscoverySession(discoveryTestFS(), nil).Build(context.Background(), ConfigDiscoveryRequest{CWD: root})
-	if err != nil {
-		t.Fatalf("first Build: %v", err)
+	const builds = 64
+	type result struct {
+		id  string
+		err error
 	}
-	second, err := NewConfigDiscoverySession(discoveryTestFS(), nil).Build(context.Background(), ConfigDiscoveryRequest{CWD: root})
-	if err != nil {
-		t.Fatalf("second Build: %v", err)
+	results := make(chan result, builds)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(builds)
+	for range builds {
+		go func() {
+			defer waitGroup.Done()
+			catalog, err := Build(context.Background(), discoveryTestFS(), nil, ConfigDiscoveryRequest{CWD: root})
+			if err != nil {
+				results <- result{err: err}
+				return
+			}
+			results <- result{id: catalog.TransactionID}
+		}()
 	}
-	if first.TransactionID == "" || first.TransactionID == second.TransactionID {
-		t.Fatalf("transaction IDs must be process-unique: first=%q second=%q", first.TransactionID, second.TransactionID)
+	waitGroup.Wait()
+	close(results)
+
+	seen := make(map[string]struct{}, builds)
+	for result := range results {
+		if result.err != nil {
+			t.Fatalf("Build: %v", result.err)
+		}
+		if result.id == "" {
+			t.Fatal("transaction ID is empty")
+		}
+		if _, duplicate := seen[result.id]; duplicate {
+			t.Fatalf("duplicate transaction ID %q", result.id)
+		}
+		seen[result.id] = struct{}{}
+	}
+	if len(seen) != builds {
+		t.Fatalf("unique transaction IDs = %d, want %d", len(seen), builds)
 	}
 }
 
@@ -1129,7 +1222,7 @@ func TestValidateConfigLoadBatchRejectsProtocolViolations(t *testing.T) {
 		},
 	}
 	loaded := func(id string) ConfigLoadResult {
-		return ConfigLoadResult{ID: id, Status: "loaded", Entries: RslintConfig{}, SourceFingerprint: "fixture:" + id}
+		return ConfigLoadResult{ID: id, Status: "loaded", Entries: rslintconfig.RslintConfig{}, SourceFingerprint: "fixture:" + id}
 	}
 	tests := []struct {
 		name     string
@@ -1161,7 +1254,7 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 	loader := newFixtureConfigLoader()
 	configPath := writeConfigCandidate(t, root, "rslint.config.js")
 	loader.failures[configPath] = ConfigModuleError{Code: "ERR", Message: "nope"}
-	_, err := NewConfigDiscoverySession(discoveryTestFS(), loader).Build(context.Background(), ConfigDiscoveryRequest{
+	_, err := Build(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1174,7 +1267,7 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 
 	invalidLoader := newFixtureConfigLoader()
 	invalidLoader.failures[configPath] = ConfigModuleError{Code: "invalid", Message: "not an array"}
-	_, err = NewConfigDiscoverySession(discoveryTestFS(), invalidLoader).Build(context.Background(), ConfigDiscoveryRequest{
+	_, err = Build(context.Background(), discoveryTestFS(), invalidLoader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1185,10 +1278,9 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 
 func newFixtureConfigLoader() *fakeConfigModuleLoader {
 	return &fakeConfigModuleLoader{
-		configs:       make(map[string]RslintConfig),
-		failures:      make(map[string]ConfigModuleError),
-		plugins:       make(map[string][]EslintPluginEntry),
-		pluginConfigs: make(map[string]bool),
+		configs:  make(map[string]rslintconfig.RslintConfig),
+		failures: make(map[string]ConfigModuleError),
+		plugins:  make(map[string][]rslintconfig.EslintPluginEntry),
 	}
 }
 
@@ -1197,7 +1289,7 @@ func buildFixtureCatalog(t *testing.T, root string, loader ConfigModuleLoader, r
 	if request.CWD == "" {
 		request.CWD = root
 	}
-	catalog, err := NewConfigDiscoverySession(discoveryTestFS(), loader).Build(context.Background(), request)
+	catalog, err := Build(context.Background(), discoveryTestFS(), loader, request)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -1208,8 +1300,8 @@ func discoveryTestFS() vfs.FS {
 	return bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 }
 
-func namedConfig(name string) RslintConfig {
-	return RslintConfig{{Name: name, Rules: Rules{}}}
+func namedConfig(name string) rslintconfig.RslintConfig {
+	return rslintconfig.RslintConfig{{Name: name, Rules: rslintconfig.Rules{}}}
 }
 
 func writeConfigCandidate(t *testing.T, root string, relativePath string) string {
@@ -1249,7 +1341,7 @@ func requestedConfigPathsByBatch(loader *fakeConfigModuleLoader) [][]string {
 	return batches
 }
 
-func pluginPrefixes(entries []EslintPluginEntry) []string {
+func pluginPrefixes(entries []rslintconfig.EslintPluginEntry) []string {
 	prefixes := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		prefixes = append(prefixes, entry.Prefix)

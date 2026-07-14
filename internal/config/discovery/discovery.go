@@ -1,9 +1,10 @@
-package config
+package discovery
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 type configCandidate struct {
@@ -19,13 +21,12 @@ type configCandidate struct {
 }
 
 type configLoadState struct {
-	id              string
-	candidate       configCandidate
-	entries         RslintConfig
-	fingerprint     string
-	eslintPlugins   []EslintPluginEntry
-	hasPluginConfig bool
-	failure         *ConfigModuleError
+	id            string
+	candidate     configCandidate
+	entries       rslintconfig.RslintConfig
+	ignoreMatcher rslintconfig.GlobalIgnoreMatcher
+	eslintPlugins []rslintconfig.EslintPluginEntry
+	failure       *ConfigModuleError
 }
 
 type discoverySeed struct {
@@ -37,6 +38,7 @@ type discoverySeed struct {
 	lexicalCandidate   bool
 	explicitFile       bool
 	ownerDir           string
+	ownerPath          string
 	done               bool
 }
 
@@ -44,6 +46,7 @@ type discoveryWalkNode struct {
 	directory          string
 	canonicalDirectory string
 	ownerDir           string
+	ownerPath          string
 	targets            *discoveryTargetTrie
 }
 
@@ -81,13 +84,12 @@ type configCatalogBuilder struct {
 	fs            vfs.FS
 	loader        ConfigModuleLoader
 	request       ConfigDiscoveryRequest
-	generation    uint64
 	transactionID string
 
 	loadStates    map[string]*configLoadState
-	configs       map[string]RslintConfig
-	sources       map[string]ConfigSource
-	scopes        map[string]LintDiscoveryScope
+	configs       map[string]rslintconfig.RslintConfig
+	sources       map[string]configSource
+	scopes        map[string]rslintconfig.LintDiscoveryScope
 	failureByPath map[string]ConfigFailure
 	hadCandidates bool
 	nextRequestID int
@@ -123,7 +125,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		if state == nil || state.failure != nil {
 			return nil, builder.allConfigsFailedError()
 		}
-		builder.activate(state, false, true)
+		if err := builder.activate(state, false); err != nil {
+			return nil, err
+		}
 		return builder.catalog()
 	}
 
@@ -219,11 +223,13 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		if seed.ownerDir == "" {
 			continue
 		}
-		state := builder.loadStateForDirectory(seed.ownerDir)
+		state := builder.loadStates[seed.ownerPath]
 		if state == nil {
 			continue
 		}
-		builder.activate(state, seed.explicitFile, false)
+		if err := builder.activate(state, seed.explicitFile); err != nil {
+			return nil, err
+		}
 	}
 	for _, seed := range explicitSeeds {
 		if seed.ownerDir == "" {
@@ -244,6 +250,7 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			directory:          directory,
 			canonicalDirectory: seed.canonicalWalkDir,
 			ownerDir:           seed.ownerDir,
+			ownerPath:          seed.ownerPath,
 			targets:            targetsByRoot[directory],
 		})
 	}
@@ -282,7 +289,7 @@ func (builder *configCatalogBuilder) normalizedDirectoryRoots() []string {
 	for _, root := range roots {
 		covered := false
 		for _, parent := range compact {
-			if pathsEqual(root, parent, builder.fs.UseCaseSensitiveFileNames()) ||
+			if discoveryPathsEqual(root, parent, builder.fs.UseCaseSensitiveFileNames()) ||
 				tspath.StartsWithDirectory(root, parent, builder.fs.UseCaseSensitiveFileNames()) {
 				covered = true
 				break
@@ -330,7 +337,7 @@ func (builder *configCatalogBuilder) targetAncestorTries(
 	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
 	for _, file := range files {
 		for _, root := range roots {
-			relative, within := relativeConfigPath(file.Path, root, useCaseSensitive)
+			relative, within := rslintconfig.RelativePathWithinConfigRoot(file.Path, root, useCaseSensitive)
 			if !within {
 				continue
 			}
@@ -416,8 +423,8 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			resolution := &resolutions[index]
 			for resolution.next < len(resolution.candidates) {
 				candidateDirectory := resolution.candidates[resolution.next].directory
-				if resolution.seed.ownerDir != "" && builder.isGloballyIgnoredDirectory(
-					resolution.seed.ownerDir,
+				if resolution.seed.ownerPath != "" && builder.isGloballyIgnoredDirectory(
+					resolution.seed.ownerPath,
 					candidateDirectory,
 					candidateDirectory,
 				) {
@@ -428,7 +435,7 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 				}
 				candidate, found := builder.findCandidateForOwner(
 					candidateDirectory,
-					resolution.seed.ownerDir,
+					resolution.seed.ownerPath,
 					candidateDirectory,
 				)
 				if !found {
@@ -460,6 +467,7 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			state := builder.loadStates[candidate.path]
 			if state != nil && state.failure == nil {
 				resolution.seed.ownerDir = candidate.directory
+				resolution.seed.ownerPath = candidate.path
 			}
 			resolution.next++
 		}
@@ -532,6 +540,7 @@ func (builder *configCatalogBuilder) resolveSeedOwners(seeds []*discoverySeed) e
 			state := builder.loadStates[candidate.path]
 			if state != nil && state.failure == nil {
 				seed.ownerDir = candidate.directory
+				seed.ownerPath = candidate.path
 				seed.done = true
 				continue
 			}
@@ -563,7 +572,7 @@ func (builder *configCatalogBuilder) findCandidate(directory string) (configCand
 
 func (builder *configCatalogBuilder) findCandidateForOwner(
 	directory string,
-	ownerDir string,
+	ownerPath string,
 	canonicalDirectory string,
 ) (configCandidate, bool) {
 	for _, name := range AutoJSConfigFileNames {
@@ -576,7 +585,7 @@ func (builder *configCatalogBuilder) findCandidateForOwner(
 		if canonicalDirectory != "" {
 			canonicalCandidate = tspath.CombinePaths(canonicalDirectory, name)
 		}
-		if builder.isGloballyIgnoredCandidate(ownerDir, candidatePath, canonicalCandidate) {
+		if builder.isGloballyIgnoredCandidate(ownerPath, candidatePath, canonicalCandidate) {
 			continue
 		}
 		return configCandidate{path: tspath.NormalizePath(candidatePath), directory: directory}, true
@@ -598,7 +607,7 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 		return nil
 	}
 	if builder.loader == nil {
-		return errors.New("JavaScript config candidates require a module loader")
+		return errors.New("javascript config candidates require a module loader")
 	}
 
 	paths := make([]string, 0, len(unique))
@@ -620,7 +629,7 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 	for _, path := range paths {
 		candidate := unique[path]
 		builder.nextRequestID++
-		id := fmt.Sprintf("%d:%06d", builder.generation, builder.nextRequestID)
+		id := fmt.Sprintf("config-%06d", builder.nextRequestID)
 		wireCandidate := ConfigLoadCandidate{
 			ID:              id,
 			ConfigPath:      candidate.path,
@@ -643,19 +652,26 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 		candidate := unique[wireCandidate.ConfigPath]
 		result := results[wireCandidate.ID]
 		state := &configLoadState{
-			id:              wireCandidate.ID,
-			candidate:       candidate,
-			fingerprint:     result.SourceFingerprint,
-			eslintPlugins:   cloneEslintPluginEntries(result.EslintPlugins),
-			hasPluginConfig: result.HasPluginConfig,
+			id:            wireCandidate.ID,
+			candidate:     candidate,
+			eslintPlugins: cloneEslintPluginEntries(result.EslintPlugins),
 		}
 		if result.Status == "failed" {
 			failure := *result.Error
 			state.failure = &failure
-		} else if err := ValidateConfig(result.Entries); err != nil {
+		} else if err := rslintconfig.ValidateConfig(result.Entries); err != nil {
 			state.failure = &ConfigModuleError{Code: "invalid", Message: err.Error()}
 		} else {
-			state.entries = append(RslintConfig(nil), result.Entries...)
+			state.entries = append(rslintconfig.RslintConfig(nil), result.Entries...)
+			// Bind authored-ignore semantics to the exact loaded candidate. One
+			// directory can be admitted through automatic and literal contexts
+			// with different candidate filenames; directory-only matcher storage
+			// would make the later load silently replace the active owner's policy.
+			state.ignoreMatcher = rslintconfig.NewGlobalIgnoreMatcher(
+				state.entries,
+				candidate.directory,
+				builder.fs,
+			)
 			builder.stats.ConfigsLoaded++
 		}
 		builder.loadStates[candidate.path] = state
@@ -745,7 +761,9 @@ func (builder *configCatalogBuilder) walkDirectories(roots []discoveryWalkNode) 
 			builder.stats.DirectoriesPruned += result.directoriesPruned
 			builder.hadCandidates = builder.hadCandidates || result.discoveredCandidate
 			if result.activation != nil {
-				builder.activate(result.activation, false, false)
+				if err := builder.activate(result.activation, false); err != nil {
+					return err
+				}
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -760,8 +778,11 @@ func (builder *configCatalogBuilder) walkDirectories(roots []discoveryWalkNode) 
 			for _, item := range suspended {
 				state := builder.loadStates[item.candidate.path]
 				if state != nil && state.failure == nil {
-					builder.activate(state, false, false)
+					if err := builder.activate(state, false); err != nil {
+						return err
+					}
 					item.node.ownerDir = state.candidate.directory
+					item.node.ownerPath = state.candidate.path
 				}
 				next = append(next, item.node)
 			}
@@ -813,14 +834,14 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	if err := builder.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
-	if builder.isGloballyIgnoredDirectory(node.ownerDir, node.directory, node.canonicalDirectory) {
+	if builder.isGloballyIgnoredDirectory(node.ownerPath, node.directory, node.canonicalDirectory) {
 		return discoveryWalkResult{directoriesPruned: 1}
 	}
 	result := discoveryWalkResult{}
 
 	if candidate, found := builder.findCandidateForOwner(
 		node.directory,
-		node.ownerDir,
+		node.ownerPath,
 		node.canonicalDirectory,
 	); found && candidate.directory != node.ownerDir {
 		result.discoveredCandidate = true
@@ -832,6 +853,7 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 		if state.failure == nil {
 			result.activation = state
 			node.ownerDir = candidate.directory
+			node.ownerPath = candidate.path
 		}
 	}
 	result.directoriesVisited = 1
@@ -851,7 +873,7 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 				continue
 			}
 		}
-		if isDefaultExcludedDirName(name, builder.fs.UseCaseSensitiveFileNames()) {
+		if rslintconfig.IsDefaultExcludedPath(name, "", builder.fs.UseCaseSensitiveFileNames()) {
 			continue
 		}
 		if entries.Symlinks != nil {
@@ -864,7 +886,7 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 		if node.canonicalDirectory != "" {
 			canonicalChild = tspath.CombinePaths(node.canonicalDirectory, name)
 		}
-		if builder.isGloballyIgnoredDirectory(node.ownerDir, child, canonicalChild) {
+		if builder.isGloballyIgnoredDirectory(node.ownerPath, child, canonicalChild) {
 			result.directoriesPruned++
 			continue
 		}
@@ -872,6 +894,7 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 			directory:          child,
 			canonicalDirectory: canonicalChild,
 			ownerDir:           node.ownerDir,
+			ownerPath:          node.ownerPath,
 			targets:            childTargets,
 		})
 	}
@@ -879,76 +902,71 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	return result
 }
 
-func (builder *configCatalogBuilder) isGloballyIgnoredDirectory(ownerDir string, directory string, canonicalDirectory string) bool {
-	relative, patterns, ok := builder.authoredIgnoreRelativePath(ownerDir, directory, canonicalDirectory)
-	return ok && len(patterns) > 0 && isDirAbsolutelyBlocked(relative, patterns)
+func (builder *configCatalogBuilder) isGloballyIgnoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
+	matcher, ok := builder.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.BlocksDirectory(directory, canonicalDirectory)
 }
 
-func (builder *configCatalogBuilder) isGloballyIgnoredCandidate(ownerDir string, candidatePath string, canonicalPath string) bool {
-	relative, patterns, ok := builder.authoredIgnoreRelativePath(ownerDir, candidatePath, canonicalPath)
-	if !ok || len(patterns) == 0 {
-		return false
-	}
-	return isDirBlockedByIgnores(relative, patterns, "") || isFileIgnored(relative, patterns, "")
+func (builder *configCatalogBuilder) isGloballyIgnoredCandidate(ownerPath string, candidatePath string, canonicalPath string) bool {
+	matcher, ok := builder.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.IgnoresPath(candidatePath, canonicalPath)
 }
 
-func (builder *configCatalogBuilder) authoredIgnoreRelativePath(ownerDir string, targetPath string, canonicalPath string) (string, []IgnorePattern, bool) {
-	if ownerDir == "" {
-		return "", nil, false
+func (builder *configCatalogBuilder) globalIgnoreMatcher(ownerPath string) (rslintconfig.GlobalIgnoreMatcher, bool) {
+	if ownerPath == "" {
+		return rslintconfig.GlobalIgnoreMatcher{}, false
 	}
-	config, ok := builder.configs[ownerDir]
-	if !ok {
-		state := builder.loadStateForDirectory(ownerDir)
-		if state == nil || state.failure != nil {
-			return "", nil, false
-		}
-		config = state.entries
-	}
-	relative, ok := relativeConfigPath(targetPath, ownerDir, builder.fs.UseCaseSensitiveFileNames())
-	if !ok && canonicalPath != "" {
-		matchPath, matchOwnerDir := ResolveConfigPathSpaceWithCanonical(targetPath, canonicalPath, ownerDir, builder.fs)
-		relative, ok = relativeConfigPath(matchPath, matchOwnerDir, true)
-	}
-	if !ok || relative == "" {
-		return "", nil, false
-	}
-	relative = strings.ReplaceAll(tspath.NormalizePath(relative), "\\", "/")
-	patterns := extractConfigIgnores(config)
-	return relative, patterns, true
-}
-
-func (builder *configCatalogBuilder) activate(state *configLoadState, explicitOnly bool, explicitConfig bool) {
+	state := builder.loadStates[ownerPath]
 	if state == nil || state.failure != nil {
-		return
+		return rslintconfig.GlobalIgnoreMatcher{}, false
+	}
+	return state.ignoreMatcher, true
+}
+
+func (builder *configCatalogBuilder) activate(state *configLoadState, explicitOnly bool) error {
+	if state == nil || state.failure != nil {
+		return nil
 	}
 	directory := state.candidate.directory
-	builder.configs[directory] = append(RslintConfig(nil), state.entries...)
 	source, exists := builder.sources[directory]
 	if !exists {
-		source = ConfigSource{
-			CandidateID:     state.id,
-			Path:            state.candidate.path,
-			Directory:       directory,
-			Fingerprint:     state.fingerprint,
-			EslintPlugins:   cloneEslintPluginEntries(state.eslintPlugins),
-			HasPluginConfig: state.hasPluginConfig,
-			ExplicitOnly:    explicitOnly,
-			ExplicitConfig:  explicitConfig,
-		}
-	} else {
-		source.ExplicitOnly = source.ExplicitOnly && explicitOnly
-		source.ExplicitConfig = source.ExplicitConfig || explicitConfig
+		builder.installSource(state, explicitOnly)
+		return nil
 	}
-	builder.sources[directory] = source
+	if source.CandidateID == state.id {
+		source.ExplicitOnly = source.ExplicitOnly && explicitOnly
+		builder.sources[directory] = source
+		return nil
+	}
+	if source.ExplicitOnly && !explicitOnly {
+		// A literal target may bypass its parent's authored ignore and discover a
+		// different filename in this directory. Once an automatic route reaches
+		// the directory, that route defines its single shared config boundary.
+		builder.installSource(state, false)
+		return nil
+	}
+	if !source.ExplicitOnly && explicitOnly {
+		// Keep the automatic candidate, while the caller still records the
+		// literal file in this directory's scope below.
+		return nil
+	}
+	return fmt.Errorf(
+		"ambiguous config candidates %q and %q for directory %q",
+		source.CandidatePath,
+		state.candidate.path,
+		directory,
+	)
 }
 
-func (builder *configCatalogBuilder) loadStateForDirectory(directory string) *configLoadState {
-	for _, state := range builder.loadStates {
-		if state.candidate.directory == directory && state.failure == nil {
-			return state
-		}
+func (builder *configCatalogBuilder) installSource(state *configLoadState, explicitOnly bool) {
+	directory := state.candidate.directory
+	builder.configs[directory] = append(rslintconfig.RslintConfig(nil), state.entries...)
+	builder.sources[directory] = configSource{
+		CandidateID:   state.id,
+		CandidatePath: state.candidate.path,
+		EslintPlugins: cloneEslintPluginEntries(state.eslintPlugins),
+		ExplicitOnly:  explicitOnly,
 	}
-	return nil
 }
 
 func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
@@ -990,16 +1008,14 @@ func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
 		eslintPlugins = cloneEslintPluginEntries(response.EslintPluginEntries)
 	}
 	return &ConfigCatalog{
-		Generation:         builder.generation,
 		TransactionID:      builder.transactionID,
 		Configs:            builder.configs,
-		Sources:            builder.sources,
 		EffectiveConfigIDs: effectiveIDs,
 		EslintPlugins:      eslintPlugins,
 		Scopes:             builder.scopes,
 		Failures:           failures,
 		Stats:              builder.stats,
-		Resolver:           NewConfigOwnerResolver(builder.configs, builder.fs),
+		Explicit:           builder.request.Mode == ConfigDiscoveryExplicit,
 	}, nil
 }
 
@@ -1030,8 +1046,8 @@ func (builder *configCatalogBuilder) validateConfigDirectoryIdentities() error {
 		if !builder.fs.UseCaseSensitiveFileNames() && strings.EqualFold(existing, directory) {
 			continue
 		}
-		return fmt.Errorf(
-			"config directories %q and %q resolve to the same filesystem location %q",
+		return fmt.Errorf( //nolint:staticcheck // Preserve the established user-facing JS API error contract.
+			"Config directories %q and %q resolve to the same filesystem location %q",
 			existing,
 			directory,
 			physicalDirectory,
@@ -1040,13 +1056,13 @@ func (builder *configCatalogBuilder) validateConfigDirectoryIdentities() error {
 	return nil
 }
 
-func cloneEslintPluginEntries(entries []EslintPluginEntry) []EslintPluginEntry {
+func cloneEslintPluginEntries(entries []rslintconfig.EslintPluginEntry) []rslintconfig.EslintPluginEntry {
 	if len(entries) == 0 {
 		return nil
 	}
-	cloned := make([]EslintPluginEntry, len(entries))
+	cloned := make([]rslintconfig.EslintPluginEntry, len(entries))
 	for index, entry := range entries {
-		cloned[index] = EslintPluginEntry{
+		cloned[index] = rslintconfig.EslintPluginEntry{
 			Prefix:    entry.Prefix,
 			RuleNames: append([]string(nil), entry.RuleNames...),
 		}
@@ -1054,7 +1070,7 @@ func cloneEslintPluginEntries(entries []EslintPluginEntry) []EslintPluginEntry {
 	return cloned
 }
 
-func aggregateEffectiveEslintPlugins(sources map[string]ConfigSource) []EslintPluginEntry {
+func aggregateEffectiveEslintPlugins(sources map[string]configSource) []rslintconfig.EslintPluginEntry {
 	byPrefix := make(map[string]map[string]struct{})
 	for _, source := range sources {
 		for _, plugin := range source.EslintPlugins {
@@ -1073,14 +1089,14 @@ func aggregateEffectiveEslintPlugins(sources map[string]ConfigSource) []EslintPl
 		prefixes = append(prefixes, prefix)
 	}
 	sort.Strings(prefixes)
-	entries := make([]EslintPluginEntry, 0, len(prefixes))
+	entries := make([]rslintconfig.EslintPluginEntry, 0, len(prefixes))
 	for _, prefix := range prefixes {
 		ruleNames := make([]string, 0, len(byPrefix[prefix]))
 		for ruleName := range byPrefix[prefix] {
 			ruleNames = append(ruleNames, ruleName)
 		}
 		sort.Strings(ruleNames)
-		entries = append(entries, EslintPluginEntry{Prefix: prefix, RuleNames: ruleNames})
+		entries = append(entries, rslintconfig.EslintPluginEntry{Prefix: prefix, RuleNames: ruleNames})
 	}
 	return entries
 }
@@ -1095,11 +1111,12 @@ func (builder *configCatalogBuilder) allConfigsFailedError() error {
 		return ErrAllConfigsFailed
 	}
 	failure := failures[0]
+	displayPath := filepath.FromSlash(failure.Path)
 	switch failure.Kind {
 	case "invalid":
-		return fmt.Errorf("%w: invalid config in %s: %s", ErrAllConfigsFailed, failure.Path, failure.Message)
+		return fmt.Errorf("%w: invalid config in %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
 	default:
-		return fmt.Errorf("%w: failed to load config %s: %s", ErrAllConfigsFailed, failure.Path, failure.Message)
+		return fmt.Errorf("%w: failed to load config %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
 	}
 }
 
@@ -1127,5 +1144,12 @@ func deduplicateWalkNodes(nodes []discoveryWalkNode) []discoveryWalkNode {
 }
 
 func isDefaultDiscoveryExcluded(path string, cwd string, useCaseSensitive bool) bool {
-	return IsDefaultExcludedPath(path, cwd, useCaseSensitive)
+	return rslintconfig.IsDefaultExcludedPath(path, cwd, useCaseSensitive)
+}
+
+func discoveryPathsEqual(a string, b string, useCaseSensitive bool) bool {
+	if useCaseSensitive {
+		return a == b
+	}
+	return strings.EqualFold(a, b)
 }

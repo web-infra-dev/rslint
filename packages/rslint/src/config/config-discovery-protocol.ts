@@ -3,9 +3,11 @@
  * discovery adapters. The transports differ (framed IPC versus JSON-RPC), but
  * every adapter sends these payloads to the same Node-side module host.
  *
- * Paths in requests are authoritative values supplied by Go. Responses use
- * only the opaque candidate ID, so evaluating a config cannot change its
- * discovery path or ownership directory.
+ * Paths in requests identify values selected by Go. Node may native-normalize
+ * configPath for local I/O, but configDirectory is an opaque routing identity
+ * and must retain its exact spelling. Load responses correlate only by opaque
+ * candidate ID. Activation summaries repeat paths for Node-side preparation,
+ * but Go never derives discovery ownership from those returned paths.
  */
 
 export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 1 as const;
@@ -50,8 +52,6 @@ export interface LoadedConfigModuleResult {
   sourceFingerprint: string;
   /** Per-config metadata; the session summary unions it across effective IDs. */
   eslintPlugins: ConfigModuleEslintPluginEntry[];
-  /** Whether this config needs a plugin-worker routing descriptor. */
-  hasPluginConfig: boolean;
 }
 
 export interface FailedConfigModuleResult {

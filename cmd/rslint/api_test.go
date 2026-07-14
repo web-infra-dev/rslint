@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
@@ -1397,8 +1398,8 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 
 	rootEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
 	nestedEntries := mustAPIConfig(t, `[{"plugins":["community"],"rules":{"community/check":"error"}}]`)
-	var loadRequests []rslintconfig.ConfigLoadBatchRequest
-	var activationRequests []rslintconfig.ConfigActivationRequest
+	var loadRequests []discovery.ConfigLoadBatchRequest
+	var activationRequests []discovery.ConfigActivationRequest
 	var pluginRequests []linter.EslintPluginLintRequest
 	var callKinds []ipc.MessageKind
 	loadedIDs := make(map[string]struct{})
@@ -1407,24 +1408,24 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 		callKinds = append(callKinds, kind)
 		switch kind {
 		case api.KindLoadConfigs:
-			request, ok := payload.(rslintconfig.ConfigLoadBatchRequest)
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
 			if !ok {
 				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
 			}
 			loadRequests = append(loadRequests, request)
-			response := rslintconfig.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				if request.ProtocolVersion != rslintconfig.ConfigDiscoveryProtocolVersion {
+				if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
 					return nil, fmt.Errorf("load protocol version = %d", request.ProtocolVersion)
 				}
-				if request.LoadMode != rslintconfig.ConfigModuleLoadFresh {
+				if request.LoadMode != discovery.ConfigModuleLoadFresh {
 					return nil, fmt.Errorf("API load mode = %q, want fresh", request.LoadMode)
 				}
 				if !filepath.IsAbs(candidate.ConfigPath) || !filepath.IsAbs(candidate.ConfigDirectory) {
 					return nil, fmt.Errorf("candidate paths must be absolute: %+v", candidate)
 				}
 				loadedIDs[candidate.ID] = struct{}{}
-				result := rslintconfig.ConfigLoadResult{
+				result := discovery.ConfigLoadResult{
 					ID:                candidate.ID,
 					Status:            "loaded",
 					SourceFingerprint: "fixture:" + filepath.Base(candidate.ConfigDirectory),
@@ -1441,7 +1442,6 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 					}
 					result.Entries = nestedEntries
 					result.EslintPlugins = []rslintconfig.EslintPluginEntry{{Prefix: "community", RuleNames: []string{"check"}}}
-					result.HasPluginConfig = true
 				default:
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
@@ -1450,12 +1450,12 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
 
 		case api.KindActivateConfigs:
-			request, ok := payload.(rslintconfig.ConfigActivationRequest)
+			request, ok := payload.(discovery.ConfigActivationRequest)
 			if !ok {
 				return nil, fmt.Errorf("unexpected activateConfigs payload %T", payload)
 			}
 			activationRequests = append(activationRequests, request)
-			if request.ProtocolVersion != rslintconfig.ConfigDiscoveryProtocolVersion {
+			if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
 				return nil, fmt.Errorf("activation protocol version = %d", request.ProtocolVersion)
 			}
 			if len(request.EffectiveConfigIDs) != len(loadedIDs) {
@@ -1466,7 +1466,7 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 					return nil, fmt.Errorf("activation contains unknown candidate ID %q", id)
 				}
 			}
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 				TransactionID: request.TransactionID,
 				EslintPluginEntries: []rslintconfig.EslintPluginEntry{{
 					Prefix:    "community",
@@ -1582,25 +1582,24 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 			requester.apiRequesterFunc = func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 				switch kind {
 				case api.KindLoadConfigs:
-					request := payload.(rslintconfig.ConfigLoadBatchRequest)
-					results := make([]rslintconfig.ConfigLoadResult, 0, len(request.Candidates))
+					request := payload.(discovery.ConfigLoadBatchRequest)
+					results := make([]discovery.ConfigLoadResult, 0, len(request.Candidates))
 					for _, candidate := range request.Candidates {
-						results = append(results, rslintconfig.ConfigLoadResult{
+						results = append(results, discovery.ConfigLoadResult{
 							ID:                candidate.ID,
 							Status:            "loaded",
 							Entries:           test.entries,
 							SourceFingerprint: "fixture",
 							EslintPlugins:     test.plugins,
-							HasPluginConfig:   len(test.plugins) > 0,
 						})
 					}
-					return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigLoadBatchResponse{
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
 						TransactionID: request.TransactionID,
 						Results:       results,
 					})
 				case api.KindActivateConfigs:
-					request := payload.(rslintconfig.ConfigActivationRequest)
-					return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{
+					request := payload.(discovery.ConfigActivationRequest)
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 						TransactionID:       request.TransactionID,
 						EslintPluginEntries: test.plugins,
 					})
@@ -1652,11 +1651,11 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 		switch kind {
 		case api.KindLoadConfigs:
-			request, ok := payload.(rslintconfig.ConfigLoadBatchRequest)
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
 			if !ok {
 				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
 			}
-			response := rslintconfig.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
 				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(unrelatedConfigPath) {
@@ -1665,7 +1664,7 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(rootConfigPath) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
-				response.Results = append(response.Results, rslintconfig.ConfigLoadResult{
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
 					ID:                candidate.ID,
 					Status:            "loaded",
 					Entries:           rootEntries,
@@ -1674,11 +1673,11 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
 		case api.KindActivateConfigs:
-			request, ok := payload.(rslintconfig.ConfigActivationRequest)
+			request, ok := payload.(discovery.ConfigActivationRequest)
 			if !ok {
 				return nil, fmt.Errorf("unexpected activateConfigs payload %T", payload)
 			}
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 				TransactionID: request.TransactionID,
 			})
 		default:
@@ -1721,13 +1720,13 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 		switch kind {
 		case api.KindLoadConfigs:
-			request := payload.(rslintconfig.ConfigLoadBatchRequest)
-			response := rslintconfig.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(configPath) {
 					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
 				}
-				response.Results = append(response.Results, rslintconfig.ConfigLoadResult{
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
 					ID:                candidate.ID,
 					Status:            "loaded",
 					Entries:           entries,
@@ -1736,8 +1735,8 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
 		case api.KindActivateConfigs:
-			request := payload.(rslintconfig.ConfigActivationRequest)
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 				TransactionID: request.TransactionID,
 			})
 		default:
@@ -1794,11 +1793,11 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *t
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 		switch kind {
 		case api.KindLoadConfigs:
-			request := payload.(rslintconfig.ConfigLoadBatchRequest)
-			response := rslintconfig.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
 				loadedIDs[candidate.ID] = struct{}{}
-				result := rslintconfig.ConfigLoadResult{
+				result := discovery.ConfigLoadResult{
 					ID:                candidate.ID,
 					Status:            "loaded",
 					SourceFingerprint: "fixture:" + filepath.Base(candidate.ConfigDirectory),
@@ -1815,11 +1814,11 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotClaimGlobSibling(t *t
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
 		case api.KindActivateConfigs:
-			request := payload.(rslintconfig.ConfigActivationRequest)
+			request := payload.(discovery.ConfigActivationRequest)
 			if len(request.EffectiveConfigIDs) != len(loadedIDs) {
 				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, loadedIDs)
 			}
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
 				TransactionID: request.TransactionID,
 			})
 		default:
@@ -1869,13 +1868,13 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 		switch kind {
 		case api.KindLoadConfigs:
-			request := payload.(rslintconfig.ConfigLoadBatchRequest)
+			request := payload.(discovery.ConfigLoadBatchRequest)
 			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(configPath) {
 				return nil, fmt.Errorf("unexpected explicit candidates: %+v", request.Candidates)
 			}
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigLoadBatchResponse{
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
 				TransactionID: request.TransactionID,
-				Results: []rslintconfig.ConfigLoadResult{{
+				Results: []discovery.ConfigLoadResult{{
 					ID:                request.Candidates[0].ID,
 					Status:            "loaded",
 					Entries:           mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`),
@@ -1883,8 +1882,8 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 				}},
 			})
 		case api.KindActivateConfigs:
-			request := payload.(rslintconfig.ConfigActivationRequest)
-			return ipc.NewMessage(ipc.KindResponse, 1, rslintconfig.ConfigActivationResponse{TransactionID: request.TransactionID})
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
 		default:
 			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
 		}
@@ -2017,16 +2016,16 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 		switch kind {
 		case api.KindLoadConfigs:
 			loadCalls.Add(1)
-			request, ok := payload.(rslintconfig.ConfigLoadBatchRequest)
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
 			if !ok {
 				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
 			}
-			response := rslintconfig.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				response.Results = append(response.Results, rslintconfig.ConfigLoadResult{
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
 					ID:     candidate.ID,
 					Status: "failed",
-					Error:  &rslintconfig.ConfigModuleError{Code: "ERR_MODULE", Message: "broken config"},
+					Error:  &discovery.ConfigModuleError{Code: "ERR_MODULE", Message: "broken config"},
 				})
 			}
 			return ipc.NewMessage(ipc.KindResponse, 1, response)
@@ -2043,7 +2042,7 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 		WorkingDirectory: dir,
 		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
 	}, requester)
-	if !errors.Is(err, rslintconfig.ErrAllConfigsFailed) {
+	if !errors.Is(err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("error = %v, want ErrAllConfigsFailed", err)
 	}
 	if loadCalls.Load() == 0 {

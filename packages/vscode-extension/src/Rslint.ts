@@ -147,13 +147,16 @@ export function configRefreshReasonForPath(
 }
 
 export function isConfigSourceChangeDuringTransaction(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const candidate = error as { code?: unknown; message?: unknown };
+  if (!isRecord(error)) return false;
   return (
-    candidate.code === 'CONFIG_CHANGED_DURING_LOAD' ||
-    (typeof candidate.message === 'string' &&
-      candidate.message.includes('config changed while'))
+    error.code === 'CONFIG_CHANGED_DURING_LOAD' ||
+    (typeof error.message === 'string' &&
+      error.message.includes('config changed while'))
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export async function retryConfigRefreshOnSourceChange(
@@ -351,7 +354,9 @@ async function withCancellationSignal<T>(
 ): Promise<T> {
   const controller = new AbortController();
   if (token.isCancellationRequested) controller.abort();
-  const subscription = token.onCancellationRequested(() => controller.abort());
+  const subscription = token.onCancellationRequested(() => {
+    controller.abort();
+  });
   try {
     return await operation(controller.signal);
   } finally {
@@ -573,17 +578,32 @@ export class Rslint implements Disposable {
 
         this.client.onRequest(
           'rslint/loadConfigs',
-          async (params: LoadConfigsRequest, token: CancellationToken) =>
-            withCancellationSignal(token, (signal) =>
-              adapter.loadConfigs(params, signal),
-            ),
+          async (params: LoadConfigsRequest, token: CancellationToken) => {
+            const response = await withCancellationSignal(
+              token,
+              async (signal) => {
+                const loaded = await adapter.loadConfigs(params, signal);
+                return loaded;
+              },
+            );
+            return response;
+          },
         );
         this.client.onRequest(
           'rslint/activateConfigs',
-          async (params: ActivateConfigsRequest, token: CancellationToken) =>
-            withCancellationSignal(token, (signal) =>
-              adapter.activateConfigs(params, signal),
-            ),
+          async (params: ActivateConfigsRequest, token: CancellationToken) => {
+            const response = await withCancellationSignal(
+              token,
+              async (signal) => {
+                const activation = await adapter.activateConfigs(
+                  params,
+                  signal,
+                );
+                return activation;
+              },
+            );
+            return response;
+          },
         );
         this.client.onRequest(
           'rslint/commitConfigs',
@@ -633,8 +653,12 @@ export class Rslint implements Disposable {
         // generation. Retry once from the now-current bytes instead of tearing
         // down the language client before the already-live watcher can recover.
         const retried = await retryConfigRefreshOnSourceChange(
-          () => this.requestConfigRefresh('initial'),
-          () => this.requestConfigRefresh('config-change'),
+          async () => {
+            await this.requestConfigRefresh('initial');
+          },
+          async () => {
+            await this.requestConfigRefresh('config-change');
+          },
         );
         if (retried) {
           this.logger.warn(

@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
 
 func TestAncestorJSConfigFileWatchersExcludeWorkspace(t *testing.T) {
@@ -23,13 +24,13 @@ func TestAncestorJSConfigFileWatchersExcludeWorkspace(t *testing.T) {
 		"file:///workspace",
 		"file:///",
 	}
-	wantCount := len(wantBases) * len(config.AutoJSConfigFileNames)
+	wantCount := len(wantBases) * len(discovery.AutoJSConfigFileNames)
 	if len(watchers) != wantCount {
 		t.Fatalf("watcher count=%d, want %d", len(watchers), wantCount)
 	}
 	for directoryIndex, wantBase := range wantBases {
-		for configIndex, wantName := range config.AutoJSConfigFileNames {
-			index := directoryIndex*len(config.AutoJSConfigFileNames) + configIndex
+		for configIndex, wantName := range discovery.AutoJSConfigFileNames {
+			index := directoryIndex*len(discovery.AutoJSConfigFileNames) + configIndex
 			relative := watchers[index].GlobPattern.RelativePattern
 			if relative == nil || relative.BaseUri.URI == nil ||
 				string(*relative.BaseUri.URI) != wantBase || relative.Pattern != wantName {
@@ -124,16 +125,16 @@ func TestAncestorJSConfigWatcherRefreshesChangedAndDeletedActiveConfig(t *testin
 	}
 	deleted := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeDeleted)
 	emptyLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	emptyRequest, ok := emptyLoad.Params.(config.ConfigLoadBatchRequest)
+	emptyRequest, ok := emptyLoad.Params.(discovery.ConfigLoadBatchRequest)
 	if !ok {
 		t.Fatalf("empty load params type=%T", emptyLoad.Params)
 	}
 	if emptyRequest.Candidates == nil || len(emptyRequest.Candidates) != 0 {
 		t.Fatalf("deleted ancestor load candidates=%#v, want []", emptyRequest.Candidates)
 	}
-	respondToConfigReverseRequest(t, s, emptyLoad, config.ConfigLoadBatchResponse{
+	respondToConfigReverseRequest(t, s, emptyLoad, discovery.ConfigLoadBatchResponse{
 		TransactionID: emptyRequest.TransactionID,
-		Results:       []config.ConfigLoadResult{},
+		Results:       []discovery.ConfigLoadResult{},
 	}, nil)
 	completeConfigWatchActivation(t, s, outgoing)
 	if err := awaitConfigWatchEvent(t, deleted); err != nil {

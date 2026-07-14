@@ -78,10 +78,10 @@ func resolveConfigPathSpace(
 	physicalConfigDir string,
 	fsys vfs.FS,
 ) string {
-	if relative, ok := relativeConfigPath(filePath, configDir, true); ok {
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, true); ok {
 		return tspath.ResolvePath(physicalConfigDir, relative)
 	}
-	if relative, ok := relativeConfigPath(filePath, configDir, false); ok && fsys != nil {
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, false); ok && fsys != nil {
 		aliasRoot := filePath
 		for remaining := relative; remaining != ""; remaining = tspath.GetDirectoryPath(remaining) {
 			aliasRoot = tspath.GetDirectoryPath(aliasRoot)
@@ -108,13 +108,15 @@ func resolveConfigPathSpace(
 			}
 		}
 	}
-	if relative, ok := relativeConfigPath(physicalFilePath, physicalConfigDir, true); ok {
+	if relative, ok := RelativePathWithinConfigRoot(physicalFilePath, physicalConfigDir, true); ok {
 		return tspath.ResolvePath(physicalConfigDir, relative)
 	}
 	return physicalFilePath
 }
 
-func relativeConfigPath(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+// RelativePathWithinConfigRoot returns filePath relative to configDir when it
+// is inside the config's lexical path space.
+func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
 	options := tspath.ComparePathsOptions{
 		CurrentDirectory:          configDir,
 		UseCaseSensitiveFileNames: useCaseSensitive,

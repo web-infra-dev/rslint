@@ -646,7 +646,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	var configMap map[string]rslintconfig.RslintConfig
 
 	// originalConfigDir maps each normalized configMap key back to the raw
-	// configDirectory the JS host sent, so the eslint-plugin wire configKey
+	// Go-owned configDirectory routing identity shared with the JS host, so the eslint-plugin wire configKey
 	// round-trips raw (byte-matching the worker's plugin map key). nil outside
 	// multi-config mode (single-config / JSON configs never mount plugins).
 	var originalConfigDir map[string]string

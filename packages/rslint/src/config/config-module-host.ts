@@ -46,7 +46,6 @@ interface StoredLoadedResult {
   entriesJSON: string;
   sourceFingerprint: string;
   eslintPlugins: ConfigModuleEslintPluginEntry[];
-  hasPluginConfig: boolean;
 }
 
 type StoredLoadResult = StoredLoadedResult | FailedConfigModuleResult;
@@ -82,6 +81,10 @@ function protocolError(message: string): Error {
   return new Error(`config module protocol: ${message}`);
 }
 
+function isConfigEntry(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function normalizeCandidate(
   candidate: ConfigModuleCandidate,
 ): ConfigModuleCandidate {
@@ -109,13 +112,22 @@ function normalizeCandidate(
   }
   return {
     id: candidate.id,
+    // configPath is a Node-local filesystem operand, so normalize it to the
+    // host platform before fingerprinting/importing. configDirectory is
+    // different: Go owns it as an opaque routing identity and later echoes it
+    // byte-for-byte in pluginLint.configKey. Normalizing that token here would
+    // turn `C:/...` into `C:\\...` on Windows and break worker map lookup.
     configPath: path.normalize(candidate.configPath),
-    configDirectory: path.normalize(candidate.configDirectory),
+    configDirectory: candidate.configDirectory,
   };
 }
 
 function cloneEntries(entriesJSON: string): Record<string, unknown>[] {
-  return JSON.parse(entriesJSON) as Record<string, unknown>[];
+  const entries: unknown = JSON.parse(entriesJSON);
+  if (!Array.isArray(entries) || !entries.every(isConfigEntry)) {
+    throw protocolError('stored config entries are malformed');
+  }
+  return entries;
 }
 
 function clonePluginEntries(
@@ -135,7 +147,6 @@ function cloneStoredResult(result: StoredLoadResult): ConfigModuleLoadResult {
       entries: cloneEntries(result.entriesJSON),
       sourceFingerprint: result.sourceFingerprint,
       eslintPlugins: clonePluginEntries(result.eslintPlugins),
-      hasPluginConfig: result.hasPluginConfig,
     };
   }
   return {
@@ -212,9 +223,13 @@ export class ConfigModuleHost {
         }
       } else {
         loaded = await Promise.all(
-          newCandidates.map((candidate) =>
-            this.#loadCandidate(candidate, session.loadMode),
-          ),
+          newCandidates.map(async (candidate) => {
+            const result = await this.#loadCandidate(
+              candidate,
+              session.loadMode,
+            );
+            return result;
+          }),
         );
       }
       // Module evaluation itself cannot always be interrupted. Do not publish
@@ -230,9 +245,15 @@ export class ConfigModuleHost {
 
       return {
         transactionId: request.transactionId,
-        results: candidates.map(({ id }) =>
-          cloneStoredResult(session.candidatesById.get(id)!.result),
-        ),
+        results: candidates.map(({ id }) => {
+          const stored = session.candidatesById.get(id);
+          if (!stored) {
+            throw protocolError(
+              `candidate ${JSON.stringify(id)} was not loaded`,
+            );
+          }
+          return cloneStoredResult(stored.result);
+        }),
       };
     });
   }
@@ -496,7 +517,10 @@ export class ConfigModuleHost {
     signal?: AbortSignal,
   ): Promise<void> {
     const currentFingerprints = await Promise.all(
-      stored.map(({ candidate }) => this.#fingerprint(candidate.configPath)),
+      stored.map(async ({ candidate }) => {
+        const fingerprint = await this.#fingerprint(candidate.configPath);
+        return fingerprint;
+      }),
     );
     assertNotAborted(signal);
     for (let index = 0; index < stored.length; index++) {
@@ -536,7 +560,7 @@ export class ConfigModuleHost {
       if (sourceFingerprint !== afterFingerprint) {
         throw new ConfigSourceChangedError(candidate.configPath);
       }
-      const { eslintPluginEntries, pluginConfigs } = collectPluginMeta([
+      const { eslintPluginEntries } = collectPluginMeta([
         {
           configPath: candidate.configPath,
           configDirectory: candidate.configDirectory,
@@ -549,7 +573,6 @@ export class ConfigModuleHost {
         entriesJSON,
         sourceFingerprint: afterFingerprint,
         eslintPlugins: clonePluginEntries(eslintPluginEntries),
-        hasPluginConfig: pluginConfigs.length > 0,
       };
     } catch (error) {
       try {
@@ -572,7 +595,7 @@ export class ConfigModuleHost {
     return `${contents.byteLength}:${createHash('sha256').update(contents).digest('hex')}`;
   }
 
-  #enqueue<T>(
+  async #enqueue<T>(
     session: ConfigModuleSession,
     operation: () => Promise<T>,
   ): Promise<T> {
@@ -581,6 +604,7 @@ export class ConfigModuleHost {
       () => undefined,
       () => undefined,
     );
-    return result;
+    const value = await result;
+    return value;
   }
 }

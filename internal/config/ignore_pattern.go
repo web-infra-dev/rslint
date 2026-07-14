@@ -2,7 +2,66 @@ package config
 
 import (
 	"strings"
+
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 )
+
+// GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
+// shared by config-candidate and lint-target discovery. Callers supply lexical
+// paths plus an optional canonical fallback; matcher internals stay private so
+// both discovery flows cannot accidentally diverge on ignore semantics.
+type GlobalIgnoreMatcher struct {
+	configDir string
+	fs        vfs.FS
+	patterns  []IgnorePattern
+}
+
+func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) GlobalIgnoreMatcher {
+	return GlobalIgnoreMatcher{
+		configDir: tspath.NormalizePath(configDir),
+		fs:        fsys,
+		patterns:  extractConfigIgnores(config),
+	}
+}
+
+// BlocksDirectory reports whether global ignores form an absolute traversal
+// boundary at directory.
+func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
+	relative, ok := matcher.relativePath(directory, canonicalDirectory)
+	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
+}
+
+// IgnoresPath reports whether global ignores exclude a config candidate.
+func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
+	relative, ok := matcher.relativePath(filePath, canonicalPath)
+	if !ok || len(matcher.patterns) == 0 {
+		return false
+	}
+	return isDirBlockedByIgnores(relative, matcher.patterns, "") ||
+		isFileIgnored(relative, matcher.patterns, "")
+}
+
+func (matcher GlobalIgnoreMatcher) relativePath(targetPath string, canonicalPath string) (string, bool) {
+	if matcher.configDir == "" {
+		return "", false
+	}
+	caseSensitive := matcher.fs == nil || matcher.fs.UseCaseSensitiveFileNames()
+	relative, ok := RelativePathWithinConfigRoot(targetPath, matcher.configDir, caseSensitive)
+	if !ok && canonicalPath != "" {
+		matchPath, matchConfigDir := ResolveConfigPathSpaceWithCanonical(
+			targetPath,
+			canonicalPath,
+			matcher.configDir,
+			matcher.fs,
+		)
+		relative, ok = RelativePathWithinConfigRoot(matchPath, matchConfigDir, true)
+	}
+	if !ok || relative == "" {
+		return "", false
+	}
+	return strings.ReplaceAll(tspath.NormalizePath(relative), "\\", "/"), true
+}
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.
 // It is derived once at parse time, replacing the per-call suffix-sniffing the

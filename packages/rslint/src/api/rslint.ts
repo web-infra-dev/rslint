@@ -116,13 +116,14 @@ export class PluginHostLifecycle {
   readonly #active = new Set<PluginLintHost>();
   readonly #shutdowns = new WeakMap<PluginLintHost, Promise<void>>();
 
-  trackBuild<T>(build: Promise<T>): Promise<T> {
+  async trackBuild<T>(build: Promise<T>): Promise<T> {
     this.#pendingBuilds.add(build);
     void build.then(
       () => this.#pendingBuilds.delete(build),
       () => this.#pendingBuilds.delete(build),
     );
-    return build;
+    const result = await build;
+    return result;
   }
 
   stage(host: PluginLintHost): void {
@@ -134,7 +135,7 @@ export class PluginHostLifecycle {
     this.#active.add(host);
   }
 
-  shutdown(host: PluginLintHost): Promise<void> {
+  async shutdown(host: PluginLintHost): Promise<void> {
     this.#staged.delete(host);
     this.#active.delete(host);
     let shutdown = this.#shutdowns.get(host);
@@ -142,18 +143,18 @@ export class PluginHostLifecycle {
       shutdown = host.shutdown();
       this.#shutdowns.set(host, shutdown);
     }
-    return shutdown;
+    await shutdown;
   }
 
   async shutdownAll(): Promise<void> {
     while (this.#pendingBuilds.size > 0) {
       await Promise.allSettled([...this.#pendingBuilds]);
     }
-    await Promise.allSettled(
-      [...new Set([...this.#staged, ...this.#active])].map((host) =>
-        this.shutdown(host),
-      ),
-    );
+    const shutdowns: Promise<void>[] = [];
+    for (const host of new Set([...this.#staged, ...this.#active])) {
+      shutdowns.push(this.shutdown(host));
+    }
+    await Promise.allSettled(shutdowns);
   }
 }
 
@@ -171,6 +172,20 @@ type CreatePluginLintHost = (
   onLog?: (record: { level: string; source: string; text: string }) => void,
 ) => Promise<PluginLintHost>;
 
+function isPluginHostFactoryModule(
+  value: unknown,
+): value is { createPluginLintHost: CreatePluginLintHost } {
+  return isRecord(value) && typeof value.createPluginLintHost === 'function';
+}
+
+function isPluginLintHost(value: unknown): value is PluginLintHost {
+  return (
+    isRecord(value) &&
+    typeof value.lint === 'function' &&
+    typeof value.shutdown === 'function'
+  );
+}
+
 let pluginHostFactoryPromise: Promise<CreatePluginLintHost> | undefined;
 
 async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
@@ -179,9 +194,12 @@ async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
     // dist/eslint-plugin in published builds. Keep it runtime-only: the library
     // declaration build deliberately excludes the worker implementation.
     const pluginEntry: string = '@rslint/core/eslint-plugin';
-    const module: { createPluginLintHost: CreatePluginLintHost } = await import(
-      /* webpackIgnore: true */ pluginEntry
-    );
+    const module: unknown = await import(/* webpackIgnore: true */ pluginEntry);
+    if (!isPluginHostFactoryModule(module)) {
+      throw new Error(
+        'rslint ESLint-plugin entry does not export createPluginLintHost',
+      );
+    }
     return module.createPluginLintHost;
   })();
   const factory = await pluginHostFactoryPromise;
@@ -233,8 +251,8 @@ export async function stageNativeConfigActivation(
     return { activation, pluginHost };
   } catch (error) {
     try {
-      const createdHost = pluginHost as PluginLintHost | null;
-      if (createdHost) {
+      const createdHost: unknown = pluginHost;
+      if (isPluginLintHost(createdHost)) {
         await (lifecycle?.shutdown(createdHost) ?? createdHost.shutdown());
       }
     } catch {

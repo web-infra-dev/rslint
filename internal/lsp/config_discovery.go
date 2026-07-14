@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
 
 const (
@@ -72,26 +73,26 @@ type lspConfigModuleLoader struct {
 	frontierSeen   bool
 	activated      bool
 	pluginDegraded bool
-	candidates     []config.ConfigLoadCandidate
+	candidates     []discovery.ConfigLoadCandidate
 }
 
 func (loader *lspConfigModuleLoader) LoadConfigs(
 	ctx context.Context,
-	request config.ConfigLoadBatchRequest,
-) (config.ConfigLoadBatchResponse, error) {
+	request discovery.ConfigLoadBatchRequest,
+) (discovery.ConfigLoadBatchResponse, error) {
 	if err := loader.observeTransaction(request.TransactionID); err != nil {
-		return config.ConfigLoadBatchResponse{}, err
+		return discovery.ConfigLoadBatchResponse{}, err
 	}
 	raw, err := loader.server.sendRequest(ctx, methodLoadConfigs, request)
 	if err != nil {
-		return config.ConfigLoadBatchResponse{}, fmt.Errorf("load config modules: %w", err)
+		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("load config modules: %w", err)
 	}
-	var response config.ConfigLoadBatchResponse
+	var response discovery.ConfigLoadBatchResponse
 	if err := decodeConfigTransactionResult(raw, &response, "loadConfigs"); err != nil {
-		return config.ConfigLoadBatchResponse{}, err
+		return discovery.ConfigLoadBatchResponse{}, err
 	}
 	if response.TransactionID != request.TransactionID {
-		return config.ConfigLoadBatchResponse{}, fmt.Errorf(
+		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf(
 			"loadConfigs transaction mismatch: got %q, want %q",
 			response.TransactionID,
 			request.TransactionID,
@@ -108,28 +109,28 @@ func (loader *lspConfigModuleLoader) LoadConfigs(
 
 func (loader *lspConfigModuleLoader) ActivateConfigs(
 	ctx context.Context,
-	request config.ConfigActivationRequest,
-) (config.ConfigActivationResponse, error) {
+	request discovery.ConfigActivationRequest,
+) (discovery.ConfigActivationResponse, error) {
 	if err := loader.observeTransaction(request.TransactionID); err != nil {
-		return config.ConfigActivationResponse{}, err
+		return discovery.ConfigActivationResponse{}, err
 	}
 	raw, err := loader.server.sendRequest(ctx, methodActivateConfigs, request)
 	if err != nil {
-		return config.ConfigActivationResponse{}, fmt.Errorf("activate config modules: %w", err)
+		return discovery.ConfigActivationResponse{}, fmt.Errorf("activate config modules: %w", err)
 	}
 	var response configActivationWireResponse
 	if err := decodeConfigTransactionResult(raw, &response, "activateConfigs"); err != nil {
-		return config.ConfigActivationResponse{}, err
+		return discovery.ConfigActivationResponse{}, err
 	}
 	if response.TransactionID != request.TransactionID {
-		return config.ConfigActivationResponse{}, fmt.Errorf(
+		return discovery.ConfigActivationResponse{}, fmt.Errorf(
 			"activateConfigs transaction mismatch: got %q, want %q",
 			response.TransactionID,
 			request.TransactionID,
 		)
 	}
 	if response.Generation != request.TransactionID {
-		return config.ConfigActivationResponse{}, fmt.Errorf(
+		return discovery.ConfigActivationResponse{}, fmt.Errorf(
 			"activateConfigs generation mismatch: got %q, want %q",
 			response.Generation,
 			request.TransactionID,
@@ -145,14 +146,14 @@ func (loader *lspConfigModuleLoader) ActivateConfigs(
 			// normal last-good rule applies and a failed replacement aborts.
 			loader.activated = true
 			loader.pluginDegraded = true
-			return config.ConfigActivationResponse{
+			return discovery.ConfigActivationResponse{
 				TransactionID: response.TransactionID,
 			}, nil
 		}
-		return config.ConfigActivationResponse{}, errors.New("client could not prepare the config plugin host")
+		return discovery.ConfigActivationResponse{}, errors.New("client could not prepare the config plugin host")
 	}
 	loader.activated = true
-	return config.ConfigActivationResponse{
+	return discovery.ConfigActivationResponse{
 		TransactionID:       response.TransactionID,
 		EslintPluginEntries: append([]config.EslintPluginEntry(nil), response.EslintPluginEntries...),
 	}, nil
@@ -178,7 +179,7 @@ func (loader *lspConfigModuleLoader) observeTransaction(transactionID string) er
 
 func (loader *lspConfigModuleLoader) ensureActivated(
 	ctx context.Context,
-	catalog *config.ConfigCatalog,
+	catalog *discovery.ConfigCatalog,
 ) error {
 	if catalog == nil {
 		return errors.New("cannot activate a nil config catalog")
@@ -193,11 +194,11 @@ func (loader *lspConfigModuleLoader) ensureActivated(
 		// ConfigModuleHost creates its transaction session on loadConfigs. An
 		// empty catalog has no natural frontier, so explicitly establish the
 		// session before asking the host to activate zero effective IDs.
-		response, err := loader.LoadConfigs(ctx, config.ConfigLoadBatchRequest{
-			ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+		response, err := loader.LoadConfigs(ctx, discovery.ConfigLoadBatchRequest{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 			TransactionID:   catalog.TransactionID,
-			LoadMode:        config.ConfigModuleLoadFresh,
-			Candidates:      []config.ConfigLoadCandidate{},
+			LoadMode:        discovery.ConfigModuleLoadFresh,
+			Candidates:      []discovery.ConfigLoadCandidate{},
 		})
 		if err != nil {
 			return err
@@ -212,8 +213,8 @@ func (loader *lspConfigModuleLoader) ensureActivated(
 	// The shared coordinator deliberately skips activation when automatic
 	// discovery finds no module candidates. LSP still stages an empty plugin
 	// generation so deleting the last JS config can be committed atomically.
-	response, err := loader.ActivateConfigs(ctx, config.ConfigActivationRequest{
-		ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+	response, err := loader.ActivateConfigs(ctx, discovery.ConfigActivationRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 		TransactionID:   catalog.TransactionID,
 		// Preserve [] rather than nil on the wire. ConfigModuleHost requires an
 		// array even when a transaction activates no effective modules.
@@ -226,7 +227,7 @@ func (loader *lspConfigModuleLoader) ensureActivated(
 	return nil
 }
 
-func (loader *lspConfigModuleLoader) unavailableCatalog(fsys vfs.FS) (*config.ConfigCatalog, error) {
+func (loader *lspConfigModuleLoader) unavailableCatalog(fsys vfs.FS) (*discovery.ConfigCatalog, error) {
 	if loader == nil || loader.transactionID == "" || len(loader.candidates) == 0 {
 		return nil, errors.New("all-config-failed recovery has no loaded candidate frontier")
 	}
@@ -251,12 +252,10 @@ func (loader *lspConfigModuleLoader) unavailableCatalog(fsys vfs.FS) (*config.Co
 		// applying JSON fallback beneath a config module that did not load.
 		configs[directory] = config.RslintConfig{}
 	}
-	return &config.ConfigCatalog{
+	return &discovery.ConfigCatalog{
 		TransactionID:      loader.transactionID,
 		Configs:            configs,
-		Sources:            make(map[string]config.ConfigSource),
 		EffectiveConfigIDs: []string{},
-		Resolver:           config.NewConfigOwnerResolver(configs, fsys),
 	}, nil
 }
 
@@ -265,7 +264,7 @@ func (loader *lspConfigModuleLoader) commit(ctx context.Context, transactionID s
 		return err
 	}
 	request := configTransactionControlRequest{
-		ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 		TransactionID:   transactionID,
 	}
 	raw, err := loader.server.sendRequest(ctx, methodCommitConfigs, request)
@@ -292,7 +291,7 @@ func (loader *lspConfigModuleLoader) abort(ctx context.Context, transactionID st
 		return nil
 	}
 	request := configTransactionControlRequest{
-		ProtocolVersion: config.ConfigDiscoveryProtocolVersion,
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 		TransactionID:   transactionID,
 	}
 	raw, err := loader.server.sendRequest(ctx, methodAbortConfigs, request)
@@ -349,7 +348,7 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	if err := stdjson.Unmarshal(data, &request); err != nil {
 		return configRefreshResponse{}, fmt.Errorf("parse config refresh params: %w", err)
 	}
-	if request.ProtocolVersion != config.ConfigDiscoveryProtocolVersion {
+	if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
 		return configRefreshResponse{}, fmt.Errorf(
 			"unsupported config refresh protocol %d",
 			request.ProtocolVersion,
@@ -374,16 +373,16 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	// generation's path identity snapshot.
 	generationFS := newConfigGenerationFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
-	catalog, err := config.NewConfigDiscoverySession(generationFS, loader).Build(ctx, config.ConfigDiscoveryRequest{
+	catalog, err := discovery.Build(ctx, generationFS, loader, discovery.ConfigDiscoveryRequest{
 		CWD:         tspath.NormalizePath(s.cwd),
-		Mode:        config.ConfigDiscoveryAuto,
+		Mode:        discovery.ConfigDiscoveryAuto,
 		ImplicitCWD: true,
 		Fresh:       true,
 	})
 	recoveredUnavailable := false
 	var unavailableCause error
 	if err != nil {
-		if !errors.Is(err, config.ErrAllConfigsFailed) || s.configDiscoveryV2HasLastGood {
+		if !errors.Is(err, discovery.ErrAllConfigsFailed) || s.configDiscoveryV2HasLastGood {
 			return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, loader.transactionID, err)
 		}
 		// A broken config on first startup must not tear down the language
@@ -470,10 +469,10 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 
 func (s *Server) failureAtCommittedConfigBoundary(
 	fsys vfs.FS,
-	catalog *config.ConfigCatalog,
-) (config.ConfigFailure, bool) {
+	catalog *discovery.ConfigCatalog,
+) (discovery.ConfigFailure, bool) {
 	if catalog == nil || len(catalog.Failures) == 0 || len(s.jsConfigs) == 0 {
-		return config.ConfigFailure{}, false
+		return discovery.ConfigFailure{}, false
 	}
 	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
 	committed := make(map[string]struct{}, len(s.jsConfigs))
@@ -495,7 +494,7 @@ func (s *Server) failureAtCommittedConfigBoundary(
 			return failure, true
 		}
 	}
-	return config.ConfigFailure{}, false
+	return discovery.ConfigFailure{}, false
 }
 
 func lspLexicalPathID(filePath string, caseSensitive bool) string {
@@ -521,7 +520,7 @@ func (s *Server) abortFailedConfigRefresh(
 
 func (s *Server) prepareDiscoveredConfigSnapshot(
 	fsys vfs.FS,
-	catalog *config.ConfigCatalog,
+	catalog *discovery.ConfigCatalog,
 ) (*lspDiscoveredConfigSnapshot, error) {
 	if catalog == nil {
 		return nil, errors.New("cannot prepare a nil config catalog")
@@ -618,7 +617,7 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 // directories that have no successfully loaded JS ancestor. Nested failures
 // covered by one such boundary are redundant; failures with a usable ancestor
 // use the coordinator's ordinary parent fallback instead.
-func unavailableConfigBoundaryDirectories(fsys vfs.FS, catalog *config.ConfigCatalog) []string {
+func unavailableConfigBoundaryDirectories(fsys vfs.FS, catalog *discovery.ConfigCatalog) []string {
 	if catalog == nil || len(catalog.Failures) == 0 {
 		return nil
 	}

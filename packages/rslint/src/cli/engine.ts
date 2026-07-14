@@ -15,6 +15,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { IpcClient } from '../ipc/index.js';
 import type { IpcMessage } from '../ipc/index.js';
 import {
+  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type ActivateConfigsRequest,
   type LoadConfigsRequest,
@@ -30,6 +31,50 @@ type CreatePluginLintHost = (
   onLog?: (rec: { level: string; source: string; text: string }) => void,
   singleThreaded?: boolean,
 ) => Promise<PluginLintHost>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPluginHostFactoryModule(
+  value: unknown,
+): value is { createPluginLintHost: CreatePluginLintHost } {
+  return isRecord(value) && typeof value.createPluginLintHost === 'function';
+}
+
+function isConfigModuleCandidate(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.configPath === 'string' &&
+    typeof value.configDirectory === 'string'
+  );
+}
+
+function isLoadConfigsRequest(value: unknown): value is LoadConfigsRequest {
+  return (
+    isRecord(value) &&
+    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
+    typeof value.transactionId === 'string' &&
+    (value.loadMode === 'cached' || value.loadMode === 'fresh') &&
+    (value.singleThreaded === undefined ||
+      typeof value.singleThreaded === 'boolean') &&
+    Array.isArray(value.candidates) &&
+    value.candidates.every(isConfigModuleCandidate)
+  );
+}
+
+function isActivateConfigsRequest(
+  value: unknown,
+): value is ActivateConfigsRequest {
+  return (
+    isRecord(value) &&
+    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
+    typeof value.transactionId === 'string' &&
+    Array.isArray(value.effectiveConfigIds) &&
+    value.effectiveConfigIds.every((id) => typeof id === 'string')
+  );
+}
 
 // POSIX: a process killed by signal N exits 128+N. Node reports the signal
 // NAME, so map the ones we can receive; collapsing all to 130 would mislabel
@@ -160,15 +205,17 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   const stagedPluginHosts = new Set<PluginLintHost>();
   const pluginHostShutdowns = new WeakMap<PluginLintHost, Promise<void>>();
 
-  const shutdownPluginHost = (host: PluginLintHost | null): Promise<void> => {
-    if (!host) return Promise.resolve();
+  const shutdownPluginHost = async (
+    host: PluginLintHost | null,
+  ): Promise<void> => {
+    if (!host) return;
     stagedPluginHosts.delete(host);
     let shutdown = pluginHostShutdowns.get(host);
     if (!shutdown) {
       shutdown = host.shutdown();
       pluginHostShutdowns.set(host, shutdown);
     }
-    return shutdown;
+    await shutdown;
   };
 
   const publishPluginHost = async (
@@ -183,7 +230,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     pluginHost = host;
   };
 
-  const buildPluginHost = (
+  const buildPluginHost = async (
     pluginConfigs: Array<{ configPath: string; configDirectory: string }>,
   ): Promise<PluginLintHost | null> => {
     const build = (async () => {
@@ -191,8 +238,14 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       let createPluginLintHost = opts.createPluginLintHost;
       if (!createPluginLintHost) {
         const pluginEntry: string = './eslint-plugin/index.js';
-        const mod: { createPluginLintHost: CreatePluginLintHost } =
-          await import(/* webpackIgnore: true */ pluginEntry);
+        const mod: unknown = await import(
+          /* webpackIgnore: true */ pluginEntry
+        );
+        if (!isPluginHostFactoryModule(mod)) {
+          throw new Error(
+            'rslint ESLint-plugin entry does not export createPluginLintHost',
+          );
+        }
         createPluginLintHost = mod.createPluginLintHost;
       }
       const host = await createPluginLintHost(
@@ -212,7 +265,8 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       () => pendingPluginHostBuilds.delete(build),
       () => pendingPluginHostBuilds.delete(build),
     );
-    return build;
+    const host = await build;
+    return host;
   };
 
   const ensurePluginHost = async (): Promise<void> => {
@@ -280,13 +334,19 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     ipc.setInboundHandler(async (msg) => {
       switch (msg.kind) {
         case 'loadConfigs': {
-          const request = msg.data as LoadConfigsRequest;
+          if (!isLoadConfigsRequest(msg.data)) {
+            throw new Error('engine: invalid loadConfigs request');
+          }
+          const request = msg.data;
           const response = await configModuleHost.loadConfigs(request);
           configTransactions.add(request.transactionId);
           return response;
         }
         case 'activateConfigs': {
-          const request = msg.data as ActivateConfigsRequest;
+          if (!isActivateConfigsRequest(msg.data)) {
+            throw new Error('engine: invalid activateConfigs request');
+          }
+          const request = msg.data;
           let stagedPluginHost: PluginLintHost | null = null;
           try {
             const response = await configModuleHost.activateConfigs(
@@ -306,14 +366,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             );
             // Do not expose a worker that re-imported the config until the
             // post-prepare fingerprint check has accepted the activation.
-            const preparedHost = stagedPluginHost as PluginLintHost | null;
+            const preparedHost = stagedPluginHost;
             await publishPluginHost(preparedHost);
             stagedPluginHost = null;
             return response;
           } catch (error) {
-            await shutdownPluginHost(
-              stagedPluginHost as PluginLintHost | null,
-            ).catch(() => undefined);
+            await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
             throw error;
           }
         }
@@ -403,7 +461,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     shuttingDown = true;
     await Promise.allSettled([...pendingPluginHostBuilds]);
     await Promise.allSettled([
-      shutdownPluginHost(pluginHost as PluginLintHost | null),
+      shutdownPluginHost(pluginHost),
       ...[...stagedPluginHosts].map(shutdownPluginHost),
     ]);
     for (const transactionId of configTransactions) {

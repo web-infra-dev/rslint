@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -93,6 +94,14 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 				t.Fatalf("git init: %v: %s", err, output)
 			}
 			for _, relative := range test.files {
+				// Windows cannot materialize a file whose name contains `*`.
+				// The platform-independent collector unit test still pins the
+				// escaped pattern conversion to `literal[*].ts`; this Git parity
+				// integration case can only exercise the literal filename where
+				// the host filesystem supports it.
+				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+					continue
+				}
 				path := filepath.Join(root, filepath.FromSlash(relative))
 				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 					t.Fatal(err)
@@ -105,6 +114,9 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 			base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 			full := config.ConfigWithGitignore(base, root, osvfs.FS(), nil)
 			for _, relative := range test.files {
+				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+					continue
+				}
 				path := filepath.Join(root, filepath.FromSlash(relative))
 				command := exec.Command(git, "-C", root, "check-ignore", "--no-index", "--quiet", "--", filepath.FromSlash(relative))
 				err := command.Run()
