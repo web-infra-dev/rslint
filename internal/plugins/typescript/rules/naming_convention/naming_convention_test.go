@@ -193,6 +193,13 @@ func TestNamingConventionRule(t *testing.T) {
 		// Accessor
 		{Code: `class Foo { get myProp() { return 1; } set myProp(v: number) {} }`},
 
+		// Anonymous class expression: the `class` selector must not infer a
+		// name from the enclosing variable declarator (real
+		// @typescript-eslint/naming-convention only checks the class's own
+		// identifier, which is absent here; `clz` is a variable name, not a
+		// class name).
+		{Code: `const clz = class extends Object {};`},
+
 		// Strict camelCase
 		{
 			Code: `const myId = 1;`,
@@ -251,6 +258,15 @@ func TestNamingConventionRule(t *testing.T) {
 			Code: `class myClass {}`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "doesNotMatchFormat", Line: 1, Column: 7},
+			},
+		},
+
+		// Named class expression violating PascalCase: the class's own
+		// identifier is still checked by the `class` selector.
+		{
+			Code: `const x = class myClass {};`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "doesNotMatchFormat", Line: 1, Column: 17},
 			},
 		},
 
