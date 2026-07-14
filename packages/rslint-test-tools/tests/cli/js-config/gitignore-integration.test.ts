@@ -242,6 +242,24 @@ describe('Gitignore: nested .gitignore files', () => {
     }
   });
 
+  test('child bare negation re-includes a parent-ignored directory', async () => {
+    const { diagnostics, cleanup } = await lintJsonline({
+      '.gitignore': 'debug/\n',
+      'packages/app/.gitignore': '!debug\n',
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'debug/root.ts': 'console.log("test");\n',
+      'packages/app/debug/app.ts': 'console.log("test");\n',
+    });
+    try {
+      expect(diagsAt(diagnostics, 'debug/root.ts').length).toBe(0);
+      expect(
+        diagsAt(diagnostics, 'packages/app/debug/app.ts').length,
+      ).toBeGreaterThan(0);
+    } finally {
+      await cleanup();
+    }
+  });
+
   test('three-level nested .gitignore cascade', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\n',
