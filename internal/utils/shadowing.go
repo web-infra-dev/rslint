@@ -328,52 +328,74 @@ func HasLocalDeclarationInStatements(statements []*ast.Node, name string) bool {
 			}
 
 		case ast.KindModuleDeclaration:
-			// Ambient module (`declare module "x"`) uses a string-literal name
-			// and doesn't bind a variable — only identifier-named namespaces do.
-			modDecl := stmt.AsModuleDeclaration()
-			if modDecl != nil && modDecl.Name() != nil &&
-				modDecl.Name().Kind == ast.KindIdentifier && modDecl.Name().Text() == name {
+			if moduleDeclarationBindsName(stmt, name) {
 				return true
 			}
 
 		case ast.KindImportEqualsDeclaration:
-			importEquals := stmt.AsImportEqualsDeclaration()
-			if importEquals != nil && importEquals.Name() != nil && importEquals.Name().Text() == name {
+			if importEqualsDeclarationBindsName(stmt, name) {
 				return true
 			}
 
 		case ast.KindImportDeclaration:
-			importDecl := stmt.AsImportDeclaration()
-			if importDecl != nil && importDecl.ImportClause != nil {
-				importClause := importDecl.ImportClause.AsImportClause()
-				if importClause != nil {
-					// Default import: import X from 'mod'
-					if importClause.Name() != nil && importClause.Name().Text() == name {
-						return true
-					}
-					// Named/namespace imports
-					if importClause.NamedBindings != nil {
-						switch importClause.NamedBindings.Kind {
-						case ast.KindNamespaceImport:
-							nsImport := importClause.NamedBindings.AsNamespaceImport()
-							if nsImport != nil && nsImport.Name() != nil && nsImport.Name().Text() == name {
-								return true
-							}
-						case ast.KindNamedImports:
-							namedImports := importClause.NamedBindings.AsNamedImports()
-							if namedImports != nil && namedImports.Elements != nil {
-								for _, elem := range namedImports.Elements.Nodes {
-									if elem != nil {
-										importSpec := elem.AsImportSpecifier()
-										if importSpec != nil && importSpec.Name() != nil && importSpec.Name().Text() == name {
-											return true
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+			if importDeclarationBindsName(stmt, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func moduleDeclarationBindsName(node *ast.Node, name string) bool {
+	moduleDeclaration := node.AsModuleDeclaration()
+	return moduleDeclaration != nil &&
+		moduleDeclaration.Name() != nil &&
+		moduleDeclaration.Name().Kind == ast.KindIdentifier &&
+		moduleDeclaration.Name().Text() == name
+}
+
+func importEqualsDeclarationBindsName(node *ast.Node, name string) bool {
+	importEquals := node.AsImportEqualsDeclaration()
+	return importEquals != nil &&
+		importEquals.Name() != nil &&
+		importEquals.Name().Text() == name
+}
+
+func importDeclarationBindsName(node *ast.Node, name string) bool {
+	importDeclaration := node.AsImportDeclaration()
+	if importDeclaration == nil || importDeclaration.ImportClause == nil {
+		return false
+	}
+	importClause := importDeclaration.ImportClause.AsImportClause()
+	if importClause == nil {
+		return false
+	}
+	if importClause.Name() != nil && importClause.Name().Text() == name {
+		return true
+	}
+	if importClause.NamedBindings == nil {
+		return false
+	}
+	switch importClause.NamedBindings.Kind {
+	case ast.KindNamespaceImport:
+		namespaceImport := importClause.NamedBindings.AsNamespaceImport()
+		return namespaceImport != nil &&
+			namespaceImport.Name() != nil &&
+			namespaceImport.Name().Text() == name
+	case ast.KindNamedImports:
+		namedImports := importClause.NamedBindings.AsNamedImports()
+		if namedImports == nil || namedImports.Elements == nil {
+			return false
+		}
+		for _, element := range namedImports.Elements.Nodes {
+			if element == nil {
+				continue
+			}
+			importSpecifier := element.AsImportSpecifier()
+			if importSpecifier != nil &&
+				importSpecifier.Name() != nil &&
+				importSpecifier.Name().Text() == name {
+				return true
 			}
 		}
 	}

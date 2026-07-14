@@ -536,6 +536,7 @@ export default defineConfig({
     './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
     './tests/eslint-plugin-promise/rules/no-callback-in-promise.test.ts',
     './tests/eslint-plugin-promise/rules/no-multiple-resolved.test.ts',
+    './tests/eslint-plugin-promise/rules/no-native.test.ts',
     './tests/eslint-plugin-promise/rules/no-nesting.test.ts',
     './tests/eslint-plugin-promise/rules/no-new-statics.test.ts',
     './tests/eslint-plugin-promise/rules/no-promise-in-callback.test.ts',

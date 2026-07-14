@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/catch_or_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_callback_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_multiple_resolved"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_native"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_nesting"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_new_statics"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_promise_in_callback"
@@ -25,6 +26,7 @@ func GetAllRules() []rule.Rule {
 		catch_or_return.CatchOrReturnRule,
 		no_callback_in_promise.NoCallbackInPromiseRule,
 		no_multiple_resolved.NoMultipleResolvedRule,
+		no_native.NoNativeRule,
 		no_nesting.NoNestingRule,
 		no_new_statics.NoNewStaticsRule,
 		no_promise_in_callback.NoPromiseInCallbackRule,
