@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
+import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
 
 // Tests that type-aware rules (e.g. require-await) only run on files covered
 // by parserOptions.project, matching CLI behavior.
@@ -9,38 +10,10 @@ import path from 'node:path';
 // - packages/core/src/index.ts: IN tsconfig, require-await SHOULD fire
 // - packages/cli/src/preview.ts: NOT in tsconfig, require-await should NOT fire
 suite('rslint type-aware rule scope', function () {
-  this.timeout(60000);
+  this.timeout(120000);
 
   function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
-  }
-
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate?: (diags: vscode.Diagnostic[]) => boolean,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate ? predicate(diagnostics) : diagnostics.length > 0) {
-        return diagnostics;
-      }
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
-      });
-    }
-    return vscode.languages.getDiagnostics(doc.uri);
   }
 
   test('file IN parserOptions.project tsconfig should get type-aware rules', async () => {

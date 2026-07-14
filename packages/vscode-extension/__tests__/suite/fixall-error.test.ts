@@ -8,6 +8,7 @@ import {
   withTmpFile,
   withOnSaveFixAll,
   replaceAll,
+  saveDocumentOnce,
 } from './fixall-helpers';
 
 suite('rslint fixAll - error flows', function () {
@@ -63,7 +64,7 @@ suite('rslint fixAll - error flows', function () {
           .map((d) => d.message)
           .join(' | ')}`,
       );
-      assert.ok(await doc.save(), 'Syntax-error probe should save');
+      await saveDocumentOnce(doc, 'Syntax-error probe should save');
       await waitForContentChange(
         doc,
         (content) => !content.includes('pVal as string'),
@@ -72,7 +73,7 @@ suite('rslint fixAll - error flows', function () {
 
       const brokenContent = 'const x = \nfunction {\nexport {\n';
       await replaceAll(editor, brokenContent);
-      assert.ok(await doc.save(), 'Broken document should save');
+      await saveDocumentOnce(doc, 'Broken document should save');
 
       await new Promise((r) => setTimeout(r, 3000));
 

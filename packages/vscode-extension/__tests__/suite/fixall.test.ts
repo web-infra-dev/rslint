@@ -7,6 +7,7 @@ import {
   openFixture,
   findFixAllAction,
   requestFixAll,
+  replaceAll,
   withTmpFile,
 } from './fixall-helpers';
 
@@ -71,9 +72,42 @@ suite('rslint fixAll - code actions', function () {
   // ======== Tests that modify content (use tmp files) ========
 
   test('no action for clean file', async () => {
+    const fixableContent =
+      "const cleanProbe: string = 'hello';\nconst cleanResult = (cleanProbe as string).toUpperCase();\n";
     const cleanContent = '// no lint errors\nexport {};\n';
-    await withTmpFile(cleanContent, async (doc) => {
-      await waitForDiagnosticsCount(doc, 0);
+    await withTmpFile(fixableContent, async (doc, editor) => {
+      const initialDiagnostics = await waitForDiagnostics(doc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-unnecessary-type-assertion'),
+        ),
+      );
+      assert.ok(
+        initialDiagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-unnecessary-type-assertion'),
+        ),
+        `Expected a fixable control diagnostic. Got: ${initialDiagnostics
+          .map((diagnostic) => diagnostic.message)
+          .join(' | ')}`,
+      );
+
+      const controlAction = findFixAllAction(await requestFixAll(doc));
+      assert.ok(
+        controlAction?.edit,
+        'Control state should provide fixAll edits',
+      );
+      const controlEdits = controlAction.edit.get(doc.uri);
+      assert.ok(
+        controlEdits && controlEdits.length > 0,
+        'Control state fixAll edit should not be empty',
+      );
+
+      await replaceAll(editor, cleanContent);
+      const cleanDiagnostics = await waitForDiagnosticsCount(doc, 0);
+      assert.strictEqual(
+        cleanDiagnostics.length,
+        0,
+        `Expected clean state to publish zero diagnostics, got ${cleanDiagnostics.length}`,
+      );
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
 

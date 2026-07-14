@@ -2,11 +2,28 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
-import { isDeepStrictEqual } from 'node:util';
+import {
+  waitForRslintDiagnostics,
+  waitForRslintDiagnosticsCount,
+  waitForRslintDiagnosticsToChange,
+} from '../utils/diagnostics';
+import { withCodeActionsOnSave } from '../utils/configuration';
+import {
+  closeAndDeleteTemporaryDocument,
+  temporaryFilePath,
+} from '../utils/documents';
+import { waitForCodeActionRegistryQuiescence } from '../utils/codeActionRegistry';
+
+export { saveDocumentOnce } from '../utils/codeActionRegistry';
+
+export const waitForDiagnostics = waitForRslintDiagnostics;
+export const waitForDiagnosticsCount = waitForRslintDiagnosticsCount;
+export const waitForDiagnosticsToChange = waitForRslintDiagnosticsToChange;
 
 export function getFixturesDir(): string {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  assert.ok(workspaceFolder, 'Expected an isolated fixture workspace');
+  if (!workspaceFolder)
+    throw new Error('VS Code test workspace is unavailable');
   return workspaceFolder.uri.fsPath;
 }
 
@@ -16,96 +33,6 @@ export async function openFixture(
   return vscode.workspace.openTextDocument(
     path.resolve(getFixturesDir(), 'src/', filename),
   );
-}
-
-export async function waitForDiagnostics(
-  doc: vscode.TextDocument,
-): Promise<vscode.Diagnostic[]> {
-  // On CI (especially Windows), the LSP server may take longer to start up,
-  // load config, type-check, and push initial diagnostics. Use generous
-  // iteration count (15) and per-iteration timeout (2s) to avoid flaky failures.
-  for (let i = 0; i < 15; i++) {
-    const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-    if (diagnostics.length > 0) {
-      return diagnostics;
-    }
-    await new Promise((resolve) => {
-      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-        for (const uri of e.uris) {
-          if (uri.toString() === doc.uri.toString()) {
-            disposable.dispose();
-            resolve(void 0);
-            return;
-          }
-        }
-      });
-      setTimeout(() => {
-        disposable.dispose();
-        resolve(void 0);
-      }, 2000);
-    });
-  }
-  return vscode.languages.getDiagnostics(doc.uri);
-}
-
-export async function waitForDiagnosticsToChange(
-  doc: vscode.TextDocument,
-  previousCount: number,
-  timeoutMs = 30000,
-): Promise<vscode.Diagnostic[]> {
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeoutMs) {
-    const current = vscode.languages.getDiagnostics(doc.uri);
-    if (current.length !== previousCount) {
-      return current;
-    }
-    await new Promise((resolve) => {
-      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-        for (const uri of e.uris) {
-          if (uri.toString() === doc.uri.toString()) {
-            disposable.dispose();
-            resolve(void 0);
-            return;
-          }
-        }
-      });
-      setTimeout(() => {
-        disposable.dispose();
-        resolve(void 0);
-      }, 500);
-    });
-  }
-  return vscode.languages.getDiagnostics(doc.uri);
-}
-
-export async function waitForDiagnosticsCount(
-  doc: vscode.TextDocument,
-  expectedCount: number,
-  timeoutMs = 30000,
-): Promise<vscode.Diagnostic[]> {
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeoutMs) {
-    const current = vscode.languages.getDiagnostics(doc.uri);
-    if (current.length === expectedCount) {
-      return current;
-    }
-    await new Promise((resolve) => {
-      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-        for (const uri of e.uris) {
-          if (uri.toString() === doc.uri.toString()) {
-            disposable.dispose();
-            resolve(void 0);
-            return;
-          }
-        }
-      });
-      setTimeout(() => {
-        disposable.dispose();
-        resolve(void 0);
-      }, 500);
-    });
-  }
-  return vscode.languages.getDiagnostics(doc.uri);
 }
 
 export function findFixAllAction(
@@ -123,6 +50,7 @@ export async function executeCodeActionProvider(
   range: vscode.Range,
   kind?: string,
 ): Promise<vscode.CodeAction[]> {
+  await waitForCodeActionRegistryQuiescence();
   const args: unknown[] = ['vscode.executeCodeActionProvider', uri, range];
   if (kind !== undefined) args.push(kind);
   const result = await vscode.commands.executeCommand<vscode.CodeAction[]>(
@@ -151,26 +79,21 @@ export async function withTmpFile(
     editor: vscode.TextEditor,
   ) => Promise<void>,
 ): Promise<void> {
-  const tmpFile = path.join(
-    getFixturesDir(),
-    'src',
-    `_fixall_tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.ts`,
+  const tmpFile = temporaryFilePath(
+    path.join(getFixturesDir(), 'src'),
+    '_fixall_tmp_',
   );
   fs.writeFileSync(tmpFile, content, 'utf-8');
+  let doc: vscode.TextDocument | undefined;
+  let testError: unknown;
   try {
-    const doc = await vscode.workspace.openTextDocument(tmpFile);
+    doc = await vscode.workspace.openTextDocument(tmpFile);
     const editor = await vscode.window.showTextDocument(doc);
     await testFn(doc, editor);
-  } finally {
-    // Close the editor tab so VSCode sends a synchronous didClose to the LSP,
-    // which cleans up the session overlay. Without this, the file deletion
-    // triggers an async didClose via the file watcher, which can race with
-    // the next test's LSP requests (all blocking methods are serialized).
-    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-    if (fs.existsSync(tmpFile)) {
-      fs.unlinkSync(tmpFile);
-    }
+  } catch (error) {
+    testError = error;
   }
+  await finishTemporaryDocument(testError, doc, tmpFile);
 }
 
 /**
@@ -239,50 +162,43 @@ export async function withOnSaveFixAll(
     'source.fixAll.rslint': 'explicit',
   },
 ): Promise<void> {
-  const fixturesDir = getFixturesDir();
-  const tmpFile = path.join(
-    fixturesDir,
-    'src',
-    `_fixall_test_${Date.now()}.ts`,
+  const tmpFile = temporaryFilePath(
+    path.join(getFixturesDir(), 'src'),
+    '_fixall_test_',
   );
   fs.writeFileSync(tmpFile, '// placeholder\n', 'utf-8');
 
+  let doc: vscode.TextDocument | undefined;
+  let testError: unknown;
   try {
-    const config = vscode.workspace.getConfiguration('editor');
-    const previousValue = config.get('codeActionsOnSave');
-    const configurationChanged = !isDeepStrictEqual(
-      previousValue,
-      codeActionsOnSave,
-    );
-    if (configurationChanged) {
-      await config.update(
-        'codeActionsOnSave',
-        codeActionsOnSave,
-        vscode.ConfigurationTarget.Workspace,
-      );
-    }
+    const openedDocument = await vscode.workspace.openTextDocument(tmpFile);
+    doc = openedDocument;
+    const editor = await vscode.window.showTextDocument(openedDocument);
+    await withCodeActionsOnSave(openedDocument, codeActionsOnSave, async () => {
+      await testFn(openedDocument, editor);
+    });
+  } catch (error) {
+    testError = error;
+  }
+  await finishTemporaryDocument(testError, doc, tmpFile);
+}
 
-    try {
-      const doc = await vscode.workspace.openTextDocument(tmpFile);
-      const editor = await vscode.window.showTextDocument(doc);
-      await testFn(doc, editor);
-    } finally {
-      if (configurationChanged) {
-        await config.update(
-          'codeActionsOnSave',
-          previousValue,
-          vscode.ConfigurationTarget.Workspace,
-        );
-      }
-    }
-  } finally {
-    // Close the editor tab so VSCode sends a synchronous didClose to the LSP,
-    // which cleans up the session overlay. Without this, the file deletion
-    // triggers an async didClose via the file watcher, which can race with
-    // the next test's LSP requests (all blocking methods are serialized).
-    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-    if (fs.existsSync(tmpFile)) {
-      fs.unlinkSync(tmpFile);
-    }
+async function finishTemporaryDocument(
+  testError: unknown,
+  document: vscode.TextDocument | undefined,
+  filePath: string,
+): Promise<void> {
+  const errors: unknown[] = [];
+  if (testError) errors.push(testError);
+
+  try {
+    await closeAndDeleteTemporaryDocument(document, filePath);
+  } catch (error) {
+    errors.push(error);
+  }
+
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'Test and temporary-file cleanup failed');
   }
 }
