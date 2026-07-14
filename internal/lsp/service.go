@@ -445,7 +445,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	needsConfigReload := false
 	needsTypeInfoRebuild := false
 	needsIgnoreRefresh := false
-	needsJSConfigRefresh := false
+	needsAncestorJSConfigRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
 		if isRslintConfigURI(uri) {
@@ -457,11 +457,11 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		if isGitignoreURI(uri) {
 			needsIgnoreRefresh = true
 		}
-		if isWorkspaceOrAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
-			needsJSConfigRefresh = true
+		if isStrictAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
+			needsAncestorJSConfigRefresh = true
 		}
 	}
-	if (needsIgnoreRefresh || needsJSConfigRefresh || needsConfigReload) && s.configDiscoveryV2Active {
+	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryV2Active {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
 		// cannot race an extension-initiated v2 transaction. JSON fallback is
@@ -469,7 +469,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		// active, otherwise a later JS activation failure could leave half of a
 		// rejected generation live.
 		reason := "gitignore-change"
-		if needsJSConfigRefresh || needsConfigReload {
+		if needsAncestorJSConfigRefresh {
 			reason = "config-change"
 		}
 		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
@@ -490,6 +490,15 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			return s.RefreshDiagnostics(ctx)
 		}
 		return nil
+	}
+	if s.configDiscoveryV2Active {
+		// The extension's direct workspace watcher is the sole v2 owner for
+		// workspace/descendant JS configs and JSON fallback. tsgo can also report
+		// those paths through its recursive project watcher; treating that report
+		// as a second refresh would evaluate every fresh module twice. Go-owned
+		// didChange handling above is intentionally limited to .gitignore and
+		// strict-ancestor JS configs, which the extension watcher cannot cover.
+		needsConfigReload = false
 	}
 	if needsConfigReload {
 		s.reloadConfigAndRelint()
@@ -525,7 +534,7 @@ func isGitignoreURI(uri string) bool {
 	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".gitignore")
 }
 
-func isWorkspaceOrAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) bool {
+func isStrictAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) bool {
 	if filePath == "" || cwd == "" || fsys == nil {
 		return false
 	}
@@ -543,8 +552,7 @@ func isWorkspaceOrAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs
 	}
 	directory := tspath.GetDirectoryPath(tspath.NormalizePath(filePath))
 	workspace := tspath.NormalizePath(cwd)
-	return pathStringsEqual(directory, workspace, caseSensitive) ||
-		tspath.StartsWithDirectory(directory, workspace, caseSensitive) ||
+	return !pathStringsEqual(directory, workspace, caseSensitive) &&
 		tspath.StartsWithDirectory(workspace, directory, caseSensitive)
 }
 

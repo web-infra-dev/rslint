@@ -503,6 +503,11 @@ Automatic discovery uses these rules:
    matching ordered results. `configDirectory` is an opaque Go-owned routing
    identity and must round-trip byte-for-byte; Node may native-normalize only
    `configPath`, which it uses for local file I/O and module import.
+   Before sending a batch, Go coalesces verified native case aliases to one
+   stable candidate ID and representative directory across all frontiers. The
+   check requires both lexical case equivalence and matching resolved file and
+   directory paths; arbitrary symlink owners are not deduplicated by physical
+   target.
    After ownership is resolved, `activateConfigs` names only effective IDs;
    Node rechecks fingerprints, prepares plugin state only for that set, then
    rechecks the same effective sources before publishing the activation. This
@@ -570,7 +575,10 @@ continues through its normal JSON fallback. Native API discovery performs no
 reverse config call and uses `overrideConfig`, or an empty syntax-only config;
 it never searches disk for JSON fallback. V2 LSP explicitly stages and commits
 an empty JS generation (an empty load batch followed by zero-ID activation),
-while loading any JSON fallback in Go as part of the new snapshot.
+while loading any JSON fallback in Go as part of the new snapshot. That empty
+generation is not a usable JavaScript last-good boundary: if a newly created JS
+config is broken, LSP commits an unavailable boundary for it rather than
+silently retaining JSON fallback below it.
 
 **JSON config**:
 
@@ -623,10 +631,14 @@ Additional current behaviors:
 - when the client supports dynamic file-watch registration, Go watches
   workspace-descendant `.gitignore` files plus exact `.gitignore` paths in
   strict workspace ancestors that may contain an automatically selected config.
-  Transactional v2 extension watchers
-  exclude `.gitignore` to avoid duplicate refreshes; legacy v0/v1 synchronization
-  retains it. Create/change/delete events rebuild the frozen config/ignore
-  snapshot and refresh open-document diagnostics
+  Transactional v2 extension watchers are the sole refresh owner for
+  workspace/descendant JS configs, JSON fallback, and dependency lockfiles;
+  Go additionally watches only strict-ancestor JS configs and `.gitignore`.
+  ts-go project watchers may still forward the same workspace events into the
+  session, but those forwarded JS/JSON events do not start a second fresh config
+  transaction. Legacy v0/v1 synchronization retains its combined watcher.
+  Create/change/delete events rebuild the frozen config/ignore snapshot and
+  refresh open-document diagnostics
 - the VS Code extension preserves last-good JS configs during reloads; a newly
   unavailable config with no usable JS ancestor contributes an empty boundary,
   preventing legacy JSON fallback only in that authored config subtree. A normal

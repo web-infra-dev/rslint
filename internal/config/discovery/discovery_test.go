@@ -1064,11 +1064,15 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		loader := newFixtureConfigLoader()
 		loader.configs[upperConfig] = namedConfig("upper")
 		loader.configs[lowerConfig] = namedConfig("lower")
+		loader.plugins[upperConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "upper", RuleNames: []string{"rule"}}}
+		loader.plugins[lowerConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "lower", RuleNames: []string{"rule"}}}
 		realpathFS := &configDiscoveryRealpathFS{
 			FS: discoveryTestFS(),
 			realPaths: map[string]string{
-				tspath.NormalizePath(upperRoot): tspath.NormalizePath(upperRoot),
-				tspath.NormalizePath(lowerRoot): tspath.NormalizePath(upperRoot),
+				tspath.NormalizePath(upperRoot):   tspath.NormalizePath(upperRoot),
+				tspath.NormalizePath(lowerRoot):   tspath.NormalizePath(upperRoot),
+				tspath.NormalizePath(upperConfig): tspath.NormalizePath(upperConfig),
+				tspath.NormalizePath(lowerConfig): tspath.NormalizePath(upperConfig),
 			},
 		}
 		fsys := &configDiscoveryCaseSensitivityFS{FS: realpathFS, caseSensitive: false}
@@ -1080,13 +1084,67 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}
-		if len(catalog.Configs) == 0 {
-			t.Fatal("native case aliases produced an empty catalog")
+		if len(catalog.Configs) != 1 || len(catalog.Scopes) != 1 {
+			t.Fatalf("native case alias catalog: configs=%v scopes=%v, want one representative", catalog.Configs, catalog.Scopes)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{upperConfig}) {
+			t.Fatalf("requested config paths = %v, want one deterministic representative", got)
+		}
+		if catalog.Stats.ConfigsRequested != 1 || catalog.Stats.ConfigsLoaded != 1 {
+			t.Fatalf("native case alias stats = %+v, want one requested and loaded config", catalog.Stats)
+		}
+		if got := pluginPrefixes(catalog.EslintPlugins); !reflect.DeepEqual(got, []string{"upper"}) {
+			t.Fatalf("effective plugin prefixes = %v, want representative plugin metadata", got)
 		}
 		if len(loader.activations) != 1 {
 			t.Fatalf("activation count = %d, want 1", len(loader.activations))
 		}
 	})
+}
+
+func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
+	root := t.TempDir()
+	upperRoot := filepath.Join(root, "Project")
+	lowerRoot := filepath.Join(root, "project")
+	upperConfig := writeConfigCandidate(t, upperRoot, "rslint.config.js")
+	lowerConfig := writeConfigCandidate(t, lowerRoot, "rslint.config.js")
+	loader := newFixtureConfigLoader()
+	loader.configs[upperConfig] = namedConfig("upper")
+	loader.configs[lowerConfig] = namedConfig("lower")
+	realpathFS := &configDiscoveryRealpathFS{
+		FS: discoveryTestFS(),
+		realPaths: map[string]string{
+			tspath.NormalizePath(upperRoot):   tspath.NormalizePath(upperRoot),
+			tspath.NormalizePath(lowerRoot):   tspath.NormalizePath(upperRoot),
+			tspath.NormalizePath(upperConfig): tspath.NormalizePath(upperConfig),
+			tspath.NormalizePath(lowerConfig): tspath.NormalizePath(upperConfig),
+		},
+	}
+	fsys := &configDiscoveryCaseSensitivityFS{FS: realpathFS, caseSensitive: false}
+	builder := configCatalogBuilder{
+		ctx:                 context.Background(),
+		fs:                  fsys,
+		loader:              loader,
+		transactionID:       "case-alias-frontiers",
+		loadStates:          make(map[string]*configLoadState),
+		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
+		failureByPath:       make(map[string]ConfigFailure),
+	}
+	if err := builder.ensureCandidates([]configCandidate{{path: upperConfig, directory: upperRoot}}); err != nil {
+		t.Fatalf("first frontier: %v", err)
+	}
+	if err := builder.ensureCandidates([]configCandidate{{path: lowerConfig, directory: lowerRoot}}); err != nil {
+		t.Fatalf("second frontier: %v", err)
+	}
+	if len(loader.batches) != 1 || len(loader.batches[0].Candidates) != 1 {
+		t.Fatalf("load batches = %+v, want one request across frontiers", loader.batches)
+	}
+	if builder.loadStates[upperConfig] == nil || builder.loadStates[upperConfig] != builder.loadStates[lowerConfig] {
+		t.Fatal("case aliases did not resolve to the same representative load state")
+	}
+	if got := builder.loadStates[lowerConfig].candidate.path; got != upperConfig {
+		t.Fatalf("representative config path = %q, want %q", got, upperConfig)
+	}
 }
 
 func TestConfigDiscoverySiblingFrontierIsBatchedDeterministically(t *testing.T) {
@@ -1253,7 +1311,9 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 	root := t.TempDir()
 	loader := newFixtureConfigLoader()
 	configPath := writeConfigCandidate(t, root, "rslint.config.js")
+	nestedConfigPath := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
 	loader.failures[configPath] = ConfigModuleError{Code: "ERR", Message: "nope"}
+	loader.failures[nestedConfigPath] = ConfigModuleError{Code: "ERR_NESTED", Message: "nested nope"}
 	_, err := Build(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
@@ -1264,9 +1324,20 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 	if !strings.Contains(err.Error(), "failed to load config") {
 		t.Fatalf("error = %v, want load-stage context", err)
 	}
+	var allFailed *AllConfigsFailedError
+	wantFailurePaths := []string{configPath, nestedConfigPath}
+	sort.Strings(wantFailurePaths)
+	if !errors.As(err, &allFailed) || len(allFailed.Failures) != 2 ||
+		!reflect.DeepEqual(
+			[]string{allFailed.Failures[0].Path, allFailed.Failures[1].Path},
+			wantFailurePaths,
+		) {
+		t.Fatalf("typed failure metadata = %#v, want sorted paths %v", allFailed, wantFailurePaths)
+	}
 
 	invalidLoader := newFixtureConfigLoader()
 	invalidLoader.failures[configPath] = ConfigModuleError{Code: "invalid", Message: "not an array"}
+	invalidLoader.failures[nestedConfigPath] = ConfigModuleError{Code: "invalid", Message: "nested not an array"}
 	_, err = Build(context.Background(), discoveryTestFS(), invalidLoader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,

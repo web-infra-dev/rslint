@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,7 +63,7 @@ func TestAncestorJSConfigFileWatchersExcludeWorkspace(t *testing.T) {
 	}
 }
 
-func TestIsWorkspaceOrAncestorAutoJSConfigPath(t *testing.T) {
+func TestIsStrictAncestorAutoJSConfigPath(t *testing.T) {
 	fsys := &mockFS{files: map[string]bool{}}
 	workspace := "/repo/packages/app"
 	tests := []struct {
@@ -72,16 +73,47 @@ func TestIsWorkspaceOrAncestorAutoJSConfigPath(t *testing.T) {
 		{path: "/repo/packages/rslint.config.js", want: true},
 		{path: "/repo/rslint.config.mjs", want: true},
 		{path: "/rslint.config.ts", want: true},
-		{path: "/repo/packages/app/rslint.config.mts", want: true},
-		{path: "/repo/packages/app/src/rslint.config.js", want: true},
+		{path: "/repo/packages/app/rslint.config.mts", want: false},
+		{path: "/repo/packages/app/src/rslint.config.js", want: false},
 		{path: "/repo/packages/sibling/rslint.config.js", want: false},
 		{path: "/repo/packages/rslint.json", want: false},
 		{path: "/repo/packages/rslint.config.cjs", want: false},
 	}
 	for _, test := range tests {
-		if got := isWorkspaceOrAncestorAutoJSConfigPath(test.path, workspace, fsys); got != test.want {
-			t.Errorf("isWorkspaceOrAncestorAutoJSConfigPath(%q)=%t, want %t", test.path, got, test.want)
+		if got := isStrictAncestorAutoJSConfigPath(test.path, workspace, fsys); got != test.want {
+			t.Errorf("isStrictAncestorAutoJSConfigPath(%q)=%t, want %t", test.path, got, test.want)
 		}
+	}
+}
+
+func TestWorkspaceConfigEventsDoNotDuplicateV2Refresh(t *testing.T) {
+	workspace := tspath.NormalizePath(t.TempDir())
+	tests := []string{
+		filepath.Join(workspace, "rslint.config.js"),
+		filepath.Join(workspace, "packages", "app", "rslint.config.mjs"),
+		filepath.Join(workspace, "rslint.json"),
+	}
+	for _, configPath := range tests {
+		t.Run(filepath.Base(configPath), func(t *testing.T) {
+			s, outgoing := newAncestorConfigWatchTestServer(workspace)
+			s.configDiscoveryV2Active = true
+			s.rslintConfigPath = "/committed/rslint.json"
+			result := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeChanged)
+			select {
+			case message := <-outgoing:
+				respondToConfigReverseRequest(t, s, message.AsRequest(), nil, errors.New("unexpected duplicate refresh"))
+				t.Fatalf("workspace event started a duplicate Go refresh: %+v", message)
+			case err := <-result:
+				if err != nil {
+					t.Fatalf("workspace config event: %v", err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("workspace config event did not complete")
+			}
+			if s.rslintConfigPath != "/committed/rslint.json" {
+				t.Fatalf("workspace event directly reloaded JSON config: %q", s.rslintConfigPath)
+			}
+		})
 	}
 }
 
@@ -248,7 +280,7 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 	}
 }
 
-func TestV2JSONWatchRefreshPreservesAtomicLastGoodOnJSFailure(t *testing.T) {
+func TestV2ConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
 	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
@@ -266,14 +298,15 @@ func TestV2JSONWatchRefreshPreservesAtomicLastGoodOnJSFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	changed := startConfigWatchEvent(s, jsonPath, lsproto.FileChangeTypeChanged)
+	changed := startConfigRefreshForTest(s, "config-change")
 	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	_, loadResponse := failedConfigResponse(t, loadMessage, "committed JS boundary is now broken")
 	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
 	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
 	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
-	if err := awaitConfigWatchEvent(t, changed); err != nil {
-		t.Fatalf("JSON watcher returned an error after preserving last-good: %v", err)
+	completed := awaitConfigRefreshResult(t, changed)
+	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
+		t.Fatalf("config refresh error = %v, want ErrAllConfigsFailed after preserving last-good", completed.err)
 	}
 
 	if len(s.jsonConfig) != 1 || s.jsonConfig[0].Rules["no-console"] != "error" ||

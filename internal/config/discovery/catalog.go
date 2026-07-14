@@ -113,6 +113,25 @@ func (catalog *ConfigCatalog) ConfigDirectories() []string {
 
 var ErrAllConfigsFailed = errors.New("all discovered JavaScript configs failed to load")
 
+// AllConfigsFailedError preserves every failed candidate while remaining
+// compatible with errors.Is(err, ErrAllConfigsFailed). Adapters can therefore
+// render their own diagnostics without parsing the user-facing summary.
+type AllConfigsFailedError struct {
+	Failures []ConfigFailure
+	message  string
+}
+
+func (err *AllConfigsFailedError) Error() string {
+	if err == nil || err.message == "" {
+		return ErrAllConfigsFailed.Error()
+	}
+	return err.message
+}
+
+func (err *AllConfigsFailedError) Unwrap() error {
+	return ErrAllConfigsFailed
+}
+
 type ConfigDiscoveryProtocolError struct {
 	Message string
 }
@@ -134,16 +153,17 @@ func Build(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request 
 	transactionID := fmt.Sprintf("config-discovery-%d", configDiscoverySequence.Add(1))
 
 	builder := configCatalogBuilder{
-		ctx:           ctx,
-		fs:            fsys,
-		loader:        loader,
-		request:       request,
-		transactionID: transactionID,
-		loadStates:    make(map[string]*configLoadState),
-		configs:       make(map[string]rslintconfig.RslintConfig),
-		sources:       make(map[string]configSource),
-		scopes:        make(map[string]rslintconfig.LintDiscoveryScope),
-		failureByPath: make(map[string]ConfigFailure),
+		ctx:                 ctx,
+		fs:                  fsys,
+		loader:              loader,
+		request:             request,
+		transactionID:       transactionID,
+		loadStates:          make(map[string]*configLoadState),
+		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
+		configs:             make(map[string]rslintconfig.RslintConfig),
+		sources:             make(map[string]configSource),
+		scopes:              make(map[string]rslintconfig.LintDiscoveryScope),
+		failureByPath:       make(map[string]ConfigFailure),
 	}
 	return builder.build()
 }

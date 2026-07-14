@@ -3,11 +3,12 @@
 /**
  * The `Rslint` class — the ESLint-style programmatic API (issue #1106).
  *
- * It is a thin JS facade over the low-level `lint()` IPC. Go owns config/file
- * discovery, ignore semantics, and config ownership; reverse IPC asks this
- * process to evaluate and normalize only the JavaScript config candidates Go
- * selected. The facade also reshapes wire-level responses into ESLint v10's
- * `LintResult[]` (per-file results, numeric severity, absolute paths, output).
+ * It is a thin JS facade over the low-level `lint()` IPC. JavaScript expands
+ * API globs; Go owns config discovery, ownership, ignore semantics, and final
+ * lint-target admission. Reverse IPC asks this process to evaluate and
+ * normalize only the JavaScript config candidates Go selected. The facade also
+ * reshapes wire-level responses into ESLint v10's `LintResult[]` (per-file
+ * results, numeric severity, absolute paths, output).
  *
  * The Go side is the single long-lived `--api` process held by the underlying
  * service; `close()` tears it down (mirrors RSLintService.close()).

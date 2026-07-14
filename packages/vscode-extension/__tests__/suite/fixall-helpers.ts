@@ -5,7 +5,9 @@ import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 
 export function getFixturesDir(): string {
-  return path.resolve(require.resolve('@rslint/core'), '../..', 'fixtures');
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  assert.ok(workspaceFolder, 'Expected an isolated fixture workspace');
+  return workspaceFolder.uri.fsPath;
 }
 
 export async function openFixture(

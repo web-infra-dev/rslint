@@ -73,7 +73,6 @@ type lspConfigModuleLoader struct {
 	frontierSeen   bool
 	activated      bool
 	pluginDegraded bool
-	candidates     []discovery.ConfigLoadCandidate
 }
 
 func (loader *lspConfigModuleLoader) LoadConfigs(
@@ -99,11 +98,6 @@ func (loader *lspConfigModuleLoader) LoadConfigs(
 		)
 	}
 	loader.frontierSeen = true
-	// Keep the exact Go-selected candidate boundaries for LSP's startup
-	// recovery policy. The shared coordinator remains authoritative for
-	// validating the response and deciding whether the build is ErrAll; this
-	// copy is consulted only after that sentinel is returned.
-	loader.candidates = append(loader.candidates, request.Candidates...)
 	return response, nil
 }
 
@@ -225,38 +219,6 @@ func (loader *lspConfigModuleLoader) ensureActivated(
 	}
 	catalog.EslintPlugins = append([]config.EslintPluginEntry(nil), response.EslintPluginEntries...)
 	return nil
-}
-
-func (loader *lspConfigModuleLoader) unavailableCatalog(fsys vfs.FS) (*discovery.ConfigCatalog, error) {
-	if loader == nil || loader.transactionID == "" || len(loader.candidates) == 0 {
-		return nil, errors.New("all-config-failed recovery has no loaded candidate frontier")
-	}
-	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
-	directoriesByID := make(map[string]string, len(loader.candidates))
-	for _, candidate := range loader.candidates {
-		directory := tspath.NormalizePath(candidate.ConfigDirectory)
-		if directory == "" {
-			continue
-		}
-		identity := lspLexicalPathID(directory, caseSensitive)
-		if _, exists := directoriesByID[identity]; !exists {
-			directoriesByID[identity] = directory
-		}
-	}
-	if len(directoriesByID) == 0 {
-		return nil, errors.New("all-config-failed recovery has no valid config directory")
-	}
-	configs := make(map[string]config.RslintConfig, len(directoriesByID))
-	for _, directory := range directoriesByID {
-		// An empty entry set establishes an ownership boundary without ever
-		// applying JSON fallback beneath a config module that did not load.
-		configs[directory] = config.RslintConfig{}
-	}
-	return &discovery.ConfigCatalog{
-		TransactionID:      loader.transactionID,
-		Configs:            configs,
-		EffectiveConfigIDs: []string{},
-	}, nil
 }
 
 func (loader *lspConfigModuleLoader) commit(ctx context.Context, transactionID string) error {
@@ -392,14 +354,20 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 		// refresh may replace it with another recovery snapshot until one full
 		// usable catalog has committed.
 		unavailableCause = err
-		catalog, err = loader.unavailableCatalog(generationFS)
-		if err != nil {
+		var allFailed *discovery.AllConfigsFailedError
+		if !errors.As(err, &allFailed) || len(allFailed.Failures) == 0 || loader.transactionID == "" {
 			return configRefreshResponse{}, s.abortFailedConfigRefresh(
 				ctx,
 				loader,
 				loader.transactionID,
-				errors.Join(unavailableCause, err),
+				errors.Join(unavailableCause, errors.New("all-config-failed recovery has no typed failure catalog")),
 			)
+		}
+		catalog = &discovery.ConfigCatalog{
+			TransactionID:      loader.transactionID,
+			Configs:            make(map[string]config.RslintConfig),
+			EffectiveConfigIDs: []string{},
+			Failures:           append([]discovery.ConfigFailure(nil), allFailed.Failures...),
 		}
 		recoveredUnavailable = true
 	} else if s.configDiscoveryV2HasLastGood {
@@ -417,17 +385,19 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	if err != nil {
 		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, catalog.TransactionID, err)
 	}
+	if recoveredUnavailable && len(snapshot.unavailableConfigs) == 0 {
+		return configRefreshResponse{}, s.abortFailedConfigRefresh(
+			ctx,
+			loader,
+			catalog.TransactionID,
+			errors.Join(unavailableCause, errors.New("all-config-failed recovery has no valid failure boundary")),
+		)
+	}
 	// Activation/commit can overlap a later filesystem mutation. Freeze the
 	// candidate's observed .gitignore state now; that mutation belongs to the
 	// next transaction and must not alter this generation's target admission.
 	generationFS.freeze()
 	snapshot.configGenerationFS = generationFS
-	if recoveredUnavailable {
-		snapshot.usableLastGood = false
-		for configDir := range snapshot.configs {
-			snapshot.unavailableConfigs[configDir] = struct{}{}
-		}
-	}
 	if err := loader.ensureActivated(ctx, catalog); err != nil {
 		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, catalog.TransactionID, err)
 	}
@@ -531,7 +501,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		configKeyByPath:    make(map[string]string, len(catalog.Configs)),
 		unavailableConfigs: make(map[string]struct{}),
 		generation:         catalog.TransactionID,
-		usableLastGood:     true,
+		// An empty catalog is a successfully committed absence of JavaScript
+		// config, not a usable JavaScript last-good generation. If a broken
+		// config appears later, it must establish an unavailable boundary rather
+		// than preserving JSON fallback beneath that new boundary.
+		usableLastGood: len(catalog.Configs) > 0,
 	}
 	seenConfigDirs := make(map[string]string, len(catalog.Configs))
 	for _, configDir := range catalog.ConfigDirectories() {

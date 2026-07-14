@@ -177,14 +177,15 @@ type Server struct {
 	jsConfigOwnerResolver *config.ConfigOwnerResolver
 	jsConfigKeyByPath     map[string]string
 	// configDiscoveryV2Active becomes true after the first structurally valid
-	// configRefresh request. It lets Go's watched config and config-scoped
-	// .gitignore events trigger a fresh v2 transaction without sending reverse
-	// requests to legacy clients.
+	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
+	// config-scoped .gitignore watchers trigger a fresh v2 transaction without
+	// sending reverse requests to legacy clients. The extension remains the sole
+	// v2 refresh owner for workspace/descendant JS and JSON changes.
 	configDiscoveryV2Active bool
-	// configDiscoveryV2HasLastGood distinguishes a fully usable committed v2
-	// catalog (including a valid empty catalog) from the synthetic unavailable
-	// boundaries used to keep LSP startup alive when every JS config is broken.
-	// Refresh failures preserve only the former as last-good state.
+	// configDiscoveryV2HasLastGood distinguishes a committed v2 catalog with at
+	// least one usable JS config from an empty catalog or the synthetic
+	// unavailable boundaries used to keep LSP alive when every JS config is
+	// broken. Refresh failures preserve only the usable JS catalog as last-good.
 	configDiscoveryV2HasLastGood bool
 	// configGenerationFS is committed atomically with the v2 catalog and keeps
 	// target admission on that generation's read-only .gitignore view. A failed

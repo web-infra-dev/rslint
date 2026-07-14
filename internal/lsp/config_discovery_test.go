@@ -502,7 +502,7 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 	if completed.err != nil {
 		t.Fatalf("initial all-failed configRefresh stopped LSP startup: %v", completed.err)
 	}
-	if completed.response.TransactionID != loadRequest.TransactionID || completed.response.ConfigCount != 1 {
+	if completed.response.TransactionID != loadRequest.TransactionID || completed.response.ConfigCount != 0 {
 		t.Fatalf("unexpected recovery response: %+v", completed.response)
 	}
 	if s.configDiscoveryV2HasLastGood {
@@ -855,6 +855,39 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	}
 	if s.eslintPluginConfigGeneration != secondActivationRequest.TransactionID {
 		t.Fatalf("empty catalog generation = %q, want %q", s.eslintPluginConfigGeneration, secondActivationRequest.TransactionID)
+	}
+	if s.configDiscoveryV2HasLastGood {
+		t.Fatal("empty JavaScript catalog was marked as a usable JavaScript last-good generation")
+	}
+
+	// A newly created broken config now establishes an unavailable JS boundary
+	// instead of preserving the empty catalog's JSON fallback.
+	writeConfigCandidate(t, root)
+	third := startConfigRefreshForTest(s, "config-change")
+	thirdLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	thirdLoadRequest, thirdLoadResponse := failedConfigResponse(t, thirdLoad, "new config is broken")
+	respondToConfigReverseRequest(t, s, thirdLoad, thirdLoadResponse, nil)
+	thirdActivation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	thirdActivationRequest, thirdActivationResponse := activationResponseForRequest(t, thirdActivation, true)
+	if len(thirdActivationRequest.EffectiveConfigIDs) != 0 {
+		t.Fatalf("unavailable activation IDs = %v, want none", thirdActivationRequest.EffectiveConfigIDs)
+	}
+	respondToConfigReverseRequest(t, s, thirdActivation, thirdActivationResponse, nil)
+	thirdCommit := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, thirdCommit, commitResponseForRequest(t, thirdCommit, true), nil)
+	completed = awaitConfigRefreshResult(t, third)
+	if completed.err != nil {
+		t.Fatalf("new broken config refresh failed instead of committing an unavailable boundary: %v", completed.err)
+	}
+	if completed.response.TransactionID != thirdLoadRequest.TransactionID || completed.response.ConfigCount != 0 {
+		t.Fatalf("unavailable recovery response = %+v", completed.response)
+	}
+	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable || s.configDiscoveryV2HasLastGood {
+		t.Fatalf("new broken config state: unavailable=%t hasLastGood=%t", unavailable, s.configDiscoveryV2HasLastGood)
+	}
+	entries, _, isJS := s.getConfigForURI(documentURIFromPath(filepath.Join(root, "src", "index.ts")))
+	if !isJS || hasPublicConfigContent(entries) {
+		t.Fatalf("new broken config fell through its empty JS boundary: entries=%+v isJS=%t", entries, isJS)
 	}
 }
 

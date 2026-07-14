@@ -34,6 +34,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -498,11 +499,13 @@ func discoverCLIConfigCatalog(
 		request,
 	)
 	if err != nil {
+		var allFailed *discovery.AllConfigsFailedError
+		if errors.As(err, &allFailed) {
+			printConfigDiscoveryFailures(allFailed.Failures)
+		}
 		return err
 	}
-	for _, failure := range catalog.Failures {
-		fmt.Fprintf(os.Stderr, "Warning: skipping config %s: %s\n", failure.Path, failure.Message)
-	}
+	printConfigDiscoveryFailures(catalog.Failures)
 
 	configDirectories := catalog.ConfigDirectories()
 	// An explicitly selected module is one invocation-wide flat config, even for
@@ -549,6 +552,12 @@ func discoverCLIConfigCatalog(
 	}
 	args.EslintPlugins = catalog.EslintPlugins
 	return nil
+}
+
+func printConfigDiscoveryFailures(failures []discovery.ConfigFailure) {
+	for _, failure := range failures {
+		fmt.Fprintf(os.Stderr, "Warning: skipping config %s: %s\n", failure.Path, failure.Message)
+	}
 }
 
 // startSynthStdinWriter feeds data into w from a background goroutine and

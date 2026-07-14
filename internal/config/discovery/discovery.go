@@ -86,14 +86,15 @@ type configCatalogBuilder struct {
 	request       ConfigDiscoveryRequest
 	transactionID string
 
-	loadStates    map[string]*configLoadState
-	configs       map[string]rslintconfig.RslintConfig
-	sources       map[string]configSource
-	scopes        map[string]rslintconfig.LintDiscoveryScope
-	failureByPath map[string]ConfigFailure
-	hadCandidates bool
-	nextRequestID int
-	stats         ConfigDiscoveryStats
+	loadStates          map[string]*configLoadState
+	loadStateByIdentity map[tspath.Path]*configLoadState
+	configs             map[string]rslintconfig.RslintConfig
+	sources             map[string]configSource
+	scopes              map[string]rslintconfig.LintDiscoveryScope
+	failureByPath       map[string]ConfigFailure
+	hadCandidates       bool
+	nextRequestID       int
+	stats               ConfigDiscoveryStats
 }
 
 func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
@@ -466,8 +467,8 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			candidate := resolution.candidates[resolution.next]
 			state := builder.loadStates[candidate.path]
 			if state != nil && state.failure == nil {
-				resolution.seed.ownerDir = candidate.directory
-				resolution.seed.ownerPath = candidate.path
+				resolution.seed.ownerDir = state.candidate.directory
+				resolution.seed.ownerPath = state.candidate.path
 			}
 			resolution.next++
 		}
@@ -539,8 +540,8 @@ func (builder *configCatalogBuilder) resolveSeedOwners(seeds []*discoverySeed) e
 			}
 			state := builder.loadStates[candidate.path]
 			if state != nil && state.failure == nil {
-				seed.ownerDir = candidate.directory
-				seed.ownerPath = candidate.path
+				seed.ownerDir = state.candidate.directory
+				seed.ownerPath = state.candidate.path
 				seed.done = true
 				continue
 			}
@@ -594,25 +595,51 @@ func (builder *configCatalogBuilder) findCandidateForOwner(
 }
 
 func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCandidate) error {
-	unique := make(map[string]configCandidate, len(rawCandidates))
+	type candidateGroup struct {
+		candidate configCandidate
+		aliases   map[string]configCandidate
+	}
+	groups := make(map[tspath.Path]*candidateGroup, len(rawCandidates))
 	for _, candidate := range rawCandidates {
 		candidate.path = tspath.NormalizePath(candidate.path)
 		candidate.directory = tspath.NormalizePath(candidate.directory)
-		if _, loaded := builder.loadStates[candidate.path]; loaded {
+		identity := tspath.ToPath(candidate.path, "", builder.fs.UseCaseSensitiveFileNames())
+		if state := builder.loadStateByIdentity[identity]; state != nil {
+			if err := builder.validateNativeCaseAlias(state.candidate, candidate); err != nil {
+				return err
+			}
+			builder.loadStates[candidate.path] = state
 			continue
 		}
-		unique[candidate.path] = candidate
+		group := groups[identity]
+		if group == nil {
+			group = &candidateGroup{
+				candidate: candidate,
+				aliases:   make(map[string]configCandidate),
+			}
+			groups[identity] = group
+		} else {
+			if err := builder.validateNativeCaseAlias(group.candidate, candidate); err != nil {
+				return err
+			}
+			if candidate.path < group.candidate.path {
+				group.candidate = candidate
+			}
+		}
+		group.aliases[candidate.path] = candidate
 	}
-	if len(unique) == 0 {
+	if len(groups) == 0 {
 		return nil
 	}
 	if builder.loader == nil {
 		return errors.New("javascript config candidates require a module loader")
 	}
 
-	paths := make([]string, 0, len(unique))
-	for path := range unique {
-		paths = append(paths, path)
+	paths := make([]string, 0, len(groups))
+	groupByPath := make(map[string]*candidateGroup, len(groups))
+	for _, group := range groups {
+		paths = append(paths, group.candidate.path)
+		groupByPath[group.candidate.path] = group
 	}
 	sort.Strings(paths)
 	loadMode := ConfigModuleLoadCached
@@ -627,7 +654,7 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 	}
 	request.Candidates = make([]ConfigLoadCandidate, 0, len(paths))
 	for _, path := range paths {
-		candidate := unique[path]
+		candidate := groupByPath[path].candidate
 		builder.nextRequestID++
 		id := fmt.Sprintf("config-%06d", builder.nextRequestID)
 		wireCandidate := ConfigLoadCandidate{
@@ -649,7 +676,8 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 	}
 
 	for _, wireCandidate := range request.Candidates {
-		candidate := unique[wireCandidate.ConfigPath]
+		group := groupByPath[wireCandidate.ConfigPath]
+		candidate := group.candidate
 		result := results[wireCandidate.ID]
 		state := &configLoadState{
 			id:            wireCandidate.ID,
@@ -674,7 +702,11 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 			)
 			builder.stats.ConfigsLoaded++
 		}
-		builder.loadStates[candidate.path] = state
+		identity := tspath.ToPath(candidate.path, "", builder.fs.UseCaseSensitiveFileNames())
+		builder.loadStateByIdentity[identity] = state
+		for aliasPath := range group.aliases {
+			builder.loadStates[aliasPath] = state
+		}
 		if state.failure != nil {
 			builder.failureByPath[candidate.path] = ConfigFailure{
 				Path:      candidate.path,
@@ -683,6 +715,38 @@ func (builder *configCatalogBuilder) ensureCandidates(rawCandidates []configCand
 				Message:   state.failure.Message,
 			}
 		}
+	}
+	return nil
+}
+
+// validateNativeCaseAlias protects the pre-load case-folding optimization
+// with the same physical-directory invariant used by the final catalog. On a
+// case-insensitive filesystem, alternate casing should execute one module;
+// unrelated lexical or symlink aliases must not be silently merged.
+func (builder *configCatalogBuilder) validateNativeCaseAlias(left configCandidate, right configCandidate) error {
+	if left.path == right.path {
+		return nil
+	}
+	if builder.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(left.path, right.path) {
+		return fmt.Errorf("config candidate identity collision between %q and %q", left.path, right.path)
+	}
+	physicalPath := func(path string) string {
+		if realPath := builder.fs.Realpath(path); realPath != "" {
+			return tspath.NormalizePath(realPath)
+		}
+		return tspath.NormalizePath(path)
+	}
+	leftPhysicalDirectory := physicalPath(left.directory)
+	rightPhysicalDirectory := physicalPath(right.directory)
+	leftPhysicalPath := physicalPath(left.path)
+	rightPhysicalPath := physicalPath(right.path)
+	if tspath.ToPath(leftPhysicalDirectory, "", true) != tspath.ToPath(rightPhysicalDirectory, "", true) ||
+		tspath.ToPath(leftPhysicalPath, "", true) != tspath.ToPath(rightPhysicalPath, "", true) {
+		return fmt.Errorf(
+			"config candidates %q and %q differ only by case but resolve to distinct filesystem paths",
+			left.path,
+			right.path,
+		)
 	}
 	return nil
 }
@@ -852,8 +916,8 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 		}
 		if state.failure == nil {
 			result.activation = state
-			node.ownerDir = candidate.directory
-			node.ownerPath = candidate.path
+			node.ownerDir = state.candidate.directory
+			node.ownerPath = state.candidate.path
 		}
 	}
 	result.directoriesVisited = 1
@@ -1112,12 +1176,14 @@ func (builder *configCatalogBuilder) allConfigsFailedError() error {
 	}
 	failure := failures[0]
 	displayPath := filepath.FromSlash(failure.Path)
+	message := ""
 	switch failure.Kind {
 	case "invalid":
-		return fmt.Errorf("%w: invalid config in %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
+		message = fmt.Sprintf("%s: invalid config in %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
 	default:
-		return fmt.Errorf("%w: failed to load config %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
+		message = fmt.Sprintf("%s: failed to load config %s: %s", ErrAllConfigsFailed, displayPath, failure.Message)
 	}
+	return &AllConfigsFailedError{Failures: failures, message: message}
 }
 
 func appendUniqueSortedPath(paths []string, path string) []string {

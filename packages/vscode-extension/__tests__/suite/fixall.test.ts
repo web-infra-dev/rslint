@@ -34,14 +34,7 @@ suite('rslint fixAll - code actions', function () {
   });
 
   test('no action for non-TS file', async () => {
-    const doc = await vscode.workspace.openTextDocument(
-      require('node:path').resolve(
-        require.resolve('@rslint/core'),
-        '../..',
-        'fixtures/src/',
-        'styles.css',
-      ),
-    );
+    const doc = await openFixture('styles.css');
     await vscode.window.showTextDocument(doc);
 
     await new Promise((r) => setTimeout(r, 2000));
