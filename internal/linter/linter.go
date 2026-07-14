@@ -731,7 +731,7 @@ func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program
 	shardResults := make([][]LintTarget, shardCount)
 
 	wg := core.NewWorkGroup(opts.SingleThreaded)
-	for shard := 0; shard < shardCount; shard++ {
+	for shard := range shardCount {
 		start := shard * chunkSize
 		end := min(start+chunkSize, len(files))
 		if start >= end {
