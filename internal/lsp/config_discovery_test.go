@@ -439,6 +439,41 @@ func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T
 	}
 }
 
+func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	installLastGoodConfig(s, root)
+
+	result := startConfigRefreshForTest(s, "config-change")
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
+		Rules: config.Rules{
+			"no-console": []any{"error", map[string]any{"allow": "warn"}},
+		},
+	}})
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+
+	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
+	abortControl := abortMessage.Params.(configTransactionControlRequest)
+	if abortControl.TransactionID != loadRequest.TransactionID {
+		t.Fatalf("abort transaction = %q, want %q", abortControl.TransactionID, loadRequest.TransactionID)
+	}
+	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
+
+	completed := awaitConfigRefreshResult(t, result)
+	if completed.err == nil || !strings.Contains(completed.err.Error(), `invalid options for rule "no-console"`) {
+		t.Fatalf("configRefresh error = %v, want invalid rule options", completed.err)
+	}
+	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
+		t.Fatalf("invalid options replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
+	}
+}
+
 func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
 	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)

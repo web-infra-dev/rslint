@@ -194,6 +194,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		return nil, errors.New("config and configDiscovery are mutually exclusive")
 	}
 
+	// Schema validation below resolves native rule implementations through the
+	// global registry. Populate it before validating even the first request in a
+	// long-lived API process; otherwise unknown-rule skipping would make the
+	// first request behave differently from every later request.
+	rslintconfig.RegisterAllRules()
+
 	// Config is the legacy/low-level already-resolved config. High-level native
 	// API callers instead send ConfigDiscovery: Go discovers ownership and asks
 	// the host to evaluate only the staged candidate frontier.
@@ -204,13 +210,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		}
 		if err := rslintconfig.ValidateConfig(rslintConfig); err != nil {
 			return nil, fmt.Errorf("invalid config: %w", err)
-		}
-		if optionsErrs := rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry); len(optionsErrs) > 0 {
-			msgs := make([]string, len(optionsErrs))
-			for i, optionsErr := range optionsErrs {
-				msgs[i] = optionsErr.Error()
-			}
-			return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(msgs, "\n"))
 		}
 	}
 	configDirectory := req.ConfigDirectory
@@ -367,11 +366,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if configMap == nil {
 		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	}
+	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
+		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
+	}
 
-	// The registry is process-global, but plugin execution is request-gated by
+	// The plugin registry is process-global, but execution is request-gated by
 	// requestPluginRules below so metadata from an earlier API request cannot
 	// make a later request dispatch stale plugin rules.
-	rslintconfig.RegisterAllRules()
 	pluginEntries := append([]rslintconfig.EslintPluginEntry(nil), catalogPlugins...)
 	for _, plugin := range req.EslintPlugins {
 		pluginEntries = append(pluginEntries, rslintconfig.EslintPluginEntry{

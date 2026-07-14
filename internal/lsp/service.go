@@ -339,12 +339,8 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 		if err := config.ValidateConfig(cfg.Entries); err != nil {
 			return fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
 		}
-		if optionsErrs := config.ValidateRuleOptions(cfg.Entries, config.GlobalRuleRegistry); len(optionsErrs) > 0 {
-			msgs := make([]string, len(optionsErrs))
-			for i, optionsErr := range optionsErrs {
-				msgs[i] = optionsErr.Error()
-			}
-			return fmt.Errorf("invalid rule options for %q:\n%s", cfg.ConfigDirectory, strings.Join(msgs, "\n"))
+		if err := validateRuleOptionsForConfig(cfg.Entries, cfg.ConfigDirectory); err != nil {
+			return err
 		}
 	}
 
@@ -426,6 +422,18 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	}
 
 	return nil
+}
+
+func validateRuleOptionsForConfig(entries config.RslintConfig, configDirectory string) error {
+	optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
+	if len(optionsErrs) == 0 {
+		return nil
+	}
+	msgs := make([]string, len(optionsErrs))
+	for i, optionsErr := range optionsErrs {
+		msgs[i] = optionsErr.Error()
+	}
+	return fmt.Errorf("invalid rule options for %q:\n%s", configDirectory, strings.Join(msgs, "\n"))
 }
 
 // handleDidChangeWatchedFiles handles file change notifications from the client.
