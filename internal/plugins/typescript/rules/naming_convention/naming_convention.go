@@ -1522,8 +1522,10 @@ func getIdentifierFromNode(ctx rule.RuleContext, node *ast.Node) []identifierInf
 		return getIdentifiersFromFunctionExpression(node)
 	case ast.KindParameter:
 		return getIdentifiersFromParameter(ctx, node)
-	case ast.KindClassDeclaration, ast.KindClassExpression:
+	case ast.KindClassDeclaration:
 		return getIdentifiersFromClassDeclaration(node)
+	case ast.KindClassExpression:
+		return getIdentifiersFromClassExpression(node)
 	case ast.KindInterfaceDeclaration:
 		return getIdentifiersFromInterfaceDeclaration(node)
 	case ast.KindTypeAliasDeclaration:
@@ -1726,6 +1728,25 @@ func getIdentifiersFromParameter(ctx rule.RuleContext, node *ast.Node) []identif
 
 func getIdentifiersFromClassDeclaration(node *ast.Node) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
+	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+		return nil
+	}
+	return []identifierInfo{{
+		name:     nameNode.AsIdentifier().Text,
+		node:     nameNode,
+		selector: selectorClass,
+	}}
+}
+
+func getIdentifiersFromClassExpression(node *ast.Node) []identifierInfo {
+	// Only named class expressions have a name to check.
+	// Use the class expression's own Name() rather than GetNameOfDeclaration(),
+	// because GetNameOfDeclaration() for anonymous class expressions returns the
+	// parent assignment target (e.g., the variable name), which would incorrectly
+	// apply the `class` selector to variable-inferred names such as
+	// `const clz = class extends Base {}` (real @typescript-eslint/naming-convention
+	// never flags this — it only validates the class's own identifier, if any).
+	nameNode := node.AsClassExpression().Name()
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 		return nil
 	}
