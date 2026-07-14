@@ -34,8 +34,9 @@
     "build:bin": "node ../../scripts/place-host-build.mjs bin",
     "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
     "build:js": "rslib build",
+    "generate:rule-types": "node ./scripts/generate-rule-option-types.mjs",
     "dev": "rslib build --watch",
-    "build": "pnpm build:bin && pnpm build:js",
+    "build": "pnpm build:bin && pnpm build:js && pnpm generate:rule-types",
     "test": "rstest run",
     "test:update": "rstest run -u"
   },
@@ -72,6 +73,7 @@
     "espree": "11.2.0",
     "esquery": "1.7.0",
     "globals": "17.7.0",
+    "json-schema-to-typescript": "^15.0.4",
     "tinyglobby": "0.2.15",
     "typescript": "5.9.3"
   },
@@ -87,8 +89,8 @@
     "@rslint/native-darwin-arm64": "workspace:*",
     "@rslint/native-darwin-x64": "workspace:*",
     "@rslint/native-linux-arm64-gnu": "workspace:*",
-    "@rslint/native-linux-x64-gnu": "workspace:*",
     "@rslint/native-linux-arm64-musl": "workspace:*",
+    "@rslint/native-linux-x64-gnu": "workspace:*",
     "@rslint/native-linux-x64-musl": "workspace:*",
     "@rslint/native-win32-arm64-msvc": "workspace:*",
     "@rslint/native-win32-x64-msvc": "workspace:*"
