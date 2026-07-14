@@ -63,6 +63,15 @@ func NewSchema(rawJSON []byte) *Schema {
 // time process-wide regardless of how many rules use it.
 var EmptyArraySchema = NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
 
+// RawJSON returns the schema's original, not-yet-compiled JSON — the same bytes
+// passed to NewSchema. Exposed for tooling that needs the schema text
+// itself rather than a compiled validator (e.g. cmd/gen-rule-types, which
+// dumps every registered rule's schema for the TypeScript rule-options
+// generator).
+func (s *Schema) RawJSON() []byte {
+	return s.rawJSON
+}
+
 // Compile compiles the schema's raw JSON exactly once and returns the
 // memoized result; every subsequent call — from any goroutine — returns the
 // same compiled schema (or the same compile error).

@@ -1,44 +1,34 @@
 import { describe, test, expect } from '@rstest/core';
 import {
-  ruleIdFromSchemaPath,
+  collectRuleSchemas,
   ruleIdToTypeName,
   injectIntoDts,
 } from '../scripts/generate-rule-option-types.mjs';
 
-describe('ruleIdFromSchemaPath', () => {
-  test('resolves a core rule schema to its bare rule ID', () => {
-    expect(
-      ruleIdFromSchemaPath('internal/rules/eqeqeq/eqeqeq.schema.json'),
-    ).toBe('eqeqeq');
-    expect(
-      ruleIdFromSchemaPath('internal/rules/no_console/no-console.schema.json'),
-    ).toBe('no-console');
-  });
+describe('collectRuleSchemas', () => {
+  // Exercises the real `go run ./cmd/gen-rule-types` boundary (Go is
+  // already a required toolchain for this package — `build:bin` compiles
+  // the native binary the same way) rather than mocking it, since the
+  // whole point of going through Go's rule registry is that it's the
+  // single source of truth for rule IDs/prefixes and declared schemas.
+  test('includes rules with a custom schema and the shared EmptyArraySchema, omits not-yet-migrated rules', () => {
+    const rules = collectRuleSchemas();
+    const byName = new Map(rules.map((r) => [r.name, r]));
 
-  test('resolves a ported-plugin rule schema to its prefixed rule ID', () => {
-    expect(
-      ruleIdFromSchemaPath(
-        'internal/plugins/typescript/rules/no_unused_vars/no-unused-vars.schema.json',
-      ),
-    ).toBe('@typescript-eslint/no-unused-vars');
-    expect(
-      ruleIdFromSchemaPath(
-        'internal/plugins/react_hooks/rules/exhaustive_deps/exhaustive-deps.schema.json',
-      ),
-    ).toBe('react-hooks/exhaustive-deps');
-    expect(
-      ruleIdFromSchemaPath(
-        'internal/plugins/jsx_a11y/rules/alt_text/alt-text.schema.json',
-      ),
-    ).toBe('jsx-a11y/alt-text');
-  });
+    expect(byName.has('eqeqeq')).toBe(true);
+    expect(byName.has('no-console')).toBe(true);
 
-  test('throws for an unrecognized plugin directory', () => {
-    expect(() =>
-      ruleIdFromSchemaPath(
-        'internal/plugins/mystery/rules/foo/foo.schema.json',
-      ),
-    ).toThrow(/unknown plugin directory/);
+    // no-debugger has no on-disk *.schema.json — it references the shared
+    // rule.EmptyArraySchema directly in Go — which is exactly the case a
+    // filesystem scan alone can't see.
+    expect(byName.get('no-debugger')?.schema).toEqual({
+      type: 'array',
+      maxItems: 0,
+    });
+
+    // A rule with no declared Schema at all must be omitted, not present
+    // with a null/empty schema.
+    expect(byName.has('no-var')).toBe(false);
   });
 });
 

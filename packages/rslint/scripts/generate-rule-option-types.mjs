@@ -1,17 +1,20 @@
 // scripts/generate-rule-option-types.mjs
 //
-// Scans internal/rules/*/*.schema.json and internal/plugins/*/rules/**/*.schema.json
-// for native rules' options JSON Schemas, compiles each into a TypeScript
-// type via json-schema-to-typescript, and injects the result into the built
-// `dist/index.d.ts` at the `@__RULE_OPTIONS__` marker inside `RulesRecord`
-// (see src/config/define-config.ts). Rules that haven't declared a schema
-// yet (internal/rule.Rule.Schema == nil) simply have no *.schema.json file
-// and keep falling back to RulesRecord's untyped index signature.
+// Dumps every registered native rule's options JSON Schema from Go (via
+// `go run ./cmd/gen-rule-types`, see cmd/gen-rule-types/schemas.go — it
+// walks internal/config.GlobalRuleRegistry, the single source of truth for
+// rule IDs, prefixes, and declared schemas), compiles each schema into a
+// TypeScript type via json-schema-to-typescript, and injects the result
+// into the built `dist/index.d.ts` at the `@__RULE_OPTIONS__` marker inside
+// `RulesRecord` (see src/config/define-config.ts). Rules that haven't
+// declared a schema yet (internal/rule.Rule.Schema == nil) are omitted by
+// the Go side and keep falling back to RulesRecord's untyped index
+// signature.
 //
 // Run after `rslib build` (dist/index.d.ts must already exist) as part of
 // `pnpm build` — see the `generate:rule-types` script in package.json.
 import { compile } from 'json-schema-to-typescript';
-import { glob } from 'tinyglobby';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,45 +24,22 @@ const REPO_ROOT = path.resolve(PACKAGE_ROOT, '../..');
 const DIST_INDEX_DTS = path.join(PACKAGE_ROOT, 'dist/index.d.ts');
 const MARKER = '/** @__RULE_OPTIONS__ */';
 
-// Ported-plugin directory name (internal/plugins/<dir>) -> rule-ID prefix.
-// Mirrors NATIVE_PLUGINS in src/config/define-config.ts.
-const PLUGIN_PREFIXES = {
-  typescript: '@typescript-eslint',
-  import: 'import',
-  react: 'react',
-  react_hooks: 'react-hooks',
-  jest: 'jest',
-  jsx_a11y: 'jsx-a11y',
-  promise: 'promise',
-  unicorn: 'unicorn',
-};
-
-const SCHEMA_GLOBS = [
-  'internal/rules/*/*.schema.json',
-  'internal/plugins/*/rules/**/*.schema.json',
-];
-
 /**
- * Resolves a `<rule-name>.schema.json` file's path (relative to the repo
- * root, forward-slash separated) to its full rule ID, per the plugin-prefix
- * convention documented in .agents/skills/port-rule/references/PORT_RULE.md.
+ * Runs `go run ./cmd/gen-rule-types`, which registers every native rule and
+ * returns `{name, schema}` for each one that declares an options JSON
+ * Schema — including a rule that only references the shared
+ * `rule.EmptyArraySchema` (no options, no on-disk `.schema.json` file),
+ * which a filesystem scan of `*.schema.json` alone can't see.
+ *
+ * @returns {{ name: string, schema: import('json-schema').JSONSchema4 }[]}
  */
-export function ruleIdFromSchemaPath(relativePath) {
-  const ruleName = path.basename(relativePath, '.schema.json');
-  const pluginMatch = relativePath.match(
-    /^internal\/plugins\/([^/]+)\/rules\//,
-  );
-  if (!pluginMatch) {
-    return ruleName;
-  }
-  const prefix = PLUGIN_PREFIXES[pluginMatch[1]];
-  if (!prefix) {
-    throw new Error(
-      `generate-rule-option-types: unknown plugin directory for schema ` +
-        `${relativePath}: ${pluginMatch[1]}`,
-    );
-  }
-  return `${prefix}/${ruleName}`;
+export function collectRuleSchemas() {
+  const output = execFileSync('go', ['run', './cmd/gen-rule-types'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf-8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return JSON.parse(output);
 }
 
 /**
@@ -76,23 +56,14 @@ export function ruleIdToTypeName(ruleId) {
     .join('');
 }
 
-async function findSchemaFiles() {
-  const files = await glob(SCHEMA_GLOBS, { cwd: REPO_ROOT });
-  return files.sort();
-}
-
 async function compileRuleOptionTypes() {
-  const files = await findSchemaFiles();
+  const rules = collectRuleSchemas();
 
   const typeDeclarations = [];
   const recordProperties = [];
 
-  for (const relativePath of files) {
-    const ruleId = ruleIdFromSchemaPath(relativePath);
+  for (const { name: ruleId, schema } of rules) {
     const typeName = `${ruleIdToTypeName(ruleId)}Options`;
-    const schema = JSON.parse(
-      await fs.readFile(path.join(REPO_ROOT, relativePath), 'utf-8'),
-    );
     const ts = await compile(schema, typeName, {
       bannerComment: '',
       additionalProperties: false,
