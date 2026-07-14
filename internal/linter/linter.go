@@ -721,8 +721,10 @@ func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program
 		return nil
 	}
 	shardCount := runtime.GOMAXPROCS(0)
-	if opts.SingleThreaded || shardCount > len(files) {
+	if opts.SingleThreaded {
 		shardCount = 1
+	} else if shardCount > len(files) {
+		shardCount = len(files)
 	}
 	if shardCount < 1 {
 		shardCount = 1
