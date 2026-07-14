@@ -708,15 +708,25 @@ func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 // After global ignore check, entries are merged in order if their files match and ignores don't.
 // cwd is the directory the config lives in; file paths are resolved relative to it.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
+	// Collect all global ignore patterns and evaluate once. This allows `!`
+	// negation patterns in separate entries to work correctly, aligned with
+	// ESLint v10 which merges all global ignores before evaluating. Callers
+	// resolving many files against the same config (FileConfigResolver)
+	// should precompute this once via extractConfigIgnores and call
+	// getConfigForFileWithIgnores directly instead of re-parsing every
+	// pattern string on every call.
+	return config.getConfigForFileWithIgnores(filePath, cwd, extractConfigIgnores(config))
+}
+
+// getConfigForFileWithIgnores is GetConfigForFile with the global ignore
+// patterns supplied by the caller, so repeated calls against the same config
+// (one per lint target) don't re-parse the same ignore pattern strings.
+func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
 	merged := &MergedConfig{
 		Rules:   make(map[string]*RuleConfig),
 		Plugins: make(map[string]struct{}),
 	}
 
-	// 1. Collect all global ignore patterns and evaluate once.
-	// This allows `!` negation patterns in separate entries to work correctly,
-	// aligned with ESLint v10 which merges all global ignores before evaluating.
-	globalIgnorePatterns := extractConfigIgnores(config)
 	if len(globalIgnorePatterns) > 0 {
 		// Phase 1: directory-level check. Patterns like `dir/**` block the
 		// directory entirely — `!` negation cannot undo this. Aligned with
