@@ -258,21 +258,54 @@ func (s *Server) reloadConfig() error {
 	return nil
 }
 
-// validateRuleOptionsForConfig runs options-only validation (not the
-// unknown-name check the CLI and API also run): an LSP config transaction
-// can commit a catalog without ESLint-plugin entries when the plugin host is
-// unavailable, and rejecting the snapshot over then-unresolvable rule names
-// would discard a perfectly valid config.
-func validateRuleOptionsForConfig(entries config.RslintConfig, configDirectory string) error {
-	optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
-	if len(optionsErrs) == 0 {
-		return nil
+// disableInvalidRules runs the same rule validation as the CLI and API —
+// unknown rule names and invalid rule options — but downgrades every failure
+// to a logged warning instead of failing the config transaction: the editor
+// keeps serving diagnostics from the rest of an otherwise healthy config.
+// Each offending rule is set to "off" in the returned entries so it never
+// runs with options it declared invalid (an unknown name would be skipped by
+// the runtime anyway; disabling it is merely uniform). A rule flagged in any
+// entry is disabled in every entry: the per-file merge could otherwise still
+// select the invalid options. When the plugin host is unavailable the
+// committed catalog carries no ESLint-plugin entries and every mounted
+// plugin rule is reported unknown — as a warning that is harmless, and the
+// degraded-host commit already logs its own notice.
+func disableInvalidRules(entries config.RslintConfig, configDirectory string, eslintPlugins []config.EslintPluginEntry) config.RslintConfig {
+	ruleErrs := config.ValidateRules(entries, config.GlobalRuleRegistry, eslintPlugins)
+	if len(ruleErrs) == 0 {
+		return entries
 	}
-	msgs := make([]string, len(optionsErrs))
-	for i, optionsErr := range optionsErrs {
-		msgs[i] = optionsErr.Error()
+	invalid := make(map[string]struct{}, len(ruleErrs))
+	for _, ruleErr := range ruleErrs {
+		log.Printf("[rslint] Warning: %s (config at %s); the rule is disabled", ruleErr.Error(), configDirectory)
+		invalid[ruleErr.RuleName] = struct{}{}
 	}
-	return fmt.Errorf("invalid rule options for %q:\n%s", configDirectory, strings.Join(msgs, "\n"))
+	sanitized := make(config.RslintConfig, len(entries))
+	for i, entry := range entries {
+		sanitized[i] = entry
+		needsClone := false
+		for name := range invalid {
+			if _, exists := entry.Rules[name]; exists {
+				needsClone = true
+				break
+			}
+		}
+		if !needsClone {
+			continue
+		}
+		// Clone the rules map rather than mutating it in place: the catalog
+		// owns the original entries and may be shared beyond this snapshot.
+		rules := make(config.Rules, len(entry.Rules))
+		for name, value := range entry.Rules {
+			if _, bad := invalid[name]; bad {
+				rules[name] = "off"
+			} else {
+				rules[name] = value
+			}
+		}
+		sanitized[i].Rules = rules
+	}
+	return sanitized
 }
 
 // handleDidChangeWatchedFiles handles file change notifications from the client.

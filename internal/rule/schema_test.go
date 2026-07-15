@@ -217,7 +217,7 @@ func TestValidateAcceptsJavaScriptOnlyRegexAsFormatRegexValue(t *testing.T) {
 }
 
 func TestValidateFillsDefaultsIntoCallerOptionsInPlace(t *testing.T) {
-	// The public Validate contract config.ValidateRuleOptions relies on:
+	// The public Validate contract config.ValidateRules relies on:
 	// defaults land in the caller's own option maps, so the very config value
 	// that was validated carries them into linting without extra plumbing —
 	// the same way ajv's useDefaults mutates the instance ESLint hands it.

@@ -149,6 +149,26 @@ func TestValidateRulesResolvesMountedPluginRules(t *testing.T) {
 	}
 }
 
+func TestValidateRulesRejectsDeclaredButUnmountedPluginRules(t *testing.T) {
+	// Declaring a prefix under `plugins` grants no exemption: enabling a
+	// plugin's rules without supplying that plugin's rule names (e.g. an API
+	// request that carries a config but no plugin metadata) is an error, not
+	// a silently inert config.
+	registry := newOptionsTestRegistry()
+	config := RslintConfig{ConfigEntry{
+		Plugins: []string{"request-plugin"},
+		Rules:   Rules{"request-plugin/rule": "error"},
+	}}
+	errs := ValidateRules(config, registry, nil)
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 unknown-rule error, got %d: %v", len(errs), errs)
+	}
+	want := `unknown rule "request-plugin/rule": plugin "request-plugin" is not registered`
+	if errs[0].Error() != want {
+		t.Errorf("unexpected message:\n got: %s\nwant: %s", errs[0].Error(), want)
+	}
+}
+
 func TestValidateRulesIgnoresStalePluginPlaceholders(t *testing.T) {
 	// A long-lived process may still hold placeholder registrations from an
 	// earlier config or request; whether a mounted rule resolves is decided
@@ -192,21 +212,6 @@ func TestValidateRulesDeduplicatesUnknownNamesAcrossEntries(t *testing.T) {
 	errs := ValidateRules(config, registry, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 deduplicated error, got %d: %v", len(errs), errs)
-	}
-}
-
-func TestValidateRuleOptionsSkipsUnknownNames(t *testing.T) {
-	// The options-only variant (used by the LSP) must keep tolerating
-	// unresolved names: a degraded plugin host commits a catalog without
-	// plugin entries, and rejecting the config over them would be wrong.
-	registry := newOptionsTestRegistry()
-	config := configWithRules(Rules{
-		"no-such-rule": []any{"error", map[string]any{"allow": "warn"}},
-		"with-schema":  []any{"error", map[string]any{"allow": "warn"}},
-	})
-	errs := ValidateRuleOptions(config, registry)
-	if len(errs) != 1 || errs[0].RuleName != "with-schema" {
-		t.Fatalf("expected only the with-schema options error, got: %v", errs)
 	}
 }
 

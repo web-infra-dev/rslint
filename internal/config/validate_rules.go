@@ -32,7 +32,9 @@ func (e RuleValidationError) Error() string { return e.Message }
 // resolved and before linting starts, so a bad config fails fast instead of
 // being silently ignored (unknown names) or surfacing mid-lint (bad
 // options). Rules configured as "off" are exempt from both checks, matching
-// ESLint, which never validates a disabled rule.
+// ESLint, which never validates a disabled rule. The CLI and API treat every
+// returned failure as fatal; the LSP downgrades them to warnings and
+// disables the offending rules instead of failing the config transaction.
 //
 // Name validation resolves against the registry's native rules (core rules
 // and first-class plugins) plus the rules of the ESLint plugins mounted via
@@ -40,22 +42,9 @@ func (e RuleValidationError) Error() string { return e.Message }
 // than the registry's placeholder registrations: the placeholders may not be
 // registered yet when validation runs (the CLI and API validate before
 // RegisterEslintPluginRules), and in a long-lived process they may be stale
-// leftovers from an earlier config.
-func ValidateRules(config RslintConfig, registry *RuleRegistry, eslintPlugins []EslintPluginEntry) []RuleValidationError {
-	return validateRules(config, registry, eslintPlugins, true)
-}
-
-// ValidateRuleOptions is ValidateRules without the unknown-name check:
-// options-only validation. The LSP uses this because its config transactions
-// can commit a catalog without ESLint-plugin entries when the plugin host is
-// unavailable (pluginDegraded) — unknown-name errors would then reject a
-// perfectly valid config, whereas the runtime merely skips the unresolved
-// rules until a later successful refresh.
-func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleValidationError {
-	return validateRules(config, registry, nil, false)
-}
-
-// validateRules implements ValidateRules/ValidateRuleOptions.
+// leftovers from an earlier config. Declaring a prefix under `plugins`
+// grants no exemption: a caller that enables a plugin's rules must also
+// supply that plugin's rule names.
 //
 // Options validation is skipped for rules that declare no schema yet
 // (rule.Rule.Schema == nil — the pre-framework status quo) and for disabled
@@ -78,7 +67,7 @@ func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleVali
 // write-back needed. The parallel loop stays race-free because every entry's
 // rule value is its own decoded JSON value, never shared with another
 // entry's.
-func validateRules(config RslintConfig, registry *RuleRegistry, eslintPlugins []EslintPluginEntry, checkNames bool) []RuleValidationError {
+func ValidateRules(config RslintConfig, registry *RuleRegistry, eslintPlugins []EslintPluginEntry) []RuleValidationError {
 	mountedRules := make(map[string]struct{})
 	mountedPrefixes := make(map[string]struct{}, len(eslintPlugins))
 	for _, plugin := range eslintPlugins {
@@ -117,9 +106,6 @@ func validateRules(config RslintConfig, registry *RuleRegistry, eslintPlugins []
 				known = false
 			}
 			if _, mounted := mountedRules[ruleName]; !known && !mounted {
-				if !checkNames {
-					continue
-				}
 				if _, dup := unknownSeen[ruleName]; dup {
 					continue
 				}
