@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"runtime"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -134,8 +136,20 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker) {
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
+		// Computed once per file and shared via ctx.Comments so
+		// rules that need every comment in the file (directive scanning,
+		// max-lines, etc.) don't each repeat this same token-tree walk.
 		comments := make([]*ast.CommentRange, 0)
 		utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
+		// ForEachComment can surface the same physical comment twice (once as
+		// a token's trailing range, once as the next token's leading range)
+		// and isn't guaranteed strictly ordered. Sort and dedup once here so
+		// every downstream consumer can rely on a clean, ordered list instead
+		// of each re-deriving it.
+		sort.Slice(comments, func(i, j int) bool { return comments[i].Pos() < comments[j].Pos() })
+		comments = slices.CompactFunc(comments, func(a, b *ast.CommentRange) bool {
+			return a.Pos() == b.Pos() && a.End() == b.End()
+		})
 
 		// Create disable manager for this file
 		disableManager := rule.NewDisableManager(file, comments)
@@ -159,6 +173,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				ConfigGlobals:  r.Globals,
 				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
+				Comments:       comments,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 				ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {

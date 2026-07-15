@@ -104,7 +104,7 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 	}
 
 	if opts.skipComments {
-		for line := range commentOnlyLines(sourceFile, text, lineStarts) {
+		for line := range commentOnlyLines(ctx.Comments, text, lineStarts) {
 			idx := line - 1
 			if idx >= 0 && idx < nLines {
 				keep[idx] = false
@@ -143,7 +143,7 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 // comments and whitespace, matching ESLint's max-lines `getLinesWithoutCode`.
 // A multi-line comment's first (last) line is excluded when non-comment code
 // exists earlier (later) on that same line.
-func commentOnlyLines(sourceFile *ast.SourceFile, text string, lineStarts []core.TextPos) map[int]bool {
+func commentOnlyLines(sourceComments []*ast.CommentRange, text string, lineStarts []core.TextPos) map[int]bool {
 	var comments []*ast.CommentRange
 	// ESLint's sourceCode.getAllComments() includes the hashbang (`#!`) line,
 	// but tsgo's ForEachComment skips past it. Synthesize a comment range so
@@ -154,10 +154,7 @@ func commentOnlyLines(sourceFile *ast.SourceFile, text string, lineStarts []core
 			Kind:      ast.KindSingleLineCommentTrivia,
 		})
 	}
-	utils.ForEachComment(sourceFile.AsNode(), func(c *ast.CommentRange) {
-		copied := *c
-		comments = append(comments, &copied)
-	}, sourceFile)
+	comments = append(comments, sourceComments...)
 	if len(comments) == 0 {
 		return nil
 	}

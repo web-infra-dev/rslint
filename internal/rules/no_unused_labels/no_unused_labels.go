@@ -68,10 +68,10 @@ func hasCommentBetweenLabelAndBody(ctx rule.RuleContext, node *ast.Node) bool {
 	bodyStart := scanner.SkipTrivia(ctx.SourceFile.Text(), ls.Statement.Pos())
 	colon, ok := labelSeparatorRange(ctx, labelToken.End(), bodyStart)
 	if !ok {
-		return utils.HasCommentInSpan(ctx.SourceFile, labelToken.End(), bodyStart)
+		return utils.HasCommentInSpan(ctx.Comments, labelToken.End(), bodyStart)
 	}
-	return utils.HasCommentInSpan(ctx.SourceFile, labelToken.End(), colon.Pos()) ||
-		utils.HasCommentInSpan(ctx.SourceFile, colon.End(), bodyStart)
+	return utils.HasCommentInSpan(ctx.Comments, labelToken.End(), colon.Pos()) ||
+		utils.HasCommentInSpan(ctx.Comments, colon.End(), bodyStart)
 }
 
 func isFixable(ctx rule.RuleContext, node *ast.Node) bool {

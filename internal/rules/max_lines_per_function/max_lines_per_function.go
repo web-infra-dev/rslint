@@ -19,7 +19,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		state := newLineState(ctx.SourceFile)
+		state := newLineState(ctx.SourceFile, ctx.Comments)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -177,7 +177,7 @@ type lineState struct {
 	lineComment []*ast.CommentRange
 }
 
-func newLineState(sourceFile *ast.SourceFile) *lineState {
+func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange) *lineState {
 	text := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)
 	if len(lineStarts) == 0 {
@@ -195,10 +195,7 @@ func newLineState(sourceFile *ast.SourceFile) *lineState {
 			Kind:      ast.KindSingleLineCommentTrivia,
 		})
 	}
-	utils.ForEachComment(sourceFile.AsNode(), func(c *ast.CommentRange) {
-		copied := *c
-		comments = append(comments, &copied)
-	}, sourceFile)
+	comments = append(comments, sourceComments...)
 	// ForEachComment may surface a comment twice (once as a token's trailing
 	// range, once as the next token's leading range) and not strictly in source
 	// order. Sort so a deterministic "last write wins" assignment to
