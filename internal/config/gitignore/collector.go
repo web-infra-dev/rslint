@@ -15,8 +15,7 @@ func normalizeGlobPath(path string) string {
 }
 
 func matchGlob(pattern string, path string) bool {
-	matched, err := doublestar.Match(pattern, path)
-	return err == nil && matched
+	return doublestar.MatchUnvalidated(pattern, path)
 }
 
 func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool {

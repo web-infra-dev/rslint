@@ -98,12 +98,6 @@ type IgnorePattern struct {
 	Negated         bool
 	Kind            dirKind
 	CaseInsensitive bool
-	// valid caches doublestar.ValidatePattern(Glob), computed once here instead
-	// of on every match. doublestar.Match() re-walks the pattern to validate it
-	// on every non-matching call (the common case, since most patterns don't
-	// apply to most files), which dominated profiles of the per-file ignore
-	// check once file collection was parallelized (see ignorePatternMatches).
-	valid bool
 }
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
@@ -140,7 +134,6 @@ func ParseIgnorePattern(raw string) IgnorePattern {
 		body = body[1:]
 	}
 	p.Glob = normalizePattern(body)
-	p.valid = doublestar.ValidatePattern(p.Glob)
 	switch {
 	case body == "":
 		p.Kind = dirNone
@@ -195,16 +188,20 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 }
 
 // ignorePatternMatches reports whether path matches pattern.Glob, applying the
-// case fold for case-insensitive patterns. It uses MatchUnvalidated with the
-// validity computed once in ParseIgnorePattern, instead of matchGlob's
-// doublestar.Match (which re-validates the pattern on every call — the common
-// case being a non-match, since most patterns don't apply to most files, which
-// dominated profiles of the per-file ignore check once file collection was
-// parallelized).
+// case fold for case-insensitive patterns. It uses MatchUnvalidated instead of
+// matchGlob's doublestar.Match: doublestar's own algorithm only ever consults
+// pattern validity to decide which "no match" error to report (ErrBadPattern
+// vs nil) — every validate-gated branch in doMatchWithSeparator/
+// isZeroLengthPattern already returns matched=false regardless of the
+// validate flag, and malformed-syntax errors hit mid-walk (unclosed `[`/`{`)
+// return false unconditionally, validate or not. So an invalid pattern can
+// never make Match report true, with or without validation, which means
+// skipping validation is always safe for a boolean-only caller — no cached
+// "is this pattern valid" flag is needed to gate it. Re-validating on every
+// call (the common case being a non-match, since most patterns don't apply to
+// most files) dominated profiles of the per-file ignore check once file
+// collection was parallelized; MatchUnvalidated skips exactly that dead work.
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
-	if !pattern.valid {
-		return false
-	}
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
 		glob = strings.ToLower(glob)

@@ -148,12 +148,12 @@ func (m *ignoreMatcher) ignores(path string) bool {
 // all their contents). We skip empty-segment boundaries from "//" so that
 // doublestar's `*` (which matches zero chars) doesn't produce false positives.
 func matchIgnore(glob, path string) bool {
-	if matched, _ := doublestar.Match(glob, path); matched {
+	if doublestar.MatchUnvalidated(glob, path) {
 		return true
 	}
 	for i := len(path) - 1; i > 0; i-- {
 		if path[i] == '/' && path[i-1] != '/' {
-			if matched, _ := doublestar.Match(glob, path[:i]); matched {
+			if doublestar.MatchUnvalidated(glob, path[:i]) {
 				return true
 			}
 		}

@@ -663,9 +663,12 @@ func registerAllCoreEslintRules() {
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
 // matchGlob matches a glob pattern against a path using doublestar.
+// MatchUnvalidated skips doublestar's re-validation of the pattern on every
+// call: an invalid pattern can never make Match report true (its own
+// validate-gated branches all resolve to matched=false regardless of the
+// validate flag), so a boolean-only caller loses nothing by skipping it.
 func matchGlob(pattern, path string) bool {
-	m, err := doublestar.Match(pattern, path)
-	return err == nil && m
+	return doublestar.MatchUnvalidated(pattern, path)
 }
 
 func normalizePattern(pattern string) string {
@@ -966,17 +969,17 @@ func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) b
 
 	normalizedPattern := normalizePattern(pattern)
 
-	if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
+	if doublestar.MatchUnvalidated(normalizedPattern, normalizedPath) {
 		return true
 	}
 	if normalizedPath != filePath {
-		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
+		if doublestar.MatchUnvalidated(normalizedPattern, filePath) {
 			return true
 		}
 	}
 	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
-		if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
+		if doublestar.MatchUnvalidated(normalizedPattern, unixPath) {
 			return true
 		}
 	}
