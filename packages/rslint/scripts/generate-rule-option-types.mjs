@@ -82,6 +82,23 @@ export function ruleIdToTypeName(ruleId) {
     .join('');
 }
 
+/**
+ * True for the shared `rule.EmptyArraySchema` (internal/rule/schema.go) that
+ * no-options rules like `no-debugger` reference directly. Special-cased so
+ * it maps straight to `RuleEntry<[]>` instead of round-tripping through
+ * json-schema-to-typescript for a named `FooOptions = []` type nothing else
+ * needs.
+ */
+function isEmptyArraySchema(schema) {
+  return (
+    schema !== null &&
+    typeof schema === 'object' &&
+    Object.keys(schema).length === 2 &&
+    schema.type === 'array' &&
+    schema.maxItems === 0
+  );
+}
+
 async function compileRuleOptionTypes() {
   const rules = collectRuleSchemas();
 
@@ -89,6 +106,11 @@ async function compileRuleOptionTypes() {
   const recordProperties = [];
 
   for (const { name: ruleId, schema } of rules) {
+    if (isEmptyArraySchema(schema)) {
+      recordProperties.push(`${JSON.stringify(ruleId)}?: RuleEntry<[]>;`);
+      continue;
+    }
+
     const typeName = `${ruleIdToTypeName(ruleId)}Options`;
     const ts = await compile(schema, typeName, {
       bannerComment: '',
