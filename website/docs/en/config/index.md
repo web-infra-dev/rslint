@@ -156,7 +156,7 @@ Plugins enabled for this entry, in one of two forms.
 
 **Array of names** — built-in (native) plugins. A name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
 
-Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `jsx-a11y`, `promise`, `react`, `react-hooks`, `unicorn`.
+Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `jsx-a11y`, `promise`, `react`, `react-hooks`, `rstest`, `unicorn`.
 
 ```ts
 {

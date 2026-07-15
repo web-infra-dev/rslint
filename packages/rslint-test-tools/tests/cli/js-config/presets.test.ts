@@ -1,6 +1,13 @@
 import { describe, test, expect } from '@rstest/core';
 import { normalizeConfig } from '@rslint/core/config-loader';
-import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
+import {
+  defineConfig,
+  ts,
+  js,
+  reactPlugin,
+  importPlugin,
+  rstestPlugin,
+} from '@rslint/core';
 
 describe('defineConfig and config presets', () => {
   test('defineConfig should be importable and return input as-is', () => {
@@ -20,10 +27,12 @@ describe('defineConfig and config presets', () => {
     expect(reactPlugin.configs.recommended).toBeDefined();
     expect(importPlugin).toBeDefined();
     expect(importPlugin.configs.recommended).toBeDefined();
+    expect(rstestPlugin).toBeDefined();
+    expect(rstestPlugin.configs.recommended).toBeDefined();
   });
 
   test('config presets should be valid config entries', () => {
-    for (const plugin of [ts, js, reactPlugin, importPlugin]) {
+    for (const plugin of [ts, js, reactPlugin, importPlugin, rstestPlugin]) {
       const rec = plugin.configs.recommended;
       expect(typeof rec).toBe('object');
       expect(rec).not.toBeNull();
@@ -59,5 +68,14 @@ describe('defineConfig and config presets', () => {
     const rec = importPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('eslint-plugin-import');
+  });
+
+  test('rstestPlugin.configs.recommended should declare rstest plugin and rule', () => {
+    const rec = rstestPlugin.configs.recommended;
+    expect(rec.plugins).toBeDefined();
+    expect(rec.plugins).toContain('rstest');
+    expect(rec.rules).toEqual({
+      'rstest/no-mocks-import': 'error',
+    });
   });
 });

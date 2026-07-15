@@ -125,6 +125,17 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     ],
   },
   {
+    prefix: 'rstest',
+    group: 'rstest',
+    importName: 'rstestPlugin',
+    presets: [
+      {
+        name: 'rstestPlugin.configs.recommended',
+        description: 'Rstest rules',
+      },
+    ],
+  },
+  {
     prefix: 'unicorn',
     group: 'eslint-plugin-unicorn',
     importName: 'unicornPlugin',
