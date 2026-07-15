@@ -1,25 +1,31 @@
 import * as vscode from 'vscode';
-export function RegisterCommands(
-  context: vscode.ExtensionContext,
+export function registerCommands(
   outputChannel: vscode.OutputChannel,
   traceOutputChannel: vscode.OutputChannel,
-) {
-  context.subscriptions.push(
-    vscode.commands.registerCommand('rslint.showMenu', showCommands),
-  );
-  // context.subscriptions.push(vscode.commands.registerCommand('rslint.restart', async () => {
-  //     await vscode.commands.executeCommand('rslint.restart');
-  // }));
-  context.subscriptions.push(
-    vscode.commands.registerCommand('rslint.output.focus', () => {
-      outputChannel.show();
-    }),
-  );
-  context.subscriptions.push(
-    vscode.commands.registerCommand('rslint.lsp-trace.focus', () => {
-      traceOutputChannel.show();
-    }),
-  );
+): vscode.Disposable[] {
+  const disposables: vscode.Disposable[] = [];
+  try {
+    disposables.push(
+      vscode.commands.registerCommand('rslint.showMenu', showCommands),
+    );
+    // vscode.commands.registerCommand('rslint.restart', async () => {
+    //   await vscode.commands.executeCommand('rslint.restart');
+    // }),
+    disposables.push(
+      vscode.commands.registerCommand('rslint.output.focus', () => {
+        outputChannel.show();
+      }),
+    );
+    disposables.push(
+      vscode.commands.registerCommand('rslint.lsp-trace.focus', () => {
+        traceOutputChannel.show();
+      }),
+    );
+    return disposables;
+  } catch (error) {
+    for (const disposable of disposables.reverse()) disposable.dispose();
+    throw error;
+  }
 }
 
 async function showCommands(): Promise<void> {

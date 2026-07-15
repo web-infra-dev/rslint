@@ -9,12 +9,27 @@ interface TestSuite {
   name: string;
   workspace: string;
   tests: string;
+  workspaceEntry?: string;
+  workspaceFolders?: string[];
 }
 
 const workspaceMarkerFile = '.rslint-vscode-test-sandbox.json';
 
 function resolveFixture(name: string): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', name);
+}
+
+function resolveSandboxEntry(workspaceRoot: string, entry: string): string {
+  const resolved = path.resolve(workspaceRoot, entry);
+  const relative = path.relative(workspaceRoot, resolved);
+  if (
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(`Workspace entry escapes its isolated sandbox: ${entry}`);
+  }
+  return resolved;
 }
 
 async function findPackageRoot(startPath: string): Promise<string> {
@@ -57,13 +72,19 @@ async function runIsolatedSuite(
       force: false,
       errorOnExist: true,
     });
+    const expectedWorkspaceFolders = await Promise.all(
+      (suite.workspaceFolders ?? ['.']).map((folder) =>
+        fs.promises.realpath(resolveSandboxEntry(workspaceCopy, folder)),
+      ),
+    );
     await fs.promises.writeFile(
       path.join(workspaceCopy, workspaceMarkerFile),
       JSON.stringify({
-        version: 1,
+        version: 2,
         nonce: randomUUID(),
         sourceWorkspace: await fs.promises.realpath(suite.workspace),
         expectedWorkspace: await fs.promises.realpath(workspaceCopy),
+        expectedWorkspaceFolders,
       }),
       { encoding: 'utf8', flag: 'wx', mode: 0o600 },
     );
@@ -85,7 +106,9 @@ async function runIsolatedSuite(
       extensionDevelopmentPath,
       extensionTestsPath: suite.tests,
       launchArgs: [
-        workspaceCopy,
+        suite.workspaceEntry
+          ? resolveSandboxEntry(workspaceCopy, suite.workspaceEntry)
+          : workspaceCopy,
         '--disable-extensions',
         '--disable-updates',
         '--disable-workspace-trust',
@@ -142,6 +165,25 @@ async function main(): Promise<void> {
       name: 'Monorepo config tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-monorepo'),
       tests: path.resolve(__dirname, './suite-monorepo'),
+    },
+    {
+      name: 'Multi-root dynamic ownership tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-multiroot'),
+      tests: path.resolve(__dirname, './suite-multiroot'),
+      workspaceEntry: 'multiroot.code-workspace',
+      workspaceFolders: [
+        'parent',
+        'sentinel',
+        'twins/left/app',
+        'twins/right/app',
+      ],
+    },
+    {
+      name: 'Multi-root initial parent-child tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-multiroot'),
+      tests: path.resolve(__dirname, './suite-multiroot'),
+      workspaceEntry: 'nested-initial.code-workspace',
+      workspaceFolders: ['parent', 'parent/nested', 'sentinel'],
     },
     {
       name: 'No config tests',

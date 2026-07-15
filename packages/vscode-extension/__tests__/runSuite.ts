@@ -68,16 +68,53 @@ function canonicalPath(filePath: string): string {
   return process.platform === 'win32' ? realPath.toLowerCase() : realPath;
 }
 
+function isPathWithin(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === '' ||
+    (relative !== '..' &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
+  );
+}
+
+function findWorkspaceMarker(startPath: string): string {
+  let current = startPath;
+  while (true) {
+    const candidate = path.join(current, workspaceMarkerFile);
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(current);
+    if (parent === current) {
+      throw new Error(
+        `Could not find isolated workspace marker above ${startPath}`,
+      );
+    }
+    current = parent;
+  }
+}
+
 function verifyIsolatedWorkspace(): void {
   const folders = vscode.workspace.workspaceFolders;
-  if (folders?.length !== 1) {
-    throw new Error(
-      `Expected exactly one isolated workspace folder, got ${folders?.length ?? 0}`,
-    );
+  if (!folders || folders.length === 0) {
+    throw new Error('Expected at least one isolated workspace folder, got 0');
   }
 
-  const actualPath = canonicalPath(folders[0].uri.fsPath);
-  const markerPath = path.join(actualPath, workspaceMarkerFile);
+  const actualPaths = folders
+    .map((folder) => canonicalPath(folder.uri.fsPath))
+    .sort();
+  const markerPaths = new Set(
+    actualPaths.map((actualPath) =>
+      canonicalPath(findWorkspaceMarker(actualPath)),
+    ),
+  );
+  if (markerPaths.size !== 1) {
+    throw new Error(
+      `Workspace folders do not share one isolated sandbox marker: ${[
+        ...markerPaths,
+      ].join(', ')}`,
+    );
+  }
+  const markerPath = [...markerPaths][0];
   let marker: unknown;
   try {
     marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
@@ -90,12 +127,18 @@ function verifyIsolatedWorkspace(): void {
     typeof marker !== 'object' ||
     marker === null ||
     !('version' in marker) ||
-    marker.version !== 1 ||
+    marker.version !== 2 ||
     !('nonce' in marker) ||
     typeof marker.nonce !== 'string' ||
     !/^[0-9a-f-]{36}$/i.test(marker.nonce) ||
     !('expectedWorkspace' in marker) ||
     typeof marker.expectedWorkspace !== 'string' ||
+    !('expectedWorkspaceFolders' in marker) ||
+    !Array.isArray(marker.expectedWorkspaceFolders) ||
+    marker.expectedWorkspaceFolders.length === 0 ||
+    !marker.expectedWorkspaceFolders.every(
+      (folder): folder is string => typeof folder === 'string',
+    ) ||
     !('sourceWorkspace' in marker) ||
     typeof marker.sourceWorkspace !== 'string'
   ) {
@@ -104,12 +147,35 @@ function verifyIsolatedWorkspace(): void {
 
   const expectedPath = canonicalPath(marker.expectedWorkspace);
   const sourcePath = canonicalPath(marker.sourceWorkspace);
-  if (actualPath !== expectedPath) {
+  const expectedPaths = marker.expectedWorkspaceFolders
+    .map((folder) => canonicalPath(folder))
+    .sort();
+  if (canonicalPath(path.dirname(markerPath)) !== expectedPath) {
     throw new Error(
-      `VS Code opened ${actualPath} instead of isolated workspace ${expectedPath}`,
+      `Isolated workspace marker is outside its declared sandbox ${expectedPath}`,
     );
   }
-  if (actualPath === sourcePath) {
+  if (
+    expectedPaths.some(
+      (expectedFolder) => !isPathWithin(expectedPath, expectedFolder),
+    )
+  ) {
+    throw new Error(
+      'An expected workspace folder escapes its isolated sandbox',
+    );
+  }
+  if (
+    actualPaths.length !== expectedPaths.length ||
+    actualPaths.some((actualPath, index) => actualPath !== expectedPaths[index])
+  ) {
+    throw new Error(
+      `VS Code opened workspace folders ${JSON.stringify(actualPaths)} instead of ${JSON.stringify(expectedPaths)}`,
+    );
+  }
+  if (
+    expectedPath === sourcePath ||
+    actualPaths.some((actualPath) => isPathWithin(sourcePath, actualPath))
+  ) {
     throw new Error(
       'VS Code tests must not run against tracked source fixtures',
     );

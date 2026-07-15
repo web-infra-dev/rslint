@@ -6,19 +6,23 @@ import {
   RelativePattern,
   WorkspaceFolder,
   OutputChannel,
+  TextDocument,
   type CancellationToken,
-  type DocumentFilter,
 } from 'vscode';
 import {
-  Executable,
+  CloseAction,
+  DidCloseTextDocumentNotification,
+  DidOpenTextDocumentNotification,
+  ErrorAction,
   LanguageClient,
   LanguageClientOptions,
+  type ErrorHandler,
+  type Middleware,
   ServerOptions,
   State,
   Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
-import type { Extension } from './Extension';
 import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -35,6 +39,11 @@ import {
   LspConfigTransactionAdapter,
   type ConfigTransactionControlRequest,
 } from './ConfigTransactionAdapter';
+import {
+  createWorkspaceDocumentSelector,
+  type WorkspaceDocumentRouter,
+} from './WorkspaceDocumentRouter';
+import { LanguageServerProcessOwner } from './LanguageServerProcessOwner';
 
 /**
  * Workspace-relative lockfiles whose individual metadata feeds the
@@ -80,34 +89,20 @@ export function recoverConfigDiscoveryOnServerState(
   );
 }
 
+export function shouldResetDocumentSessionOnServerState(
+  oldState: State,
+  newState: State,
+): boolean {
+  return oldState === State.Running && newState !== State.Running;
+}
+
 /** Bind each language client to the workspace whose Go process owns discovery. */
 export function createLanguageClientOptions(
   workspaceFolder: WorkspaceFolder,
   outputChannel: OutputChannel | undefined,
+  middleware?: Middleware,
 ): LanguageClientOptions {
-  const workspacePattern = new RelativePattern(workspaceFolder, '**/*');
-  const documentSelector = [
-    {
-      scheme: 'file',
-      language: 'typescript',
-      pattern: workspacePattern,
-    },
-    {
-      scheme: 'file',
-      language: 'typescriptreact',
-      pattern: workspacePattern,
-    },
-    {
-      scheme: 'file',
-      language: 'javascript',
-      pattern: workspacePattern,
-    },
-    {
-      scheme: 'file',
-      language: 'javascriptreact',
-      pattern: workspacePattern,
-    },
-  ] satisfies DocumentFilter[];
+  const documentSelector = createWorkspaceDocumentSelector(workspaceFolder);
   return {
     workspaceFolder,
     // languageclient v9 types this client-only selector as the LSP shape,
@@ -118,6 +113,7 @@ export function createLanguageClientOptions(
       // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       documentSelector as unknown as LanguageClientOptions['documentSelector'],
     outputChannel,
+    middleware,
   };
 }
 
@@ -174,85 +170,276 @@ async function withCancellationSignal<T>(
   }
 }
 
+function abortError(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error('Rslint workspace start was cancelled');
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw abortError(signal);
+}
+
+async function raceWithAbort<T>(
+  operation: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  throwIfAborted(signal);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    operation.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+export interface LanguageClientCloseTarget {
+  readonly state: State;
+  readonly diagnostics: Disposable | undefined;
+  dispose(): Promise<void>;
+}
+
+/**
+ * vscode-languageclient calls stop() without observing its promise when an
+ * initialize request fails. Its base stop rejects for non-Running states; the
+ * process owner handles those states, so normalize only that inactive case and
+ * preserve actionable failures from a Running shutdown.
+ */
+export class ManagedLanguageClient extends LanguageClient {
+  public override async stop(timeout?: number): Promise<void> {
+    const stateBeforeStop = this.state;
+    try {
+      await super.stop(timeout);
+    } catch (error) {
+      if (stateBeforeStop === State.Running) throw error;
+    }
+  }
+}
+
+/**
+ * Disposes a LanguageClient without waiting for a possibly hung initialize
+ * request. Its outer LanguageServerProcessOwner blocks restarts and terminates
+ * the callback-owned child after an inactive-state rejection; failures from a
+ * Running client remain independently actionable.
+ */
+export async function disposeLanguageClient(
+  client: LanguageClientCloseTarget,
+): Promise<void> {
+  const diagnostics = client.diagnostics;
+  const reportDisposeFailure = client.state === State.Running;
+  const errors: unknown[] = [];
+  try {
+    await client.dispose();
+  } catch (error) {
+    if (reportDisposeFailure) errors.push(error);
+  }
+  try {
+    diagnostics?.dispose();
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'failed to dispose language client');
+  }
+}
+
+export async function waitForPromiseSettlement(
+  promise: Promise<unknown>,
+  timeoutMs: number,
+  description: string,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const settled = await Promise.race([
+      promise.then(
+        () => true,
+        () => true,
+      ),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => {
+          resolve(false);
+        }, timeoutMs);
+      }),
+    ]);
+    if (!settled) {
+      throw new Error(`${description} did not settle within ${timeoutMs}ms`);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+interface ClientStoppedObservation {
+  readonly promise: Promise<void>;
+  dispose(): void;
+}
+
+function observeClientStopped(
+  client: LanguageClient,
+): ClientStoppedObservation {
+  if (client.state === State.Stopped) {
+    return { promise: Promise.resolve(), dispose: () => undefined };
+  }
+  let subscription: Disposable | undefined;
+  const promise = new Promise<void>((resolve) => {
+    subscription = client.onDidChangeState((event) => {
+      if (event.newState === State.Stopped) resolve();
+    });
+  });
+  return {
+    promise,
+    dispose() {
+      subscription?.dispose();
+      subscription = undefined;
+    },
+  };
+}
+
+export interface RslintOptions {
+  readonly rootKey: string;
+  readonly extensionUri: Uri;
+  readonly workspaceFolder: WorkspaceFolder;
+  readonly outputChannel: OutputChannel;
+  readonly lspOutputChannel: OutputChannel;
+  readonly router: WorkspaceDocumentRouter;
+}
+
 export class Rslint implements Disposable {
   private client: LanguageClient | undefined;
   private readonly logger: Logger;
-  private readonly extension: Extension;
-  private readonly workspaceFolder: WorkspaceFolder;
+  public readonly rootKey: string;
+  public readonly workspaceFolder: WorkspaceFolder;
+  private readonly extensionUri: Uri;
+  private readonly router: WorkspaceDocumentRouter;
   private readonly lspOutputChannel: OutputChannel | undefined;
   private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
   private configReloadChain: Promise<void> = Promise.resolve();
   private serverRestartWatcher: Disposable | undefined;
+  private serverProcessOwner: LanguageServerProcessOwner | undefined;
+  private stateWatcher: Disposable | undefined;
+  private readonly requestHandlers: Disposable[] = [];
   private lifecycleEpoch = 0;
   private pluginDependencyRevision = 0;
   private pluginLintPoolDisposed = false;
   private configTransactionAdapter: LspConfigTransactionAdapter | undefined;
+  private startPromise: Promise<void> | undefined;
+  private startOperation: Promise<void> | undefined;
+  private clientStartPromise: Promise<void> | undefined;
+  private closePromise: Promise<void> | undefined;
+  private closing = false;
   /**
    * Hosts the in-process WorkerPool that answers Go's reverse
    * `rslint/pluginLint` requests for rules mounted via a config's
    * object-form `plugins`. It stays uninitialized until a config actually
    * mounts plugins.
    */
-  private pluginLintPool: PluginLintPool;
+  private readonly pluginLintPool: PluginLintPool;
 
-  constructor(
-    extension: Extension,
-    workspaceFolder: WorkspaceFolder,
-    outputChannel: OutputChannel,
-    lspOutputChannel: OutputChannel,
-  ) {
-    this.extension = extension;
-    this.workspaceFolder = workspaceFolder;
-    this.logger = new Logger('Rslint (workspace)').useDefaultLogLevel();
-    this.lspOutputChannel = lspOutputChannel;
-    this.outputChannel = outputChannel;
-    this.pluginLintPool = new PluginLintPool(this.logger);
+  constructor(options: RslintOptions) {
+    this.rootKey = options.rootKey;
+    this.extensionUri = options.extensionUri;
+    this.workspaceFolder = options.workspaceFolder;
+    this.router = options.router;
+    const logger = new Logger(
+      `Rslint (${options.workspaceFolder.name}: ${options.workspaceFolder.uri.fsPath})`,
+    ).useDefaultLogLevel();
+    this.logger = logger;
+    this.lspOutputChannel = options.lspOutputChannel;
+    this.outputChannel = options.outputChannel;
+    try {
+      this.pluginLintPool = new PluginLintPool(logger);
+    } catch (error) {
+      logger.dispose();
+      throw error;
+    }
   }
 
-  public async start(): Promise<void> {
-    if (this.client) {
-      this.logger.warn('Rslint client is already running');
+  public async start(signal: AbortSignal): Promise<void> {
+    if (this.startPromise) {
+      await this.startPromise;
       return;
     }
-
-    if (this.pluginLintPoolDisposed) {
-      this.pluginLintPool = new PluginLintPool(this.logger);
-      this.pluginLintPoolDisposed = false;
+    if (this.closing || signal.aborted) {
+      throw abortError(signal);
     }
+    this.startOperation = this.startImpl(signal);
+    // The abort facade releases the per-URI coordinator even when JavaScript
+    // module evaluation itself cannot be interrupted. startImpl retains its
+    // own rejection handler and epoch checks so a late completion is harmless.
+    this.startPromise = raceWithAbort(this.startOperation, signal);
+    void this.startOperation.catch(() => undefined);
+    await this.startPromise;
+  }
+
+  private async startImpl(signal: AbortSignal): Promise<void> {
     this.configReloadChain = Promise.resolve();
-    this.serverRestartWatcher?.dispose();
-    this.serverRestartWatcher = undefined;
     this.lifecycleEpoch++;
+    const epoch = this.lifecycleEpoch;
     const pluginLintPool = this.pluginLintPool;
     this.pluginDependencyRevision = 0;
-    this.configTransactionAdapter?.dispose();
-    this.configTransactionAdapter = undefined;
 
     const binPath = await this.getBinaryPath();
+    this.assertStartCurrent(epoch, signal);
     this.logger.info('Rslint binary path:', binPath);
 
-    const run: Executable = {
-      command: binPath,
-      args: ['--lsp'],
-    };
-
-    const serverOptions: ServerOptions = {
-      run,
-      debug: run,
+    const serverProcessOwner = new LanguageServerProcessOwner(
+      binPath,
+      ['--lsp'],
+      this.workspaceFolder.uri.fsPath,
+    );
+    this.serverProcessOwner = serverProcessOwner;
+    const serverOptions: ServerOptions = async () => {
+      const process = await serverProcessOwner.start();
+      return process;
     };
 
     // Check if LSP tracing is enabled
     const traceServer = workspace
-      .getConfiguration('rslint')
+      .getConfiguration('rslint', this.workspaceFolder.uri)
       .get<string>('trace.server', 'off');
     const traceEnabled = traceServer !== 'off';
 
     const clientOptions = createLanguageClientOptions(
       this.workspaceFolder,
       this.outputChannel,
+      this.router.createMiddleware(this),
     );
+    const errorHandlerHolder: { current?: ErrorHandler } = {};
+    clientOptions.errorHandler = {
+      error: async (error, message, count) => {
+        const result = await Promise.resolve(
+          errorHandlerHolder.current?.error(error, message, count) ?? {
+            action: ErrorAction.Shutdown,
+          },
+        );
+        return result;
+      },
+      closed: async () => {
+        if (this.closing) {
+          return { action: CloseAction.DoNotRestart, handled: true };
+        }
+        const result = await Promise.resolve(
+          errorHandlerHolder.current?.closed() ?? {
+            action: CloseAction.DoNotRestart,
+          },
+        );
+        return result;
+      },
+    };
 
     if (traceEnabled) {
       clientOptions.traceOutputChannel = this.lspOutputChannel;
@@ -263,15 +450,25 @@ export class Rslint implements Disposable {
       this.logger.debug('LSP tracing disabled by configuration');
     }
 
-    this.client = new LanguageClient(
+    const client = new ManagedLanguageClient(
       'rslint',
-      'Rslint Language Server',
+      `Rslint Language Server (${this.workspaceFolder.name})`,
       serverOptions,
       clientOptions,
     );
+    errorHandlerHolder.current = client.createDefaultErrorHandler();
+    this.client = client;
+    this.stateWatcher = client.onDidChangeState((event) => {
+      this.logger.debug(
+        `Language client state ${event.oldState} -> ${event.newState}`,
+      );
+    });
 
     try {
-      await this.client.start();
+      const clientStartPromise = client.start();
+      this.clientStartPromise = clientStartPromise;
+      await clientStartPromise;
+      this.assertStartCurrent(epoch, signal, client);
 
       const adapter = new LspConfigTransactionAdapter(
         new ConfigModuleHost(),
@@ -280,29 +477,37 @@ export class Rslint implements Disposable {
       );
       this.configTransactionAdapter = adapter;
 
-      this.client.onRequest(
-        'rslint/loadConfigs',
-        async (params: LoadConfigsRequest, token: CancellationToken) =>
-          withCancellationSignal(token, async (signal) =>
-            adapter.loadConfigs(params, signal),
-          ),
+      this.requestHandlers.push(
+        client.onRequest(
+          'rslint/loadConfigs',
+          async (params: LoadConfigsRequest, token: CancellationToken) =>
+            withCancellationSignal(token, async (requestSignal) =>
+              adapter.loadConfigs(params, requestSignal),
+            ),
+        ),
       );
-      this.client.onRequest(
-        'rslint/activateConfigs',
-        async (params: ActivateConfigsRequest, token: CancellationToken) =>
-          withCancellationSignal(token, async (signal) =>
-            adapter.activateConfigs(params, signal),
-          ),
+      this.requestHandlers.push(
+        client.onRequest(
+          'rslint/activateConfigs',
+          async (params: ActivateConfigsRequest, token: CancellationToken) =>
+            withCancellationSignal(token, async (requestSignal) =>
+              adapter.activateConfigs(params, requestSignal),
+            ),
+        ),
       );
-      this.client.onRequest(
-        'rslint/commitConfigs',
-        async (params: ConfigTransactionControlRequest) =>
-          adapter.commitConfigs(params),
+      this.requestHandlers.push(
+        client.onRequest(
+          'rslint/commitConfigs',
+          async (params: ConfigTransactionControlRequest) =>
+            adapter.commitConfigs(params),
+        ),
       );
-      this.client.onRequest(
-        'rslint/abortConfigs',
-        async (params: ConfigTransactionControlRequest) =>
-          adapter.abortConfigs(params),
+      this.requestHandlers.push(
+        client.onRequest(
+          'rslint/abortConfigs',
+          async (params: ConfigTransactionControlRequest) =>
+            adapter.abortConfigs(params),
+        ),
       );
 
       // Answer Go's reverse `rslint/pluginLint` requests: Go lints
@@ -313,16 +518,56 @@ export class Rslint implements Disposable {
       // $/cancelRequest for a superseded keystroke / closed document — is
       // threaded through to the pool, which bridges it to an AbortSignal and
       // cancels the in-flight worker tasks.
-      this.client.onRequest(
-        'rslint/pluginLint',
-        async (params: EslintPluginLintRequest, token: CancellationToken) =>
-          pluginLintPool.lint(params, token),
+      this.requestHandlers.push(
+        client.onRequest(
+          'rslint/pluginLint',
+          async (params: EslintPluginLintRequest, token: CancellationToken) =>
+            pluginLintPool.lint(params, token),
+        ),
       );
+
+      // client.start() has already emitted the initial Running transition. Any
+      // later Running event belongs to an automatic native-server restart.
+      // Reset router-side server-open state before LanguageClient replays open
+      // documents, then rebuild the replacement Go process's config catalog.
+      this.serverRestartWatcher = client.onDidChangeState((event) => {
+        if (
+          shouldResetDocumentSessionOnServerState(
+            event.oldState,
+            event.newState,
+          )
+        ) {
+          this.router.resetServerSession(this).catch((error: unknown) => {
+            this.logger.error(
+              'Failed to reset documents after server exit',
+              error,
+            );
+          });
+        }
+        const recovery = recoverConfigDiscoveryOnServerState(
+          event.newState,
+          async (reason, beforeRequest) => {
+            await this.router.resetServerSession(this);
+            await this.requestConfigRefresh(reason, beforeRequest);
+          },
+        );
+        recovery?.then(
+          () => {
+            this.logger.info(
+              'Documents and config discovery recovered after server restart',
+            );
+          },
+          (error: unknown) => {
+            this.logger.error('Failed to recover after server restart', error);
+          },
+        );
+      });
 
       if (traceEnabled) {
         const traceLevel =
           traceServer === 'verbose' ? Trace.Verbose : Trace.Messages;
-        await this.client.setTrace(traceLevel);
+        await client.setTrace(traceLevel);
+        this.assertStartCurrent(epoch, signal, client);
         this.logger.info(`LSP trace level set to: ${traceServer}`);
       }
 
@@ -341,47 +586,32 @@ export class Rslint implements Disposable {
           await this.requestConfigRefresh('config-change');
         },
       );
+      this.assertStartCurrent(epoch, signal, client);
       if (retried) {
         this.logger.warn(
           'Config changed during initial activation; discovery recovered on retry',
         );
       }
 
-      // client.start() has already emitted the initial Running transition. Any
-      // later Running event belongs to an automatic native-server restart and
-      // needs a fresh Go catalog; request handlers and the plugin pool survive on
-      // the extension side.
-      this.serverRestartWatcher = this.client.onDidChangeState((event) => {
-        const recovery = recoverConfigDiscoveryOnServerState(
-          event.newState,
-          async (reason, beforeRequest) =>
-            this.requestConfigRefresh(reason, beforeRequest),
-        );
-        recovery?.then(
-          () => {
-            this.logger.info('Config discovery recovered after server restart');
-          },
-          (error: unknown) => {
-            this.logger.error(
-              'Failed to recover config discovery after server restart',
-              error,
-            );
-          },
-        );
-      });
-
       this.logger.info('Rslint language client started successfully');
     } catch (err: unknown) {
       this.logger.error('Failed to start Rslint language client', err);
-      try {
-        await this.stop();
-      } catch (cleanupError: unknown) {
-        this.logger.error(
-          'Failed to clean up a partial Rslint start',
-          cleanupError,
-        );
-      }
       throw err;
+    }
+  }
+
+  private assertStartCurrent(
+    epoch: number,
+    signal: AbortSignal,
+    client?: LanguageClient,
+  ): void {
+    throwIfAborted(signal);
+    if (
+      this.closing ||
+      epoch !== this.lifecycleEpoch ||
+      (client !== undefined && client !== this.client)
+    ) {
+      throw abortError(signal);
     }
   }
 
@@ -458,7 +688,8 @@ export class Rslint implements Disposable {
       epoch === this.lifecycleEpoch &&
       client === this.client &&
       pluginLintPool === this.pluginLintPool &&
-      !this.pluginLintPoolDisposed
+      !this.pluginLintPoolDisposed &&
+      !this.closing
     );
   }
 
@@ -515,80 +746,179 @@ export class Rslint implements Disposable {
     return parts.join('|');
   }
 
-  public async stop(): Promise<void> {
+  public async close(): Promise<void> {
+    await (this.closePromise ??= this.closeImpl());
+  }
+
+  private async closeImpl(): Promise<void> {
+    const errors: unknown[] = [];
+    const disposeSafely = (resource: Disposable | undefined): void => {
+      if (!resource) return;
+      try {
+        resource.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
+
+    this.closing = true;
     this.lifecycleEpoch++;
     clearTimeout(this.configReloadTimer);
-    this.serverRestartWatcher?.dispose();
+    this.configReloadTimer = undefined;
+    disposeSafely(this.serverRestartWatcher);
     this.serverRestartWatcher = undefined;
-    this.configWatcher?.dispose();
+    disposeSafely(this.configWatcher);
     this.configWatcher = undefined;
-    this.configTransactionAdapter?.dispose();
+    disposeSafely(this.configTransactionAdapter);
     this.configTransactionAdapter = undefined;
-    // Do not await configReloadChain: user config evaluation can contain a
-    // non-settling top-level await. The epoch above makes any late completion
-    // side-effect free, while resetting the chain keeps a future start usable.
+    for (const handler of this.requestHandlers.splice(0)) {
+      disposeSafely(handler);
+    }
+    disposeSafely(this.stateWatcher);
+    this.stateWatcher = undefined;
+    // Do not await startOperation/configReloadChain: user module evaluation can
+    // contain a non-settling top-level await. Epoch/closing checks fence every
+    // late continuation from publishing resources or state.
     this.configReloadChain = Promise.resolve();
+    this.pluginLintPoolDisposed = true;
 
     const client = this.client;
     this.client = undefined;
-    const pluginLintPool = this.pluginLintPool;
-    this.pluginLintPoolDisposed = true;
-
-    const [poolResult, clientResult] = await Promise.allSettled([
-      pluginLintPool.dispose(),
-      client ? client.stop() : Promise.resolve(),
-    ]);
-    if (!client) {
-      this.logger.debug('Rslint client is not running');
-    } else if (clientResult.status === 'fulfilled') {
-      this.logger.info('Rslint language client stopped');
+    const clientStartPromise = this.clientStartPromise;
+    this.clientStartPromise = undefined;
+    const clientStopped =
+      client?.state === State.Starting
+        ? observeClientStopped(client)
+        : undefined;
+    const serverProcessOwner = this.serverProcessOwner;
+    this.serverProcessOwner = undefined;
+    // Block vscode-languageclient's automatic restart callback before its
+    // graceful client shutdown begins. The owner force-terminates and awaits
+    // any surviving child after the bounded protocol shutdown finishes.
+    serverProcessOwner?.beginClose();
+    const asynchronousCleanups: Promise<void>[] = [
+      (async () => {
+        await this.pluginLintPool.dispose();
+      })(),
+    ];
+    if (client) {
+      asynchronousCleanups.push(
+        (async () => {
+          const clientErrors: unknown[] = [];
+          try {
+            await disposeLanguageClient(client);
+          } catch (error) {
+            clientErrors.push(error);
+          }
+          try {
+            await serverProcessOwner?.close();
+          } catch (error) {
+            clientErrors.push(error);
+          }
+          if (clientStartPromise) {
+            try {
+              await waitForPromiseSettlement(
+                clientStartPromise,
+                2_000,
+                'language client start',
+              );
+            } catch (error) {
+              clientErrors.push(error);
+            }
+          }
+          if (clientStopped) {
+            try {
+              await waitForPromiseSettlement(
+                clientStopped.promise,
+                2_000,
+                'language client terminal state',
+              );
+            } catch (error) {
+              clientErrors.push(error);
+            } finally {
+              clientStopped.dispose();
+            }
+          }
+          if (clientErrors.length > 0) {
+            throw new AggregateError(
+              clientErrors,
+              'failed to close language client resources',
+            );
+          }
+        })(),
+      );
+    } else if (serverProcessOwner) {
+      asynchronousCleanups.push(
+        (async () => {
+          await serverProcessOwner.close();
+        })(),
+      );
     }
+    const results = await Promise.allSettled(asynchronousCleanups);
     this.pluginDependencyRevision = 0;
-    if (poolResult.status === 'rejected') throw poolResult.reason;
-    if (clientResult.status === 'rejected') throw clientResult.reason;
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        const reason: unknown = result.reason;
+        errors.push(reason);
+      }
+    }
+    try {
+      for (const error of errors) {
+        this.logger.error('Failed to close Rslint workspace resource', error);
+      }
+      if (errors.length === 0) {
+        this.logger.info('Rslint language client closed');
+      }
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      this.logger.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, 'failed to close Rslint workspace');
+    }
   }
 
   public isRunning(): boolean {
     return this.client?.state === State.Running;
   }
 
-  public getClient(): LanguageClient | undefined {
-    return this.client;
+  public async sendDocumentOpen(document: TextDocument): Promise<void> {
+    const provider = this.client
+      ?.getFeature(DidOpenTextDocumentNotification.method)
+      .getProvider(document);
+    if (!provider) {
+      throw new Error(`didOpen provider is unavailable for ${document.uri}`);
+    }
+    await provider.send(document);
   }
 
-  public onDidChangeState(listener: (event: any) => void): Disposable {
-    if (!this.client) {
-      throw new Error('Client is not initialized');
+  public async sendDocumentClose(document: TextDocument): Promise<void> {
+    const provider = this.client
+      ?.getFeature(DidCloseTextDocumentNotification.method)
+      .getProvider(document);
+    if (!provider) {
+      throw new Error(`didClose provider is unavailable for ${document.uri}`);
     }
-    return this.client.onDidChangeState(listener);
+    await provider.send(document);
+  }
+
+  public clearDocumentDiagnostics(uri: Uri): void {
+    this.client?.diagnostics?.delete(uri);
   }
 
   public dispose(): void {
-    this.lifecycleEpoch++;
-    clearTimeout(this.configReloadTimer);
-    this.serverRestartWatcher?.dispose();
-    this.serverRestartWatcher = undefined;
-    this.configReloadChain = Promise.resolve();
-    this.pluginLintPoolDisposed = true;
-    this.configTransactionAdapter?.dispose();
-    this.configTransactionAdapter = undefined;
-    void this.pluginLintPool.dispose();
-    const client = this.client;
-    this.client = undefined;
-    if (client) {
-      client.stop().catch((err: unknown) => {
-        this.logger.error('Error disposing Rslint client', err);
-      });
-    }
-    this.configWatcher?.dispose();
-    this.configWatcher = undefined;
-    this.lspOutputChannel?.dispose();
+    void this.close().catch(() => undefined);
   }
 
   private async findBinaryFromUserSettings(): Promise<string | null> {
     const customBinPathConfig = workspace
-      .getConfiguration()
-      .get<string>('rslint.customBinPath')
+      .getConfiguration('rslint', this.workspaceFolder.uri)
+      .get<string>('customBinPath')
       ?.trim();
 
     if (!customBinPathConfig) {
@@ -714,7 +1044,7 @@ export class Rslint implements Disposable {
 
   private findBinaryFromBuiltIn(): string {
     const builtInBinPath = Uri.joinPath(
-      this.extension.context.extensionUri,
+      this.extensionUri,
       'dist',
       'rslint',
     ).fsPath;
@@ -727,8 +1057,8 @@ export class Rslint implements Disposable {
 
   private async getBinaryPath(): Promise<string> {
     const binPathConfig = workspace
-      .getConfiguration()
-      .get<RslintBinPath>('rslint.binPath');
+      .getConfiguration('rslint', this.workspaceFolder.uri)
+      .get<RslintBinPath>('binPath');
 
     let finalBinPath: string | null = null;
     if (binPathConfig === 'local') {
@@ -755,7 +1085,10 @@ export class Rslint implements Disposable {
       }
     }
 
+    if (!finalBinPath) {
+      throw new Error(`Unsupported rslint.binPath setting: ${binPathConfig}`);
+    }
     this.logger.debug('Final Rslint binary path:', finalBinPath);
-    return finalBinPath!;
+    return finalBinPath;
   }
 }
