@@ -8,6 +8,7 @@ import {
   withTmpFile,
   withOnSaveFixAll,
   replaceAll,
+  saveDocumentOnce,
 } from './fixall-helpers';
 
 suite('rslint fixAll - cascade (multi-pass)', function () {
@@ -75,7 +76,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
           .join(' | ')}`,
       );
 
-      assert.ok(await doc.save(), 'Cascade document should save');
+      await saveDocumentOnce(doc, 'Cascade document should save');
 
       // Event-driven wait: resolves the moment the on-save fixAll edit
       // lands on the document, instead of polling on a 500ms interval.

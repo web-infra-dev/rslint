@@ -1,11 +1,14 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import { getRslintDiagnostics } from '../utils/diagnostics';
+import { waitForCodeActionRegistryQuiescence } from '../utils/codeActionRegistry';
 import {
   waitForDiagnostics,
   waitForDiagnosticsCount,
   waitForContentChange,
   withOnSaveFixAll,
   replaceAll,
+  saveDocumentOnce,
 } from './fixall-helpers';
 
 function assertHasFixableDiagnostic(
@@ -36,8 +39,8 @@ suite('rslint fixAll - on-save', function () {
         const diags = await waitForDiagnostics(doc);
         assertHasFixableDiagnostic(diags, 'generic source.fixAll setup');
 
-        assert.ok(
-          await doc.save(),
+        await saveDocumentOnce(
+          doc,
           'Document should complete the generic source.fixAll save pipeline',
         );
         await waitForContentChange(
@@ -67,7 +70,7 @@ suite('rslint fixAll - on-save', function () {
       const diags = await waitForDiagnostics(doc);
       assertHasFixableDiagnostic(diags, 'fixable on-save setup');
 
-      assert.ok(await doc.save(), 'Fixable document should save');
+      await saveDocumentOnce(doc, 'Fixable document should save');
       await waitForContentChange(
         doc,
         (content) => !content.includes('saveVal as string'),
@@ -90,7 +93,7 @@ suite('rslint fixAll - on-save', function () {
       );
       const probeDiags = await waitForDiagnostics(doc);
       assertHasFixableDiagnostic(probeDiags, 'clean-file probe setup');
-      assert.ok(await doc.save(), 'Clean-file probe should save');
+      await saveDocumentOnce(doc, 'Clean-file probe should save');
       await waitForContentChange(
         doc,
         (content) => !content.includes('probeVal as string'),
@@ -107,7 +110,7 @@ suite('rslint fixAll - on-save', function () {
       await replaceAll(editor, cleanContent);
       await new Promise((r) => setTimeout(r, 3000));
 
-      assert.ok(await doc.save(), 'Clean document should save');
+      await saveDocumentOnce(doc, 'Clean document should save');
       await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
@@ -127,7 +130,7 @@ suite('rslint fixAll - on-save', function () {
       );
       const probeDiags = await waitForDiagnostics(doc);
       assertHasFixableDiagnostic(probeDiags, 'non-fixable probe setup');
-      assert.ok(await doc.save(), 'Non-fixable probe should save');
+      await saveDocumentOnce(doc, 'Non-fixable probe should save');
       await waitForContentChange(
         doc,
         (content) => !content.includes('probeVal2 as string'),
@@ -145,7 +148,7 @@ suite('rslint fixAll - on-save', function () {
       const diags = await waitForDiagnostics(doc);
       assert.ok(diags.length > 0, 'Should have non-fixable diagnostics');
 
-      assert.ok(await doc.save(), 'Non-fixable document should save');
+      await saveDocumentOnce(doc, 'Non-fixable document should save');
       await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
@@ -154,7 +157,7 @@ suite('rslint fixAll - on-save', function () {
         'Non-fixable file content should not change after on-save',
       );
 
-      const diagsAfter = vscode.languages.getDiagnostics(doc.uri);
+      const diagsAfter = getRslintDiagnostics(doc);
       assert.ok(
         diagsAfter.length > 0,
         'Non-fixable diagnostics should remain after save',
@@ -165,7 +168,7 @@ suite('rslint fixAll - on-save', function () {
   test('edit then immediately save (debounce not fired)', async () => {
     await withOnSaveFixAll(async (doc, editor) => {
       await replaceAll(editor, '// clean start\nexport {};\n');
-      assert.ok(await doc.save(), 'Initial clean document should save');
+      await saveDocumentOnce(doc, 'Initial clean document should save');
       const cleanDiagnostics = await waitForDiagnosticsCount(doc, 0);
       assert.strictEqual(
         cleanDiagnostics.length,
@@ -175,14 +178,21 @@ suite('rslint fixAll - on-save', function () {
           .join(' | ')}`,
       );
 
+      // Put the readiness delay before the edit. The save below intentionally
+      // follows the edit immediately, so this test cannot pass merely because
+      // the normal 1.5s registry barrier allowed the diagnostics debounce to
+      // fire. Any registry mutation in this tiny edit/save gap still makes the
+      // one-shot save fail rather than retrying it.
+      await waitForCodeActionRegistryQuiescence();
       await replaceAll(
         editor,
         "const quickVal: string = 'x';\nconst quickRes = (quickVal as string).trim();\n",
       );
 
-      assert.ok(
-        await doc.save(),
+      await saveDocumentOnce(
+        doc,
         'Edited document should complete the code-action-on-save pipeline',
+        async () => {},
       );
 
       // Event-driven wait — Windows CI needs more headroom than the previous

@@ -165,10 +165,12 @@ jobs:
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
         with:
-          path: packages/vscode-extension/.vscode-test
-          key: vscode-test-${{ matrix.os }}
+          # Cache only immutable VS Code distributions. The v2 namespace keeps
+          # legacy archives containing user data/extensions from being restored.
+          path: packages/vscode-extension/.vscode-test/vscode-*
+          key: vscode-distributions-v2-${{ matrix.os }}
           restore-keys: |
-            vscode-test-${{ matrix.os }}-
+            vscode-distributions-v2-${{ matrix.os }}-
 
       - name: Test
         run: xvfb-run -a pnpm test
@@ -264,10 +266,12 @@ jobs:
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
         with:
-          path: packages/vscode-extension/.vscode-test
-          key: vscode-test-windows
+          # Cache only immutable VS Code distributions. The v2 namespace keeps
+          # legacy archives containing user data/extensions from being restored.
+          path: packages/vscode-extension/.vscode-test/vscode-*
+          key: vscode-distributions-v2-windows
           restore-keys: |
-            vscode-test-windows-
+            vscode-distributions-v2-windows-
 
       - name: Test
         run: pnpm --filter rslint test
