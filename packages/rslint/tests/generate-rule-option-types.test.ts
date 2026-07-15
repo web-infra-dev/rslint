@@ -58,7 +58,7 @@ describe('injectIntoDts', () => {
     '    [key: string]: RuleEntry<any[]> | undefined;\r\n' +
     '}\r\n';
 
-  test('splices named properties before the marker and type declarations after the interface', () => {
+  test('splices named properties in place of the marker and type declarations after the interface', () => {
     const result = injectIntoDts(pristine, {
       typeDeclarations: ['export type EqeqeqOptions = [];'],
       recordProperties: ['"eqeqeq"?: RuleEntry<EqeqeqOptions>;'],
@@ -73,12 +73,10 @@ describe('injectIntoDts', () => {
     expect(result).toContain(
       'Doc comment for RulesRecord.\r\n */\r\ndeclare interface RulesRecord {',
     );
+    // The marker comment itself must not survive into the output.
+    expect(result).not.toContain('@__RULE_OPTIONS__');
     expect(result).toContain(
-      '    "eqeqeq"?: RuleEntry<EqeqeqOptions>;\n    /** @__RULE_OPTIONS__ */',
-    );
-    // The pre-existing marker line (and everything after it) must survive untouched.
-    expect(result).toContain(
-      '    /** @__RULE_OPTIONS__ */\r\n    [key: string]: RuleEntry<any[]> | undefined;\r\n}\r\n',
+      '    "eqeqeq"?: RuleEntry<EqeqeqOptions>;\n    [key: string]: RuleEntry<any[]> | undefined;\r\n}\r\n',
     );
   });
 
@@ -94,16 +92,23 @@ describe('injectIntoDts', () => {
     expect(result).toContain(
       '    "eqeqeq"?: RuleEntry<EqeqeqOptions>;\n' +
         '    "no-console"?: RuleEntry<NoConsoleOptions>;\n' +
-        '    /** @__RULE_OPTIONS__ */',
+        '    [key: string]: RuleEntry<any[]> | undefined;',
     );
   });
 
-  test('is a no-op on the record properties when nothing was generated', () => {
+  test('strips the marker comment even when nothing was generated, leaving the fallback signature intact', () => {
     const result = injectIntoDts(pristine, {
       typeDeclarations: [],
       recordProperties: [],
     });
-    expect(result).toBe(pristine);
+    expect(result).toBe(
+      '/**\r\n' +
+        ' * Doc comment for RulesRecord.\r\n' +
+        ' */\r\n' +
+        'declare interface RulesRecord {\r\n' +
+        '    [key: string]: RuleEntry<any[]> | undefined;\r\n' +
+        '}\r\n',
+    );
   });
 
   test('throws when the marker is missing', () => {

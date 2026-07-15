@@ -128,11 +128,13 @@ async function compileRuleOptionTypes() {
 
 /**
  * Splices generated rule-option types into a built `dist/index.d.ts`: the
- * named properties land just before `RulesRecord`'s `@__RULE_OPTIONS__`-
- * marked index signature (so they take precedence over the fallback
- * `any[]` shape), and the type declarations land right after the
- * interface's closing brace — not just above it, which would wedge them
- * between the interface's own doc comment and its declaration.
+ * named properties land where `RulesRecord`'s `@__RULE_OPTIONS__`-marked
+ * index signature was (so they take precedence over the fallback `any[]`
+ * shape), and the type declarations land right after the interface's
+ * closing brace — not just above it, which would wedge them between the
+ * interface's own doc comment and its declaration. The marker comment
+ * itself is build-time-only wiring and is dropped, not shipped in the
+ * published `.d.ts`.
  */
 export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
   const markerIndex = dts.indexOf(MARKER);
@@ -151,12 +153,12 @@ export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
     );
   }
   // Match the marker line's own indentation so injected properties line up
-  // with the fallback index signature already in the bundled output. The
-  // marker line itself (from markerLineStart onward) is left untouched and
-  // kept as-is — splicing in new lines *before* it rather than doing a
-  // MARKER substring `.replace()` avoids double-counting that line's own
-  // pre-existing indentation.
+  // with the fallback index signature already in the bundled output, then
+  // replace the whole marker line (comment included) with the injected
+  // properties rather than splicing in front of it, so the marker never
+  // survives into the output.
   const markerLineStart = dts.lastIndexOf('\n', markerIndex) + 1;
+  const markerLineEnd = dts.indexOf('\n', markerIndex) + 1;
   const indent = dts.slice(markerLineStart, markerIndex);
   const propertiesBlock = recordProperties
     .map((property) => `${indent}${property}\n`)
@@ -165,7 +167,7 @@ export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
   const withProperties =
     dts.slice(0, markerLineStart) +
     propertiesBlock +
-    dts.slice(markerLineStart);
+    dts.slice(markerLineEnd);
 
   if (!typeDeclarations.length) {
     return withProperties;
