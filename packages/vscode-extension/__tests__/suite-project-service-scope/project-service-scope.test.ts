@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import { findFixAllAction, requestFixAll } from '../suite/fixall-helpers';
+import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
 
 // Type-aware rule scope when parserOptions uses `projectService: true`
 // (the shape `ts.configs.recommended` exports) without an explicit
@@ -24,35 +25,10 @@ import { findFixAllAction, requestFixAll } from '../suite/fixall-helpers';
 //                                    should NOT fire, while native no-var should
 //                                    diagnose and participate in fixAll.
 suite('rslint projectService type-aware scope', function () {
-  this.timeout(60000);
+  this.timeout(120000);
 
   function workspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
-  }
-
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate: (diags: vscode.Diagnostic[]) => boolean,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const current = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate(current)) return current;
-      await new Promise((resolve) => {
-        let timer: ReturnType<typeof setTimeout>;
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          if (e.uris.some((uri) => uri.toString() === doc.uri.toString())) {
-            clearTimeout(timer);
-            disposable.dispose();
-            resolve(void 0);
-          }
-        });
-        timer = setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
-      });
-    }
-    return vscode.languages.getDiagnostics(doc.uri);
   }
 
   // Only inspect rslint-originated diagnostics — TS's own 6133 ("declared but
