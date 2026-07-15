@@ -3,8 +3,8 @@
 /**
  * The `Rslint` class — the ESLint-style programmatic API (issue #1106).
  *
- * It is a thin JS facade over the low-level `lint()` IPC. JavaScript expands
- * API globs; Go owns config discovery, ownership, ignore semantics, and final
+ * It is a thin JS facade over the low-level `lint()` IPC. Go expands API
+ * inputs and owns config discovery, ownership, ignore semantics, and final
  * lint-target admission. Reverse IPC asks this process to evaluate and
  * normalize only the JavaScript config candidates Go selected. The facade also
  * reshapes wire-level responses into ESLint v10's `LintResult[]` (per-file
@@ -14,9 +14,7 @@
  * service; `close()` tears it down (mirrors RSLintService.close()).
  */
 import path from 'node:path';
-import { lstat, readFile, stat, writeFile } from 'node:fs/promises';
-import { convertPathToPattern, glob, isDynamicPattern } from 'tinyglobby';
-import picomatch from 'picomatch';
+import { readFile, writeFile } from 'node:fs/promises';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
@@ -25,12 +23,9 @@ import {
   normalizeConfig,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
+  type ConfigPredicate,
 } from '../config/config-loader.js';
-import {
-  nativePathIdentity,
-  RunPathResolver,
-  type ResolvedFilesystemPath,
-} from './path-identity.js';
+import { nativePathIdentity } from './path-identity.js';
 import type { RslintConfigEntry } from '../config/define-config.js';
 import type {
   Diagnostic,
@@ -87,8 +82,8 @@ export interface LintMessage {
   severity: 1 | 2; // ESLint: 1 = warning, 2 = error
   message: string;
   messageId?: string;
-  line: number; // 1-based
-  column: number; // 1-based, UTF-16
+  line?: number; // 1-based
+  column?: number; // 1-based, UTF-16
   endLine?: number;
   endColumn?: number;
   fix?: LintMessageFix;
@@ -268,153 +263,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-interface ClassifiedLintPatterns {
-  literalFilePatterns: string[];
-  literalDirectorySymlinks: string[];
-  scanDirectories: string[];
-}
-
-type GlobPatternRole = 'match' | 'ignore' | 'skip';
-
-// Keep this classification aligned with tinyglobby's processPatterns(): a
-// leading `!(` starts a positive extglob, while `!pattern` is an exclusion.
-function globPatternRole(pattern: string): GlobPatternRole {
-  if (pattern[0] !== '!' || pattern[1] === '(') return 'match';
-  if (pattern[1] !== '!' || pattern[2] === '(') return 'ignore';
-  return 'skip';
-}
-
-interface PlannedLintFile extends ResolvedFilesystemPath {
-  explicit: boolean;
-}
-
-const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
-
-function staticGlobRoot(pattern: string, cwd: string): string {
-  const absolutePattern = path.resolve(cwd, pattern);
-  const root = path.parse(absolutePattern).root;
-  const segments = absolutePattern.slice(root.length).split(path.sep);
-  let current = root;
-  for (const segment of segments) {
-    if (!segment || isDynamicPattern(segment)) break;
-    current = path.join(current, segment);
-  }
-  return current || cwd;
-}
-
-function compactScanDirectories(directories: Iterable<string>): string[] {
-  const byIdentity = new Map<string, string>();
-  for (const directory of directories) {
-    const normalized = path.normalize(directory);
-    const key = nativePathIdentity.key(normalized);
-    if (!byIdentity.has(key)) byIdentity.set(key, normalized);
-  }
-  const sorted = [...byIdentity.values()].sort(
-    (a, b) => a.length - b.length || nativePathIdentity.compare(a, b),
-  );
-  const compact: string[] = [];
-  for (const directory of sorted) {
-    if (
-      !compact.some((parent) =>
-        nativePathIdentity.isSameOrChild(parent, directory),
-      )
-    ) {
-      compact.push(directory);
-    }
-  }
-  return compact;
-}
-
-function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
-  let normalized = pattern;
-  if (normalized.endsWith('/') || normalized.endsWith('\\')) {
-    normalized = normalized.slice(0, -1);
-  }
-  if (path.isAbsolute(normalized)) {
-    normalized = path.relative(cwd, normalized);
-  }
-  normalized = normalized.split(path.sep).join('/');
-  return path.posix.normalize(normalized);
-}
-
-function matchesExcludedLiteral(
-  filePath: string,
-  patterns: readonly string[],
-  cwd: string,
-): boolean {
-  const candidate = path.relative(cwd, filePath).split(path.sep).join('/');
-  for (const rawPattern of patterns) {
-    let pattern = rawPattern;
-    if (pattern.startsWith('!')) {
-      if (pattern[1] === '(') continue;
-      if (pattern[1] === '!' && pattern[2] !== '(') continue;
-      pattern = pattern.slice(1);
-    }
-    pattern = normalizeGlobPatternForCwd(pattern, cwd);
-    const expandedPatterns = pattern.endsWith('*')
-      ? [pattern]
-      : [pattern, `${pattern}/**`];
-    if (picomatch(expandedPatterns, { dot: true, nocase: false })(candidate)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-async function classifyLintPatterns(
-  patterns: string[],
-  cwd: string,
-): Promise<ClassifiedLintPatterns> {
-  const literalFilePatterns: string[] = [];
-  const literalDirectorySymlinks: string[] = [];
-  const scanDirectories = new Set<string>();
-  const excludedLiteralPatterns = [
-    ...DEFAULT_LINT_GLOB_IGNORES,
-    ...patterns.filter((pattern) => globPatternRole(pattern) === 'ignore'),
-  ];
-
-  for (const pattern of patterns) {
-    if (globPatternRole(pattern) !== 'match') continue;
-    if (isDynamicPattern(pattern)) {
-      const scanRoot = staticGlobRoot(pattern, cwd);
-      try {
-        if ((await stat(scanRoot)).isDirectory()) {
-          scanDirectories.add(scanRoot);
-        }
-      } catch {
-        // A missing static root cannot contribute a matched target.
-      }
-      continue;
-    }
-
-    const absolute = path.resolve(cwd, pattern);
-    try {
-      const info = await stat(absolute);
-      if (info.isDirectory()) {
-        scanDirectories.add(absolute);
-        if ((await lstat(absolute)).isSymbolicLink()) {
-          literalDirectorySymlinks.push(absolute);
-        }
-      } else if (info.isFile()) {
-        const absolutePattern = path.resolve(cwd, pattern);
-        if (
-          !matchesExcludedLiteral(absolutePattern, excludedLiteralPatterns, cwd)
-        ) {
-          literalFilePatterns.push(absolutePattern);
-        }
-      }
-    } catch {
-      // tinyglobby will omit a missing literal from the match set.
-    }
-  }
-
-  return {
-    literalFilePatterns,
-    literalDirectorySymlinks,
-    scanDirectories: compactScanDirectories(scanDirectories),
-  };
-}
-
 export class Rslint {
   readonly #service: RSLintService;
   readonly #cwd: string;
@@ -423,7 +271,7 @@ export class Rslint {
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
   readonly #pluginHosts = new PluginHostLifecycle();
-  #normalizedOverrideConfig?: Record<string, unknown>[];
+  readonly #configHost = new ConfigModuleHost();
   #closeRequested = false;
   #closePromise?: Promise<void>;
 
@@ -454,42 +302,35 @@ export class Rslint {
     options: { filePath?: string } = {},
   ): Promise<LintResult[]> {
     const filePath = path.resolve(this.#cwd, options.filePath ?? '__text__.ts');
-    const pathResolver = new RunPathResolver();
-    const resolvedFile =
-      await pathResolver.resolveWithAncestorFallback(filePath);
-    const overrideConfig = this.#getNormalizedOverrideConfig() ?? [];
-    const usesNativeDiscovery = this.#overrideConfigFile !== true;
-    const discoverySession = usesNativeDiscovery
-      ? this.#createNativeConfigDiscoverySession()
-      : null;
+    const { entries: overrideConfig, predicates: overridePredicates } =
+      this.#normalizeOverrideConfigForRequest();
+    const discoveryMode =
+      this.#overrideConfigFile === true
+        ? 'inline'
+        : typeof this.#overrideConfigFile === 'string'
+          ? 'explicit'
+          : 'auto';
+    const discoverySession =
+      this.#createNativeConfigDiscoverySession(overridePredicates);
     try {
       const response = await this.#service.lint(
         {
-          config: usesNativeDiscovery ? undefined : overrideConfig,
-          configDiscovery: usesNativeDiscovery
-            ? {
-                mode:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? 'explicit'
-                    : 'auto',
-                explicitConfigPath:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? path.resolve(this.#cwd, this.#overrideConfigFile)
-                    : undefined,
-                explicitFiles: [true],
-                overrideConfig,
-              }
-            : undefined,
-          configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
+          configDiscovery: {
+            mode: discoveryMode,
+            inputs: [filePath],
+            explicitConfigPath:
+              typeof this.#overrideConfigFile === 'string'
+                ? path.resolve(this.#cwd, this.#overrideConfigFile)
+                : undefined,
+            overrideConfig,
+          },
           workingDirectory: this.#cwd,
-          files: [filePath],
-          canonicalFiles: [resolvedFile.canonicalPath],
           // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
           // same-path code entry wins so `lintText` always lints `code`.
           fileContents: { ...this.#resolveOverlay(), [filePath]: code },
           fix: this.#fix,
         },
-        discoverySession?.handlers ?? {},
+        discoverySession.handlers,
       );
       const results = this.#toLintResults(response, this.#cwd, [filePath], {
         [filePath]: code,
@@ -513,146 +354,77 @@ export class Rslint {
       }
       return primary;
     } finally {
-      await discoverySession?.shutdown();
+      await discoverySession.shutdown();
     }
   }
 
-  /**
-   * Lint files matched by glob pattern(s), resolved against `cwd`. Results are
-   * ordered by the linted file's path (deterministic), not by glob-walk order.
-   */
+  /** Lint files matched by glob pattern(s), resolved against `cwd`. */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
-    const globs = Array.isArray(patterns) ? patterns : [patterns];
-    const { literalFilePatterns, literalDirectorySymlinks, scanDirectories } =
-      await classifyLintPatterns(globs, this.#cwd);
-    const globOptions = {
-      cwd: this.#cwd,
-      absolute: true,
-      onlyFiles: true,
-      dot: true,
-      ignore: DEFAULT_LINT_GLOB_IGNORES,
-    } as const;
-    const matched = await glob(globs, {
-      ...globOptions,
-      followSymbolicLinks: false,
-    });
-    const directorySymlinkMatches =
-      literalDirectorySymlinks.length === 0
-        ? []
-        : await glob(
-            [
-              ...literalDirectorySymlinks.map(
-                (directory) => `${convertPathToPattern(directory)}/**/*`,
-              ),
-              ...globs.filter((pattern) => pattern.startsWith('!')),
-            ],
-            {
-              ...globOptions,
-              // The explicitly named symlink is the scan root; nested directory
-              // symlinks remain excluded.
-              followSymbolicLinks: false,
-            },
-          );
-    // stat() already established each literal as a file. Keep its caller
-    // spelling directly, including file symlinks, without a second glob crawl.
-    const literalMatches = literalFilePatterns;
-
-    const filesByIdentity = new Map<
-      string,
-      { filePath: string; explicit: boolean }
-    >();
-    for (const file of [...matched, ...directorySymlinkMatches]) {
-      const normalized = path.normalize(file);
-      const key = nativePathIdentity.key(normalized);
-      if (!filesByIdentity.has(key)) {
-        filesByIdentity.set(key, { filePath: normalized, explicit: false });
+    let globs: string[];
+    if (patterns === '' || (Array.isArray(patterns) && patterns.length === 0)) {
+      globs = ['.'];
+    } else {
+      if (
+        (typeof patterns !== 'string' && !Array.isArray(patterns)) ||
+        (typeof patterns === 'string' && patterns.length === 0) ||
+        (Array.isArray(patterns) &&
+          patterns.some(
+            (pattern) => typeof pattern !== 'string' || pattern.length === 0,
+          ))
+      ) {
+        throw new Error(
+          "'patterns' must be a non-empty string or an array of non-empty strings",
+        );
       }
+      globs = Array.isArray(patterns) ? patterns : [patterns];
     }
-    for (const file of literalMatches) {
-      const normalized = path.normalize(file);
-      const key = nativePathIdentity.key(normalized);
-      // Preserve the spelling of a literal target over an overlapping glob.
-      filesByIdentity.set(key, { filePath: normalized, explicit: true });
-    }
-
-    const lexicalFiles = [...filesByIdentity.values()];
-    if (lexicalFiles.length === 0) return [];
-
-    const pathResolver = new RunPathResolver();
-    const resolvedPaths = await pathResolver.resolveAll(
-      lexicalFiles.map(({ filePath }) => filePath),
-    );
-    const plannedFiles: PlannedLintFile[] = resolvedPaths.map(
-      (resolved, index) => ({
-        ...resolved,
-        explicit: lexicalFiles[index].explicit,
-      }),
-    );
-
-    // Preserve lexical aliases through discovery. Go owns the final canonical
-    // target plan: aliases under one config are coalesced there, while aliases
-    // governed by different configs must remain visible so it can reject the
-    // ambiguous ownership instead of silently dropping one before discovery.
-    const selectedFiles = [...plannedFiles].sort((left, right) =>
-      nativePathIdentity.compare(left.lexicalPath, right.lexicalPath),
-    );
-    const overrideConfig = this.#getNormalizedOverrideConfig() ?? [];
-    const usesNativeDiscovery = this.#overrideConfigFile !== true;
-    const discoverySession = usesNativeDiscovery
-      ? this.#createNativeConfigDiscoverySession()
-      : null;
+    const { entries: overrideConfig, predicates: overridePredicates } =
+      this.#normalizeOverrideConfigForRequest();
+    const discoveryMode =
+      this.#overrideConfigFile === true
+        ? 'inline'
+        : typeof this.#overrideConfigFile === 'string'
+          ? 'explicit'
+          : 'auto';
+    const discoverySession =
+      this.#createNativeConfigDiscoverySession(overridePredicates);
     try {
-      const files = selectedFiles.map((file) => file.lexicalPath);
       const response = await this.#service.lint(
         {
-          config: usesNativeDiscovery ? undefined : overrideConfig,
-          configDiscovery: usesNativeDiscovery
-            ? {
-                mode:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? 'explicit'
-                    : 'auto',
-                explicitConfigPath:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? path.resolve(this.#cwd, this.#overrideConfigFile)
-                    : undefined,
-                directories: scanDirectories,
-                explicitFiles: selectedFiles.map((file) => file.explicit),
-                overrideConfig,
-              }
-            : undefined,
-          configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
+          configDiscovery: {
+            mode: discoveryMode,
+            inputs: globs,
+            explicitConfigPath:
+              typeof this.#overrideConfigFile === 'string'
+                ? path.resolve(this.#cwd, this.#overrideConfigFile)
+                : undefined,
+            overrideConfig,
+          },
           workingDirectory: this.#cwd,
-          files,
-          canonicalFiles: selectedFiles.map((file) => file.canonicalPath),
           // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
           fileContents: this.#resolveOverlay(),
           fix: this.#fix,
         },
-        discoverySession?.handlers ?? {},
+        discoverySession.handlers,
       );
       const { contents, bomFiles } = await this.#readDiagnosticContents(
         response,
         this.#cwd,
       );
-      // The multi-config native path returns absolute identities. Relative
-      // values remain accepted for low-level/older implementations.
-      const linted = response.lintedFiles
-        ? response.lintedFiles.map((file) =>
-            path.isAbsolute(file)
-              ? path.normalize(file)
-              : path.resolve(this.#cwd, file),
-          )
-        : files;
+      const linted = response.resultFiles.map((file) =>
+        path.isAbsolute(file)
+          ? path.normalize(file)
+          : path.resolve(this.#cwd, file),
+      );
       return this.#toLintResults(
         response,
         this.#cwd,
         linted,
         contents,
         bomFiles,
-      ).sort((a, b) => nativePathIdentity.compare(a.filePath, b.filePath));
+      );
     } finally {
-      await discoverySession?.shutdown();
+      await discoverySession.shutdown();
     }
   }
 
@@ -710,28 +482,46 @@ export class Rslint {
     return resolved;
   }
 
-  #createNativeConfigDiscoverySession(): NativeConfigDiscoverySession {
-    const configHost = new ConfigModuleHost();
+  #createNativeConfigDiscoverySession(
+    externalPredicates: ReadonlyMap<string, ConfigPredicate>,
+  ): NativeConfigDiscoverySession {
+    const configHost = this.#configHost;
     const transactions = new Set<string>();
     let pluginSession: PluginLintSession | null = null;
 
     const shutdown = async (): Promise<void> => {
-      if (pluginSession) {
-        await this.#pluginHosts.shutdown(pluginSession.host);
+      try {
+        if (pluginSession) {
+          await this.#pluginHosts.shutdown(pluginSession.host);
+        }
+      } finally {
+        pluginSession = null;
+        for (const transactionId of transactions) {
+          configHost.deleteSession(transactionId);
+        }
+        transactions.clear();
       }
-      pluginSession = null;
-      for (const transactionId of transactions) {
-        configHost.deleteSession(transactionId);
-      }
-      transactions.clear();
     };
 
     return {
       handlers: {
         loadConfigs: async (request) => {
-          const response = await configHost.loadConfigs(request);
+          // Register before module evaluation: a sibling discovery branch can
+          // fail while this import is still pending, causing the outer lint to
+          // enter shutdown before loadConfigs settles. The host allocates its
+          // session before awaiting the import, so shutdown can safely detach
+          // that state even when JavaScript module evaluation itself cannot be
+          // cancelled.
           transactions.add(request.transactionId);
-          return response;
+          return configHost.loadConfigs(request);
+        },
+        evaluateConfigPredicates: async (request) => {
+          transactions.add(request.transactionId);
+          return configHost.evaluateConfigPredicates(
+            request,
+            undefined,
+            externalPredicates,
+          );
         },
         activateConfigs: async (request) => {
           const { activation, pluginHost } = await stageNativeConfigActivation(
@@ -767,9 +557,13 @@ export class Rslint {
     };
   }
 
-  #getNormalizedOverrideConfig(): Record<string, unknown>[] | null {
-    if (this.#overrideConfig == null) return null;
-    if (this.#normalizedOverrideConfig) return this.#normalizedOverrideConfig;
+  #normalizeOverrideConfigForRequest(): {
+    entries: Record<string, unknown>[];
+    predicates: ReadonlyMap<string, ConfigPredicate>;
+  } {
+    if (this.#overrideConfig == null) {
+      return { entries: [], predicates: new Map() };
+    }
     const override = Array.isArray(this.#overrideConfig)
       ? this.#overrideConfig
       : [this.#overrideConfig];
@@ -792,8 +586,14 @@ export class Rslint {
         );
       }
     }
-    this.#normalizedOverrideConfig = normalizeConfig(override);
-    return this.#normalizedOverrideConfig;
+    const predicates = new Map<string, ConfigPredicate>();
+    let predicateSequence = 0;
+    const entries = normalizeConfig(override, (predicate) => {
+      const predicateId = `override:predicate-${String(++predicateSequence).padStart(6, '0')}`;
+      predicates.set(predicateId, predicate);
+      return predicateId;
+    });
+    return { entries, predicates };
   }
 
   async #readDiagnosticContents(
@@ -871,6 +671,21 @@ export class Rslint {
         byFile.set(key, bucket);
       }
       bucket.messages.push(toLintMessage(d, contentByPath.get(key)));
+    }
+
+    for (const warning of response.fileWarnings ?? []) {
+      const abs = toAbs(warning.filePath);
+      const key = nativePathIdentity.key(abs);
+      let bucket = byFile.get(key);
+      if (!bucket) {
+        bucket = { filePath: abs, messages: [] };
+        byFile.set(key, bucket);
+      }
+      bucket.messages.push({
+        ruleId: null,
+        severity: 1,
+        message: warning.message,
+      });
     }
 
     // Wire `output` is keyed by relative path; remap to absolute.

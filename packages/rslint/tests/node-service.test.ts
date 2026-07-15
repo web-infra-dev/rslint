@@ -20,6 +20,29 @@ function childOf(svc: NodeRslintService): { kill: (sig?: string) => void } {
 }
 
 suite('NodeRslintService reject-all-pending on crash/terminate', () => {
+  test('an orphaned reverse handler does not pin the process after its outer request settles', async () => {
+    const { spawn } = await import('node:child_process');
+    const script = path.resolve(
+      __dirname,
+      './fixtures/orphan-reverse-exit.mjs',
+    );
+    const child = spawn(process.execPath, [script], {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    });
+    const code = await new Promise<number | 'TIMEOUT-HANG'>((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        resolve('TIMEOUT-HANG');
+      }, 10_000);
+      child.on('exit', (exitCode) => {
+        clearTimeout(timer);
+        resolve(exitCode ?? 1);
+      });
+    });
+    expect(code).toBe(0);
+  });
+
   test('answers an inbound request without confusing a colliding outbound id', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     svc.setInboundHandler(async (message) => ({
@@ -82,9 +105,9 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
   test('does not harm a normal request/response round-trip', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     await expect(
-      svc.sendMessage('handshake', { version: '2.0.0' }),
+      svc.sendMessage('handshake', { version: '3.0.0' }),
     ).resolves.toEqual({
-      version: '2.0.0',
+      version: '3.0.0',
       ok: true,
       capabilities: ['reversePluginLint'],
     });
@@ -109,7 +132,7 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     process.env.RSLINT_FAKE_EXIT_SILENT = '1';
     try {
       const svc = new NodeRslintService({ rslintPath: FAKE });
-      await svc.sendMessage('handshake', { version: '2.0.0' });
+      await svc.sendMessage('handshake', { version: '3.0.0' });
       await expect(svc.sendMessage('exit', {})).resolves.toBeNull();
     } finally {
       delete process.env.RSLINT_FAKE_EXIT_SILENT;

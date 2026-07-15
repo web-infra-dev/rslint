@@ -11,8 +11,6 @@
  * transport boundary.
  */
 
-export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 1 as const;
-
 export type ConfigModuleLoadMode = 'cached' | 'fresh';
 
 export interface ConfigModuleCandidate {
@@ -25,13 +23,12 @@ export interface ConfigModuleCandidate {
 }
 
 export interface LoadConfigsRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
   /** Isolates batches belonging to one discovery transaction. */
   transactionId: string;
   /**
-   * `cached` preserves one-shot CLI module-import semantics. `fresh` is used
-   * by long-lived API and editor refreshes; it cache-busts the entry module,
-   * while static transitive imports retain Node's normal module cache.
+   * `cached` uses Node's ordinary module-import semantics for CLI and native
+   * API calls. `fresh` is reserved for editor refresh transactions and
+   * cache-busts the entry module; static imports retain Node's normal cache.
    */
   loadMode: ConfigModuleLoadMode;
   /** Serialize module evaluation when the CLI requested --singleThreaded. */
@@ -72,7 +69,6 @@ export interface LoadConfigsResponse {
 
 /** Go's final effective-ID selection after ignore/ownership resolution. */
 export interface ActivateConfigsRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
   transactionId: string;
   effectiveConfigIds: string[];
 }
@@ -81,4 +77,38 @@ export interface ActivateConfigsRequest {
 export interface ActivateConfigsResponse {
   transactionId: string;
   eslintPluginEntries: ConfigModuleEslintPluginEntry[];
+}
+
+export interface ConfigPredicateCall {
+  /** Opaque, transaction-local correlation ID allocated by Go. */
+  callId: string;
+  /** Opaque closure occurrence ID allocated while Node normalizes a module. */
+  predicateId: string;
+  /** Absolute lexical path. Node converts separators to the host-native form. */
+  absolutePath: string;
+  /** Directory predicates receive a native trailing path separator. */
+  directory?: boolean;
+}
+
+export interface EvaluateConfigPredicatesRequest {
+  transactionId: string;
+  calls: ConfigPredicateCall[];
+}
+
+export type ConfigPredicateResult =
+  | {
+      callId: string;
+      status: 'evaluated';
+      value: boolean;
+    }
+  | {
+      callId: string;
+      status: 'failed';
+      error: { message: string; code?: string };
+    };
+
+export interface EvaluateConfigPredicatesResponse {
+  transactionId: string;
+  /** Results preserve request order exactly. */
+  results: ConfigPredicateResult[];
 }

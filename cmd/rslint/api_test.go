@@ -9,51 +9,16 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
-
-type canonicalPathBaseFS struct {
-	vfs.FS
-	realpathCalls atomic.Int32
-}
-
-func (fs *canonicalPathBaseFS) Realpath(filePath string) string {
-	fs.realpathCalls.Add(1)
-	return fs.FS.Realpath(filePath)
-}
-
-func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
-	base := &canonicalPathBaseFS{FS: osvfs.FS()}
-	fsys := &canonicalPathVFS{
-		FS:             base,
-		canonicalPaths: map[string]string{exactFilesystemPathID("/lexical/a.ts"): "/physical/a.ts"},
-	}
-	if got := fsys.Realpath("/lexical/a.ts"); got != "/physical/a.ts" {
-		t.Fatalf("Realpath returned %q, want request hint", got)
-	}
-	if calls := base.realpathCalls.Load(); calls != 0 {
-		t.Fatalf("request hint must avoid base realpath, got %d calls", calls)
-	}
-}
-
-func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
-	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
-		Files:          []string{"a.ts"},
-		CanonicalFiles: []string{"a.ts", "b.ts"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "canonicalFiles must be parallel to files") {
-		t.Fatalf("expected canonicalFiles length error, got %v", err)
-	}
-}
 
 func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
@@ -1403,8 +1368,11 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 	var pluginRequests []linter.EslintPluginLintRequest
 	var callKinds []ipc.MessageKind
 	loadedIDs := make(map[string]struct{})
+	var requestMu sync.Mutex
 
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		requestMu.Lock()
+		defer requestMu.Unlock()
 		callKinds = append(callKinds, kind)
 		switch kind {
 		case api.KindLoadConfigs:
@@ -1415,11 +1383,8 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 			loadRequests = append(loadRequests, request)
 			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
 			for _, candidate := range request.Candidates {
-				if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
-					return nil, fmt.Errorf("load protocol version = %d", request.ProtocolVersion)
-				}
-				if request.LoadMode != discovery.ConfigModuleLoadFresh {
-					return nil, fmt.Errorf("API load mode = %q, want fresh", request.LoadMode)
+				if request.LoadMode != discovery.ConfigModuleLoadCached {
+					return nil, fmt.Errorf("API load mode = %q, want cached ESLint-instance semantics", request.LoadMode)
 				}
 				if !filepath.IsAbs(candidate.ConfigPath) || !filepath.IsAbs(candidate.ConfigDirectory) {
 					return nil, fmt.Errorf("candidate paths must be absolute: %+v", candidate)
@@ -1453,9 +1418,6 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 				return nil, fmt.Errorf("unexpected activateConfigs payload %T", payload)
 			}
 			activationRequests = append(activationRequests, request)
-			if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
-				return nil, fmt.Errorf("activation protocol version = %d", request.ProtocolVersion)
-			}
 			if len(request.EffectiveConfigIDs) != len(loadedIDs) {
 				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, loadedIDs)
 			}
@@ -1509,7 +1471,7 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{rootTarget, nestedTarget},
 		WorkingDirectory: root,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto", Inputs: []string{rootTarget, nestedTarget}},
 	}, requester)
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
@@ -1572,11 +1534,7 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 			})
 
 			var pluginLintCalls atomic.Int32
-			requester := apiPeerCapabilityRequester{
-				capabilities: map[string]struct{}{
-					api.CapabilityReverseConfigLoad: {},
-				},
-			}
+			requester := apiPeerCapabilityRequester{capabilities: map[string]struct{}{}}
 			requester.apiRequesterFunc = func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 				switch kind {
 				case api.KindLoadConfigs:
@@ -1610,7 +1568,7 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 				Files:            []string{target},
 				WorkingDirectory: root,
-				ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+				ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto", Inputs: []string{target}},
 			}, requester)
 			if test.wantCapErr {
 				if err == nil || !strings.Contains(err.Error(), "does not advertise reversePluginLint capability required by discovered ESLint plugins") {
@@ -1631,7 +1589,7 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 	}
 }
 
-func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *testing.T) {
+func TestHandleLint_ConfigDiscoveryDirectFileOnlyLoadsItsAncestorBranch(t *testing.T) {
 	root := t.TempDir()
 	rootConfigPath := filepath.Join(root, "rslint.config.js")
 	unrelatedConfigPath := filepath.Join(root, "src", "deep", "rslint.config.js")
@@ -1684,9 +1642,8 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:          "auto",
-			Directories:   []string{root},
-			ExplicitFiles: []bool{false},
+			Mode:   "auto",
+			Inputs: []string{target},
 		},
 	}, requester)
 	if err != nil {
@@ -1710,6 +1667,8 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 		".gitignore":       "foo.js\nbar.js\n",
 		"foo.js":           "debugger;\n",
 		"bar.js":           "debugger;\n",
+		"src/a.js":         "debugger;\n",
+		"src/b.js":         "debugger;\n",
 	})
 	entries := mustAPIConfig(t, `[{"ignores":["!foo.js"]},{"rules":{"no-debugger":"error"}}]`)
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
@@ -1744,9 +1703,8 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			Files:            files,
 			WorkingDirectory: root,
 			ConfigDiscovery: &api.ConfigDiscoveryRequest{
-				Mode:          "auto",
-				Directories:   []string{root},
-				ExplicitFiles: make([]bool, len(files)),
+				Mode:   "auto",
+				Inputs: append([]string{}, files...),
 			},
 		}, requester)
 		if err != nil {
@@ -1764,102 +1722,23 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 		withBar.Diagnostics[0].FilePath != "foo.js" || withBar.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("config negation restored the wrong gitignored target: %+v", withBar)
 	}
-}
-
-func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(t *testing.T) {
-	root := t.TempDir()
-	ignoredDir := filepath.Join(root, "ignored")
-	rootConfigPath := filepath.Join(root, "rslint.config.js")
-	nestedConfigPath := filepath.Join(ignoredDir, "rslint.config.js")
-	explicitTarget := filepath.Join(ignoredDir, "explicit.js")
-	automaticTarget := filepath.Join(ignoredDir, "automatic.js")
-	writeProgramTestFiles(t, root, map[string]string{
-		"rslint.config.js":         "export default [];\n",
-		"ignored/rslint.config.js": "export default [];\n",
-		"ignored/.gitignore":       "automatic.js\n",
-		"ignored/explicit.js":      "debugger;\nconsole.log('explicit');\n",
-		"ignored/automatic.js":     "debugger;\nconsole.log('automatic');\n",
-	})
-
-	rootEntries := mustAPIConfig(t, `[{"ignores":["ignored/rslint.config.js"]},{"rules":{"no-console":"error"}}]`)
-	nestedEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
-	loadedIDs := make(map[string]map[string]struct{})
-	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
-		switch kind {
-		case api.KindLoadConfigs:
-			request := payload.(discovery.ConfigLoadBatchRequest)
-			transactionIDs := loadedIDs[request.TransactionID]
-			if transactionIDs == nil {
-				transactionIDs = make(map[string]struct{})
-				loadedIDs[request.TransactionID] = transactionIDs
-			}
-			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
-			for _, candidate := range request.Candidates {
-				transactionIDs[candidate.ID] = struct{}{}
-				result := discovery.ConfigLoadResult{
-					ID:     candidate.ID,
-					Status: "loaded",
-				}
-				switch filepath.Clean(candidate.ConfigPath) {
-				case filepath.Clean(rootConfigPath):
-					result.Entries = rootEntries
-				case filepath.Clean(nestedConfigPath):
-					result.Entries = nestedEntries
-				default:
-					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
-				}
-				response.Results = append(response.Results, result)
-			}
-			return ipc.NewMessage(ipc.KindResponse, 1, response)
-		case api.KindActivateConfigs:
-			request := payload.(discovery.ConfigActivationRequest)
-			transactionIDs := loadedIDs[request.TransactionID]
-			if len(request.EffectiveConfigIDs) != len(transactionIDs) {
-				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, transactionIDs)
-			}
-			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
-				TransactionID: request.TransactionID,
-			})
-		default:
-			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
-		}
-	})
-
-	run := func(files []string, explicitFiles []bool) *api.LintResponse {
-		t.Helper()
-		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-			Files:            files,
-			WorkingDirectory: root,
-			ConfigDiscovery: &api.ConfigDiscoveryRequest{
-				Mode:          "auto",
-				Directories:   []string{ignoredDir},
-				ExplicitFiles: explicitFiles,
-			},
-		}, requester)
-		if err != nil {
-			t.Fatalf("HandleLintWithContext: %v", err)
-		}
-		return response
+	if len(withBar.FileWarnings) != 1 || withBar.FileWarnings[0].FilePath != "bar.js" {
+		t.Fatalf("direct gitignored input warning = %+v, want bar.js", withBar.FileWarnings)
 	}
-
-	automaticOnly := run([]string{automaticTarget}, []bool{false})
-	if automaticOnly.FileCount != 0 || len(automaticOnly.Diagnostics) != 0 {
-		t.Fatalf("parent-owned automatic target ignored by nested .gitignore was linted: %+v", automaticOnly)
+	if !reflect.DeepEqual(withBar.ResultFiles, []string{"foo.js", "bar.js"}) {
+		t.Fatalf("result order = %v, want linted then warning in caller order", withBar.ResultFiles)
 	}
-
-	response := run(
-		[]string{explicitTarget, automaticTarget},
-		[]bool{true, false},
-	)
-	if response.FileCount != 1 || len(response.Diagnostics) != 1 {
-		t.Fatalf("adding a literal changed the automatic target's ignore result: %+v", response)
+	barFirst := run([]string{bar, foo})
+	if !reflect.DeepEqual(barFirst.ResultFiles, []string{"bar.js", "foo.js"}) {
+		t.Fatalf("result order = %v, want warning then linted in caller order", barFirst.ResultFiles)
 	}
-	if response.Diagnostics[0].FilePath != "ignored/explicit.js" || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("explicit target did not retain nested owner: %+v", response.Diagnostics)
+	mixed := run([]string{"src/*.js", bar, foo})
+	if !reflect.DeepEqual(mixed.ResultFiles, []string{"bar.js", "foo.js", "src/a.js", "src/b.js"}) {
+		t.Fatalf("mixed result order = %v, want ESLint explicit phase before glob phase", mixed.ResultFiles)
 	}
 }
 
-func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testing.T) {
+func TestHandleLint_ExplicitConfigReportsTargetOutsideWorkingDirectory(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetDirectory := t.TempDir()
 	configPath := filepath.Join(workingDirectory, "custom.config.mjs")
@@ -1900,14 +1779,15 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
 			Mode:               "explicit",
 			ExplicitConfigPath: configPath,
-			ExplicitFiles:      []bool{true},
+			Inputs:             []string{targetPath},
 		},
 	}, requester)
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("explicit config did not govern outside target: %+v", response)
+	if response.FileCount != 0 || len(response.Diagnostics) != 0 || len(response.FileWarnings) != 1 ||
+		response.FileWarnings[0].Message != "File ignored because outside of base path." {
+		t.Fatalf("outside target response = %+v, want ESLint external warning", response)
 	}
 }
 
@@ -1931,47 +1811,20 @@ func TestHandleLint_ConfigAndConfigDiscoveryAreMutuallyExclusive(t *testing.T) {
 	}
 }
 
-func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
-	var reverseCalls atomic.Int32
-	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
-		reverseCalls.Add(1)
-		return nil, errors.New("reverse request must not run")
-	})
-	dir := t.TempDir()
-
-	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-		Files:            []string{filepath.Join(dir, "a.js"), filepath.Join(dir, "b.js")},
-		WorkingDirectory: dir,
-		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:          "auto",
-			ExplicitFiles: []bool{true},
-		},
-	}, requester)
-	if err == nil || !strings.Contains(err.Error(), "configDiscovery.explicitFiles must be parallel to files") {
-		t.Fatalf("expected explicitFiles length error, got %v", err)
-	}
-	if reverseCalls.Load() != 0 {
-		t.Fatalf("invalid request issued %d reverse calls", reverseCalls.Load())
-	}
-}
-
-func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *testing.T) {
+func TestHandleLint_ConfigDiscoveryWithoutCandidateIsFatal(t *testing.T) {
 	tests := []struct {
-		name       string
-		source     string
-		override   json.RawMessage
-		wantPrefix string
+		name     string
+		source   string
+		override json.RawMessage
 	}{
 		{
-			name:       "override config",
-			source:     "debugger;\n",
-			override:   json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
-			wantPrefix: "no-debugger",
+			name:     "override does not replace a missing config file",
+			source:   "debugger;\n",
+			override: json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
 		},
 		{
-			name:       "syntax only",
-			source:     "const = ;\n",
-			wantPrefix: "TypeScript(TS",
+			name:   "no override",
+			source: "const = ;\n",
 		},
 	}
 
@@ -1993,17 +1846,18 @@ func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *t
 				WorkingDirectory: dir,
 				ConfigDiscovery: &api.ConfigDiscoveryRequest{
 					Mode:           "auto",
+					Inputs:         []string{target},
 					OverrideConfig: test.override,
 				},
 			}, requester)
-			if err != nil {
-				t.Fatalf("HandleLintWithContext: %v", err)
+			if !errors.Is(err, discovery.ErrConfigFileMissing) {
+				t.Fatalf("error = %v, want ErrConfigFileMissing", err)
 			}
 			if reverseCalls.Load() != 0 {
 				t.Fatalf("no-candidate discovery issued %d reverse calls", reverseCalls.Load())
 			}
-			if len(response.Diagnostics) != 1 || !strings.HasPrefix(response.Diagnostics[0].RuleName, test.wantPrefix) {
-				t.Fatalf("diagnostics = %+v, want rule prefix %q", response.Diagnostics, test.wantPrefix)
+			if response != nil {
+				t.Fatalf("response = %+v, want nil on missing config", response)
 			}
 		})
 	}
@@ -2045,7 +1899,10 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(dir, "input.js")},
 		WorkingDirectory: dir,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Mode:   "auto",
+			Inputs: []string{filepath.Join(dir, "input.js")},
+		},
 	}, requester)
 	if !errors.Is(err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("error = %v, want ErrAllConfigsFailed", err)

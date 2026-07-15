@@ -79,9 +79,6 @@ importers:
       jiti:
         specifier: ^2.0.0
         version: 2.6.1
-      picomatch:
-        specifier: 4.0.4
-        version: 4.0.4
     devDependencies:
       '@eslint/plugin-kit':
         specifier: 0.7.2
@@ -95,9 +92,6 @@ importers:
       '@types/node':
         specifier: 24.0.14
         version: 24.0.14
-      '@types/picomatch':
-        specifier: 4.0.2
-        version: 4.0.2
       '@typescript-eslint/scope-manager':
         specifier: 8.59.4
         version: 8.59.4
@@ -122,9 +116,6 @@ importers:
       globals:
         specifier: 17.7.0
         version: 17.7.0
-      tinyglobby:
-        specifier: 0.2.15
-        version: 0.2.15
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -2836,9 +2827,6 @@ packages:
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
-
-  '@types/picomatch@4.0.2':
-    resolution: {integrity: sha512-qHHxQ+P9PysNEGbALT8f8YOSHW0KJu6l2xU8DYY0fu/EmGxXdVnuTLvFUvBgPJMSqXq29SYHveejeAha+4AYgA==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -8771,8 +8759,6 @@ snapshots:
       undici-types: 7.24.6
 
   '@types/normalize-package-data@2.4.4': {}
-
-  '@types/picomatch@4.0.2': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:

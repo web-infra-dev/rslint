@@ -9,13 +9,14 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/hostfs"
 	"github.com/web-infra-dev/rslint/internal/lsp"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func runLSP(args []string) int {
 
-	fs := bundled.WrapFS(osvfs.FS())
+	fs := bundled.WrapFS(hostfs.NativeOS(osvfs.FS()))
 	defaultLibraryPath := bundled.LibPath()
 	typingsLocation := getGlobalTypingsCacheLocation()
 

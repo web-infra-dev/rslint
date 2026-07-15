@@ -8,10 +8,32 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
+
+func manualDiscoveredTargetWithGitignore(
+	entries rslintconfig.RslintConfig,
+	configDir string,
+	targetPath string,
+	explicit bool,
+) (discovery.DiscoveredTarget, bool) {
+	configDir = tspath.NormalizePath(configDir)
+	targetPath = tspath.NormalizePath(targetPath)
+	effective := rslintconfig.ConfigWithGitignore(entries, configDir, osvfs.FS(), []string{targetPath})
+	merged := effective.GetConfigForFile(targetPath, configDir)
+	if merged == nil {
+		return discovery.DiscoveredTarget{}, false
+	}
+	return discovery.DiscoveredTarget{
+		Path:            targetPath,
+		ConfigDirectory: configDir,
+		Explicit:        explicit,
+		MergedConfig:    merged,
+	}, true
+}
 
 func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 	tests := []struct {
@@ -29,12 +51,6 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			name:          "global config ignore suppresses explicit target",
 			relative:      "global.ts",
 			globalIgnores: []string{"global.ts"},
-		},
-		{
-			name:         "entry ignore keeps target but removes rules",
-			relative:     "entry.ts",
-			entryIgnores: []string{"entry.ts"},
-			wantLinted:   true,
 		},
 		{
 			name:       "root gitignore suppresses explicit target",
@@ -76,13 +92,12 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:     "pruned nested source does not override root negation",
+			name:     "ignored parent blocks root descendant negation",
 			relative: "dist/types/private.ts",
 			gitignores: map[string]string{
 				".gitignore":            "dist/\n!dist/types/\n",
 				"dist/types/.gitignore": "private.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:       "directory symlink remains lintable without ignore",
@@ -223,15 +238,19 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 		Files: []string{"**/*.ts"},
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
+	var targets []discovery.DiscoveredTarget
+	if target, configured := manualDiscoveredTargetWithGitignore(entry, firstDir, firstTarget, false); configured {
+		targets = append(targets, target)
+	}
+	if target, configured := manualDiscoveredTargetWithGitignore(entry, secondDir, secondTarget, false); configured {
+		targets = append(targets, target)
+	}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
 			tspath.NormalizePath(firstDir):  entry,
 			tspath.NormalizePath(secondDir): entry,
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
-			tspath.NormalizePath(firstDir):  {Files: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
-			tspath.NormalizePath(secondDir): {Files: []string{tspath.NormalizePath(secondTarget)}, ExplicitOnly: true},
-		},
+		Targets: targets,
 	}
 
 	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
@@ -251,7 +270,7 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}
 }
 
-func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
+func TestCLIMixedLiteralAndGlobTargetsUseExactGitignorePostFilter(t *testing.T) {
 	workspace := t.TempDir()
 	ignoredDir := filepath.Join(workspace, "ignored")
 	explicitTarget := filepath.Join(ignoredDir, "explicit.js")
@@ -269,17 +288,21 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rootEntries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}}
+	nestedEntries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
+	var targets []discovery.DiscoveredTarget
+	if target, configured := manualDiscoveredTargetWithGitignore(nestedEntries, ignoredDir, explicitTarget, true); configured {
+		targets = append(targets, target)
+	}
+	if target, configured := manualDiscoveredTargetWithGitignore(nestedEntries, ignoredDir, automaticTarget, false); configured {
+		targets = append(targets, target)
+	}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(workspace):  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
-			tspath.NormalizePath(ignoredDir): {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+			tspath.NormalizePath(workspace):  rootEntries,
+			tspath.NormalizePath(ignoredDir): nestedEntries,
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
-			tspath.NormalizePath(ignoredDir): {
-				Files:        []string{tspath.NormalizePath(explicitTarget)},
-				ExplicitOnly: true,
-			},
-		},
+		Targets: targets,
 	}
 	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
@@ -303,8 +326,8 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 	workspace := t.TempDir()
 	childDir := filepath.Join(workspace, "packages", "app")
-	parentOwnedTarget := filepath.Join(childDir, "parent-owned.ts")
-	parentIgnoredTarget := filepath.Join(childDir, "parent-ignored.ts")
+	parentOwnedTarget := filepath.Join(workspace, "parent-owned.ts")
+	parentIgnoredTarget := filepath.Join(workspace, "parent-ignored.ts")
 	childOwnedTarget := filepath.Join(childDir, "child-owned.ts")
 	if err := os.MkdirAll(childDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -325,24 +348,25 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		Files: []string{"**/*.ts"},
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
+	var targets []discovery.DiscoveredTarget
+	for _, candidate := range []struct {
+		path  string
+		owner string
+	}{
+		{path: parentOwnedTarget, owner: workspace},
+		{path: parentIgnoredTarget, owner: workspace},
+		{path: childOwnedTarget, owner: childDir},
+	} {
+		if target, configured := manualDiscoveredTargetWithGitignore(entry, candidate.owner, candidate.path, false); configured {
+			targets = append(targets, target)
+		}
+	}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
 			tspath.NormalizePath(workspace): entry,
 			tspath.NormalizePath(childDir):  entry,
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
-			tspath.NormalizePath(workspace): {
-				Files: []string{
-					tspath.NormalizePath(parentOwnedTarget),
-					tspath.NormalizePath(parentIgnoredTarget),
-				},
-				ExplicitOnly: true,
-			},
-			tspath.NormalizePath(childDir): {
-				Files:        []string{tspath.NormalizePath(childOwnedTarget)},
-				ExplicitOnly: true,
-			},
-		},
+		Targets: targets,
 	}
 	for _, test := range []struct {
 		name           string

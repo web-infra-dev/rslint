@@ -25,7 +25,7 @@ func resolveConfigOwner(filePath string, configMap map[string]RslintConfig) (str
 }
 
 func TestResolveConfigPathSpace(t *testing.T) {
-	t.Run("symlink aliases use the physical config root", func(t *testing.T) {
+	t.Run("symlink aliases project back into the authored config root", func(t *testing.T) {
 		fs := &configPathSpaceFS{
 			caseSensitive: true,
 			realPaths: map[string]string{
@@ -36,7 +36,7 @@ func TestResolveConfigPathSpace(t *testing.T) {
 		}
 		for _, filePath := range []string{"/alias/src/a.ts", "/real/src/a.ts"} {
 			matchFile, matchDir := ResolveConfigPathSpace(filePath, "/alias", fs)
-			if matchFile != "/real/src/a.ts" || matchDir != "/real" {
+			if matchFile != "/alias/src/a.ts" || matchDir != "/alias" {
 				t.Fatalf("ResolveConfigPathSpace(%q) = (%q, %q)", filePath, matchFile, matchDir)
 			}
 		}
@@ -56,7 +56,7 @@ func TestResolveConfigPathSpace(t *testing.T) {
 		}
 	})
 
-	t.Run("distinct physical casing is not collapsed by a global case flag", func(t *testing.T) {
+	t.Run("Windows path scope follows case-insensitive path semantics", func(t *testing.T) {
 		fs := &configPathSpaceFS{
 			caseSensitive: false,
 			realPaths: map[string]string{
@@ -65,8 +65,8 @@ func TestResolveConfigPathSpace(t *testing.T) {
 			},
 		}
 		matchFile, matchDir := ResolveConfigPathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
-		if matchFile != "c:/repo/src/index.ts" || matchDir != "C:/Repo" {
-			t.Fatalf("distinct physical roots were collapsed: (%q, %q)", matchFile, matchDir)
+		if matchFile != "C:/Repo/src/index.ts" || matchDir != "C:/Repo" {
+			t.Fatalf("Windows path scope was not projected consistently: (%q, %q)", matchFile, matchDir)
 		}
 	})
 
@@ -148,33 +148,6 @@ func TestConfigOwnerResolverChildConfigDirs(t *testing.T) {
 	children[0] = "/mutated"
 	if fresh := resolver.ChildConfigDirs("/repo"); fresh[0] != "/repo/packages/app" {
 		t.Fatalf("ChildConfigDirs exposed resolver state: %v", fresh)
-	}
-}
-
-func TestConfigOwnerResolverForAutomaticTargetsExcludesExplicitOnlyBoundary(t *testing.T) {
-	configMap := map[string]RslintConfig{
-		"/repo":          nil,
-		"/repo/ignored":  nil,
-		"/repo/packages": nil,
-	}
-	scopes := map[string]LintDiscoveryScope{
-		"/repo/ignored": {ExplicitOnly: true},
-	}
-
-	automatic := NewConfigOwnerResolverForAutomaticTargets(configMap, scopes, nil)
-	dir, _ := automatic.Resolve("/repo/ignored/automatic.ts")
-	if dir != "/repo" {
-		t.Fatalf("explicit-only config claimed automatic target: %q", dir)
-	}
-	children := automatic.ChildConfigDirs("/repo")
-	if len(children) != 1 || children[0] != "/repo/packages" {
-		t.Fatalf("automatic child boundaries = %v", children)
-	}
-
-	complete := NewConfigOwnerResolver(configMap, nil)
-	dir, _ = complete.Resolve("/repo/ignored/explicit.ts")
-	if dir != "/repo/ignored" {
-		t.Fatalf("complete resolver lost literal owner: %q", dir)
 	}
 }
 

@@ -5,13 +5,16 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 )
 
 func normalizeGlobPath(path string) string {
-	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
+	return hostpath.NormalizeForRoot(path, path)
+}
+
+func joinHostPath(basePath string, child string) string {
+	return hostpath.ResolveForRoot(basePath, basePath, child)
 }
 
 func matchGlob(pattern string, path string) bool {
@@ -29,15 +32,6 @@ func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool
 		return false
 	}
 	return matchGlob(pattern, path)
-}
-
-func isDefaultExcludedDirName(name string, useCaseSensitive bool) bool {
-	for _, excluded := range utils.DefaultExcludeDirNames {
-		if name == excluded || (!useCaseSensitive && strings.EqualFold(name, excluded)) {
-			return true
-		}
-	}
-	return false
 }
 
 // Collect reads the .gitignore files relevant to one lint invocation. A nil
@@ -116,7 +110,7 @@ func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, f
 		current := normalizedConfigDir
 		dirSet[current] = struct{}{}
 		for _, component := range splitPathComponents(rel) {
-			current = tspath.CombinePaths(current, component)
+			current = joinHostPath(current, component)
 			if isCollectionBoundary(current, boundaries, useCaseSensitive) {
 				break
 			}
@@ -146,7 +140,7 @@ func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, f
 			continue
 		}
 
-		content, ok := fsys.ReadFile(tspath.CombinePaths(dir, ".gitignore"))
+		content, ok := fsys.ReadFile(joinHostPath(dir, ".gitignore"))
 		if !ok {
 			continue
 		}
@@ -177,9 +171,7 @@ func normalizeCollectionBoundaries(configDir string, stopDirs []string, useCaseS
 
 func isCollectionBoundary(dir string, boundaries []string, useCaseSensitive bool) bool {
 	for _, boundary := range boundaries {
-		if tspath.ComparePaths(dir, boundary, tspath.ComparePathsOptions{
-			UseCaseSensitiveFileNames: useCaseSensitive,
-		}) == 0 {
+		if hostpath.EqualForRoot(boundary, dir, boundary, useCaseSensitive) {
 			return true
 		}
 	}
@@ -202,7 +194,7 @@ func isDescendantSymlinkDir(configDir string, dir string, fsys vfs.FS) bool {
 	}
 
 	parent := parentDir(dir)
-	name := tspath.GetBaseFileName(dir)
+	name := hostpath.BaseForRoot(dir, dir)
 	entries := fsys.GetAccessibleEntries(parent)
 	if entries.Symlinks != nil {
 		for symlink := range entries.Symlinks {
@@ -218,10 +210,8 @@ func isDescendantSymlinkDir(configDir string, dir string, fsys vfs.FS) bool {
 	if parentRealPath == "" || dirRealPath == "" {
 		return false
 	}
-	expectedRealPath := tspath.CombinePaths(parentRealPath, name)
-	return tspath.ComparePaths(dirRealPath, expectedRealPath, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
-	}) != 0
+	expectedRealPath := joinHostPath(parentRealPath, name)
+	return !hostpath.EqualForRoot(expectedRealPath, dirRealPath, expectedRealPath, fsys.UseCaseSensitiveFileNames())
 }
 
 type gitignorePruneRule struct {
@@ -326,7 +316,7 @@ type filesystemPath struct {
 // tspath's generic root parser stops at the server, which is appropriate for
 // URLs but would let filesystem traversal escape above a Windows share.
 func splitFilesystemPath(path string) filesystemPath {
-	path = tspath.NormalizePath(path)
+	path = hostpath.NormalizeForRoot(path, path)
 	if strings.HasPrefix(path, "//") {
 		serverAndRest := path[2:]
 		serverEnd := strings.Index(serverAndRest, "/")
@@ -350,7 +340,7 @@ func splitFilesystemPath(path string) filesystemPath {
 		return filesystemPath{root: root, rest: rest, caseInsensitive: true}
 	}
 
-	rootLength := tspath.GetRootLength(path)
+	rootLength := rootLength(path)
 	if rootLength == 0 {
 		return filesystemPath{rest: strings.Trim(path, "/")}
 	}
@@ -374,7 +364,7 @@ func joinFilesystemPath(path filesystemPath, rest string) string {
 	if path.root == "" {
 		return rest
 	}
-	return tspath.CombinePaths(path.root, rest)
+	return joinHostPath(path.root, rest)
 }
 
 func sameFilesystemRoot(left filesystemPath, right filesystemPath, useCaseSensitive bool) bool {
@@ -392,6 +382,16 @@ func equalFilesystemPath(left string, right string, caseInsensitive bool) bool {
 		return strings.EqualFold(left, right)
 	}
 	return left == right
+}
+
+func rootLength(path string) int {
+	if strings.HasPrefix(path, "/") {
+		return 1
+	}
+	if len(path) >= 3 && path[1] == ':' && path[2] == '/' {
+		return 3
+	}
+	return 0
 }
 
 // parentDir returns the parent directory of dir. Filesystem roots are returned
@@ -491,7 +491,7 @@ func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
 }
 
 func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, state *gitignoreWalkState) {
-	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
+	gitignorePath := joinHostPath(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
 		localGlobs := convertGitignoreToGlobs(content, relDir)
 		*result = append(*result, localGlobs...)
@@ -507,11 +507,7 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 		state.visited[parentRealPath] = struct{}{}
 	}
 	for _, dir := range entries.Directories {
-		if isDefaultExcludedDirName(dir, fsys.UseCaseSensitiveFileNames()) {
-			continue
-		}
-
-		childAbs := tspath.CombinePaths(absDir, dir)
+		childAbs := joinHostPath(absDir, dir)
 		if isCollectionBoundary(childAbs, boundaries, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
@@ -522,10 +518,8 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			}
 		} else {
 			childRealPath = state.realpath(childAbs, fsys)
-			expectedRealPath := tspath.CombinePaths(parentRealPath, dir)
-			if tspath.ComparePaths(childRealPath, expectedRealPath, tspath.ComparePathsOptions{
-				UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
-			}) != 0 {
+			expectedRealPath := joinHostPath(parentRealPath, dir)
+			if !hostpath.EqualForRoot(expectedRealPath, childRealPath, expectedRealPath, fsys.UseCaseSensitiveFileNames()) {
 				continue
 			}
 		}

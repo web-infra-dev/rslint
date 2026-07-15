@@ -23,6 +23,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"golang.org/x/sync/errgroup"
@@ -59,6 +60,7 @@ func NewServer(opts *ServerOptions) *Server {
 		typingsLocation:        opts.TypingsLocation,
 		parseCache:             opts.ParseCache,
 		jsConfigs:              make(map[string]config.RslintConfig),
+		jsConfigEvaluators:     make(map[string]*config.ConfigEvaluator),
 		jsUnavailableConfigs:   make(map[string]struct{}),
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
@@ -169,6 +171,12 @@ type Server struct {
 	// jsConfigs is keyed by the catalog's absolute filesystem directory
 	// byte-for-byte so Go ownership and Node plugin routing share one identity.
 	jsConfigs map[string]config.RslintConfig
+	// jsConfigEvaluators are the committed ConfigArray instances created during
+	// discovery. They retain exact-path decisions and the live predicate host;
+	// native lint, community plugins, and fix passes consume their one merged
+	// result instead of rematching the flat config independently.
+	jsConfigEvaluators  map[string]*config.ConfigEvaluator
+	activeConfigCatalog *discovery.ConfigCatalog
 	// The resolver is rebuilt atomically with each config transaction. Its keys
 	// are the same filesystem paths stored in jsConfigs.
 	jsConfigOwnerResolver *config.ConfigOwnerResolver
@@ -184,15 +192,20 @@ type Server struct {
 	// unavailable boundaries used to keep LSP alive when every JS config is
 	// broken. Refresh failures preserve only the usable JS catalog as last-good.
 	configDiscoveryHasLastGood bool
-	// configSnapshotIncludesGitignore means the current catalog already contains
-	// the .gitignore view captured during its transaction. Before the first
-	// committed snapshot, the JSON startup config still uses the live policy.
+	// configSnapshotIncludesGitignore means the current transaction owns the
+	// .gitignore policy: JS owners use their retained lazy evaluator and the JSON
+	// fallback contains its collected patterns. Before the first commit, the
+	// startup JSON config still applies the policy per target.
 	configSnapshotIncludesGitignore bool
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
-	jsonConfig           config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
-	rslintConfigPath     string              // path to rslint.json/rslint.jsonc, empty if not found
+	// configDiscoveryLookupDirs records open-document directories whose nearest
+	// config was resolved explicitly in the committed generation. It prevents
+	// repeated refreshes when that exact path remains ignored by its own config.
+	configDiscoveryLookupDirs map[string]struct{}
+	jsonConfig                config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
+	rslintConfigPath          string              // path to rslint.json/rslint.jsonc, empty if not found
 	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
 	// For the JSON-config path this is a single global list.
 	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
@@ -235,9 +248,9 @@ type Server struct {
 	eslintPluginRules map[string]struct{}
 
 	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
-	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
-	// used, driving an isolated overlay Program); tests inject a mock to exercise the
-	// plugin-fix fold loop without spinning up a language service.
+	// computeFixAllContent. Production leaves it nil and drives an isolated
+	// overlay Program directly; tests inject a mock to exercise the plugin-fix
+	// fold loop without spinning up a language service.
 	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error)
 
 	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
@@ -406,6 +419,12 @@ func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryE
 func (s *Server) IsActive() bool { return s.session != nil }
 
 func (s *Server) Run() error {
+	defer func() {
+		if s.activeConfigCatalog != nil {
+			s.activeConfigCatalog.ClosePredicateEvaluation()
+			s.activeConfigCatalog = nil
+		}
+	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -619,62 +621,6 @@ func TestSyntacticErrorType(t *testing.T) {
 	}
 }
 
-// ======== groupDiagsByFile tests ========
-
-func TestGroupDiagsByFile_Empty(t *testing.T) {
-	result := groupDiagsByFile(nil)
-	if len(result) != 0 {
-		t.Errorf("expected empty map for nil input, got %d entries", len(result))
-	}
-
-	result = groupDiagsByFile([]rule.RuleDiagnostic{})
-	if len(result) != 0 {
-		t.Errorf("expected empty map for empty input, got %d entries", len(result))
-	}
-}
-
-func TestGroupDiagsByFile_SingleFile(t *testing.T) {
-	source := "const x = 1;\nconst y = 2;\n"
-	d1, _ := createTestDiagnostic(t, source, 0, 5)
-	// Create a second diagnostic from the SAME source file
-	d2 := d1
-	d2.Range = core.NewTextRange(13, 18)
-	d2.Message = rule.RuleMessage{Id: "test2", Description: "Second diagnostic"}
-
-	result := groupDiagsByFile([]rule.RuleDiagnostic{d1, d2})
-
-	if len(result) != 1 {
-		t.Fatalf("expected 1 file group, got %d", len(result))
-	}
-
-	for _, diags := range result {
-		if len(diags) != 2 {
-			t.Errorf("expected 2 diagnostics in group, got %d", len(diags))
-		}
-	}
-}
-
-func TestGroupDiagsByFile_MultipleFiles(t *testing.T) {
-	// Create diagnostics from two different temp directories (different files)
-	sourceA := "const a = 1;"
-	sourceB := "const b = 2;"
-	dA, _ := createTestDiagnostic(t, sourceA, 0, 5)
-	dB, _ := createTestDiagnostic(t, sourceB, 0, 5)
-
-	result := groupDiagsByFile([]rule.RuleDiagnostic{dA, dB})
-
-	// Each diagnostic comes from a different temp dir → different file names
-	if len(result) != 2 {
-		t.Fatalf("expected 2 file groups, got %d", len(result))
-	}
-
-	for _, diags := range result {
-		if len(diags) != 1 {
-			t.Errorf("expected 1 diagnostic per file, got %d", len(diags))
-		}
-	}
-}
-
 // ======== resolveStartTime tests ========
 
 func TestResolveStartTime_Zero(t *testing.T) {
@@ -820,9 +766,16 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	configDir := tspath.NormalizePath(dir)
 
 	t.Run("explicit empty export remains a JS config", func(t *testing.T) {
+		emptyConfig := rslintconfig.RslintConfig{}
 		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
 			ConfigCatalog: &discovery.ConfigCatalog{
-				Configs:  map[string]rslintconfig.RslintConfig{configDir: {}},
+				Configs: map[string]rslintconfig.RslintConfig{configDir: emptyConfig},
+				Targets: []discovery.DiscoveredTarget{{
+					Path:            target,
+					ConfigDirectory: configDir,
+					Explicit:        true,
+					MergedConfig:    emptyConfig.GetConfigForFile(target, configDir),
+				}},
 				Explicit: true,
 			},
 			AllowFiles:     []string{target},
@@ -878,15 +831,22 @@ func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T)
 		{name: "declared plugin rule runs", plugins: []string{"@typescript-eslint"}, wantFailure: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			entries := rslintconfig.RslintConfig{{
+				Files:   []string{"**/*.ts"},
+				Plugins: test.plugins,
+				Rules:   rslintconfig.Rules{"@typescript-eslint/no-explicit-any": "error"},
+			}}
 			code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
 				ConfigCatalog: &discovery.ConfigCatalog{
 					Configs: map[string]rslintconfig.RslintConfig{
-						configDir: {{
-							Files:   []string{"**/*.ts"},
-							Plugins: test.plugins,
-							Rules:   rslintconfig.Rules{"@typescript-eslint/no-explicit-any": "error"},
-						}},
+						configDir: entries,
 					},
+					Targets: []discovery.DiscoveredTarget{{
+						Path:            target,
+						ConfigDirectory: configDir,
+						Explicit:        true,
+						MergedConfig:    entries.GetConfigForFile(target, configDir),
+					}},
 					Explicit: true,
 				},
 				AllowFiles:     []string{target},
@@ -1025,14 +985,88 @@ func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
 	}
 }
 
+func TestCollectDiscoveryExplicitWarningsUsesAuthoritativeStatuses(t *testing.T) {
+	catalog := &discovery.ConfigCatalog{
+		ExplicitInputs: []discovery.ExplicitInputResult{
+			{Path: "/work/kept.js", Status: discovery.ExplicitInputConfigured},
+			{Path: "/work/config-ignored.js", Status: discovery.ExplicitInputIgnored},
+			{Path: "/work/config-ignored.js", Status: discovery.ExplicitInputIgnored, Order: 99},
+			{Path: "/work/unconfigured.txt", Status: discovery.ExplicitInputUnconfigured},
+			{Path: "/outside/external.js", Status: discovery.ExplicitInputExternal},
+			{Path: "/work/gitignored.js", Status: discovery.ExplicitInputIgnored},
+		},
+	}
+	warnings := collectDiscoveryExplicitWarnings(catalog)
+	want := []allowFileWarning{
+		{Path: "/work/config-ignored.js", Kind: allowFileIgnored},
+		{Path: "/work/unconfigured.txt", Kind: allowFileUnconfigured},
+		{Path: "/outside/external.js", Kind: allowFileExternal},
+		{Path: "/work/gitignored.js", Kind: allowFileIgnored},
+	}
+	if !reflect.DeepEqual(warnings, want) {
+		t.Fatalf("warnings = %#v, want %#v", warnings, want)
+	}
+}
+
+func TestExecuteLintPipelineDiscoveryFileWarningQuietAndMaxWarnings(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "ignored.ts")
+	if err := os.WriteFile(target, []byte("const = ;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
+	newCatalog := func() *discovery.ConfigCatalog {
+		return &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{root: entries},
+			ExplicitInputs: []discovery.ExplicitInputResult{{
+				Path: target, Status: discovery.ExplicitInputIgnored,
+			}},
+		}
+	}
+	tests := []struct {
+		name           string
+		quiet          bool
+		maxWarnings    int
+		wantCode       int
+		wantStdout     bool
+		wantMaxMessage bool
+	}{
+		{name: "normal", maxWarnings: -1, wantCode: 0, wantStdout: true},
+		{name: "quiet", quiet: true, maxWarnings: -1, wantCode: 0},
+		{name: "quiet max warnings", quiet: true, maxWarnings: 0, wantCode: 1, wantMaxMessage: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			code, stdout, stderr := runLintPipelineForTest(t, root, lintArgs{
+				ConfigCatalog:  newCatalog(),
+				AllowFiles:     []string{target},
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: true,
+				Quiet:          test.quiet,
+				MaxWarnings:    test.maxWarnings,
+			})
+			if code != test.wantCode {
+				t.Fatalf("code = %d, want %d; stdout=%q stderr=%q", code, test.wantCode, stdout, stderr)
+			}
+			if got := strings.Contains(stdout, "ignored because of a matching ignore pattern"); got != test.wantStdout {
+				t.Fatalf("warning visibility = %v, want %v; stdout=%q", got, test.wantStdout, stdout)
+			}
+			if got := strings.Contains(stderr, "too many warnings"); got != test.wantMaxMessage {
+				t.Fatalf("max-warning message = %v, want %v; stderr=%q", got, test.wantMaxMessage, stderr)
+			}
+		})
+	}
+}
+
 func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	// No allowFiles → no work, no warnings. Important so callers can rely
 	// on a non-nil result implying actual user-specified files.
-	got := collectAllowFileWarnings(nil, nil, nil, "/work", true)
+	got := collectAllowFileWarnings(nil, nil, "/work", nil)
 	if got != nil {
 		t.Errorf("empty allowFiles should produce nil, got %+v", got)
 	}
-	got = collectAllowFileWarnings([]string{}, nil, nil, "/work", true)
+	got = collectAllowFileWarnings([]string{}, nil, "/work", nil)
 	if got != nil {
 		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
 	}
@@ -1047,12 +1081,11 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		rslintconfig.RslintConfig{
 			{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		configDir,
-		true,
+		nil,
 	)
 	if len(warnings) != 0 {
 		t.Fatalf("files scope miss should not emit warning, got %+v", warnings)
@@ -1068,12 +1101,11 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		tspath.GetDirectoryPath(target),
-		true,
+		nil,
 	)
 	if len(warnings) != 0 {
 		t.Fatalf("existing files should not produce warnings, got %+v", warnings)
@@ -1084,12 +1116,11 @@ func TestCollectAllowFileWarnings_MissingFileWarns(t *testing.T) {
 	target := tspath.NormalizePath(filepath.Join(t.TempDir(), "missing.ts"))
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		tspath.GetDirectoryPath(target),
-		true,
+		nil,
 	)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one missing-file warning, got %+v", warnings)
@@ -1108,13 +1139,12 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		rslintconfig.RslintConfig{
 			{Ignores: []string{"src/**"}},
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		configDir,
-		true,
+		nil,
 	)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one warning, got %+v", warnings)
@@ -1136,58 +1166,17 @@ func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		tspath.NormalizePath(dir),
-		true,
+		nil,
 	)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one warning, got %+v", warnings)
 	}
 	if warnings[0].Kind != allowFileIgnored {
 		t.Fatalf("expected allowFileIgnored, got %+v", warnings[0])
-	}
-}
-
-func TestCollectAllowFileWarnings_KeepsLexicalConfigOwnersSeparate(t *testing.T) {
-	root := t.TempDir()
-	sharedDir := filepath.Join(root, "shared")
-	ownerA := filepath.Join(root, "a")
-	ownerB := filepath.Join(root, "b")
-	for _, dir := range []string{sharedDir, ownerA, ownerB} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(sharedDir, "index.ts"), []byte("export {};\n"), 0o644); err != nil {
-		t.Fatalf("write target: %v", err)
-	}
-	for _, owner := range []string{ownerA, ownerB} {
-		if err := os.Symlink(sharedDir, filepath.Join(owner, "link")); err != nil {
-			t.Skipf("symlink unavailable: %v", err)
-		}
-	}
-
-	ownerA = tspath.NormalizePath(ownerA)
-	ownerB = tspath.NormalizePath(ownerB)
-	targetA := tspath.ResolvePath(ownerA, "link/index.ts")
-	targetB := tspath.ResolvePath(ownerB, "link/index.ts")
-	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	warnings := collectAllowFileWarnings(
-		[]string{targetA, targetB},
-		map[string]rslintconfig.RslintConfig{
-			ownerA: {{Ignores: []string{"link/**"}}},
-			ownerB: {{}},
-		},
-		nil,
-		root,
-		true,
-		fsys,
-	)
-	if len(warnings) != 1 || warnings[0].Path != targetA || warnings[0].Kind != allowFileIgnored {
-		t.Fatalf("expected only the target owned by config A to be ignored, got %+v", warnings)
 	}
 }
 
@@ -1219,7 +1208,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	targetPlan, err := resolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
+	targetPlan, err := resolveLintTargetPlan(targetConfig, dir, fs, nil, []string{tspath.NormalizePath(dir)}, true)
 	if err != nil {
 		t.Fatalf("resolveLintTargetPlan: %v", err)
 	}
@@ -1228,8 +1217,8 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
 	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
-	targetsByProgram := binding.TargetsByProgram
+	typeInfoFiles := bindingTypeInfoFiles(binding)
+	targetsByProgram := bindingTargetsByProgram(binding)
 	targetFiles := make([]string, 0, len(targetPlan.Targets))
 	for _, target := range targetPlan.Targets {
 		targetFiles = append(targetFiles, target.Path)
@@ -1533,23 +1522,6 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 	}
 }
 
-func TestRemapDiagnosticTargetPaths(t *testing.T) {
-	diagnostics := []rule.RuleDiagnostic{
-		{FilePath: "/program/link.ts"},
-		{FilePath: "/program/unchanged.ts"},
-	}
-	remapDiagnosticTargetPaths(diagnostics, map[string]string{
-		"/program/link.ts": "/requested/real.ts",
-	})
-
-	if diagnostics[0].FilePath != "/requested/real.ts" {
-		t.Fatalf("expected requested target path, got %q", diagnostics[0].FilePath)
-	}
-	if diagnostics[1].FilePath != "/program/unchanged.ts" {
-		t.Fatalf("unexpected remap of unrelated diagnostic: %q", diagnostics[1].FilePath)
-	}
-}
-
 func TestDeduplicateTypeScriptDiagnosticsAcrossPathAliases(t *testing.T) {
 	dir := t.TempDir()
 	realPath := filepath.Join(dir, "real.ts")
@@ -1616,7 +1588,7 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 	aliasDiagnostic := base
 	aliasDiagnostic.FilePath = aliasPath
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	preferred := map[string]string{canonicalFilesystemPathID(realPath, fsys): realPath}
+	preferred := map[string]string{canonicalHostPathID(realPath, fsys): realPath}
 
 	got := deduplicateTypeScriptDiagnostics([]rule.RuleDiagnostic{aliasDiagnostic, realDiagnostic}, fsys, preferred)
 	if len(got) != 1 || got[0].FilePath != realPath {
@@ -1628,24 +1600,172 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 	}
 }
 
-func TestApplyFixPassReturnsWriteError(t *testing.T) {
-	diagnostic, _ := createTestDiagnostic(t, "a", 0, 1)
-	diagnostic.FixesPtr = &[]rule.RuleFix{{
-		Range: core.NewTextRange(0, 1),
-		Text:  "b",
-	}}
+func TestWriteIndependentFixOutputsReturnsWriteError(t *testing.T) {
 	directoryPath := t.TempDir()
-
-	fixed, err := applyFixPass(map[string][]rule.RuleDiagnostic{
-		directoryPath: {diagnostic},
-	})
+	err := writeIndependentFixOutputs([]independentFixResult{{
+		path: directoryPath, content: "b", didFix: true,
+	}}, false)
 	if err == nil {
 		t.Fatal("expected a write error")
 	}
-	if fixed != 0 {
-		t.Fatalf("failed write must not count as a fix, got %d", fixed)
-	}
 	if !strings.Contains(err.Error(), directoryPath) {
 		t.Fatalf("write error must identify the target path, got %v", err)
+	}
+}
+
+func TestWriteIndependentFixOutputsSerializesLexicalAliasesWhenSingleThreaded(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory symlink setup requires privileges on Windows")
+	}
+	const source = `var value = "x";`
+	root := t.TempDir()
+	physicalDir := filepath.Join(root, "physical")
+	if err := os.MkdirAll(physicalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physical := filepath.Join(physicalDir, "file.js")
+	if err := os.WriteFile(physical, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasA := filepath.Join(root, "alias-a")
+	aliasB := filepath.Join(root, "alias-b")
+	if err := os.Symlink(physicalDir, aliasA); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(physicalDir, aliasB); err != nil {
+		t.Fatal(err)
+	}
+	pathA := filepath.Join(aliasA, "file.js")
+	pathB := filepath.Join(aliasB, "file.js")
+
+	wantA := `var value = 'x';`
+	wantB := `let value = "x";`
+	if err := writeIndependentFixOutputs([]independentFixResult{
+		{path: pathA, content: wantA, didFix: true},
+		{path: pathB, content: wantB, didFix: true},
+	}, true); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(physical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(content)
+	if got != wantB {
+		t.Fatalf("single-threaded physical output = %q, want final complete lexical output %q (first was %q)", got, wantB, wantA)
+	}
+}
+
+func TestExecuteLintPipelineFixesLexicalAliasesInIsolatedMemory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory symlink setup requires privileges on Windows")
+	}
+	root := t.TempDir()
+	physicalDir := filepath.Join(root, "physical")
+	if err := os.MkdirAll(physicalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physical := filepath.Join(physicalDir, "file.ts")
+	const source = "const pattern = /bar  baz/; const obj = { ['x']: 1 };\n"
+	if err := os.WriteFile(physical, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasA := filepath.Join(root, "alias-a")
+	aliasB := filepath.Join(root, "alias-b")
+	if err := os.Symlink(physicalDir, aliasA); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := os.Symlink(physicalDir, aliasB); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	pathA := filepath.Join(aliasA, "file.ts")
+	pathB := filepath.Join(aliasB, "file.ts")
+	configA := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: rslintconfig.Rules{"no-regex-spaces": "error"},
+	}}
+	configB := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: rslintconfig.Rules{"no-useless-computed-key": "error"},
+	}}
+	catalog := &discovery.ConfigCatalog{
+		Configs: map[string]rslintconfig.RslintConfig{
+			aliasA: configA,
+			aliasB: configB,
+		},
+		Targets: []discovery.DiscoveredTarget{
+			{
+				Path: pathA, ConfigDirectory: aliasA,
+				MergedConfig: configA.GetConfigForFile(pathA, aliasA),
+			},
+			{
+				Path: pathB, ConfigDirectory: aliasB,
+				MergedConfig: configB.GetConfigForFile(pathB, aliasB),
+			},
+		},
+	}
+	code, stdout, stderr := runLintPipelineForTest(t, root, lintArgs{
+		ConfigCatalog:  catalog,
+		Fix:            true,
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 0 || stdout != "" || stderr != "" {
+		t.Fatalf("fix pipeline failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	content, err := os.ReadFile(physical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantA := "const pattern = /bar {2}baz/; const obj = { ['x']: 1 };\n"
+	wantB := "const pattern = /bar  baz/; const obj = { 'x': 1 };\n"
+	if got := string(content); got != wantB {
+		t.Fatalf("single-threaded physical output = %q, want final isolated lexical output %q (first was %q)", got, wantB, wantA)
+	}
+}
+
+func TestExecuteLintPipelinePreservesNativePOSIXBackslashTargetThroughCompilerAlias(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows uses backslash as a path separator")
+	}
+	root := t.TempDir()
+	target := filepath.Join(root, `a\b.ts`)
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "a", "b.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entries := rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}}
+	catalog := &discovery.ConfigCatalog{
+		Configs: map[string]rslintconfig.RslintConfig{root: entries},
+		Targets: []discovery.DiscoveredTarget{{
+			Path: target, ConfigDirectory: root,
+			MergedConfig: entries.GetConfigForFile(target, root),
+		}},
+	}
+
+	code, stdout, stderr := runLintPipelineForTest(t, root, lintArgs{
+		ConfigCatalog:  catalog,
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 || stderr != "" {
+		t.Fatalf("lint pipeline failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	var diagnostic struct {
+		RuleName string `json:"ruleName"`
+		FilePath string `json:"filePath"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &diagnostic); err != nil {
+		t.Fatalf("decode jsonline diagnostic %q: %v", stdout, err)
+	}
+	if diagnostic.RuleName != "no-debugger" || diagnostic.FilePath != `a\b.ts` {
+		t.Fatalf("diagnostic lost native lexical target: %+v", diagnostic)
 	}
 }

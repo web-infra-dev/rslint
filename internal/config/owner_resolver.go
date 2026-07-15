@@ -1,36 +1,207 @@
 package config
 
 import (
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"sort"
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 )
 
-// LintDiscoveryScope records explicit-file provenance supplied by config
-// discovery. ExplicitOnly keeps a config loaded solely for an explicit file out
-// of automatic ownership, handoff, and directory-discovery decisions. Files in
-// the scope remain owned by that config.
-type LintDiscoveryScope struct {
-	Files        []string
-	ExplicitOnly bool
+type configDirectoryIndex struct {
+	fsys                     vfs.FS
+	configKeyByPath          map[string]string
+	caseFoldedConfigKeys     map[string][]string
+	canonicalConfigKeyByPath map[string]string
+	ambiguousCanonicalPaths  map[string]struct{}
+	normalizedByKey          map[string]string
+	canonicalByKey           map[string]string
+	childrenByKey            map[string][]string
 }
 
-func configMapForAutomaticTargets(
-	configMap map[string]RslintConfig,
-	scopes map[string]LintDiscoveryScope,
-) map[string]RslintConfig {
-	for configDir := range configMap {
-		if !scopes[configDir].ExplicitOnly {
-			continue
+func newConfigDirectoryIndex(configMap map[string]RslintConfig, fsys vfs.FS) *configDirectoryIndex {
+	index := &configDirectoryIndex{
+		fsys:                     fsys,
+		configKeyByPath:          make(map[string]string, len(configMap)),
+		caseFoldedConfigKeys:     make(map[string][]string, len(configMap)),
+		canonicalConfigKeyByPath: make(map[string]string, len(configMap)),
+		ambiguousCanonicalPaths:  make(map[string]struct{}),
+		normalizedByKey:          make(map[string]string, len(configMap)),
+		canonicalByKey:           make(map[string]string, len(configMap)),
+		childrenByKey:            make(map[string][]string, len(configMap)),
+	}
+	configKeys := make([]string, 0, len(configMap))
+	for configKey := range configMap {
+		configKeys = append(configKeys, configKey)
+	}
+	sort.Strings(configKeys)
+	for _, configKey := range configKeys {
+		normalized := normalizePathForRoot(configKey, configKey)
+		index.normalizedByKey[configKey] = normalized
+		pathID := ownerPathIdentity(normalized, true)
+		if _, exists := index.configKeyByPath[pathID]; !exists {
+			index.configKeyByPath[pathID] = configKey
 		}
-		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
-		for candidateDir, candidateConfig := range configMap {
-			if !scopes[candidateDir].ExplicitOnly {
-				automaticConfigMap[candidateDir] = candidateConfig
+		foldedPathID := ownerPathIdentity(normalized, false)
+		index.caseFoldedConfigKeys[foldedPathID] = append(index.caseFoldedConfigKeys[foldedPathID], configKey)
+
+		canonical := normalized
+		if fsys != nil {
+			if realPath := fsys.Realpath(normalized); realPath != "" {
+				canonical = normalizePathForRoot(normalized, realPath)
 			}
 		}
-		return automaticConfigMap
+		index.canonicalByKey[configKey] = canonical
+		canonicalID := ownerPathIdentity(canonical, true)
+		if _, ambiguous := index.ambiguousCanonicalPaths[canonicalID]; ambiguous {
+			continue
+		}
+		if existing, exists := index.canonicalConfigKeyByPath[canonicalID]; !exists {
+			index.canonicalConfigKeyByPath[canonicalID] = configKey
+		} else if existing != configKey {
+			// Lexical aliases remain independently addressable. A physical-path
+			// fallback cannot choose between them, so leave it unresolved instead
+			// of silently assigning the file to the first map entry.
+			delete(index.canonicalConfigKeyByPath, canonicalID)
+			index.ambiguousCanonicalPaths[canonicalID] = struct{}{}
+		}
 	}
-	return configMap
+
+	for _, configKey := range configKeys {
+		normalized := index.normalizedByKey[configKey]
+		if parentKey, ok := index.nearestLexicalConfigAncestor(normalized); ok {
+			index.addChildBoundary(parentKey, normalized)
+		}
+	}
+	for configKey := range index.childrenByKey {
+		sort.Strings(index.childrenByKey[configKey])
+	}
+	return index
+}
+
+func (index *configDirectoryIndex) nearestLexicalConfigAncestor(configDir string) (string, bool) {
+	current := directoryPathForRoot(configDir, configDir)
+	for current != "" && current != configDir {
+		if configKey, ok := index.configKeyForLexicalDirectory(current); ok {
+			return configKey, true
+		}
+		next := directoryPathForRoot(configDir, current)
+		if next == current {
+			break
+		}
+		current = next
+	}
+	return "", false
+}
+
+func (index *configDirectoryIndex) addChildBoundary(configKey string, boundary string) {
+	boundary = normalizePathForRoot(boundary, boundary)
+	for _, existing := range index.childrenByKey[configKey] {
+		if existing == boundary {
+			return
+		}
+	}
+	index.childrenByKey[configKey] = append(index.childrenByKey[configKey], boundary)
+}
+
+func (index *configDirectoryIndex) childConfigDirs(configKey string) []string {
+	if index == nil {
+		return nil
+	}
+	return index.childrenByKey[configKey]
+}
+
+func (index *configDirectoryIndex) nearestConfig(filePath string) (string, bool) {
+	if index == nil {
+		return "", false
+	}
+	filePath = normalizePathForRoot(filePath, filePath)
+	if configKey, ok := index.nearestLexicalConfig(filePath); ok {
+		return configKey, true
+	}
+	if index.fsys == nil {
+		return "", false
+	}
+	realPath := index.fsys.Realpath(filePath)
+	if realPath == "" {
+		return "", false
+	}
+	return index.nearestConfigInPathSpace(
+		normalizePathForRoot(filePath, realPath),
+		index.canonicalConfigKeyByPath,
+	)
+}
+
+func (index *configDirectoryIndex) nearestLexicalConfig(filePath string) (string, bool) {
+	if index == nil {
+		return "", false
+	}
+	filePath = normalizePathForRoot(filePath, filePath)
+	current := directoryPathForRoot(filePath, filePath)
+	for current != "" {
+		if configKey, ok := index.configKeyForLexicalDirectory(current); ok {
+			return configKey, true
+		}
+		next := directoryPathForRoot(filePath, current)
+		if next == current {
+			break
+		}
+		current = next
+	}
+	return "", false
+}
+
+func (index *configDirectoryIndex) configKeyForLexicalDirectory(directory string) (string, bool) {
+	if index == nil {
+		return "", false
+	}
+	if configKey, ok := index.configKeyByPath[ownerPathIdentity(directory, true)]; ok {
+		return configKey, true
+	}
+	if index.fsys == nil {
+		return "", false
+	}
+	candidates := index.caseFoldedConfigKeys[ownerPathIdentity(directory, false)]
+	if len(candidates) == 0 {
+		return "", false
+	}
+	canonicalDirectory := index.fsys.Realpath(directory)
+	if canonicalDirectory == "" {
+		return "", false
+	}
+	canonicalDirectory = normalizePathForRoot(directory, canonicalDirectory)
+	for _, configKey := range candidates {
+		if pathsEqualForRoot(canonicalDirectory, canonicalDirectory, index.canonicalByKey[configKey], true) {
+			return configKey, true
+		}
+	}
+	return "", false
+}
+
+func (index *configDirectoryIndex) nearestConfigInPathSpace(
+	filePath string,
+	configKeyByPath map[string]string,
+) (string, bool) {
+	current := directoryPathForRoot(filePath, filePath)
+	for current != "" {
+		if configKey, ok := configKeyByPath[ownerPathIdentity(current, true)]; ok {
+			return configKey, true
+		}
+		next := directoryPathForRoot(filePath, current)
+		if next == current {
+			break
+		}
+		current = next
+	}
+	return "", false
+}
+
+func ownerPathIdentity(path string, caseSensitive bool) string {
+	path = normalizePathForRoot(path, path)
+	if !caseSensitive {
+		path = strings.ToLower(path)
+	}
+	return path
 }
 
 // ConfigOwnerResolver snapshots an already-loaded config catalog and resolves
@@ -54,18 +225,6 @@ func NewConfigOwnerResolver(configMap map[string]RslintConfig, fsys vfs.FS) *Con
 	}
 }
 
-// NewConfigOwnerResolverForAutomaticTargets excludes configs that were loaded
-// only for catalog-scoped literal files. Those configs own their literal scope,
-// but they are not ownership handoff or .gitignore source boundaries for files
-// reached through an automatic directory/glob walk.
-func NewConfigOwnerResolverForAutomaticTargets(
-	configMap map[string]RslintConfig,
-	scopes map[string]LintDiscoveryScope,
-	fsys vfs.FS,
-) *ConfigOwnerResolver {
-	return NewConfigOwnerResolver(configMapForAutomaticTargets(configMap, scopes), fsys)
-}
-
 func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintConfig) {
 	if resolver == nil || resolver.index == nil {
 		return "", nil
@@ -87,11 +246,11 @@ func (resolver *ConfigOwnerResolver) ChildConfigDirs(configDir string) []string 
 	return append([]string(nil), resolver.index.childConfigDirs(configDir)...)
 }
 
-// ResolveConfigPathSpace returns the physical path pair used for files and
-// ignores matching. It preserves the file's path relative to the authored
-// config directory, then anchors both paths on the config directory's realpath.
-// Lexical and symlink aliases therefore share one matching space without
-// case-folding distinct path identities.
+// ResolveConfigPathSpace returns the authored lexical path pair used for files
+// and ignores matching. Canonical identity is consulted only to recover the
+// target's relative location when a Program reports a physical path; the final
+// pair is projected back under configDir so absolute basePath values, aliases,
+// and diagnostics all observe the same path space ESLint received.
 func ResolveConfigPathSpace(filePath string, configDir string, fsys vfs.FS) (string, string) {
 	return ResolveConfigPathSpaceWithCanonical(filePath, "", configDir, fsys)
 }
@@ -99,16 +258,25 @@ func ResolveConfigPathSpace(filePath string, configDir string, fsys vfs.FS) (str
 // ResolveConfigPathSpaceWithCanonical is ResolveConfigPathSpace with an
 // optional physical file identity already established by target discovery.
 func ResolveConfigPathSpaceWithCanonical(filePath string, canonicalPath string, configDir string, fsys vfs.FS) (string, string) {
-	filePath = tspath.NormalizePath(filePath)
-	configDir = tspath.NormalizePath(configDir)
+	governingRoot := configDir
+	filePath = normalizePathForRoot(governingRoot, filePath)
+	configDir = normalizePathForRoot(governingRoot, configDir)
 	physicalConfigDir := configDir
 	if fsys != nil {
 		if realPath := fsys.Realpath(configDir); realPath != "" {
-			physicalConfigDir = tspath.NormalizePath(realPath)
+			physicalConfigDir = normalizePathForRoot(configDir, realPath)
 		}
 	}
 
-	return resolveConfigPathSpace(filePath, canonicalPath, configDir, physicalConfigDir, fsys), physicalConfigDir
+	physicalMatchPath := resolveConfigPathSpace(filePath, canonicalPath, configDir, physicalConfigDir, fsys)
+	if relative, within := RelativePathWithinConfigRoot(
+		physicalMatchPath,
+		physicalConfigDir,
+		selectorScopeCaseSensitive(physicalConfigDir),
+	); within {
+		return resolvePathForRoot(configDir, configDir, relative), configDir
+	}
+	return filePath, configDir
 }
 
 func resolveConfigPathSpace(
@@ -118,38 +286,38 @@ func resolveConfigPathSpace(
 	physicalConfigDir string,
 	fsys vfs.FS,
 ) string {
-	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, true); ok {
-		return tspath.ResolvePath(physicalConfigDir, relative)
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, selectorScopeCaseSensitive(configDir)); ok {
+		return resolvePathForRoot(physicalConfigDir, physicalConfigDir, relative)
 	}
 	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, false); ok && fsys != nil {
 		aliasRoot := filePath
-		for remaining := relative; remaining != ""; remaining = tspath.GetDirectoryPath(remaining) {
-			aliasRoot = tspath.GetDirectoryPath(aliasRoot)
+		for remaining := relative; remaining != ""; remaining = directoryPathForRoot(configDir, remaining) {
+			aliasRoot = directoryPathForRoot(configDir, aliasRoot)
 		}
 		if realRoot := fsys.Realpath(aliasRoot); realRoot != "" &&
-			tspath.ComparePaths(
-				tspath.NormalizePath(realRoot),
-				physicalConfigDir,
-				tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
-			) == 0 {
-			return tspath.ResolvePath(physicalConfigDir, relative)
+			pathsEqualForRoot(physicalConfigDir, realRoot, physicalConfigDir, true) {
+			return resolvePathForRoot(physicalConfigDir, physicalConfigDir, relative)
 		}
 	}
 
 	physicalFilePath := ""
 	if canonicalPath != "" {
-		physicalFilePath = tspath.NormalizePath(canonicalPath)
+		physicalFilePath = normalizePathForRoot(physicalConfigDir, canonicalPath)
 	}
 	if physicalFilePath == "" {
 		physicalFilePath = filePath
 		if fsys != nil {
 			if realPath := fsys.Realpath(filePath); realPath != "" {
-				physicalFilePath = tspath.NormalizePath(realPath)
+				physicalFilePath = normalizePathForRoot(physicalConfigDir, realPath)
 			}
 		}
 	}
-	if relative, ok := RelativePathWithinConfigRoot(physicalFilePath, physicalConfigDir, true); ok {
-		return tspath.ResolvePath(physicalConfigDir, relative)
+	if relative, ok := RelativePathWithinConfigRoot(
+		physicalFilePath,
+		physicalConfigDir,
+		selectorScopeCaseSensitive(physicalConfigDir),
+	); ok {
+		return resolvePathForRoot(physicalConfigDir, physicalConfigDir, relative)
 	}
 	return physicalFilePath
 }
@@ -157,15 +325,5 @@ func resolveConfigPathSpace(
 // RelativePathWithinConfigRoot returns filePath relative to configDir when it
 // is inside the config's lexical path space.
 func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
-	options := tspath.ComparePathsOptions{
-		CurrentDirectory:          configDir,
-		UseCaseSensitiveFileNames: useCaseSensitive,
-	}
-	if tspath.ComparePaths(filePath, configDir, options) == 0 {
-		return "", true
-	}
-	if !tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
-		return "", false
-	}
-	return tspath.GetRelativePathFromDirectory(configDir, filePath, options), true
+	return hostpath.RelativeWithin(filePath, configDir, useCaseSensitive)
 }

@@ -1,6 +1,7 @@
 import { Rslint } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect, rs } from '@rstest/core';
+import { ConfigModuleHost } from '@rslint/core/config-loader';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -222,7 +223,7 @@ describe('Rslint class', () => {
     }
   });
 
-  test('lintText resolves config from the canonical ancestor of a virtual file', async () => {
+  test('lintText does not use a canonical-ancestor config fallback', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-virtual-symlink-'),
     );
@@ -252,14 +253,11 @@ describe('Rslint class', () => {
       const virtualFile = path.join(aliasPackage, 'src', 'virtual.ts');
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const [result] = await rslint.lintText(
-          'let values: Array<string> = [];\n',
-          { filePath: virtualFile },
-        );
-        expect(result.filePath).toBe(path.normalize(virtualFile));
-        expect(result.messages.map((message) => message.ruleId)).toEqual([
-          '@typescript-eslint/array-type',
-        ]);
+        await expect(
+          rslint.lintText('let values: Array<string> = [];\n', {
+            filePath: virtualFile,
+          }),
+        ).rejects.toThrow(/Could not find config file/);
       } finally {
         await rslint.close();
       }
@@ -477,7 +475,214 @@ describe('Rslint class', () => {
     }
   });
 
-  test('no config candidate uses overrideConfig or syntax-only linting', async () => {
+  test('reuses one Rslint instance with request-scoped override predicates', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-predicate-inline-'),
+    );
+    const calls = [];
+    const selectKeep = (filePath) => {
+      calls.push(path.basename(filePath));
+      return path.basename(filePath) === 'keep.ts';
+    };
+    try {
+      await writeFile(path.join(tmp, 'keep.ts'), 'debugger;\n');
+      await writeFile(path.join(tmp, 'drop.ts'), 'debugger;\n');
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          { files: [selectKeep], rules: { 'no-debugger': 'error' } },
+        ],
+      });
+      try {
+        for (let request = 0; request < 2; request++) {
+          const results = await rslint.lintFiles('*.ts');
+          const byName = new Map(
+            results.map((result) => [path.basename(result.filePath), result]),
+          );
+          expect(
+            byName.get('keep.ts').messages.map((message) => message.ruleId),
+          ).toEqual(['no-debugger']);
+          expect(byName.get('drop.ts').messages).toEqual([]);
+        }
+        expect(calls.sort()).toEqual([
+          'drop.ts',
+          'drop.ts',
+          'keep.ts',
+          'keep.ts',
+        ]);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('auto-discovered function selectors execute once per visited file', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-predicate-auto-'));
+    const marker = path.join(tmp, 'predicate-calls.log');
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        [
+          "import { appendFileSync } from 'node:fs';",
+          "const marker = new URL('./predicate-calls.log', import.meta.url);",
+          'export default [{',
+          '  files: [(filePath) => {',
+          '    appendFileSync(marker, `${filePath}\\n`);',
+          "    return filePath.endsWith('keep.ts');",
+          '  }],',
+          "  rules: { 'no-debugger': 'error' },",
+          '}];',
+          '',
+        ].join('\n'),
+      );
+      await writeFile(path.join(tmp, 'keep.ts'), 'debugger;\n');
+      await writeFile(path.join(tmp, 'drop.ts'), 'debugger;\n');
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles('*.ts');
+        const byName = new Map(
+          results.map((result) => [path.basename(result.filePath), result]),
+        );
+        expect(
+          byName.get('keep.ts').messages.map((message) => message.ruleId),
+        ).toEqual(['no-debugger']);
+        expect(byName.get('drop.ts').messages).toEqual([]);
+      } finally {
+        await rslint.close();
+      }
+
+      const evaluated = (await readFile(marker, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((filePath) => path.basename(filePath))
+        .sort();
+      // ESLint evaluates ConfigArray before its input glob. The config module
+      // is therefore visited too, but the selected lint target is never
+      // rematched by native/plugin/fix consumers.
+      expect(evaluated).toEqual(['drop.ts', 'keep.ts', 'rslint.config.mjs']);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('explicit config predicates are selected once and reused by fix passes', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-predicate-explicit-'),
+    );
+    const configDir = path.join(tmp, 'config');
+    const marker = path.join(configDir, 'predicate-calls.log');
+    const configPath = path.join(configDir, 'custom.config.mjs');
+    try {
+      await mkdir(configDir, { recursive: true });
+      await writeFile(
+        configPath,
+        [
+          "import { appendFileSync } from 'node:fs';",
+          "const marker = new URL('./predicate-calls.log', import.meta.url);",
+          'const record = (kind, filePath) => {',
+          '  appendFileSync(marker, `${kind}:${filePath}\\n`);',
+          '  return filePath;',
+          '};',
+          'export default [{',
+          "  files: [(filePath) => record('files', filePath).endsWith('.ts')],",
+          "  ignores: [(filePath) => record('ignores', filePath).endsWith('drop.ts')],",
+          "  rules: { 'no-regex-spaces': 'error' },",
+          '}];',
+          '',
+        ].join('\n'),
+      );
+      await writeFile(path.join(tmp, 'keep.ts'), 'const keep = /a  b/;\n');
+      await writeFile(path.join(tmp, 'drop.ts'), 'const drop = /a  b/;\n');
+
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: configPath,
+        fix: true,
+      });
+      try {
+        const results = await rslint.lintFiles('*.ts');
+        const byName = new Map(
+          results.map((result) => [path.basename(result.filePath), result]),
+        );
+        expect(byName.get('keep.ts').output).toBe('const keep = /a {2}b/;\n');
+        expect(byName.get('drop.ts').messages).toEqual([]);
+      } finally {
+        await rslint.close();
+      }
+
+      const calls = (await readFile(marker, 'utf8')).trim().split('\n');
+      expect(new Set(calls).size).toBe(calls.length);
+      expect(calls.some((call) => call.endsWith('keep.ts'))).toBe(true);
+      expect(calls.some((call) => call.endsWith('drop.ts'))).toBe(true);
+      expect(calls.some((call) => call.startsWith('files:'))).toBe(true);
+      expect(calls.some((call) => call.startsWith('ignores:'))).toBe(true);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('fail-fast sibling discovery deletes a still-loading config transaction', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-config-fail-fast-'),
+    );
+    const hangingDir = path.join(tmp, 'hanging');
+    const failingDir = path.join(tmp, 'failing');
+    const loadSpy = rs.spyOn(ConfigModuleHost.prototype, 'loadConfigs');
+    const deleteSpy = rs.spyOn(ConfigModuleHost.prototype, 'deleteSession');
+    const rslint = new Rslint({ cwd: tmp });
+    try {
+      await mkdir(hangingDir, { recursive: true });
+      await mkdir(failingDir, { recursive: true });
+      await writeFile(
+        path.join(hangingDir, 'rslint.config.mjs'),
+        'await new Promise(() => {});\nexport default [];\n',
+      );
+      await writeFile(
+        path.join(failingDir, 'rslint.config.mjs'),
+        "await new Promise((resolve) => setTimeout(resolve, 100));\nthrow new Error('broken sibling');\n",
+      );
+      await writeFile(path.join(hangingDir, 'index.ts'), 'export {};\n');
+      await writeFile(path.join(failingDir, 'index.ts'), 'export {};\n');
+
+      let timeout;
+      const error = await Promise.race([
+        rslint.lintFiles(['hanging/index.ts', 'failing/*.ts']).then(
+          () => new Error('lint unexpectedly succeeded'),
+          (reason) => reason,
+        ),
+        new Promise((resolve) => {
+          timeout = setTimeout(
+            () => resolve(new Error('lintFiles timed out')),
+            5_000,
+          );
+        }),
+      ]);
+      clearTimeout(timeout);
+      expect(error.message).toContain('broken sibling');
+
+      const hangingLoad = loadSpy.mock.calls.find(([request]) =>
+        request.candidates.some((candidate) =>
+          candidate.configPath.includes(`${path.sep}hanging${path.sep}`),
+        ),
+      );
+      expect(hangingLoad).toBeDefined();
+      const transactionId = hangingLoad[0].transactionId;
+      expect(
+        deleteSpy.mock.calls.some(([deletedId]) => deletedId === transactionId),
+      ).toBe(true);
+    } finally {
+      await rslint.close();
+      loadSpy.mockRestore();
+      deleteSpy.mockRestore();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('no config candidate is fatal unless config discovery is disabled', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-no-candidate-'));
     const configured = new Rslint({
       cwd: tmp,
@@ -485,19 +690,12 @@ describe('Rslint class', () => {
     });
     const syntaxOnly = new Rslint({ cwd: tmp });
     try {
-      const configuredResults = await configured.lintText('debugger;\n', {
-        filePath: 'configured.ts',
-      });
-      expect(
-        configuredResults[0].messages.map((message) => message.ruleId),
-      ).toContain('no-debugger');
-
-      const syntaxResults = await syntaxOnly.lintText('const = ;\n', {
-        filePath: 'syntax.ts',
-      });
-      expect(syntaxResults).toHaveLength(1);
-      expect(syntaxResults[0].messages).toHaveLength(1);
-      expect(syntaxResults[0].messages[0].ruleId).toBe('TypeScript(TS1134)');
+      await expect(
+        configured.lintText('debugger;\n', { filePath: 'configured.ts' }),
+      ).rejects.toThrow(/Could not find config file/);
+      await expect(
+        syntaxOnly.lintText('const = ;\n', { filePath: 'syntax.ts' }),
+      ).rejects.toThrow(/Could not find config file/);
     } finally {
       await Promise.all([configured.close(), syntaxOnly.close()]);
       await rm(tmp, { recursive: true, force: true });
@@ -608,7 +806,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles discovers config for a positive extglob', async () => {
+  test('lintFiles preserves ESLint leading-negation unmatched behavior', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-extglob-'));
     try {
       await writeFile(
@@ -622,14 +820,9 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const results = await rslint.lintFiles('!(vendor)/**/*.ts');
-        expect(results).toHaveLength(1);
-        expect(path.relative(tmp, results[0].filePath)).toBe(
-          path.join('included', 'index.ts'),
+        await expect(rslint.lintFiles('!(vendor)/**/*.ts')).rejects.toThrow(
+          /All files matched/,
         );
-        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
-          'no-debugger',
-        ]);
       } finally {
         await rslint.close();
       }
@@ -780,49 +973,6 @@ module.exports = config;`
     }
   });
 
-  test('repeated API calls fresh-load changed config and plugin topology', async () => {
-    const tmp = await mkdtemp(
-      path.join(os.tmpdir(), 'rslint-api-fresh-config-'),
-    );
-    const configPath = path.join(tmp, 'rslint.config.mjs');
-    const pluginXUrl = pathToFileURL(
-      path.join(eslintPluginFixturesDir, 'cfgX', 'plugin-x.mjs'),
-    ).href;
-    const pluginYUrl = pathToFileURL(
-      path.join(eslintPluginFixturesDir, 'cfgY', 'plugin-y.mjs'),
-    ).href;
-    const writeConfig = async (pluginUrl, ruleName) => {
-      await writeFile(
-        configPath,
-        `import plugin from ${JSON.stringify(pluginUrl)};\n` +
-          `export default [{ plugins: { p: plugin }, rules: { ${JSON.stringify(`p/${ruleName}`)}: 'error' } }];\n`,
-      );
-    };
-    try {
-      await writeConfig(pluginXUrl, 'no-foo');
-      const rslint = new Rslint({ cwd: tmp });
-      try {
-        const source = 'const foo = 1; const bar = 2;\n';
-        const first = await rslint.lintText(source, { filePath: 'index.ts' });
-        expect(first[0].messages.map((message) => message.ruleId)).toEqual([
-          'p/no-foo',
-        ]);
-
-        await writeConfig(pluginYUrl, 'no-bar');
-        const second = await rslint.lintText(source, {
-          filePath: 'index.ts',
-        });
-        expect(second[0].messages.map((message) => message.ruleId)).toEqual([
-          'p/no-bar',
-        ]);
-      } finally {
-        await rslint.close();
-      }
-    } finally {
-      await rm(tmp, { recursive: true, force: true });
-    }
-  });
-
   test('overrideConfig preserves authored routing for same-prefix community plugins', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-plugin-override-routing-'),
@@ -884,7 +1034,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles falls back from a broken nested config to the nearest loaded ancestor', async () => {
+  test('lintFiles treats a broken nearest config as fatal', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-broken-fallback-'),
     );
@@ -906,11 +1056,9 @@ module.exports = config;`
       const rslint = new Rslint({ cwd: tmp });
       try {
         for (const target of ['**/*.ts', 'packages/app/index.ts']) {
-          const results = await rslint.lintFiles(target);
-          expect(results).toHaveLength(1);
-          const ruleIds = results[0].messages.map((message) => message.ruleId);
-          expect(ruleIds).toContain('no-console');
-          expect(ruleIds).not.toContain('no-debugger');
+          await expect(rslint.lintFiles(target)).rejects.toThrow(
+            /failed to load nearest JavaScript config/,
+          );
         }
       } finally {
         await rslint.close();
@@ -920,7 +1068,7 @@ module.exports = config;`
     }
   });
 
-  test('lintText falls back from a broken nearest JS config to a loaded ancestor', async () => {
+  test('lintText treats a broken nearest JS config as fatal', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-text-broken-fallback-'),
     );
@@ -943,13 +1091,11 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const [result] = await rslint.lintText(
-          'debugger;\nconsole.log("ancestor");\n',
-          { filePath: path.join(nested, 'index.ts') },
-        );
-        const ruleIds = result.messages.map((message) => message.ruleId);
-        expect(ruleIds).toContain('no-console');
-        expect(ruleIds).not.toContain('no-debugger');
+        await expect(
+          rslint.lintText('debugger;\nconsole.log("ancestor");\n', {
+            filePath: path.join(nested, 'index.ts'),
+          }),
+        ).rejects.toThrow(/failed to load nearest JavaScript config/);
       } finally {
         await rslint.close();
       }
@@ -988,7 +1134,7 @@ module.exports = config;`
         }
         expect(thrown).toBeInstanceOf(Error);
         expect(thrown.message).toContain(
-          'all discovered JavaScript configs failed to load',
+          'failed to load nearest JavaScript config',
         );
         expect(thrown.message).toContain(nestedConfig);
       } finally {
@@ -999,7 +1145,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles skips a broken subtree when another selected config loads', async () => {
+  test('lintFiles rejects the whole search when any nearest config is broken', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-broken-boundary-'),
     );
@@ -1022,26 +1168,12 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const results = await rslint.lintFiles('**/*.ts');
-        expect(results).toHaveLength(1);
-        expect(path.relative(tmp, results[0].filePath)).toBe(
-          path.join('healthy', 'index.ts'),
+        await expect(rslint.lintFiles('**/*.ts')).rejects.toThrow(
+          /failed to load nearest JavaScript config/,
         );
-        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
-          'no-debugger',
-        ]);
-
-        const explicitResults = await rslint.lintFiles([
-          'broken/index.ts',
-          'healthy/index.ts',
-        ]);
-        expect(explicitResults).toHaveLength(1);
-        expect(path.relative(tmp, explicitResults[0].filePath)).toBe(
-          path.join('healthy', 'index.ts'),
-        );
-        expect(
-          explicitResults[0].messages.map((message) => message.ruleId),
-        ).toEqual(['no-debugger']);
+        await expect(
+          rslint.lintFiles(['broken/index.ts', 'healthy/index.ts']),
+        ).rejects.toThrow(/failed to load nearest JavaScript config/);
       } finally {
         await rslint.close();
       }
@@ -1163,13 +1295,14 @@ module.exports = config;`
           'packages/app/*.ts',
           'packages/app/index.ts',
         ]);
-        expect(results).toHaveLength(1);
-        expect(results[0].filePath).toBe(
-          path.join(tmp, 'packages', 'app', 'index.ts'),
-        );
-        const ruleIds = results[0].messages.map((m) => m.ruleId);
-        expect(ruleIds).toContain('no-debugger');
-        expect(ruleIds).not.toContain('no-console');
+        expect(
+          results.map((result) => path.basename(result.filePath)).sort(),
+        ).toEqual(['automatic.ts', 'index.ts']);
+        for (const result of results) {
+          const ruleIds = result.messages.map((message) => message.ruleId);
+          expect(ruleIds).toContain('no-debugger');
+          expect(ruleIds).not.toContain('no-console');
+        }
       } finally {
         await rslint.close();
       }
@@ -1205,7 +1338,9 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        expect(await rslint.lintFiles('**/*.ts')).toEqual([]);
+        await expect(rslint.lintFiles('**/*.ts')).rejects.toThrow(
+          /All files matched/,
+        );
       } finally {
         await rslint.close();
       }
@@ -1314,7 +1449,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles coalesces aliases of one physical file under the same config', async () => {
+  test('lintFiles preserves lexical aliases of one physical file', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-file-alias-dedupe-'),
     );
@@ -1335,11 +1470,14 @@ module.exports = config;`
       });
       try {
         const results = await rslint.lintFiles(['target.ts', 'link.ts']);
-        expect(results).toHaveLength(1);
-        expect(results[0].filePath).toBe(path.normalize(link));
-        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
-          'no-debugger',
-        ]);
+        expect(results.map((result) => result.filePath).sort()).toEqual(
+          [path.normalize(target), path.normalize(link)].sort(),
+        );
+        for (const result of results) {
+          expect(result.messages.map((message) => message.ruleId)).toEqual([
+            'no-debugger',
+          ]);
+        }
       } finally {
         await rslint.close();
       }
@@ -1348,7 +1486,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles rejects one physical file governed by different configs', async () => {
+  test('lintFiles keeps aliases governed by different lexical configs', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-file-alias-owner-'),
     );
@@ -1358,7 +1496,7 @@ module.exports = config;`
       const ownerB = path.join(tmp, 'b');
       await mkdir(ownerA);
       await mkdir(ownerB);
-      await writeFile(shared, 'debugger;\n');
+      await writeFile(shared, "debugger; console.log('alias');\n");
       try {
         await symlink(shared, path.join(ownerA, 'target.ts'), 'file');
         await symlink(shared, path.join(ownerB, 'target.ts'), 'file');
@@ -1376,10 +1514,83 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        await expect(
-          rslint.lintFiles(['a/target.ts', 'b/target.ts']),
-        ).rejects.toThrow(
-          /resolve to the same file.*governed by different configs/,
+        const results = await rslint.lintFiles(['a/target.ts', 'b/target.ts']);
+        const byPath = new Map(
+          results.map((result) => [
+            path.relative(tmp, result.filePath),
+            result,
+          ]),
+        );
+        expect(
+          byPath
+            .get(path.join('a', 'target.ts'))
+            .messages.map((message) => message.ruleId),
+        ).toEqual(['no-debugger']);
+        expect(
+          byPath
+            .get(path.join('b', 'target.ts'))
+            .messages.map((message) => message.ruleId),
+        ).toEqual(['no-console']);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('fix:true keeps lexical alias outputs isolated by governing config', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-file-alias-fix-'),
+    );
+    try {
+      const shared = path.join(tmp, 'shared.ts');
+      const ownerA = path.join(tmp, 'a');
+      const ownerB = path.join(tmp, 'b');
+      await mkdir(ownerA);
+      await mkdir(ownerB);
+      const source = "const pattern = /bar  baz/; const obj = { ['x']: 1 };\n";
+      await writeFile(shared, source);
+      try {
+        await symlink(shared, path.join(ownerA, 'target.ts'), 'file');
+        await symlink(shared, path.join(ownerB, 'target.ts'), 'file');
+      } catch {
+        return;
+      }
+      await writeFile(
+        path.join(ownerA, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-regex-spaces': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(ownerB, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-useless-computed-key': 'error' } }];\n",
+      );
+
+      const rslint = new Rslint({ cwd: tmp, fix: true });
+      try {
+        const results = await rslint.lintFiles(['a/target.ts', 'b/target.ts']);
+        const byPath = new Map(
+          results.map((result) => [
+            path.relative(tmp, result.filePath),
+            result,
+          ]),
+        );
+        const resultA = byPath.get(path.join('a', 'target.ts'));
+        const resultB = byPath.get(path.join('b', 'target.ts'));
+        expect(resultA.messages.map((message) => message.ruleId)).toEqual([
+          'no-regex-spaces',
+        ]);
+        expect(resultB.messages.map((message) => message.ruleId)).toEqual([
+          'no-useless-computed-key',
+        ]);
+        expect(resultA.output).toBe(
+          "const pattern = /bar {2}baz/; const obj = { ['x']: 1 };\n",
+        );
+        expect(resultB.output).toBe(
+          "const pattern = /bar  baz/; const obj = { 'x': 1 };\n",
         );
       } finally {
         await rslint.close();
@@ -1389,7 +1600,40 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles rejects aliases of one physical config directory', async () => {
+  test('lintFiles preserves a native POSIX backslash filename through compiler binding', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-posix-backslash-file-'),
+    );
+    try {
+      const target = path.join(tmp, 'a\\b.ts');
+      await writeFile(target, 'debugger;\n');
+      await mkdir(path.join(tmp, 'a'));
+      await writeFile(path.join(tmp, 'a', 'b.ts'), 'export {};\n');
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
+      );
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles('a\\b.ts');
+        expect(results).toHaveLength(1);
+        expect(results[0].filePath).toBe(path.normalize(target));
+        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+          'no-debugger',
+        ]);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles keeps lexical config-directory aliases independent', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-config-directory-alias-'),
     );
@@ -1421,9 +1665,10 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        await expect(rslint.lintFiles(['a/a.ts', 'b/b.ts'])).rejects.toThrow(
-          /Config directories .* resolve to the same filesystem location/,
-        );
+        const results = await rslint.lintFiles(['a/a.ts', 'b/b.ts']);
+        expect(
+          results.map((result) => path.relative(tmp, result.filePath)).sort(),
+        ).toEqual([path.join('a', 'a.ts'), path.join('b', 'b.ts')]);
       } finally {
         await rslint.close();
       }
@@ -1432,7 +1677,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles finds a config through the unique physical path fallback', async () => {
+  test('lintFiles does not find config through a physical path fallback', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-file-alias-config-'),
     );
@@ -1456,12 +1701,9 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const results = await rslint.lintFiles('entry/link.ts');
-        expect(results).toHaveLength(1);
-        expect(results[0].filePath).toBe(path.normalize(link));
-        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
-          'no-debugger',
-        ]);
+        await expect(rslint.lintFiles('entry/link.ts')).rejects.toThrow(
+          /Could not find config file/,
+        );
       } finally {
         await rslint.close();
       }
@@ -1552,7 +1794,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles applies negative patterns case-sensitively to a literal file symlink', async () => {
+  test('lintFiles treats a leading bang as a minimatch-negated search', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-literal-negative-case-'),
     );
@@ -1580,9 +1822,9 @@ module.exports = config;`
         overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
       });
       try {
-        const results = await rslint.lintFiles(['Foo/link.ts', '!foo/link.ts']);
-        expect(results).toHaveLength(1);
-        expect(results[0].filePath).toBe(path.normalize(link));
+        await expect(
+          rslint.lintFiles(['Foo/link.ts', '!foo/link.ts']),
+        ).rejects.toThrow(/All files matched/);
       } finally {
         await rslint.close();
       }
@@ -1591,7 +1833,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles excludes a literal file symlink matched by a negative pattern', async () => {
+  test('lintFiles reports a leading-bang pattern as unmatched', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-literal-negative-'),
     );
@@ -1611,7 +1853,9 @@ module.exports = config;`
         overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
       });
       try {
-        expect(await rslint.lintFiles(['link.ts', '!link.ts'])).toHaveLength(0);
+        await expect(rslint.lintFiles(['link.ts', '!link.ts'])).rejects.toThrow(
+          /All files matched/,
+        );
       } finally {
         await rslint.close();
       }
@@ -1767,7 +2011,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles scans an explicit directory symlink with its physical ancestor config', async () => {
+  test('lintFiles does not use a physical ancestor config for a directory symlink', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-explicit-directory-symlink-'),
     );
@@ -1794,12 +2038,9 @@ module.exports = config;`
       const rslint = new Rslint({ cwd: tmp });
       try {
         for (const pattern of ['link', 'link/**/*.ts']) {
-          const results = await rslint.lintFiles(pattern);
-          expect(results).toHaveLength(1);
-          expect(results[0].filePath).toBe(path.join(linkDir, 'index.ts'));
-          expect(results[0].messages.map((message) => message.ruleId)).toEqual([
-            'no-debugger',
-          ]);
+          await expect(rslint.lintFiles(pattern)).rejects.toThrow(
+            /Could not find config file/,
+          );
         }
       } finally {
         await rslint.close();
@@ -1975,12 +2216,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles returns no result when every match is config-ignored', async () => {
-    // Regression guard for the empty-lintedFiles wire case: when all glob
-    // matches are excluded by config `ignores`, Go returns an empty (non-nil)
-    // lintedFiles array — NOT an omitted field — so the class yields zero
-    // results instead of falling back to the glob matches and seeding phantom
-    // empty results.
+  test('lintFiles returns an ESLint warning result for an ignored literal', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-ignored-'));
     try {
       await writeFile(path.join(tmp, 'tsconfig.json'), '{}');
@@ -2004,7 +2240,15 @@ module.exports = config;`
       });
       try {
         const results = await rslint.lintFiles('ignored.ts');
-        expect(results).toEqual([]);
+        expect(results).toHaveLength(1);
+        expect(results[0].warningCount).toBe(1);
+        expect(results[0].messages).toEqual([
+          {
+            ruleId: null,
+            severity: 1,
+            message: 'File ignored because of a matching ignore pattern.',
+          },
+        ]);
       } finally {
         await rslint.close();
       }

@@ -63,7 +63,6 @@
     "@rslib/core": "0.23.0",
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
-    "@types/picomatch": "4.0.2",
     "@typescript-eslint/scope-manager": "8.59.4",
     "@typescript-eslint/visitor-keys": "8.59.4",
     "@typescript/native-preview": "7.0.0-dev.20250904.1",
@@ -72,7 +71,6 @@
     "espree": "11.2.0",
     "esquery": "1.7.0",
     "globals": "17.7.0",
-    "tinyglobby": "0.2.15",
     "typescript": "5.9.3"
   },
   "peerDependencies": {
@@ -92,8 +90,5 @@
     "@rslint/native-linux-x64-musl": "workspace:*",
     "@rslint/native-win32-arm64-msvc": "workspace:*",
     "@rslint/native-win32-x64-msvc": "workspace:*"
-  },
-  "dependencies": {
-    "picomatch": "4.0.4"
   }
 }

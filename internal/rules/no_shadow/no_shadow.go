@@ -1263,7 +1263,7 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 
 		filename := ""
 		if ctx.SourceFile.AsNode() != nil {
-			filename = ctx.SourceFile.FileName()
+			filename = ctx.FileName()
 		}
 		isDeclFile := strings.HasSuffix(filename, ".d.ts") ||
 			strings.HasSuffix(filename, ".d.cts") ||

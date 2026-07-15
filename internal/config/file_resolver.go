@@ -3,6 +3,7 @@ package config
 import (
 	"sync"
 
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
@@ -19,12 +20,12 @@ type cachedEnabledRules struct {
 type FileConfigResolver struct {
 	config         RslintConfig
 	cwd            string
+	fs             vfs.FS
 	enforcePlugins bool
-	// globalIgnorePatterns is parsed once per run instead of per file: the
-	// config's global `ignores` set is fixed for the whole run, so
-	// re-deriving it (string parsing + allocation) on every ConfigForFile
-	// call is pure waste at thousands-of-files scale.
-	globalIgnorePatterns []IgnorePattern
+	// globalIgnoreLayers and selectorMatcher are immutable, precompiled views
+	// shared by every worker. Each entry retains its own resolved basePath.
+	globalIgnoreLayers []configIgnoreLayer
+	selectorMatcher    *FileSelectorMatcher
 
 	mu          sync.RWMutex
 	configCache map[string]cachedMergedConfig
@@ -32,15 +33,26 @@ type FileConfigResolver struct {
 }
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
-func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool) *FileConfigResolver {
+func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool, fsys vfs.FS) *FileConfigResolver {
 	return &FileConfigResolver{
-		config:               config,
-		cwd:                  cwd,
-		enforcePlugins:       enforcePlugins,
-		globalIgnorePatterns: extractConfigIgnores(config),
-		configCache:          make(map[string]cachedMergedConfig),
-		rulesCache:           make(map[string]cachedEnabledRules),
+		config:             config,
+		cwd:                cwd,
+		fs:                 fsys,
+		enforcePlugins:     enforcePlugins,
+		globalIgnoreLayers: compileConfigIgnoreLayers(config, cwd, fsys),
+		selectorMatcher:    NewFileSelectorMatcher(config, cwd),
+		configCache:        make(map[string]cachedMergedConfig),
+		rulesCache:         make(map[string]cachedEnabledRules),
 	}
+}
+
+// IsFileIgnored reports only global-ignore exclusion. It deliberately does not
+// conflate an unselected file or an entry-local ignore with global admission.
+func (r *FileConfigResolver) IsFileIgnored(filePath string) bool {
+	if r == nil {
+		return false
+	}
+	return isFileIgnoredByConfigLayers(filePath, "", r.globalIgnoreLayers, r.fs)
 }
 
 // ConfigForFile returns the merged config for filePath, caching nil misses.
@@ -52,7 +64,7 @@ func (r *FileConfigResolver) ConfigForFile(filePath string) *MergedConfig {
 	}
 	r.mu.RUnlock()
 
-	merged := r.config.getConfigForFileWithIgnores(filePath, r.cwd, r.globalIgnorePatterns)
+	merged := r.config.getConfigForFileWithMatchers(filePath, r.cwd, r.globalIgnoreLayers, r.selectorMatcher)
 
 	r.mu.Lock()
 	if cached, ok := r.configCache[filePath]; ok {

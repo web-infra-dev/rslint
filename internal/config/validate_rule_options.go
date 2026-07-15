@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -23,7 +22,7 @@ func (e RuleOptionsError) Error() string {
 }
 
 // ValidateRuleOptions validates every enabled rule's options in config
-// against the rule's declared schema, in parallel, and returns every failure
+// against the rule's declared schema and returns every failure
 // (not just the first) sorted by rule name for deterministic output.
 //
 // It is meant to run as a separate step right after configuration is
@@ -37,9 +36,8 @@ func (e RuleOptionsError) Error() string {
 //
 // Each entry's options are validated independently, mirroring ESLint, which
 // validates every config array element's options rather than only the final
-// merged value. The parallel loop leans on [rule.Schema]'s internal
-// sync.Once: racing first uses compile each schema at most once, and a
-// schema shared by many rules (EmptyArraySchema) compiles a single time.
+// merged value. [rule.Schema]'s internal sync.Once compiles each schema at
+// most once, including schemas shared by many rules (EmptyArraySchema).
 //
 // Validation is also where schema-declared `default` values are filled in,
 // exactly like ajv's `useDefaults` in ESLint: [rule.Schema.Validate] mutates
@@ -47,9 +45,9 @@ func (e RuleOptionsError) Error() string {
 // options slice aliases the raw config entry value it was parsed from
 // (parseRuleConfigValue sub-slices, it never copies), the defaults land in
 // the very options the per-file config merge later hands to rules — no
-// write-back needed. The parallel loop stays race-free because every entry's
-// rule value is its own decoded JSON value, never shared with another
-// entry's.
+// write-back needed. Validation is deliberately serial because JavaScript
+// configs may reuse the same rule options array/object across entries;
+// applying schema defaults to such aliased values concurrently would race.
 func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOptionsError {
 	type workItem struct {
 		entryIndex int
@@ -90,15 +88,9 @@ func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOpti
 	})
 
 	results := make([]error, len(items))
-	var wg sync.WaitGroup
 	for i, item := range items {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			results[i] = item.schema.Validate(item.options)
-		}()
+		results[i] = item.schema.Validate(item.options)
 	}
-	wg.Wait()
 
 	var errs []RuleOptionsError
 	seen := map[string]bool{}

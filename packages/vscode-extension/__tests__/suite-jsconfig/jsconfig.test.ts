@@ -61,6 +61,22 @@ suite('rslint JS config support', function () {
     if (cleanupError) throw cleanupError;
   }
 
+  async function waitForFileContent(
+    filePath: string,
+    predicate: (content: string) => boolean,
+    timeoutMs = 60_000,
+  ): Promise<string> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        if (predicate(content)) return content;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(`waitForFileContent: timeout waiting for ${filePath}`);
+  }
+
   test('JS config should produce diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -456,7 +472,7 @@ export default [];
     );
   });
 
-  test('parent global ignores remove nested configs from the effective catalog', async () => {
+  test('parent global ignores prune the catalog but exact open lookup still selects the nested config', async () => {
     const root = getWorkspaceRoot();
     const rootConfigPath = path.join(root, 'rslint.config.js');
     const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
@@ -465,6 +481,7 @@ export default [];
     const nestedFilePath = path.join(nestedDir, 'index.ts');
     const loadMarkerPath = path.join(nestedDir, 'config-loads.txt');
     const rootDoc = await openFixture('index.ts');
+    let nestedDoc: vscode.TextDocument | undefined;
 
     const ignoredRootConfig = originalRootConfig
       .replace(
@@ -489,14 +506,10 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
           'utf8',
         );
 
-        const nestedDoc =
-          await vscode.workspace.openTextDocument(nestedFilePath);
-        await vscode.window.showTextDocument(nestedDoc);
-        await waitForDiagnostics(nestedDoc, (diagnostics) =>
-          diagnostics.some((diagnostic) =>
-            diagnostic.message.includes('Unexpected console statement'),
-          ),
-        );
+        // The config-source watcher refreshes the baseline workspace catalog.
+        // Do not open the nested document yet: an open document is an exact
+        // LookupPaths request and intentionally bypasses traversal pruning.
+        await waitForFileContent(loadMarkerPath, (content) => content === 'x');
 
         await vscode.window.showTextDocument(rootDoc);
         const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
@@ -504,47 +517,62 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
             diagnostic.message.includes('no-explicit-any'),
           ),
         );
-        const nestedCleared = waitForDiagnostics(
-          nestedDoc,
-          (diagnostics) =>
-            !diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('Unexpected console statement'),
-            ),
-        );
-
         fs.writeFileSync(rootConfigPath, ignoredRootConfig, 'utf8');
-        await Promise.all([parentApplied, nestedCleared]);
+        await parentApplied;
 
         assert.strictEqual(
           fs.readFileSync(loadMarkerPath, 'utf8'),
           'x',
           'The ignored nested candidate must not be evaluated again',
         );
-        assert.ok(
-          !vscode.languages
-            .getDiagnostics(nestedDoc.uri)
-            .some((diagnostic) =>
+        nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
+        await vscode.window.showTextDocument(nestedDoc);
+        const nestedDiagnostics = await waitForDiagnostics(
+          nestedDoc,
+          (diagnostics) =>
+            diagnostics.some((diagnostic) =>
               diagnostic.message.includes('Unexpected console statement'),
             ),
-          'The ignored nested config must not be sent in the effective catalog',
+        );
+        assert.ok(
+          nestedDiagnostics.some((diagnostic) =>
+            diagnostic.message.includes('Unexpected console statement'),
+          ),
+          'An exact open-document lookup must select the nearest nested config',
+        );
+        assert.strictEqual(
+          await waitForFileContent(
+            loadMarkerPath,
+            (content) => content === 'xx',
+          ),
+          'xx',
+          'The exact lookup must evaluate the nested lexical candidate once more',
         );
       },
       async () => {
-        const restored = waitForDiagnostics(
-          rootDoc,
-          (diagnostics) =>
-            diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-unsafe-member-access'),
-            ) &&
-            !diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-explicit-any'),
-            ),
+        await withFailClosedCleanup(
+          async () => {
+            if (nestedDoc) await closeTextEditor(nestedDoc);
+          },
+          async () => {
+            const restored = waitForDiagnostics(
+              rootDoc,
+              (diagnostics) =>
+                diagnostics.some((diagnostic) =>
+                  diagnostic.message.includes('no-unsafe-member-access'),
+                ) &&
+                !diagnostics.some((diagnostic) =>
+                  diagnostic.message.includes('no-explicit-any'),
+                ),
+            );
+            fs.rmSync(nestedDir, { recursive: true, force: true });
+            fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+            await restored;
+          },
+          'Parent-ignore exact-lookup resource cleanup',
         );
-        fs.rmSync(nestedDir, { recursive: true, force: true });
-        fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-        await restored;
       },
-      'Parent-ignore catalog test',
+      'Parent-ignore catalog/exact-lookup test',
     );
   });
 

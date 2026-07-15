@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type ActivateConfigsResponse,
   type ConfigModuleActivationPlan,
@@ -47,7 +46,6 @@ function request(
   singleThreaded = false,
 ): LoadConfigsRequest {
   return {
-    protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
     transactionId,
     loadMode,
     ...(singleThreaded ? { singleThreaded: true } : {}),
@@ -66,7 +64,6 @@ async function activateWithPlan(
   let plan: ConfigModuleActivationPlan | undefined;
   const response = await host.activateConfigs(
     {
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId,
       effectiveConfigIds,
     },
@@ -124,6 +121,171 @@ describe('ConfigModuleHost', () => {
     }
   });
 
+  test('does not serialize independent parallel loads in one transaction', async () => {
+    const root = createTempDir();
+    const blocked = candidate(root, 'blocked');
+    const ready = candidate(root, 'ready');
+    const blockedStarted = deferred<void>();
+    const releaseBlocked = deferred<void>();
+    let blockedSettled = false;
+    const host = new ConfigModuleHost({
+      loadCached: async (configPath) => {
+        if (configPath === blocked.configPath) {
+          blockedStarted.resolve();
+          await releaseBlocked.promise;
+        }
+        return [{ name: path.basename(configPath) }];
+      },
+    });
+
+    try {
+      const blockedLoad = host
+        .loadConfigs(request('tx-independent', [blocked]))
+        .then((result) => {
+          blockedSettled = true;
+          return result;
+        });
+      await blockedStarted.promise;
+      const readyResult = await host.loadConfigs(
+        request('tx-independent', [ready]),
+      );
+      expect(readyResult.results[0]).toMatchObject({
+        id: 'ready',
+        status: 'loaded',
+      });
+      expect(blockedSettled).toBe(false);
+      releaseBlocked.resolve();
+      await blockedLoad;
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('coalesces concurrent requests for the same candidate id', async () => {
+    const root = createTempDir();
+    const shared = candidate(root, 'shared');
+    const started = deferred<void>();
+    const release = deferred<void>();
+    let moduleLoads = 0;
+    let iterations = 0;
+    const exported = new Proxy([{}], {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator) iterations++;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const host = new ConfigModuleHost({
+      loadCached: async () => {
+        moduleLoads++;
+        started.resolve();
+        await release.promise;
+        return exported;
+      },
+    });
+
+    try {
+      const first = host.loadConfigs(request('tx-same-id', [shared]));
+      await started.promise;
+      const second = host.loadConfigs(request('tx-same-id', [shared]));
+      release.resolve();
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(moduleLoads).toBe(1);
+      expect(iterations).toBe(1);
+      expect(secondResult).toEqual(firstResult);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('shares one physical module load while normalizing every lexical candidate', async () => {
+    const root = createTempDir();
+    const physicalDirectory = path.join(root, 'physical');
+    const aliasDirectory = path.join(root, 'alias');
+    fs.mkdirSync(physicalDirectory);
+    fs.symlinkSync(
+      physicalDirectory,
+      aliasDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const first = candidate(
+      physicalDirectory,
+      'first',
+      'shared.config.js',
+      physicalDirectory,
+    );
+    const second: ConfigModuleCandidate = {
+      ...first,
+      id: 'second',
+      configPath: path.join(aliasDirectory, 'shared.config.js'),
+      configDirectory: aliasDirectory,
+    };
+    let moduleLoads = 0;
+    let iterations = 0;
+    const matcher = () => true;
+    const exported = new Proxy(
+      [
+        {
+          files: [matcher],
+          plugins: { shared: { rules: { rule: {} } } },
+        },
+      ],
+      {
+        get(target, property, receiver) {
+          if (property === Symbol.iterator) iterations++;
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+    const host = new ConfigModuleHost({
+      loadFresh: async () => {
+        moduleLoads++;
+        return exported;
+      },
+    });
+
+    try {
+      const loaded = await host.loadConfigs(
+        request('tx-physical-alias', [first, second], 'fresh'),
+      );
+      expect(moduleLoads).toBe(1);
+      expect(iterations).toBe(2);
+      expect(loaded.results.map(({ id, status }) => ({ id, status }))).toEqual([
+        { id: 'first', status: 'loaded' },
+        { id: 'second', status: 'loaded' },
+      ]);
+      const predicateIds = loaded.results.map((result) => {
+        if (result.status !== 'loaded') throw new Error(result.error.message);
+        const entry = result.entries[0] as {
+          files: Array<{ $rslintPredicate: string }>;
+        };
+        return entry.files[0].$rslintPredicate;
+      });
+      expect(predicateIds[0]).not.toBe(predicateIds[1]);
+      expect(predicateIds[0]).toContain('first:predicate-');
+      expect(predicateIds[1]).toContain('second:predicate-');
+
+      const { plan } = await activateWithPlan(host, 'tx-physical-alias', [
+        'first',
+        'second',
+      ]);
+      expect(
+        plan.configs.map(({ configDirectory }) => configDirectory),
+      ).toEqual([physicalDirectory, aliasDirectory]);
+      expect(plan.pluginConfigs).toEqual([
+        {
+          configPath: first.configPath,
+          configDirectory: physicalDirectory,
+        },
+        {
+          configPath: second.configPath,
+          configDirectory: aliasDirectory,
+        },
+      ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('loads a batch serially when singleThreaded is requested', async () => {
     const root = createTempDir();
     const first = candidate(root, 'first');
@@ -172,6 +334,43 @@ describe('ConfigModuleHost', () => {
     }
   });
 
+  test('serializes independent requests in a singleThreaded transaction', async () => {
+    const root = createTempDir();
+    const first = candidate(root, 'first-request');
+    const second = candidate(root, 'second-request');
+    const firstStarted = deferred<void>();
+    const releaseFirst = deferred<void>();
+    let secondStarted = false;
+    const host = new ConfigModuleHost({
+      loadCached: async (configPath) => {
+        if (configPath === first.configPath) {
+          firstStarted.resolve();
+          await releaseFirst.promise;
+        } else {
+          secondStarted = true;
+        }
+        return [{}];
+      },
+    });
+
+    try {
+      const firstLoad = host.loadConfigs(
+        request('tx-serial-requests', [first], 'cached', true),
+      );
+      await firstStarted.promise;
+      const secondLoad = host.loadConfigs(
+        request('tx-serial-requests', [second], 'cached', true),
+      );
+      await Promise.resolve();
+      expect(secondStarted).toBe(false);
+      releaseFirst.resolve();
+      await Promise.all([firstLoad, secondLoad]);
+      expect(secondStarted).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('contains config evaluation and normalization failures per candidate', async () => {
     const root = createTempDir();
     const good = candidate(root, 'good');
@@ -181,7 +380,7 @@ describe('ConfigModuleHost', () => {
       loadCached: async (configPath) => {
         const id = path.basename(configPath).split('.')[0];
         if (id === 'runtime') throw new Error('boom from config');
-        if (id === 'invalid') return { rules: {} };
+        if (id === 'invalid') return 42;
         return [{ rules: { 'no-console': 'error' } }];
       },
     });
@@ -204,7 +403,7 @@ describe('ConfigModuleHost', () => {
         status: 'failed',
         error: {
           code: 'invalid',
-          message: expect.stringContaining('must export an array'),
+          message: expect.stringContaining('must be an object'),
         },
       });
       expect(
@@ -399,7 +598,6 @@ describe('ConfigModuleHost', () => {
       fs.writeFileSync(config.configPath, '// edited after load\n');
       await expect(
         host.activateConfigs({
-          protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
           transactionId: 'tx-stale',
           effectiveConfigIds: ['stale'],
         }),
@@ -414,7 +612,6 @@ describe('ConfigModuleHost', () => {
     const config = candidate(root, 'prepare-race');
     const host = new ConfigModuleHost({ loadCached: async () => [] });
     const activationRequest = {
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-prepare-race',
       effectiveConfigIds: ['prepare-race'],
     } as const;
@@ -477,13 +674,114 @@ describe('ConfigModuleHost', () => {
       await host.loadConfigs(request('tx-known', [one]));
       await expect(
         host.activateConfigs({
-          protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
           transactionId: 'tx-known',
           effectiveConfigIds: ['missing'],
         }),
       ).rejects.toThrow('unknown effective config id');
       expect(host.deleteSession('tx-known')).toBe(true);
       expect(host.deleteSession('tx-known')).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('evaluates live matchers synchronously with native paths and JS truthiness', async () => {
+    const root = createTempDir();
+    const config = candidate(root, 'predicates');
+    const observed: Array<{ path: string; receiver: unknown }> = [];
+    const record = function (this: unknown, absolutePath: string): void {
+      observed.push({ path: absolutePath, receiver: this });
+    };
+    const host = new ConfigModuleHost({
+      loadCached: async () => [
+        {
+          files: [
+            function (this: unknown, absolutePath: string) {
+              record.call(this, absolutePath);
+              return 0;
+            },
+            function (this: unknown, absolutePath: string) {
+              record.call(this, absolutePath);
+              return { matched: false };
+            },
+            function (this: unknown, absolutePath: string) {
+              record.call(this, absolutePath);
+              return Promise.resolve(false);
+            },
+            function (this: unknown, absolutePath: string) {
+              record.call(this, absolutePath);
+              throw new Error('matcher boom');
+            },
+          ],
+        },
+      ],
+    });
+
+    try {
+      const loaded = await host.loadConfigs(request('tx-predicates', [config]));
+      const result = loaded.results[0];
+      if (result.status !== 'loaded') throw new Error(result.error.message);
+      const entry = result.entries[0] as {
+        files: Array<{ $rslintPredicate: string }>;
+      };
+      const predicateIds = entry.files.map(
+        (descriptor) => descriptor.$rslintPredicate,
+      );
+      expect(new Set(predicateIds).size).toBe(4);
+
+      const directory = path.join(root, 'nested');
+      const response = await host.evaluateConfigPredicates({
+        transactionId: 'tx-predicates',
+        calls: predicateIds.map((predicateId, index) => ({
+          callId: `call-${index}`,
+          predicateId,
+          absolutePath: directory,
+          directory: true,
+        })),
+      });
+      expect(response.results).toEqual([
+        { callId: 'call-0', status: 'evaluated', value: false },
+        { callId: 'call-1', status: 'evaluated', value: true },
+        { callId: 'call-2', status: 'evaluated', value: true },
+        {
+          callId: 'call-3',
+          status: 'failed',
+          error: { code: 'predicate', message: 'matcher boom' },
+        },
+      ]);
+      expect(observed).toEqual(
+        Array.from({ length: 4 }, () => ({
+          path: `${path.normalize(directory)}${path.sep}`,
+          receiver: undefined,
+        })),
+      );
+
+      await activateWithPlan(host, 'tx-predicates', ['predicates']);
+      await expect(
+        host.evaluateConfigPredicates({
+          transactionId: 'tx-predicates',
+          calls: [
+            {
+              callId: 'unknown',
+              predicateId: 'predicates:predicate-999999',
+              absolutePath: directory,
+            },
+          ],
+        }),
+      ).rejects.toThrow('unknown predicate id');
+      expect(host.deleteSession('tx-predicates')).toBe(true);
+      await expect(
+        host.evaluateConfigPredicates({
+          transactionId: 'tx-predicates',
+          calls: [
+            {
+              callId: 'stale',
+              predicateId: predicateIds[0],
+              absolutePath: directory,
+            },
+          ],
+        }),
+      ).rejects.toThrow('unknown transaction');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

@@ -1,30 +1,33 @@
 package lsp
 
 import (
-	"strings"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 )
 
 // configSnapshotFS gives one config-discovery transaction a stable view of
 // every .gitignore file it observes. cachedvfs deliberately does not cache
-// ReadFile, while snapshot preparation may visit one source for multiple
-// ownership scopes. Caching those bytes keeps all scopes in the candidate
-// catalog consistent; the resulting config entries contain materialized ignore
-// patterns and do not retain this filesystem after commit.
+// ReadFile, while a committed JS evaluator may revisit one source for later
+// exact files. Caching those bytes keeps the generation internally consistent;
+// the evaluator retains this filesystem until a later transaction replaces it.
 type configSnapshotFS struct {
 	vfs.FS
 
 	mu                sync.Mutex
-	gitignoreSnapshot map[string]configSnapshotFile
+	gitignoreSnapshot map[string]*configSnapshotState
 	caseSensitive     bool
 }
 
 type configSnapshotFile struct {
 	content string
 	exists  bool
+}
+
+type configSnapshotState struct {
+	ready chan struct{}
+	file  configSnapshotFile
 }
 
 func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
@@ -34,7 +37,7 @@ func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 	}
 	return &configSnapshotFS{
 		FS:                fsys,
-		gitignoreSnapshot: make(map[string]configSnapshotFile),
+		gitignoreSnapshot: make(map[string]*configSnapshotState),
 		caseSensitive:     caseSensitive,
 	}
 }
@@ -43,21 +46,26 @@ func (fsys *configSnapshotFS) ReadFile(filePath string) (string, bool) {
 	if fsys == nil || fsys.FS == nil {
 		return "", false
 	}
-	filePath = tspath.NormalizePath(filePath)
-	if tspath.GetBaseFileName(filePath) != ".gitignore" {
+	filePath = hostpath.NormalizeForRoot(filePath, filePath)
+	if hostpath.BaseForRoot(filePath, filePath) != ".gitignore" {
 		return fsys.FS.ReadFile(filePath)
 	}
 
-	key := filePath
-	if !fsys.caseSensitive {
-		key = strings.ToLower(key)
-	}
+	key := hostpath.Identity(filePath, hostpath.DirectoryForRoot(filePath, filePath), fsys.caseSensitive)
 	fsys.mu.Lock()
-	defer fsys.mu.Unlock()
-	if file, ok := fsys.gitignoreSnapshot[key]; ok {
-		return file.content, file.exists
+	if state, ok := fsys.gitignoreSnapshot[key]; ok {
+		fsys.mu.Unlock()
+		<-state.ready
+		return state.file.content, state.file.exists
 	}
+	state := &configSnapshotState{ready: make(chan struct{})}
+	fsys.gitignoreSnapshot[key] = state
+	fsys.mu.Unlock()
+
+	// Different .gitignore sources are independent and may be read in
+	// parallel. Only readers of this exact source wait for its first snapshot.
 	content, exists := fsys.FS.ReadFile(filePath)
-	fsys.gitignoreSnapshot[key] = configSnapshotFile{content: content, exists: exists}
+	state.file = configSnapshotFile{content: content, exists: exists}
+	close(state.ready)
 	return content, exists
 }

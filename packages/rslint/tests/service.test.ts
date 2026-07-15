@@ -1,7 +1,6 @@
 import { describe, expect, test } from '@rstest/core';
 
 import { RSLintService } from '../src/service/service.js';
-import { API_REVERSE_CONFIG_LOAD_CAPABILITY } from '../src/service/protocol.js';
 import type {
   InboundRequestHandler,
   IpcMessage,
@@ -19,7 +18,7 @@ class ReverseLintBackend implements RslintServiceInterface {
   async sendMessage(kind: string, data: any): Promise<any> {
     if (kind === 'handshake')
       return {
-        version: '2.0.0',
+        version: '3.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       };
@@ -98,9 +97,9 @@ class ReverseConfigBackend extends ReverseLintBackend {
     if (kind === 'handshake') {
       this.handshakeCapabilities = [...(data.capabilities ?? [])];
       return {
-        version: '2.0.0',
+        version: '3.0.0',
         ok: true,
-        capabilities: [API_REVERSE_CONFIG_LOAD_CAPABILITY],
+        capabilities: [],
       };
     }
     if (kind === 'lint') {
@@ -110,12 +109,17 @@ class ReverseConfigBackend extends ReverseLintBackend {
         kind: 'loadConfigs',
         data: { transactionId: 'tx-service', candidates: ['candidate'] },
       });
-      const activated = await this.inbound({
+      const evaluated = await this.inbound({
         id: 102,
+        kind: 'evaluateConfigPredicates',
+        data: { transactionId: 'tx-service', calls: ['predicate'] },
+      });
+      const activated = await this.inbound({
+        id: 103,
         kind: 'activateConfigs',
         data: { transactionId: 'tx-service', effectiveConfigIds: ['config'] },
       });
-      return { loaded, activated };
+      return { loaded, evaluated, activated };
     }
     return super.sendMessage(kind, data);
   }
@@ -134,24 +138,6 @@ describe('RSLintService reverse lint request scoping', () => {
       ),
     ).resolves.toEqual({ request: { token: 'a.ts' }, ok: true });
     expect(backend.lintPayloads[0]).toMatchObject({ eslintPlugins });
-    await service.close();
-  });
-
-  test('forwards canonical paths parallel to lint files', async () => {
-    const backend = new ReverseLintBackend();
-    const service = new RSLintService(backend);
-
-    await service.lint(
-      {
-        files: ['/lexical/a.ts'],
-        canonicalFiles: ['/physical/a.ts'],
-      },
-      { pluginLint: () => ({ diagnostics: [] }) },
-    );
-    expect(backend.lintPayloads[0]).toMatchObject({
-      files: ['/lexical/a.ts'],
-      canonicalFiles: ['/physical/a.ts'],
-    });
     await service.close();
   });
 
@@ -177,7 +163,7 @@ describe('RSLintService reverse lint request scoping', () => {
     };
     const service = new RSLintService(backend);
     await expect(service.lint({ files: ['a.ts'] })).rejects.toThrow(
-      /protocol mismatch.*2\.0\.0.*1\.0\.0/,
+      /protocol mismatch.*3\.0\.0.*1\.0\.0/,
     );
     await service.close();
   });
@@ -186,7 +172,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const backend = new ReverseLintBackend();
     backend.sendMessage = async (kind: string, data: any): Promise<any> => {
       if (kind === 'handshake') {
-        return { version: '2.0.0', ok: true, capabilities: [] };
+        return { version: '3.0.0', ok: true, capabilities: [] };
       }
       return ReverseLintBackend.prototype.sendMessage.call(backend, kind, data);
     };
@@ -206,9 +192,10 @@ describe('RSLintService reverse lint request scoping', () => {
 
     await expect(
       service.lint(
-        { configDiscovery: { mode: 'auto' } },
+        { configDiscovery: { mode: 'auto', inputs: ['.'] } },
         {
           loadConfigs: (request) => ({ loaded: request }),
+          evaluateConfigPredicates: (request) => ({ evaluated: request }),
           activateConfigs: (request) => ({ activated: request }),
         },
       ),
@@ -219,6 +206,12 @@ describe('RSLintService reverse lint request scoping', () => {
           candidates: ['candidate'],
         },
       },
+      evaluated: {
+        evaluated: {
+          transactionId: 'tx-service',
+          calls: ['predicate'],
+        },
+      },
       activated: {
         activated: {
           transactionId: 'tx-service',
@@ -226,25 +219,8 @@ describe('RSLintService reverse lint request scoping', () => {
         },
       },
     });
-    expect(backend.handshakeCapabilities).toEqual([
-      API_REVERSE_CONFIG_LOAD_CAPABILITY,
-    ]);
+    expect(backend.handshakeCapabilities).toEqual([]);
     expect(backend.lintPayloads).toEqual([]);
-    await service.close();
-  });
-
-  test('requires negotiated reverse config loading support', async () => {
-    const backend = new ReverseLintBackend();
-    const service = new RSLintService(backend);
-    await expect(
-      service.lint(
-        { configDiscovery: { mode: 'auto' } },
-        {
-          loadConfigs: () => ({ results: [] }),
-          activateConfigs: () => ({ eslintPluginEntries: [] }),
-        },
-      ),
-    ).rejects.toThrow(/does not support reverse config loading/);
     await service.close();
   });
 
@@ -252,10 +228,12 @@ describe('RSLintService reverse lint request scoping', () => {
     const service = new RSLintService(new ReverseConfigBackend());
     await expect(
       service.lint(
-        { configDiscovery: { mode: 'auto' } },
+        { configDiscovery: { mode: 'auto', inputs: ['.'] } },
         { loadConfigs: () => ({ results: [] }) },
       ),
-    ).rejects.toThrow(/loadConfigs and activateConfigs handlers together/);
+    ).rejects.toThrow(
+      /loadConfigs, evaluateConfigPredicates, and activateConfigs handlers together/,
+    );
     await service.close();
   });
 

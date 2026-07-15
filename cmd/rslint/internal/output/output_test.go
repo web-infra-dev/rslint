@@ -288,11 +288,8 @@ func TestQuietFiltersRenderingButNotCounts(t *testing.T) {
 	if err := Render(&defaultBuf, report, Options{Format: FormatDefault, Quiet: true}); err != nil {
 		t.Fatal(err)
 	}
-	if strings.HasPrefix(defaultBuf.String(), "\n") {
-		t.Fatalf("quiet warning-only default report has a stray blank line: %q", defaultBuf.String())
-	}
-	if !strings.Contains(defaultBuf.String(), "1 warning") {
-		t.Fatalf("summary lost hidden warning count: %q", defaultBuf.String())
+	if defaultBuf.Len() != 0 {
+		t.Fatalf("quiet warning-only default output = %q, want empty", defaultBuf.String())
 	}
 }
 
@@ -426,4 +423,57 @@ func createOutputTestDiagnostic(t *testing.T, severity rule.DiagnosticSeverity) 
 		Message:    rule.RuleMessage{Description: "test message"},
 		Severity:   severity,
 	}, tspath.ComparePathsOptions{CurrentDirectory: dir, UseCaseSensitiveFileNames: true}
+}
+
+func TestFileWarningsUseFormatterAndCountWithoutSyntheticRange(t *testing.T) {
+	dir := t.TempDir()
+	warning := FileWarning{
+		FilePath: filepath.Join(dir, `literal\\file.ts`),
+		Message:  "is ignored because of a matching ignore pattern",
+	}
+	paths := tspath.ComparePathsOptions{CurrentDirectory: dir, UseCaseSensitiveFileNames: true}
+	report := NewReportWithFileWarnings(nil, []FileWarning{warning}, Metadata{Mode: ModeLint})
+	if got := report.Counts().Warnings; got != 1 {
+		t.Fatalf("warning count = %d, want 1", got)
+	}
+
+	tests := []struct {
+		format Format
+		want   []string
+		not    []string
+	}{
+		{FormatDefault, []string{"literal\\\\file.ts", warning.Message, "1 warning"}, nil},
+		{FormatJSONLine, []string{`"filePath":"literal\\\\file.ts"`, `"severity":"warning"`, warning.Message}, []string{`"range"`, `"ruleName"`}},
+		{FormatGitHub, []string{"::warning file=literal\\\\file.ts::", warning.Message}, []string{"line="}},
+		{FormatGitLab, []string{`"check_name":"rslint/file-warning"`, `"begin":1`, warning.Message}, []string{`"positions"`}},
+	}
+	for _, test := range tests {
+		t.Run(test.format.String(), func(t *testing.T) {
+			var rendered strings.Builder
+			if err := Render(&rendered, report, Options{Format: test.format, ComparePaths: paths}); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range test.want {
+				if !strings.Contains(rendered.String(), want) {
+					t.Fatalf("output %q does not contain %q", rendered.String(), want)
+				}
+			}
+			for _, unwanted := range test.not {
+				if strings.Contains(rendered.String(), unwanted) {
+					t.Fatalf("output %q unexpectedly contains %q", rendered.String(), unwanted)
+				}
+			}
+		})
+	}
+
+	var quiet strings.Builder
+	if err := Render(&quiet, report, Options{Format: FormatJSONLine, ComparePaths: paths, Quiet: true}); err != nil {
+		t.Fatal(err)
+	}
+	if quiet.Len() != 0 {
+		t.Fatalf("quiet warning output = %q, want empty", quiet.String())
+	}
+	if report.Counts().Warnings != 1 {
+		t.Fatal("quiet rendering must not change warning counts")
+	}
 }

@@ -20,6 +20,7 @@ type Options struct {
 
 type formatter interface {
 	begin(w *bufio.Writer, report Report, hasVisibleDiagnostics bool) error
+	fileWarning(w *bufio.Writer, view fileWarningView) error
 	diagnostic(w *bufio.Writer, view diagnosticView) error
 	finish(w *bufio.Writer, report Report) error
 }
@@ -33,6 +34,12 @@ func Render(dst io.Writer, report Report, options Options) error {
 	// Build and validate every visible view before writing anything. A malformed
 	// diagnostic must not leave a partial machine-readable report (for example,
 	// an unterminated GitLab JSON array) in the destination.
+	warningViews := make([]fileWarningView, 0, len(report.fileWarnings))
+	if !options.Quiet {
+		for _, warning := range report.fileWarnings {
+			warningViews = append(warningViews, newFileWarningView(warning, options.ComparePaths))
+		}
+	}
 	views := make([]diagnosticView, 0, len(report.diagnostics))
 	for _, diagnostic := range report.diagnostics {
 		if !isVisible(diagnostic, options.Quiet) {
@@ -46,8 +53,13 @@ func Render(dst io.Writer, report Report, options Options) error {
 	}
 
 	w := bufio.NewWriterSize(dst, outputBufferSize)
-	if err := selected.begin(w, report, len(views) > 0); err != nil {
+	if err := selected.begin(w, report, len(warningViews)+len(views) > 0); err != nil {
 		return errors.Join(err, w.Flush())
+	}
+	for _, view := range warningViews {
+		if err := selected.fileWarning(w, view); err != nil {
+			return errors.Join(err, w.Flush())
+		}
 	}
 
 	for _, view := range views {
@@ -74,7 +86,7 @@ func isVisible(diagnostic rule.RuleDiagnostic, quiet bool) bool {
 func newFormatter(options Options) (formatter, error) {
 	switch options.Format {
 	case FormatDefault:
-		return &defaultFormatter{colors: newColorScheme(options.ColorEnabled)}, nil
+		return &defaultFormatter{colors: newColorScheme(options.ColorEnabled), suppressEmpty: options.Quiet}, nil
 	case FormatJSONLine:
 		return jsonLineFormatter{}, nil
 	case FormatGitHub:

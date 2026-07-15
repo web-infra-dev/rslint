@@ -87,11 +87,11 @@ func TestCwdHandling(t *testing.T) {
 			description:  "Patterns with .. segments should resolve and match",
 		},
 		{
-			name:         "Pattern with mid-path /./ ignores correctly",
+			name:         "Pattern with mid-path /./ remains literal",
 			filePath:     "src/utils/helper.ts",
 			patterns:     []string{"src/./utils/**"},
-			shouldIgnore: true,
-			description:  "Patterns with mid-path /./ should collapse and match",
+			shouldIgnore: false,
+			description:  "Minimatch level one preserves mid-pattern dot segments",
 		},
 	}
 
@@ -150,28 +150,31 @@ func TestNormalizePath(t *testing.T) {
 	}
 }
 
-func TestNormalizePattern(t *testing.T) {
+func TestNormalizeConfigPattern(t *testing.T) {
 	tests := []struct {
 		name     string
 		pattern  string
 		expected string
 	}{
 		{name: "No-op for clean pattern", pattern: "src/**/*.ts", expected: "src/**/*.ts"},
-		{name: "Strip leading ./", pattern: "./src/**/*.ts", expected: "src/**/*.ts"},
-		{name: "Collapse mid-path /./", pattern: "src/./utils/*.ts", expected: "src/utils/*.ts"},
-		{name: "Resolve .. segment", pattern: "src/../lib/*.ts", expected: "lib/*.ts"},
-		{name: "Combined ./ prefix and .. segment", pattern: "./src/../lib/*.ts", expected: "lib/*.ts"},
-		{name: "Multiple /./", pattern: "src/./utils/./deep/*.ts", expected: "src/utils/deep/*.ts"},
-		{name: "Exact file with ./", pattern: "./src/file.ts", expected: "src/file.ts"},
+		{name: "Strip exactly one leading ./", pattern: "./src/**/*.ts", expected: "src/**/*.ts"},
+		{name: "Strip ./ after exactly one negation", pattern: "!./src/**/*.ts", expected: "!src/**/*.ts"},
+		{name: "Preserve ./ after two negations", pattern: "!!./src/**/*.ts", expected: "!!./src/**/*.ts"},
+		{name: "Preserve ./ after three negations", pattern: "!!!./src/**/*.ts", expected: "!!!./src/**/*.ts"},
+		{name: "Preserve mid-path /./", pattern: "src/./utils/*.ts", expected: "src/./utils/*.ts"},
+		{name: "Preserve .. segment", pattern: "src/../lib/*.ts", expected: "src/../lib/*.ts"},
+		{name: "Strip only prefix from combined segments", pattern: "./src/../lib/*.ts", expected: "src/../lib/*.ts"},
+		{name: "Preserve multiple /./", pattern: "src/./utils/./deep/*.ts", expected: "src/./utils/./deep/*.ts"},
+		{name: "Strip exact file ./", pattern: "./src/file.ts", expected: "src/file.ts"},
 		{name: "Plain filename unchanged", pattern: "*.ts", expected: "*.ts"},
 		{name: "Double star unchanged", pattern: "**/*.ts", expected: "**/*.ts"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizePattern(tt.pattern)
+			result := normalizeConfigPattern(tt.pattern)
 			if result != tt.expected {
-				t.Errorf("normalizePattern(%q) = %q, expected %q",
+				t.Errorf("normalizeConfigPattern(%q) = %q, expected %q",
 					tt.pattern, result, tt.expected)
 			}
 		})
@@ -215,13 +218,13 @@ func TestIsFileMatchedDotSlashPrefix(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "Pattern with mid-path /./",
+			name:     "Pattern with mid-path /./ is not path-cleaned",
 			filePath: "src/utils/helper.ts",
 			patterns: []string{"src/./utils/*.ts"},
-			expected: true,
+			expected: false,
 		},
 		{
-			name:     "Pattern with .. segment",
+			name:     "Minimatch level one resolves a literal .. segment",
 			filePath: "lib/component.ts",
 			patterns: []string{"src/../lib/*.ts"},
 			expected: true,
@@ -233,9 +236,21 @@ func TestIsFileMatchedDotSlashPrefix(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "Pattern with combined ./ prefix and .. segment",
+			name:     "Leading ./ and level-one .. optimization compose",
 			filePath: "lib/component.ts",
 			patterns: []string{"./src/../lib/*.ts"},
+			expected: true,
+		},
+		{
+			name:     "Only one leading ./ is adjusted",
+			filePath: "src/component.ts",
+			patterns: []string{"././src/**"},
+			expected: false,
+		},
+		{
+			name:     "Minimatch coalesces repeated slash",
+			filePath: "src/utils/helper.ts",
+			patterns: []string{"src//utils/*.ts"},
 			expected: true,
 		},
 		{
@@ -273,6 +288,11 @@ func TestIsFileMatchedDotSlashPrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	matcher := NewFileSelectorMatcher(RslintConfig{{Files: patterns}}, cwd)
+	return matcher.entryMatches(0, filePath)
 }
 
 func TestDoublestarBehavior(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/hostfs"
 )
 
 type OverlayVFS struct {
@@ -188,7 +189,7 @@ func NewOverlayVFSForFile(filePath string, source string) vfs.FS {
 	virtualFiles := make(map[string]string, 1)
 	virtualFiles[filePath] = source
 	return &OverlayVFS{
-		bundled.WrapFS(osvfs.FS()),
+		bundled.WrapFS(hostfs.NativeOS(osvfs.FS())),
 		virtualFiles,
 	}
 }

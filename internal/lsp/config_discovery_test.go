@@ -13,7 +13,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -23,6 +22,50 @@ import (
 type configRefreshTestResult struct {
 	response configRefreshResponse
 	err      error
+}
+
+// snapshotConfigModuleLoader lets snapshot tests obtain the same evaluator-
+// bearing catalog that production receives from discovery.Build. Constructing
+// ConfigCatalog literals would bypass the live ConfigArray instance whose
+// identity the LSP is required to retain.
+type snapshotConfigModuleLoader struct {
+	configs map[string]config.RslintConfig
+}
+
+func (loader *snapshotConfigModuleLoader) LoadConfigs(
+	_ context.Context,
+	request discovery.ConfigLoadBatchRequest,
+) (discovery.ConfigLoadBatchResponse, error) {
+	response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+	for _, candidate := range request.Candidates {
+		response.Results = append(response.Results, discovery.ConfigLoadResult{
+			ID:      candidate.ID,
+			Status:  "loaded",
+			Entries: loader.configs[config.NormalizeHostPath(candidate.ConfigDirectory)],
+		})
+	}
+	return response, nil
+}
+
+func (*snapshotConfigModuleLoader) EvaluateConfigPredicates(
+	_ context.Context,
+	request discovery.ConfigPredicateBatchRequest,
+) (discovery.ConfigPredicateBatchResponse, error) {
+	response := discovery.ConfigPredicateBatchResponse{TransactionID: request.TransactionID}
+	for _, call := range request.Calls {
+		response.Results = append(response.Results, discovery.ConfigPredicateResult{
+			CallID: call.CallID,
+			Status: "evaluated",
+		})
+	}
+	return response, nil
+}
+
+func (*snapshotConfigModuleLoader) ActivateConfigs(
+	_ context.Context,
+	request discovery.ConfigActivationRequest,
+) (discovery.ConfigActivationResponse, error) {
+	return discovery.ConfigActivationResponse{TransactionID: request.TransactionID}, nil
 }
 
 func configRuleValue(entries config.RslintConfig, name string) (any, bool) {
@@ -45,24 +88,6 @@ func hasPublicConfigContent(entries config.RslintConfig) bool {
 	return false
 }
 
-type configBoundaryIdentityFS struct {
-	vfs.FS
-	caseSensitive bool
-	realPaths     map[string]string
-}
-
-func (fs *configBoundaryIdentityFS) UseCaseSensitiveFileNames() bool {
-	return fs.caseSensitive
-}
-
-func (fs *configBoundaryIdentityFS) Realpath(filePath string) string {
-	filePath = tspath.NormalizePath(filePath)
-	if realPath := fs.realPaths[filePath]; realPath != "" {
-		return realPath
-	}
-	return filePath
-}
-
 func newConfigRefreshTestServer(t *testing.T) (*Server, <-chan *lsproto.Message, string) {
 	t.Helper()
 	root := tspath.NormalizePath(t.TempDir())
@@ -74,11 +99,18 @@ func newConfigRefreshTestServer(t *testing.T) (*Server, <-chan *lsproto.Message,
 }
 
 func startConfigRefreshForTest(s *Server, reason string) <-chan configRefreshTestResult {
+	return startConfigRefreshForTestWithContext(context.Background(), s, reason)
+}
+
+func startConfigRefreshForTestWithContext(
+	ctx context.Context,
+	s *Server,
+	reason string,
+) <-chan configRefreshTestResult {
 	result := make(chan configRefreshTestResult, 1)
 	go func() {
-		response, err := s.handleConfigRefresh(context.Background(), map[string]any{
-			"protocolVersion": discovery.ConfigDiscoveryProtocolVersion,
-			"reason":          reason,
+		response, err := s.handleConfigRefresh(ctx, map[string]any{
+			"reason": reason,
 		})
 		result <- configRefreshTestResult{response: response, err: err}
 	}()
@@ -254,6 +286,14 @@ func writeConfigCandidate(t *testing.T, root string) {
 func installLastGoodConfig(s *Server, root string) {
 	entries := config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
+	s.jsConfigEvaluators = map[string]*config.ConfigEvaluator{
+		root: config.NewConfigEvaluatorWithGitignore(
+			discoveredJSConfigForTest(entries),
+			root,
+			s.fs,
+			nil,
+		),
+	}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
@@ -322,6 +362,241 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	}
 }
 
+func TestCommittedConfigRefreshKeepsLivePredicateSessionForLaterFiles(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+
+	refreshCtx, cancelRefresh := context.WithCancel(context.Background())
+	refresh := startConfigRefreshForTestWithContext(refreshCtx, s, "initial")
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, ok := loadMessage.Params.(discovery.ConfigLoadBatchRequest)
+	if !ok || len(loadRequest.Candidates) != 1 {
+		t.Fatalf("loadConfigs params = %#v", loadMessage.Params)
+	}
+	// Respond in the actual JSON wire shape so ConfigLoadResult's trusted
+	// decoder, rather than an in-process ConfigEntry copy, creates the opaque
+	// live-predicate descriptor.
+	loadResponse := map[string]any{
+		"transactionId": loadRequest.TransactionID,
+		"results": []any{map[string]any{
+			"id":     loadRequest.Candidates[0].ID,
+			"status": "loaded",
+			"entries": []any{map[string]any{
+				"files": []any{map[string]any{"$rslintPredicate": "selector-1"}},
+				"rules": map[string]any{"no-debugger": "error"},
+			}},
+		}},
+	}
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	if completed := awaitConfigRefreshResult(t, refresh); completed.err != nil {
+		t.Fatalf("configRefresh failed: %v", completed.err)
+	}
+	// Production dispatch cancels the request context immediately after sending
+	// the configRefresh response. The committed evaluator/session must not inherit
+	// that short-lived cancellation boundary.
+	cancelRefresh()
+	t.Cleanup(func() {
+		if s.activeConfigCatalog != nil {
+			s.activeConfigCatalog.ClosePredicateEvaluation()
+		}
+	})
+
+	type selectionResult struct {
+		selection lspLintConfigSelection
+		err       error
+	}
+	resolve := func(filePath string, predicateValue bool) lspLintConfigSelection {
+		t.Helper()
+		result := make(chan selectionResult, 1)
+		go func() {
+			selection, resolveErr := s.resolveLintConfigForURI(
+				context.Background(),
+				documentURIFromPath(filePath),
+			)
+			result <- selectionResult{selection: selection, err: resolveErr}
+		}()
+
+		var predicateMessage *lsproto.RequestMessage
+		select {
+		case message := <-outgoing:
+			predicateMessage = message.AsRequest()
+			if predicateMessage.Method != methodEvaluateConfigPredicates {
+				t.Fatalf("reverse request method = %q, want %q", predicateMessage.Method, methodEvaluateConfigPredicates)
+			}
+		case resolved := <-result:
+			t.Fatalf("selection completed without predicate request: selection=%+v err=%v", resolved.selection, resolved.err)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for predicate request for %q", filePath)
+		}
+		predicateRequest, ok := predicateMessage.Params.(discovery.ConfigPredicateBatchRequest)
+		if !ok {
+			t.Fatalf("evaluateConfigPredicates params type = %T", predicateMessage.Params)
+		}
+		if predicateRequest.TransactionID != loadRequest.TransactionID || len(predicateRequest.Calls) != 1 {
+			t.Fatalf("predicate request = %+v", predicateRequest)
+		}
+		call := predicateRequest.Calls[0]
+		if call.PredicateID != "selector-1" || call.AbsolutePath != tspath.NormalizePath(filePath) || call.Directory {
+			t.Fatalf("predicate call = %+v", call)
+		}
+		respondToConfigReverseRequest(t, s, predicateMessage, discovery.ConfigPredicateBatchResponse{
+			TransactionID: predicateRequest.TransactionID,
+			Results: []discovery.ConfigPredicateResult{{
+				CallID: call.CallID,
+				Status: "evaluated",
+				Value:  predicateValue,
+			}},
+		}, nil)
+		resolved := <-result
+		if resolved.err != nil {
+			t.Fatalf("resolveLintConfigForURI: %v", resolved.err)
+		}
+		return resolved.selection
+	}
+
+	keepPath := tspath.NormalizePath(filepath.Join(root, "keep.ts"))
+	keep := resolve(keepPath, true)
+	if keep.merged == nil {
+		t.Fatal("keep selection is unconfigured")
+	}
+	keepRule := keep.merged.Rules["no-debugger"]
+	if keepRule == nil || keepRule.GetLevel() != "error" {
+		t.Fatalf("keep selection = %+v", keep.merged)
+	}
+	// ConfigArray's exact-path cache must serve every later native/plugin/fix
+	// consumer without another reverse predicate call.
+	keepAgain, err := s.resolveLintConfigForURI(context.Background(), documentURIFromPath(keepPath))
+	if err != nil || keepAgain.merged != keep.merged {
+		t.Fatalf("cached keep selection = %+v, err=%v", keepAgain.merged, err)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("cached selection triggered reverse request %q", message.AsRequest().Method)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	dropPath := tspath.NormalizePath(filepath.Join(root, "drop.ts"))
+	drop := resolve(dropPath, false)
+	if drop.merged == nil {
+		t.Fatal("drop selection lost the default script configuration")
+	}
+	if rule := drop.merged.Rules["no-debugger"]; rule != nil {
+		t.Fatalf("drop selection retained predicate rule: %+v", rule)
+	}
+}
+
+func TestHandleDidOpenRefreshesExactHiddenConfigOncePerDirectory(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	hidden := tspath.NormalizePath(filepath.Join(root, "hidden", "app"))
+	if err := os.MkdirAll(hidden, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeConfigCandidate(t, hidden)
+
+	installLastGoodConfig(s, root)
+	s.jsConfigs[root] = config.RslintConfig{
+		{Ignores: []string{"hidden/**"}},
+		{Rules: config.Rules{"no-console": "error"}},
+	}
+	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.configDiscoveryActive = true
+	s.configDiscoveryLookupDirs = make(map[string]struct{})
+
+	documentPath := tspath.NormalizePath(filepath.Join(hidden, "virtual.ts"))
+	didOpenDone := make(chan error, 1)
+	go func() {
+		didOpenDone <- s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+			TextDocument: &lsproto.TextDocumentItem{
+				Uri:        documentURIFromPath(documentPath),
+				LanguageId: "typescript",
+				Version:    1,
+				Text:       "debugger;\n",
+			},
+		})
+	}()
+
+	committed := false
+	for !committed {
+		select {
+		case message := <-outgoing:
+			request := message.AsRequest()
+			switch request.Method {
+			case methodLoadConfigs:
+				loadRequest, ok := request.Params.(discovery.ConfigLoadBatchRequest)
+				if !ok {
+					t.Fatalf("loadConfigs params type = %T", request.Params)
+				}
+				results := make([]discovery.ConfigLoadResult, len(loadRequest.Candidates))
+				for index, candidate := range loadRequest.Candidates {
+					entries := config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+					if candidate.ConfigDirectory == hidden {
+						entries = config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+					}
+					results[index] = discovery.ConfigLoadResult{
+						ID:      candidate.ID,
+						Status:  "loaded",
+						Entries: entries,
+					}
+				}
+				respondToConfigReverseRequest(t, s, request, discovery.ConfigLoadBatchResponse{
+					TransactionID: loadRequest.TransactionID,
+					Results:       results,
+				}, nil)
+			case methodActivateConfigs:
+				_, response := activationResponseForRequest(t, request, true)
+				respondToConfigReverseRequest(t, s, request, response, nil)
+			case methodCommitConfigs:
+				respondToConfigReverseRequest(t, s, request, commitResponseForRequest(t, request, true), nil)
+				committed = true
+			default:
+				t.Fatalf("unexpected reverse request %q", request.Method)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for didOpen config refresh")
+		}
+	}
+	if err := <-didOpenDone; err != nil {
+		t.Fatalf("handleDidOpen: %v", err)
+	}
+
+	owner, entries := s.jsConfigOwnerResolver.Resolve(documentPath)
+	if owner != hidden {
+		t.Fatalf("owner = %q, want hidden exact config %q", owner, hidden)
+	}
+	if value, found := configRuleValue(entries, "no-debugger"); !found || value != "error" {
+		t.Fatalf("hidden config was not committed: %+v", entries)
+	}
+	directoryID := lspLexicalPathID(hidden, s.fs.UseCaseSensitiveFileNames())
+	if _, lookedUp := s.configDiscoveryLookupDirs[directoryID]; !lookedUp {
+		t.Fatalf("open-document directory %q was not coalesced", hidden)
+	}
+
+	secondPath := tspath.NormalizePath(filepath.Join(hidden, "second.ts"))
+	if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+		TextDocument: &lsproto.TextDocumentItem{
+			Uri:        documentURIFromPath(secondPath),
+			LanguageId: "typescript",
+			Version:    1,
+			Text:       "console.log(1);\n",
+		},
+	}); err != nil {
+		t.Fatalf("second handleDidOpen: %v", err)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("second open in the same directory triggered %q", message.AsRequest().Method)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
@@ -341,36 +616,81 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	if err := os.WriteFile(filepath.Join(child, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeConfigCandidate := func(directory string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(directory, "rslint.config.mjs"), []byte("export default [];\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeConfigCandidate(root)
+	writeConfigCandidate(child)
 
 	fsys := bundled.WrapFS(osvfs.FS())
-	catalog := &discovery.ConfigCatalog{
-		TransactionID: "snapshot-boundaries",
-		Configs: map[string]config.RslintConfig{
+	catalog, err := discovery.Build(
+		context.Background(),
+		fsys,
+		&snapshotConfigModuleLoader{configs: map[string]config.RslintConfig{
 			root:  {{Rules: config.Rules{"no-console": "error"}}},
 			child: {{Rules: config.Rules{"no-debugger": "error"}}},
+		}},
+		discovery.ConfigDiscoveryRequest{
+			CWD:                     root,
+			Mode:                    discovery.ConfigDiscoveryAuto,
+			LookupPaths:             []string{rootTarget, childTarget},
+			RetainUnconfiguredAreas: true,
+			AllowMissingConfig:      true,
 		},
+	)
+	if err != nil {
+		t.Fatalf("build evaluator-bearing catalog: %v", err)
 	}
+	defer catalog.ClosePredicateEvaluation()
 	s := newTestServer()
 	s.cwd = root
-	snapshot, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	snapshot, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !snapshot.configs[root].IsFileIgnored(rootTarget, root) {
-		t.Fatal("root config did not collect its own .gitignore")
+	assertIgnoredByOwner := func(filePath string, wantOwner string) {
+		t.Helper()
+		resolvedDir, _ := snapshot.ownerResolver.Resolve(filePath)
+		if resolvedDir != wantOwner {
+			t.Fatalf("owner for %q = %q, want %q", filePath, resolvedDir, wantOwner)
+		}
+		evaluator := snapshot.evaluators[resolvedDir]
+		if evaluator == nil {
+			t.Fatalf("owner %q has no evaluator", resolvedDir)
+		}
+		resolution, err := evaluator.GetConfigForFile(context.Background(), filePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resolution.Status != config.ConfigFileIgnored {
+			t.Fatalf("resolution for %q = %q, want ignored", filePath, resolution.Status)
+		}
 	}
-	resolvedDir, resolvedConfig := snapshot.ownerResolver.Resolve(rootTarget)
-	if resolvedDir != root || !resolvedConfig.IsFileIgnored(rootTarget, root) {
-		t.Fatalf("committed owner resolver returned stale config: dir=%q config=%+v", resolvedDir, resolvedConfig)
-	}
-	if snapshot.configs[root].IsFileIgnored(childTarget, root) {
-		t.Fatal("root config crossed the child config's .gitignore source boundary")
-	}
-	if !snapshot.configs[child].IsFileIgnored(childTarget, child) {
-		t.Fatal("child config did not collect its own .gitignore")
-	}
+	assertIgnoredByOwner(rootTarget, root)
+	assertIgnoredByOwner(childTarget, child)
 	if snapshot.jsonConfig.IsFileIgnored(childTarget, root) {
 		t.Fatal("JSON fallback crossed the child JS config's .gitignore source boundary")
+	}
+}
+
+func TestPrepareDiscoveredConfigSnapshotRejectsCatalogWithoutEvaluator(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	s := newTestServer()
+	s.cwd = root
+	_, err := s.prepareDiscoveredConfigSnapshot(
+		bundled.WrapFS(osvfs.FS()),
+		&discovery.ConfigCatalog{
+			Configs: map[string]config.RslintConfig{
+				root: {{Rules: config.Rules{"no-console": "error"}}},
+			},
+		},
+		nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "has no committed evaluator") {
+		t.Fatalf("error = %v, want missing evaluator invariant failure", err)
 	}
 }
 
@@ -571,91 +891,6 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 	}
 }
 
-func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild(t *testing.T) {
-	config.RegisterAllRules()
-	s, outgoing, root := newConfigRefreshTestServer(t)
-	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
-	if err := os.MkdirAll(nested, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeConfigCandidate(t, root)
-	writeConfigCandidate(t, nested)
-	if err := os.WriteFile(
-		filepath.Join(root, "rslint.json"),
-		[]byte(`[{"rules":{"no-console":"error"}}]`),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	result := startConfigRefreshForTest(s, "initial")
-	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	_, rootResponse := failedConfigResponse(t, rootLoad, "broken root module")
-	respondToConfigReverseRequest(t, s, rootLoad, rootResponse, nil)
-
-	nestedLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	nestedRequest, nestedResponse := loadedConfigResponse(t, nestedLoad, config.RslintConfig{{
-		Rules: config.Rules{"no-debugger": "error"},
-	}})
-	respondToConfigReverseRequest(t, s, nestedLoad, nestedResponse, nil)
-
-	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
-	activationRequest, activationResponse := activationResponseForRequest(t, activationMessage, true)
-	if len(activationRequest.EffectiveConfigIDs) != 1 ||
-		activationRequest.EffectiveConfigIDs[0] != nestedRequest.Candidates[0].ID {
-		t.Fatalf("partial activation IDs = %v, want nested config only", activationRequest.EffectiveConfigIDs)
-	}
-	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
-	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
-	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
-
-	completed := awaitConfigRefreshResult(t, result)
-	if completed.err != nil {
-		t.Fatalf("partial initial configRefresh failed: %v", completed.err)
-	}
-	if !s.configDiscoveryHasLastGood {
-		t.Fatalf("partial recovery did not establish last-good: response %+v", completed.response)
-	}
-	rootEntries, exists := s.jsConfigs[root]
-	if !exists || hasPublicConfigContent(rootEntries) {
-		t.Fatalf("broken root boundary = %+v, want empty JS config", rootEntries)
-	}
-	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable {
-		t.Fatal("broken root was not committed as an unavailable boundary")
-	}
-	outsideNested := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
-	if !s.isUnavailableConfigForURI(outsideNested) {
-		t.Fatal("broken root did not suppress lint outside the usable child")
-	}
-	entries, _, isJS := s.getConfigForURI(outsideNested)
-	if !isJS || hasPublicConfigContent(entries) {
-		t.Fatalf("broken root fell through to JSON: entries=%+v isJS=%t", entries, isJS)
-	}
-	nestedFile := documentURIFromPath(filepath.Join(nested, "src", "index.ts"))
-	if s.isUnavailableConfigForURI(nestedFile) {
-		t.Fatal("usable child inherited its parent's unavailable state")
-	}
-	entries, configDir, isJS := s.getConfigForURI(nestedFile)
-	value, found := configRuleValue(entries, "no-debugger")
-	if !isJS || configDir != nested || !found || value != "error" {
-		t.Fatalf("usable child config = %+v, dir=%q, isJS=%t", entries, configDir, isJS)
-	}
-
-	// The synthetic parent is a retryable tombstone, not last-good data. A
-	// later failure at that same path must not reject a transaction that could
-	// discover or update usable descendants. The real child remains protected.
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &discovery.ConfigCatalog{
-		Failures: []discovery.ConfigFailure{{Directory: root, Message: "still broken"}},
-	}); invalidates {
-		t.Fatalf("unavailable tombstone invalidated refresh: %+v", failure)
-	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(s.fs, &discovery.ConfigCatalog{
-		Failures: []discovery.ConfigFailure{{Directory: nested, Message: "child broke"}},
-	}); !invalidates || failure.Directory != nested {
-		t.Fatalf("usable child failure = %+v, invalidates=%t", failure, invalidates)
-	}
-}
-
 func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 	parent := t.TempDir()
 	realRoot := tspath.NormalizePath(filepath.Join(parent, "real"))
@@ -673,57 +908,17 @@ func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	fsy := bundled.WrapFS(osvfs.FS())
-	catalog := &discovery.ConfigCatalog{
-		Configs: map[string]config.RslintConfig{
-			realRoot: {{}},
-		},
-		Failures: []discovery.ConfigFailure{{Directory: aliasRoot}},
-	}
-	resolver := config.NewConfigOwnerResolver(catalog.Configs, fsy)
+	configs := map[string]config.RslintConfig{realRoot: {{}}}
+	resolver := config.NewConfigOwnerResolver(configs, fsy)
 	if owner, _ := resolver.Resolve(filepath.Join(aliasRoot, "src", "index.ts")); owner != realRoot {
 		t.Fatalf("test precondition: canonical resolver owner = %q, want %q", owner, realRoot)
 	}
-	boundaries := unavailableConfigBoundaryDirectories(fsy, catalog)
+	boundaries := unavailableConfigBoundaryDirectories(
+		fsy,
+		[]discovery.ConfigFailure{{Directory: aliasRoot}},
+	)
 	if len(boundaries) != 1 || boundaries[0] != aliasRoot {
 		t.Fatalf("symlink failure boundaries = %v, want lexical alias %q", boundaries, aliasRoot)
-	}
-}
-
-func TestFailureAtCommittedConfigBoundaryUsesLexicalIdentity(t *testing.T) {
-	fsy := &configBoundaryIdentityFS{
-		FS:            bundled.WrapFS(osvfs.FS()),
-		caseSensitive: true,
-		realPaths: map[string]string{
-			"/repo/a": "/shared",
-			"/repo/b": "/shared",
-		},
-	}
-	s := newTestServer()
-	s.fs = fsy
-	s.jsConfigs = map[string]config.RslintConfig{
-		"/repo/a": {{}},
-	}
-	s.jsUnavailableConfigs = make(map[string]struct{})
-
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
-		Failures: []discovery.ConfigFailure{{Directory: "/repo/b"}},
-	}); invalidates {
-		t.Fatalf("physical-only alias invalidated lexical last-good: %+v", failure)
-	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
-		Failures: []discovery.ConfigFailure{{Directory: "/repo/a"}},
-	}); !invalidates || failure.Directory != "/repo/a" {
-		t.Fatalf("same lexical boundary = %+v, invalidates=%t", failure, invalidates)
-	}
-
-	fsy.caseSensitive = false
-	s.jsConfigs = map[string]config.RslintConfig{
-		"C:/Repo/App": {{}},
-	}
-	if failure, invalidates := s.failureAtCommittedConfigBoundary(fsy, &discovery.ConfigCatalog{
-		Failures: []discovery.ConfigFailure{{Directory: "c:/repo/app"}},
-	}); !invalidates || failure.Directory != "c:/repo/app" {
-		t.Fatalf("native case alias = %+v, invalidates=%t", failure, invalidates)
 	}
 }
 
@@ -780,28 +975,108 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	_, nestedResponse := failedConfigResponse(t, nestedLoad, "nested reload failure")
 	respondToConfigReverseRequest(t, s, nestedLoad, nestedResponse, nil)
 
-	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
-	activationRequest, activationResponse := activationResponseForRequest(t, activationMessage, true)
-	if len(activationRequest.EffectiveConfigIDs) != 1 {
-		t.Fatalf("partial activation IDs = %v, want root only", activationRequest.EffectiveConfigIDs)
-	}
-	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
-
 	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
 	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
 
 	completed := awaitConfigRefreshResult(t, result)
-	if completed.err == nil || !strings.Contains(completed.err.Error(), "last-good boundary") {
-		t.Fatalf("partial refresh error = %v, want last-good boundary failure", completed.err)
+	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
+		t.Fatalf("partial refresh error = %v, want strict nearest-config failure", completed.err)
 	}
-	if s.eslintPluginConfigGeneration != "last-good" ||
-		s.jsConfigs[root][0].Rules["no-console"] != "error" ||
-		s.jsConfigs[nested][0].Rules["old-nested"] != "error" {
+	rootValue, rootOK := configRuleValue(s.jsConfigs[root], "no-console")
+	nestedValue, nestedOK := configRuleValue(s.jsConfigs[nested], "old-nested")
+	if s.eslintPluginConfigGeneration != "last-good" || !rootOK || rootValue != "error" || !nestedOK || nestedValue != "error" {
 		t.Fatalf("partial boundary failure replaced last-good state: %+v", s.jsConfigs)
 	}
 }
 
-func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
+func TestHandleConfigRefreshKnownUnavailableSiblingAllowsReplacement(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	broken := tspath.NormalizePath(filepath.Join(root, "packages", "broken"))
+	if err := os.MkdirAll(broken, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeConfigCandidate(t, root)
+	writeConfigCandidate(t, broken)
+	installLastGoodConfig(s, root)
+	s.jsConfigs[broken] = config.RslintConfig{}
+	s.jsUnavailableConfigs[broken] = struct{}{}
+	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.tsConfigPathsByConfig[broken] = nil
+
+	result := startConfigRefreshForTest(s, "config-change")
+	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, rootResponse := loadedConfigResponse(t, rootLoad, config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	respondToConfigReverseRequest(t, s, rootLoad, rootResponse, nil)
+
+	brokenLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, brokenResponse := failedConfigResponse(t, brokenLoad, "known broken sibling")
+	respondToConfigReverseRequest(t, s, brokenLoad, brokenResponse, nil)
+
+	activation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activation, true)
+	respondToConfigReverseRequest(t, s, activation, activationResponse, nil)
+	commit := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commit, commitResponseForRequest(t, commit, true), nil)
+
+	completed := awaitConfigRefreshResult(t, result)
+	if completed.err != nil {
+		t.Fatalf("known unavailable sibling blocked replacement: %v", completed.err)
+	}
+	if value, ok := configRuleValue(s.jsConfigs[root], "no-debugger"); !ok || value != "error" {
+		t.Fatalf("updated root was not committed: %+v", s.jsConfigs[root])
+	}
+	if _, unavailable := s.jsUnavailableConfigs[broken]; !unavailable {
+		t.Fatalf("known broken sibling lost unavailable boundary: %+v", s.jsUnavailableConfigs)
+	}
+	if !s.configDiscoveryHasLastGood {
+		t.Fatal("partial replacement lost its usable last-good state")
+	}
+}
+
+func TestConfigFailuresCoveredByCommittedUnavailableUsesPhysicalAlias(t *testing.T) {
+	root := t.TempDir()
+	realRoot := filepath.Join(root, "real-workspace")
+	aliasRoot := filepath.Join(root, "alias-workspace")
+	realBroken := filepath.Join(realRoot, "packages", "broken")
+	if err := os.MkdirAll(realBroken, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	baseFS := bundled.WrapFS(osvfs.FS())
+	canonicalRealRoot := baseFS.Realpath(tspath.NormalizePath(realRoot))
+	fsys := &realpathAliasLSPTestFS{
+		FS:        baseFS,
+		aliasRoot: aliasRoot,
+		realRoot:  canonicalRealRoot,
+	}
+	canonicalBroken := tspath.NormalizePath(filepath.Join(canonicalRealRoot, "packages", "broken"))
+	aliasBroken := tspath.NormalizePath(filepath.Join(aliasRoot, "packages", "broken"))
+	failures := []discovery.ConfigFailure{{Directory: aliasBroken}}
+
+	if !configFailuresCoveredByCommittedUnavailable(
+		fsys,
+		failures,
+		map[string]config.RslintConfig{canonicalBroken: {}},
+		map[string]struct{}{canonicalBroken: {}},
+	) {
+		t.Fatal("physical alias of a committed unavailable boundary was rejected")
+	}
+	if configFailuresCoveredByCommittedUnavailable(
+		fsys,
+		failures,
+		map[string]config.RslintConfig{
+			canonicalRealRoot: {},
+			canonicalBroken:   {{Rules: config.Rules{"no-debugger": "error"}}},
+		},
+		map[string]struct{}{canonicalRealRoot: {}},
+	) {
+		t.Fatal("physical alias of an active child inside an unavailable parent was accepted")
+	}
+}
+
+func TestHandleConfigRefreshNewFailedBoundaryIsFatal(t *testing.T) {
 	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
@@ -821,18 +1096,15 @@ func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
 	nestedLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	_, nestedResponse := failedConfigResponse(t, nestedLoad, "new nested config is broken")
 	respondToConfigReverseRequest(t, s, nestedLoad, nestedResponse, nil)
-	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
-	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
-	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
-	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
-	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
+	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
 
 	completed := awaitConfigRefreshResult(t, result)
-	if completed.err != nil {
-		t.Fatalf("new failed child should use core parent fallback: %v", completed.err)
+	if !errors.Is(completed.err, discovery.ErrAllConfigsFailed) {
+		t.Fatalf("new failed child error = %v, want strict nearest-config failure", completed.err)
 	}
-	if len(s.jsConfigs) != 1 || s.jsConfigs[root][0].Rules["new-root"] != "error" {
-		t.Fatalf("parent fallback catalog = %+v", s.jsConfigs)
+	if value, ok := configRuleValue(s.jsConfigs[root], "no-console"); len(s.jsConfigs) != 1 || !ok || value != "error" {
+		t.Fatalf("failed child replaced last-good catalog = %+v", s.jsConfigs)
 	}
 	owner, ok := s.nearestJSConfigKey(documentURIFromPath(filepath.Join(nested, "src", "index.ts")))
 	if !ok || owner != root {
@@ -973,8 +1245,11 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 
 	targetURI := documentURIFromPath(target)
 	isIgnored := func() bool {
-		effective, cwd, _ := s.getLintConfigForURI(targetURI)
-		return effective.IsFileIgnored(target, cwd)
+		selection, err := s.resolveLintConfigForURI(context.Background(), targetURI)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return selection.merged == nil
 	}
 	if !isIgnored() {
 		t.Fatal("target behind the committed .gitignore would produce diagnostics")
@@ -1141,23 +1416,5 @@ func TestConfigRefreshProtocolRegistration(t *testing.T) {
 	}
 	if handlers()[lsproto.Method("rslint/configCapabilities")] != nil {
 		t.Fatal("deprecated rslint/configCapabilities handler is still registered")
-	}
-}
-
-func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) {
-	s := newTestServer()
-	s.eslintPluginConfigGeneration = "last-good"
-	_, err := s.handleConfigRefresh(context.Background(), map[string]any{
-		"protocolVersion": discovery.ConfigDiscoveryProtocolVersion + 1,
-		"reason":          "initial",
-	})
-	if err == nil || !strings.Contains(err.Error(), "unsupported config refresh protocol") {
-		t.Fatalf("configRefresh error = %v", err)
-	}
-	if s.eslintPluginConfigGeneration != "last-good" {
-		t.Fatal("invalid protocol mutated committed generation")
-	}
-	if s.configDiscoveryActive {
-		t.Fatal("invalid protocol enabled reverse watcher transactions")
 	}
 }

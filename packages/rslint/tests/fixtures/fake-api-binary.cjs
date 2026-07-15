@@ -5,6 +5,8 @@
 //   - crash     → process.exit(42)            (simulate an unexpected crash)
 //   - exit      → response {} then exit 0      (normal close)
 //   - reverse   → pluginLint request, then echo the Node response/error
+//   - orphanReverse → pluginLint request + immediate outer response (the
+//                     reverse result is deliberately no longer awaited)
 //   - anything else (e.g. lint) → no reply     (stays in-flight, so the test
 //     can kill/terminate while a request is pending)
 // Lets the reject-all-pending logic be exercised without the real Go binary.
@@ -25,7 +27,7 @@ function onMessage(msg) {
       kind: 'response',
       id: msg.id,
       data: {
-        version: '2.0.0',
+        version: '3.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       },
@@ -42,6 +44,16 @@ function onMessage(msg) {
       id: msg.id,
       data: { files: [{ path: 'probe.ts' }], rules: {} },
     });
+  } else if (msg.kind === 'orphanReverse') {
+    // Go may abandon a non-cancellable JavaScript config import after a sibling
+    // discovery branch fails. Model that ordering exactly: issue the reverse
+    // request, then settle the outer lint without waiting for its response.
+    send({
+      kind: 'loadConfigs',
+      id: msg.id,
+      data: { transactionId: 'orphaned-config-load' },
+    });
+    send({ kind: 'response', id: msg.id, data: {} });
   } else if (
     reverseRequests.has(msg.id) &&
     (msg.kind === 'response' || msg.kind === 'error')

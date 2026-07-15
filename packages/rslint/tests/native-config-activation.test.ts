@@ -7,10 +7,7 @@ import {
   PluginHostLifecycle,
   stageNativeConfigActivation,
 } from '../src/api/rslint.js';
-import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
-  ConfigModuleHost,
-} from '../src/config/config-loader.js';
+import { ConfigModuleHost } from '../src/config/config-loader.js';
 
 describe('native API config activation', () => {
   test('shuts down a newly created plugin host when its config changes during creation', async () => {
@@ -27,7 +24,6 @@ describe('native API config activation', () => {
       ],
     });
     const request = {
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'api-prepare-race',
       effectiveConfigIds: ['root'],
     } as const;
@@ -36,7 +32,6 @@ describe('native API config activation', () => {
 
     try {
       await configHost.loadConfigs({
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
         transactionId: request.transactionId,
         loadMode: 'cached',
         candidates: [
@@ -105,7 +100,6 @@ describe('native API config activation', () => {
       },
     });
     const request = {
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'api-staged-close',
       effectiveConfigIds: ['root'],
     } as const;
@@ -115,7 +109,6 @@ describe('native API config activation', () => {
 
     try {
       await configHost.loadConfigs({
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
         transactionId: request.transactionId,
         loadMode: 'cached',
         candidates: [

@@ -3,8 +3,8 @@ package config
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/config/minimatch"
 )
 
 // GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
@@ -12,136 +12,319 @@ import (
 // paths plus an optional canonical fallback; matcher internals stay private so
 // both discovery flows cannot accidentally diverge on ignore semantics.
 type GlobalIgnoreMatcher struct {
-	configDir string
-	fs        vfs.FS
-	patterns  []IgnorePattern
+	fs     vfs.FS
+	layers []configIgnoreLayer
+}
+
+// configIgnoreLayer preserves the ConfigArray order and path root of one
+// global-ignore entry. basePath is resolved once from the config directory;
+// patterns never need to be reparsed while walking or resolving files.
+type configIgnoreLayer struct {
+	basePath          string
+	canonicalBasePath string
+	patterns          []IgnorePattern
+	matchers          []compiledIgnoreMatcher
+}
+
+type compiledIgnoreMatcher struct {
+	pattern     *IgnorePattern
+	predicateID string
+}
+
+// WithDefaultGlobalIgnores installs the product-level default ignore entry in
+// the same ordered config array as authored ignores. Later negations can reopen
+// it exactly like ESLint's defaultConfig, including root-only .git/ and
+// any-depth node_modules/ behavior.
+func WithDefaultGlobalIgnores(config RslintConfig) RslintConfig {
+	for _, entry := range config {
+		if entry.defaultIgnores {
+			return config
+		}
+	}
+	effective := make(RslintConfig, 0, len(config)+1)
+	effective = append(effective, ConfigEntry{
+		Name:           "rslint/default-ignores",
+		Ignores:        []string{"**/node_modules/", ".git/"},
+		defaultIgnores: true,
+	})
+	effective = append(effective, config...)
+	return effective
 }
 
 func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) GlobalIgnoreMatcher {
 	return GlobalIgnoreMatcher{
-		configDir: tspath.NormalizePath(configDir),
-		fs:        fsys,
-		patterns:  extractConfigIgnores(config),
+		fs:     fsys,
+		layers: compileConfigIgnoreLayers(config, configDir, fsys),
 	}
 }
 
-// BlocksDirectory reports whether global ignores form an absolute traversal
-// boundary at directory.
+// BlocksDirectory reports whether directory or one of its ancestors is ignored
+// by the ordered global-ignore view.
 func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
-	relative, ok := matcher.relativePath(directory, canonicalDirectory)
-	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
+	return isDirectoryIgnoredByConfigLayers(
+		directory,
+		canonicalDirectory,
+		matcher.layers,
+		matcher.fs,
+	)
 }
 
 // IgnoresPath reports whether global ignores exclude a config candidate.
 func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
-	relative, ok := matcher.relativePath(filePath, canonicalPath)
-	if !ok || len(matcher.patterns) == 0 {
+	return isFileIgnoredByConfigLayers(
+		filePath,
+		canonicalPath,
+		matcher.layers,
+		matcher.fs,
+	)
+}
+
+func compileConfigIgnoreLayers(config RslintConfig, configDir string, fsys vfs.FS) []configIgnoreLayer {
+	layers := make([]configIgnoreLayer, 0, len(config))
+	for _, entry := range config {
+		if !isGlobalIgnoreEntry(entry) {
+			continue
+		}
+		patterns := ParseIgnorePatterns(entry.Ignores)
+		ordered := make([]compiledIgnoreMatcher, 0, len(ignoreMatchers(entry)))
+		if entry.gitignoreSemantics {
+			patterns = parseCollectedGitignorePatterns(entry.Ignores, entry.gitignoreCaseInsensitive)
+			for index := range patterns {
+				ordered = append(ordered, compiledIgnoreMatcher{pattern: &patterns[index]})
+			}
+		} else {
+			patterns = patterns[:0]
+			for _, matcher := range ignoreMatchers(entry) {
+				if matcher.isPredicate() {
+					ordered = append(ordered, compiledIgnoreMatcher{predicateID: matcher.predicateID})
+					continue
+				}
+				pattern := ParseIgnorePattern(matcher.pattern)
+				patterns = append(patterns, pattern)
+				ordered = append(ordered, compiledIgnoreMatcher{pattern: &patterns[len(patterns)-1]})
+			}
+		}
+		if len(ordered) == 0 {
+			continue
+		}
+		basePath := resolveConfigEntryBasePath(configDir, entry.BasePath)
+		canonicalBasePath := ""
+		if fsys != nil && basePath != "" {
+			if realPath := fsys.Realpath(basePath); realPath != "" {
+				canonicalBasePath = NormalizeHostPath(realPath)
+			}
+		}
+		layers = append(layers, configIgnoreLayer{
+			basePath:          basePath,
+			canonicalBasePath: canonicalBasePath,
+			patterns:          patterns,
+			matchers:          ordered,
+		})
+	}
+	return layers
+}
+
+func resolveConfigEntryBasePath(configDir string, entryBasePath string) string {
+	if configDir != "" {
+		configDir = normalizePathForRoot(configDir, configDir)
+	}
+	if entryBasePath != "" {
+		entryBasePath = normalizePathForRoot(configDir, entryBasePath)
+	}
+	if entryBasePath == "." {
+		entryBasePath = ""
+	}
+	if entryBasePath == "" {
+		return configDir
+	}
+	if pathIsAbsoluteForRoot(configDir, entryBasePath) || configDir == "" {
+		return entryBasePath
+	}
+	return normalizePathForRoot(configDir, resolvePathForRoot(configDir, configDir, entryBasePath))
+}
+
+func (layer configIgnoreLayer) relativePath(targetPath string, canonicalPath string, fsys vfs.FS) (string, bool) {
+	targetPath = normalizePathForRoot(layer.basePath, targetPath)
+	if layer.basePath == "" {
+		if targetPath == "" || targetPath == "." {
+			return "", false
+		}
+		return strings.ReplaceAll(targetPath, "\\", "/"), true
+	}
+	caseSensitive := selectorScopeCaseSensitive(layer.basePath)
+	relative, ok := RelativePathWithinConfigRoot(targetPath, layer.basePath, caseSensitive)
+	if !ok && layer.canonicalBasePath != "" {
+		if canonicalPath == "" && fsys != nil {
+			canonicalPath = fsys.Realpath(targetPath)
+		}
+		if canonicalPath != "" {
+			relative, ok = RelativePathWithinConfigRoot(
+				normalizePathForRoot(layer.canonicalBasePath, canonicalPath),
+				layer.canonicalBasePath,
+				selectorScopeCaseSensitive(layer.canonicalBasePath),
+			)
+		}
+	}
+	if !ok || relative == "" || relative == "." {
+		// ConfigArray deliberately skips an ignore entry at its own basePath.
+		return "", false
+	}
+	relative = normalizePathForRoot(layer.basePath, relative)
+	if !pathUsesNativePOSIXSemantics(layer.basePath) {
+		relative = strings.ReplaceAll(relative, "\\", "/")
+	}
+	return strings.TrimPrefix(relative, "./"), true
+}
+
+func isDirectoryIgnoredByConfigLayers(
+	directory string,
+	canonicalDirectory string,
+	layers []configIgnoreLayer,
+	fsys vfs.FS,
+) bool {
+	if len(layers) == 0 {
 		return false
 	}
-	return isDirBlockedByIgnores(relative, matcher.patterns, "") ||
-		isFileIgnored(relative, matcher.patterns, "")
+	directory = NormalizeHostPath(directory)
+	canonicalDirectory = NormalizeHostPath(canonicalDirectory)
+	ancestors := pathAncestors(directory)
+	canonicalAncestors := pathAncestors(canonicalDirectory)
+	for index, ancestor := range ancestors {
+		canonicalAncestor := ""
+		if len(canonicalAncestors) == len(ancestors) {
+			canonicalAncestor = canonicalAncestors[index]
+		}
+		if isDirectoryIgnoredDirectlyByConfigLayers(ancestor, canonicalAncestor, layers, fsys) {
+			return true
+		}
+	}
+	return false
 }
 
-func (matcher GlobalIgnoreMatcher) relativePath(targetPath string, canonicalPath string) (string, bool) {
-	if matcher.configDir == "" {
-		return "", false
+func isDirectoryIgnoredDirectlyByConfigLayers(
+	directory string,
+	canonicalDirectory string,
+	layers []configIgnoreLayer,
+	fsys vfs.FS,
+) bool {
+	ignored := false
+	for _, layer := range layers {
+		relative, within := layer.relativePath(directory, canonicalDirectory, fsys)
+		if !within {
+			continue
+		}
+		for _, pattern := range layer.patterns {
+			if searchDirectoryIgnorePatternMatches(pattern, relative) {
+				ignored = !pattern.Negated
+			}
+		}
 	}
-	caseSensitive := matcher.fs == nil || matcher.fs.UseCaseSensitiveFileNames()
-	relative, ok := RelativePathWithinConfigRoot(targetPath, matcher.configDir, caseSensitive)
-	if !ok && canonicalPath != "" {
-		matchPath, matchConfigDir := ResolveConfigPathSpaceWithCanonical(
-			targetPath,
-			canonicalPath,
-			matcher.configDir,
-			matcher.fs,
-		)
-		relative, ok = RelativePathWithinConfigRoot(matchPath, matchConfigDir, true)
-	}
-	if !ok || relative == "" {
-		return "", false
-	}
-	return strings.ReplaceAll(tspath.NormalizePath(relative), "\\", "/"), true
+	return ignored
 }
 
-// dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.
-// It is derived once at parse time, replacing the per-call suffix-sniffing the
-// pre-refactor linter did via isFileLevelPattern (and isDirPathBlocked, which
-// called it) on every directory check.
-type dirKind uint8
+func searchDirectoryIgnorePatternMatches(pattern IgnorePattern, relativeDirectory string) bool {
+	// ConfigArray checks a directory using a trailing separator. The matcher
+	// also checks the bare spelling to model Minimatch's optional terminal
+	// empty segment exactly.
+	return ignorePatternMatches(pattern, strings.TrimSuffix(relativeDirectory, "/")+"/") ||
+		ignorePatternMatches(pattern, strings.TrimSuffix(relativeDirectory, "/"))
+}
 
-const (
-	// dirNone: the pattern does not authorize any directory-level handling.
-	// Pure file patterns (`*.log`) and single-level patterns (`dir/*`).
-	dirNone dirKind = iota
-	// dirAbsoluteBlock: an ESLint directory-level block (`dir/**`, bare names
-	// like `**/build`). Blocks both the lint decision (GetConfigForFile) and
-	// the walk; `!` negation can NEVER re-include inside it.
-	dirAbsoluteBlock
-	// dirFileLevelCover: a gitignore directory pattern in file-level form
-	// (`dir/**/*`). It covers the whole subtree for WALK pruning, but `!` can
-	// still re-include individual files (so pruning must be negation-aware).
-	dirFileLevelCover
-)
+func isFileIgnoredByConfigLayers(
+	filePath string,
+	canonicalPath string,
+	layers []configIgnoreLayer,
+	fsys vfs.FS,
+) bool {
+	if len(layers) == 0 {
+		return false
+	}
+	canonicalDirectory := ""
+	if canonicalPath != "" {
+		canonicalDirectory = HostDirectoryPath(canonicalPath)
+	}
+	if isDirectoryIgnoredByConfigLayers(
+		HostDirectoryPath(filePath),
+		canonicalDirectory,
+		layers,
+		fsys,
+	) {
+		return true
+	}
+	ignored := false
+	for _, layer := range layers {
+		relative, within := layer.relativePath(filePath, canonicalPath, fsys)
+		if !within {
+			continue
+		}
+		for _, pattern := range layer.patterns {
+			if ignorePatternMatches(pattern, relative) {
+				ignored = !pattern.Negated
+			}
+		}
+	}
+	return ignored
+}
 
-// IgnorePattern is a parsed ignore pattern that carries the structural metadata
-// a raw glob string would otherwise force every consumer to re-derive:
-//   - Negated: the gitignore/ESLint `!` re-include flag.
-//   - Kind: the directory role (see dirKind), classified once here instead of
-//     by suffix inspection at each call site.
-//
-// Glob is the normalized, `!`-stripped matcher fed to doublestar — byte-for-byte
-// the same string the old []string pipeline matched against, so file-level
-// matching (isFileIgnored) is unchanged.
+func pathAncestors(value string) []string {
+	if value == "" || value == "." {
+		return nil
+	}
+	var reversed []string
+	for current := value; current != "" && current != "."; {
+		reversed = append(reversed, current)
+		parent := directoryPathForRoot(value, current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	ancestors := make([]string, len(reversed))
+	for index := range reversed {
+		ancestors[len(reversed)-1-index] = reversed[index]
+	}
+	return ancestors
+}
+
+// IgnorePattern is one precompiled, ordered ConfigArray ignore pattern. Glob is
+// the normalized positive matcher body; Negated records are re-inclusions.
 type IgnorePattern struct {
 	Glob            string
 	Negated         bool
-	Kind            dirKind
 	CaseInsensitive bool
+	gitignore       bool
+	matcher         *minimatch.SearchPattern
 }
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
-// gitignore-converted glob) into the structured form. This is the SINGLE place
-// that derives directory role / negation from the string; downstream code reads
-// fields.
+// gitignore-converted glob) into the structured form.
 //
-// PRINCIPLE: the directory role (Kind) is classified from the suffix of the RAW
-// body (after stripping `!`); Glob is separately normalized as the matcher. Kind
-// keys on the raw body — never the normalized Glob — because that is what the
-// pre-refactor isFileLevelPattern sniffed; classifying the normalized form would
-// drift for any pattern whose suffix class changes under normalization. Suffix
-// → role (empty raw body → none):
-//
-//	`X/**/*`              → fileLevelCover (gitignore dir, prunable, `!`-aware)
-//	`X/*` (not `X/**`)    → none           (single level, not subtree coverage)
-//	`X/**`, bare, `*.log` → absoluteBlock   (ESLint dir-level, `!`-proof)
-//
-// Two normalize-sensitive cases fall out of "classify the raw suffix", both
-// required for byte-equivalence with the pre-refactor linter:
-//   - `./*` (Glob normalizes to bare `*`): raw ends `/*` → none. Classifying the
-//     Glob would make it absoluteBlock, blocking every top-level dir while
-//     isFileIgnored of `*` stays false for nested files — silently dropping them.
-//   - `foo/..` (Glob normalizes to ""): raw is non-empty with no dir suffix →
-//     absoluteBlock with an empty Glob. Pre-refactor isDirPathBlocked also kept
-//     it absolute, its empty glob matching the empty leading segment of an
-//     absolute dir path. (A literal empty / `!`-only pattern is the none case,
-//     so the empty guard keys on body == "", not Glob == "".)
+// ConfigArray normalizes exactly one initial "./", including the instance
+// immediately after exactly one leading "!". Any number of leading exclamation
+// marks then makes this an ordered re-inclusion, while the positive matcher is
+// compiled after stripping all of them (Minimatch flipNegate semantics).
 func ParseIgnorePattern(raw string) IgnorePattern {
 	p := IgnorePattern{}
-	body := raw
-	if strings.HasPrefix(body, "!") {
-		p.Negated = true
-		body = body[1:]
+	normalized := normalizeConfigPattern(raw)
+	p.Negated = strings.HasPrefix(normalized, "!")
+	body := strings.TrimLeft(normalized, "!")
+	p.Glob = body
+	if compiled, err := minimatch.CompileRelativePattern(p.Glob); err == nil {
+		p.matcher = &compiled
 	}
-	p.Glob = normalizePattern(body)
-	switch {
-	case body == "":
-		p.Kind = dirNone
-	case strings.HasSuffix(body, "/**/*"):
-		p.Kind = dirFileLevelCover
-	case strings.HasSuffix(body, "/*") && !strings.HasSuffix(body, "/**"):
-		p.Kind = dirNone
-	default:
-		p.Kind = dirAbsoluteBlock
+	return p
+}
+
+func parseGitignorePattern(raw string) IgnorePattern {
+	p := IgnorePattern{gitignore: true}
+	p.Negated = strings.HasPrefix(raw, "!")
+	body := strings.TrimPrefix(raw, "!")
+	// The collector uses ./ solely to protect a rooted, escaped leading ! from
+	// ConfigArray syntax. It is not a path segment in the Git pattern.
+	body = strings.TrimPrefix(body, "./")
+	p.Glob = body
+	if compiled, err := minimatch.CompileGitignorePattern(body); err == nil {
+		p.matcher = &compiled
 	}
 	return p
 }
@@ -187,12 +370,18 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 }
 
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
-	glob := pattern.Glob
 	if pattern.CaseInsensitive {
-		glob = strings.ToLower(glob)
-		path = strings.ToLower(path)
+		compile := minimatch.CompileRelativePattern
+		if pattern.gitignore {
+			compile = minimatch.CompileGitignorePattern
+		}
+		compiled, err := compile(strings.ToLower(pattern.Glob))
+		return err == nil && compiled.Match(strings.ToLower(path))
 	}
-	return matchGlob(glob, path)
+	if pattern.matcher == nil {
+		return false
+	}
+	return pattern.matcher.Match(path)
 }
 
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).
@@ -204,148 +393,4 @@ func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
 		}
 	}
 	return ignored
-}
-
-// isDirAbsolutelyBlocked reports whether dirPath (or an ancestor segment) is
-// matched by a positive directory-level pattern (`dir/**`, bare names). This is
-// the ESLint "directory blocking is absolute and cannot be negated" semantics —
-// `!` and file-level patterns are excluded by Kind. Shared by GetConfigForFile
-// (lint) and canPruneDir (walk).
-func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
-	for i := range patterns {
-		p := patterns[i]
-		if p.Negated || p.Kind != dirAbsoluteBlock {
-			continue
-		}
-		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
-			return true
-		}
-		segments := strings.Split(dirPath, "/")
-		for j := 1; j < len(segments); j++ {
-			partial := strings.Join(segments[:j], "/")
-			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// canPruneDir reports whether a directory walk may skip dirPath entirely. It is
-// the single, negation-aware directory-prune predicate for the gap-file walk.
-// The pre-refactor walk pruned only absolutely-blocked directories
-// (isDirPathBlocked); canPruneDir keeps that and ADDS pruning of gitignore
-// file-level covers (dir/**/*). Sound: prunes only when every descendant file
-// would be rejected by the linter's own ignore decision (directory block OR
-// isFileIgnored), so the gap-file set is unchanged.
-//
-//	absolute block (dir/**) → prune, ignoring `!` (ESLint absolute semantics)
-//	file-level cover (dir/**/*) → prune ONLY if no `!` reaches into the subtree
-func canPruneDir(dirPath string, patterns []IgnorePattern, neg negReach) bool {
-	if isDirAbsolutelyBlocked(dirPath, patterns) {
-		return true
-	}
-	if neg.overlaps(dirPath) {
-		return false
-	}
-	for i := range patterns {
-		p := patterns[i]
-		if p.Negated || p.Kind != dirFileLevelCover {
-			continue
-		}
-		// File-level `X/**/*` never matches the bare directory; probe `dir/x`.
-		if ignorePatternMatches(p, dirPath+"/x") {
-			return true
-		}
-	}
-	return false
-}
-
-// negReach describes how far the `!` negations in an ignore set can re-include,
-// so canPruneDir never prunes a directory whose subtree a `!` could re-include.
-// Built once per ignore set via buildNegReach.
-type negReach struct {
-	prefixes []negPrefix
-}
-
-// negPrefix is one negation's reach: unrooted means "any depth" (conservatively
-// blocks all file-level pruning); literal is the leading wildcard-free path of a
-// rooted negation, used for subtree-overlap checks. caseInsensitive keeps that
-// prefix anchored while applying the same case fold as final gitignore matching.
-type negPrefix struct {
-	unrooted        bool
-	literal         string
-	caseInsensitive bool
-}
-
-// buildNegReach extracts negation reaches from a parsed ignore set. Patterns
-// already carry Negated + a normalized Glob, so no string re-parsing.
-func buildNegReach(patterns []IgnorePattern) negReach {
-	var out []negPrefix
-	for i := range patterns {
-		p := patterns[i]
-		if !p.Negated {
-			continue
-		}
-		// A negation with no concrete leading segment (`!**/keep`, `!*.log`,
-		// empty) can re-include at any depth — literalSegmentPrefix returns ""
-		// for those, and we mark them unrooted to conservatively disable
-		// file-level pruning.
-		if lit := literalSegmentPrefix(p.Glob); lit != "" {
-			out = append(out, negPrefix{
-				literal:         lit,
-				caseInsensitive: p.CaseInsensitive,
-			})
-		} else {
-			out = append(out, negPrefix{unrooted: true})
-		}
-	}
-	return negReach{prefixes: out}
-}
-
-// overlaps reports whether any negation could re-include something in dirPath's
-// subtree (so the directory must not be pruned).
-func (n negReach) overlaps(dirPath string) bool {
-	for _, np := range n.prefixes {
-		literal := np.literal
-		candidate := dirPath
-		if np.caseInsensitive {
-			literal = strings.ToLower(literal)
-			candidate = strings.ToLower(candidate)
-		}
-		if np.unrooted || segPrefixEither(literal, candidate) {
-			return true
-		}
-	}
-	return false
-}
-
-// literalSegmentPrefix returns the leading path segments of pattern before the
-// first glob metacharacter (`*`, `?`, `[`, `{`). For example `tests/e2e/**/*`
-// → `tests/e2e`, `a/b*c/d` → `a`. Returns "" when the first segment already
-// contains a metacharacter (the pattern is not anchored to a concrete path).
-func literalSegmentPrefix(pattern string) string {
-	i := strings.IndexAny(pattern, "*?[{")
-	if i < 0 {
-		return strings.TrimSuffix(pattern, "/")
-	}
-	prefix := pattern[:i]
-	if idx := strings.LastIndex(prefix, "/"); idx >= 0 {
-		return prefix[:idx]
-	}
-	return ""
-}
-
-// segPrefixEither reports whether a is a path-segment prefix of b or vice versa
-// (e.g. "target" vs "target/keep", or "tests/e2e" vs "tests") — the negation
-// target sits inside the directory, or the directory sits inside the negation's
-// covered range.
-func segPrefixEither(a, b string) bool {
-	return segPrefix(a, b) || segPrefix(b, a)
-}
-
-// segPrefix reports whether prefix equals path or path lies under prefix/
-// (segment-anchored, so "a/b" is a prefix of "a/b/c" but not of "a/bc").
-func segPrefix(prefix, path string) bool {
-	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

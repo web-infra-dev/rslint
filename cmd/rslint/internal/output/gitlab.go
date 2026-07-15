@@ -87,6 +87,41 @@ func (f *gitlabFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error
 	return nil
 }
 
+func (f *gitlabFormatter) fileWarning(w *bufio.Writer, view fileWarningView) error {
+	type gitlabWarning struct {
+		Description string `json:"description"`
+		CheckName   string `json:"check_name"`
+		Fingerprint string `json:"fingerprint"`
+		Severity    string `json:"severity"`
+		Location    struct {
+			Path  string `json:"path"`
+			Lines struct {
+				Begin int `json:"begin"`
+				End   int `json:"end"`
+			} `json:"lines"`
+		} `json:"location"`
+	}
+	warning := gitlabWarning{
+		Description: view.raw.Message,
+		CheckName:   "rslint/file-warning",
+		Fingerprint: f.fingerprints.fingerprint(view.relativePath, "rslint/file-warning", view.raw.Message, 1, 0, 1, 0),
+		Severity:    "minor",
+	}
+	warning.Location.Path = view.relativePath
+	warning.Location.Lines.Begin = 1
+	warning.Location.Lines.End = 1
+	encoded, err := json.Marshal(warning)
+	if err != nil {
+		return err
+	}
+	if f.wrote > 0 {
+		w.WriteByte(',')
+	}
+	w.Write(encoded)
+	f.wrote++
+	return nil
+}
+
 func (f *gitlabFormatter) finish(w *bufio.Writer, _ Report) error {
 	w.WriteString("]\n")
 	return nil

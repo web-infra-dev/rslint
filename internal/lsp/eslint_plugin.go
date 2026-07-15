@@ -72,30 +72,35 @@ func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *str
 	if s.isUnavailableConfigForURI(uri) {
 		return linter.EslintPluginFileInput{}, false
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.buildPluginFileInputWithConfig(uri, textOverride, rslintConfig, configCwd, isJSConfig)
+	ctx := s.backgroundCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	selection, err := s.resolveLintConfigForURI(ctx, uri)
+	if err != nil || selection.merged == nil {
+		return linter.EslintPluginFileInput{}, false
+	}
+	return s.buildPluginFileInputFromMergedConfig(
+		uri,
+		textOverride,
+		selection.isJS,
+		selection.merged,
+	)
 }
 
-func (s *Server) buildPluginFileInputWithConfig(
+func (s *Server) buildPluginFileInputFromMergedConfig(
 	uri lsproto.DocumentUri,
 	textOverride *string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
 	isJSConfig bool,
+	merged *config.MergedConfig,
 ) (linter.EslintPluginFileInput, bool) {
 	configKey := s.pluginConfigKeyForURI(uri)
 	filePath := uriToPath(uri)
-	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
-	if isDefaultExcludedLintPath(configFilePath, matchConfigDir, s.fs) {
-		return linter.EslintPluginFileInput{}, false
-	}
-
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, matchConfigDir, isJSConfig)
-	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(configFilePath)
 	if merged == nil {
 		// File is globally ignored — no plugin (or native) diagnostics.
 		return linter.EslintPluginFileInput{}, false
 	}
+	enabledRules := config.GlobalRuleRegistry.GetEnabledRulesForMergedConfig(merged, isJSConfig)
 
 	// Text is the content the worker lints. An explicit override (fixAll's
 	// in-progress fixed content) wins; otherwise use the editor overlay
@@ -185,16 +190,28 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 		s.cancelInflightPluginDispatch(uri)
 		return
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
+	ctx := s.backgroundCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	selection, err := s.resolveLintConfigForURI(ctx, uri)
+	if err != nil || selection.merged == nil {
+		s.cancelInflightPluginDispatch(uri)
+		return
+	}
+	s.dispatchPluginLintWithMergedConfig(
+		uri,
+		generation,
+		selection.isJS,
+		selection.merged,
+	)
 }
 
-func (s *Server) dispatchPluginLintWithConfig(
+func (s *Server) dispatchPluginLintWithMergedConfig(
 	uri lsproto.DocumentUri,
 	generation uint64,
-	rslintConfig config.RslintConfig,
-	configCwd string,
 	isJSConfig bool,
+	merged *config.MergedConfig,
 ) {
 	// Supersede any prior in-flight dispatch for this URI FIRST — before the
 	// no-plugin-work early return below. Even a relint that yields no plugin
@@ -204,7 +221,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	// a $/cancelRequest tells the client to stop the worker.
 	s.cancelInflightPluginDispatch(uri)
 
-	input, ok := s.buildPluginFileInputWithConfig(uri, nil, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInputFromMergedConfig(uri, nil, isJSConfig, merged)
 	if !ok {
 		return
 	}
@@ -364,21 +381,31 @@ func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUr
 	if s.isUnavailableConfigForURI(uri) {
 		return nil
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.lintPluginRulesSyncWithConfig(ctx, uri, content, fix, suggestionsMode, rslintConfig, configCwd, isJSConfig)
+	selection, err := s.resolveLintConfigForURI(ctx, uri)
+	if err != nil || selection.merged == nil {
+		return nil
+	}
+	return s.lintPluginRulesSyncWithMergedConfig(
+		ctx,
+		uri,
+		content,
+		fix,
+		suggestionsMode,
+		selection.isJS,
+		selection.merged,
+	)
 }
 
-func (s *Server) lintPluginRulesSyncWithConfig(
+func (s *Server) lintPluginRulesSyncWithMergedConfig(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	content string,
 	fix bool,
 	suggestionsMode string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
 	isJSConfig bool,
+	merged *config.MergedConfig,
 ) []rule.RuleDiagnostic {
-	input, ok := s.buildPluginFileInputWithConfig(uri, &content, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInputFromMergedConfig(uri, &content, isJSConfig, merged)
 	if !ok {
 		return nil
 	}

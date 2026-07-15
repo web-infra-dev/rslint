@@ -1,10 +1,11 @@
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type ConfigModuleActivationPlan,
   type ConfigModuleEslintPluginEntry,
   type ConfigModulePluginDescriptor,
+  type EvaluateConfigPredicatesRequest,
+  type EvaluateConfigPredicatesResponse,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
 } from '@rslint/core/config-loader';
@@ -18,7 +19,6 @@ interface ConfigActivationWireResponse {
 }
 
 export interface ConfigTransactionControlRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
   transactionId: string;
 }
 
@@ -43,6 +43,10 @@ interface ConfigModuleHostAdapter {
     signal?: AbortSignal,
     prepare?: (plan: ConfigModuleActivationPlan) => Promise<void>,
   ): Promise<ActivateConfigsResponse>;
+  evaluateConfigPredicates(
+    request: EvaluateConfigPredicatesRequest,
+    signal?: AbortSignal,
+  ): Promise<EvaluateConfigPredicatesResponse>;
   deleteSession(transactionId: string): boolean;
 }
 
@@ -68,11 +72,6 @@ function assertTransactionControlRequest(
   if (!request || typeof request !== 'object') {
     throw new Error('config transaction request must be an object');
   }
-  if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
-    throw new Error(
-      `unsupported config transaction protocol ${String(request.protocolVersion)}`,
-    );
-  }
   if (
     typeof request.transactionId !== 'string' ||
     request.transactionId.length === 0
@@ -89,7 +88,9 @@ function assertTransactionControlRequest(
  * and mirrors Go's final commit/abort for the same transaction ID.
  */
 export class LspConfigTransactionAdapter {
-  private readonly transactions = new Set<string>();
+  private readonly stagedTransactions = new Set<string>();
+  private activeTransaction: string | undefined;
+  private predecessorTransaction: string | undefined;
   private disposed = false;
 
   constructor(
@@ -106,7 +107,7 @@ export class LspConfigTransactionAdapter {
     assertTransactionControlRequest(request);
     throwIfAborted(signal);
     const transactionId = request.transactionId;
-    this.transactions.add(transactionId);
+    this.stagedTransactions.add(transactionId);
     try {
       // Editor reloads must not reuse the config entry module. Go still sends
       // the shared envelope, but the LSP transport makes that entry-freshness
@@ -121,7 +122,7 @@ export class LspConfigTransactionAdapter {
       throwIfAborted(signal);
       return response;
     } catch (error) {
-      this.cleanup(transactionId);
+      this.discardStaged(transactionId);
       throw error;
     }
   }
@@ -166,9 +167,22 @@ export class LspConfigTransactionAdapter {
       };
     } catch (error) {
       await this.pluginLintPool.abort(transactionId).catch(() => undefined);
-      this.cleanup(transactionId);
+      this.discardStaged(transactionId);
       throw error;
     }
+  }
+
+  async evaluateConfigPredicates(
+    request: EvaluateConfigPredicatesRequest,
+    signal?: AbortSignal,
+  ): Promise<EvaluateConfigPredicatesResponse> {
+    this.assertActive();
+    assertTransactionControlRequest(request);
+    throwIfAborted(signal);
+    const response = await this.host.evaluateConfigPredicates(request, signal);
+    this.assertActive();
+    throwIfAborted(signal);
+    return response;
   }
 
   async commitConfigs(
@@ -177,12 +191,27 @@ export class LspConfigTransactionAdapter {
     this.assertActive();
     assertTransactionControlRequest(request);
     const transactionId = request.transactionId;
+    if (
+      transactionId !== this.activeTransaction &&
+      !this.stagedTransactions.has(transactionId)
+    ) {
+      throw new Error(
+        `cannot commit unknown config transaction ${JSON.stringify(transactionId)}`,
+      );
+    }
     if (!(await this.pluginLintPool.commit(transactionId))) {
       throw new Error(
         `failed to commit plugin-host generation ${JSON.stringify(transactionId)}`,
       );
     }
-    this.cleanup(transactionId);
+    if (transactionId !== this.activeTransaction) {
+      if (this.predecessorTransaction) {
+        this.host.deleteSession(this.predecessorTransaction);
+      }
+      this.predecessorTransaction = this.activeTransaction;
+      this.activeTransaction = transactionId;
+      this.stagedTransactions.delete(transactionId);
+    }
     return {
       transactionId,
       committed: true,
@@ -197,7 +226,13 @@ export class LspConfigTransactionAdapter {
     try {
       await this.pluginLintPool.abort(transactionId);
     } finally {
-      this.cleanup(transactionId);
+      if (transactionId === this.activeTransaction) {
+        this.host.deleteSession(transactionId);
+        this.activeTransaction = this.predecessorTransaction;
+        this.predecessorTransaction = undefined;
+      } else if (this.stagedTransactions.has(transactionId)) {
+        this.discardStaged(transactionId);
+      }
     }
     return {
       transactionId,
@@ -214,8 +249,8 @@ export class LspConfigTransactionAdapter {
    */
   async resetForServerRestart(): Promise<void> {
     this.assertActive();
-    const orphaned = [...this.transactions];
-    this.transactions.clear();
+    const orphaned = [...this.stagedTransactions];
+    this.stagedTransactions.clear();
     for (const transactionId of orphaned) {
       this.host.deleteSession(transactionId);
     }
@@ -229,15 +264,23 @@ export class LspConfigTransactionAdapter {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const transactionId of this.transactions) {
+    const transactions = new Set([
+      ...this.stagedTransactions,
+      this.activeTransaction,
+      this.predecessorTransaction,
+    ]);
+    for (const transactionId of transactions) {
+      if (!transactionId) continue;
       this.host.deleteSession(transactionId);
     }
-    this.transactions.clear();
+    this.stagedTransactions.clear();
+    this.activeTransaction = undefined;
+    this.predecessorTransaction = undefined;
   }
 
-  private cleanup(transactionId: string): void {
+  private discardStaged(transactionId: string): void {
     this.host.deleteSession(transactionId);
-    this.transactions.delete(transactionId);
+    this.stagedTransactions.delete(transactionId);
   }
 
   private assertActive(): void {

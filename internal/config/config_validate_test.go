@@ -47,6 +47,49 @@ func TestValidateConfig_RejectsEmptyFilesOnIgnoreOnlyEntry(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_RejectsOverlongMinimatchPatterns(t *testing.T) {
+	overlongASCII := strings.Repeat("a", 65_537)
+	// One astral rune occupies two UTF-16 code units, which is the limit used
+	// by Minimatch 10 rather than Go's byte or rune length.
+	overlongUTF16 := strings.Repeat("😀", 32_769)
+	tests := []struct {
+		name string
+		key  string
+		cfg  RslintConfig
+	}{
+		{name: "files", key: "files", cfg: RslintConfig{{Files: []string{overlongASCII}}}},
+		{name: "nested files", key: "files", cfg: RslintConfig{{FilePatternGroups: [][]string{{"**/*.js", overlongUTF16}}}}},
+		{
+			name: "module mixed files",
+			key:  "files",
+			cfg: RslintConfig{{moduleFileSelectors: []configFileSelector{{matchers: []configMatcher{
+				{predicateID: "predicate-1"},
+				{pattern: overlongASCII},
+			}}}}},
+		},
+		{name: "ignores", key: "ignores", cfg: RslintConfig{{Ignores: []string{overlongASCII}}}},
+		{
+			name: "module mixed ignores",
+			key:  "ignores",
+			cfg: RslintConfig{{moduleIgnoreMatchers: []configMatcher{
+				{predicateID: "predicate-1"},
+				{pattern: overlongUTF16},
+			}}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateConfig(test.cfg)
+			if err == nil {
+				t.Fatal("expected overlong pattern to be rejected")
+			}
+			if message := err.Error(); !strings.Contains(message, `key "`+test.key+`"`) || !strings.Contains(message, "pattern is too long") {
+				t.Fatalf("error lacks pattern context: %q", message)
+			}
+		})
+	}
+}
+
 func TestValidateConfig_RejectsNullFilesFromJSON(t *testing.T) {
 	var cfg RslintConfig
 	err := json.Unmarshal([]byte(`[{"files": null, "rules": {}}]`), &cfg)

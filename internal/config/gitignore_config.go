@@ -3,7 +3,6 @@ package config
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 )
@@ -22,15 +21,11 @@ func ConfigWithGitignore(config RslintConfig, configDir string, fsys vfs.FS, tar
 // excluding caller-supplied descendant ownership boundaries. A boundary and
 // its subtree are handed off without reading that subtree's .gitignore files.
 func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fsys vfs.FS, targetFiles []string, stopDirs []string) RslintConfig {
+	config = WithDefaultGlobalIgnores(config)
 	collectionFiles := targetFiles
 	var isDirectoryBlocked func(string) bool
 	if targetFiles == nil {
-		configIgnores := extractConfigIgnores(config)
-		if len(configIgnores) > 0 {
-			isDirectoryBlocked = func(relativePath string) bool {
-				return isDirAbsolutelyBlocked(relativePath, configIgnores)
-			}
-		}
+		isDirectoryBlocked = gitignoreDirectoryBlocker(config, configDir, fsys)
 	} else if fsys != nil && len(targetFiles) > 0 {
 		collectionFiles = make([]string, len(targetFiles))
 		for i, file := range targetFiles {
@@ -38,6 +33,21 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 		}
 	}
 	globs := gitignore.CollectWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
+	return configWithCollectedGitignore(config, globs, fsys)
+}
+
+func gitignoreDirectoryBlocker(config RslintConfig, configDir string, fsys vfs.FS) func(string) bool {
+	layers := compileConfigIgnoreLayers(config, configDir, fsys)
+	if len(layers) == 0 {
+		return nil
+	}
+	return func(relativePath string) bool {
+		directory := resolvePathForRoot(configDir, configDir, relativePath)
+		return isDirectoryIgnoredByConfigLayers(directory, "", layers, fsys)
+	}
+}
+
+func configWithCollectedGitignore(config RslintConfig, globs []string, fsys vfs.FS) RslintConfig {
 	if len(globs) == 0 {
 		return config
 	}
@@ -47,9 +57,19 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 		gitignoreSemantics:       true,
 		gitignoreCaseInsensitive: caseInsensitive,
 	}
+	// Keep one ordered policy: .gitignore, product defaults, authored config.
+	// The product defaults remain the discovery baseline even when .gitignore
+	// negates node_modules or .git; an authored config negation can deliberately
+	// reopen either earlier source. This also keeps exact/LSP admission identical
+	// to CLI/API discovery, whose .gitignore phase cannot expand the catalog.
 	effective := make(RslintConfig, 0, len(config)+1)
-	effective = append(effective, gitignoreEntry)
-	effective = append(effective, config...)
+	for _, entry := range config {
+		if entry.defaultIgnores {
+			effective = append(effective, gitignoreEntry, entry)
+			continue
+		}
+		effective = append(effective, entry)
+	}
 	return effective
 }
 
@@ -60,7 +80,7 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []IgnorePattern {
 	patterns := make([]IgnorePattern, 0, len(globs)*2)
 	parse := func(raw string) IgnorePattern {
-		pattern := ParseIgnorePattern(raw)
+		pattern := parseGitignorePattern(raw)
 		pattern.CaseInsensitive = caseInsensitive
 		return pattern
 	}
@@ -85,7 +105,6 @@ func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []Ign
 		}
 
 		direct := parse(raw)
-		direct.Kind = dirNone
 		patterns = append(patterns, direct)
 		patterns = append(patterns, parse(prefix+body+"/**/*"))
 	}
@@ -93,10 +112,18 @@ func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []Ign
 }
 
 func gitignoreCollectionFilePath(filePath string, configDir string, fsys vfs.FS) string {
-	filePath = tspath.NormalizePath(filePath)
+	filePath = normalizePathForRoot(configDir, filePath)
+	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	// The normal discovery path is already in the governing config's lexical
+	// space. Preserve it without repeatedly resolving the same config root through realpath for
+	// every directory and file query; physical projection is only needed for a
+	// compiler-reported path or another alias outside that lexical root.
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, caseSensitive); ok {
+		return resolvePathForRoot(configDir, configDir, relative)
+	}
 	matchFile, matchDir := ResolveConfigPathSpace(filePath, configDir, fsys)
 	if relative, ok := RelativePathWithinConfigRoot(matchFile, matchDir, true); ok {
-		return tspath.ResolvePath(configDir, relative)
+		return resolvePathForRoot(configDir, configDir, relative)
 	}
 	return filePath
 }

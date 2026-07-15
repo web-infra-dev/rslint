@@ -14,6 +14,7 @@ alertdialog
 alink
 allman
 allof
+alnum
 allowundefined
 alphanum
 analysed
@@ -102,6 +103,7 @@ colocate
 columnheader
 combinator
 combinators
+compilerpath
 componentwillmount
 componentwillreceiveprops
 componentwillupdate
@@ -110,6 +112,7 @@ contenteditable
 contentinfo
 corge
 cpuprof
+cntrl
 ctype
 dagre
 datalist
@@ -153,6 +156,7 @@ exclam
 execdir
 extensionless
 extglob
+extglobs
 extname
 fanout
 fatih
@@ -201,6 +205,9 @@ Geor
 getsp
 gimuygimuygimuy
 github
+globby
+globstar
+globstars
 glossref
 gnored
 GOARCH
@@ -226,6 +233,8 @@ hecker
 hgroup
 hoge
 hooksutil
+hostfs
+hostpath
 hotpink
 HTTPSURL
 hujson
@@ -530,7 +539,6 @@ Thaa
 thenables
 throughs
 Tibt
-tinyglobby
 tmdb
 tmpl
 tokenlist
@@ -603,8 +611,10 @@ WCAG
 webauthn
 wellformed
 WHATWG
+wildmatch
 wordlist
 xdescribe
+xdigit
 xiang
 xitiViewMap
 xjavascript

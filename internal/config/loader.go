@@ -67,17 +67,23 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 	return config, configDirectory, nil
 }
 
-// normalizeJSONConfig injects core rules and plugin rules into each entry's Rules map.
-// This ensures JSON config and JS config are processed identically in GetConfigForFile.
-// User-specified rules always take precedence over auto-enabled defaults.
-// NOTE: This function mutates the input slice in-place (modifies entry Rules maps directly).
+// normalizeJSONConfig preserves the legacy JSON/JSONC model: ignores attached
+// to a rule entry are invocation-global. JS/TS flat configs deliberately keep
+// those ignores entry-local instead. User-specified rules still take precedence
+// over the auto-enabled JSON defaults.
 func normalizeJSONConfig(config RslintConfig) RslintConfig {
+	result := make(RslintConfig, 0, len(config)*2)
 	for i := range config {
 		entry := &config[i]
 
 		// Skip global-ignore-only entries (no rules, plugins, or other fields)
 		if isGlobalIgnoreEntry(*entry) {
+			result = append(result, *entry)
 			continue
+		}
+		if len(entry.Ignores) > 0 {
+			result = append(result, ConfigEntry{Ignores: append([]string(nil), entry.Ignores...)})
+			entry.Ignores = nil
 		}
 
 		if entry.Rules == nil {
@@ -103,9 +109,10 @@ func normalizeJSONConfig(config RslintConfig) RslintConfig {
 				}
 			}
 		}
+		result = append(result, *entry)
 	}
 
-	return config
+	return result
 }
 
 // LoadDefaultRslintConfig attempts to load default configuration files

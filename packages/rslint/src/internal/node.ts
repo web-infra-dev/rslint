@@ -33,7 +33,6 @@ export class NodeRslintService implements RslintServiceInterface {
   // request could reject and surface as an unhandledRejection.
   private closing: boolean;
   private inboundHandler: InboundRequestHandler | null;
-  private activeInboundRequests: number;
 
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
@@ -42,7 +41,6 @@ export class NodeRslintService implements RslintServiceInterface {
     this.dead = false;
     this.closing = false;
     this.inboundHandler = null;
-    this.activeInboundRequests = 0;
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -122,10 +120,14 @@ export class NodeRslintService implements RslintServiceInterface {
   }
 
   private updateLoopActivity(): void {
-    this.setLoopActive(
-      !this.dead &&
-        (this.pendingMessages.size > 0 || this.activeInboundRequests > 0),
-    );
+    // Every valid Go -> Node reverse request is nested inside an unresolved
+    // Node -> Go request (currently lint). That outer pending request owns the
+    // event-loop ref for the whole exchange. Once Go answers it, any reverse
+    // handler still evaluating a non-cancellable JavaScript module is orphaned:
+    // Go has stopped waiting for its reply, so it must not pin the caller's
+    // process. Unref is not termination; a later sendMessage re-refs the same
+    // reusable Go child immediately.
+    this.setLoopActive(!this.dead && this.pendingMessages.size > 0);
   }
 
   /** Install the handler for positive-id requests sent by the Go peer. */
@@ -244,8 +246,6 @@ export class NodeRslintService implements RslintServiceInterface {
 
     if (id <= 0) return;
 
-    this.activeInboundRequests++;
-    this.updateLoopActivity();
     void Promise.resolve()
       .then(async () => {
         if (!this.inboundHandler) {
@@ -278,10 +278,6 @@ export class NodeRslintService implements RslintServiceInterface {
           });
         },
       )
-      .finally(() => {
-        this.activeInboundRequests--;
-        this.updateLoopActivity();
-      })
       .catch(() => {
         // A terminal stdin write failure is reported by the stream/process
         // handlers, which also settle the outer request. Avoid a detached

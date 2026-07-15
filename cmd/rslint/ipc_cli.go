@@ -22,8 +22,9 @@
 // executeLintPipeline (using either a typed Go-discovered catalog or the
 // native JSON/JSONC loader) → drain output, send `shutdown`, exit.
 //
-// Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
-// disconnect, init/transport error) · 130 interrupted.
+// Exit codes: 0 clean · 1 lint diagnostics/legacy config errors ·
+// 2 fatal discovery or IPC errors (peer disconnect, init/transport error) ·
+// 130 interrupted.
 //
 // Excluded from the js/wasm build: signal handling needs syscall.SIGHUP,
 // undefined there, and there is no Node IPC parent. ipc_cli_js.go provides a
@@ -33,7 +34,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -45,11 +45,12 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/hostfs"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
@@ -58,12 +59,13 @@ import (
 // The transport (ipc.Channel) owns only response/error/handshake/exit; the
 // kinds below are declared here and travel through the same opaque envelope.
 const (
-	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
-	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
-	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text
-	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
-	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
-	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
+	kindInit                     ipc.MessageKind = "init"                     // Node → Go: handshake payload
+	kindShutdown                 ipc.MessageKind = "shutdown"                 // Go → Node: lint done
+	kindOutput                   ipc.MessageKind = "output"                   // Go → Node: forwarded stdout text
+	kindPluginLint               ipc.MessageKind = "pluginLint"               // Go → Node: run ESLint-plugin rules in a worker
+	kindLoadConfigs              ipc.MessageKind = "loadConfigs"              // Go → Node: evaluate one config frontier
+	kindEvaluateConfigPredicates ipc.MessageKind = "evaluateConfigPredicates" // Go → Node: execute reached files/ignores function barriers
+	kindActivateConfigs          ipc.MessageKind = "activateConfigs"          // Go → Node: prepare the effective config/plugin set
 )
 
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
@@ -87,8 +89,9 @@ type initPayload struct {
 }
 
 type configDiscoveryPayload struct {
-	Mode               string `json:"mode"`
-	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
+	Mode               string   `json:"mode"`
+	ExplicitConfigPath string   `json:"explicitConfigPath,omitempty"`
+	Inputs             []string `json:"inputs,omitempty"`
 }
 
 type ipcConfigModuleLoader struct {
@@ -115,6 +118,18 @@ func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, reques
 	var response discovery.ConfigActivationResponse
 	if err := msg.Decode(&response); err != nil {
 		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs response: %w", err)
+	}
+	return response, nil
+}
+
+func (loader *ipcConfigModuleLoader) EvaluateConfigPredicates(ctx context.Context, request discovery.ConfigPredicateBatchRequest) (discovery.ConfigPredicateBatchResponse, error) {
+	msg, err := loader.channel.SendRequest(ctx, kindEvaluateConfigPredicates, request)
+	if err != nil {
+		return discovery.ConfigPredicateBatchResponse{}, err
+	}
+	var response discovery.ConfigPredicateBatchResponse
+	if err := msg.Decode(&response); err != nil {
+		return discovery.ConfigPredicateBatchResponse{}, fmt.Errorf("decode evaluateConfigPredicates response: %w", err)
 	}
 	return response, nil
 }
@@ -261,7 +276,7 @@ func runCLI(args []string) int {
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
-	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	baseArgs.FS = bundled.WrapFS(cachedvfs.From(hostfs.NativeOS(osvfs.FS())))
 
 	// Preserve help/init priority, then reject an invalid payload-authoritative
 	// format before config discovery can execute user JavaScript.
@@ -293,7 +308,7 @@ func runCLI(args []string) int {
 			if interrupted {
 				return 130
 			}
-			return 1
+			return 2
 		}
 	}
 
@@ -383,8 +398,8 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) {
 }
 
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
-// mirroring parseLintFlags's positional handling (filepath.Abs +
-// tspath.NormalizePath) so the IPC and flag entry paths produce identical
+// mirroring parseLintFlags's positional handling (filepath.Abs + native path
+// normalization) so the IPC and flag entry paths produce identical
 // FileScope downstream. An Abs failure is skipped with a stderr warning rather
 // than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
@@ -394,7 +409,7 @@ func classifyPaths(paths []string) (files []string, dirs []string) {
 			fmt.Fprintf(os.Stderr, "rslint: filepath.Abs(%q) failed: %v\n", p, err)
 			continue
 		}
-		normalized := tspath.NormalizePath(absPath)
+		normalized := hostpath.Normalize(absPath)
 		info, statErr := os.Stat(absPath)
 		if statErr == nil && info.IsDir() {
 			dirs = append(dirs, normalized)
@@ -418,22 +433,25 @@ func discoverCLIConfigCatalog(
 	if err != nil {
 		return fmt.Errorf("get working directory for config discovery: %w", err)
 	}
-	cwd = tspath.NormalizePath(cwd)
+	cwd = hostpath.Normalize(cwd)
 	request := discovery.ConfigDiscoveryRequest{
-		CWD:            cwd,
-		Directories:    append([]string(nil), args.AllowDirs...),
-		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
-		SingleThreaded: args.SingleThreaded,
+		CWD:                     cwd,
+		Inputs:                  append([]string{}, payload.ConfigDiscovery.Inputs...),
+		CollectTargets:          !args.TypeCheckOnly,
+		GlobInputPaths:          true,
+		ErrorOnUnmatchedPattern: true,
+		SingleThreaded:          args.SingleThreaded,
 	}
-	for _, filePath := range args.AllowFiles {
-		request.Files = append(request.Files, discovery.DiscoveryFile{
-			Path:     filePath,
-			Explicit: true,
-		})
+	if len(request.Inputs) == 0 {
+		request.Inputs = []string{"."}
 	}
 	switch payload.ConfigDiscovery.Mode {
 	case "auto", "":
 		request.Mode = discovery.ConfigDiscoveryAuto
+		// Only auto discovery may fall through to the retained JSON/JSONC
+		// loader when no JavaScript owner participates. An explicit JS/TS config
+		// is authoritative and keeps ESLint's native search/config error order.
+		request.AllowMissingConfig = true
 	case "explicit":
 		request.Mode = discovery.ConfigDiscoveryExplicit
 		request.ExplicitConfigPath = payload.ConfigDiscovery.ExplicitConfigPath
@@ -448,14 +466,16 @@ func discoverCLIConfigCatalog(
 		request,
 	)
 	if err != nil {
-		var allFailed *discovery.AllConfigsFailedError
-		if errors.As(err, &allFailed) {
-			printConfigDiscoveryFailures(allFailed.Failures)
-		}
 		return err
 	}
-	printConfigDiscoveryFailures(catalog.Failures)
 	args.ConfigCatalog = catalog
+	if len(catalog.Configs) > 0 && !args.TypeCheckOnly {
+		args.AllowFiles = make([]string, 0, len(catalog.Targets))
+		for _, target := range catalog.Targets {
+			args.AllowFiles = append(args.AllowFiles, target.Path)
+		}
+		args.AllowDirs = nil
+	}
 	return nil
 }
 

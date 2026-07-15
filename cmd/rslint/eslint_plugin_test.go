@@ -14,36 +14,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// TestPluginConfigResolver_UsesGoOwnedCatalogKey proves the routing identity is
-// the same normalized key Go published in its typed discovery catalog. Node
-// treats that key as opaque when activating the matching plugin host.
-func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
-	configDir := tspath.NormalizePath(`C:\proj`)
-	configMap := map[string]rslintconfig.RslintConfig{
-		configDir: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-	}
-	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
-	}
-	wireKey, merged := r.resolve(configDir + "/src/a.ts")
-	if wireKey != configDir {
-		t.Errorf("wire configKey = %q, want Go-owned catalog key %q", wireKey, configDir)
-	}
-	if merged == nil {
-		t.Fatal("expected a merged config for the matched file")
-	}
-
-	// With no low-level API routing override, the owner key is used directly.
-	posix := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": configMap[configDir]},
-		}),
-	}
-	if wk, m := posix.resolve("/posix/proj/a.ts"); wk != "/posix/proj" || m == nil {
-		t.Errorf("POSIX fallback: wireKey=%q merged-nil=%v, want /posix/proj + non-nil", wk, m == nil)
-	}
-}
-
 func pluginInput() []linter.EslintPluginFileInput {
 	return []linter.EslintPluginFileInput{
 		{Path: "/proj/a.ts", ConfigKey: "/proj", Rules: []linter.ConfiguredRule{
@@ -99,34 +69,7 @@ func TestDispatchPluginLintAsync_NoInputsNoDiagnostic(t *testing.T) {
 	}
 }
 
-// TestPluginConfigResolver_Branches covers resolve()'s non-match and
-// single-config (configMap==nil) fallback branches.
-func TestPluginConfigResolver_Branches(t *testing.T) {
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/proj": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-	}
-
-	// Multi-config, file under no config -> ("", nil).
-	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
-	}
-	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
-		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
-	}
-
-	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
-	single := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			Config:           configMap["/proj"],
-			CurrentDirectory: "/proj",
-		}),
-	}
-	if wk, m := single.resolve("/proj/a.ts"); wk != "/proj" || m == nil {
-		t.Errorf("single-config -> (currentDirectory, merged), got (%q, nil=%v)", wk, m == nil)
-	}
-}
-
-func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
+func TestLintConfigResolver_BoundOwnersAndTypeInfoGate(t *testing.T) {
 	rslintconfig.RegisterAllRules()
 
 	configMap := map[string]rslintconfig.RslintConfig{
@@ -145,9 +88,19 @@ func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
 	typeInfoFiles := map[string]struct{}{
 		"/repo/packages/app/src/typed.ts": {},
 	}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := mustNewLintConfigResolver(t, lintConfigResolverOptions{
 		ConfigMap:     configMap,
 		TypeInfoFiles: typeInfoFiles,
+		OwnerConfigDirBySourcePath: map[string]string{
+			"/repo/packages/app/src/gap.ts":   "/repo/packages/app",
+			"/repo/packages/app/src/typed.ts": "/repo/packages/app",
+			"/repo/root.ts":                   "/repo",
+		},
+		MergedConfigBySourcePath: map[string]*rslintconfig.MergedConfig{
+			"/repo/packages/app/src/gap.ts":   configMap["/repo/packages/app"].GetConfigForFile("/repo/packages/app/src/gap.ts", "/repo/packages/app"),
+			"/repo/packages/app/src/typed.ts": configMap["/repo/packages/app"].GetConfigForFile("/repo/packages/app/src/typed.ts", "/repo/packages/app"),
+			"/repo/root.ts":                   configMap["/repo"].GetConfigForFile("/repo/root.ts", "/repo"),
+		},
 	})
 
 	gapRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/gap.ts"))
@@ -189,9 +142,12 @@ func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
 		}},
 	}
 	sourcePath := "/repo/packages/app/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := mustNewLintConfigResolver(t, lintConfigResolverOptions{
 		ConfigMap:                  configMap,
 		OwnerConfigDirBySourcePath: map[string]string{sourcePath: "/repo"},
+		MergedConfigBySourcePath: map[string]*rslintconfig.MergedConfig{
+			sourcePath: configMap["/repo"].GetConfigForFile(sourcePath, "/repo"),
+		},
 	})
 
 	rules := configuredRuleNameSet(resolver.ActiveRulesForFile(sourcePath))
@@ -212,7 +168,7 @@ func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) 
 		}},
 		Rules: rslintconfig.Rules{"no-console": "error"},
 	}}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := mustNewLintConfigResolver(t, lintConfigResolverOptions{
 		Config:                 cfg,
 		CurrentDirectory:       "/repo",
 		TypeInfoFiles:          map[string]struct{}{"/outside/real-a.ts": {}},
@@ -231,6 +187,36 @@ func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) 
 	}
 }
 
+func TestPluginConfigResolverReusesBoundMergedConfig(t *testing.T) {
+	const sourcePath = "/repo/src/selected.ts"
+	selected := &rslintconfig.MergedConfig{
+		Settings: rslintconfig.Settings{"selection": "predicate"},
+		LanguageOptions: &rslintconfig.LanguageOptions{Raw: map[string]any{
+			"sourceType": "module",
+		}},
+	}
+	lintResolver := mustNewLintConfigResolver(t, lintConfigResolverOptions{
+		ConfigMap: map[string]rslintconfig.RslintConfig{
+			"/repo": {{Settings: rslintconfig.Settings{"selection": "legacy-rematch"}}},
+		},
+		OwnerConfigDirBySourcePath: map[string]string{sourcePath: "/repo"},
+		MergedConfigBySourcePath:   map[string]*rslintconfig.MergedConfig{sourcePath: selected},
+	})
+
+	wireKey, merged := (pluginConfigResolver{
+		lintResolvers: []*lintConfigResolver{lintResolver},
+		pluginConfigDirByOwner: map[string]string{
+			"/repo": "wire-owner",
+		},
+	}).resolveForView(0, sourcePath)
+	if wireKey != "wire-owner" {
+		t.Fatalf("wire key = %q, want wire-owner", wireKey)
+	}
+	if merged != selected {
+		t.Fatalf("plugin resolver rematched config: got=%+v want exact bound=%+v", merged, selected)
+	}
+}
+
 type caseInsensitiveResolverFS struct {
 	vfs.FS
 }
@@ -244,7 +230,10 @@ func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *test
 	rslintconfig.RegisterAllRules()
 	fsys := &caseInsensitiveResolverFS{FS: osvfs.FS()}
 	sourcePath := "c:/repo/src/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	selected := &rslintconfig.MergedConfig{Rules: map[string]*rslintconfig.RuleConfig{
+		"no-console": {Level: "error"},
+	}}
+	resolver := mustNewLintConfigResolver(t, lintConfigResolverOptions{
 		ConfigMap: map[string]rslintconfig.RslintConfig{
 			"C:/Repo": {{
 				Files: []string{"src/**/*.ts"},
@@ -255,6 +244,9 @@ func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *test
 		OwnerConfigDirBySourcePath: map[string]string{
 			"C:/REPO/SRC/A.ts": "c:/repo",
 		},
+		MergedConfigBySourcePath: map[string]*rslintconfig.MergedConfig{
+			"C:/REPO/SRC/A.ts": selected,
+		},
 		FS: fsys,
 	})
 
@@ -262,6 +254,42 @@ func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *test
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("expected case-equivalent source mapping to retain config rules, got %v", configuredRuleNameSet(rules))
 	}
+}
+
+func TestLintConfigResolverModernBindingRejectsMissingExactMergedConfig(t *testing.T) {
+	_, err := newLintConfigResolver(lintConfigResolverOptions{
+		ConfigMap: map[string]rslintconfig.RslintConfig{
+			"/repo": {{Rules: rslintconfig.Rules{"no-console": "error"}}},
+		},
+		OwnerConfigDirBySourcePath: map[string]string{"/repo/a.ts": "/repo"},
+		RequiredSourcePaths:        []string{"/repo/a.ts"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "no exact merged config") {
+		t.Fatalf("error = %v, want modern binding invariant failure", err)
+	}
+}
+
+func TestLintConfigResolverModernBindingRejectsNilExactMergedConfig(t *testing.T) {
+	_, err := newLintConfigResolver(lintConfigResolverOptions{
+		ConfigMap: map[string]rslintconfig.RslintConfig{
+			"/repo": {{Rules: rslintconfig.Rules{"no-console": "error"}}},
+		},
+		OwnerConfigDirBySourcePath: map[string]string{"/repo/a.ts": "/repo"},
+		MergedConfigBySourcePath:   map[string]*rslintconfig.MergedConfig{"/repo/a.ts": nil},
+		RequiredSourcePaths:        []string{"/repo/a.ts"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "no exact merged config") {
+		t.Fatalf("error = %v, want nil modern binding invariant failure", err)
+	}
+}
+
+func mustNewLintConfigResolver(t *testing.T, options lintConfigResolverOptions) *lintConfigResolver {
+	t.Helper()
+	resolver, err := newLintConfigResolver(options)
+	if err != nil {
+		t.Fatalf("newLintConfigResolver: %v", err)
+	}
+	return resolver
 }
 
 func configuredRuleNameSet(rules []linter.ConfiguredRule) map[string]bool {

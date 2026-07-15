@@ -37,9 +37,9 @@ func (r *RuleRegistry) GetAllRules() map[string]rule.Rule {
 }
 
 // GetEnabledRules returns rules that are enabled in the configuration for a given file.
-// It returns nil rules and a nil merged config when no config entry matches.
-// Target planning remains responsible for deciding whether an explicitly
-// requested file is still parsed without lint rules.
+// It returns a non-nil empty merged config for default script files when no
+// authored entry contributes rules. A nil merged config means the file was
+// globally ignored or is outside the selector union.
 // When enforcePlugins is true (JS/TS config), rules with a plugin prefix (e.g. "@typescript-eslint/")
 // are included only when the normalized native or third-party prefix is
 // declared in the merged config's Plugins set.

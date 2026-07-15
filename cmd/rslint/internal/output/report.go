@@ -36,16 +36,29 @@ type Counts struct {
 	TypeErrors int
 }
 
+// FileWarning is a file-scoped warning without a source range or rule. Config
+// discovery uses it for explicit files excluded by ignores/base-path/config
+// selection; it must count like an ESLint warning without fabricating an AST.
+type FileWarning struct {
+	FilePath string
+	Message  string
+}
+
 type Report struct {
-	diagnostics []rule.RuleDiagnostic
-	metadata    Metadata
-	counts      Counts
+	diagnostics  []rule.RuleDiagnostic
+	fileWarnings []FileWarning
+	metadata     Metadata
+	counts       Counts
 }
 
 // NewReport snapshots one completed CLI run. Render consumes the report once:
 // the default formatter finalizes elapsed time only after diagnostic output is
 // flushed, preserving the CLI's end-to-end timing boundary.
 func NewReport(diagnostics []rule.RuleDiagnostic, metadata Metadata) Report {
+	return NewReportWithFileWarnings(diagnostics, nil, metadata)
+}
+
+func NewReportWithFileWarnings(diagnostics []rule.RuleDiagnostic, fileWarnings []FileWarning, metadata Metadata) Report {
 	counts := Counts{}
 	for _, diagnostic := range diagnostics {
 		switch diagnostic.Severity {
@@ -59,12 +72,14 @@ func NewReport(diagnostics []rule.RuleDiagnostic, metadata Metadata) Report {
 			counts.Warnings++
 		}
 	}
+	counts.Warnings += len(fileWarnings)
 	counts.LintErrors = counts.Errors - counts.TypeErrors
 
 	return Report{
-		diagnostics: slices.Clone(diagnostics),
-		metadata:    metadata,
-		counts:      counts,
+		diagnostics:  slices.Clone(diagnostics),
+		fileWarnings: slices.Clone(fileWarnings),
+		metadata:     metadata,
+		counts:       counts,
 	}
 }
 

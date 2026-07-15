@@ -35,6 +35,11 @@ func (githubFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
 	return nil
 }
 
+func (githubFormatter) fileWarning(w *bufio.Writer, view fileWarningView) error {
+	fmt.Fprintf(w, "::warning file=%s::%s\n", escapeProperty(view.relativePath), escapeData(view.raw.Message))
+	return nil
+}
+
 func (githubFormatter) finish(_ *bufio.Writer, _ Report) error { return nil }
 
 func escapeData(value string) string {

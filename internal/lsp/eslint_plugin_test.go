@@ -362,10 +362,17 @@ func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
 	s.documents[uri] = "foo();\n"
 
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(uriToPath(uri), configCwd, s.fs)
+	merged := config.NewFileConfigResolver(
+		config.WithDefaultGlobalIgnores(effective),
+		matchConfigDir,
+		isJSConfig,
+		s.fs,
+	).ConfigForFile(configFilePath)
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configCwd, isJSConfig); !ok {
+	if input, ok := s.buildPluginFileInputFromMergedConfig(uri, nil, isJSConfig, merged); !ok {
 		t.Fatal("captured effective config changed after .gitignore update")
 	} else if len(input.Rules) != 1 || input.Rules[0].Name != "tpsnapshot/no-foo" {
 		t.Fatalf("captured effective config produced unexpected input: %+v", input)
@@ -601,8 +608,11 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		}}}, nil
 	}
 
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	selection, err := s.resolveLintConfigForURI(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.computeFixAllContent(context.Background(), uri, original, selection.config, selection.cwd, selection.isJS, nil, selection.merged)
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -660,8 +670,11 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	}
 
 	start := time.Now()
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	selection, err := s.resolveLintConfigForURI(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.computeFixAllContent(context.Background(), uri, original, selection.config, selection.cwd, selection.isJS, nil, selection.merged)
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped
@@ -698,7 +711,7 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil)
+	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil, nil)
 	if got != malformed {
 		t.Fatalf("syntax-error fixAll changed content to %q", got)
 	}

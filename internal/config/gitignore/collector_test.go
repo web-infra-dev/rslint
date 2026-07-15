@@ -323,7 +323,7 @@ func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
 	assert.Equal(t, globs[0], "**/dist/**/*")
 }
 
-func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
+func TestReadGitignoreAsGlobs_DefaultDirsRemainCaseSensitive(t *testing.T) {
 	mock := &gitignoreMockFS{
 		FS: osvfs.FS(),
 		entries: map[string]vfs.Entries{
@@ -337,10 +337,12 @@ func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
 	}
 
 	readGitignoreAsGlobs("/repo", mock, nil)
+	found := false
 	for _, accessed := range mock.accessedDirs {
-		if strings.EqualFold(accessed, "/repo/node_modules") {
-			t.Fatalf("case-insensitive filesystem must not scan default excluded directory %q", accessed)
-		}
+		found = found || strings.EqualFold(accessed, "/repo/node_modules")
+	}
+	if !found {
+		t.Fatal("ESLint default ignore patterns remain case-sensitive")
 	}
 }
 

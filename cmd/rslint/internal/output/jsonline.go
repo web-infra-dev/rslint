@@ -46,4 +46,19 @@ func (jsonLineFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error 
 	return nil
 }
 
+func (jsonLineFormatter) fileWarning(w *bufio.Writer, view fileWarningView) error {
+	encoded, err := json.Marshal(struct {
+		Message  string `json:"message"`
+		FilePath string `json:"filePath"`
+		Severity string `json:"severity"`
+	}{
+		Message: view.raw.Message, FilePath: view.relativePath, Severity: "warning",
+	})
+	if err != nil {
+		return err
+	}
+	w.Write(encoded)
+	return w.WriteByte('\n')
+}
+
 func (jsonLineFormatter) finish(_ *bufio.Writer, _ Report) error { return nil }

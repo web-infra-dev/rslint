@@ -15,9 +15,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { IpcClient } from '../ipc/index.js';
 import type { IpcMessage } from '../ipc/index.js';
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type ActivateConfigsRequest,
+  type EvaluateConfigPredicatesRequest,
   type LoadConfigsRequest,
 } from '../config/config-loader.js';
 
@@ -54,7 +54,6 @@ function isConfigModuleCandidate(value: unknown): boolean {
 function isLoadConfigsRequest(value: unknown): value is LoadConfigsRequest {
   return (
     isRecord(value) &&
-    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
     typeof value.transactionId === 'string' &&
     (value.loadMode === 'cached' || value.loadMode === 'fresh') &&
     (value.singleThreaded === undefined ||
@@ -69,10 +68,27 @@ function isActivateConfigsRequest(
 ): value is ActivateConfigsRequest {
   return (
     isRecord(value) &&
-    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
     typeof value.transactionId === 'string' &&
     Array.isArray(value.effectiveConfigIds) &&
     value.effectiveConfigIds.every((id) => typeof id === 'string')
+  );
+}
+
+function isEvaluateConfigPredicatesRequest(
+  value: unknown,
+): value is EvaluateConfigPredicatesRequest {
+  return (
+    isRecord(value) &&
+    typeof value.transactionId === 'string' &&
+    Array.isArray(value.calls) &&
+    value.calls.every(
+      (call) =>
+        isRecord(call) &&
+        typeof call.callId === 'string' &&
+        typeof call.predicateId === 'string' &&
+        typeof call.absolutePath === 'string' &&
+        (call.directory === undefined || typeof call.directory === 'boolean'),
+    )
   );
 }
 
@@ -327,6 +343,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
             throw error;
           }
+        }
+        case 'evaluateConfigPredicates': {
+          if (!isEvaluateConfigPredicatesRequest(msg.data)) {
+            throw new Error('engine: invalid evaluateConfigPredicates request');
+          }
+          return configModuleHost.evaluateConfigPredicates(msg.data);
         }
         case 'shutdown':
           // Go signals it's done; teardown happens via the 'exit' event below.

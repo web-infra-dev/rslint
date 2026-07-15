@@ -104,6 +104,12 @@ type LintResult struct {
 type RunLinterOptions struct {
 	Programs       []*compiler.Program
 	SingleThreaded bool
+	// ProgramViews is the exact phase-1 lint plan. When non-nil, RunLinter and
+	// CollectLintTargets use these views instead of deriving parallel state from
+	// Programs/TargetFiles/GetRulesForFile. Multiple views may safely reference
+	// one project-backed Program while carrying distinct lexical target/config
+	// identities. Phase 2 always uses the unique Programs slice.
+	ProgramViews []LintProgramView
 
 	Scope            FileScope
 	ExcludePaths     []string
@@ -125,12 +131,30 @@ type RunLinterOptions struct {
 	OnDiagnostic DiagnosticHandler
 }
 
+// LintProgramView binds one Program to one exact lexical lint-target/config
+// view. The Program graph and checker remain project-backed and shareable;
+// target paths, rule resolution, type-info eligibility, and diagnostics stay
+// local to the view. An explicitly empty TypeInfoFiles map means the view is a
+// synthesized gap Program with no reliable project type information.
+type LintProgramView struct {
+	Program           *compiler.Program
+	TargetFiles       []string
+	FileFilter        FileFilter
+	GetRulesForFile   RuleHandler
+	TypeInfoFiles     map[string]struct{}
+	OnDiagnostic      DiagnosticHandler
+	TargetPathForFile func(*ast.SourceFile) string
+}
+
 // LintSingleFileOptions configures a single-file, single-program rule pass.
 // The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
 	Program *compiler.Program
 	// File is the exact source-file name exposed by Program.
 	File string
+	// TargetPath is the caller-visible lexical host path. It may differ from
+	// File when the Program uses a compiler-only alias.
+	TargetPath string
 	// HasTypeInfo controls whether rules marked RequiresTypeInfo are eligible.
 	// Non-type-aware rules may still use the Program's checker for local analysis.
 	HasTypeInfo     bool

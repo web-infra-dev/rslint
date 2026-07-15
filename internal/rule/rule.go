@@ -251,7 +251,11 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 
 type RuleContext struct {
 	SourceFile *ast.SourceFile
-	Settings   map[string]interface{}
+	// FilePath is the caller-visible host path for SourceFile. It can differ
+	// from SourceFile.FileName() when ts-go needs a representable compiler alias
+	// for a legal host filename (for example a POSIX backslash filename).
+	FilePath string
+	Settings map[string]interface{}
 	// ConfigGlobals contains only globals from the effective
 	// `languageOptions.globals` configuration, before inline comments are
 	// applied. A false value is an explicit "off" setting.
@@ -295,6 +299,18 @@ type RuleContext struct {
 	// diagnostic at an explicit TextRange instead of a node's trimmed
 	// range.
 	ReportRangeWithFixesAndSuggestions func(textRange core.TextRange, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
+}
+
+// FileName returns the caller-visible file path. Rules whose behavior depends
+// on the current file name should use this instead of SourceFile.FileName().
+func (ctx RuleContext) FileName() string {
+	if ctx.FilePath != "" {
+		return ctx.FilePath
+	}
+	if ctx.SourceFile != nil {
+		return ctx.SourceFile.FileName()
+	}
+	return ""
 }
 
 func ReportNodeWithFixesOrSuggestions(ctx RuleContext, node *ast.Node, fix bool, msg RuleMessage, suggestionMsg RuleMessage, fixes ...RuleFix) {

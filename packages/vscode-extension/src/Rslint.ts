@@ -27,10 +27,10 @@ import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type ActivateConfigsRequest,
   type ConfigModuleActivationPlan,
+  type EvaluateConfigPredicatesRequest,
   type LoadConfigsRequest,
 } from '@rslint/core/config-loader';
 import { PluginLintPool } from './PluginLintPool';
@@ -64,7 +64,6 @@ export type ConfigRefreshReason =
   | 'dependency-change';
 
 interface ConfigRefreshRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
   reason: ConfigRefreshReason;
 }
 
@@ -497,6 +496,18 @@ export class Rslint implements Disposable {
       );
       this.requestHandlers.push(
         client.onRequest(
+          'rslint/evaluateConfigPredicates',
+          async (
+            params: EvaluateConfigPredicatesRequest,
+            token: CancellationToken,
+          ) =>
+            withCancellationSignal(token, async (requestSignal) =>
+              adapter.evaluateConfigPredicates(params, requestSignal),
+            ),
+        ),
+      );
+      this.requestHandlers.push(
+        client.onRequest(
           'rslint/commitConfigs',
           async (params: ConfigTransactionControlRequest) =>
             adapter.commitConfigs(params),
@@ -670,7 +681,6 @@ export class Rslint implements Disposable {
         return;
       }
       const request: ConfigRefreshRequest = {
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
         reason,
       };
       await client.sendRequest('rslint/configRefresh', request);

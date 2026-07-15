@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/compilerpath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -28,22 +32,36 @@ type lintProgramSet struct {
 	ConfigOrders []programConfigOrders
 }
 
-func exactFilesystemPathID(filePath string) string {
+func compilerPathID(filePath string) string {
 	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
 }
 
-func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
-	filePath = tspath.NormalizePath(filePath)
-	if fsys != nil {
+func compilerCanRepresentHostPath(filePath string) bool {
+	return compilerpath.CanRepresent(filePath)
+}
+
+func exactHostPathID(filePath string) string {
+	return hostpath.NormalizeForRoot(filePath, filePath)
+}
+
+func authoritativeHostPath(filePath string, fsys vfs.FS) string {
+	// Use the path's own root as the governing syntax so synthetic Windows
+	// paths in cross-platform tests retain drive semantics on POSIX hosts.
+	// Authored relative values never reach this physical-identity boundary.
+	filePath = hostpath.NormalizeForRoot(filePath, filePath)
+	// Compiler-owned virtual paths (for example bundled:///libs/lib.es5.d.ts)
+	// are not host filesystem operands. osvfs.Realpath intentionally requires
+	// an absolute host path and panics for these schemes.
+	if fsys != nil && hostpath.IsAbsoluteForRoot(filePath, filePath) {
 		if realPath := fsys.Realpath(filePath); realPath != "" {
-			return tspath.NormalizePath(realPath)
+			return hostpath.NormalizeForRoot(realPath, realPath)
 		}
 	}
 	return filePath
 }
 
-func canonicalFilesystemPathID(filePath string, fsys vfs.FS) string {
-	return exactFilesystemPathID(authoritativeFilesystemPath(filePath, fsys))
+func canonicalHostPathID(filePath string, fsys vfs.FS) string {
+	return exactHostPathID(authoritativeHostPath(filePath, fsys))
 }
 
 // configPathForLintTarget returns the target path used for files/ignores
@@ -63,10 +81,10 @@ func storeSourcePathMapping(mapping map[string]string, sourcePath string, canoni
 	if mapping == nil {
 		return
 	}
-	normalizedSource := tspath.NormalizePath(sourcePath)
+	normalizedSource := compilerPathID(sourcePath)
 	mapping[normalizedSource] = value
-	if canonicalSourcePath != "" {
-		mapping[exactFilesystemPathID(canonicalSourcePath)] = value
+	if canonicalSourcePath != "" && compilerCanRepresentHostPath(canonicalSourcePath) {
+		mapping[compilerPathID(canonicalSourcePath)] = value
 	}
 }
 
@@ -95,7 +113,7 @@ func createProgramSetForConfigs(
 	for _, configDir := range configDirs {
 		entries := configMap[configDir]
 		normalizedConfigDir := tspath.NormalizePath(configDir)
-		configDirID := exactFilesystemPathID(normalizedConfigDir)
+		configDirID := exactHostPathID(configDir)
 		tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, normalizedConfigDir, fsys)
 		if err != nil {
 			return lintProgramSet{}, fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
@@ -103,7 +121,7 @@ func createProgramSetForConfigs(
 
 		for order, tsconfigPath := range tsConfigs {
 			tsconfigPath = tspath.NormalizePath(tsconfigPath)
-			tsconfigID := exactFilesystemPathID(tsconfigPath)
+			tsconfigID := compilerPathID(tsconfigPath)
 			if programIndex, ok := programByTsconfig[tsconfigID]; ok {
 				if _, alreadyAssociated := set.ConfigOrders[programIndex][configDirID]; !alreadyAssociated {
 					set.ConfigOrders[programIndex][configDirID] = order
@@ -193,14 +211,43 @@ func parallelGitignoreAndPrograms(
 // createFallbackProgram creates a Program for selected lint targets not
 // included in any existing Program. It uses minimal compiler options sufficient
 // for AST parsing (no type checking).
+type fallbackProgram struct {
+	program            *compiler.Program
+	sourcePathByTarget map[string]string
+}
+
 func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
 	configDir string,
 	fsys vfs.FS,
 	parseCache *utils.ParseCache,
-) (*compiler.Program, error) {
-	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
+) (fallbackProgram, error) {
+	compilerFiles := make([]string, 0, len(gapFiles))
+	sourcePathByTarget := make(map[string]string, len(gapFiles))
+	virtualFiles := make(map[string]string)
+	reserved := make(map[string]struct{}, len(gapFiles)*2)
+	for _, filePath := range gapFiles {
+		reserved[compilerPathID(filePath)] = struct{}{}
+	}
+	for _, filePath := range gapFiles {
+		sourcePath := filePath
+		if !compilerCanRepresentHostPath(filePath) {
+			contents, ok := fsys.ReadFile(filePath)
+			if !ok {
+				return fallbackProgram{}, fmt.Errorf("read fallback lint target %q", filePath)
+			}
+			sourcePath = compilerpath.Alias(filePath, fsys, reserved)
+			virtualFiles[sourcePath] = contents
+		}
+		compilerFiles = append(compilerFiles, sourcePath)
+		sourcePathByTarget[exactHostPathID(filePath)] = sourcePath
+	}
+	compilerFS := fsys
+	if len(virtualFiles) > 0 {
+		compilerFS = utils.NewOverlayVFS(fsys, virtualFiles)
+	}
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, compilerFS), parseCache)
 	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
 		Target:    core.ScriptTargetESNext,
 		Module:    core.ModuleKindESNext,
@@ -208,21 +255,52 @@ func createFallbackProgram(
 		AllowJs:   core.TSTrue,
 		NoLib:     core.TSTrue,
 		NoResolve: core.TSTrue,
-	}, gapFiles, host)
+	}, compilerFiles, host)
 	if err != nil {
-		return nil, fmt.Errorf("create fallback Program for %d lint target(s): %w", len(gapFiles), err)
+		return fallbackProgram{}, fmt.Errorf("create fallback Program for %d lint target(s): %w", len(gapFiles), err)
 	}
-	return program, nil
+	return fallbackProgram{program: program, sourcePathByTarget: sourcePathByTarget}, nil
 }
 
 type resolvedLintTarget struct {
 	Path           string
 	CanonicalPath  string
 	OwnerConfigDir string
+	MergedConfig   *rslintconfig.MergedConfig
 }
 
 type lintTargetPlan struct {
 	Targets []resolvedLintTarget
+}
+
+// resolveDiscoveredLintTargetPlan binds Go discovery's exact lexical targets
+// to physical identities without re-running config matching or ownership.
+// Physical identity is only a Program-membership hint: ESLint preserves two
+// distinct lexical targets even when they resolve to the same file, so this
+// stage must not coalesce or reject aliases.
+func resolveDiscoveredLintTargetPlan(
+	targets []discovery.DiscoveredTarget,
+	fsys vfs.FS,
+) (lintTargetPlan, error) {
+	plan := lintTargetPlan{Targets: make([]resolvedLintTarget, 0, len(targets))}
+	for _, discovered := range targets {
+		if discovered.MergedConfig == nil {
+			return lintTargetPlan{}, fmt.Errorf("config discovery invariant: target %q has no exact merged config", discovered.Path)
+		}
+		canonicalPath := hostpath.Normalize(discovered.Path)
+		if fsys != nil {
+			if realPath := fsys.Realpath(canonicalPath); realPath != "" {
+				canonicalPath = hostpath.Normalize(realPath)
+			}
+		}
+		plan.Targets = append(plan.Targets, resolvedLintTarget{
+			Path:           hostpath.Normalize(discovered.Path),
+			CanonicalPath:  canonicalPath,
+			OwnerConfigDir: hostpath.Normalize(discovered.ConfigDirectory),
+			MergedConfig:   discovered.MergedConfig,
+		})
+	}
+	return plan, nil
 }
 
 func configsForLintTargetPlan(
@@ -242,73 +320,38 @@ func configsForLintTargetPlan(
 }
 
 func resolveLintTargetPlan(
-	configMap map[string]rslintconfig.RslintConfig,
 	rslintConfig rslintconfig.RslintConfig,
 	currentDirectory string,
-	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
 	fsys vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
 ) (lintTargetPlan, error) {
-	type targetWithOwner struct {
-		path          string
-		canonicalPath string
-		owner         string
-	}
-	var targetFiles []targetWithOwner
-	if configMap != nil {
-		for _, target := range discoverLintFilesMultiConfig(configMap, configTargetScopes, fsys, allowFiles, allowDirs, singleThreaded) {
-			targetFiles = append(targetFiles, targetWithOwner{
-				path:          target.Path,
-				canonicalPath: target.CanonicalPath,
-				owner:         target.ConfigDirectory,
-			})
-		}
-	} else {
-		for _, target := range rslintconfig.DiscoverLintTargets(rslintConfig, currentDirectory, fsys, allowFiles, allowDirs, singleThreaded) {
-			targetFiles = append(targetFiles, targetWithOwner{
-				path:          target.Path,
-				canonicalPath: target.CanonicalPath,
-				owner:         currentDirectory,
-			})
-		}
-	}
-
+	targetFiles := rslintconfig.DiscoverLintTargets(
+		rslintConfig,
+		currentDirectory,
+		fsys,
+		allowFiles,
+		allowDirs,
+		singleThreaded,
+	)
 	plan := lintTargetPlan{Targets: make([]resolvedLintTarget, 0, len(targetFiles))}
-	seenCanonical := make(map[string]resolvedLintTarget, len(targetFiles))
 	for _, discovered := range targetFiles {
-		targetPath := discovered.path
-		ownerConfigDir := discovered.owner
-		canonicalPath := tspath.NormalizePath(targetPath)
-		if discovered.canonicalPath != "" {
-			canonicalPath = tspath.NormalizePath(discovered.canonicalPath)
+		targetPath := discovered.Path
+		canonicalPath := hostpath.Normalize(targetPath)
+		if discovered.CanonicalPath != "" {
+			canonicalPath = hostpath.Normalize(discovered.CanonicalPath)
 		}
-		if discovered.canonicalPath == "" && fsys != nil {
+		if discovered.CanonicalPath == "" && fsys != nil {
 			if realPath := fsys.Realpath(canonicalPath); realPath != "" {
-				canonicalPath = tspath.NormalizePath(realPath)
+				canonicalPath = hostpath.Normalize(realPath)
 			}
 		}
-		canonicalKey := exactFilesystemPathID(canonicalPath)
-		target := resolvedLintTarget{
-			Path:           tspath.NormalizePath(targetPath),
+		plan.Targets = append(plan.Targets, resolvedLintTarget{
+			Path:           hostpath.Normalize(targetPath),
 			CanonicalPath:  canonicalPath,
-			OwnerConfigDir: tspath.NormalizePath(ownerConfigDir),
-		}
-		if existing, exists := seenCanonical[canonicalKey]; exists {
-			if canonicalFilesystemPathID(existing.OwnerConfigDir, fsys) != canonicalFilesystemPathID(target.OwnerConfigDir, fsys) {
-				return lintTargetPlan{}, fmt.Errorf(
-					"lint target aliases %q and %q resolve to the same file but are governed by different configs %q and %q",
-					existing.Path,
-					target.Path,
-					existing.OwnerConfigDir,
-					target.OwnerConfigDir,
-				)
-			}
-			continue
-		}
-		seenCanonical[canonicalKey] = target
-		plan.Targets = append(plan.Targets, target)
+			OwnerConfigDir: hostpath.Normalize(currentDirectory),
+		})
 	}
 	return plan, nil
 }
@@ -319,7 +362,7 @@ func preferredCallerTargetPaths(plan lintTargetPlan) map[string]string {
 	}
 	preferred := make(map[string]string, len(plan.Targets))
 	for _, target := range plan.Targets {
-		canonicalID := exactFilesystemPathID(target.CanonicalPath)
+		canonicalID := exactHostPathID(target.CanonicalPath)
 		if _, exists := preferred[canonicalID]; !exists {
 			preferred[canonicalID] = target.Path
 		}
@@ -328,22 +371,72 @@ func preferredCallerTargetPaths(plan lintTargetPlan) map[string]string {
 }
 
 type lintTargetBinding struct {
-	Programs                   []*compiler.Program
+	Programs              []*compiler.Program
+	Views                 []lintTargetView
+	SkipTypeCheckPrograms []bool
+	GapFiles              []string
+}
+
+// lintTargetView is the phase-1 identity of one set of lexical targets. Views
+// may share a project-backed Program, but never share config/path mappings.
+// This lets two symlink aliases use distinct nearest configs without cloning
+// the Program or losing its TypeChecker.
+type lintTargetView struct {
+	ProgramIndex               int
+	TargetFiles                []string
 	TypeInfoFiles              map[string]struct{}
-	GapFiles                   []string
-	TargetsByProgram           [][]string
 	TargetPathBySourcePath     map[string]string
 	ConfigPathBySourcePath     map[string]string
 	OwnerConfigDirBySourcePath map[string]string
+	MergedConfigBySourcePath   map[string]*rslintconfig.MergedConfig
+}
+
+func storeMergedConfigMapping(
+	mapping map[string]*rslintconfig.MergedConfig,
+	sourcePath string,
+	canonicalSourcePath string,
+	merged *rslintconfig.MergedConfig,
+) {
+	if mapping == nil || merged == nil {
+		return
+	}
+	mapping[compilerPathID(sourcePath)] = merged
+	if canonicalSourcePath != "" && compilerCanRepresentHostPath(canonicalSourcePath) {
+		mapping[compilerPathID(canonicalSourcePath)] = merged
+	}
+}
+
+func storeViewSourcePathMapping(
+	view *lintTargetView,
+	sourcePath string,
+	canonicalSourcePath string,
+	targetPath string,
+	configPath string,
+	ownerConfigDir string,
+	merged *rslintconfig.MergedConfig,
+) {
+	if view.TargetPathBySourcePath == nil {
+		view.TargetPathBySourcePath = make(map[string]string)
+		view.ConfigPathBySourcePath = make(map[string]string)
+		view.OwnerConfigDirBySourcePath = make(map[string]string)
+		view.MergedConfigBySourcePath = make(map[string]*rslintconfig.MergedConfig)
+	}
+	storeSourcePathMapping(view.TargetPathBySourcePath, sourcePath, canonicalSourcePath, targetPath)
+	storeSourcePathMapping(view.ConfigPathBySourcePath, sourcePath, canonicalSourcePath, configPath)
+	storeSourcePathMapping(view.OwnerConfigDirBySourcePath, sourcePath, canonicalSourcePath, ownerConfigDir)
+	storeMergedConfigMapping(view.MergedConfigBySourcePath, sourcePath, canonicalSourcePath, merged)
 }
 
 func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
 	if program == nil || targetPath == "" {
 		return nil
 	}
+	if !compilerCanRepresentHostPath(targetPath) {
+		return nil
+	}
 	targetPath = tspath.NormalizePath(targetPath)
 	sourceFile := program.GetSourceFile(targetPath)
-	if sourceFile == nil || exactFilesystemPathID(sourceFile.FileName()) != exactFilesystemPathID(targetPath) {
+	if sourceFile == nil || compilerPathID(sourceFile.FileName()) != compilerPathID(targetPath) {
 		return nil
 	}
 	return sourceFile
@@ -373,10 +466,13 @@ func (index *programFileIndex) sourceFile(programIndex int, canonicalTarget stri
 		programIndex < 0 || programIndex >= len(index.programs) {
 		return nil
 	}
+	if !compilerCanRepresentHostPath(canonicalTarget) {
+		return nil
+	}
 	if !index.built {
 		index.build()
 	}
-	return index.sourcesByProgram[programIndex][exactFilesystemPathID(canonicalTarget)]
+	return index.sourcesByProgram[programIndex][compilerPathID(canonicalTarget)]
 }
 
 type programSourceMembership struct {
@@ -398,7 +494,7 @@ func (index *programFileIndex) build() {
 		}
 		for _, sourceFile := range program.GetSourceFiles() {
 			sourcePath := tspath.NormalizePath(sourceFile.FileName())
-			sourcePathID := exactFilesystemPathID(sourcePath)
+			sourcePathID := compilerPathID(sourcePath)
 			sourceIndex, exists := sourceIndexByPath[sourcePathID]
 			if !exists {
 				sourceIndex = len(sourcePaths)
@@ -417,7 +513,7 @@ func (index *programFileIndex) build() {
 	work := core.NewWorkGroup(index.singleThreaded)
 	for i := range sourcePaths {
 		work.Queue(func() {
-			canonicalIDs[i] = canonicalFilesystemPathID(sourcePaths[i], index.fsys)
+			canonicalIDs[i] = compilerPathID(authoritativeHostPath(sourcePaths[i], index.fsys))
 		})
 	}
 	work.RunAndWait()
@@ -446,29 +542,41 @@ func groupFallbackTargets(
 	}
 
 	groups := make([][]resolvedLintTarget, 0, 1)
-	keysByGroup := make([]map[tspath.Path]struct{}, 0, 1)
+	keysByGroup := make([]map[string]struct{}, 0, 1)
+	canonicalKeysByGroup := make([]map[string]struct{}, 0, 1)
 	for _, gap := range gaps {
-		key := tspath.ToPath(gap.Path, currentDirectory, useCaseSensitive)
+		key := exactHostPathID(gap.Path)
+		canonicalKey := exactHostPathID(gap.CanonicalPath)
+		if !useCaseSensitive {
+			key = strings.ToLower(key)
+			canonicalKey = strings.ToLower(canonicalKey)
+		}
 		groupIndex := -1
 		for i, keys := range keysByGroup {
-			if _, exists := keys[key]; !exists {
-				groupIndex = i
-				break
+			if _, exists := keys[key]; exists {
+				continue
 			}
+			if _, exists := canonicalKeysByGroup[i][canonicalKey]; exists {
+				continue
+			}
+			groupIndex = i
+			break
 		}
 		if groupIndex == -1 {
 			groupIndex = len(groups)
 			groups = append(groups, nil)
-			keysByGroup = append(keysByGroup, make(map[tspath.Path]struct{}))
+			keysByGroup = append(keysByGroup, make(map[string]struct{}))
+			canonicalKeysByGroup = append(canonicalKeysByGroup, make(map[string]struct{}))
 		}
 		groups[groupIndex] = append(groups[groupIndex], gap)
 		keysByGroup[groupIndex][key] = struct{}{}
+		canonicalKeysByGroup[groupIndex][canonicalKey] = struct{}{}
 	}
 	return groups
 }
 
 func orderedProgramIndexesForConfig(set lintProgramSet, configDir string) []int {
-	configDirID := exactFilesystemPathID(configDir)
+	configDirID := exactHostPathID(configDir)
 	indexes := make([]int, 0, len(set.Programs))
 	for i := range set.Programs {
 		if i < len(set.ConfigOrders) {
@@ -500,17 +608,17 @@ func bindLintTargetPlan(
 	singleThreaded bool,
 ) (lintTargetBinding, error) {
 	binding := lintTargetBinding{
-		Programs:                   append([]*compiler.Program(nil), set.Programs...),
-		TargetsByProgram:           make([][]string, len(set.Programs)),
-		TypeInfoFiles:              make(map[string]struct{}),
-		TargetPathBySourcePath:     make(map[string]string),
-		ConfigPathBySourcePath:     make(map[string]string),
-		OwnerConfigDirBySourcePath: make(map[string]string),
+		Programs: append([]*compiler.Program(nil), set.Programs...),
+		Views:    make([]lintTargetView, len(set.Programs)),
+	}
+	for i := range binding.Views {
+		binding.Views[i].ProgramIndex = i
 	}
 
 	var gaps []resolvedLintTarget
 	programIndexesByConfig := make(map[string][]int)
 	programFiles := newProgramFileIndex(set.Programs, fsys, singleThreaded)
+	usedSourcesByProgram := make([]map[string]struct{}, len(set.Programs))
 	for _, target := range plan.Targets {
 		programIndexes, cached := programIndexesByConfig[target.OwnerConfigDir]
 		if !cached {
@@ -527,15 +635,31 @@ func bindLintTargetPlan(
 				continue
 			}
 			sourcePath := sourceFile.FileName()
-			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.OwnerConfigDir)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, configPathForLintTarget(target, fsys))
-			binding.TypeInfoFiles[sourcePath] = struct{}{}
-			binding.TypeInfoFiles[target.Path] = struct{}{}
-			binding.TypeInfoFiles[target.CanonicalPath] = struct{}{}
-			if tspath.NormalizePath(sourcePath) != target.Path {
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
+			viewIndex := programIndex
+			sourceID := compilerPathID(sourcePath)
+			if usedSourcesByProgram[programIndex] == nil {
+				usedSourcesByProgram[programIndex] = make(map[string]struct{})
 			}
+			if _, occupied := usedSourcesByProgram[programIndex][sourceID]; occupied {
+				// One Program exposes one SourceFile identity, while ESLint keeps
+				// every lexical input/config identity. Reuse the project-backed
+				// Program as a separate lint-only view instead of degrading the
+				// alias to a no-type-info fallback Program.
+				viewIndex = len(binding.Views)
+				binding.Views = append(binding.Views, lintTargetView{ProgramIndex: programIndex})
+			} else {
+				usedSourcesByProgram[programIndex][sourceID] = struct{}{}
+			}
+			binding.Views[viewIndex].TargetFiles = append(binding.Views[viewIndex].TargetFiles, sourcePath)
+			storeViewSourcePathMapping(
+				&binding.Views[viewIndex],
+				sourcePath,
+				target.CanonicalPath,
+				target.Path,
+				configPathForLintTarget(target, fsys),
+				target.OwnerConfigDir,
+				target.MergedConfig,
+			)
 			bound = true
 			break
 		}
@@ -555,77 +679,49 @@ func bindLintTargetPlan(
 			for _, gap := range fallbackTargets {
 				fallbackFiles = append(fallbackFiles, gap.Path)
 			}
-			fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, fsys, parseCache)
+			fallbackResult, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, fsys, parseCache)
 			if err != nil {
 				return lintTargetBinding{}, err
 			}
+			fallback := fallbackResult.program
 			if fallback == nil {
 				return lintTargetBinding{}, fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(fallbackTargets))
 			}
 			fallbackIndex := len(binding.Programs)
 			binding.Programs = append(binding.Programs, fallback)
-			binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
+			viewIndex := len(binding.Views)
+			// An explicitly empty set means no target in this synthesized
+			// Program has reliable project type information.
+			binding.Views = append(binding.Views, lintTargetView{
+				ProgramIndex:  fallbackIndex,
+				TypeInfoFiles: map[string]struct{}{},
+			})
 			for _, gap := range fallbackTargets {
-				sourceFile := exactProgramSourceFile(fallback, gap.Path)
+				sourcePath := fallbackResult.sourcePathByTarget[exactHostPathID(gap.Path)]
+				sourceFile := exactProgramSourceFile(fallback, sourcePath)
 				if sourceFile == nil {
 					return lintTargetBinding{}, fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
 				}
-				sourcePath := sourceFile.FileName()
-				binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
-				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, gap.CanonicalPath, gap.OwnerConfigDir)
-				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, gap.CanonicalPath, configPathForLintTarget(gap, fsys))
-				if tspath.NormalizePath(sourcePath) != gap.Path {
-					storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.CanonicalPath, gap.Path)
-				}
+				sourcePath = sourceFile.FileName()
+				binding.Views[viewIndex].TargetFiles = append(binding.Views[viewIndex].TargetFiles, sourcePath)
+				storeViewSourcePathMapping(
+					&binding.Views[viewIndex],
+					sourcePath,
+					gap.CanonicalPath,
+					gap.Path,
+					configPathForLintTarget(gap, fsys),
+					gap.OwnerConfigDir,
+					gap.MergedConfig,
+				)
 			}
 		}
 	}
 
-	for i := range binding.TargetsByProgram {
-		sort.Strings(binding.TargetsByProgram[i])
+	for i := range binding.Views {
+		sort.Strings(binding.Views[i].TargetFiles)
 	}
-	if len(binding.GapFiles) == 0 {
-		binding.TypeInfoFiles = nil
-	}
-	if len(binding.TargetPathBySourcePath) == 0 {
-		binding.TargetPathBySourcePath = nil
-	}
+	binding.SkipTypeCheckPrograms = buildTypeCheckSkipMask(binding.Programs)
 	return binding, nil
-}
-
-func discoverLintFilesMultiConfig(
-	configMap map[string]rslintconfig.RslintConfig,
-	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
-	fs vfs.FS,
-	allowFiles []string,
-	allowDirs []string,
-	singleThreaded bool,
-) []rslintconfig.DiscoveredLintTarget {
-	return rslintconfig.DiscoverLintTargetsMultiConfig(configMap, configTargetScopes, fs, allowFiles, allowDirs, singleThreaded)
-}
-
-func configTargetFilesByOwner(
-	configMap map[string]rslintconfig.RslintConfig,
-	scopes map[string]rslintconfig.LintDiscoveryScope,
-	fs vfs.FS,
-	allowedFiles []string,
-	singleThreaded bool,
-) map[string][]string {
-	filesByOwner := make(map[string][]string, len(configMap))
-	for _, target := range discoverLintFilesMultiConfig(
-		configMap,
-		scopes,
-		fs,
-		allowedFiles,
-		nil,
-		singleThreaded,
-	) {
-		filesByOwner[target.ConfigDirectory] = append(
-			filesByOwner[target.ConfigDirectory],
-			target.Path,
-		)
-	}
-	return filesByOwner
 }
 
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
@@ -666,30 +762,22 @@ type syntacticDiagnosticKey struct {
 	end  int
 }
 
-func collectTargetSyntacticDiagnostics(
-	programs []*compiler.Program,
-	targetsByProgram [][]string,
-	skipTypeCheck []bool,
+func collectTargetViewSyntacticDiagnostics(
+	binding lintTargetBinding,
 	typeCheck bool,
 	typeCheckOnly bool,
 ) ([]rule.RuleDiagnostic, map[string]struct{}) {
 	syntaxErrorFiles := make(map[string]struct{})
-	if len(programs) == 0 || len(targetsByProgram) == 0 {
-		return nil, syntaxErrorFiles
-	}
-
 	seen := make(map[syntacticDiagnosticKey]struct{})
 	var diagnostics []rule.RuleDiagnostic
-	for i, program := range programs {
-		// When --type-check runs, tsconfig-backed Programs surface syntactic
-		// diagnostics through the type-check phase. We still inspect every target
-		// here so the lint-rule phase can skip malformed files, matching ESLint.
-		coveredByTypeCheck := typeCheck && (i >= len(skipTypeCheck) || !skipTypeCheck[i])
-		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
+	for _, view := range binding.Views {
+		if view.ProgramIndex < 0 || view.ProgramIndex >= len(binding.Programs) {
 			continue
 		}
+		program := binding.Programs[view.ProgramIndex]
+		coveredByTypeCheck := typeCheck && (view.ProgramIndex >= len(binding.SkipTypeCheckPrograms) || !binding.SkipTypeCheckPrograms[view.ProgramIndex])
 		ctx := context.Background()
-		for _, target := range targetsByProgram[i] {
+		for _, target := range view.TargetFiles {
 			file := program.GetSourceFile(target)
 			if file == nil {
 				continue
@@ -699,13 +787,12 @@ func collectTargetSyntacticDiagnostics(
 				if coveredByTypeCheck || typeCheckOnly {
 					continue
 				}
-				loc := diagnostic.Loc()
-				key := syntacticDiagnosticKey{
-					path: file.FileName(),
-					code: diagnostic.Code(),
-					pos:  loc.Pos(),
-					end:  loc.End(),
+				filePath := file.FileName()
+				if targetPath := view.TargetPathBySourcePath[compilerPathID(filePath)]; targetPath != "" {
+					filePath = targetPath
 				}
+				loc := diagnostic.Loc()
+				key := syntacticDiagnosticKey{path: filePath, code: diagnostic.Code(), pos: loc.Pos(), end: loc.End()}
 				if _, ok := seen[key]; ok {
 					continue
 				}
@@ -713,7 +800,7 @@ func collectTargetSyntacticDiagnostics(
 				diagnostics = append(diagnostics, rule.RuleDiagnostic{
 					RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
 					SourceFile:   file,
-					FilePath:     file.FileName(),
+					FilePath:     filePath,
 					Range:        loc,
 					Message:      rule.RuleMessage{Description: diagnostic.String()},
 					Severity:     rule.SeverityError,

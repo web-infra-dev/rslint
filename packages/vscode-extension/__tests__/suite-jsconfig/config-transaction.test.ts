@@ -1,10 +1,11 @@
 import * as assert from 'node:assert';
 
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type ConfigModuleActivationPlan,
+  type EvaluateConfigPredicatesRequest,
+  type EvaluateConfigPredicatesResponse,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
 } from '@rslint/core/config-loader';
@@ -121,6 +122,7 @@ class TestConfigHost {
   readonly loadRequests: LoadConfigsRequest[] = [];
   readonly activationRequests: ActivateConfigsRequest[] = [];
   readonly deletedTransactions: string[] = [];
+  readonly predicateRequests: EvaluateConfigPredicatesRequest[] = [];
   loadError: Error | undefined;
   changedDuringPrepare = false;
   activation: ConfigModuleActivationPlan = {
@@ -171,6 +173,13 @@ class TestConfigHost {
     };
   }
 
+  async evaluateConfigPredicates(
+    request: EvaluateConfigPredicatesRequest,
+  ): Promise<EvaluateConfigPredicatesResponse> {
+    this.predicateRequests.push(request);
+    return { transactionId: request.transactionId, results: [] };
+  }
+
   deleteSession(transactionId: string): boolean {
     this.deletedTransactions.push(transactionId);
     return true;
@@ -214,7 +223,6 @@ class TestPluginPool {
 
 function loadRequest(transactionId = 'tx-1'): LoadConfigsRequest {
   return {
-    protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
     transactionId,
     loadMode: 'cached',
     candidates: [],
@@ -255,7 +263,6 @@ suite('LSP config discovery transactions', () => {
     assert.strictEqual(host.loadRequests[0].loadMode, 'fresh');
 
     const activated = await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-1',
       effectiveConfigIds: ['root'],
     });
@@ -273,7 +280,6 @@ suite('LSP config discovery transactions', () => {
     ]);
 
     const committed = await adapter.commitConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-1',
     });
     assert.deepStrictEqual(committed, {
@@ -281,7 +287,15 @@ suite('LSP config discovery transactions', () => {
       committed: true,
     });
     assert.deepStrictEqual(pool.commitCalls, ['tx-1']);
-    assert.deepStrictEqual(host.deletedTransactions, ['tx-1']);
+    assert.deepStrictEqual(host.deletedTransactions, []);
+
+    await adapter.evaluateConfigPredicates({
+      transactionId: 'tx-1',
+      calls: [],
+    });
+    assert.deepStrictEqual(host.predicateRequests, [
+      { transactionId: 'tx-1', calls: [] },
+    ]);
   });
 
   test('a rejected commit retains the session until Go aborts it', async () => {
@@ -296,13 +310,11 @@ suite('LSP config discovery transactions', () => {
 
     await adapter.loadConfigs(loadRequest('tx-abort'));
     await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-abort',
       effectiveConfigIds: ['root'],
     });
     await assert.rejects(
       adapter.commitConfigs({
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
         transactionId: 'tx-abort',
       }),
       /failed to commit plugin-host generation/,
@@ -310,7 +322,6 @@ suite('LSP config discovery transactions', () => {
     assert.deepStrictEqual(host.deletedTransactions, []);
 
     const aborted = await adapter.abortConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-abort',
     });
     assert.deepStrictEqual(aborted, {
@@ -332,7 +343,6 @@ suite('LSP config discovery transactions', () => {
 
     await adapter.loadConfigs(loadRequest('old-process-tx'));
     await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'old-process-tx',
       effectiveConfigIds: ['root'],
     });
@@ -342,7 +352,6 @@ suite('LSP config discovery transactions', () => {
 
     await adapter.loadConfigs(loadRequest('new-process-tx'));
     const activation = await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'new-process-tx',
       effectiveConfigIds: ['root'],
     });
@@ -397,7 +406,6 @@ suite('LSP config discovery transactions', () => {
 
     await adapter.loadConfigs(loadRequest('tx-degraded'));
     const activated = await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-degraded',
       effectiveConfigIds: ['root'],
     });
@@ -408,13 +416,12 @@ suite('LSP config discovery transactions', () => {
     });
 
     const committed = await adapter.commitConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-degraded',
     });
     assert.strictEqual(committed.committed, true);
     assert.deepStrictEqual(pool.commitCalls, ['tx-degraded']);
     assert.deepStrictEqual(pool.abortCalls, []);
-    assert.deepStrictEqual(host.deletedTransactions, ['tx-degraded']);
+    assert.deepStrictEqual(host.deletedTransactions, []);
   });
 
   test('a config rewrite during plugin prepare aborts without commit or leaked session', async () => {
@@ -432,7 +439,6 @@ suite('LSP config discovery transactions', () => {
     await adapter.loadConfigs(loadRequest('tx-prepare-race'));
     await assert.rejects(
       adapter.activateConfigs({
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
         transactionId: 'tx-prepare-race',
         effectiveConfigIds: ['root'],
       }),
@@ -454,17 +460,14 @@ suite('LSP config discovery transactions', () => {
 
     await adapter.loadConfigs(loadRequest('tx-response-lost'));
     await adapter.activateConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-response-lost',
       effectiveConfigIds: ['root'],
     });
     await adapter.commitConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-response-lost',
     });
 
     const aborted = await adapter.abortConfigs({
-      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
       transactionId: 'tx-response-lost',
     });
     assert.deepStrictEqual(aborted, {
@@ -473,10 +476,48 @@ suite('LSP config discovery transactions', () => {
     });
     assert.deepStrictEqual(pool.commitCalls, ['tx-response-lost']);
     assert.deepStrictEqual(pool.abortCalls, ['tx-response-lost']);
-    assert.deepStrictEqual(host.deletedTransactions, [
-      'tx-response-lost',
-      'tx-response-lost',
-    ]);
+    assert.deepStrictEqual(host.deletedTransactions, ['tx-response-lost']);
+  });
+
+  test('keeps active and rollback sessions until a later commit proves them obsolete', async () => {
+    const host = new TestConfigHost();
+    const pool = new TestPluginPool();
+    const adapter = new LspConfigTransactionAdapter(
+      host,
+      pool,
+      () => 'fingerprint-generations',
+    );
+    const commit = async (transactionId: string): Promise<void> => {
+      await adapter.loadConfigs(loadRequest(transactionId));
+      await adapter.activateConfigs({
+        transactionId,
+        effectiveConfigIds: ['root'],
+      });
+      await adapter.commitConfigs({ transactionId });
+    };
+
+    await commit('tx-a');
+    await commit('tx-b');
+    assert.deepStrictEqual(host.deletedTransactions, []);
+
+    // Committing C proves Go received B's response, so A can finally be
+    // released while B remains available for compensating rollback.
+    await commit('tx-c');
+    assert.deepStrictEqual(host.deletedTransactions, ['tx-a']);
+
+    await adapter.abortConfigs({ transactionId: 'tx-c' });
+    assert.deepStrictEqual(host.deletedTransactions, ['tx-a', 'tx-c']);
+    await adapter.evaluateConfigPredicates({
+      transactionId: 'tx-b',
+      calls: [],
+    });
+    assert.deepStrictEqual(host.predicateRequests.at(-1), {
+      transactionId: 'tx-b',
+      calls: [],
+    });
+
+    adapter.dispose();
+    assert.deepStrictEqual(host.deletedTransactions, ['tx-a', 'tx-c', 'tx-b']);
   });
 
   test('a failed module-host request cannot leak transaction state', async () => {

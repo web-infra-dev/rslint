@@ -130,6 +130,10 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 		return
 	}
 
+	// Cycle closure is a Program-graph identity comparison. Imported targets
+	// expose SourceFile.FileName(), so the starting node must stay in the same
+	// compiler path space; caller-visible ctx.FileName() is only for reporting
+	// and path-context APIs.
 	myPath := ctx.SourceFile.FileName()
 	if myPath == "" || myPath == "<text>" {
 		return

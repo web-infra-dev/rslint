@@ -15,10 +15,13 @@ import (
 )
 
 type defaultFormatter struct {
-	colors colorScheme
+	colors        colorScheme
+	suppressEmpty bool
+	hasVisible    bool
 }
 
 func (f *defaultFormatter) begin(w *bufio.Writer, _ Report, hasVisibleDiagnostics bool) error {
+	f.hasVisible = hasVisibleDiagnostics
 	if hasVisibleDiagnostics {
 		return w.WriteByte('\n')
 	}
@@ -30,7 +33,15 @@ func (f *defaultFormatter) diagnostic(w *bufio.Writer, view diagnosticView) erro
 	return nil
 }
 
+func (f *defaultFormatter) fileWarning(w *bufio.Writer, view fileWarningView) error {
+	fmt.Fprintf(w, "%s: %s %s\n", f.colors.WarnText("warning"), f.colors.FileName("%s", view.relativePath), view.raw.Message)
+	return nil
+}
+
 func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
+	if f.suppressEmpty && !f.hasVisible {
+		return nil
+	}
 	// Preserve the existing timing boundary: diagnostics are flushed to the
 	// real destination before the summary duration is measured.
 	if err := w.Flush(); err != nil {

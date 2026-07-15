@@ -42,8 +42,8 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 		},
 		{
 			name:       "escaping significant spaces and literal braces",
-			gitignores: map[string]string{".gitignore": "\\!important.ts\n\\#generated.ts\ntrailing\\ \n leading.ts\nliteral\\*.ts\n{one,two}.ts\n"},
-			files:      []string{"!important.ts", "#generated.ts", "trailing ", "trailing", " leading.ts", "leading.ts", "literal*.ts", "literal-one.ts", "{one,two}.ts", "one.ts"},
+			gitignores: map[string]string{".gitignore": "\\!important.ts\n\\#generated.ts\n/\\!root-important.ts\n/\\#root-generated.ts\ntrailing\\ \n leading.ts\nliteral\\*.ts\n{one,two}.ts\n@(foo).js\n+(foo).js\n?(foo).js\n*(foo).js\n"},
+			files:      []string{"!important.ts", "#generated.ts", "root-important.ts", "root-generated.ts", "trailing ", "trailing", " leading.ts", "leading.ts", "literal*.ts", "literal-one.ts", "{one,two}.ts", "one.ts", "@(foo).js", "+(foo).js", "a(foo).js", "abc(foo).js", "foo.js"},
 		},
 		{
 			name:       "directory parent propagation",
@@ -170,7 +170,7 @@ func collectGitignoreGlobsForTest(configDir string, fsys vfs.FS, configIgnores [
 		base = config.RslintConfig{{Ignores: configIgnores}}
 	}
 	effective := config.ConfigWithGitignore(base, configDir, fsys, nil)
-	if len(effective) == len(base) {
+	if len(effective) == 0 || effective[0].Name == "rslint/default-ignores" {
 		return nil
 	}
 	return effective[0].Ignores
@@ -178,7 +178,7 @@ func collectGitignoreGlobsForTest(configDir string, fsys vfs.FS, configIgnores [
 
 func collectGitignoreGlobsForFilesForTest(configDir string, fsys vfs.FS, files []string) []string {
 	effective := config.ConfigWithGitignore(config.RslintConfig{}, configDir, fsys, files)
-	if len(effective) == 0 {
+	if len(effective) == 0 || effective[0].Name == "rslint/default-ignores" {
 		return nil
 	}
 	return effective[0].Ignores
@@ -208,7 +208,7 @@ func TestConfigWithGitignore_DefaultAndExplicitScopes(t *testing.T) {
 	assert.Assert(t, !explicit.IsFileIgnored(tspath.ResolvePath(dir, "nested/private.ts"), dir))
 
 	empty := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{})
-	assert.Equal(t, len(empty), len(base))
+	assert.Equal(t, len(empty), len(base)+1)
 	assert.Assert(t, base[0].Ignores == nil, "ConfigWithGitignore mutated its input: %v", base)
 }
 
@@ -260,7 +260,7 @@ func TestConfigWithGitignore_ExplicitTargetOutsideConfigTreeDoesNotReadExternalG
 	}
 	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 	effective := config.ConfigWithGitignore(base, configDir, osvfs.FS(), []string{target})
-	assert.Equal(t, len(effective), len(base))
+	assert.Equal(t, len(effective), len(base)+1)
 	assert.Assert(t, !effective.IsFileIgnored(target, configDir))
 }
 
@@ -277,7 +277,7 @@ func TestConfigWithGitignore_ExplicitMatchesDefaultPruning(t *testing.T) {
 	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
 	explicit := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
 	assert.Equal(t, explicit.IsFileIgnored(target, dir), full.IsFileIgnored(target, dir))
-	assert.Assert(t, !explicit.IsFileIgnored(target, dir))
+	assert.Assert(t, explicit.IsFileIgnored(target, dir))
 }
 
 func TestConfigWithGitignore_FullWalkHonorsOrderedDirectoryReinclude(t *testing.T) {
@@ -290,7 +290,7 @@ func TestConfigWithGitignore_FullWalkHonorsOrderedDirectoryReinclude(t *testing.
 	effective := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
 
 	files := config.DiscoverLintFiles(effective, dir, osvfs.FS(), nil, nil, true)
-	assert.DeepEqual(t, files, []string{tspath.ResolvePath(dir, "rstest/coverage/keep.ts")})
+	assert.DeepEqual(t, files, []string{})
 }
 
 func TestConfigWithGitignore_ConfigNegationCanOverride(t *testing.T) {
@@ -328,8 +328,8 @@ func TestConfigWithGitignore_ConfigNegationCanOverrideBareGitPattern(t *testing.
 		config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
 		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
 	} {
-		assert.Assert(t, !effective.IsFileIgnored(target, dir))
-		assert.Assert(t, effective.GetConfigForFile(target, dir) != nil)
+		assert.Assert(t, effective.IsFileIgnored(target, dir))
+		assert.Assert(t, effective.GetConfigForFile(target, dir) == nil)
 	}
 }
 

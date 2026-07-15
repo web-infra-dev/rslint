@@ -154,6 +154,9 @@ export interface ESLintPlugin {
   [key: string]: unknown;
 }
 
+/** A synchronous ESLint flat-config path matcher. */
+export type ConfigPathMatcher = string | ((absolutePath: string) => boolean);
+
 /**
  * A single entry in an rslint config array. Multiple entries may target
  * different file globs and are merged at lint time.
@@ -162,6 +165,12 @@ export interface RslintConfigEntry {
   /** Optional human-readable name for this config entry. */
   name?: string;
   /**
+   * Directory that `files` and `ignores` in this entry are relative to.
+   * Relative paths use the effective config base: an automatically discovered
+   * config's directory, or the invocation cwd for explicit/inline config.
+   */
+  basePath?: string;
+  /**
    * Glob selectors for files this entry applies to. Top-level selectors are
    * ORed; strings inside one nested array are ANDed, matching ESLint flat
    * config semantics.
@@ -169,14 +178,14 @@ export interface RslintConfigEntry {
    * @example
    * files: ['src/**', 'tests/**']
    */
-  files?: Array<string | string[]>;
+  files?: Array<ConfigPathMatcher | ConfigPathMatcher[]>;
   /**
    * Glob patterns excluded from this entry.
    *
    * @example
    * ignores: ['node_modules/**', 'dist/**']
    */
-  ignores?: string[];
+  ignores?: ConfigPathMatcher[];
   /** Language-level configuration (parser, etc.). */
   languageOptions?: LanguageOptions;
   /**

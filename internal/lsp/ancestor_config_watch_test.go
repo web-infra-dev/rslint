@@ -25,13 +25,14 @@ func TestAncestorJSConfigFileWatchersExcludeWorkspace(t *testing.T) {
 		"file:///workspace",
 		"file:///",
 	}
-	wantCount := len(wantBases) * len(discovery.AutoJSConfigFileNames)
+	configFileNames := discovery.AutoJSConfigFileNames()
+	wantCount := len(wantBases) * len(configFileNames)
 	if len(watchers) != wantCount {
 		t.Fatalf("watcher count=%d, want %d", len(watchers), wantCount)
 	}
 	for directoryIndex, wantBase := range wantBases {
-		for configIndex, wantName := range discovery.AutoJSConfigFileNames {
-			index := directoryIndex*len(discovery.AutoJSConfigFileNames) + configIndex
+		for configIndex, wantName := range configFileNames {
+			index := directoryIndex*len(configFileNames) + configIndex
 			relative := watchers[index].GlobPattern.RelativePattern
 			if relative == nil || relative.BaseUri.URI == nil ||
 				string(*relative.BaseUri.URI) != wantBase || relative.Pattern != wantName {
@@ -148,7 +149,7 @@ func TestAncestorJSConfigWatcherRefreshesChangedAndDeletedActiveConfig(t *testin
 	if err := awaitConfigWatchEvent(t, changed); err != nil {
 		t.Fatalf("changed ancestor config refresh failed: %v", err)
 	}
-	if got := s.jsConfigs[ancestor][0].Rules["no-debugger"]; got != "error" {
+	if got, ok := configRuleValue(s.jsConfigs[ancestor], "no-debugger"); !ok || got != "error" {
 		t.Fatalf("changed ancestor config was not committed: %+v", s.jsConfigs)
 	}
 
@@ -197,15 +198,6 @@ func TestAncestorJSConfigWatcherDiscoversNewNearerConfig(t *testing.T) {
 	s.configDiscoveryActive = true
 	created := startConfigWatchEvent(s, nearerConfigPath, lsproto.FileChangeTypeCreated)
 
-	outerLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	outerRequest, outerResponse := loadedConfigResponse(t, outerLoad, config.RslintConfig{{
-		Rules: config.Rules{"no-console": "error"},
-	}})
-	if got := outerRequest.Candidates[0].ConfigDirectory; got != outer {
-		t.Fatalf("outer candidate directory=%q, want %q", got, outer)
-	}
-	respondToConfigReverseRequest(t, s, outerLoad, outerResponse, nil)
-
 	nearerLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	nearerRequest, nearerResponse := loadedConfigResponse(t, nearerLoad, config.RslintConfig{{
 		Rules: config.Rules{"no-debugger": "error"},
@@ -224,7 +216,10 @@ func TestAncestorJSConfigWatcherDiscoversNewNearerConfig(t *testing.T) {
 	if !ok || owner != nearer {
 		t.Fatalf("workspace config owner=%q, ok=%t; want nearer ancestor %q", owner, ok, nearer)
 	}
-	if got := s.jsConfigs[nearer][0].Rules["no-debugger"]; got != "error" {
+	if len(s.jsConfigs) != 1 {
+		t.Fatalf("ancestor lookup loaded non-nearest configs: %+v", s.jsConfigs)
+	}
+	if got, ok := configRuleValue(s.jsConfigs[nearer], "no-debugger"); !ok || got != "error" {
 		t.Fatalf("nearer ancestor config was not committed: %+v", s.jsConfigs)
 	}
 }
@@ -248,8 +243,11 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 	installLastGoodConfig(s, ancestor)
 	s.configDiscoveryActive = true
 	uri := documentURIFromPath(target)
-	effective, configDir, _ := s.getLintConfigForURI(uri)
-	if effective.IsFileIgnored(target, configDir) {
+	selection, err := s.resolveLintConfigForURI(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selection.merged == nil {
 		t.Fatal("target was ignored before the ancestor-chain .gitignore existed")
 	}
 
@@ -271,11 +269,14 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 		t.Fatalf("ancestor-chain .gitignore refresh failed: %v", err)
 	}
 
-	effective, configDir, _ = s.getLintConfigForURI(uri)
-	if configDir != ancestor {
-		t.Fatalf("effective config directory=%q, want %q", configDir, ancestor)
+	selection, err = s.resolveLintConfigForURI(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !effective.IsFileIgnored(target, configDir) {
+	if selection.cwd != ancestor {
+		t.Fatalf("effective config directory=%q, want %q", selection.cwd, ancestor)
+	}
+	if selection.merged != nil {
 		t.Fatal("ancestor-chain .gitignore was not committed into the active snapshot")
 	}
 }
@@ -316,7 +317,7 @@ func TestConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
 	if s.rslintConfigPath != jsonPath {
 		t.Fatalf("JSON fallback path=%q, want last-good %q", s.rslintConfigPath, jsonPath)
 	}
-	if got := s.jsConfigs[workspace][0].Rules["no-console"]; got != "error" {
+	if got, ok := configRuleValue(s.jsConfigs[workspace], "no-console"); !ok || got != "error" {
 		t.Fatalf("rejected refresh mutated live JS config: %+v", s.jsConfigs)
 	}
 }

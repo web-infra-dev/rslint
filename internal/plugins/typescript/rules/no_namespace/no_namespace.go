@@ -72,7 +72,7 @@ var NoNamespaceRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if we're in a .d.ts file and allowDefinitionFiles is true
-				if opts.AllowDefinitionFiles != nil && *opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+				if opts.AllowDefinitionFiles != nil && *opts.AllowDefinitionFiles && strings.HasSuffix(ctx.FileName(), ".d.ts") {
 					return
 				}
 

@@ -59,16 +59,18 @@ const (
 	// KindLoadConfigs asks a capable Node host to evaluate one Go-discovered
 	// config frontier.
 	KindLoadConfigs ipc.MessageKind = "loadConfigs"
+	// KindEvaluateConfigPredicates asks Node to synchronously execute the live
+	// files/ignores matcher barriers reached by Go's ConfigArray evaluator.
+	KindEvaluateConfigPredicates ipc.MessageKind = "evaluateConfigPredicates"
 	// KindActivateConfigs asks Node to validate and prepare the final effective
 	// config/plugin generation before Go commits it.
 	KindActivateConfigs ipc.MessageKind = "activateConfigs"
 )
 
 // Version is the IPC protocol version.
-const Version = "2.0.0"
+const Version = "3.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
-const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
@@ -86,10 +88,6 @@ type HandshakeResponse struct {
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
 	Files []string `json:"files,omitempty"`
-	// CanonicalFiles is parallel to Files when the host already resolved physical
-	// identity. Go uses these paths for this request instead of repeating realpath
-	// calls; omitted by lower-level clients that have no pre-resolved identity.
-	CanonicalFiles []string `json:"canonicalFiles,omitempty"`
 	// Config is the low-level, already-resolved RslintConfig path used by WASM
 	// and custom service clients. High-level native callers normally leave it
 	// empty and use ConfigDiscovery: Go then discovers candidates/ownership and
@@ -105,8 +103,8 @@ type LintRequest struct {
 	// files / ignores / parserOptions.project. Defaults to the working dir.
 	ConfigDirectory string `json:"configDirectory,omitempty"`
 	// PluginConfigDirectory is the opaque worker routing key for community
-	// plugins. It can differ from ConfigDirectory when overrideConfig rebases
-	// authored path patterns to the API cwd.
+	// plugins. It may differ from ConfigDirectory for low-level clients; staged
+	// high-level discovery uses each catalog owner's config directory.
 	PluginConfigDirectory string            `json:"pluginConfigDirectory,omitempty"`
 	WorkingDirectory      string            `json:"workingDirectory,omitempty"`
 	FileContents          map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
@@ -122,15 +120,14 @@ type LintRequest struct {
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
 
-// ConfigDiscoveryRequest is the API-facing scope for Go's shared staged
-// discovery coordinator. Files themselves remain in LintRequest.Files.
+// ConfigDiscoveryRequest is the API-facing scope for Go's staged,
+// pattern-aware discovery coordinator.
 type ConfigDiscoveryRequest struct {
 	Mode               string `json:"mode"`
 	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
-	// Directories are static roots for the already-expanded Files set. Go limits
-	// config discovery below them to branches that can govern those files.
-	Directories    []string        `json:"directories,omitempty"`
-	ExplicitFiles  []bool          `json:"explicitFiles,omitempty"`
+	// Inputs are the raw lintFiles patterns (or lintText's one direct file).
+	// Go performs stat classification and config-aware expansion.
+	Inputs         []string        `json:"inputs"`
 	OverrideConfig json.RawMessage `json:"overrideConfig,omitempty"`
 }
 
@@ -145,6 +142,10 @@ type ByteArray []byte
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
+	// FileWarnings carries ESLint-style results for literal inputs that were
+	// ignored or had no matching config. They are not linted files and therefore
+	// remain separate from Diagnostics and LintedFiles.
+	FileWarnings []FileWarning `json:"fileWarnings,omitempty"`
 	// ErrorCount / WarningCount are split by severity (ESLint semantics):
 	// ErrorCount counts only error-severity diagnostics, NOT the total.
 	ErrorCount   int `json:"errorCount"`
@@ -160,18 +161,21 @@ type LintResponse struct {
 	// This is the same path space as Diagnostic.FilePath and Output. The JS side
 	// seeds one LintResult per entry, so ignored glob matches yield no phantom
 	// results. Present for lintFiles; lintText seeds its own explicit path.
-	//
-	// MUST NOT be omitempty: an all-ignored lint produces an empty (non-nil)
-	// slice that has to serialize as `[]`, distinct from an old binary that
-	// omits the field entirely. The JS glob-fallback keys on the field's
-	// ABSENCE, so collapsing empty→absent would re-seed phantom empty results.
 	LintedFiles []string `json:"lintedFiles"`
+	// ResultFiles is the stable ESLint result-array order, including literal
+	// warning-only files. It is always present, including as an empty array.
+	ResultFiles []string `json:"resultFiles"`
 	// Output holds the fixed source per file, present only when Fix was
 	// requested and at least one fix applied (ESLint LintResult.output, but
 	// keyed by file path since one lint covers many files). The JS side writes
 	// these back via Rslint.outputFixes.
 	Output             map[string]string    `json:"output,omitempty"`
 	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
+}
+
+type FileWarning struct {
+	FilePath string `json:"filePath"`
+	Message  string `json:"message"`
 }
 
 // Position represents a position in a file
@@ -334,10 +338,7 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 		}
 		var capabilities []string
 		if _, ok := s.handler.(BidirectionalHandler); ok {
-			capabilities = []string{
-				CapabilityReversePluginLint,
-				CapabilityReverseConfigLoad,
-			}
+			capabilities = []string{CapabilityReversePluginLint}
 		}
 		return HandshakeResponse{
 			Version:      Version,
@@ -362,12 +363,9 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 				return nil, errors.New("API peer does not advertise reversePluginLint capability")
 			}
 		}
-		if req.ConfigDiscovery != nil {
+		if req.ConfigDiscovery != nil && req.ConfigDiscovery.Mode != "inline" {
 			if !bidirectional {
 				return nil, errors.New("API handler does not support reverseConfigLoad requests")
-			}
-			if _, ok := s.peerCapabilities[CapabilityReverseConfigLoad]; !ok {
-				return nil, errors.New("API peer does not advertise reverseConfigLoadV1 capability")
 			}
 		}
 		if bidirectional {

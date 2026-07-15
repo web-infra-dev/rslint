@@ -3,6 +3,7 @@
  */
 import type {
   ActivateConfigsRequest,
+  EvaluateConfigPredicatesRequest,
   LoadConfigsRequest,
 } from './config/config-discovery-protocol.js';
 
@@ -45,6 +46,8 @@ export interface Diagnostic {
 
 export interface LintResponse {
   diagnostics: Diagnostic[];
+  /** Literal inputs skipped by config/default/.gitignore matching. */
+  fileWarnings?: Array<{ filePath: string; message: string }>;
   // errorCount / warningCount are split by severity (ESLint semantics):
   // errorCount counts only error-severity diagnostics, not the total.
   errorCount: number;
@@ -57,16 +60,16 @@ export interface LintResponse {
   // Files actually linted (config `ignores` excluded), each a requested target
   // path relative to configDirectory — same path space as Diagnostic.filePath.
   // Present for lintFiles so the Rslint class seeds one result per linted file.
-  lintedFiles?: string[];
+  lintedFiles: string[];
+  // Stable result-array order, including direct inputs represented only by a
+  // file warning.
+  resultFiles: string[];
   output?: Record<string, string>; // Per-file fixed source, present when fix:true applied a fix
   encodedSourceFiles?: Record<string, string>; // Binary encoded source files as base64-encoded strings
 }
 
 export interface LintOptions {
   files?: string[];
-  // Optional physical paths parallel to files. High-level Node APIs provide
-  // these after target planning so Go does not repeat realpath resolution.
-  canonicalFiles?: string[];
   // A caller-supplied, already normalized config (normalizeConfig output:
   // plain objects, plugins as string[], no live functions). High-level Node
   // APIs normally use configDiscovery instead; overrideConfigFile:true uses
@@ -82,12 +85,10 @@ export interface LintOptions {
    * backends intentionally do not advertise this host-filesystem capability.
    */
   configDiscovery?: {
-    mode: 'auto' | 'explicit';
+    mode: 'auto' | 'explicit' | 'inline';
     explicitConfigPath?: string;
-    /** Static glob roots; Go visits only branches leading to the supplied files. */
-    directories?: string[];
-    /** Parallel to `files`; true only for caller-literal file targets. */
-    explicitFiles?: boolean[];
+    /** Raw lint patterns. Native Go owns stat classification and expansion. */
+    inputs: string[];
     /** Normalized API override entries appended to every selected config. */
     overrideConfig?: Record<string, unknown>[];
   };
@@ -133,6 +134,9 @@ export type InboundRequestHandler = (message: IpcMessage) => unknown;
 export interface LintInboundHandlers {
   pluginLint?: (request: unknown) => unknown;
   loadConfigs?: (request: LoadConfigsRequest) => unknown;
+  evaluateConfigPredicates?: (
+    request: EvaluateConfigPredicatesRequest,
+  ) => unknown;
   activateConfigs?: (request: ActivateConfigsRequest) => unknown;
 }
 

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runEngine } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
+import { resolveRslintBinary } from '../src/internal/resolve-binary.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FAKE_BIN = path.resolve(__dirname, './fixtures/fake-ipc-binary.cjs');
@@ -52,6 +53,71 @@ describe('runEngine init payload TTY fact', () => {
     const { exitCode, payload } = await runWithSink(new PassThrough());
     expect(exitCode).toBe(0);
     expect(payload.runtime?.stdoutIsTTY).toBe(false);
+  });
+});
+
+describe('runEngine live config predicates', () => {
+  test('the real CLI evaluates each visited path once and reuses its selection', async () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'rslint-cli-predicate-'),
+    );
+    const marker = path.join(root, 'predicate-calls.log');
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    let output = '';
+    let errors = '';
+    stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    stderr.on('data', (chunk: Buffer) => {
+      errors += chunk.toString();
+    });
+    fs.writeFileSync(
+      path.join(root, 'rslint.config.mjs'),
+      [
+        "import { appendFileSync } from 'node:fs';",
+        "const marker = new URL('./predicate-calls.log', import.meta.url);",
+        'export default [{',
+        '  files: [(filePath) => {',
+        '    appendFileSync(marker, `${filePath}\\n`);',
+        "    return filePath.endsWith('keep.ts');",
+        '  }],',
+        "  rules: { 'no-debugger': 'error' },",
+        '}];',
+        '',
+      ].join('\n'),
+    );
+    fs.writeFileSync(path.join(root, 'keep.ts'), 'debugger;\n');
+    fs.writeFileSync(path.join(root, 'drop.ts'), 'debugger;\n');
+
+    try {
+      const exitCode = await runEngine({
+        binPath: resolveRslintBinary(),
+        goArgs: ['--start-time=0'],
+        cwd: root,
+        runtime: { singleThreaded: true },
+        extraInit: {
+          configDiscovery: { mode: 'auto', inputs: ['*.ts'] },
+        },
+        stdout,
+        stderr,
+      });
+      expect(exitCode).toBe(1);
+      expect(errors).toBe('');
+      expect(output).toContain('keep.ts');
+      expect(output).toContain('no-debugger');
+      expect(output).not.toContain('drop.ts');
+
+      const evaluated = fs
+        .readFileSync(marker, 'utf8')
+        .trim()
+        .split('\n')
+        .map((filePath) => path.basename(filePath))
+        .sort();
+      expect(evaluated).toEqual(['drop.ts', 'keep.ts', 'rslint.config.mjs']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

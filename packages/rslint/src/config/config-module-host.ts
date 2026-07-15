@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -7,10 +7,10 @@ import {
   loadConfigFile,
   loadConfigFileFresh,
   normalizeConfig,
+  type ConfigPredicate,
   type PluginConfigDescriptor,
 } from './config-file-loader.js';
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type ConfigModuleCandidate,
@@ -18,6 +18,8 @@ import {
   type ConfigModuleLoadMode,
   type ConfigModuleLoadResult,
   type FailedConfigModuleResult,
+  type EvaluateConfigPredicatesRequest,
+  type EvaluateConfigPredicatesResponse,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
 } from './config-discovery-protocol.js';
@@ -67,6 +69,7 @@ interface StoredLoadedResult {
   /** JSON is the immutable session copy and exactly matches the wire shape. */
   entriesJSON: string;
   sourceFingerprint: string;
+  predicatesById: Map<string, ConfigPredicate>;
 }
 
 type StoredLoadResult = StoredLoadedResult | FailedConfigModuleResult;
@@ -75,8 +78,19 @@ interface ConfigModuleSession {
   loadMode: ConfigModuleLoadMode;
   singleThreaded: boolean;
   candidatesById: Map<string, StoredCandidate>;
-  idByConfigPath: Map<string, string>;
+  candidateLoadsById: Map<
+    string,
+    { candidate: ConfigModuleCandidate; promise: Promise<StoredLoadResult> }
+  >;
+  sourceByConfigPath: Map<string, Promise<LoadedConfigSource>>;
+  predicatesById: Map<string, ConfigPredicate>;
+  effectivePredicateIds?: Set<string>;
   operation: Promise<void>;
+}
+
+interface LoadedConfigSource {
+  rawConfig: unknown;
+  sourceFingerprint: string;
 }
 
 class ConfigSourceChangedError extends Error {
@@ -194,8 +208,8 @@ function errorPayload(
  * Executes config modules on behalf of Go's discovery coordinator.
  *
  * A host may serve multiple concurrent discovery transactions. Operations in
- * one transaction are serialized (frontier batches can safely build on earlier
- * batches), while separate transactions remain independent. Call
+ * one transaction may load independent candidates concurrently, while
+ * activation and predicate operations remain serialized after discovery. Call
  * deleteSession after commit/abort so normalized entries do not remain live.
  */
 export class ConfigModuleHost {
@@ -224,39 +238,42 @@ export class ConfigModuleHost {
       request.loadMode,
       request.singleThreaded === true,
     );
-    return this.#enqueue(session, async () => {
+    const run = async (): Promise<LoadConfigsResponse> => {
       assertNotAborted(signal);
       this.#validateCandidateBatch(session, candidates);
 
-      const newCandidates = candidates.filter(
-        ({ id }) => !session.candidatesById.has(id),
-      );
-      let loaded: StoredLoadResult[];
+      const load = (candidate: ConfigModuleCandidate) => {
+        const stored = session.candidatesById.get(candidate.id);
+        if (stored) return Promise.resolve(stored.result);
+        const inFlight = session.candidateLoadsById.get(candidate.id);
+        if (inFlight) return inFlight.promise;
+        const promise = this.#loadCandidate(candidate, session);
+        session.candidateLoadsById.set(candidate.id, { candidate, promise });
+        return promise;
+      };
+      const loaded: StoredLoadResult[] = [];
       if (request.singleThreaded) {
-        loaded = [];
-        for (const candidate of newCandidates) {
-          loaded.push(await this.#loadCandidate(candidate, session.loadMode));
-        }
+        for (const candidate of candidates) loaded.push(await load(candidate));
       } else {
-        loaded = await Promise.all(
-          newCandidates.map(async (candidate) => {
-            const result = await this.#loadCandidate(
-              candidate,
-              session.loadMode,
-            );
-            return result;
-          }),
-        );
+        loaded.push(...(await Promise.all(candidates.map(load))));
       }
       // Module evaluation itself cannot always be interrupted. Do not publish
       // any of its results into session state after a superseding transaction.
       assertNotAborted(signal);
 
-      for (let index = 0; index < newCandidates.length; index++) {
-        const candidate = newCandidates[index];
+      for (let index = 0; index < candidates.length; index++) {
+        const candidate = candidates[index];
         const result = loaded[index];
-        session.candidatesById.set(candidate.id, { candidate, result });
-        session.idByConfigPath.set(candidate.configPath, candidate.id);
+        const alreadyStored = session.candidatesById.has(candidate.id);
+        if (!alreadyStored) {
+          session.candidatesById.set(candidate.id, { candidate, result });
+          session.candidateLoadsById.delete(candidate.id);
+        }
+        if (!alreadyStored && result.status === 'loaded') {
+          for (const [predicateId, predicate] of result.predicatesById) {
+            session.predicatesById.set(predicateId, predicate);
+          }
+        }
       }
 
       return {
@@ -271,7 +288,8 @@ export class ConfigModuleHost {
           return cloneStoredResult(stored.result);
         }),
       };
-    });
+    };
+    return request.singleThreaded ? this.#enqueue(session, run) : run();
   }
 
   /**
@@ -339,7 +357,78 @@ export class ConfigModuleHost {
     await prepare?.(plan);
     assertNotAborted(signal);
     await this.#verifyEffectiveConfigs(request, signal);
+    this.#markEffectivePredicates(request);
     return response;
+  }
+
+  /**
+   * Execute exactly the live matcher barriers selected by Go. Calls are
+   * synchronous and ordered; Promise/thenable return values are deliberately
+   * treated as ordinary truthy objects, matching ConfigArray.
+   */
+  async evaluateConfigPredicates(
+    request: EvaluateConfigPredicatesRequest,
+    signal?: AbortSignal,
+    externalPredicates?: ReadonlyMap<string, ConfigPredicate>,
+  ): Promise<EvaluateConfigPredicatesResponse> {
+    this.#validatePredicateRequest(request);
+    const session = this.#sessions.get(request.transactionId);
+    if (!session && !externalPredicates) {
+      throw protocolError(
+        `unknown transaction ${JSON.stringify(request.transactionId)}`,
+      );
+    }
+    const run = async (): Promise<EvaluateConfigPredicatesResponse> => {
+      assertNotAborted(signal);
+      const predicates = request.calls.map((call) => {
+        const external = externalPredicates?.get(call.predicateId);
+        const predicate =
+          external ?? session?.predicatesById.get(call.predicateId);
+        if (!predicate) {
+          throw protocolError(
+            `unknown predicate id ${JSON.stringify(call.predicateId)} in transaction ${JSON.stringify(request.transactionId)}`,
+          );
+        }
+        if (
+          session?.effectivePredicateIds &&
+          !external &&
+          !session.effectivePredicateIds.has(call.predicateId)
+        ) {
+          throw protocolError(
+            `predicate id ${JSON.stringify(call.predicateId)} is not part of the activated config set`,
+          );
+        }
+        return predicate;
+      });
+
+      const results: EvaluateConfigPredicatesResponse['results'] = [];
+      for (let index = 0; index < request.calls.length; index++) {
+        assertNotAborted(signal);
+        const call = request.calls[index];
+        let nativePath = path.normalize(call.absolutePath);
+        if (call.directory && !nativePath.endsWith(path.sep)) {
+          nativePath += path.sep;
+        }
+        try {
+          const value = Reflect.apply(predicates[index], undefined, [
+            nativePath,
+          ]);
+          results.push({
+            callId: call.callId,
+            status: 'evaluated',
+            value: Boolean(value),
+          });
+        } catch (error) {
+          results.push({
+            callId: call.callId,
+            status: 'failed',
+            error: errorPayload(error, 'predicate'),
+          });
+        }
+      }
+      return { transactionId: request.transactionId, results };
+    };
+    return session ? this.#enqueue(session, run) : run();
   }
 
   /**
@@ -377,11 +466,6 @@ export class ConfigModuleHost {
     if (!request || typeof request !== 'object') {
       throw protocolError('load request must be an object');
     }
-    if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
-      throw protocolError(
-        `unsupported version ${String(request.protocolVersion)}; expected ${CONFIG_DISCOVERY_PROTOCOL_VERSION}`,
-      );
-    }
     if (
       typeof request.transactionId !== 'string' ||
       request.transactionId.length === 0
@@ -406,11 +490,6 @@ export class ConfigModuleHost {
     if (!request || typeof request !== 'object') {
       throw protocolError('activation request must be an object');
     }
-    if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
-      throw protocolError(
-        `unsupported version ${String(request.protocolVersion)}; expected ${CONFIG_DISCOVERY_PROTOCOL_VERSION}`,
-      );
-    }
     if (
       typeof request.transactionId !== 'string' ||
       request.transactionId.length === 0
@@ -419,6 +498,43 @@ export class ConfigModuleHost {
     }
     if (!Array.isArray(request.effectiveConfigIds)) {
       throw protocolError('effectiveConfigIds must be an array');
+    }
+  }
+
+  #validatePredicateRequest(request: EvaluateConfigPredicatesRequest): void {
+    if (!request || typeof request !== 'object') {
+      throw protocolError('predicate request must be an object');
+    }
+    if (
+      typeof request.transactionId !== 'string' ||
+      request.transactionId.length === 0
+    ) {
+      throw protocolError('transactionId must be a non-empty string');
+    }
+    if (!Array.isArray(request.calls)) {
+      throw protocolError('predicate calls must be an array');
+    }
+    const callIds = new Set<string>();
+    for (const call of request.calls) {
+      if (
+        !call ||
+        typeof call !== 'object' ||
+        typeof call.callId !== 'string' ||
+        call.callId.length === 0 ||
+        typeof call.predicateId !== 'string' ||
+        call.predicateId.length === 0 ||
+        typeof call.absolutePath !== 'string' ||
+        !path.isAbsolute(call.absolutePath) ||
+        (call.directory !== undefined && typeof call.directory !== 'boolean')
+      ) {
+        throw protocolError('predicate call is malformed');
+      }
+      if (callIds.has(call.callId)) {
+        throw protocolError(
+          `predicate request contains duplicate call id ${JSON.stringify(call.callId)}`,
+        );
+      }
+      callIds.add(call.callId);
     }
   }
 
@@ -445,7 +561,9 @@ export class ConfigModuleHost {
       loadMode,
       singleThreaded,
       candidatesById: new Map(),
-      idByConfigPath: new Map(),
+      candidateLoadsById: new Map(),
+      sourceByConfigPath: new Map(),
+      predicatesById: new Map(),
       operation: Promise.resolve(),
     };
     this.#sessions.set(transactionId, session);
@@ -457,7 +575,6 @@ export class ConfigModuleHost {
     candidates: readonly ConfigModuleCandidate[],
   ): void {
     const ids = new Set<string>();
-    const paths = new Map<string, string>();
     for (const candidate of candidates) {
       if (ids.has(candidate.id)) {
         throw protocolError(
@@ -465,29 +582,19 @@ export class ConfigModuleHost {
         );
       }
       ids.add(candidate.id);
-
-      const batchOwner = paths.get(candidate.configPath);
-      if (batchOwner && batchOwner !== candidate.id) {
-        throw protocolError(
-          `candidate IDs ${JSON.stringify(batchOwner)} and ${JSON.stringify(candidate.id)} use the same configPath`,
-        );
-      }
-      paths.set(candidate.configPath, candidate.id);
-
       const existing = session.candidatesById.get(candidate.id);
+      const inFlight = session.candidateLoadsById.get(candidate.id);
       if (
-        existing &&
-        (existing.candidate.configPath !== candidate.configPath ||
-          existing.candidate.configDirectory !== candidate.configDirectory)
+        (existing &&
+          (existing.candidate.configPath !== candidate.configPath ||
+            existing.candidate.configDirectory !==
+              candidate.configDirectory)) ||
+        (inFlight &&
+          (inFlight.candidate.configPath !== candidate.configPath ||
+            inFlight.candidate.configDirectory !== candidate.configDirectory))
       ) {
         throw protocolError(
           `candidate id ${JSON.stringify(candidate.id)} changed path or directory within one transaction`,
-        );
-      }
-      const pathOwner = session.idByConfigPath.get(candidate.configPath);
-      if (pathOwner && pathOwner !== candidate.id) {
-        throw protocolError(
-          `candidate IDs ${JSON.stringify(pathOwner)} and ${JSON.stringify(candidate.id)} use the same configPath`,
         );
       }
     }
@@ -523,6 +630,25 @@ export class ConfigModuleHost {
     });
   }
 
+  #markEffectivePredicates(request: ActivateConfigsRequest): void {
+    const session = this.#sessions.get(request.transactionId);
+    if (!session) {
+      throw protocolError(
+        `unknown transaction ${JSON.stringify(request.transactionId)}`,
+      );
+    }
+    const effective = new Set<string>();
+    for (const { result } of this.#effectiveCandidates(
+      session,
+      request.effectiveConfigIds,
+    )) {
+      for (const predicateId of result.predicatesById.keys()) {
+        effective.add(predicateId);
+      }
+    }
+    session.effectivePredicateIds = effective;
+  }
+
   async #verifyFingerprints(
     stored: ReadonlyArray<{
       candidate: ConfigModuleCandidate;
@@ -552,19 +678,32 @@ export class ConfigModuleHost {
 
   async #loadCandidate(
     candidate: ConfigModuleCandidate,
-    loadMode: ConfigModuleLoadMode,
+    session: ConfigModuleSession,
   ): Promise<StoredLoadResult> {
     // Preserve the stage at which a candidate failed. Besides making catalog
     // failures actionable, this lets CLI/API/LSP distinguish module-loading
     // failures from a module that evaluated but exported an invalid config.
     let failureCode = 'load';
     try {
-      const sourceFingerprint = await this.#fingerprint(candidate.configPath);
-      const rawConfig = await (loadMode === 'fresh'
-        ? this.#loadFresh(candidate.configPath)
-        : this.#loadCached(candidate.configPath));
+      // Node's module registry is keyed by the physical module. Preserve the
+      // lexical candidate for routing/plugin metadata, but share only the raw
+      // module export across symlink aliases. Every candidate is normalized
+      // independently below so functions receive unique predicate IDs.
+      const sourceKey = path.normalize(await realpath(candidate.configPath));
+      let source = session.sourceByConfigPath.get(sourceKey);
+      if (!source) {
+        source = this.#loadConfigSource(candidate.configPath, session.loadMode);
+        session.sourceByConfigPath.set(sourceKey, source);
+      }
+      const { rawConfig, sourceFingerprint } = await source;
       failureCode = 'invalid';
-      const normalized = normalizeConfig(rawConfig);
+      const predicatesById = new Map<string, ConfigPredicate>();
+      let predicateSequence = 0;
+      const normalized = normalizeConfig(rawConfig, (predicate) => {
+        const predicateId = `${candidate.id}:predicate-${String(++predicateSequence).padStart(6, '0')}`;
+        predicatesById.set(predicateId, predicate);
+        return predicateId;
+      });
       // This is the cross-process serialization boundary. Keeping the canonical
       // JSON also prevents a caller mutating a response from corrupting session
       // state used later by #summarizeEffectiveConfigs.
@@ -578,6 +717,7 @@ export class ConfigModuleHost {
         status: 'loaded',
         entriesJSON,
         sourceFingerprint: afterFingerprint,
+        predicatesById,
       };
     } catch (error) {
       return {
@@ -586,6 +726,17 @@ export class ConfigModuleHost {
         error: errorPayload(error, failureCode),
       };
     }
+  }
+
+  async #loadConfigSource(
+    configPath: string,
+    loadMode: ConfigModuleLoadMode,
+  ): Promise<LoadedConfigSource> {
+    const sourceFingerprint = await this.#fingerprint(configPath);
+    const rawConfig = await (loadMode === 'fresh'
+      ? this.#loadFresh(configPath)
+      : this.#loadCached(configPath));
+    return { rawConfig, sourceFingerprint };
   }
 
   async #fingerprint(configPath: string): Promise<string> {

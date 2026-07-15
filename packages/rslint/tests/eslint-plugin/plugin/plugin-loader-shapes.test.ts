@@ -68,6 +68,26 @@ async function withTempDir<T>(
 const RULE_DEMO_BODY = `{ create() { return {}; } }`;
 
 describe('plugin-loader input shapes', () => {
+  test('single config object export registers its live plugins', async () => {
+    await withTempDir(
+      {
+        'rslint.config.mjs': `
+          const plugin = { rules: { demo: ${RULE_DEMO_BODY} } };
+          export default { plugins: { p: plugin } };
+        `,
+      },
+      async (dir) => {
+        const out = await loadPluginsFromConfigs([
+          {
+            configPath: path.join(dir, 'rslint.config.mjs'),
+            configDirectory: dir,
+          },
+        ]);
+        expect(out.get(dir)?.rules.has('p/demo')).toBe(true);
+      },
+    );
+  });
+
   test('direct plugin object — { p: { rules: {demo} } } registers p/demo', async () => {
     await withTempDir(
       {

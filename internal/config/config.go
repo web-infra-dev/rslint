@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/config/minimatch"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
@@ -27,7 +27,8 @@ type RslintConfig []ConfigEntry
 
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
-	Name string `json:"name,omitempty"`
+	Name     string `json:"name,omitempty"`
+	BasePath string `json:"basePath,omitempty"`
 	// Files retains the established Go construction API for top-level OR
 	// patterns. FilePatternGroups stores nested arrays, each of which is an AND
 	// group. JSON encoding combines both fields back into one mixed `files`
@@ -36,6 +37,7 @@ type ConfigEntry struct {
 	FilePatternGroups [][]string       `json:"-"`
 	Ignores           []string         `json:"ignores,omitempty"`
 	LanguageOptions   *LanguageOptions `json:"languageOptions,omitempty"`
+	defaultIgnores    bool
 	// Omit an absent rules map when marshaling. Emitting an invented
 	// `"rules": null` changes flat-config object-shape semantics when the JSON
 	// is decoded again: an ignores-only global entry becomes an entry-local
@@ -50,6 +52,13 @@ type ConfigEntry struct {
 	// same ordered ignore sequence so later config negations can re-include.
 	gitignoreSemantics       bool
 	gitignoreCaseInsensitive bool
+
+	// moduleFileSelectors and moduleIgnoreMatchers retain the ordered
+	// string/function matcher union produced by a trusted JavaScript config
+	// module. Ordinary JSON/JSONC decoding never populates these fields, so an
+	// authored JSON object cannot forge a live Node predicate descriptor.
+	moduleFileSelectors  []configFileSelector
+	moduleIgnoreMatchers []configMatcher
 }
 
 func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
@@ -182,7 +191,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" {
+			if key != "ignores" && key != "name" && key != "basePath" {
 				hasNonGlobalKey = true
 				break
 			}
@@ -248,11 +257,41 @@ func ValidateConfig(config RslintConfig) error {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
+		if err := validateConfigPatterns(entry); err != nil {
+			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
 		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
 		if err := validateConfigRules(entry.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
+	}
+	return nil
+}
+
+func validateConfigPatterns(entry ConfigEntry) error {
+	for selectorIndex, selector := range fileSelectors(entry) {
+		for matcherIndex, matcher := range selector.matchers {
+			if matcher.isPredicate() {
+				continue
+			}
+			if _, err := minimatch.CompileRelativePattern(normalizeConfigPattern(matcher.pattern)); err != nil {
+				return fmt.Errorf(
+					"key \"files\": pattern at selector %d, index %d: %w",
+					selectorIndex,
+					matcherIndex,
+					err,
+				)
+			}
+		}
+	}
+	for matcherIndex, matcher := range ignoreMatchers(entry) {
+		if matcher.isPredicate() {
+			continue
+		}
+		if _, err := minimatch.CompileRelativePattern(normalizeConfigPattern(matcher.pattern)); err != nil {
+			return fmt.Errorf("key \"ignores\": pattern at index %d: %w", matcherIndex, err)
 		}
 	}
 	return nil
@@ -659,39 +698,6 @@ func registerAllCoreEslintRules() {
 	}
 }
 
-// normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
-// normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
-// "/./", resolves ".."), so patterns must undergo the same transformation.
-// matchGlob matches a glob pattern against a path using doublestar.
-func matchGlob(pattern, path string) bool {
-	m, err := doublestar.Match(pattern, path)
-	return err == nil && m
-}
-
-func normalizePattern(pattern string) string {
-	return tspath.NormalizePath(pattern)
-}
-
-// isDirBlockedByIgnores checks if the file's directory is blocked by a
-// directory-level ignore pattern (e.g., `dir/**`). File-level patterns and
-// negation patterns are excluded (by Kind) in isDirAbsolutelyBlocked. This
-// aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
-// `!` negation cannot undo it.
-func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
-	var dirPath string
-	if cwd != "" {
-		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
-	} else {
-		dirPath = tspath.GetDirectoryPath(filePath)
-	}
-	dirPath = strings.ReplaceAll(dirPath, "\\", "/")
-	dirPath = strings.TrimSuffix(dirPath, "/")
-	if dirPath == "" || dirPath == "." {
-		return false
-	}
-	return isDirAbsolutelyBlocked(dirPath, patterns)
-}
-
 // normalizePath converts file path to be relative to cwd for consistent matching
 func normalizePath(filePath, cwd string) string {
 	return tspath.NormalizePath(tspath.ConvertToRelativePath(filePath, tspath.ComparePathsOptions{
@@ -708,21 +714,6 @@ type MergedConfig struct {
 	Plugins         map[string]struct{}
 }
 
-func extractConfigIgnores(config RslintConfig) []IgnorePattern {
-	var ignores []IgnorePattern
-	for _, entry := range config {
-		if !isGlobalIgnoreEntry(entry) {
-			continue
-		}
-		if entry.gitignoreSemantics {
-			ignores = append(ignores, parseCollectedGitignorePatterns(entry.Ignores, entry.gitignoreCaseInsensitive)...)
-		} else {
-			ignores = append(ignores, ParseIgnorePatterns(entry.Ignores)...)
-		}
-	}
-	return ignores
-}
-
 // IsFileIgnored reports whether filePath is excluded by the config's global
 // `ignores` patterns. It is distinct from GetConfigForFile returning nil,
 // which also covers "no entry matched this file" — callers that need ESLint's
@@ -730,12 +721,17 @@ func extractConfigIgnores(config RslintConfig) []IgnorePattern {
 // this method. Program-wide type-check diagnostics are intentionally governed
 // by tsconfig membership instead.
 func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
-	patterns := extractConfigIgnores(config)
-	if len(patterns) == 0 {
-		return false
+	if cwd != "" {
+		if _, within := RelativePathWithinConfigRoot(filePath, cwd, selectorScopeCaseSensitive(cwd)); !within {
+			return false
+		}
 	}
-	return isDirBlockedByIgnores(filePath, patterns, cwd) ||
-		isFileIgnored(filePath, patterns, cwd)
+	return isFileIgnoredByConfigLayers(
+		filePath,
+		"",
+		compileConfigIgnoreLayers(config, cwd, nil),
+		nil,
+	)
 }
 
 // GetConfigForFile computes the merged configuration for a selected file
@@ -743,103 +739,73 @@ func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 // globally ignored, outside the config's implicit/explicit selector union, or
 // no entry contributes configuration.
 //
-// Global ignore evaluation happens in two phases:
-//  1. Directory-level (isDirBlockedByIgnores): patterns like dir/** block entire directories.
-//     Negation (!) cannot override directory-level blocking.
-//  2. File-level (isFileIgnored): sequential evaluation with ! negation support for re-inclusion.
-//
-// After global ignore check, entries are merged in order if their files match and ignores don't.
+// Global ignores are evaluated through the same ordered directory-ancestor and
+// file matcher used by target discovery. Entries are then merged in order when
+// their files match and entry-local ignores do not.
 // cwd is the directory the config lives in; file paths are resolved relative to it.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
-	// Collect all global ignore patterns and evaluate once. This allows `!`
-	// negation patterns in separate entries to work correctly, aligned with
-	// ESLint v10 which merges all global ignores before evaluating. Callers
-	// resolving many files against the same config (FileConfigResolver)
-	// should precompute this once via extractConfigIgnores and call
-	// getConfigForFileWithIgnores directly instead of re-parsing every
-	// pattern string on every call.
-	return config.getConfigForFileWithIgnores(filePath, cwd, extractConfigIgnores(config))
+	return config.getConfigForFileWithMatchers(
+		filePath,
+		cwd,
+		compileConfigIgnoreLayers(config, cwd, nil),
+		NewFileSelectorMatcher(config, cwd),
+	)
 }
 
-// getConfigForFileWithIgnores is GetConfigForFile with the global ignore
-// patterns supplied by the caller, so repeated calls against the same config
-// (one per lint target) don't re-parse the same ignore pattern strings.
-func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
-	merged := &MergedConfig{
-		Rules:   make(map[string]*RuleConfig),
-		Plugins: make(map[string]struct{}),
-	}
-
-	if len(globalIgnorePatterns) > 0 {
-		if isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
-			return nil
-		}
-		if isFileIgnored(filePath, globalIgnorePatterns, cwd) {
-			return nil
-		}
+func (config RslintConfig) getConfigForFileWithMatchers(
+	filePath string,
+	cwd string,
+	globalIgnoreLayers []configIgnoreLayer,
+	selectorMatcher *FileSelectorMatcher,
+) *MergedConfig {
+	if isFileIgnoredByConfigLayers(filePath, "", globalIgnoreLayers, nil) {
+		return nil
 	}
 
 	// A CLI/API explicit target can bypass config `files` for parsing, but it
 	// must not make unscoped entries apply to a path the config itself never
 	// selected. Conversely, an explicit selector makes unscoped entries apply
 	// to that file, as in ESLint flat config cascading.
-	if !isFileSelectedByConfig(config, filePath, cwd) {
+	selected := false
+	if selectorMatcher == nil {
+		selectorMatcher = NewFileSelectorMatcher(config, cwd)
+	}
+	selected = selectorMatcher.Selects(filePath)
+	if !selected {
 		return nil
 	}
 
-	// Track whether any non-global entry matched this file
-	entryMatched := false
+	// The default lint-file baseline is itself an effective empty config. This
+	// keeps syntax diagnostics enabled when the authored config is empty or all
+	// of its rule entries are locally ignored.
+	entryMatched := isDefaultLintFile(filePath)
+	matchingEntries := make([]int, 0, len(config))
 
-	for _, entry := range config {
+	for entryIndex, entry := range config {
 		if isGlobalIgnoreEntry(entry) {
+			continue
+		}
+		// Every entry, including a no-files cascade entry, is scoped to its
+		// resolved basePath. Paths outside that root skip the entry entirely.
+		if !selectorMatcher.entryContains(entryIndex, filePath) {
 			continue
 		}
 
 		// 2. files matching
-		if hasFileSelectors(entry) && !isFileMatchedByConfigEntry(filePath, entry, cwd) {
-			continue
+		if hasFileSelectors(entry) {
+			if !selectorMatcher.entryMatches(entryIndex, filePath) {
+				continue
+			}
 		}
 
-		// 3. Entry-level ignores. Parsed per entry; entry.Ignores is usually
-		// empty (ESLint configs put ignores in a dedicated global-ignore entry),
-		// so ParseIgnorePatterns returns nil and this is free in the common case.
-		if isFileIgnored(filePath, ParseIgnorePatterns(entry.Ignores), cwd) {
+		// 3. Entry-local ignores share the entry's basePath and only suppress
+		// this entry; they never remove the file from the global target set.
+		if selectorMatcher.entryIgnoresFile(entryIndex, filePath) {
 			continue
 		}
 
 		entryMatched = true
-
-		// 4. Rules: later entries override earlier ones. When the later value
-		// changes only severity, ESLint retains the earlier rule options.
-		for ruleName, ruleValue := range entry.Rules {
-			next, hasOptions, err := parseRuleConfigValue(ruleValue)
-			if err != nil {
-				// Config ingress validates rule values before merge. Keep this
-				// guard for callers that construct a config without validating it.
-				continue
-			}
-			if previous := merged.Rules[ruleName]; !hasOptions && previous != nil {
-				next.Options = append([]interface{}(nil), previous.Options...)
-			}
-			merged.Rules[ruleName] = next
-		}
-
-		// 5. Plugins: union from all matching entries (normalized to rule prefix form)
-		for _, plugin := range entry.Plugins {
-			merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
-		}
-
-		// 6. Settings: recursively merge ordinary objects; arrays and scalar
-		// values are replaced by the later entry.
-		if entry.Settings != nil {
-			merged.Settings = Settings(deepMergeConfigObjects(
-				map[string]any(merged.Settings),
-				map[string]any(entry.Settings),
-			))
-		}
-
-		// 7. LanguageOptions: deep merge
-		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+		matchingEntries = append(matchingEntries, entryIndex)
 	}
 
 	// No entry matched this file — do not lint it
@@ -847,44 +813,113 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 		return nil
 	}
 
+	return mergeConfigEntryIndices(config, matchingEntries)
+}
+
+func mergeConfigEntryIndices(config RslintConfig, indices []int) *MergedConfig {
+	merged := &MergedConfig{
+		Rules:   make(map[string]*RuleConfig),
+		Plugins: make(map[string]struct{}),
+	}
+	for _, entryIndex := range indices {
+		if entryIndex < 0 || entryIndex >= len(config) {
+			continue
+		}
+		mergeConfigEntryInto(merged, config[entryIndex])
+	}
 	return merged
 }
 
-// isGlobalIgnoreEntry returns true if the entry has only ignores and an
-// optional name. Empty config objects are still present and make ignores local
-// to the entry, matching ESLint flat config semantics.
+func mergeConfigEntryInto(merged *MergedConfig, entry ConfigEntry) {
+	if merged == nil {
+		return
+	}
+	if merged.Rules == nil {
+		merged.Rules = make(map[string]*RuleConfig)
+	}
+	if merged.Plugins == nil {
+		merged.Plugins = make(map[string]struct{})
+	}
+
+	// Rules: later entries override earlier ones. When the later value changes
+	// only severity, ESLint retains the earlier rule options.
+	for ruleName, ruleValue := range entry.Rules {
+		next, hasOptions, err := parseRuleConfigValue(ruleValue)
+		if err != nil {
+			// Config ingress validates rule values before merge. Keep this guard for
+			// callers that construct a config without validating it.
+			continue
+		}
+		if previous := merged.Rules[ruleName]; !hasOptions && previous != nil {
+			next.Options = append([]interface{}(nil), previous.Options...)
+		}
+		merged.Rules[ruleName] = next
+	}
+
+	for _, plugin := range entry.Plugins {
+		merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
+	}
+	if entry.Settings != nil {
+		merged.Settings = Settings(deepMergeConfigObjects(
+			map[string]any(merged.Settings),
+			map[string]any(entry.Settings),
+		))
+	}
+	merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+}
+
+// MergeConfigEntry applies one already-selected cascade entry to an immutable
+// per-file result. It is used for CLI rule overlays, which must affect existing
+// targets without widening config discovery.
+func MergeConfigEntry(base *MergedConfig, entry ConfigEntry) *MergedConfig {
+	merged := cloneMergedConfig(base)
+	mergeConfigEntryInto(merged, entry)
+	return merged
+}
+
+func cloneMergedConfig(base *MergedConfig) *MergedConfig {
+	merged := &MergedConfig{
+		Rules:   make(map[string]*RuleConfig),
+		Plugins: make(map[string]struct{}),
+	}
+	if base == nil {
+		return merged
+	}
+	for name, ruleConfig := range base.Rules {
+		if ruleConfig == nil {
+			continue
+		}
+		cloned := *ruleConfig
+		cloned.Options = append([]interface{}(nil), ruleConfig.Options...)
+		merged.Rules[name] = &cloned
+	}
+	for plugin := range base.Plugins {
+		merged.Plugins[plugin] = struct{}{}
+	}
+	if base.Settings != nil {
+		merged.Settings = Settings(deepMergeConfigObjects(nil, map[string]any(base.Settings)))
+	}
+	merged.LanguageOptions = mergeLanguageOptions(nil, base.LanguageOptions)
+	return merged
+}
+
+// isGlobalIgnoreEntry returns true if the entry has only ignores plus ESLint's
+// metadata fields (name and basePath). Empty config objects are still present
+// and make ignores local to the entry, matching flat-config object-shape
+// semantics.
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return entry.Files == nil &&
 		entry.FilePatternGroups == nil &&
+		entry.moduleFileSelectors == nil &&
 		entry.Rules == nil &&
 		entry.Plugins == nil &&
 		entry.Settings == nil &&
 		entry.LanguageOptions == nil &&
-		len(entry.Ignores) > 0
+		hasIgnoreMatchers(entry)
 }
 
 func hasFileSelectors(entry ConfigEntry) bool {
-	return len(entry.Files) > 0 || len(entry.FilePatternGroups) > 0
-}
-
-func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) bool {
-	if isFileMatched(filePath, entry.Files, cwd) {
-		return true
-	}
-	for _, group := range entry.FilePatternGroups {
-		// ESLint treats an empty nested selector as a vacuously true AND group.
-		matched := true
-		for _, pattern := range group {
-			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
-				matched = false
-				break
-			}
-		}
-		if matched {
-			return true
-		}
-	}
-	return false
+	return len(entry.Files) > 0 || len(entry.FilePatternGroups) > 0 || len(entry.moduleFileSelectors) > 0
 }
 
 func deepMergeConfigObjects(base map[string]any, override map[string]any) map[string]any {
@@ -931,56 +966,6 @@ func cloneConfigValue(value any) any {
 	default:
 		return value
 	}
-}
-
-// isFileMatched checks if a file matches any of the given glob patterns
-func isFileMatched(filePath string, patterns []string, cwd string) bool {
-	for _, pattern := range patterns {
-		if isSingleFilePatternMatched(filePath, pattern, cwd) {
-			return true
-		}
-	}
-	return false
-}
-
-func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	negated := false
-	for strings.HasPrefix(pattern, "!") {
-		negated = !negated
-		pattern = strings.TrimPrefix(pattern, "!")
-	}
-	matched := isPositiveFilePatternMatched(filePath, pattern, cwd)
-	if negated {
-		return !matched
-	}
-	return matched
-}
-
-func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	var normalizedPath string
-	if cwd != "" {
-		normalizedPath = normalizePath(filePath, cwd)
-	} else {
-		normalizedPath = filePath
-	}
-
-	normalizedPattern := normalizePattern(pattern)
-
-	if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
-		return true
-	}
-	if normalizedPath != filePath {
-		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-			return true
-		}
-	}
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-	if unixPath != normalizedPath {
-		if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
-			return true
-		}
-	}
-	return false
 }
 
 // mergeLanguageOptions deep-merges two LanguageOptions, with override taking precedence

@@ -1,5 +1,4 @@
 import path from 'node:path';
-import fs from 'node:fs';
 import {
   OUTPUT_FORMATS,
   parseArgs,
@@ -44,15 +43,6 @@ export async function run(
     return 2;
   }
 
-  // Validate explicit --config flag
-  if (args.config) {
-    const configPath = path.resolve(cwd, args.config);
-    if (!fs.existsSync(configPath)) {
-      process.stderr.write(`Error: config file not found: ${configPath}\n`);
-      return 1;
-    }
-  }
-
   // Build Go args: start-time flag BEFORE positional args, because Go's
   // flag.Parse stops at the first positional argument.
   const goArgs = [`--start-time=${startTime}`, ...args.rest];
@@ -85,6 +75,7 @@ export async function run(
         explicitConfigPath: usesExplicitJSConfig
           ? explicitConfigPath
           : undefined,
+        inputs: args.positionals.length === 0 ? ['.'] : args.positionals,
       },
     },
   });

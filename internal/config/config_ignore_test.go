@@ -114,6 +114,15 @@ func TestIsFileIgnored_Negation(t *testing.T) {
 	}
 }
 
+func TestConfigIgnorePatternsUseMinimatchUTF16Units(t *testing.T) {
+	if isFileIgnored("😀", ParseIgnorePatterns([]string{"?"}), "") {
+		t.Fatal("one ? must not ignore an astral filename composed of two UTF-16 units")
+	}
+	if !isFileIgnored("😀", ParseIgnorePatterns([]string{"??"}), "") {
+		t.Fatal("two ? wildcards must ignore one astral filename like Minimatch")
+	}
+}
+
 func TestGetConfigForFile_NegationInGlobalIgnore(t *testing.T) {
 	config := RslintConfig{
 		{
@@ -165,8 +174,8 @@ func TestGetConfigForFile_NegationInEntryIgnore(t *testing.T) {
 	}
 
 	merged2 := config.GetConfigForFile("vendor/lib/src/a.ts", "")
-	if merged2 != nil {
-		t.Error("Expected vendor/lib/src/a.ts to be ignored by entry-level ignores")
+	if merged2 == nil || merged2.Rules["no-debugger"] != nil {
+		t.Error("entry-local ignores must leave only the default empty config")
 	}
 }
 
@@ -307,9 +316,8 @@ func TestGetConfigForFile_NegationWithEmptyCwd(t *testing.T) {
 
 	// cwd="" → uses isFileIgnoredSimple path
 	merged := config.GetConfigForFile("vendor/keep/src/b.ts", "")
-	if merged == nil {
-		t.Fatal("Expected vendor/keep/src/b.ts to be re-included with empty cwd")
-		return
+	if merged != nil {
+		t.Fatal("a descendant negation cannot reopen the ignored vendor/keep parent")
 	}
 
 	merged2 := config.GetConfigForFile("vendor/lib/src/a.ts", "")
@@ -334,8 +342,8 @@ func TestGetConfigForFile_NegationGlobalAndEntryInteraction(t *testing.T) {
 
 	// build/test.js: global re-includes it, but entry-level ignores it again
 	merged := config.GetConfigForFile("build/test.js", "")
-	if merged != nil {
-		t.Error("Expected build/test.js to be excluded by entry-level ignores even though global re-included it")
+	if merged == nil || merged.Rules["no-debugger"] != nil {
+		t.Error("entry-local ignores must suppress its rule while retaining the default baseline")
 	}
 
 	// src/index.js: not in any ignore → linted
@@ -391,7 +399,8 @@ func TestGetConfigForFile_NegationAcrossGlobalIgnoreEntries(t *testing.T) {
 }
 
 func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
-	// dist/** is directory-level → blocks entirely, ! cannot undo
+	// A later negation of the same directory pattern reopens it; a subsequent
+	// narrower positive pattern can then ignore a child again.
 	config := RslintConfig{
 		{
 			Ignores: []string{"dist/**", "!dist/**", "dist/generated/**"},
@@ -402,10 +411,10 @@ func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
 		},
 	}
 
-	// dist/** blocks directory → dist/index.js ignored (! cannot undo dir/**)
+	// !dist/** reopens the directory.
 	merged := config.GetConfigForFile("dist/index.js", "")
-	if merged != nil {
-		t.Error("Expected dist/index.js to be ignored (dir/** blocks, ! cannot undo)")
+	if merged == nil {
+		t.Error("Expected dist/index.js to be re-included by !dist/**")
 	}
 
 	// With file-level pattern: sequential override works
@@ -488,7 +497,7 @@ func TestIsFileIgnored_DirectoryBlockingBeatsNegation(t *testing.T) {
 	}
 }
 
-func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
+func TestCompileConfigIgnoreLayersOnlyIncludesGlobalEntries(t *testing.T) {
 	config := RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
@@ -498,23 +507,44 @@ func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
 		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}},
 	}
 
-	ignores := extractConfigIgnores(config)
-	if len(ignores) != 2 || ignores[0].Glob != "**/tests/**" || ignores[1].Glob != "scripts/**" {
-		t.Fatalf("extractConfigIgnores() = %#v", ignores)
+	layers := compileConfigIgnoreLayers(config, "/repo", nil)
+	if len(layers) != 2 || layers[0].patterns[0].Glob != "**/tests/**" || layers[1].patterns[0].Glob != "scripts/**" {
+		t.Fatalf("compileConfigIgnoreLayers() = %#v", layers)
 	}
 }
 
-func TestExtractConfigIgnores_MultipleEntries(t *testing.T) {
+func TestCompileConfigIgnoreLayersPreservesEntryOrder(t *testing.T) {
 	config := RslintConfig{
 		{Ignores: []string{"**/tests/**", "packages/example/compiled/**"}},
 		{Ignores: []string{"crates/**"}},
 	}
 
-	ignores := extractConfigIgnores(config)
-	if len(ignores) != 3 ||
-		ignores[0].Glob != "**/tests/**" ||
-		ignores[1].Glob != "packages/example/compiled/**" ||
-		ignores[2].Glob != "crates/**" {
-		t.Fatalf("extractConfigIgnores() = %#v", ignores)
+	layers := compileConfigIgnoreLayers(config, "/repo", nil)
+	if len(layers) != 2 || len(layers[0].patterns) != 2 || len(layers[1].patterns) != 1 ||
+		layers[0].patterns[0].Glob != "**/tests/**" ||
+		layers[0].patterns[1].Glob != "packages/example/compiled/**" ||
+		layers[1].patterns[0].Glob != "crates/**" {
+		t.Fatalf("compileConfigIgnoreLayers() = %#v", layers)
+	}
+}
+
+func TestIgnoreNegationAndDotNormalizationMatchesESLint(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		ignored bool
+	}{
+		{name: "one negation strips dot prefix", pattern: "!./src/**", ignored: false},
+		{name: "two negations reinclude", pattern: "!!src/**", ignored: false},
+		{name: "two negations preserve dot prefix", pattern: "!!./src/**", ignored: true},
+		{name: "three negations also reinclude matching positive body", pattern: "!!!src/**", ignored: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			patterns := ParseIgnorePatterns([]string{"**/*.js", test.pattern})
+			if got := isFileIgnored("src/a.js", patterns, ""); got != test.ignored {
+				t.Fatalf("patterns %q: ignored=%v, want %v", test.pattern, got, test.ignored)
+			}
+		})
 	}
 }

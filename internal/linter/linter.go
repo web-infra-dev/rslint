@@ -85,7 +85,10 @@ type runProgramOptions struct {
 	// Rules that require type information are filtered for every other file,
 	// and remaining rules receive a nil TypeChecker. nil = no gap distinction.
 	TypeInfoFiles map[string]struct{}
-	OnDiagnostic  DiagnosticHandler
+	// TargetPathForFile maps a compiler SourceFile back to its caller-visible
+	// lexical host path. nil keeps SourceFile.FileName().
+	TargetPathForFile func(*ast.SourceFile) string
+	OnDiagnostic      DiagnosticHandler
 }
 
 type programLintResult struct {
@@ -134,6 +137,12 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	// the checker is the only shared resource and is owned exclusively by the
 	// calling worker (see the sharding below).
 	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker) {
+		filePath := file.FileName()
+		if opts.TargetPathForFile != nil {
+			if targetPath := opts.TargetPathForFile(file); targetPath != "" {
+				filePath = targetPath
+			}
+		}
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
 		// Computed once per file and shared via ctx.Comments so
@@ -168,6 +177,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		for _, r := range rules {
 			ctx := rule.RuleContext{
 				SourceFile:     file,
+				FilePath:       filePath,
 				Program:        opts.Program,
 				Settings:       r.Settings,
 				ConfigGlobals:  r.Globals,
@@ -185,7 +195,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Range:      textRange,
 						Message:    msg,
 						SourceFile: file,
-						FilePath:   file.FileName(),
+						FilePath:   filePath,
 						Severity:   r.Severity,
 					})
 				},
@@ -199,7 +209,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
-						FilePath:   file.FileName(),
+						FilePath:   filePath,
 						Severity:   r.Severity,
 					})
 				},
@@ -213,7 +223,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
-						FilePath:    file.FileName(),
+						FilePath:    filePath,
 						Severity:    r.Severity,
 					})
 				},
@@ -227,7 +237,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Range:      trimmedRange,
 						Message:    msg,
 						SourceFile: file,
-						FilePath:   file.FileName(),
+						FilePath:   filePath,
 						Severity:   r.Severity,
 					})
 				},
@@ -242,7 +252,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
-						FilePath:   file.FileName(),
+						FilePath:   filePath,
 						Severity:   r.Severity,
 					})
 				},
@@ -257,7 +267,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
-						FilePath:    file.FileName(),
+						FilePath:    filePath,
 						Severity:    r.Severity,
 					})
 				},
@@ -273,7 +283,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
-						FilePath:    file.FileName(),
+						FilePath:    filePath,
 						Severity:    r.Severity,
 					})
 				},
@@ -288,7 +298,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
-						FilePath:    file.FileName(),
+						FilePath:    filePath,
 						Severity:    r.Severity,
 					})
 				},
@@ -523,6 +533,46 @@ func shouldSkipRulesForSyntax(opts runProgramOptions, file *ast.SourceFile, ctx 
 // / ExcludePaths — it covers the full program just like tsc.
 //
 // See RunLinterOptions for each field's zero-value semantics.
+func lintProgramViews(opts RunLinterOptions) []LintProgramView {
+	if opts.ProgramViews != nil {
+		return opts.ProgramViews
+	}
+
+	views := make([]LintProgramView, 0, len(opts.Programs))
+	for i, program := range opts.Programs {
+		var perProgramFilter FileFilter
+		if i < len(opts.PerProgramFilter) {
+			perProgramFilter = opts.PerProgramFilter[i]
+		}
+		var targetFiles []string
+		if opts.TargetFiles != nil && i < len(opts.TargetFiles) {
+			targetFiles = opts.TargetFiles[i]
+		}
+		filter := perProgramFilter
+		if opts.TargetFiles == nil {
+			filter = composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
+		}
+		views = append(views, LintProgramView{
+			Program:         program,
+			TargetFiles:     targetFiles,
+			FileFilter:      filter,
+			GetRulesForFile: opts.GetRulesForFile,
+			TypeInfoFiles:   opts.TypeInfoFiles,
+			OnDiagnostic:    opts.OnDiagnostic,
+		})
+	}
+	return views
+}
+
+func hasRuleHandler(views []LintProgramView) bool {
+	for _, view := range views {
+		if view.GetRulesForFile != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
@@ -533,51 +583,46 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
+	views := lintProgramViews(opts)
 
-	// Phase 1: lint rules per program (parallel). Skipped when no rule
+	// Phase 1: lint rules per view (parallel). Skipped when no rule
 	// handler was supplied — see doc above.
-	if opts.GetRulesForFile != nil {
-		programResults := make([]programLintResult, len(opts.Programs))
+	if hasRuleHandler(views) {
+		viewResults := make([]programLintResult, len(views))
 		wg := core.NewWorkGroup(opts.SingleThreaded)
-		for i, program := range opts.Programs {
-			var perProgramFilter FileFilter
-			if i < len(opts.PerProgramFilter) {
-				perProgramFilter = opts.PerProgramFilter[i]
+		for i, view := range views {
+			if view.Program == nil || view.GetRulesForFile == nil {
+				continue
 			}
-			var targetFiles []string
-			if opts.TargetFiles != nil && i < len(opts.TargetFiles) {
-				targetFiles = opts.TargetFiles[i]
+			onDiagnostic := view.OnDiagnostic
+			if onDiagnostic == nil {
+				onDiagnostic = opts.OnDiagnostic
 			}
-			filter := perProgramFilter
-			if opts.TargetFiles == nil {
-				ownedFiles := buildOwnedFileSet(program)
-				filter = composeOwnedFilter(perProgramFilter, ownedFiles)
-			}
-
 			programOpts := runProgramOptions{
-				Program:              program,
+				Program:              view.Program,
 				Scope:                opts.Scope,
 				ExcludePaths:         opts.ExcludePaths,
-				FileFilter:           filter,
-				TargetFiles:          targetFiles,
-				HasTargetFiles:       opts.TargetFiles != nil,
-				GetRulesForFile:      opts.GetRulesForFile,
+				FileFilter:           view.FileFilter,
+				TargetFiles:          view.TargetFiles,
+				HasTargetFiles:       opts.ProgramViews != nil || opts.TargetFiles != nil,
+				GetRulesForFile:      view.GetRulesForFile,
 				CollectExecutedRules: true,
 				SyntaxErrorFiles:     opts.SyntaxErrorFiles,
 				SingleThreaded:       opts.SingleThreaded,
-				TypeInfoFiles:        opts.TypeInfoFiles,
-				OnDiagnostic:         opts.OnDiagnostic,
+				TypeInfoFiles:        view.TypeInfoFiles,
+				TargetPathForFile:    view.TargetPathForFile,
+				OnDiagnostic:         onDiagnostic,
 			}
-			programIndex := i
+			viewIndex := i
 			programOptions := programOpts
 			wg.Queue(func() {
-				programResults[programIndex] = runLintRulesInProgram(programOptions)
+				viewResults[viewIndex] = runLintRulesInProgram(programOptions)
 			})
 		}
 		wg.RunAndWait()
-		for _, programResult := range programResults {
-			lintedFileCount += programResult.lintedFileCount
-			for name := range programResult.executedRules {
+		for _, viewResult := range viewResults {
+			lintedFileCount += viewResult.lintedFileCount
+			for name := range viewResult.executedRules {
 				executedRules[name] = struct{}{}
 			}
 		}
@@ -678,8 +723,12 @@ func collectExactFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 // LintTarget is one file paired with the rules configured for it, as
 // resolved by RunLinterOptions.GetRulesForFile.
 type LintTarget struct {
-	File  *ast.SourceFile
-	Rules []ConfiguredRule
+	File      *ast.SourceFile
+	Rules     []ConfiguredRule
+	ViewIndex int
+	// Path is the lexical target identity for this view. It may differ from
+	// File.FileName() when two caller-visible paths resolve to one SourceFile.
+	Path string
 }
 
 // CollectLintTargets resolves, for every file RunLinter would lint, the
@@ -689,7 +738,8 @@ type LintTarget struct {
 // as RunLinter (exact TargetFiles when present, otherwise Scope / legacy
 // owned-file filtering, plus ExcludePaths and per-program filters).
 func CollectLintTargets(opts RunLinterOptions) []LintTarget {
-	if opts.GetRulesForFile == nil {
+	views := lintProgramViews(opts)
+	if !hasRuleHandler(views) {
 		return nil
 	}
 	excludePaths := opts.ExcludePaths
@@ -697,30 +747,21 @@ func CollectLintTargets(opts RunLinterOptions) []LintTarget {
 		excludePaths = utils.ExcludePaths
 	}
 	var targets []LintTarget
-	for i, program := range opts.Programs {
-		var perProgramFilter FileFilter
-		if i < len(opts.PerProgramFilter) {
-			perProgramFilter = opts.PerProgramFilter[i]
-		}
-		var targetFiles []string
-		if opts.TargetFiles != nil && i < len(opts.TargetFiles) {
-			targetFiles = opts.TargetFiles[i]
-		}
-		filter := perProgramFilter
-		if opts.TargetFiles == nil {
-			filter = composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
+	for i, view := range views {
+		if view.Program == nil || view.GetRulesForFile == nil {
+			continue
 		}
 		files := collectFilesToLint(runProgramOptions{
-			Program:          program,
+			Program:          view.Program,
 			Scope:            opts.Scope,
 			ExcludePaths:     excludePaths,
-			FileFilter:       filter,
-			TargetFiles:      targetFiles,
-			HasTargetFiles:   opts.TargetFiles != nil,
+			FileFilter:       view.FileFilter,
+			TargetFiles:      view.TargetFiles,
+			HasTargetFiles:   opts.ProgramViews != nil || opts.TargetFiles != nil,
 			SyntaxErrorFiles: opts.SyntaxErrorFiles,
-			TypeInfoFiles:    opts.TypeInfoFiles,
+			TypeInfoFiles:    view.TypeInfoFiles,
 		})
-		targets = append(targets, collectLintTargetsForFiles(opts, program, files)...)
+		targets = append(targets, collectLintTargetsForFiles(opts, i, view, files)...)
 	}
 	return targets
 }
@@ -731,7 +772,12 @@ func CollectLintTargets(opts RunLinterOptions) []LintTarget {
 // This is what turns the serial per-file config/glob resolution — the
 // dominant cost on large repos with many ignore/files patterns — into a
 // wall-clock win before the real, already-parallel lint pass even starts.
-func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program, files []*ast.SourceFile) []LintTarget {
+func collectLintTargetsForFiles(
+	opts RunLinterOptions,
+	viewIndex int,
+	view LintProgramView,
+	files []*ast.SourceFile,
+) []LintTarget {
 	if len(files) == 0 {
 		return nil
 	}
@@ -761,16 +807,20 @@ func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program
 			var result []LintTarget
 			for _, file := range shardFiles {
 				if shouldSkipRulesForSyntax(runProgramOptions{
-					Program:          program,
+					Program:          view.Program,
 					SyntaxErrorFiles: opts.SyntaxErrorFiles,
 				}, file, ctx) {
 					continue
 				}
-				rules := filterRulesForTypeInfo(opts.GetRulesForFile(file), file.FileName(), opts.TypeInfoFiles)
+				rules := filterRulesForTypeInfo(view.GetRulesForFile(file), file.FileName(), view.TypeInfoFiles)
 				if len(rules) == 0 {
 					continue
 				}
-				result = append(result, LintTarget{File: file, Rules: rules})
+				path := file.FileName()
+				if view.TargetPathForFile != nil {
+					path = view.TargetPathForFile(file)
+				}
+				result = append(result, LintTarget{File: file, Rules: rules, ViewIndex: viewIndex, Path: path})
 			}
 			shardResults[shardIndex] = result
 		})
@@ -800,6 +850,10 @@ func LintSingleFile(opts LintSingleFileOptions) {
 			return FilterNonTypeAwareRules(base(file))
 		}
 	}
+	var targetPathForFile func(*ast.SourceFile) string
+	if opts.TargetPath != "" {
+		targetPathForFile = func(*ast.SourceFile) string { return opts.TargetPath }
+	}
 	runLintRulesInProgram(runProgramOptions{
 		Program:          opts.Program,
 		ExcludePaths:     opts.ExcludePaths,
@@ -809,8 +863,9 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		SyntaxErrorFiles: map[string]struct{}{},
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of spawning a worker.
-		SingleThreaded: true,
-		OnDiagnostic:   opts.OnDiagnostic,
+		SingleThreaded:    true,
+		TargetPathForFile: targetPathForFile,
+		OnDiagnostic:      opts.OnDiagnostic,
 	})
 }
 

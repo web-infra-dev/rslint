@@ -1,11 +1,7 @@
 import { describe, expect, test } from '@rstest/core';
 import path from 'node:path';
 
-import {
-  AncestorPathIndex,
-  createCachedAncestorFinder,
-  createPathIdentity,
-} from '../src/api/path-identity.js';
+import { createPathIdentity } from '../src/api/path-identity.js';
 
 describe('path identity', () => {
   test('uses case-sensitive POSIX identity', () => {
@@ -31,18 +27,6 @@ describe('path identity', () => {
       true,
     );
     expect(identity.isSameOrChild('C:\\Repo', 'D:\\Repo\\file.ts')).toBe(false);
-
-    const index = new AncestorPathIndex(
-      [
-        ['C:\\Repo', 'root'],
-        ['C:\\Repo\\Packages\\App', 'app'],
-      ],
-      identity,
-    );
-    expect(index.find('c:/repo/packages/APP/src')).toBe('app');
-    expect(index.find('C:\\REPO\\other')).toBe('root');
-    expect(index.find('D:\\Repo')).toBeUndefined();
-
     const caseSensitive = createPathIdentity(path.win32, true);
     expect(caseSensitive.equals('C:\\Repo', 'C:\\repo')).toBe(false);
     expect(
@@ -52,36 +36,18 @@ describe('path identity', () => {
 
   test('routes UNC paths with Windows case semantics', () => {
     const identity = createPathIdentity(path.win32, false);
-    const index = new AncestorPathIndex(
-      [
-        ['\\\\Server\\Share\\Repo', 'root'],
-        ['\\\\server\\share\\repo\\packages\\app', 'app'],
-      ],
-      identity,
-    );
 
-    expect(index.find('\\\\SERVER\\SHARE\\Repo\\Packages\\App\\src')).toBe(
-      'app',
-    );
-    expect(index.find('\\\\server\\other\\repo')).toBeUndefined();
-  });
-
-  test('caches shared ancestor probes by directory', () => {
-    const identity = createPathIdentity(path.posix, true);
-    const probes: string[] = [];
-    const find = createCachedAncestorFinder((directory) => {
-      probes.push(directory);
-      return directory === '/repo' ? '/repo/rslint.config.mjs' : undefined;
-    }, identity);
-
-    expect(find('/repo/packages/app/src')).toBe('/repo/rslint.config.mjs');
-    expect(find('/repo/packages/app/test')).toBe('/repo/rslint.config.mjs');
-    expect(probes).toEqual([
-      '/repo/packages/app/src',
-      '/repo/packages/app',
-      '/repo/packages',
-      '/repo',
-      '/repo/packages/app/test',
-    ]);
+    expect(
+      identity.isSameOrChild(
+        '\\\\server\\share\\repo\\packages\\app',
+        '\\\\SERVER\\SHARE\\Repo\\Packages\\App\\src',
+      ),
+    ).toBe(true);
+    expect(
+      identity.isSameOrChild(
+        '\\\\server\\share\\repo',
+        '\\\\server\\other\\repo',
+      ),
+    ).toBe(false);
   });
 });

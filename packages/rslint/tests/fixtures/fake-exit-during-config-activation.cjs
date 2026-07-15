@@ -23,7 +23,6 @@ function onMessage(message) {
       kind: 'loadConfigs',
       id: 300,
       data: {
-        protocolVersion: 1,
         transactionId: 'cli-exit-during-prepare',
         loadMode: 'cached',
         candidates: [
@@ -42,7 +41,6 @@ function onMessage(message) {
       kind: 'activateConfigs',
       id: 301,
       data: {
-        protocolVersion: 1,
         transactionId: 'cli-exit-during-prepare',
         effectiveConfigIds: ['root'],
       },

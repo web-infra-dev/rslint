@@ -52,7 +52,7 @@ var JsxFilenameExtensionRule = rule.Rule{
 			return false
 		}
 
-		fileName := ctx.SourceFile.FileName()
+		fileName := ctx.FileName()
 
 		// Skip virtual files like <text>
 		if strings.HasPrefix(fileName, "<") {

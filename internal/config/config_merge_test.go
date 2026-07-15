@@ -87,11 +87,10 @@ func TestGetConfigForFile_EntryIgnores_NoMatch(t *testing.T) {
 		},
 	}
 
-	// Test file is ignored by entry-level ignores and no other entry matches
-	// Should return nil (file should not be linted)
+	// The entry is ignored, but the default script baseline remains effective.
 	merged := config.GetConfigForFile("src/app.test.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for file ignored by all entries")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("expected an empty default config for the entry-local ignore")
 	}
 }
 
@@ -140,10 +139,10 @@ func TestGetConfigForFile_FilesMatching(t *testing.T) {
 		t.Error("Expected no-debugger for matching .ts file")
 	}
 
-	// JS file should not match — no entry matches, return nil
+	// JS file misses the authored entry but retains the default empty config.
 	merged = config.GetConfigForFile("src/app.js", "")
-	if merged != nil {
-		t.Error("Expected nil for non-matching file with no other entries")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("expected an empty default config for the files miss")
 	}
 }
 
@@ -583,10 +582,10 @@ func TestGetConfigForFile_EntryIgnores_NoFiles(t *testing.T) {
 		t.Error("Expected no-debugger for non-ignored file")
 	}
 
-	// Ignored file — no entry matches, return nil
+	// The entry-local ignore removes rules, not the default script baseline.
 	merged = config.GetConfigForFile("src/app.test.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for ignored file with no other matching entry")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("expected an empty default config for the ignored file")
 	}
 }
 
@@ -594,8 +593,8 @@ func TestGetConfigForFile_EmptyConfig(t *testing.T) {
 	config := RslintConfig{}
 
 	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for empty config (no entries)")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("an empty config must retain the default script baseline")
 	}
 }
 
@@ -613,10 +612,6 @@ func TestConfigDecode_PreservesNonGlobalIgnoreObjectShape(t *testing.T) {
 		if len(cfg) != 1 || isGlobalIgnoreEntry(cfg[0]) {
 			t.Fatalf("entry with another authored key must not become a global ignore: %#v", cfg)
 		}
-		if ignores := extractConfigIgnores(cfg); len(ignores) != 0 {
-			t.Fatalf("entry-level ignore leaked into global ignores: %#v", ignores)
-		}
-
 		encoded, err := json.Marshal(cfg)
 		if err != nil {
 			t.Fatalf("re-encode %s: %v", raw, err)
@@ -892,10 +887,10 @@ func TestGetConfigForFile_GlobalIgnore_PlusEntryIgnores(t *testing.T) {
 		t.Error("Expected nil for dist file (global ignore)")
 	}
 
-	// Test file: entry-level ignore, no other entry matches → nil
+	// Test file: the entry-local ignore leaves the default empty config.
 	merged = config.GetConfigForFile("src/app.test.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for test file (entry-level ignore, no other match)")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("expected an empty default config for the test file")
 	}
 
 	// Normal file: not ignored anywhere, entry2 matches
@@ -938,8 +933,8 @@ func TestGetConfigForFile_CwdAffectsMatching(t *testing.T) {
 	// With cwd = monorepo root (/monorepo),
 	// relative path = packages/foo/src/index.ts → does NOT match src/**/*.ts ✗
 	merged = config.GetConfigForFile(absPath, "/monorepo")
-	if merged != nil {
-		t.Error("Expected no match when cwd is the monorepo root (wrong base for pattern)")
+	if merged == nil || merged.Rules["no-console"] != nil {
+		t.Error("the wrong selector base must leave only the default config")
 	}
 }
 
@@ -963,11 +958,10 @@ func TestGetConfigForFile_CwdIgnoresMatching(t *testing.T) {
 		t.Error("Expected file to be ignored when cwd matches config directory")
 	}
 
-	// With wrong cwd = /other, relative path won't start with dist/ → NOT ignored
+	// With the wrong cwd, the absolute file is outside the ConfigArray base.
 	merged = config.GetConfigForFile(absPath, "/other")
-	if merged == nil {
-		t.Fatal("Expected file to NOT be ignored with wrong cwd")
-		return
+	if merged != nil {
+		t.Fatal("an absolute file outside cwd must not receive config")
 	}
 }
 
@@ -1017,10 +1011,11 @@ func TestGetConfigForFile_WindowsPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			merged := cfg.GetConfigForFile(tt.filePath, tt.cwd)
-			if tt.wantHit && merged == nil {
+			matched := merged != nil && merged.Rules["no-console"] != nil
+			if tt.wantHit && !matched {
 				t.Errorf("expected match for filePath=%q cwd=%q", tt.filePath, tt.cwd)
 			}
-			if !tt.wantHit && merged != nil {
+			if !tt.wantHit && matched {
 				t.Errorf("expected no match for filePath=%q cwd=%q", tt.filePath, tt.cwd)
 			}
 		})
@@ -1043,8 +1038,8 @@ func TestGetConfigForFile_FilesAndGroupsUseOrOutsideAndInside(t *testing.T) {
 		}
 	}
 	for _, filePath := range []string{"/repo/src/app.test.js", "/repo/other/app.js", "/repo/src/app.ts"} {
-		if merged := cfg.GetConfigForFile(filePath, "/repo"); merged != nil {
-			t.Fatalf("expected %q to fail the complete AND group, got %+v", filePath, merged)
+		if merged := cfg.GetConfigForFile(filePath, "/repo"); merged == nil || merged.Rules["no-console"] != nil {
+			t.Fatalf("expected %q to retain only the default config, got %+v", filePath, merged)
 		}
 	}
 }

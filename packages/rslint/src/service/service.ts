@@ -9,7 +9,6 @@ import type {
 } from '../types.js';
 import {
   API_PROTOCOL_VERSION,
-  API_REVERSE_CONFIG_LOAD_CAPABILITY,
   API_REVERSE_PLUGIN_LINT_CAPABILITY,
 } from './protocol.js';
 
@@ -47,10 +46,16 @@ export class RSLintService {
 
     return this.enqueue(async () => {
       const hasLoadConfigs = Boolean(handlers.loadConfigs);
+      const hasEvaluateConfigPredicates = Boolean(
+        handlers.evaluateConfigPredicates,
+      );
       const hasActivateConfigs = Boolean(handlers.activateConfigs);
-      if (hasLoadConfigs !== hasActivateConfigs) {
+      if (
+        hasLoadConfigs !== hasActivateConfigs ||
+        hasLoadConfigs !== hasEvaluateConfigPredicates
+      ) {
         throw new Error(
-          'reverse config discovery requires loadConfigs and activateConfigs handlers together',
+          'reverse config discovery requires loadConfigs, evaluateConfigPredicates, and activateConfigs handlers together',
         );
       }
       if (
@@ -66,7 +71,6 @@ export class RSLintService {
       try {
         return await this.lintExclusive(options, {
           pluginLint: Boolean(handlers.pluginLint),
-          configLoad: hasLoadConfigs && hasActivateConfigs,
         });
       } finally {
         this.activeLintHandlers = null;
@@ -76,11 +80,10 @@ export class RSLintService {
 
   private async lintExclusive(
     options: LintOptions,
-    requiredReverse: { pluginLint: boolean; configLoad: boolean },
+    requiredReverse: { pluginLint: boolean },
   ): Promise<LintResponse> {
     const {
       files,
-      canonicalFiles,
       config,
       configDiscovery,
       eslintPlugins,
@@ -97,7 +100,6 @@ export class RSLintService {
     // Send lint request
     return this.service.sendMessage('lint', {
       files,
-      canonicalFiles,
       config,
       configDiscovery,
       eslintPlugins,
@@ -138,7 +140,7 @@ export class RSLintService {
       compilerOptions,
     } = options;
 
-    await this.handshake({ pluginLint: false, configLoad: false });
+    await this.handshake({ pluginLint: false });
 
     // Send getAstInfo request
     return this.service.sendMessage('getAstInfo', {
@@ -195,14 +197,10 @@ export class RSLintService {
 
   private async handshake(requiredReverse: {
     pluginLint: boolean;
-    configLoad: boolean;
   }): Promise<void> {
     const requestedCapabilities: string[] = [];
     if (requiredReverse.pluginLint) {
       requestedCapabilities.push(API_REVERSE_PLUGIN_LINT_CAPABILITY);
-    }
-    if (requiredReverse.configLoad) {
-      requestedCapabilities.push(API_REVERSE_CONFIG_LOAD_CAPABILITY);
     }
     const response: unknown = await this.service.sendMessage('handshake', {
       version: API_PROTOCOL_VERSION,
@@ -232,12 +230,6 @@ export class RSLintService {
         'rslint backend does not support reverse pluginLint requests',
       );
     }
-    if (
-      requiredReverse.configLoad &&
-      !capabilities.includes(API_REVERSE_CONFIG_LOAD_CAPABILITY)
-    ) {
-      throw new Error('rslint backend does not support reverse config loading');
-    }
   }
 
   private async enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -266,6 +258,15 @@ export class RSLintService {
         if (!handler) {
           throw new Error(
             'rslint service received loadConfigs without an active config host',
+          );
+        }
+        return handler(message.data);
+      }
+      case 'evaluateConfigPredicates': {
+        const handler = this.activeLintHandlers?.evaluateConfigPredicates;
+        if (!handler) {
+          throw new Error(
+            'rslint service received evaluateConfigPredicates without an active config host',
           );
         }
         return handler(message.data);

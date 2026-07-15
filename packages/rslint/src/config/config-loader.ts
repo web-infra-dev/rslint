@@ -9,6 +9,7 @@ export {
   loadConfigFile,
   loadConfigFileFresh,
   normalizeConfig,
+  type ConfigPredicate,
   type PluginConfigDescriptor,
 } from './config-file-loader.js';
 export { ConfigModuleHost } from './config-module-host.js';
@@ -19,7 +20,6 @@ export type {
   EffectiveConfigModule,
 } from './config-module-host.js';
 export {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type ConfigModuleCandidate,
@@ -27,11 +27,11 @@ export {
   type ConfigModuleLoadMode,
   type ConfigModuleLoadResult,
   type FailedConfigModuleResult,
+  type EvaluateConfigPredicatesRequest,
+  type EvaluateConfigPredicatesResponse,
+  type ConfigPredicateCall,
+  type ConfigPredicateResult,
   type LoadConfigsRequest,
   type LoadConfigsResponse,
   type LoadedConfigModuleResult,
 } from './config-discovery-protocol.js';
-export {
-  filterConfigsByParentIgnores,
-  type ConfigEntry,
-} from './config-hierarchy.js';

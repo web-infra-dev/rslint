@@ -96,6 +96,21 @@ describe('loadConfigFile', () => {
       cleanup(tmp);
     }
   });
+
+  test('does not reinterpret a missing or null default as the module namespace', async () => {
+    const tmp = createTempDir();
+    try {
+      const namedOnly = path.join(tmp, 'named-only.mjs');
+      const nullDefault = path.join(tmp, 'null-default.mjs');
+      fs.writeFileSync(namedOnly, 'export const rules = {};');
+      fs.writeFileSync(nullDefault, 'export default null;');
+
+      expect(await loadConfigFile(namedOnly)).toBeUndefined();
+      expect(await loadConfigFile(nullDefault)).toBeNull();
+    } finally {
+      cleanup(tmp);
+    }
+  });
 });
 
 describe('loadConfigFileFresh', () => {
@@ -115,6 +130,44 @@ describe('loadConfigFileFresh', () => {
           { name: 'second' },
         ]);
       } finally {
+        cleanup(tmp);
+      }
+    },
+  );
+
+  test.each(['ts', 'cts'])(
+    'reloads a changed .%s config through uncached jiti',
+    async (extension) => {
+      const tmp = createTempDir();
+      const configPath = path.join(tmp, `rslint.config.${extension}`);
+      const descriptor = Object.getOwnPropertyDescriptor(
+        process.features,
+        'typescript',
+      );
+      Object.defineProperty(process.features, 'typescript', {
+        configurable: true,
+        value: false,
+      });
+      try {
+        fs.writeFileSync(
+          configPath,
+          'const name: string = "first"; module.exports = [{ name }];',
+        );
+        expect(await loadConfigFileFresh(configPath)).toEqual([
+          { name: 'first' },
+        ]);
+
+        fs.writeFileSync(
+          configPath,
+          'const name: string = "second"; module.exports = [{ name }];',
+        );
+        expect(await loadConfigFileFresh(configPath)).toEqual([
+          { name: 'second' },
+        ]);
+      } finally {
+        if (descriptor) {
+          Object.defineProperty(process.features, 'typescript', descriptor);
+        }
         cleanup(tmp);
       }
     },
@@ -182,10 +235,17 @@ describe('normalizeConfig', () => {
     },
   );
 
-  test('throws when config is not an array', () => {
-    expect(() => normalizeConfig({ rules: {} })).toThrow(
-      'rslint config must export an array',
-    );
+  test('accepts a single config object export', () => {
+    expect(normalizeConfig({ rules: { 'no-console': 'error' } })).toEqual([
+      { rules: { 'no-console': 'error' } },
+    ]);
+  });
+
+  test('accepts empty config exports', () => {
+    expect(normalizeConfig(undefined)).toEqual([]);
+    expect(normalizeConfig({})).toEqual([]);
+    expect(normalizeConfig([])).toEqual([]);
+    expect(() => normalizeConfig(null)).toThrow(/unexpected null config/);
   });
 
   test('preserves name and strips unknown fields', () => {
@@ -204,6 +264,7 @@ describe('normalizeConfig', () => {
   test('preserves all known fields', () => {
     const result = normalizeConfig([
       {
+        basePath: 'packages/app',
         files: ['**/*.ts'],
         ignores: ['dist/**'],
         languageOptions: {
@@ -215,6 +276,7 @@ describe('normalizeConfig', () => {
       },
     ]);
     const entry = result[0];
+    expect(entry.basePath).toBe('packages/app');
     expect(entry.files).toEqual(['**/*.ts']);
     expect(entry.ignores).toEqual(['dist/**']);
     expect(entry.rules).toEqual({ 'no-console': 'error' });
@@ -265,7 +327,7 @@ describe('normalizeConfig', () => {
 
   test('throws when files contains invalid selector values', () => {
     expect(() => normalizeConfig([{ files: [123], rules: {} }])).toThrow(
-      '"files" must contain only strings or arrays of strings',
+      '"files" must contain only strings, functions, or arrays of strings and functions',
     );
   });
 
@@ -288,6 +350,63 @@ describe('normalizeConfig', () => {
   test('throws when ignores contains non-string values', () => {
     expect(() => normalizeConfig([{ ignores: [null], rules: {} }])).toThrow(
       '"ignores" must contain only strings',
+    );
+  });
+
+  test('rejects a non-string basePath', () => {
+    expect(() =>
+      normalizeConfig([{ basePath: 42, ignores: ['dist/**'] }]),
+    ).toThrow('"basePath" must be a string');
+  });
+
+  test('keeps basePath as metadata on a global-ignore entry', () => {
+    expect(
+      normalizeConfig([
+        { name: 'generated', basePath: 'packages/app', ignores: ['dist/**'] },
+      ]),
+    ).toEqual([
+      { name: 'generated', basePath: 'packages/app', ignores: ['dist/**'] },
+    ]);
+  });
+
+  test('encodes every function matcher occurrence as a distinct opaque predicate', () => {
+    const matcher = () => true;
+    const registered: Array<{ predicate: unknown; location: string }> = [];
+    const normalized = normalizeConfig(
+      [
+        {
+          files: [matcher, ['**/*.ts', matcher]],
+          ignores: [matcher],
+        },
+      ],
+      (predicate, location) => {
+        registered.push({ predicate, location });
+        return `predicate-${registered.length}`;
+      },
+    );
+
+    expect(normalized).toEqual([
+      {
+        files: [
+          { $rslintPredicate: 'predicate-1' },
+          ['**/*.ts', { $rslintPredicate: 'predicate-2' }],
+        ],
+        ignores: [{ $rslintPredicate: 'predicate-3' }],
+      },
+    ]);
+    expect(registered).toEqual([
+      { predicate: matcher, location: 'entries[0].files[0]' },
+      { predicate: matcher, location: 'entries[0].files[1][1]' },
+      { predicate: matcher, location: 'entries[0].ignores[0]' },
+    ]);
+  });
+
+  test('rejects function matchers outside the trusted discovery normalizer', () => {
+    expect(() => normalizeConfig([{ files: [() => true] }])).toThrow(
+      'must contain only strings, functions',
+    );
+    expect(() => normalizeConfig([{ ignores: [() => true] }])).toThrow(
+      'must contain only strings and functions',
     );
   });
 

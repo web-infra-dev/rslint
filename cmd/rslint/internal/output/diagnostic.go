@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -18,6 +19,22 @@ type diagnosticView struct {
 	relativePath string
 	start        location
 	end          location
+}
+
+type fileWarningView struct {
+	raw          FileWarning
+	relativePath string
+}
+
+func newFileWarningView(warning FileWarning, paths tspath.ComparePathsOptions) fileWarningView {
+	return fileWarningView{
+		raw: warning,
+		relativePath: hostpath.ConvertToRelativePath(
+			warning.FilePath,
+			paths.CurrentDirectory,
+			paths.UseCaseSensitiveFileNames,
+		),
+	}
 }
 
 func newDiagnosticView(diagnostic rule.RuleDiagnostic, paths tspath.ComparePathsOptions) (diagnosticView, error) {
@@ -42,9 +59,13 @@ func newDiagnosticView(diagnostic rule.RuleDiagnostic, paths tspath.ComparePaths
 	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, end)
 
 	return diagnosticView{
-		raw:          diagnostic,
-		relativePath: tspath.ConvertToRelativePath(diagnostic.FilePath, paths),
-		start:        location{line: startLine, column: int(startColumn)},
-		end:          location{line: endLine, column: int(endColumn)},
+		raw: diagnostic,
+		relativePath: hostpath.ConvertToRelativePath(
+			diagnostic.FilePath,
+			paths.CurrentDirectory,
+			paths.UseCaseSensitiveFileNames,
+		),
+		start: location{line: startLine, column: int(startColumn)},
+		end:   location{line: endLine, column: int(endColumn)},
 	}, nil
 }

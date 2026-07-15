@@ -17,19 +17,19 @@ import (
 // plugin routing identity through pluginConfigDirByOwner; CLI discovery already
 // uses its Go-owned config directory as that identity and leaves the map nil.
 type pluginConfigResolver struct {
-	lintResolver           *lintConfigResolver
+	lintResolvers          []*lintConfigResolver
 	pluginConfigDirByOwner map[string]string
 }
 
-// resolve returns the worker wire configKey + merged config for filePath. Go
-// resolves the file against its owning-config key, then substitutes the
-// low-level API's opaque plugin routing identity when one was supplied.
-func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
-	if r.lintResolver == nil {
+func (r pluginConfigResolver) resolveForView(viewIndex int, filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
+	if viewIndex < 0 || viewIndex >= len(r.lintResolvers) {
 		return "", nil
 	}
-	configPath := r.lintResolver.configPathFor(filePath)
-	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath, configPath)
+	lintResolver := r.lintResolvers[viewIndex]
+	if lintResolver == nil {
+		return "", nil
+	}
+	cfgDir, ok := lintResolver.ownerConfigDirForFile(filePath)
 	if !ok {
 		return "", nil
 	}
@@ -37,7 +37,11 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	if pluginConfigDir, ok := r.pluginConfigDirByOwner[cfgDir]; ok {
 		wireKey = pluginConfigDir
 	}
-	return wireKey, resolver.ConfigForFile(configPath)
+	// Routing still comes from the owning config directory, but config payloads
+	// must use discovery's sole exact-path selection. Re-running the generic
+	// resolver here would lose live files/ignores predicates and could send the
+	// plugin worker different languageOptions/settings than native lint used.
+	return wireKey, lintResolver.ConfigForFile(filePath)
 }
 
 // buildPluginFileInputs collects, from RunLinter's lint targets, the files that
@@ -57,8 +61,8 @@ func buildPluginFileInputs(runOpts linter.RunLinterOptions, resolver pluginConfi
 		if !hasEslintPluginRule(t.Rules) {
 			continue
 		}
-		filePath := t.File.FileName()
-		wireKey, merged := resolver.resolve(filePath)
+		filePath := t.Path
+		wireKey, merged := resolver.resolveForView(t.ViewIndex, t.File.FileName())
 		languageOptions, settings := rslintconfig.PluginMergedMaps(merged)
 		// text=nil → the worker reads disk; sourceFile=t.File → Go rebuilds
 		// against the frame ts-go already loaded (no re-read/decode). Shared

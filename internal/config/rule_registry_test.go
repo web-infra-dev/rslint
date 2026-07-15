@@ -497,10 +497,10 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T)
 		t.Error("Expected rule to be enabled for non-ignored file")
 	}
 
-	// Ignored file: entry is skipped entirely, no config returned (nil)
+	// Ignored entry: the default script baseline remains, with no enabled rules.
 	rules2, merged := GlobalRuleRegistry.GetEnabledRules(config, "src/app.test.ts", "", true)
-	if merged != nil {
-		t.Error("Expected nil merged config for ignored file")
+	if merged == nil || len(merged.Rules) != 0 {
+		t.Error("expected an empty default merged config for ignored entry")
 	}
 	if rules2 != nil {
 		t.Error("Expected nil rules for ignored file")
@@ -646,7 +646,7 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", false)
+	resolver := NewFileConfigResolver(cfg, "/repo", false, nil)
 
 	filePath := "/repo/src/app.ts"
 	cachedRules, cachedMerged := resolver.EnabledRulesForFile(filePath)
@@ -682,12 +682,12 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 		t.Fatalf("expected no-console for uncovered file, got %q", uncovered[0].Name)
 	}
 
-	if ignoredConfig := resolver.ConfigForFile("/repo/test/app.ts"); ignoredConfig != nil {
-		t.Fatalf("expected files-miss path to have no merged config")
+	if ignoredConfig := resolver.ConfigForFile("/repo/test/app.ts"); ignoredConfig == nil || len(ignoredConfig.Rules) != 0 {
+		t.Fatalf("expected files-miss path to retain the empty default config")
 	}
 	filesMissRules, filesMissConfig := resolver.EnabledRulesForFile("/repo/test/app.ts")
-	if filesMissRules != nil || filesMissConfig != nil {
-		t.Fatalf("expected files-miss path to return nil rules/config, got %v %#v", ruleNames(filesMissRules), filesMissConfig)
+	if filesMissRules != nil || filesMissConfig == nil || len(filesMissConfig.Rules) != 0 {
+		t.Fatalf("expected files-miss path to return no rules and an empty config, got %v %#v", ruleNames(filesMissRules), filesMissConfig)
 	}
 }
 
@@ -703,7 +703,7 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", false)
+	resolver := NewFileConfigResolver(cfg, "/repo", false, nil)
 	paths := []string{
 		"/repo/src/a.ts",
 		"/repo/src/b.ts",

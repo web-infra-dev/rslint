@@ -35,6 +35,7 @@ export type MessageKind =
   // Go -> Node reverse request: evaluate one staged config frontier. The same
   // logical payload is used by the API and LSP adapters.
   | 'loadConfigs'
+  | 'evaluateConfigPredicates'
   | 'activateConfigs'
   // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
   // files in the worker pool and return the diagnostics.

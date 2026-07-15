@@ -2,12 +2,35 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
+import { configExportEntries } from './config-export-shape.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
 let freshConfigLoadNonce = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export type ConfigPredicate = (absolutePath: string) => unknown;
+export type RegisterConfigPredicate = (
+  predicate: ConfigPredicate,
+  location: string,
+) => string;
+
+function isConfigPredicate(value: unknown): value is ConfigPredicate {
+  return typeof value === 'function';
+}
+
+function encodeConfigMatcher(
+  matcher: unknown,
+  location: string,
+  registerPredicate?: RegisterConfigPredicate,
+): unknown {
+  if (typeof matcher === 'string') return matcher;
+  if (isConfigPredicate(matcher) && registerPredicate) {
+    return { $rslintPredicate: registerPredicate(matcher, location) };
+  }
+  return matcher;
 }
 
 /**
@@ -27,7 +50,7 @@ export async function loadConfigFile(configPath: string): Promise<unknown> {
       const mod: Record<string, unknown> = await import(
         pathToFileURL(configPath).href
       );
-      return mod.default ?? mod;
+      return mod.default;
     }
 
     const jiti = await loadJiti(configPath);
@@ -47,7 +70,7 @@ export async function loadConfigFile(configPath: string): Promise<unknown> {
   const mod: Record<string, unknown> = await import(
     pathToFileURL(configPath).href
   );
-  return mod.default ?? mod;
+  return mod.default;
 }
 
 /**
@@ -76,7 +99,17 @@ export async function loadConfigFileFresh(
     (ext === '.ts' || ext === '.mts' || ext === '.cts') &&
     !process.features.typescript
   ) {
-    return loadConfigFile(configPath);
+    const jiti = await loadJiti(configPath, false);
+    if (jiti) {
+      const resolved = await jiti.import(configPath);
+      return extractDefault(resolved);
+    }
+    throw new Error(
+      `Failed to load TypeScript config file: ${configPath}\n` +
+        `To load .ts/.mts/.cts config files, either:\n` +
+        `  1. Use Node.js >= 22.6 (with native TypeScript support)\n` +
+        `  2. Install jiti as a dependency: npm install -D jiti`,
+    );
   }
   return importConfigFresh(configPath);
 }
@@ -85,18 +118,24 @@ async function importConfigFresh(configPath: string): Promise<unknown> {
   const url = pathToFileURL(configPath);
   url.searchParams.set('rslint', String(freshConfigLoadNonce++));
   const mod: Record<string, unknown> = await import(url.href);
-  return mod.default ?? mod;
+  return mod.default;
 }
 
 /**
  * Try to load jiti (optional peer dependency).
  */
-async function loadJiti(configPath: string): Promise<{
+async function loadJiti(
+  configPath: string,
+  moduleCache = true,
+): Promise<{
   import: (path: string) => Promise<unknown>;
 } | null> {
   try {
     const { createJiti } = await import('jiti');
-    return createJiti(path.dirname(configPath), { interopDefault: true });
+    return createJiti(path.dirname(configPath), {
+      interopDefault: true,
+      moduleCache,
+    });
   } catch {
     return null;
   }
@@ -112,22 +151,21 @@ function extractDefault(mod: unknown): unknown {
 /**
  * Validate and strip non-serializable fields from the config.
  */
-export function normalizeConfig(config: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(config)) {
-    throw new Error(
-      `rslint config must export an array (flat config format), got ${typeof config}`,
-    );
-  }
+export function normalizeConfig(
+  config: unknown,
+  registerPredicate?: RegisterConfigPredicate,
+): Record<string, unknown>[] {
+  const entries = configExportEntries(config);
 
-  for (let index = 0; index < config.length; index++) {
-    if (!Object.prototype.hasOwnProperty.call(config, index)) {
+  for (let index = 0; index < entries.length; index++) {
+    if (!Object.prototype.hasOwnProperty.call(entries, index)) {
       throw new Error(
         `[rslint] Config entry at index ${index}: unexpected undefined config`,
       );
     }
   }
 
-  return config.map((rawEntry: unknown, index: number) => {
+  return entries.map((rawEntry: unknown, index: number) => {
     if (rawEntry === null) {
       throw new Error(
         `[rslint] Config entry at index ${index}: unexpected null config`,
@@ -163,14 +201,20 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       entry.files.some(
         (pattern) =>
           typeof pattern !== 'string' &&
+          !(registerPredicate && isConfigPredicate(pattern)) &&
           (!Array.isArray(pattern) ||
-            pattern.some((nestedPattern) => typeof nestedPattern !== 'string')),
+            pattern.some(
+              (nestedPattern) =>
+                typeof nestedPattern !== 'string' &&
+                !(registerPredicate && isConfigPredicate(nestedPattern)),
+            )),
       )
     ) {
       throw new Error(
-        `[rslint] Config entry at index ${index}: "files" must contain only strings or arrays of strings`,
+        `[rslint] Config entry at index ${index}: "files" must contain only strings, functions, or arrays of strings and functions`,
       );
     }
+    const files = Array.isArray(entry.files) ? entry.files : undefined;
     const hasIgnores = Object.prototype.hasOwnProperty.call(entry, 'ignores');
     if (hasIgnores && !Array.isArray(entry.ignores)) {
       throw new Error(
@@ -179,12 +223,17 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     }
     if (
       Array.isArray(entry.ignores) &&
-      entry.ignores.some((pattern) => typeof pattern !== 'string')
+      entry.ignores.some(
+        (pattern) =>
+          typeof pattern !== 'string' &&
+          !(registerPredicate && isConfigPredicate(pattern)),
+      )
     ) {
       throw new Error(
-        `[rslint] Config entry at index ${index}: "ignores" must contain only strings`,
+        `[rslint] Config entry at index ${index}: "ignores" must contain only strings and functions`,
       );
     }
+    const ignores = Array.isArray(entry.ignores) ? entry.ignores : undefined;
 
     for (const key of ['rules', 'languageOptions', 'settings'] as const) {
       if (
@@ -238,6 +287,14 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         `[rslint] Config entry at index ${index}: "name" must be a string`,
       );
     }
+    if (
+      Object.prototype.hasOwnProperty.call(entry, 'basePath') &&
+      typeof entry.basePath !== 'string'
+    ) {
+      throw new Error(
+        `[rslint] Config entry at index ${index}: "basePath" must be a string`,
+      );
+    }
 
     // Extract ESLint-plugin metadata from the object-form `plugins`. Live
     // plugin objects carry functions and must NEVER reach the serializable
@@ -283,7 +340,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     // authored keys, including keys whose value is undefined. Preserve that
     // distinction when normalization omits an undefined or unsupported field.
     const authoredNonGlobalKey = Object.keys(entry).some(
-      (key) => key !== 'name' && key !== 'ignores',
+      (key) => key !== 'name' && key !== 'basePath' && key !== 'ignores',
     );
     const serializesNonGlobalKey =
       hasFiles ||
@@ -296,8 +353,37 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
 
     return {
       ...(entry.name !== undefined ? { name: entry.name } : {}),
-      ...(hasFiles ? { files: entry.files } : {}),
-      ...(entry.ignores !== undefined ? { ignores: entry.ignores } : {}),
+      ...(entry.basePath !== undefined ? { basePath: entry.basePath } : {}),
+      ...(hasFiles
+        ? {
+            files: files?.map((matcher, matcherIndex) =>
+              Array.isArray(matcher)
+                ? matcher.map((nestedMatcher, nestedIndex) =>
+                    encodeConfigMatcher(
+                      nestedMatcher,
+                      `entries[${index}].files[${matcherIndex}][${nestedIndex}]`,
+                      registerPredicate,
+                    ),
+                  )
+                : encodeConfigMatcher(
+                    matcher,
+                    `entries[${index}].files[${matcherIndex}]`,
+                    registerPredicate,
+                  ),
+            ),
+          }
+        : {}),
+      ...(entry.ignores !== undefined
+        ? {
+            ignores: ignores?.map((matcher, matcherIndex) =>
+              encodeConfigMatcher(
+                matcher,
+                `entries[${index}].ignores[${matcherIndex}]`,
+                registerPredicate,
+              ),
+            ),
+          }
+        : {}),
       ...(entry.languageOptions !== undefined
         ? { languageOptions: entry.languageOptions }
         : {}),

@@ -180,6 +180,26 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 	}
 }
 
+func TestRunCLIExplicitBrokenConfigDefersToUnmatchedGlob(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "broken.config.mjs")
+	if err := os.WriteFile(configPath, []byte("export default [;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _ := runCLIInitForTest(t, map[string]any{
+		"workingDirectory": dir,
+		"configDiscovery": map[string]any{
+			"mode":               "explicit",
+			"explicitConfigPath": configPath,
+			"inputs":             []string{"absent/**/*.ts"},
+		},
+	})
+	if code != 2 {
+		t.Fatalf("exit code = %d, want ESLint configuration/search error code 2", code)
+	}
+}
+
 func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	// Truly unset NO_COLOR/FORCE_COLOR (set-but-empty would trip tiers 3/4);
 	// t.Setenv first arranges restoration and marks the test non-parallel,
@@ -334,6 +354,7 @@ func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 	peer := ipc.NewChannel(stdoutR, stdinW)
 	var outMu sync.Mutex
 	var out bytes.Buffer
+	outputHandled := make(chan struct{}, 1)
 	peer.RegisterNotification(kindOutput, func(msg *ipc.Message) {
 		var d struct {
 			Text string `json:"text"`
@@ -344,6 +365,10 @@ func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 		outMu.Lock()
 		out.WriteString(d.Text)
 		outMu.Unlock()
+		select {
+		case outputHandled <- struct{}{}:
+		default:
+		}
 	})
 	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
 		if msg.Kind == kindShutdown {
@@ -371,8 +396,17 @@ func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 		t.Fatal("runCLI did not return within 60s")
 	}
 
-	// runCLI returns only after finalizeStdout drained every output frame and
-	// the shutdown round-trip completed, so `out` is complete here.
+	// Notifications dispatch asynchronously in ipc.Channel. The shutdown frame
+	// is ordered after stdout on the wire, but its response can win the scheduler
+	// race with the already-dispatched output handler under -race. Every current
+	// code-1 fixture renders one sub-threshold output frame, so wait for that
+	// handler before inspecting the buffer.
+	if code == 1 {
+		select {
+		case <-outputHandled:
+		case <-time.After(2 * time.Second):
+		}
+	}
 	outMu.Lock()
 	text := out.String()
 	outMu.Unlock()

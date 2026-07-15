@@ -31,6 +31,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
+import { configExportEntries } from '../../config/config-export-shape.js';
 import {
   selectPluginSource,
   unwrapPluginModule,
@@ -72,7 +73,10 @@ async function importConfigFile(configFilePath: string): Promise<unknown> {
       (process.features as { typescript?: boolean }).typescript,
     );
     if (useNative) {
-      return import(pathToFileURL(configFilePath).href);
+      const configModule = (await import(
+        pathToFileURL(configFilePath).href
+      )) as { default?: unknown };
+      return configModule.default;
     }
     let jiti;
     try {
@@ -96,13 +100,19 @@ async function importConfigFile(configFilePath: string): Promise<unknown> {
       );
     }
     const resolved = await jiti.import(configFilePath);
-    // jiti returns the module namespace — wrap so the rest of
-    // `loadPluginsFromConfigFile` can keep its
-    // `(configMod as { default?: unknown }).default ?? configMod`
-    // unwrap.
+    if (
+      typeof resolved === 'object' &&
+      resolved !== null &&
+      'default' in resolved
+    ) {
+      return (resolved as { default?: unknown }).default;
+    }
     return resolved;
   }
-  return import(pathToFileURL(configFilePath).href);
+  const configModule = (await import(pathToFileURL(configFilePath).href)) as {
+    default?: unknown;
+  };
+  return configModule.default;
 }
 
 /**
@@ -193,9 +203,7 @@ export async function loadPluginsFromConfigFile(
 
   // Config file's default export is `RslintConfigEntry[]`; each entry may
   // carry `plugins: { <prefix>: pluginObj }`.
-  const exportedDefault =
-    (configMod as { default?: unknown }).default ?? configMod;
-  const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
+  const configArray = configExportEntries(configMod);
 
   // Track which prefixes we've already loaded: a re-declared prefix with the
   // SAME plugin instance is deduped (collapse to one LoadedPlugin), while a

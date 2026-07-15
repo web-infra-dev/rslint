@@ -7,7 +7,7 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/hostpath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -453,13 +453,11 @@ var FilenameCaseRule = rule.Rule{
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
-		fileName := ctx.SourceFile.FileName()
+		fileName := ctx.FileName()
 		if fileName == "" {
 			return rule.RuleListeners{}
 		}
-		// `tspath.GetBaseFileName` normalizes `\` → `/` first, so a Windows
-		// path like `src\foo\bar.js` resolves the basename correctly.
-		basename := tspath.GetBaseFileName(fileName)
+		basename := hostpath.Base(fileName)
 		// Skip ESLint's stdin / inline-source virtual filenames.
 		if basename == "<input>" || basename == "<text>" {
 			return rule.RuleListeners{}

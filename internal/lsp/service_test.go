@@ -43,7 +43,39 @@ func newTestServer() *Server {
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
 	s.jsConfigs = configs
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(configs, s.fs)
+	s.jsConfigEvaluators = make(map[string]*config.ConfigEvaluator, len(configs))
+	for configDir, entries := range configs {
+		s.jsConfigEvaluators[configDir] = config.NewConfigEvaluatorWithGitignore(
+			discoveredJSConfigForTest(entries),
+			configDir,
+			s.fs,
+			nil,
+		)
+	}
 	s.jsUnavailableConfigs = make(map[string]struct{})
+}
+
+func discoveredJSConfigForTest(entries config.RslintConfig) config.RslintConfig {
+	patterns := make([]string, 0, len(config.DefaultLintFileExtensions))
+	for _, extension := range config.DefaultLintFileExtensions {
+		patterns = append(patterns, "**/*"+extension)
+	}
+	effective := config.WithDefaultGlobalIgnores(config.RslintConfig{{
+		Name:  "rslint/test-default-file-patterns",
+		Files: patterns,
+	}})
+	return append(effective, entries...)
+}
+
+func lspActiveRulesForFile(
+	rslintConfig config.RslintConfig,
+	filePath string,
+	cwd string,
+	enforcePlugins bool,
+	hasTypeInfo bool,
+) []linter.ConfiguredRule {
+	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins, nil).
+		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
 }
 
 func documentURIFromPath(filePath string) lsproto.DocumentUri {
@@ -1708,10 +1740,9 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
 		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
 	}
-	if _, err := s.defaultFixAllNativeLint(
-		ctx,
+	if _, err := s.runConfiguredLintForContent(
 		toURI(sourcePath),
-		1,
+		ctx,
 		"export const value = 2;\n",
 		config.RslintConfig{{}},
 		dir,
@@ -1874,6 +1905,90 @@ func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
+func TestResolveLintConfigForURIProjectsAliasIntoCommittedEvaluator(t *testing.T) {
+	root := t.TempDir()
+	realRoot := filepath.Join(root, "real-workspace")
+	aliasRoot := filepath.Join(root, "alias-workspace")
+	realFile := filepath.Join(realRoot, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(realFile, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = aliasRoot
+	baseFS := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	canonicalRealRoot := baseFS.Realpath(tspath.NormalizePath(realRoot))
+	s.fs = &realpathAliasLSPTestFS{
+		FS:        baseFS,
+		aliasRoot: aliasRoot,
+		realRoot:  canonicalRealRoot,
+	}
+	entries := config.RslintConfig{{
+		Files: []string{"src/**/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
+	normalizedRealRoot := tspath.NormalizePath(canonicalRealRoot)
+	s.jsConfigs = map[string]config.RslintConfig{normalizedRealRoot: entries}
+	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigEvaluators = map[string]*config.ConfigEvaluator{
+		normalizedRealRoot: config.NewConfigEvaluator(entries, normalizedRealRoot, s.fs, nil),
+	}
+	s.configSnapshotIncludesGitignore = true
+
+	selection, err := s.resolveLintConfigForURI(
+		context.Background(),
+		documentURIFromPath(filepath.Join(aliasRoot, "src", "index.ts")),
+	)
+	if err != nil {
+		t.Fatalf("resolve aliased URI: %v", err)
+	}
+	if selection.cwd != normalizedRealRoot || selection.merged == nil {
+		t.Fatalf("aliased URI selection = cwd %q, merged %+v", selection.cwd, selection.merged)
+	}
+	if rule := selection.merged.Rules["no-debugger"]; rule == nil || rule.GetLevel() != "error" {
+		t.Fatalf("aliased URI lost committed evaluator rule: %+v", selection.merged.Rules)
+	}
+}
+
+func TestResolveLintConfigForURIRejectsJavaScriptConfigWithoutEvaluator(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	target := filepath.Join(root, "index.ts")
+	s := newTestServer()
+	s.cwd = root
+	s.fs = bundled.WrapFS(osvfs.FS())
+	s.jsConfigs = map[string]config.RslintConfig{
+		root: {{Rules: config.Rules{"no-console": "error"}}},
+	}
+	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+
+	_, err := s.resolveLintConfigForURI(context.Background(), documentURIFromPath(target))
+	if err == nil || !strings.Contains(err.Error(), "has no evaluator") {
+		t.Fatalf("error = %v, want missing evaluator invariant failure", err)
+	}
+}
+
+func TestRunConfiguredLintForContentRejectsJavaScriptWithoutMergedConfig(t *testing.T) {
+	root := t.TempDir()
+	s := newTestServer()
+	s.cwd = root
+	s.fs = bundled.WrapFS(osvfs.FS())
+	_, err := s.runConfiguredLintForContent(
+		documentURIFromPath(filepath.Join(root, "index.ts")),
+		context.Background(),
+		"export {};\n",
+		config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}},
+		root,
+		true,
+		nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "has no exact merged config") {
+		t.Fatalf("error = %v, want missing exact merged config invariant failure", err)
+	}
+}
+
 func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	root := t.TempDir()
 	realRoot := filepath.Join(root, "real-workspace")
@@ -2000,25 +2115,30 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	s.cwd = realRoot
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	fileURI := documentURIFromPath(realFile)
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
+	jsConfigs := map[string]config.RslintConfig{
 		tspath.NormalizePath(aliasRoot): {{
 			Files: []string{"src/**/*.ts"},
 			Rules: config.Rules{"no-debugger": "error"},
 		}},
-	})
+	}
+	installJSConfigsForTest(s, jsConfigs)
 
-	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
-	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(aliasRoot) {
-		t.Fatalf("physical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
+	selection, err := s.resolveLintConfigForURI(context.Background(), fileURI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !selection.isJS || tspath.NormalizePath(selection.cwd) != tspath.NormalizePath(aliasRoot) {
+		t.Fatalf("physical file resolved to config cwd %q, JS=%v", selection.cwd, selection.isJS)
 	}
 	result, err := s.runConfiguredLintForContent(
 		fileURI,
 		context.Background(),
 		source,
-		cfg,
-		configCwd,
-		isJSConfig,
+		selection.config,
+		selection.cwd,
+		selection.isJS,
 		nil,
+		selection.merged,
 	)
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
@@ -2030,15 +2150,21 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(realRoot, ".gitignore"), []byte("src/index.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(fileURI)
+	// A watched .gitignore change commits a fresh discovery evaluator.
+	installJSConfigsForTest(s, jsConfigs)
+	selection, err = s.resolveLintConfigForURI(context.Background(), fileURI)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err = s.runConfiguredLintForContent(
 		fileURI,
 		context.Background(),
 		source,
-		effective,
-		configCwd,
-		isJSConfig,
+		selection.config,
+		selection.cwd,
+		selection.isJS,
 		nil,
+		selection.merged,
 	)
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent with .gitignore failed: %v", err)
@@ -2078,18 +2204,22 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	})
 
 	fileURI := documentURIFromPath(filepath.Join(aliasDir, "index.ts"))
-	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
-	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(root) {
-		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
+	selection, err := s.resolveLintConfigForURI(context.Background(), fileURI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !selection.isJS || tspath.NormalizePath(selection.cwd) != tspath.NormalizePath(root) {
+		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", selection.cwd, selection.isJS)
 	}
 	result, err := s.runConfiguredLintForContent(
 		fileURI,
 		context.Background(),
 		source,
-		cfg,
-		configCwd,
-		isJSConfig,
+		selection.config,
+		selection.cwd,
+		selection.isJS,
 		nil,
+		selection.merged,
 	)
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
@@ -2131,6 +2261,7 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 		root,
 		false,
 		nil,
+		nil,
 	)
 	if got != source {
 		t.Fatalf("fixAll modified a default-excluded file: %q", got)
@@ -2159,7 +2290,14 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		Files: []string{"**/*.ts"},
 		Rules: config.Rules{"no-var": "error"},
 	}}
-	result, err := s.runConfiguredLintForContent(uri, context.Background(), source, cfg, configDir, true, nil)
+	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configDir, s.fs)
+	merged := config.NewFileConfigResolver(
+		config.WithDefaultGlobalIgnores(cfg),
+		matchConfigDir,
+		true,
+		s.fs,
+	).ConfigForFile(configFilePath)
+	result, err := s.runConfiguredLintForContent(uri, context.Background(), source, cfg, configDir, true, nil, merged)
 	if err != nil {
 		t.Fatalf("lint without tsconfig: %v", err)
 	}
@@ -2174,6 +2312,7 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		configDir,
 		true,
 		nil,
+		merged,
 	)
 	const want = "export const orphan = (() => { let output = 1; return output; })();\n"
 	if got != want {
@@ -2378,14 +2517,13 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:     "pruned nested source does not override root negation",
+			name:     "ignored parent blocks root descendant negation",
 			relative: "dist/types/private.ts",
 			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
 			gitignores: map[string]string{
 				".gitignore":            "dist/\n!dist/types/\n",
 				"dist/types/.gitignore": "private.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:       "directory symlink remains lintable without ignore",

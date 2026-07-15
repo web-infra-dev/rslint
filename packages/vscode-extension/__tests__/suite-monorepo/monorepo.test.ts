@@ -100,19 +100,21 @@ suite('rslint monorepo multi-config support', function () {
     );
   });
 
-  test('broken sub-package file should fall back to root config', async () => {
-    // Partial config failures retain the established behavior: the failed
-    // config is skipped while the valid ancestor config remains active.
+  test('broken sub-package file should not inherit the root config', async () => {
+    // A failed nearest config is an ownership boundary. Silently falling back
+    // to the ancestor would lint with a config ESLint would never select.
     const doc = await openFile('packages/broken/src/index.ts');
     await vscode.window.showTextDocument(doc);
 
-    const diagnostics = await waitForDiagnostics(doc, (diags) =>
-      diags.some((d) => d.message.includes('no-explicit-any')),
-    );
-
-    assert.ok(
-      diagnostics.some((d) => d.message.includes('no-explicit-any')),
-      'Broken package file should fall back to the root config',
+    // didOpen publishes the unavailable boundary synchronously. Leave enough
+    // time for that publication to cross the language-client transport before
+    // asserting that no ancestor rule leaked through.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const diagnostics = vscode.languages.getDiagnostics(doc.uri);
+    assert.strictEqual(
+      diagnostics.filter((diagnostic) => diagnostic.source === 'rslint').length,
+      0,
+      'Broken package file should not inherit diagnostics from the root config',
     );
   });
 

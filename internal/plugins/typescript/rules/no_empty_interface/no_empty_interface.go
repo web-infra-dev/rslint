@@ -99,7 +99,7 @@ var NoEmptyInterfaceRule = rule.CreateRule(rule.Rule{
 
 					// Check if in ambient declaration (.d.ts file)
 					isInAmbientDeclaration := false
-					if strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+					if strings.HasSuffix(ctx.FileName(), ".d.ts") {
 						// Check if we're inside a declared module
 						parent := node.Parent
 						for parent != nil {

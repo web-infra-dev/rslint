@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -83,31 +82,31 @@ func TestHandleLintDiscoveredConfigValidatesRuleOptions(t *testing.T) {
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(root, "input.js")},
 		WorkingDirectory: root,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Mode:   "auto",
+			Inputs: []string{filepath.Join(root, "input.js")},
+		},
 	}, requester)
 	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
 		t.Fatalf("discovered config did not validate rule options: %v", err)
 	}
 }
 
-func TestHandleLintDiscoveryOverrideValidatesRuleOptionsWithoutCandidate(t *testing.T) {
+func TestHandleLintInlineOverrideValidatesRuleOptions(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "input.js")
 	if err := os.WriteFile(target, []byte("console.log('test');\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
-		return nil, errors.New("empty discovery must not issue reverse requests")
-	})
-
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:           "auto",
+			Mode:           "inline",
+			Inputs:         []string{target},
 			OverrideConfig: json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
 		},
-	}, requester)
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
 		t.Fatalf("discovery override did not validate rule options: %v", err)
 	}

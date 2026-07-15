@@ -103,6 +103,16 @@ exports[`lint api > diag snapshot 1`] = `
     "src/fixall.ts",
     "src/index.ts",
   ],
+  "resultFiles": [
+    "src/autofix.ts",
+    "src/close-test.ts",
+    "src/disable-file.ts",
+    "src/disable.ts",
+    "src/error-transitions.ts",
+    "src/fixall-cascade.ts",
+    "src/fixall.ts",
+    "src/index.ts",
+  ],
   "ruleCount": 1,
   "warningCount": 0,
 }
@@ -134,6 +144,9 @@ exports[`lint api > virtual file support 1`] = `
   "fixableErrorCount": 0,
   "fixableWarningCount": 0,
   "lintedFiles": [
+    "src/virtual.ts",
+  ],
+  "resultFiles": [
     "src/virtual.ts",
   ],
   "ruleCount": 1,
