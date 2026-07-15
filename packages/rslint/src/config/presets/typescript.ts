@@ -51,7 +51,7 @@ const recommended: RslintConfigEntry = {
     'no-delete-var': 'error',
     'no-dupe-else-if': 'error',
     'no-empty-character-class': 'error',
-    // 'no-empty-static-block': 'error', // not implemented
+    'no-empty-static-block': 'error',
     'no-ex-assign': 'error',
     'no-extra-boolean-cast': 'error',
     'no-fallthrough': 'error',
@@ -68,9 +68,9 @@ const recommended: RslintConfigEntry = {
     'no-unexpected-multiline': 'error',
     'no-unsafe-finally': 'error',
     'no-unsafe-optional-chaining': 'error',
-    // 'no-unused-labels': 'error', // not implemented
-    // 'no-unused-private-class-members': 'error', // not implemented
-    // 'no-unassigned-vars': 'error', // not implemented
+    'no-unused-labels': 'error',
+    'no-unused-private-class-members': 'error',
+    'no-unassigned-vars': 'error',
     // 'no-useless-assignment': 'error', // not implemented
     'no-useless-backreference': 'error',
     'no-useless-catch': 'error',
