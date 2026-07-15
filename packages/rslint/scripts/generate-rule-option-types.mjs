@@ -41,7 +41,13 @@ const MARKER = '/** @__RULE_OPTIONS__ */';
  */
 function resolveHostBinary() {
   const ext = process.platform === 'win32' ? '.exe' : '';
-  const bin = path.join(REPO_ROOT, 'npm', 'rslint', hostTuple(), `rslint${ext}`);
+  const bin = path.join(
+    REPO_ROOT,
+    'npm',
+    'rslint',
+    hostTuple(),
+    `rslint${ext}`,
+  );
   if (!existsSync(bin)) {
     throw new Error(
       `generate-rule-option-types: host rslint binary not found at ${bin} — ` +
@@ -165,9 +171,7 @@ export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
     .join('');
 
   const withProperties =
-    dts.slice(0, markerLineStart) +
-    propertiesBlock +
-    dts.slice(markerLineEnd);
+    dts.slice(0, markerLineStart) + propertiesBlock + dts.slice(markerLineEnd);
 
   if (!typeDeclarations.length) {
     return withProperties;
