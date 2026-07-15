@@ -10,12 +10,12 @@ const recommended: RslintConfigEntry = {
     'promise/param-names': 'error',
     'promise/catch-or-return': 'error',
     // 'promise/no-native': 'off', // not implemented
-    // 'promise/no-nesting': 'warn', // not implemented
+    'promise/no-nesting': 'warn',
     'promise/no-promise-in-callback': 'warn',
-    // 'promise/no-callback-in-promise': 'warn', // not implemented
+    'promise/no-callback-in-promise': 'warn',
     'promise/avoid-new': 'off',
-    // 'promise/no-new-statics': 'error', // not implemented
-    // 'promise/no-return-in-finally': 'warn', // not implemented
+    'promise/no-new-statics': 'error',
+    'promise/no-return-in-finally': 'warn',
     'promise/valid-params': 'warn',
   },
 };
