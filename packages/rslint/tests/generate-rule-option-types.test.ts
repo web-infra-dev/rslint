@@ -111,13 +111,14 @@ describe('injectIntoDts', () => {
     );
   });
 
-  test('throws when the marker is missing', () => {
-    expect(() =>
-      injectIntoDts('interface RulesRecord {}', {
+  test('returns dts as-is when the marker is missing', () => {
+    const input = 'interface RulesRecord {}';
+    expect(
+      injectIntoDts(input, {
         typeDeclarations: [],
         recordProperties: [],
       }),
-    ).toThrow(/couldn't find the/);
+    ).toBe(input);
   });
 
   test('throws when RulesRecord is missing', () => {

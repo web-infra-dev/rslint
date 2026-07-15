@@ -6,6 +6,7 @@
       "properties": {
         "allow": {
           "type": "array",
+          "description": "Allowed method names on the console object.",
           "items": { "type": "string" },
           "minItems": 1,
           "uniqueItems": true
