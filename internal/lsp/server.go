@@ -449,9 +449,9 @@ func (s *Server) readLoop(ctx context.Context) error {
 		if s.initializeParams == nil && msg.Kind == jsonrpc.MessageKindRequest {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodInitialize {
-				initParams, ok := req.Params.(*lsproto.InitializeParams)
-				if !ok {
-					s.sendError(req.ID, lsproto.ErrorCodeInvalidParams)
+				initParams, err := decodeParams[*lsproto.InitializeParams](req)
+				if err != nil {
+					s.sendError(req.ID, err)
 					continue
 				}
 				resp, err := s.handleInitialize(ctx, initParams)
@@ -477,7 +477,7 @@ func (s *Server) readLoop(ctx context.Context) error {
 		} else {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodCancelRequest {
-				if cancelParams, ok := req.Params.(*lsproto.CancelParams); ok {
+				if cancelParams, err := decodeParams[*lsproto.CancelParams](req); err == nil {
 					s.cancelRequest(cancelParams.Id)
 				}
 			} else {
@@ -749,7 +749,11 @@ var handlers = sync.OnceValue(func() handlerMap {
 		if req.ID == nil {
 			return fmt.Errorf("%w: rslint/configRefresh must be a request", lsproto.ErrorCodeInvalidRequest)
 		}
-		response, err := s.handleConfigRefresh(ctx, req.Params)
+		params, err := decodeParams[configRefreshRequest](req)
+		if err != nil {
+			return err
+		}
+		response, err := s.handleConfigRefresh(ctx, params)
 		if err != nil {
 			return err
 		}
@@ -762,14 +766,9 @@ var handlers = sync.OnceValue(func() handlerMap {
 
 func registerNotificationHandler[Req any](handlers handlerMap, info lsproto.NotificationInfo[Req], fn func(*Server, context.Context, Req) error) {
 	handlers[info.Method] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
-		var params Req
-		// Ignore empty params; all generated params are either pointers or any.
-		if req.Params != nil {
-			p, ok := req.Params.(Req)
-			if !ok {
-				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
-			}
-			params = p
+		params, err := decodeParams[Req](req)
+		if err != nil {
+			return err
 		}
 		if err := fn(s, ctx, params); err != nil {
 			return err
@@ -780,14 +779,9 @@ func registerNotificationHandler[Req any](handlers handlerMap, info lsproto.Noti
 
 func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.RequestInfo[Req, Resp], fn func(*Server, context.Context, Req) (Resp, error)) {
 	handlers[info.Method] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
-		var params Req
-		// Ignore empty params.
-		if req.Params != nil {
-			p, ok := req.Params.(Req)
-			if !ok {
-				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
-			}
-			params = p
+		params, err := decodeParams[Req](req)
+		if err != nil {
+			return err
 		}
 		resp, err := fn(s, ctx, params)
 		if err != nil {
@@ -799,6 +793,17 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 		s.sendResult(req.ID, resp)
 		return nil
 	}
+}
+
+// decodeParams accepts both raw params produced by the LSP reader and typed
+// params used by embedded callers and tests.
+func decodeParams[Req any](req *lsproto.RequestMessage) (Req, error) {
+	if req.Params != nil {
+		if params, ok := req.Params.(Req); ok {
+			return params, nil
+		}
+	}
+	return lsproto.UnmarshalParams[Req](req)
 }
 
 func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {

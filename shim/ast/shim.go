@@ -218,6 +218,10 @@ type EqualsGreaterThanToken = ast.EqualsGreaterThanToken
 type EqualsToken = ast.EqualsToken
 //go:linkname EscapeAllInternalSymbolNames github.com/microsoft/typescript-go/internal/ast.EscapeAllInternalSymbolNames
 func EscapeAllInternalSymbolNames(name string) string
+//go:linkname EscapeInternalSymbolName github.com/microsoft/typescript-go/internal/ast.EscapeInternalSymbolName
+func EscapeInternalSymbolName(name string) string
+//go:linkname EscapeSymbolName github.com/microsoft/typescript-go/internal/ast.EscapeSymbolName
+func EscapeSymbolName(name string) string
 type ExclamationToken = ast.ExclamationToken
 type ExponentiationOperator = ast.ExponentiationOperator
 type ExportAssignment = ast.ExportAssignment
@@ -257,6 +261,8 @@ const FindAncestorTrue = ast.FindAncestorTrue
 func FindConstructorDeclaration(node *ast.ClassLikeDeclaration) *ast.Node
 //go:linkname FindLastVisibleNode github.com/microsoft/typescript-go/internal/ast.FindLastVisibleNode
 func FindLastVisibleNode(nodes []*ast.Node) *ast.Node
+//go:linkname FindManyAncestors github.com/microsoft/typescript-go/internal/ast.FindManyAncestors
+func FindManyAncestors(node *ast.Node, callbacks ...func(*ast.Node) bool) []*ast.Node
 type FlowFlags = ast.FlowFlags
 const FlowFlagsArrayMutation = ast.FlowFlagsArrayMutation
 const FlowFlagsAssignment = ast.FlowFlagsAssignment
@@ -2245,8 +2251,12 @@ type NumericLiteral = ast.NumericLiteral
 type NumericLiteralNode = ast.NumericLiteralNode
 type NumericOrStringLikeLiteral = ast.NumericOrStringLikeLiteral
 const OEKAll = ast.OEKAll
+const OEKAllExceptAssertionsOrExpressionsWithTypeArguments = ast.OEKAllExceptAssertionsOrExpressionsWithTypeArguments
 const OEKAssertions = ast.OEKAssertions
+const OEKAssignments = ast.OEKAssignments
+const OEKComma = ast.OEKComma
 const OEKExcludeJSDocTypeAssertion = ast.OEKExcludeJSDocTypeAssertion
+const OEKExpressionTypePassthrough = ast.OEKExpressionTypePassthrough
 const OEKExpressionsWithTypeArguments = ast.OEKExpressionsWithTypeArguments
 const OEKNonNullAssertions = ast.OEKNonNullAssertions
 const OEKParentheses = ast.OEKParentheses
