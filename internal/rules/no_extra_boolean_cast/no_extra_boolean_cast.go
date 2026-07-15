@@ -273,7 +273,7 @@ func buildNegationFix(ctx rule.RuleContext, outerUnary *ast.Node) []rule.RuleFix
 	}
 
 	replaceRange := utils.TrimNodeTextRange(ctx.SourceFile, outerUnary)
-	if utils.HasCommentInSpan(ctx.SourceFile, replaceRange.Pos(), replaceRange.End()) {
+	if utils.HasCommentInSpan(ctx.Comments, replaceRange.Pos(), replaceRange.End()) {
 		return nil
 	}
 
@@ -311,13 +311,13 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if parent != nil && parent.Kind == ast.KindPrefixUnaryExpression &&
 			parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
 			parentRange := utils.TrimNodeTextRange(ctx.SourceFile, parent)
-			if utils.HasCommentInSpan(ctx.SourceFile, parentRange.Pos(), parentRange.End()) {
+			if utils.HasCommentInSpan(ctx.Comments, parentRange.Pos(), parentRange.End()) {
 				return nil
 			}
 			return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, parent, maybePrefixSpace(ctx.SourceFile, parentRange, "true"))}
 		}
 
-		if utils.HasCommentInSpan(ctx.SourceFile, callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.Comments, callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, callNode, maybePrefixSpace(ctx.SourceFile, callRange, "false"))}
@@ -328,7 +328,7 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if ast.IsSpreadElement(arg) {
 			return nil
 		}
-		if utils.HasCommentInSpan(ctx.SourceFile, callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.Comments, callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		// Peel parens to match ESLint's paren-less AST; see buildNegationFix.

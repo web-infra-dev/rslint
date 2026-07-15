@@ -266,7 +266,14 @@ type RuleContext struct {
 	// DisableManager, built the same way). Rules should read this instead of
 	// parsing comments or config themselves. Nil only when neither source
 	// mentions any globals; a name maps to false when its final setting is "off".
-	Globals                    map[string]bool
+	Globals map[string]bool
+	// Comments holds every comment in SourceFile, in source order,
+	// computed once per file by the linter (see DisableManager, built the
+	// same way). Rules that need all of a file's comments should read this
+	// instead of walking the token tree again with utils.ForEachComment —
+	// several rules doing that independently once dominated per-file lint
+	// time (each repeats the same full tokenization the parser already did).
+	Comments                   []*ast.CommentRange
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager

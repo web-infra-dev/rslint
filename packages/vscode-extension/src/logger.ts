@@ -12,6 +12,7 @@ export class Logger {
   static defaultLogLevel: LogLevel = LogLevel.INFO;
   private readonly outputChannel: OutputChannel;
   private logLevel: LogLevel = LogLevel.INFO;
+  private disposed = false;
 
   static setDefaultLogLevel(context: { extensionMode: ExtensionMode }): void {
     Logger.defaultLogLevel =
@@ -69,11 +70,13 @@ export class Logger {
   }
 
   public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.outputChannel.dispose();
   }
 
   private log(level: LogLevel, message: string, ...args: unknown[]): void {
-    if (level < this.logLevel) {
+    if (this.disposed || level < this.logLevel) {
       return;
     }
 
