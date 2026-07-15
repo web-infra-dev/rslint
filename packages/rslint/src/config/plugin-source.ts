@@ -3,7 +3,7 @@
  * Shared source-selection + unwrap logic for ESLint-plugin mounting.
  *
  * Used by BOTH the worker loader (`plugin-loader.ts`, which instantiates
- * live plugins) and the host config normalizer (`config-loader.ts`, which
+ * live plugins) and the host config normalizer (`config-file-loader.ts`, which
  * extracts `{prefix, ruleNames}` metadata for Go). Centralizing the
  * precedence + unwrap rules guarantees host and worker agree on which
  * plugin object belongs to which prefix — otherwise Go could register a
@@ -11,7 +11,7 @@
  * "rule not found".
  *
  * Pure functions, no runtime deps — safe to bundle into the main library
- * (where `config-loader.ts` lives) and the worker alike.
+ * (where `config-file-loader.ts` lives) and the worker alike.
  */
 
 /**

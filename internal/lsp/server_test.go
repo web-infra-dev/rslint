@@ -23,17 +23,17 @@ func (m *mockFS) FileExists(path string) bool {
 }
 
 // Stubbed implementations of other vfs.FS interface methods for testing purposes
-func (m *mockFS) UseCaseSensitiveFileNames() bool                                   { return true }
-func (m *mockFS) ReadFile(path string) (string, bool)                               { return "", false }
-func (m *mockFS) WriteFile(path string, data string) error                         { return nil }
-func (m *mockFS) AppendFile(path string, data string) error                         { return nil }
-func (m *mockFS) Remove(path string) error                                          { return nil }
-func (m *mockFS) Chtimes(path string, aTime time.Time, mTime time.Time) error       { return nil }
-func (m *mockFS) DirectoryExists(path string) bool                                  { return false }
-func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                      { return vfs.Entries{} }
-func (m *mockFS) Stat(path string) vfs.FileInfo                                     { return nil }
-func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error                 { return nil }
-func (m *mockFS) Realpath(path string) string                                       { return path }
+func (m *mockFS) UseCaseSensitiveFileNames() bool                             { return true }
+func (m *mockFS) ReadFile(path string) (string, bool)                         { return "", false }
+func (m *mockFS) WriteFile(path string, data string) error                    { return nil }
+func (m *mockFS) AppendFile(path string, data string) error                   { return nil }
+func (m *mockFS) Remove(path string) error                                    { return nil }
+func (m *mockFS) Chtimes(path string, aTime time.Time, mTime time.Time) error { return nil }
+func (m *mockFS) DirectoryExists(path string) bool                            { return false }
+func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                { return vfs.Entries{} }
+func (m *mockFS) Stat(path string) vfs.FileInfo                               { return nil }
+func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error           { return nil }
+func (m *mockFS) Realpath(path string) string                                 { return path }
 
 func TestFindRslintConfig(t *testing.T) {
 	// FIXME: skip windows tests now

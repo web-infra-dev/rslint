@@ -34,7 +34,8 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
 export interface ConfigDescriptor {
   /** Absolute filesystem path of the selected JS/TS config file. */
   configPath: string;
-  /** Absolute filesystem path of the directory holding the config file.
-   *  Matches the `ConfigKey` Go emits per file during plugin-lint dispatch. */
+  /** Go-authoritative absolute matching/routing directory. In explicit mode
+   *  this can differ from the config file's parent and MUST byte-match the
+   *  `ConfigKey` Go emits during plugin-lint dispatch. */
   configDirectory: string;
 }

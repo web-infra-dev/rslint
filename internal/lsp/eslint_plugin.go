@@ -35,8 +35,7 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 				return nil, err
 			}
 			// raw is already-decoded JSON (map/slice); re-marshal then decode
-			// into the typed result, mirroring handleConfigUpdate's handling
-			// of an `any` params payload (service.go).
+			// it into the typed result.
 			data, err := stdjson.Marshal(raw)
 			if err != nil {
 				return nil, fmt.Errorf("marshal pluginLint result: %w", err)
@@ -59,9 +58,8 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 // rules — exactly the rules the native pass treats as no-op placeholders.
 // Per-file languageOptions / settings come from GetConfigForFile (the same
 // merged config the native pass resolves). configKey is the owning config
-// directory in URI form: that is the string the VS Code extension registered
-// its worker-pool LoadedPlugins under (Uri.file(dir).toString()), and the
-// worker routes tasks to plugins by matching it byte-for-byte.
+// directory's catalog identity: the absolute filesystem path discovered by Go.
+// The worker routes tasks by matching it byte-for-byte.
 //
 // textOverride forces the text the worker lints: the diagnostics path passes
 // nil (use the s.documents overlay), while the multi-pass fixAll path passes
@@ -113,14 +111,50 @@ func (s *Server) buildPluginFileInputWithConfig(
 
 	// sourceFile=nil: the LSP rebuilds against the overlay Text (the worker
 	// linted that same string). Shared filter/assembly with the CLI (F1).
+	enabledRules = s.pluginRulesForCurrentGeneration(enabledRules)
 	languageOptions, settings := config.PluginMergedMaps(merged)
 	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
 }
 
-// pluginConfigKeyForURI returns the owning config directory in URI form
-// (e.g. "file:///project") — the configKey the Node worker pool routes on.
-// It walks parents exactly like getConfigForURI but yields the URI key rather
-// than the filesystem path getConfigForURI returns for cwd use.
+// eslintPluginRuleSet expands activation metadata into the exact rule names
+// the matching Node generation can execute. It always returns a non-nil map:
+// an activated generation with no community plugins must block placeholders
+// retained in the process-wide registry by older generations.
+func eslintPluginRuleSet(entries []config.EslintPluginEntry) map[string]struct{} {
+	rules := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.Prefix == "" {
+			continue
+		}
+		for _, ruleName := range entry.RuleNames {
+			if ruleName != "" {
+				rules[entry.Prefix+"/"+ruleName] = struct{}{}
+			}
+		}
+	}
+	return rules
+}
+
+func (s *Server) pluginRulesForCurrentGeneration(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
+	if s.eslintPluginRules == nil {
+		return rules
+	}
+	filtered := make([]linter.ConfiguredRule, 0, len(rules))
+	for _, configuredRule := range rules {
+		if !configuredRule.IsEslintPluginRule {
+			filtered = append(filtered, configuredRule)
+			continue
+		}
+		if _, ok := s.eslintPluginRules[configuredRule.Name]; ok {
+			filtered = append(filtered, configuredRule)
+		}
+	}
+	return filtered
+}
+
+// pluginConfigKeyForURI returns the owning config directory's absolute path.
+// It uses the same resolver as getConfigForURI and preserves the catalog key
+// byte-for-byte for the Node worker.
 //
 // For the JSON-config fallback there is no JS config directory, so the key is
 // empty — the worker has no plugins registered for that path anyway (JSON
@@ -165,7 +199,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	// Supersede any prior in-flight dispatch for this URI FIRST — before the
 	// no-plugin-work early return below. Even a relint that yields no plugin
 	// rules (the file became globally ignored, or its plugin-rule set dropped to
-	// empty via a configUpdate) must still cancel the prior dispatch so its Node
+	// empty after a config refresh) must still cancel the prior dispatch so its Node
 	// worker stops instead of running to completion. Go-side frees the goroutine;
 	// a $/cancelRequest tells the client to stop the worker.
 	s.cancelInflightPluginDispatch(uri)

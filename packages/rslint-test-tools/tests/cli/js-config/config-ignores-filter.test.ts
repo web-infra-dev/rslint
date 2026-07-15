@@ -288,8 +288,8 @@ describe('Config discovery: parent global ignores filter nested configs', () => 
   test('specifying file in ignored dir uses nearest config (ESLint v10 aligned)', async () => {
     // ESLint v10: explicit file arg → find nearest config per-file.
     // Even though root ignores __tests__/**, the file uses its own nearest
-    // config (__tests__/fixtures/rslint.config.mjs) because file args
-    // go through findJSConfigUp, not findJSConfigsInDir.
+    // config (__tests__/fixtures/rslint.config.mjs) because Go resolves literal
+    // files by nearest ownership rather than the directory-walk frontier.
     const { diagnostics, cleanup } = await lintAndParse(
       {
         'tsconfig.json': TS_CONFIG,

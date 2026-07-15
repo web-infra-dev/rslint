@@ -151,6 +151,33 @@ func TestConfigOwnerResolverChildConfigDirs(t *testing.T) {
 	}
 }
 
+func TestConfigOwnerResolverForAutomaticTargetsExcludesExplicitOnlyBoundary(t *testing.T) {
+	configMap := map[string]RslintConfig{
+		"/repo":          nil,
+		"/repo/ignored":  nil,
+		"/repo/packages": nil,
+	}
+	scopes := map[string]LintDiscoveryScope{
+		"/repo/ignored": {ExplicitOnly: true},
+	}
+
+	automatic := NewConfigOwnerResolverForAutomaticTargets(configMap, scopes, nil)
+	dir, _ := automatic.Resolve("/repo/ignored/automatic.ts")
+	if dir != "/repo" {
+		t.Fatalf("explicit-only config claimed automatic target: %q", dir)
+	}
+	children := automatic.ChildConfigDirs("/repo")
+	if len(children) != 1 || children[0] != "/repo/packages" {
+		t.Fatalf("automatic child boundaries = %v", children)
+	}
+
+	complete := NewConfigOwnerResolver(configMap, nil)
+	dir, _ = complete.Resolve("/repo/ignored/explicit.ts")
+	if dir != "/repo/ignored" {
+		t.Fatalf("complete resolver lost literal owner: %q", dir)
+	}
+}
+
 func TestConfigOwnerResolverUsesPhysicalFallbackWithoutLexicalOwner(t *testing.T) {
 	fs := &configPathSpaceFS{
 		caseSensitive: true,
