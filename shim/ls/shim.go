@@ -65,6 +65,7 @@ type ImportsResult = ls.ImportsResult
 //go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
 func IsInString(sourceFile *ast.SourceFile, position int, previousToken *ast.Node) bool
 var IsolatedDeclarationsFixProvider = ls.IsolatedDeclarationsFixProvider
+type JSDocTagInfo = ls.JSDocTagInfo
 type KeywordCompletionFilters = ls.KeywordCompletionFilters
 const KeywordCompletionFiltersAll = ls.KeywordCompletionFiltersAll
 const KeywordCompletionFiltersClassElementKeywords = ls.KeywordCompletionFiltersClassElementKeywords

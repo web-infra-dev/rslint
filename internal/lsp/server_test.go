@@ -1,10 +1,13 @@
 package lsp
 
 import (
+	"encoding/json"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/microsoft/typescript-go/shim/jsonrpc"
+	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
@@ -34,6 +37,25 @@ func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                { 
 func (m *mockFS) Stat(path string) vfs.FileInfo                               { return nil }
 func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error           { return nil }
 func (m *mockFS) Realpath(path string) string                                 { return path }
+
+func TestDecodeParamsAcceptsRawJSONValue(t *testing.T) {
+	data := []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///tmp","capabilities":{}}}`)
+	var msg lsproto.Message
+	if err := json.Unmarshal(data, &msg); err != nil {
+		t.Fatalf("unmarshal message: %v", err)
+	}
+	if msg.Kind != jsonrpc.MessageKindRequest {
+		t.Fatalf("message kind = %v, want request", msg.Kind)
+	}
+
+	params, err := decodeParams[*lsproto.InitializeParams](msg.AsRequest())
+	if err != nil {
+		t.Fatalf("decode initialize params: %v", err)
+	}
+	if params == nil || params.Capabilities == nil {
+		t.Fatalf("decoded params missing capabilities: %+v", params)
+	}
+}
 
 func TestFindRslintConfig(t *testing.T) {
 	// FIXME: skip windows tests now
