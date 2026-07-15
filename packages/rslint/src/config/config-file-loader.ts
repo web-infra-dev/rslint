@@ -4,14 +4,6 @@ import { pathToFileURL } from 'node:url';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
-/** Config basenames eligible for automatic discovery. */
-export const JS_CONFIG_FILES = [
-  'rslint.config.js',
-  'rslint.config.mjs',
-  'rslint.config.ts',
-  'rslint.config.mts',
-] as const;
-
 let freshConfigLoadNonce = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

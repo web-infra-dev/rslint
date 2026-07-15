@@ -5,7 +5,6 @@
  * helpers directly so this facade can expose both APIs without an ESM cycle.
  */
 export {
-  JS_CONFIG_FILES,
   collectPluginMeta,
   loadConfigFile,
   loadConfigFileFresh,
