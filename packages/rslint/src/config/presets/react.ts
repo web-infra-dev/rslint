@@ -6,7 +6,7 @@ const recommended: RslintConfigEntry = {
   files: ['**/*.jsx', '**/*.tsx'],
   plugins: ['react'],
   rules: {
-    // 'react/display-name': 'error', // not implemented
+    'react/display-name': 'error',
     'react/jsx-key': 'error',
     'react/jsx-no-comment-textnodes': 'error',
     'react/jsx-no-duplicate-props': 'error',
