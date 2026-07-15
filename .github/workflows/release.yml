@@ -108,7 +108,7 @@ jobs:
       - name: Build @rslint/core dist
         run: |
           pnpm --filter @rslint/core build:js
-          pnpm --filter @rslint/core run build:types
+          pnpm --filter @rslint/core build:types
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
@@ -269,7 +269,7 @@ jobs:
         run: pnpm --filter @rslint/native build
 
       - name: Build
-        run: pnpm run build
+        run: pnpm build
 
       - name: TypeCheck
         run: pnpm typecheck

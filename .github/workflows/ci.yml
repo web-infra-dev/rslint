@@ -143,16 +143,16 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native run build
+        run: pnpm --filter @rslint/native build
 
       - name: Format
         run: pnpm format:check
 
       - name: Build
-        run: pnpm run build
+        run: pnpm build
 
       - name: Dogfooding
-        run: pnpm run lint --format github
+        run: pnpm lint --format github
 
       - name: TypeCheck
         run: pnpm typecheck
@@ -171,7 +171,7 @@ jobs:
             vscode-test-${{ matrix.os }}-
 
       - name: Test
-        run: xvfb-run -a pnpm run test
+        run: xvfb-run -a pnpm test
 
   test-node-windows:
     name: Test npm packages (rspack-windows-2022-large)
@@ -197,7 +197,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native run build
+        run: pnpm --filter @rslint/native build
 
       - name: Build rslint.exe
         shell: pwsh
@@ -238,7 +238,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native run build
+        run: pnpm --filter @rslint/native build
 
       - name: Download rslint.exe
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -257,8 +257,8 @@ jobs:
         shell: bash
         run: |
           pnpm --filter @rslint/api build
-          pnpm --filter @rslint/core run build:js
-          pnpm --filter @rslint/core run build:types
+          pnpm --filter @rslint/core build:js
+          pnpm --filter @rslint/core build:types
           pnpm --filter rslint build
 
       - name: VSCode Test Cache
