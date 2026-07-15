@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_conditional_expect"
+	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_conditional_in_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_confusing_set_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
@@ -53,6 +54,7 @@ func GetAllRules() []rule.Rule {
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
+		no_conditional_in.NoConditionalInTestRule,
 		no_confusing_set_timeout.NoConfusingSetTimeoutRule,
 		no_deprecated_functions.NoDeprecatedFunctionsRule,
 		no_disabled_tests.NoDisabledTestsRule,
