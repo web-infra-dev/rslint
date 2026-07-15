@@ -107,12 +107,12 @@ function isEmptyArraySchema(schema) {
 
 const SCOPE_TO_URL_NAME = {
   '@typescript-eslint': 'typescript-eslint',
-  'react': 'react',
+  react: 'react',
   'react-hooks': 'react-hooks',
-  'import': 'import',
-  'promise': 'promise',
-  'jest': 'jest',
-  'unicorn': 'unicorn',
+  import: 'import',
+  promise: 'promise',
+  jest: 'jest',
+  unicorn: 'unicorn',
   'jsx-a11y': 'jsx-a11y',
 };
 
@@ -139,7 +139,9 @@ async function compileRuleOptionTypes() {
     const comment = `/**\n * @see ${url}\n */\n`;
 
     if (isEmptyArraySchema(schema)) {
-      recordProperties.push(`${comment}${JSON.stringify(ruleId)}?: RuleEntry<[]>;`);
+      recordProperties.push(
+        `${comment}${JSON.stringify(ruleId)}?: RuleEntry<[]>;`,
+      );
       continue;
     }
 
@@ -189,11 +191,12 @@ export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
   const markerLineEnd = dts.indexOf('\n', markerIndex) + 1;
   const indent = dts.slice(markerLineStart, markerIndex);
   const propertiesBlock = recordProperties
-    .map((property) =>
-      property
-        .split('\n')
-        .map((line) => (line ? `${indent}${line}` : ''))
-        .join('\n') + '\n'
+    .map(
+      (property) =>
+        property
+          .split('\n')
+          .map((line) => (line ? `${indent}${line}` : ''))
+          .join('\n') + '\n',
     )
     .join('');
 
