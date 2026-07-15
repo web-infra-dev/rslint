@@ -16,21 +16,39 @@ import (
 
 func TestGitignoreFileWatchers(t *testing.T) {
 	watchers := gitignoreFileWatchers("/workspace/packages/app", true)
-	if len(watchers) != 1 {
-		t.Fatalf("watcher count=%d, want one config-scoped recursive watcher", len(watchers))
+	if len(watchers) != 4 {
+		t.Fatalf("watcher count=%d, want workspace recursive plus three strict ancestors", len(watchers))
 	}
 	recursive := watchers[0].GlobPattern.RelativePattern
 	if recursive == nil || recursive.BaseUri.URI == nil || string(*recursive.BaseUri.URI) != "file:///workspace/packages/app" || recursive.Pattern != "**/.gitignore" {
 		t.Fatalf("recursive watcher=%+v", watchers[0])
 	}
+	wantAncestorBases := []string{"file:///workspace/packages", "file:///workspace", "file:///"}
+	for index, wantBase := range wantAncestorBases {
+		relative := watchers[index+1].GlobPattern.RelativePattern
+		if relative == nil || relative.BaseUri.URI == nil || string(*relative.BaseUri.URI) != wantBase || relative.Pattern != ".gitignore" {
+			t.Fatalf("ancestor watcher[%d]=%+v, want base %q", index, watchers[index+1], wantBase)
+		}
+	}
 	withoutRelativePatterns := gitignoreFileWatchers("/workspace/packages/app", false)
-	if len(withoutRelativePatterns) != 1 {
+	if len(withoutRelativePatterns) != 4 {
 		t.Fatalf("watchers without relative-pattern support=%+v", withoutRelativePatterns)
 	}
-	pattern := withoutRelativePatterns[0].GlobPattern.Pattern
-	want := "/workspace/packages/app/**/.gitignore"
-	if pattern == nil || *pattern != want {
-		t.Fatalf("absolute watcher=%+v, want %q", withoutRelativePatterns[0], want)
+	wantPatterns := []string{
+		"/workspace/packages/app/**/.gitignore",
+		"/workspace/packages/.gitignore",
+		"/workspace/.gitignore",
+		"/.gitignore",
+	}
+	for index, want := range wantPatterns {
+		pattern := withoutRelativePatterns[index].GlobPattern.Pattern
+		if pattern == nil || *pattern != want {
+			t.Fatalf("absolute watcher[%d]=%+v, want %q", index, withoutRelativePatterns[index], want)
+		}
+	}
+	rootWatchers := gitignoreFileWatchers("/", true)
+	if len(rootWatchers) != 1 || rootWatchers[0].GlobPattern.RelativePattern == nil {
+		t.Fatalf("filesystem root watchers=%+v", rootWatchers)
 	}
 }
 

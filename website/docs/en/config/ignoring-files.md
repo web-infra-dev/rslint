@@ -53,7 +53,7 @@ Global ignore patterns affect both file matching and directory traversal (includ
 | `dir/**/*` | Ignores files inside, but allows directory traversal |
 | `dir/*`    | Ignores direct children files only                   |
 
-Use `dir/**` to completely exclude a directory (including any nested configs inside it). Use `dir/**/*` if you only want to ignore files but still allow nested configs to be discovered.
+Use `dir/**` to completely exclude a directory. Use `dir/**/*` when the walker must still enter the directory so later negations can make selected files or config candidates reachable. An automatically discovered `rslint.config.*` that still matches the file-cover ignore is not loaded; explicitly negate that candidate when you want it to become a config boundary.
 
 You can use `!` negation patterns to re-include specific files. Patterns are evaluated sequentially — later patterns override earlier ones:
 
@@ -116,13 +116,12 @@ coverage/
 !dist/          # re-include dist/ under packages/app/
 ```
 
-If you need to lint a file that is in `.gitignore`, add a `!` negation pattern in your config's global ignores:
+To make a lint target reachable, re-include it in the applicable `.gitignore` policy or with a later global ignore entry in `rslint.config.*`:
 
-```ts
-export default [
-  {
-    ignores: ['!dist/important.ts'], // override .gitignore for this file
-  },
-  // ...
-];
+```text
+# .gitignore
+dist/*
+!dist/important.ts
 ```
+
+Configuration discovery is independent of `.gitignore`: an automatically discovered or explicitly selected `rslint.config.*` is still loaded when its path matches an ignore rule. `.gitignore` is applied later, when Go selects lint targets inside that config's ownership scope.

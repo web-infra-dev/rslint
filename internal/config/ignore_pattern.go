@@ -4,7 +4,65 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 )
+
+// GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
+// shared by config-candidate and lint-target discovery. Callers supply lexical
+// paths plus an optional canonical fallback; matcher internals stay private so
+// both discovery flows cannot accidentally diverge on ignore semantics.
+type GlobalIgnoreMatcher struct {
+	configDir string
+	fs        vfs.FS
+	patterns  []IgnorePattern
+}
+
+func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) GlobalIgnoreMatcher {
+	return GlobalIgnoreMatcher{
+		configDir: tspath.NormalizePath(configDir),
+		fs:        fsys,
+		patterns:  extractConfigIgnores(config),
+	}
+}
+
+// BlocksDirectory reports whether global ignores form an absolute traversal
+// boundary at directory.
+func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
+	relative, ok := matcher.relativePath(directory, canonicalDirectory)
+	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
+}
+
+// IgnoresPath reports whether global ignores exclude a config candidate.
+func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
+	relative, ok := matcher.relativePath(filePath, canonicalPath)
+	if !ok || len(matcher.patterns) == 0 {
+		return false
+	}
+	return isDirBlockedByIgnores(relative, matcher.patterns, "") ||
+		isFileIgnored(relative, matcher.patterns, "")
+}
+
+func (matcher GlobalIgnoreMatcher) relativePath(targetPath string, canonicalPath string) (string, bool) {
+	if matcher.configDir == "" {
+		return "", false
+	}
+	caseSensitive := matcher.fs == nil || matcher.fs.UseCaseSensitiveFileNames()
+	relative, ok := RelativePathWithinConfigRoot(targetPath, matcher.configDir, caseSensitive)
+	if !ok && canonicalPath != "" {
+		matchPath, matchConfigDir := ResolveConfigPathSpaceWithCanonical(
+			targetPath,
+			canonicalPath,
+			matcher.configDir,
+			matcher.fs,
+		)
+		relative, ok = RelativePathWithinConfigRoot(matchPath, matchConfigDir, true)
+	}
+	if !ok || relative == "" {
+		return "", false
+	}
+	return strings.ReplaceAll(tspath.NormalizePath(relative), "\\", "/"), true
+}
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.
 // It is derived once at parse time, replacing the per-call suffix-sniffing the
@@ -36,14 +94,15 @@ const (
 // the same string the old []string pipeline matched against, so file-level
 // matching (isFileIgnored) is unchanged.
 type IgnorePattern struct {
-	Glob    string
-	Negated bool
-	Kind    dirKind
+	Glob            string
+	Negated         bool
+	Kind            dirKind
+	CaseInsensitive bool
 	// valid caches doublestar.ValidatePattern(Glob), computed once here instead
 	// of on every match. doublestar.Match() re-walks the pattern to validate it
 	// on every non-matching call (the common case, since most patterns don't
 	// apply to most files), which dominated profiles of the per-file ignore
-	// check once file collection was parallelized (see matches).
+	// check once file collection was parallelized (see ignorePatternMatches).
 	valid bool
 }
 
@@ -112,16 +171,6 @@ func ParseIgnorePatterns(raw []string) []IgnorePattern {
 	return out
 }
 
-// matches reports whether path matches p.Glob. It uses MatchUnvalidated with
-// the validity computed once in ParseIgnorePattern, instead of matchGlob's
-// doublestar.Match (which re-validates the pattern on every call).
-func (p IgnorePattern) matches(path string) bool {
-	if !p.valid {
-		return false
-	}
-	return doublestar.MatchUnvalidated(p.Glob, path)
-}
-
 // isFileIgnored evaluates patterns sequentially (later overrides earlier; `!`
 // re-includes), aligned with ESLint v10. Matches only the cwd-relative path —
 // never the absolute path — so `**/`-prefixed patterns can't hit system dirs.
@@ -134,9 +183,9 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 
 	ignored := false
 	for _, p := range patterns {
-		matched := p.matches(normalizedPath)
+		matched := ignorePatternMatches(p, normalizedPath)
 		if !matched && unixPath != normalizedPath {
-			matched = p.matches(unixPath)
+			matched = ignorePatternMatches(p, unixPath)
 		}
 		if matched {
 			ignored = !p.Negated
@@ -145,11 +194,30 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 	return ignored
 }
 
+// ignorePatternMatches reports whether path matches pattern.Glob, applying the
+// case fold for case-insensitive patterns. It uses MatchUnvalidated with the
+// validity computed once in ParseIgnorePattern, instead of matchGlob's
+// doublestar.Match (which re-validates the pattern on every call — the common
+// case being a non-match, since most patterns don't apply to most files, which
+// dominated profiles of the per-file ignore check once file collection was
+// parallelized).
+func ignorePatternMatches(pattern IgnorePattern, path string) bool {
+	if !pattern.valid {
+		return false
+	}
+	glob := pattern.Glob
+	if pattern.CaseInsensitive {
+		glob = strings.ToLower(glob)
+		path = strings.ToLower(path)
+	}
+	return doublestar.MatchUnvalidated(glob, path)
+}
+
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).
 func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
 	ignored := false
 	for _, p := range patterns {
-		if p.matches(filePath) {
+		if ignorePatternMatches(p, filePath) {
 			ignored = !p.Negated
 		}
 	}
@@ -167,13 +235,13 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 		if p.Negated || p.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if p.matches(dirPath) || p.matches(dirPath+"/x") {
+		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
 			return true
 		}
 		segments := strings.Split(dirPath, "/")
 		for j := 1; j < len(segments); j++ {
 			partial := strings.Join(segments[:j], "/")
-			if p.matches(partial) || p.matches(partial+"/x") {
+			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
 				return true
 			}
 		}
@@ -204,7 +272,7 @@ func canPruneDir(dirPath string, patterns []IgnorePattern, neg negReach) bool {
 			continue
 		}
 		// File-level `X/**/*` never matches the bare directory; probe `dir/x`.
-		if p.matches(dirPath + "/x") {
+		if ignorePatternMatches(p, dirPath+"/x") {
 			return true
 		}
 	}
@@ -220,10 +288,12 @@ type negReach struct {
 
 // negPrefix is one negation's reach: unrooted means "any depth" (conservatively
 // blocks all file-level pruning); literal is the leading wildcard-free path of a
-// rooted negation, used for subtree-overlap checks.
+// rooted negation, used for subtree-overlap checks. caseInsensitive keeps that
+// prefix anchored while applying the same case fold as final gitignore matching.
 type negPrefix struct {
-	unrooted bool
-	literal  string
+	unrooted        bool
+	literal         string
+	caseInsensitive bool
 }
 
 // buildNegReach extracts negation reaches from a parsed ignore set. Patterns
@@ -240,7 +310,10 @@ func buildNegReach(patterns []IgnorePattern) negReach {
 		// for those, and we mark them unrooted to conservatively disable
 		// file-level pruning.
 		if lit := literalSegmentPrefix(p.Glob); lit != "" {
-			out = append(out, negPrefix{literal: lit})
+			out = append(out, negPrefix{
+				literal:         lit,
+				caseInsensitive: p.CaseInsensitive,
+			})
 		} else {
 			out = append(out, negPrefix{unrooted: true})
 		}
@@ -252,7 +325,13 @@ func buildNegReach(patterns []IgnorePattern) negReach {
 // subtree (so the directory must not be pruned).
 func (n negReach) overlaps(dirPath string) bool {
 	for _, np := range n.prefixes {
-		if np.unrooted || segPrefixEither(np.literal, dirPath) {
+		literal := np.literal
+		candidate := dirPath
+		if np.caseInsensitive {
+			literal = strings.ToLower(literal)
+			candidate = strings.ToLower(candidate)
+		}
+		if np.unrooted || segPrefixEither(literal, candidate) {
 			return true
 		}
 	}

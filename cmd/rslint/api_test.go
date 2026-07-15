@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -13,6 +15,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
@@ -630,6 +634,31 @@ func TestHandleLint_ExplicitFileGitignoredIsSkipped(t *testing.T) {
 	}
 	if len(response.Diagnostics) != 0 {
 		t.Fatalf("expected no diagnostics for gitignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *testing.T) {
+	workingDirectory := t.TempDir()
+	configDirectory := filepath.Join(workingDirectory, "config")
+	target := filepath.Join(configDirectory, "src", "source.js")
+	writeProgramTestFiles(t, configDirectory, map[string]string{
+		"src/source.js": "debugger;\n",
+	})
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+		ConfigDirectory:  configDirectory,
+		WorkingDirectory: workingDirectory,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint: %v", err)
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/source.js" {
+		t.Fatalf("diagnostic paths = %+v, want config-relative source", response.Diagnostics)
+	}
+	if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
+		t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
 	}
 }
 
@@ -1332,6 +1361,701 @@ type apiRequesterFunc func(context.Context, ipc.MessageKind, any) (*ipc.Message,
 
 func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
 	return f(ctx, kind, payload)
+}
+
+type apiPeerCapabilityRequester struct {
+	apiRequesterFunc
+	capabilities map[string]struct{}
+}
+
+func (requester apiPeerCapabilityRequester) PeerSupportsCapability(capability string) bool {
+	_, ok := requester.capabilities[capability]
+	return ok
+}
+
+func mustAPIConfig(t *testing.T, source string) rslintconfig.RslintConfig {
+	t.Helper()
+	var config rslintconfig.RslintConfig
+	if err := json.Unmarshal([]byte(source), &config); err != nil {
+		t.Fatalf("parse test config: %v", err)
+	}
+	return config
+}
+
+func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testing.T) {
+	root := t.TempDir()
+	nestedDir := filepath.Join(root, "packages", "app")
+	rootConfigPath := filepath.Join(root, "rslint.config.js")
+	nestedConfigPath := filepath.Join(nestedDir, "rslint.config.js")
+	rootTarget := filepath.Join(root, "src", "root.js")
+	nestedTarget := filepath.Join(nestedDir, "src", "app.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js":              "export default [];\n",
+		"src/root.js":                   "debugger;\n",
+		"packages/app/rslint.config.js": "export default [];\n",
+		"packages/app/src/app.js":       "const bad = 1;\n",
+	})
+
+	rootEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	nestedEntries := mustAPIConfig(t, `[{"plugins":["community"],"rules":{"community/check":"error"}}]`)
+	var loadRequests []discovery.ConfigLoadBatchRequest
+	var activationRequests []discovery.ConfigActivationRequest
+	var pluginRequests []linter.EslintPluginLintRequest
+	var callKinds []ipc.MessageKind
+	loadedIDs := make(map[string]struct{})
+
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		callKinds = append(callKinds, kind)
+		switch kind {
+		case api.KindLoadConfigs:
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
+			}
+			loadRequests = append(loadRequests, request)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
+					return nil, fmt.Errorf("load protocol version = %d", request.ProtocolVersion)
+				}
+				if request.LoadMode != discovery.ConfigModuleLoadFresh {
+					return nil, fmt.Errorf("API load mode = %q, want fresh", request.LoadMode)
+				}
+				if !filepath.IsAbs(candidate.ConfigPath) || !filepath.IsAbs(candidate.ConfigDirectory) {
+					return nil, fmt.Errorf("candidate paths must be absolute: %+v", candidate)
+				}
+				loadedIDs[candidate.ID] = struct{}{}
+				result := discovery.ConfigLoadResult{
+					ID:     candidate.ID,
+					Status: "loaded",
+				}
+				switch filepath.Clean(candidate.ConfigPath) {
+				case filepath.Clean(rootConfigPath):
+					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(root) {
+						return nil, fmt.Errorf("root configDirectory = %q, want %q", candidate.ConfigDirectory, root)
+					}
+					result.Entries = rootEntries
+				case filepath.Clean(nestedConfigPath):
+					if filepath.Clean(candidate.ConfigDirectory) != filepath.Clean(nestedDir) {
+						return nil, fmt.Errorf("nested configDirectory = %q, want %q", candidate.ConfigDirectory, nestedDir)
+					}
+					result.Entries = nestedEntries
+				default:
+					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
+				}
+				response.Results = append(response.Results, result)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+
+		case api.KindActivateConfigs:
+			request, ok := payload.(discovery.ConfigActivationRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected activateConfigs payload %T", payload)
+			}
+			activationRequests = append(activationRequests, request)
+			if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
+				return nil, fmt.Errorf("activation protocol version = %d", request.ProtocolVersion)
+			}
+			if len(request.EffectiveConfigIDs) != len(loadedIDs) {
+				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, loadedIDs)
+			}
+			for _, id := range request.EffectiveConfigIDs {
+				if _, ok := loadedIDs[id]; !ok {
+					return nil, fmt.Errorf("activation contains unknown candidate ID %q", id)
+				}
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+				EslintPluginEntries: []rslintconfig.EslintPluginEntry{{
+					Prefix:    "community",
+					RuleNames: []string{"check"},
+				}},
+			})
+
+		case api.KindPluginLint:
+			request, ok := payload.(linter.EslintPluginLintRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected pluginLint payload %T", payload)
+			}
+			pluginRequests = append(pluginRequests, request)
+			if len(request.Files) != 1 {
+				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+			}
+			file := request.Files[0]
+			if !filepath.IsAbs(file.ConfigKey) || filepath.Clean(file.ConfigKey) != filepath.Clean(nestedDir) {
+				return nil, fmt.Errorf("plugin configKey = %q, want absolute owner %q", file.ConfigKey, nestedDir)
+			}
+			if filepath.Clean(file.Path) != filepath.Clean(nestedTarget) {
+				return nil, fmt.Errorf("plugin file = %q, want nested target %q", file.Path, nestedTarget)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, linter.EslintPluginLintResult{
+				Results: []linter.EslintPluginFileResult{{
+					FilePath: file.Path,
+					Diagnostics: []linter.EslintPluginDiagnostic{{
+						RuleName:  "community/check",
+						MessageId: "found",
+						Message:   "community check",
+						StartPos:  0,
+						EndPos:    5,
+					}},
+				}},
+			})
+
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{rootTarget, nestedTarget},
+		WorkingDirectory: root,
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext: %v", err)
+	}
+	if len(loadRequests) == 0 {
+		t.Fatal("config discovery did not issue loadConfigs")
+	}
+	if len(activationRequests) != 1 {
+		t.Fatalf("activateConfigs calls = %d, want 1", len(activationRequests))
+	}
+	if len(pluginRequests) != 1 {
+		t.Fatalf("pluginLint calls = %d, want 1", len(pluginRequests))
+	}
+	if len(callKinds) < 3 || callKinds[len(callKinds)-2] != api.KindActivateConfigs || callKinds[len(callKinds)-1] != api.KindPluginLint {
+		t.Fatalf("reverse request order = %v, want load... activate pluginLint", callKinds)
+	}
+	if response.FileCount != 2 {
+		t.Fatalf("FileCount = %d, want 2 (%v)", response.FileCount, response.LintedFiles)
+	}
+	diagnosticRules := make(map[string]string, len(response.Diagnostics))
+	for _, diagnostic := range response.Diagnostics {
+		diagnosticRules[filepath.ToSlash(diagnostic.FilePath)] = diagnostic.RuleName
+	}
+	if diagnosticRules["src/root.js"] != "no-debugger" {
+		t.Fatalf("root target did not use root owner config: %+v", response.Diagnostics)
+	}
+	if diagnosticRules["packages/app/src/app.js"] != "community/check" {
+		t.Fatalf("nested target did not use nested owner config: %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t *testing.T) {
+	tests := []struct {
+		name        string
+		entries     rslintconfig.RslintConfig
+		plugins     []rslintconfig.EslintPluginEntry
+		wantCapErr  bool
+		wantFileCnt int
+	}{
+		{
+			name:        "native config does not require plugin capability",
+			entries:     mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`),
+			wantFileCnt: 1,
+		},
+		{
+			name:       "object plugin requires plugin capability",
+			entries:    mustAPIConfig(t, `[{"plugins":["community"],"rules":{"community/check":"error"}}]`),
+			plugins:    []rslintconfig.EslintPluginEntry{{Prefix: "community", RuleNames: []string{"check"}}},
+			wantCapErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			target := filepath.Join(root, "src", "input.js")
+			writeProgramTestFiles(t, root, map[string]string{
+				"rslint.config.js": "export default [];\n",
+				"src/input.js":     "debugger;\n",
+			})
+
+			var pluginLintCalls atomic.Int32
+			requester := apiPeerCapabilityRequester{
+				capabilities: map[string]struct{}{
+					api.CapabilityReverseConfigLoad: {},
+				},
+			}
+			requester.apiRequesterFunc = func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+				switch kind {
+				case api.KindLoadConfigs:
+					request := payload.(discovery.ConfigLoadBatchRequest)
+					results := make([]discovery.ConfigLoadResult, 0, len(request.Candidates))
+					for _, candidate := range request.Candidates {
+						results = append(results, discovery.ConfigLoadResult{
+							ID:      candidate.ID,
+							Status:  "loaded",
+							Entries: test.entries,
+						})
+					}
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
+						TransactionID: request.TransactionID,
+						Results:       results,
+					})
+				case api.KindActivateConfigs:
+					request := payload.(discovery.ConfigActivationRequest)
+					return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+						TransactionID:       request.TransactionID,
+						EslintPluginEntries: test.plugins,
+					})
+				case api.KindPluginLint:
+					pluginLintCalls.Add(1)
+					return nil, errors.New("pluginLint must not be reached without its capability")
+				default:
+					return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+				}
+			}
+
+			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+				Files:            []string{target},
+				WorkingDirectory: root,
+				ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+			}, requester)
+			if test.wantCapErr {
+				if err == nil || !strings.Contains(err.Error(), "does not advertise reversePluginLint capability required by discovered ESLint plugins") {
+					t.Fatalf("error = %v, want discovered-plugin capability error", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("native-only discovery unexpectedly required pluginLint: %v", err)
+				}
+				if response == nil || response.FileCount != test.wantFileCnt {
+					t.Fatalf("response = %+v, want fileCount %d", response, test.wantFileCnt)
+				}
+			}
+			if calls := pluginLintCalls.Load(); calls != 0 {
+				t.Fatalf("pluginLint calls = %d, want 0", calls)
+			}
+		})
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *testing.T) {
+	root := t.TempDir()
+	rootConfigPath := filepath.Join(root, "rslint.config.js")
+	unrelatedConfigPath := filepath.Join(root, "src", "deep", "rslint.config.js")
+	target := filepath.Join(root, "src", "index.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js":          "export default [];\n",
+		"src/index.js":              "debugger;\n",
+		"src/deep/rslint.config.js": "export default [];\n",
+	})
+
+	rootEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	var requestedPaths []string
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
+			}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
+				if filepath.Clean(candidate.ConfigPath) == filepath.Clean(unrelatedConfigPath) {
+					return nil, fmt.Errorf("unrelated config was evaluated: %q", candidate.ConfigPath)
+				}
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(rootConfigPath) {
+					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
+				}
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: rootEntries,
+				})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request, ok := payload.(discovery.ConfigActivationRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected activateConfigs payload %T", payload)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+			})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{target},
+		WorkingDirectory: root,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Mode:          "auto",
+			Directories:   []string{root},
+			ExplicitFiles: []bool{false},
+		},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext: %v", err)
+	}
+	if !reflect.DeepEqual(requestedPaths, []string{filepath.Clean(rootConfigPath)}) {
+		t.Fatalf("requested config paths = %v, want only root", requestedPaths)
+	}
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("unexpected target response: %+v", response)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "rslint.config.js")
+	foo := filepath.Join(root, "foo.js")
+	bar := filepath.Join(root, "bar.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js": "export default [];\n",
+		".gitignore":       "foo.js\nbar.js\n",
+		"foo.js":           "debugger;\n",
+		"bar.js":           "debugger;\n",
+	})
+	entries := mustAPIConfig(t, `[{"ignores":["!foo.js"]},{"rules":{"no-debugger":"error"}}]`)
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				if filepath.Clean(candidate.ConfigPath) != filepath.Clean(configPath) {
+					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
+				}
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: entries,
+				})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+			})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	run := func(files []string) *api.LintResponse {
+		t.Helper()
+		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			Files:            files,
+			WorkingDirectory: root,
+			ConfigDiscovery: &api.ConfigDiscoveryRequest{
+				Mode:          "auto",
+				Directories:   []string{root},
+				ExplicitFiles: make([]bool, len(files)),
+			},
+		}, requester)
+		if err != nil {
+			t.Fatalf("HandleLintWithContext(%v): %v", files, err)
+		}
+		return response
+	}
+
+	fooOnly := run([]string{foo})
+	if fooOnly.FileCount != 1 || len(fooOnly.Diagnostics) != 1 || fooOnly.Diagnostics[0].FilePath != "foo.js" {
+		t.Fatalf("config negation did not restore gitignored foo: %+v", fooOnly)
+	}
+	withBar := run([]string{foo, bar})
+	if withBar.FileCount != 1 || len(withBar.Diagnostics) != 1 ||
+		withBar.Diagnostics[0].FilePath != "foo.js" || withBar.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("config negation restored the wrong gitignored target: %+v", withBar)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(t *testing.T) {
+	root := t.TempDir()
+	ignoredDir := filepath.Join(root, "ignored")
+	rootConfigPath := filepath.Join(root, "rslint.config.js")
+	nestedConfigPath := filepath.Join(ignoredDir, "rslint.config.js")
+	explicitTarget := filepath.Join(ignoredDir, "explicit.js")
+	automaticTarget := filepath.Join(ignoredDir, "automatic.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js":         "export default [];\n",
+		"ignored/rslint.config.js": "export default [];\n",
+		"ignored/.gitignore":       "automatic.js\n",
+		"ignored/explicit.js":      "debugger;\nconsole.log('explicit');\n",
+		"ignored/automatic.js":     "debugger;\nconsole.log('automatic');\n",
+	})
+
+	rootEntries := mustAPIConfig(t, `[{"ignores":["ignored/rslint.config.js"]},{"rules":{"no-console":"error"}}]`)
+	nestedEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	loadedIDs := make(map[string]map[string]struct{})
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			transactionIDs := loadedIDs[request.TransactionID]
+			if transactionIDs == nil {
+				transactionIDs = make(map[string]struct{})
+				loadedIDs[request.TransactionID] = transactionIDs
+			}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				transactionIDs[candidate.ID] = struct{}{}
+				result := discovery.ConfigLoadResult{
+					ID:     candidate.ID,
+					Status: "loaded",
+				}
+				switch filepath.Clean(candidate.ConfigPath) {
+				case filepath.Clean(rootConfigPath):
+					result.Entries = rootEntries
+				case filepath.Clean(nestedConfigPath):
+					result.Entries = nestedEntries
+				default:
+					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
+				}
+				response.Results = append(response.Results, result)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			transactionIDs := loadedIDs[request.TransactionID]
+			if len(request.EffectiveConfigIDs) != len(transactionIDs) {
+				return nil, fmt.Errorf("effective IDs = %v, loaded IDs = %v", request.EffectiveConfigIDs, transactionIDs)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+			})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	run := func(files []string, explicitFiles []bool) *api.LintResponse {
+		t.Helper()
+		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			Files:            files,
+			WorkingDirectory: root,
+			ConfigDiscovery: &api.ConfigDiscoveryRequest{
+				Mode:          "auto",
+				Directories:   []string{ignoredDir},
+				ExplicitFiles: explicitFiles,
+			},
+		}, requester)
+		if err != nil {
+			t.Fatalf("HandleLintWithContext: %v", err)
+		}
+		return response
+	}
+
+	automaticOnly := run([]string{automaticTarget}, []bool{false})
+	if automaticOnly.FileCount != 0 || len(automaticOnly.Diagnostics) != 0 {
+		t.Fatalf("parent-owned automatic target ignored by nested .gitignore was linted: %+v", automaticOnly)
+	}
+
+	response := run(
+		[]string{explicitTarget, automaticTarget},
+		[]bool{true, false},
+	)
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 {
+		t.Fatalf("adding a literal changed the automatic target's ignore result: %+v", response)
+	}
+	if response.Diagnostics[0].FilePath != "ignored/explicit.js" || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("explicit target did not retain nested owner: %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testing.T) {
+	workingDirectory := t.TempDir()
+	targetDirectory := t.TempDir()
+	configPath := filepath.Join(workingDirectory, "custom.config.mjs")
+	targetPath := filepath.Join(targetDirectory, "outside.js")
+	writeProgramTestFiles(t, workingDirectory, map[string]string{
+		"custom.config.mjs": "export default [];\n",
+	})
+	if err := os.WriteFile(targetPath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigPath) != filepath.Clean(configPath) {
+				return nil, fmt.Errorf("unexpected explicit candidates: %+v", request.Candidates)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
+				TransactionID: request.TransactionID,
+				Results: []discovery.ConfigLoadResult{{
+					ID:      request.Candidates[0].ID,
+					Status:  "loaded",
+					Entries: mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`),
+				}},
+			})
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{targetPath},
+		WorkingDirectory: workingDirectory,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Mode:               "explicit",
+			ExplicitConfigPath: configPath,
+			ExplicitFiles:      []bool{true},
+		},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext: %v", err)
+	}
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("explicit config did not govern outside target: %+v", response)
+	}
+}
+
+func TestHandleLint_ConfigAndConfigDiscoveryAreMutuallyExclusive(t *testing.T) {
+	var reverseCalls atomic.Int32
+	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
+		reverseCalls.Add(1)
+		return nil, errors.New("reverse request must not run")
+	})
+
+	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Config:           json.RawMessage(`[]`),
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		WorkingDirectory: t.TempDir(),
+	}, requester)
+	if err == nil || !strings.Contains(err.Error(), "config and configDiscovery are mutually exclusive") {
+		t.Fatalf("expected mutual-exclusion error, got %v", err)
+	}
+	if reverseCalls.Load() != 0 {
+		t.Fatalf("invalid request issued %d reverse calls", reverseCalls.Load())
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
+	var reverseCalls atomic.Int32
+	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
+		reverseCalls.Add(1)
+		return nil, errors.New("reverse request must not run")
+	})
+	dir := t.TempDir()
+
+	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{filepath.Join(dir, "a.js"), filepath.Join(dir, "b.js")},
+		WorkingDirectory: dir,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Mode:          "auto",
+			ExplicitFiles: []bool{true},
+		},
+	}, requester)
+	if err == nil || !strings.Contains(err.Error(), "configDiscovery.explicitFiles must be parallel to files") {
+		t.Fatalf("expected explicitFiles length error, got %v", err)
+	}
+	if reverseCalls.Load() != 0 {
+		t.Fatalf("invalid request issued %d reverse calls", reverseCalls.Load())
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		override   json.RawMessage
+		wantPrefix string
+	}{
+		{
+			name:       "override config",
+			source:     "debugger;\n",
+			override:   json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+			wantPrefix: "no-debugger",
+		},
+		{
+			name:       "syntax only",
+			source:     "const = ;\n",
+			wantPrefix: "TypeScript(TS",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			target := filepath.Join(dir, "input.js")
+			if err := os.WriteFile(target, []byte(test.source), 0o644); err != nil {
+				t.Fatalf("write target: %v", err)
+			}
+			var reverseCalls atomic.Int32
+			requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
+				reverseCalls.Add(1)
+				return nil, errors.New("an empty catalog must not activate Node state")
+			})
+
+			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+				Files:            []string{target},
+				WorkingDirectory: dir,
+				ConfigDiscovery: &api.ConfigDiscoveryRequest{
+					Mode:           "auto",
+					OverrideConfig: test.override,
+				},
+			}, requester)
+			if err != nil {
+				t.Fatalf("HandleLintWithContext: %v", err)
+			}
+			if reverseCalls.Load() != 0 {
+				t.Fatalf("no-candidate discovery issued %d reverse calls", reverseCalls.Load())
+			}
+			if len(response.Diagnostics) != 1 || !strings.HasPrefix(response.Diagnostics[0].RuleName, test.wantPrefix) {
+				t.Fatalf("diagnostics = %+v, want rule prefix %q", response.Diagnostics, test.wantPrefix)
+			}
+		})
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
+	dir := t.TempDir()
+	writeProgramTestFiles(t, dir, map[string]string{
+		"rslint.config.js": "export default [];\n",
+		"input.js":         "debugger;\n",
+	})
+	var loadCalls atomic.Int32
+	var activateCalls atomic.Int32
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			loadCalls.Add(1)
+			request, ok := payload.(discovery.ConfigLoadBatchRequest)
+			if !ok {
+				return nil, fmt.Errorf("unexpected loadConfigs payload %T", payload)
+			}
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				response.Results = append(response.Results, discovery.ConfigLoadResult{
+					ID:     candidate.ID,
+					Status: "failed",
+					Error:  &discovery.ConfigModuleError{Code: "ERR_MODULE", Message: "broken config"},
+				})
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			activateCalls.Add(1)
+			return nil, errors.New("all-failed discovery must not activate")
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{filepath.Join(dir, "input.js")},
+		WorkingDirectory: dir,
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+	}, requester)
+	if !errors.Is(err, discovery.ErrAllConfigsFailed) {
+		t.Fatalf("error = %v, want ErrAllConfigsFailed", err)
+	}
+	if loadCalls.Load() == 0 {
+		t.Fatal("all-failed discovery never requested its candidate")
+	}
+	if activateCalls.Load() != 0 {
+		t.Fatalf("all-failed discovery issued %d activation calls", activateCalls.Load())
+	}
 }
 
 func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {

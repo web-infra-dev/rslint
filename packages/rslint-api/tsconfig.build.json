@@ -8,7 +8,6 @@
     "noImplicitReturns": false,
     "noImplicitOverride": false,
     "rootDir": "../..",
-    "baseUrl": ".",
     // No source file in `src/**` references `#enums/*`. The mapping exists
     // purely so api-extractor (rslib's d.ts bundler) can resolve the Node
     // subpath imports inside transitively pulled `_packages/native-preview`
@@ -23,7 +22,11 @@
 
   "include": [
     "src/**/*.ts",
-    "../../typescript-go/_packages/native-preview/src/**/*.ts"
+    "../../typescript-go/_packages/native-preview/src/api/node/**/*.ts",
+    "../../typescript-go/_packages/native-preview/src/api/timing.ts",
+    "../../typescript-go/_packages/native-preview/src/ast/**/*.ts",
+    "../../typescript-go/_packages/native-preview/src/enums/**/*.enum.ts",
+    "../../typescript-go/_packages/native-preview/src/internal/utils.ts"
   ],
   "references": []
 }

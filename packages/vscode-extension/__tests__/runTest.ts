@@ -1,162 +1,189 @@
-import * as path from 'path';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { runTests } from '@vscode/test-electron';
+
+interface TestSuite {
+  name: string;
+  workspace: string;
+  tests: string;
+}
+
+const workspaceMarkerFile = '.rslint-vscode-test-sandbox.json';
 
 function resolveFixture(name: string): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', name);
 }
 
-async function main() {
-  const extensionDevelopmentPath = path.resolve(__dirname, '../..');
-  let failed = false;
-
-  // --- Existing tests (JSON config workspace) ---
-  const testWorkspace = resolveFixture('fixtures');
-  const extensionTestsPath = path.resolve(__dirname, './suite');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('JSON config tests (stable) failed:', err);
-    failed = true;
-  }
-
-  // try {
-  //   await runTests({
-  //     extensionDevelopmentPath,
-  //     extensionTestsPath,
-  //     launchArgs: ['--disable-extensions', testWorkspace],
-  //     version: '1.106.3',
-  //   });
-  // } catch (err) {
-  //   console.error('JSON config tests (1.106.3) failed:', err);
-  //   failed = true;
-  // }
-
-  // --- JS config tests ---
-  const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
-  const jsConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-jsconfig');
-  const jsConfigTestsPath = path.resolve(__dirname, './suite-jsconfig');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: jsConfigTestsPath,
-      launchArgs: ['--disable-extensions', jsConfigWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('JS config tests failed:', err);
-    failed = true;
-  }
-
-  // --- Monorepo multi-config tests ---
-  const monorepoWorkspace = path.resolve(testsSourceDir, 'fixtures-monorepo');
-  const monorepoTestsPath = path.resolve(__dirname, './suite-monorepo');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: monorepoTestsPath,
-      launchArgs: ['--disable-extensions', monorepoWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('Monorepo config tests failed:', err);
-    failed = true;
-  }
-
-  // --- No config fallback tests ---
-  const noConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-noconfig');
-  const noConfigTestsPath = path.resolve(__dirname, './suite-noconfig');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: noConfigTestsPath,
-      launchArgs: ['--disable-extensions', noConfigWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('No config tests failed:', err);
-    failed = true;
-  }
-
-  // --- Type-aware rule scope tests ---
-  const typeAwareScopeWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-type-aware-scope',
-  );
-  const typeAwareScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-type-aware-scope',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: typeAwareScopeTestsPath,
-      launchArgs: ['--disable-extensions', typeAwareScopeWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('Type-aware scope tests failed:', err);
-    failed = true;
-  }
-
-  // --- projectService type-aware scope tests ---
-  const projectServiceScopeWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-project-service-scope',
-  );
-  const projectServiceScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-project-service-scope',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: projectServiceScopeTestsPath,
-      launchArgs: ['--disable-extensions', projectServiceScopeWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('projectService scope tests failed:', err);
-    failed = true;
-  }
-
-  // --- eslintPlugins reverse-dispatch tests ---
-  const eslintPluginsWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-eslint-plugins',
-  );
-  const eslintPluginsTestsPath = path.resolve(
-    __dirname,
-    './suite-eslint-plugins',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: eslintPluginsTestsPath,
-      launchArgs: ['--disable-extensions', eslintPluginsWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('eslintPlugins tests failed:', err);
-    failed = true;
-  }
-
-  if (failed) {
-    console.error('Some test suites failed');
-    process.exit(1);
+async function findPackageRoot(startPath: string): Promise<string> {
+  let current = path.resolve(startPath);
+  while (true) {
+    try {
+      await fs.promises.access(path.join(current, 'package.json'));
+      return current;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        throw new Error(`Could not find a package boundary above ${startPath}`);
+      }
+      current = parent;
+    }
   }
 }
 
-main();
+async function runIsolatedSuite(
+  extensionDevelopmentPath: string,
+  suite: TestSuite,
+): Promise<void> {
+  // Go discovery intentionally searches strict cwd ancestors, so keep each
+  // fixture in a clean physical workspace outside this repository. Use short
+  // paths on Unix as VS Code and the language client append socket names that
+  // can otherwise exceed macOS's Unix-domain socket path limit.
+  const tempRoot = process.platform === 'win32' ? os.tmpdir() : '/tmp';
+  const profileRoot = await fs.promises.mkdtemp(path.join(tempRoot, 'rsv-'));
+  const userDataDir = path.join(profileRoot, 'u');
+  const extensionsDir = path.join(profileRoot, 'e');
+  const workspaceCopy = path.join(profileRoot, 'w');
+
+  let testError: unknown;
+  try {
+    // Suites intentionally create, rewrite, and delete config files. Run them
+    // against a private copy so even an Extension Host crash cannot mutate a
+    // tracked fixture in the checkout.
+    await fs.promises.cp(suite.workspace, workspaceCopy, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+    });
+    await fs.promises.writeFile(
+      path.join(workspaceCopy, workspaceMarkerFile),
+      JSON.stringify({
+        version: 1,
+        nonce: randomUUID(),
+        sourceWorkspace: await fs.promises.realpath(suite.workspace),
+        expectedWorkspace: await fs.promises.realpath(workspaceCopy),
+      }),
+      { encoding: 'utf8', flag: 'wx', mode: 0o600 },
+    );
+
+    // Preserve the source workspace's package boundary and dependency lookup
+    // without placing a writable node_modules link inside the test workspace.
+    const packageRoot = await findPackageRoot(suite.workspace);
+    await fs.promises.copyFile(
+      path.join(packageRoot, 'package.json'),
+      path.join(profileRoot, 'package.json'),
+    );
+    await fs.promises.symlink(
+      path.join(packageRoot, 'node_modules'),
+      path.join(profileRoot, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: suite.tests,
+      launchArgs: [
+        workspaceCopy,
+        '--disable-extensions',
+        '--disable-updates',
+        '--disable-workspace-trust',
+        '--force-disable-user-env',
+        '--skip-release-notes',
+        '--skip-welcome',
+        `--user-data-dir=${userDataDir}`,
+        `--extensions-dir=${extensionsDir}`,
+      ],
+      // Omit `version`: @vscode/test-electron resolves the current stable
+      // release on every run instead of pinning a VS Code build.
+    });
+  } catch (error) {
+    testError = error;
+  }
+
+  let cleanupError: unknown;
+  try {
+    await fs.promises.rm(profileRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  if (testError && cleanupError) {
+    throw new AggregateError(
+      [testError, cleanupError],
+      `${suite.name} failed and its isolated sandbox could not be removed`,
+    );
+  }
+  if (testError) throw testError;
+  if (cleanupError) throw cleanupError;
+}
+
+async function main(): Promise<void> {
+  const extensionDevelopmentPath = path.resolve(__dirname, '../..');
+  const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
+  const suites: TestSuite[] = [
+    {
+      name: 'JSON config tests',
+      workspace: resolveFixture('fixtures'),
+      tests: path.resolve(__dirname, './suite'),
+    },
+    {
+      name: 'JS config tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
+      tests: path.resolve(__dirname, './suite-jsconfig'),
+    },
+    {
+      name: 'Monorepo config tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-monorepo'),
+      tests: path.resolve(__dirname, './suite-monorepo'),
+    },
+    {
+      name: 'No config tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-noconfig'),
+      tests: path.resolve(__dirname, './suite-noconfig'),
+    },
+    {
+      name: 'Type-aware scope tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-type-aware-scope'),
+      tests: path.resolve(__dirname, './suite-type-aware-scope'),
+    },
+    {
+      name: 'projectService scope tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-project-service-scope'),
+      tests: path.resolve(__dirname, './suite-project-service-scope'),
+    },
+    {
+      name: 'eslintPlugins tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
+      tests: path.resolve(__dirname, './suite-eslint-plugins'),
+    },
+  ];
+
+  const failures: unknown[] = [];
+  for (const suite of suites) {
+    try {
+      await runIsolatedSuite(extensionDevelopmentPath, suite);
+    } catch (error) {
+      console.error(`${suite.name} failed:`, error);
+      failures.push(error);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `${failures.length} VS Code suite(s) failed`,
+    );
+  }
+}
+
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

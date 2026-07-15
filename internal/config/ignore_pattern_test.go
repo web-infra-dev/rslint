@@ -337,6 +337,30 @@ func TestNegReach_OverlapsBoundary(t *testing.T) {
 	}
 }
 
+// A case-insensitive filesystem changes matching, not whether an anchored
+// negation has an anchored prefix. Preserve that prefix and fold only the
+// overlap comparison; otherwise one unrelated negation disables every
+// file-level directory prune on macOS/Windows.
+func TestNegReach_CaseInsensitiveAnchoredPrefix(t *testing.T) {
+	parsed := ParseIgnorePatterns([]string{
+		"**/TARGET/**/*",
+		"!Scripts/**/Debug",
+	})
+	for i := range parsed {
+		parsed[i].CaseInsensitive = true
+	}
+
+	neg := buildNegReach(parsed)
+	assert.Equal(t, len(neg.prefixes), 1)
+	assert.Equal(t, neg.prefixes[0].unrooted, false)
+	assert.Equal(t, neg.prefixes[0].literal, "Scripts")
+	assert.Equal(t, neg.prefixes[0].caseInsensitive, true)
+	assert.Assert(t, neg.overlaps("scripts"), "case-folded exact prefix must overlap")
+	assert.Assert(t, neg.overlaps("SCRIPTS/pkg"), "case-folded descendant must overlap")
+	assert.Assert(t, !neg.overlaps("target"), "unrelated target must remain prunable")
+	assert.Assert(t, canPruneDir("target", parsed, neg), "unrelated ignored target must be pruned")
+}
+
 // --- Unit: buildNegReach with glob-metachar / double-slash negations ---
 // TestBuildNegReach covers brace, dotslash, and mid-pattern metachars. Fill the
 // `?`, `[abc]`, and double-slash forms: literalSegmentPrefix must stop at the

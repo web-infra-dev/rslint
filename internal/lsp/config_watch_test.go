@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -80,7 +79,9 @@ func TestReloadConfigAndRelint_RefreshesJSONFallbackWhenJSConfigsActive(t *testi
 	s := newTestServer()
 	s.fs = osvfs.FS()
 	s.cwd = dir
-	s.jsConfigs["file:///other"] = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/other": {{Rules: config.Rules{"no-console": "error"}}},
+	})
 
 	s.reloadConfigAndRelint()
 
@@ -604,116 +605,9 @@ func TestHandleInitialized_WatchDisabledWhenCapabilitiesNil(t *testing.T) {
 
 // ======== isBlockingMethod tests ========
 
-func TestIsBlockingMethod_ConfigUpdate(t *testing.T) {
-	if !isBlockingMethod(lsproto.Method("rslint/configUpdate")) {
-		t.Error("rslint/configUpdate must be a blocking method to avoid data races on jsConfigs")
-	}
-}
-
-func TestConfigUpdateRequestAcknowledgesAcceptedGeneration(t *testing.T) {
-	s, outgoing := newTestServerWithQueue()
-	id := jsonrpc.NewIDString("config-update-1")
-	req := &lsproto.RequestMessage{
-		ID:     id,
-		Method: lsproto.Method("rslint/configUpdate"),
-		Params: map[string]any{
-			"generation": "accepted",
-			"configs": []any{
-				map[string]any{"configDirectory": "file:///project", "entries": []any{}},
-			},
-		},
-	}
-
-	if err := handlers()[req.Method](s, context.Background(), req); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case message := <-outgoing:
-		response := message.AsResponse()
-		if response.ID == nil || response.ID.String() != id.String() || response.Error != nil {
-			t.Fatalf("unexpected config update response: %+v", response)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("config update request was not acknowledged")
-	}
-}
-
 func TestIsBlockingMethod_CodeAction(t *testing.T) {
 	if !isBlockingMethod(lsproto.MethodTextDocumentCodeAction) {
 		t.Error("textDocument/codeAction must be a blocking method to avoid data races on s.diagnostics")
-	}
-}
-
-// TestDispatchLoop_ConfigUpdateBeforeDidOpen verifies that when a configUpdate
-// notification and a didOpen notification are queued sequentially, the dispatch
-// loop processes configUpdate first (both are blocking), so didOpen sees the
-// updated jsConfigs.
-func TestDispatchLoop_ConfigUpdateBeforeDidOpen(t *testing.T) {
-	s, _ := newTestServerWithQueue()
-	s.requestQueue = make(chan *lsproto.RequestMessage, 10)
-
-	// Build a configUpdate notification with a test config
-	configPayload := map[string]any{
-		"configs": []map[string]any{
-			{
-				"configDirectory": "file:///project",
-				"entries": []map[string]any{
-					{
-						"files": []string{"**/*.ts"},
-						"rules": map[string]string{"no-console": "error"},
-					},
-				},
-			},
-		},
-	}
-	configReq := &lsproto.RequestMessage{
-		Method: lsproto.Method("rslint/configUpdate"),
-		Params: configPayload,
-	}
-
-	// Build a didOpen notification as a sentinel — once it's processed,
-	// we know all prior blocking messages have completed.
-	openReq := &lsproto.RequestMessage{
-		Method: lsproto.MethodTextDocumentDidOpen,
-		Params: &lsproto.DidOpenTextDocumentParams{
-			TextDocument: &lsproto.TextDocumentItem{
-				Uri:     "file:///project/test.ts",
-				Text:    "const x = 1;",
-				Version: 1,
-			},
-		},
-	}
-
-	// Queue both messages before starting the loop
-	s.requestQueue <- configReq
-	s.requestQueue <- openReq
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() {
-		done <- s.dispatchLoop(ctx)
-	}()
-
-	// Wait for both messages to be processed, then cancel
-	time.Sleep(100 * time.Millisecond)
-	cancel()
-	<-done
-
-	// Verify configUpdate was applied before didOpen ran
-	if len(s.jsConfigs) == 0 {
-		t.Fatal("jsConfigs should have been populated by configUpdate before didOpen")
-	}
-	cfg, ok := s.jsConfigs["file:///project"]
-	if !ok {
-		t.Fatal("jsConfigs missing 'file:///project' key")
-	}
-	if len(cfg) == 0 {
-		t.Fatal("config entries should not be empty")
-	}
-
-	// Verify didOpen also ran (the sentinel)
-	if _, ok := s.documents["file:///project/test.ts"]; !ok {
-		t.Fatal("didOpen should have stored the document")
 	}
 }
 

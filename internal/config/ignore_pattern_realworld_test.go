@@ -175,6 +175,21 @@ func TestRealConfig_RspackNodeModulesReinclude(t *testing.T) {
 	// An unrelated node_modules cover IS prunable (no negation reaches it).
 	assert.Assert(t, canPruneDir("packages/core/node_modules", pats, neg),
 		"unprotected node_modules must be pruned")
+
+	// Gitignore matching is case-insensitive on the default macOS/Windows
+	// filesystems. The anchored re-includes must still protect their own paths
+	// without globally disabling pruning for every unrelated node_modules tree.
+	caseInsensitive := append([]IgnorePattern(nil), pats...)
+	for i := range caseInsensitive {
+		caseInsensitive[i].CaseInsensitive = true
+	}
+	caseInsensitiveNeg := buildNegReach(caseInsensitive)
+	assert.Assert(t, !canPruneDir("TESTS/RSPACK-TEST", caseInsensitive, caseInsensitiveNeg),
+		"case-folded protected subtree must not be pruned")
+	assert.Assert(t, !canPruneDir("SCRIPTS", caseInsensitive, caseInsensitiveNeg),
+		"case-folded scripts subtree must not be pruned")
+	assert.Assert(t, canPruneDir("PACKAGES/CORE/NODE_MODULES", caseInsensitive, caseInsensitiveNeg),
+		"case-insensitive unrelated node_modules must remain prunable")
 }
 
 // --- rspack rooted ext-filter `npm/**/*.node` + `/npm/*` single-level +

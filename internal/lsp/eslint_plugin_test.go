@@ -206,16 +206,17 @@ func TestDispatchLoop_PluginResultMerged(t *testing.T) {
 
 func TestPluginConfigKeyForURI(t *testing.T) {
 	s := newTestServer()
-	// JS config registered under a URI key (as configUpdate stores it).
-	s.jsConfigs["file:///project"] = config.RslintConfig{{}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/project": {{}},
+	})
 
 	tests := []struct {
 		name string
 		uri  lsproto.DocumentUri
 		want string
 	}{
-		{"file directly under config dir", "file:///project/a.ts", "file:///project"},
-		{"file in nested subdir", "file:///project/src/deep/b.ts", "file:///project"},
+		{"file directly under config dir", "file:///project/a.ts", "/project"},
+		{"file in nested subdir", "file:///project/src/deep/b.ts", "/project"},
 		{"file outside any config", "file:///other/c.ts", ""},
 	}
 	for _, tt := range tests {
@@ -246,12 +247,14 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 	})
 
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tplsp"},
-			Rules:   config.Rules{"tplsp/no-foo": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tplsp"},
+				Rules:   config.Rules{"tplsp/no-foo": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "overlay buffer"
 
@@ -263,8 +266,8 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 	if in.Text == nil || *in.Text != "overlay buffer" {
 		t.Errorf("nil override should use overlay, got %v", in.Text)
 	}
-	if in.ConfigKey != "file:///proj" {
-		t.Errorf("configKey = %q, want file:///proj", in.ConfigKey)
+	if in.ConfigKey != "/proj" {
+		t.Errorf("configKey = %q, want /proj", in.ConfigKey)
 	}
 	if len(in.Rules) != 1 || in.Rules[0].Name != "tplsp/no-foo" {
 		t.Errorf("expected only the plugin rule forwarded, got %+v", in.Rules)
@@ -287,13 +290,15 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	})
 
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Files:   []string{"**/*.ts"},
-			Plugins: []string{"tplfiles"},
-			Rules:   config.Rules{"tplfiles/no-foo": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Files:   []string{"**/*.ts"},
+				Plugins: []string{"tplfiles"},
+				Rules:   config.Rules{"tplfiles/no-foo": "error"},
+			},
 		},
-	}
+	})
 	s.documents["file:///proj/matched.ts"] = "foo();"
 	s.documents["file:///proj/outside.js"] = "foo();"
 
@@ -370,16 +375,49 @@ func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
 	}
 }
 
+func TestPluginRulesForCurrentGenerationRejectsStalePlaceholders(t *testing.T) {
+	rules := []linter.ConfiguredRule{
+		{Name: "native", IsEslintPluginRule: false},
+		{Name: "current/check", IsEslintPluginRule: true},
+		{Name: "stale/check", IsEslintPluginRule: true},
+	}
+	s := newTestServer()
+
+	// A nil gate is reserved for isolated pre-transaction call sites.
+	if got := s.pluginRulesForCurrentGeneration(rules); len(got) != len(rules) {
+		t.Fatalf("nil generation gate filtered rules: %+v", got)
+	}
+
+	s.eslintPluginRules = eslintPluginRuleSet([]config.EslintPluginEntry{{
+		Prefix:    "current",
+		RuleNames: []string{"check"},
+	}})
+	got := s.pluginRulesForCurrentGeneration(rules)
+	if len(got) != 2 || got[0].Name != "native" || got[1].Name != "current/check" {
+		t.Fatalf("generation gate retained stale plugin rules: %+v", got)
+	}
+
+	// An explicit empty generation must block every process-global plugin
+	// placeholder while preserving native rules.
+	s.eslintPluginRules = eslintPluginRuleSet(nil)
+	got = s.pluginRulesForCurrentGeneration(rules)
+	if len(got) != 1 || got[0].Name != "native" {
+		t.Fatalf("empty generation did not block plugin rules: %+v", got)
+	}
+}
+
 func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},
 	})
 
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{{
-		Plugins: []string{"tplexcluded"},
-		Rules:   config.Rules{"tplexcluded/no-foo": "error"},
-	}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {{
+			Plugins: []string{"tplexcluded"},
+			Rules:   config.Rules{"tplexcluded/no-foo": "error"},
+		}},
+	})
 
 	for _, uri := range []lsproto.DocumentUri{
 		"file:///proj/node_modules/pkg/index.ts",
@@ -399,20 +437,22 @@ func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
 	})
 
 	s := newTestServer()
-	s.jsConfigs["file:///Users/John%20Doe/my%20project"] = config.RslintConfig{
-		{
-			Files:   []string{"**/*.ts"},
-			Plugins: []string{"tprootcfg"},
-			Rules:   config.Rules{"tprootcfg/no-root": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/Users/John Doe/my project": {
+			{
+				Files:   []string{"**/*.ts"},
+				Plugins: []string{"tprootcfg"},
+				Rules:   config.Rules{"tprootcfg/no-root": "error"},
+			},
 		},
-	}
-	s.jsConfigs["file:///Users/John%20Doe/my%20project/packages/foo"] = config.RslintConfig{
-		{
-			Files:   []string{"src/**/*.ts"},
-			Plugins: []string{"tpnestedcfg"},
-			Rules:   config.Rules{"tpnestedcfg/no-foo": "error"},
+		"/Users/John Doe/my project/packages/foo": {
+			{
+				Files:   []string{"src/**/*.ts"},
+				Plugins: []string{"tpnestedcfg"},
+				Rules:   config.Rules{"tpnestedcfg/no-foo": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///Users/John%20Doe/my%20project/packages/foo/src/index.ts")
 	s.documents[uri] = "foo();"
 
@@ -420,8 +460,8 @@ func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
 	if !ok {
 		t.Fatal("expected nested encoded config to produce plugin input")
 	}
-	if in.ConfigKey != "file:///Users/John%20Doe/my%20project/packages/foo" {
-		t.Fatalf("configKey = %q, want encoded nested config URI", in.ConfigKey)
+	if in.ConfigKey != "/Users/John Doe/my project/packages/foo" {
+		t.Fatalf("configKey = %q, want decoded nested config path", in.ConfigKey)
 	}
 	if in.Path != "/Users/John Doe/my project/packages/foo/src/index.ts" {
 		t.Fatalf("path = %q, want decoded filesystem path", in.Path)
@@ -439,12 +479,14 @@ func TestLintPluginRulesSync_RebuildsWithFixes(t *testing.T) {
 		{Prefix: "tplsync", RuleNames: []string{"no-bar"}},
 	})
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tplsync"},
-			Rules:   config.Rules{"tplsync/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tplsync"},
+				Rules:   config.Rules{"tplsync/no-bar": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	content := "const bar = 1;"
 
@@ -506,12 +548,14 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		{Prefix: "tpfold", RuleNames: []string{"no-bar"}},
 	})
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tpfold"},
-			Rules:   config.Rules{"tpfold/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tpfold"},
+				Rules:   config.Rules{"tpfold/no-bar": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	const original = "const bar = 1;" // "bar" at [6,9], "1" at [12,13]
 	s.documents[uri] = original
@@ -580,12 +624,14 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		{Prefix: "tptimeout", RuleNames: []string{"no-bar"}},
 	})
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tptimeout"},
-			Rules:   config.Rules{"tptimeout/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tptimeout"},
+				Rules:   config.Rules{"tptimeout/no-bar": "error"},
+			},
 		},
-	}
+	})
 	s.pluginReverseTimeout = 20 * time.Millisecond
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	const original = "const bar = 1;"
@@ -670,12 +716,14 @@ func TestLintPluginRulesSync_ExpiredCtxReturnsNil(t *testing.T) {
 		{Prefix: "tpexpired", RuleNames: []string{"no-bar"}},
 	})
 	s := newTestServer()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tpexpired"},
-			Rules:   config.Rules{"tpexpired/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tpexpired"},
+				Rules:   config.Rules{"tpexpired/no-bar": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	content := "const bar = 1;"
 
@@ -838,12 +886,14 @@ func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
 	})
 	s := newTestServer()
 	s.backgroundCtx = context.Background()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tpleak"},
-			Rules:   config.Rules{"tpleak/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tpleak"},
+				Rules:   config.Rules{"tpleak/no-bar": "error"},
+			},
 		},
-	}
+	})
 	s.pluginReverseTimeout = 30 * time.Millisecond
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "const bar = 1;"
@@ -915,12 +965,14 @@ func TestDispatchPluginLint_DeliversSuccessResultNotRacedAway(t *testing.T) {
 	})
 	s := newTestServer()
 	s.backgroundCtx = context.Background()
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Plugins: []string{"tpok"},
-			Rules:   config.Rules{"tpok/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Plugins: []string{"tpok"},
+				Rules:   config.Rules{"tpok/no-bar": "error"},
+			},
 		},
-	}
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 7
@@ -983,9 +1035,9 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()
 	s.pluginReverseTimeout = 500 * time.Millisecond // backstop so residual goroutines exit
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{Plugins: []string{"tpsup"}, Rules: config.Rules{"tpsup/no-bar": "error"}},
-	}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {{Plugins: []string{"tpsup"}, Rules: config.Rules{"tpsup/no-bar": "error"}}},
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
@@ -1037,9 +1089,9 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()
 	s.pluginReverseTimeout = 500 * time.Millisecond
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{Plugins: []string{"tpfilescancel"}, Rules: config.Rules{"tpfilescancel/no-bar": "error"}},
-	}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {{Plugins: []string{"tpfilescancel"}, Rules: config.Rules{"tpfilescancel/no-bar": "error"}}},
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
@@ -1061,13 +1113,15 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 	// Reconfigure the same open TS file out of the plugin entry's files scope.
 	// The next dispatch has no plugin work, but it still must cancel the stale
 	// in-flight worker from the previous generation.
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{
-			Files:   []string{"**/*.js"},
-			Plugins: []string{"tpfilescancel"},
-			Rules:   config.Rules{"tpfilescancel/no-bar": "error"},
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {
+			{
+				Files:   []string{"**/*.js"},
+				Plugins: []string{"tpfilescancel"},
+				Rules:   config.Rules{"tpfilescancel/no-bar": "error"},
+			},
 		},
-	}
+	})
 	s.docGeneration[uri] = 2
 	s.dispatchPluginLint(uri, 2)
 
@@ -1103,9 +1157,9 @@ func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()
 	s.pluginReverseTimeout = 500 * time.Millisecond
-	s.jsConfigs["file:///proj"] = config.RslintConfig{
-		{Plugins: []string{"tpclose"}, Rules: config.Rules{"tpclose/no-bar": "error"}},
-	}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/proj": {{Plugins: []string{"tpclose"}, Rules: config.Rules{"tpclose/no-bar": "error"}}},
+	})
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1

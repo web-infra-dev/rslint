@@ -1,154 +1,54 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
-import { executeCodeActionProvider } from './fixall-helpers';
+import { executeCodeActionProvider, getFixturesDir } from './fixall-helpers';
+import {
+  getRslintDiagnostics,
+  waitForRslintDiagnostics as waitForDiagnostics,
+  waitForRslintDiagnosticsCount as waitForDiagnosticsCount,
+  waitForRslintDiagnosticsToChange as waitForDiagnosticsToChange,
+} from '../utils/diagnostics';
+import { closeTextEditor, revertTextDocument } from '../utils/documents';
 
 suite('rslint extension', function () {
   this.timeout(90000);
 
-  // Helper function to wait for diagnostics.
-  // On CI (especially Windows), the LSP server may take longer to start up,
-  // load config, type-check, and push initial diagnostics. Use generous
-  // iteration count (15) and per-iteration timeout (2s) to avoid flaky failures.
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 15; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (diagnostics.length > 0) {
-        return diagnostics;
-      }
-
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 2000);
-      });
+  teardown(async () => {
+    const fixturesSource = path.resolve(getFixturesDir(), 'src');
+    const dirtyFixtures = vscode.workspace.textDocuments.filter((document) => {
+      if (document.uri.scheme !== 'file') return false;
+      const relative = path.relative(fixturesSource, document.uri.fsPath);
+      return (
+        document.isDirty &&
+        relative !== '' &&
+        !relative.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(relative)
+      );
+    });
+    for (const document of dirtyFixtures) {
+      await revertTextDocument(document);
     }
+  });
 
-    return vscode.languages.getDiagnostics(doc.uri);
-  }
-
-  async function waitForDiagnosticsToChange(
-    doc: vscode.TextDocument,
-    previousCount: number,
-    timeoutMs = 30000,
-  ): Promise<vscode.Diagnostic[]> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-      const current = vscode.languages.getDiagnostics(doc.uri);
-      if (current.length !== previousCount) {
-        return current;
-      }
-
-      // Wait for diagnostics change event or short timeout
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 500);
-      });
-    }
-
-    return vscode.languages.getDiagnostics(doc.uri);
-  }
-
-  async function waitForDiagnosticsCount(
-    doc: vscode.TextDocument,
-    expectedCount: number,
-    timeoutMs = 30000,
-  ): Promise<vscode.Diagnostic[]> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-      const current = vscode.languages.getDiagnostics(doc.uri);
-      if (current.length === expectedCount) {
-        return current;
-      }
-
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 500);
-      });
-    }
-
-    return vscode.languages.getDiagnostics(doc.uri);
-  }
-
-  async function waitForDiagnosticsWithMessage(
+  function waitForDiagnosticsWithMessage(
     doc: vscode.TextDocument,
     messageSubstring: string,
     timeoutMs = 30000,
   ): Promise<vscode.Diagnostic[]> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-      const current = vscode.languages.getDiagnostics(doc.uri);
-      if (current.some((d) => d.message.includes(messageSubstring))) {
-        return current;
-      }
-
-      // Wait for diagnostics change event or short timeout
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 500);
-      });
-    }
-
-    return vscode.languages.getDiagnostics(doc.uri);
+    return waitForDiagnostics(
+      doc,
+      (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes(messageSubstring),
+        ),
+      timeoutMs,
+    );
   }
 
   // Helper function to open a test fixture
   async function openFixture(filename: string): Promise<vscode.TextDocument> {
     return vscode.workspace.openTextDocument(
-      path.resolve(
-        require.resolve('@rslint/core'),
-        '../..',
-        `fixtures/src/`,
-        filename,
-      ),
+      path.resolve(getFixturesDir(), 'src', filename),
     );
   }
 
@@ -207,35 +107,41 @@ suite('rslint extension', function () {
         d.message.includes('no-unnecessary-type-assertion') ||
         (d.source === 'rslint' && d.message.includes('assertion')),
     );
+    assert.ok(
+      typeAssertionDiag,
+      `Expected a no-unnecessary-type-assertion diagnostic. Got: ${diagnostics
+        .map((diagnostic) => diagnostic.message)
+        .join(' | ')}`,
+    );
 
-    if (typeAssertionDiag) {
-      // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProvider(
-        doc.uri,
-        typeAssertionDiag.range,
-      );
+    // Request code actions for the diagnostic range
+    const codeActions = await executeCodeActionProvider(
+      doc.uri,
+      typeAssertionDiag.range,
+    );
 
-      assert.ok(
-        codeActions && codeActions.length > 0,
-        'Should have code actions',
-      );
+    assert.ok(codeActions.length > 0, 'Should have code actions');
 
-      // Look for auto fix action
-      const autoFixAction = codeActions.find(
-        (action) =>
-          action.title.toLowerCase().includes('fix') &&
-          action.kind?.value === vscode.CodeActionKind.QuickFix.value,
-      );
+    // Look for auto fix action
+    const autoFixAction = codeActions.find(
+      (action) =>
+        action.title.toLowerCase().includes('fix') &&
+        action.kind?.value === vscode.CodeActionKind.QuickFix.value,
+    );
 
-      assert.ok(autoFixAction, 'Should have auto fix action');
-      assert.ok(
-        autoFixAction.isPreferred,
-        'Auto fix should be marked as preferred',
-      );
+    assert.ok(autoFixAction, 'Should have auto fix action');
+    assert.ok(
+      autoFixAction.isPreferred,
+      'Auto fix should be marked as preferred',
+    );
 
-      // Verify the action has an edit
-      assert.ok(autoFixAction.edit, 'Auto fix action should have an edit');
-    }
+    // Verify the action has an edit
+    assert.ok(autoFixAction.edit, 'Auto fix action should have an edit');
+    const autoFixEdits = autoFixAction.edit.get(doc.uri);
+    assert.ok(
+      autoFixEdits && autoFixEdits.length > 0,
+      'Auto fix edit should not be empty',
+    );
   });
 
   test('code actions - disable rule for line', async () => {
@@ -249,46 +155,49 @@ suite('rslint extension', function () {
     const unsafeDiag = diagnostics.find(
       (d) => d.message.includes('unsafe') || d.message.includes('Unsafe'),
     );
+    assert.ok(
+      unsafeDiag,
+      `Expected an unsafe diagnostic. Got: ${diagnostics
+        .map((diagnostic) => diagnostic.message)
+        .join(' | ')}`,
+    );
 
-    if (unsafeDiag) {
-      // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProvider(
-        doc.uri,
-        unsafeDiag.range,
-      );
+    // Request code actions for the diagnostic range
+    const codeActions = await executeCodeActionProvider(
+      doc.uri,
+      unsafeDiag.range,
+    );
 
-      assert.ok(
-        codeActions && codeActions.length > 0,
-        'Should have code actions',
-      );
+    assert.ok(codeActions.length > 0, 'Should have code actions');
 
-      // Look for disable rule for line action
-      const disableLineAction = codeActions.find(
-        (action) =>
-          action.title.toLowerCase().includes('disable') &&
-          action.title.toLowerCase().includes('line'),
-      );
+    // Look for disable rule for line action
+    const disableLineAction = codeActions.find(
+      (action) =>
+        action.title.toLowerCase().includes('disable') &&
+        action.title.toLowerCase().includes('line'),
+    );
 
-      assert.ok(disableLineAction, 'Should have disable rule for line action');
-      assert.ok(
-        !disableLineAction.isPreferred,
-        'Disable action should not be marked as preferred',
-      );
+    assert.ok(disableLineAction, 'Should have disable rule for line action');
+    assert.ok(
+      !disableLineAction.isPreferred,
+      'Disable action should not be marked as preferred',
+    );
 
-      // Verify the action has an edit
-      assert.ok(disableLineAction.edit, 'Disable action should have an edit');
+    // Verify the action has an edit
+    assert.ok(disableLineAction.edit, 'Disable action should have an edit');
 
-      // Verify the edit contains rslint-disable-next-line
-      const workspaceEdit = disableLineAction.edit;
-      const edits = workspaceEdit.get(doc.uri);
-      if (edits && edits.length > 0) {
-        const editText = edits[0].newText;
-        assert.ok(
-          editText.includes('rslint-disable-next-line'),
-          'Edit should contain rslint-disable-next-line comment',
-        );
-      }
-    }
+    // Verify the edit contains rslint-disable-next-line
+    const workspaceEdit = disableLineAction.edit;
+    const edits = workspaceEdit.get(doc.uri);
+    assert.ok(
+      edits && edits.length > 0,
+      'Disable-line edit should not be empty',
+    );
+    const editText = edits[0].newText;
+    assert.ok(
+      editText.includes('rslint-disable-next-line'),
+      'Edit should contain rslint-disable-next-line comment',
+    );
   });
 
   test('code actions - disable rule for file', async () => {
@@ -302,47 +211,49 @@ suite('rslint extension', function () {
     const unsafeDiag = diagnostics.find(
       (d) => d.message.includes('unsafe') || d.message.includes('Unsafe'),
     );
+    assert.ok(
+      unsafeDiag,
+      `Expected an unsafe diagnostic. Got: ${diagnostics
+        .map((diagnostic) => diagnostic.message)
+        .join(' | ')}`,
+    );
 
-    if (unsafeDiag) {
-      // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProvider(
-        doc.uri,
-        unsafeDiag.range,
-      );
+    // Request code actions for the diagnostic range
+    const codeActions = await executeCodeActionProvider(
+      doc.uri,
+      unsafeDiag.range,
+    );
 
-      assert.ok(
-        codeActions && codeActions.length > 0,
-        'Should have code actions',
-      );
+    assert.ok(codeActions.length > 0, 'Should have code actions');
 
-      // Look for disable rule for file action
-      const disableFileAction = codeActions.find(
-        (action) =>
-          action.title.toLowerCase().includes('disable') &&
-          action.title.toLowerCase().includes('file'),
-      );
+    // Look for disable rule for file action
+    const disableFileAction = codeActions.find(
+      (action) =>
+        action.title.toLowerCase().includes('disable') &&
+        action.title.toLowerCase().includes('file'),
+    );
 
-      assert.ok(disableFileAction, 'Should have disable rule for file action');
-      assert.ok(
-        !disableFileAction.isPreferred,
-        'Disable action should not be marked as preferred',
-      );
+    assert.ok(disableFileAction, 'Should have disable rule for file action');
+    assert.ok(
+      !disableFileAction.isPreferred,
+      'Disable action should not be marked as preferred',
+    );
 
-      // Verify the action has an edit
-      assert.ok(disableFileAction.edit, 'Disable action should have an edit');
+    // Verify the action has an edit
+    assert.ok(disableFileAction.edit, 'Disable action should have an edit');
 
-      // Verify the edit contains rslint-disable comment
-      const workspaceEdit = disableFileAction.edit;
-      const edits = workspaceEdit.get(doc.uri);
-      if (edits && edits.length > 0) {
-        const editText = edits[0].newText;
-        assert.ok(
-          editText.includes('rslint-disable') &&
-            !editText.includes('-next-line'),
-          'Edit should contain rslint-disable comment for entire file',
-        );
-      }
-    }
+    // Verify the edit contains rslint-disable comment
+    const workspaceEdit = disableFileAction.edit;
+    const edits = workspaceEdit.get(doc.uri);
+    assert.ok(
+      edits && edits.length > 0,
+      'Disable-file edit should not be empty',
+    );
+    const editText = edits[0].newText;
+    assert.ok(
+      editText.includes('rslint-disable') && !editText.includes('-next-line'),
+      'Edit should contain rslint-disable comment for entire file',
+    );
   });
 
   test('code actions - range overlap', async () => {
@@ -393,12 +304,14 @@ suite('rslint extension', function () {
       editBuilder.replace(fullRange, '// no lint errors\nexport {};\n');
     });
 
-    // 3. Wait for diagnostics to update (should decrease)
-    const updatedDiags = await waitForDiagnosticsToChange(doc, initialCount);
+    // 3. Wait for the exact final state; accepting the first smaller
+    // intermediate publication could hide diagnostics that never clear.
+    const updatedDiags = await waitForDiagnosticsCount(doc, 0);
 
-    assert.ok(
-      updatedDiags.length < initialCount,
-      `Expected fewer diagnostics after removing errors. Before: ${initialCount}, After: ${updatedDiags.length}`,
+    assert.strictEqual(
+      updatedDiags.length,
+      0,
+      `Expected zero diagnostics after removing errors. Before: ${initialCount}, After: ${updatedDiags.length}`,
     );
   });
 
@@ -460,11 +373,12 @@ suite('rslint extension', function () {
     );
 
     // 3. Wait for diagnostics to settle — should reflect the error-free final state
-    const finalDiags = await waitForDiagnosticsToChange(doc, initialCount);
+    const finalDiags = await waitForDiagnosticsCount(doc, 0);
 
-    assert.ok(
-      finalDiags.length < initialCount,
-      `After rapid edits ending with clean code, expected fewer diagnostics. Before: ${initialCount}, After: ${finalDiags.length}`,
+    assert.strictEqual(
+      finalDiags.length,
+      0,
+      `After rapid edits ending with clean code, expected zero diagnostics. Before: ${initialCount}, After: ${finalDiags.length}`,
     );
   });
 
@@ -503,12 +417,16 @@ suite('rslint extension', function () {
     const fullRange = () =>
       new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
 
+    // Start from a published non-empty snapshot, so the following zero cannot
+    // be the document's not-yet-linted initial state.
+    await waitForDiagnostics(doc);
+
     // Step 1: start from clean state to establish baseline
     await editor.edit((b) =>
       b.replace(fullRange(), '// no errors\nexport {};\n'),
     );
     await waitForDiagnosticsCount(doc, 0, 10000);
-    const cleanCount = vscode.languages.getDiagnostics(doc.uri).length;
+    const cleanCount = getRslintDiagnostics(doc).length;
 
     // Step 2: introduce errors
     await editor.edit((b) =>
@@ -543,15 +461,21 @@ suite('rslint extension', function () {
     const fullRange = () =>
       new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
 
+    // Establish a published non-empty baseline first, so waiting for zero
+    // cannot pass on the clean document's not-yet-linted initial state.
+    await editor.edit((b) =>
+      b.replace(
+        fullRange(),
+        'const baseline: any = {};\nbaseline.member;\nexport {};\n',
+      ),
+    );
+    await waitForDiagnosticsWithMessage(doc, 'no-unsafe-member-access');
+
     // Step 1: Start with clean code — should have zero diagnostics
     await editor.edit((b) =>
       b.replace(fullRange(), '// no errors\nexport {};\n'),
     );
-    // -1 as previousCount ensures the condition (current.length !== -1) is always
-    // true on the first check, effectively meaning "wait for any diagnostics event".
-    await waitForDiagnosticsToChange(doc, -1, 5000);
-    await new Promise((r) => setTimeout(r, 1000));
-    const cleanDiags = vscode.languages.getDiagnostics(doc.uri);
+    const cleanDiags = await waitForDiagnosticsCount(doc, 0, 30_000);
     assert.strictEqual(
       cleanDiags.length,
       0,
@@ -625,6 +549,7 @@ suite('rslint extension', function () {
 
     const diagnostics = await waitForDiagnostics(doc);
 
+    let comparedAutoFixAndDisable = false;
     for (const diagnostic of diagnostics) {
       // Filter quick fixes
       const codeActions = (
@@ -646,6 +571,7 @@ suite('rslint extension', function () {
 
       // If both auto fix and disable actions exist, auto fix should be preferred
       if (autoFixActions.length > 0 && disableActions.length > 0) {
+        comparedAutoFixAndDisable = true;
         assert.ok(
           autoFixActions.some((action) => action.isPreferred),
           'Auto fix actions should be marked as preferred',
@@ -656,13 +582,18 @@ suite('rslint extension', function () {
         );
       }
     }
+    assert.ok(
+      comparedAutoFixAndDisable,
+      `Expected at least one diagnostic with both auto-fix and disable actions. Diagnostics: ${diagnostics
+        .map((diagnostic) => diagnostic.message)
+        .join(' | ')}`,
+    );
   });
 
-  test('diagnostics correct after close and reopen cycle', async () => {
-    // Note: VSCode's test framework caches documents from openTextDocument,
-    // so didClose is not reliably sent when editors close. Instead, we test
-    // the full lifecycle: open → edit to clean → close → reopen original →
-    // verify diagnostics reappear (server state is consistent).
+  test('diagnostics correct after reverting and reopening the editor tab', async () => {
+    // VS Code may retain a TextDocument model after its last editor closes, so
+    // this test deliberately covers editor-tab lifecycle rather than claiming
+    // an LSP didClose cycle: edit → revert → close tab → reopen.
     const doc = await openFixture('close-test.ts');
     const editor = await vscode.window.showTextDocument(doc);
 
@@ -680,29 +611,21 @@ suite('rslint extension', function () {
       doc.positionAt(doc.getText().length),
     );
     await editor.edit((b) => b.replace(fullRange, '// clean\nexport {};\n'));
-    const cleanDiags = await waitForDiagnosticsToChange(doc, initialCount);
+    const cleanDiags = await waitForDiagnosticsCount(doc, 0);
     assert.strictEqual(
       cleanDiags.length,
       0,
       `Expected 0 diagnostics after cleaning, got ${cleanDiags.length}`,
     );
 
-    // 3. Close editor and reopen with original error content
-    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    // 3. Revert the dirty overlay and close the exact editor tab before
+    // reopening the original error content from disk.
+    await closeTextEditor(doc);
     const doc2 = await openFixture('close-test.ts');
-    const editor2 = await vscode.window.showTextDocument(doc2);
+    await vscode.window.showTextDocument(doc2);
 
-    // 4. Restore original error content
-    const fullRange2 = new vscode.Range(
-      doc2.positionAt(0),
-      doc2.positionAt(doc2.getText().length),
-    );
-    await editor2.edit((b) =>
-      b.replace(fullRange2, 'const unsafeVal: any = 42;\nunsafeVal.prop;\n'),
-    );
-
-    // 5. Diagnostics should reappear — server correctly handles the cycle
-    const reopenDiags = await waitForDiagnosticsToChange(doc2, 0);
+    // 4. Diagnostics should reappear — server correctly handles the cycle
+    const reopenDiags = await waitForDiagnostics(doc2);
     assert.ok(
       reopenDiags.length > 0,
       `Expected diagnostics after restoring errors, got ${reopenDiags.length}`,
@@ -710,20 +633,13 @@ suite('rslint extension', function () {
   });
 
   test('no diagnostics for non-TypeScript files', async () => {
-    const doc = await vscode.workspace.openTextDocument(
-      path.resolve(
-        require.resolve('@rslint/core'),
-        '../..',
-        'fixtures/src/',
-        'styles.css',
-      ),
-    );
+    const doc = await openFixture('styles.css');
     await vscode.window.showTextDocument(doc);
 
     // Wait a reasonable amount of time — diagnostics should NOT appear
     await new Promise((r) => setTimeout(r, 3000));
 
-    const diagnostics = vscode.languages.getDiagnostics(doc.uri);
+    const diagnostics = getRslintDiagnostics(doc);
     assert.strictEqual(
       diagnostics.length,
       0,

@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@rstest/core';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import {
   runRslint,
   createTempDir,
@@ -51,6 +52,33 @@ describe('CLI JS config integration', () => {
       expect(result.stdout).toContain('no-unsafe-member-access');
     } finally {
       await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('explicit JS config governs a target outside cwd', async () => {
+    const tempDir = await createTempDir({
+      'custom.config.js':
+        'export default [{ rules: { "no-debugger": "error" } }];\n',
+    });
+    const outsideDir = await createTempDir({
+      'outside.js': 'debugger;\n',
+    });
+    try {
+      const result = await runRslint(
+        [
+          '--config',
+          path.join(tempDir, 'custom.config.js'),
+          '--format',
+          'jsonline',
+          path.join(outsideDir, 'outside.js'),
+        ],
+        tempDir,
+      );
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toContain('no-debugger');
+      expect(result.stdout).toContain('outside.js');
+    } finally {
+      await Promise.all([cleanupTempDir(tempDir), cleanupTempDir(outsideDir)]);
     }
   });
 

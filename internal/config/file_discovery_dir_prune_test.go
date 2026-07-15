@@ -134,6 +134,43 @@ func TestDiscoverGapFiles_UnrootedNegationConservative(t *testing.T) {
 	assert.Assert(t, !gapSet[paths["build/other/y.ts"]])
 }
 
+// A case-insensitive anchored negation protects only its own subtree. It must
+// not disable pruning for unrelated file-level covers, which previously made
+// macOS/Windows walks enter every ignored directory in large repositories.
+func TestDiscoverGapFiles_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"src/a.ts",
+		"target/deep/x.ts",
+		"scripts/debug/keep.ts",
+		"scripts/other/drop.ts",
+	})
+	config := RslintConfig{
+		{
+			Ignores: []string{
+				"**/target/**/*",
+				"**/scripts/**/*",
+				"!Scripts/**/Debug/**/*",
+			},
+			gitignoreSemantics:       true,
+			gitignoreCaseInsensitive: true,
+		},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
+	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
+	dirs := spy.snapshotAccessedDirs()
+
+	assert.Assert(t, !dirAccessed(dirs, "target"), "unrelated target must be pruned")
+	assert.Assert(t, dirAccessed(dirs, "scripts/debug"), "case-folded re-included subtree must be walked")
+
+	gapSet := toSet(gapFiles)
+	assert.Assert(t, gapSet[paths["src/a.ts"]])
+	assert.Assert(t, gapSet[paths["scripts/debug/keep.ts"]], "case-folded negation must re-include debug")
+	assert.Assert(t, !gapSet[paths["scripts/other/drop.ts"]], "non-negated sibling must remain ignored")
+	assert.Assert(t, !gapSet[paths["target/deep/x.ts"]], "unrelated ignored file must stay excluded")
+}
+
 // Directory-level `dir/**` (absolute, not negatable) vs file-level `dir/**/*`
 // (negation-aware): pruning behavior differs and stays aligned with ESLint v10.
 func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {

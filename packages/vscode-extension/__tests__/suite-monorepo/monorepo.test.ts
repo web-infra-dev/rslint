@@ -2,42 +2,14 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
+import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
+import { revertTextDocument } from '../utils/documents';
 
 suite('rslint monorepo multi-config support', function () {
-  this.timeout(60000);
+  this.timeout(120000);
 
   function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
-  }
-
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate?: (diags: vscode.Diagnostic[]) => boolean,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate ? predicate(diagnostics) : diagnostics.length > 0) {
-        return diagnostics;
-      }
-
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
-      });
-    }
-
-    return vscode.languages.getDiagnostics(doc.uri);
   }
 
   async function openFile(relativePath: string): Promise<vscode.TextDocument> {
@@ -386,8 +358,11 @@ suite('rslint monorepo multi-config support', function () {
 
     const fooDoc = await openFile('packages/foo/src/index.ts');
     await vscode.window.showTextDocument(fooDoc);
+    const barDoc = await openFile('packages/bar/src/index.ts');
+    await vscode.window.showTextDocument(barDoc);
 
-    // 1. Verify initial: foo uses its own config
+    // 1. Establish positive publications for both configs. Any later empty bar
+    // snapshot is therefore a real transition, not a not-yet-linted default.
     const initialFooDiags = await waitForDiagnostics(fooDoc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -397,44 +372,97 @@ suite('rslint monorepo multi-config support', function () {
       ),
       'Initial: foo file should have no-unsafe-member-access from foo config',
     );
+    await waitForDiagnostics(barDoc, (diags) =>
+      diags.some((d) => d.message.includes('no-explicit-any')),
+    );
 
+    let testError: unknown;
     try {
       // 2. Delete root config
-      fs.unlinkSync(rootConfigPath);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // 3. Foo should still work with its own config
-      const fooEditor = await vscode.window.showTextDocument(fooDoc);
-      await triggerRelint(fooEditor);
-
-      const fooDiagsAfter = await waitForDiagnostics(fooDoc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      );
-      assert.ok(
-        fooDiagsAfter.some((d) =>
-          d.message.includes('no-unsafe-member-access'),
-        ),
-        'After root delete: foo file should still use foo config',
-      );
-
-      // 4. Bar (no sub-config) should lose diagnostics
-      const barDoc = await openFile('packages/bar/src/index.ts');
-      const barEditor = await vscode.window.showTextDocument(barDoc);
-      await triggerRelint(barEditor);
-
-      const barDiags = await waitForDiagnostics(
+      const barCleared = waitForDiagnostics(
         barDoc,
-        (diags) => diags.filter((d) => d.source === 'rslint').length === 0,
+        (diagnostics) => diagnostics.length === 0,
       );
+      fs.unlinkSync(rootConfigPath);
+      await triggerRelint(await vscode.window.showTextDocument(fooDoc));
+      await triggerRelint(await vscode.window.showTextDocument(barDoc));
+
+      // 3. Bar has no sub-config, so the observed root-config diagnostic must
+      // transition to an explicit empty publication.
+      const barDiags = await barCleared;
       assert.strictEqual(
-        barDiags.filter((d) => d.source === 'rslint').length,
+        barDiags.length,
         0,
         'After root delete: bar file should have no rslint diagnostics (no config)',
       );
-    } finally {
-      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // 4. Prove foo's surviving sub-config still evaluates new content after
+      // the root deletion transaction, rather than accepting a stale snapshot.
+      const originalFooContent = fooDoc.getText();
+      const fooEditor = await vscode.window.showTextDocument(fooDoc);
+      const fooCleared = waitForDiagnostics(
+        fooDoc,
+        (diagnostics) => diagnostics.length === 0,
+      );
+      assert.ok(
+        await fooEditor.edit((edit) => {
+          edit.replace(
+            new vscode.Range(
+              fooDoc.positionAt(0),
+              fooDoc.positionAt(fooDoc.getText().length),
+            ),
+            'const safe = 1;\n',
+          );
+        }),
+        'Editing foo to a clean state should succeed',
+      );
+      await fooCleared;
+
+      const fooRestored = waitForDiagnostics(fooDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-unsafe-member-access'),
+        ),
+      );
+      assert.ok(
+        await fooEditor.edit((edit) => {
+          edit.replace(
+            new vscode.Range(
+              fooDoc.positionAt(0),
+              fooDoc.positionAt(fooDoc.getText().length),
+            ),
+            originalFooContent,
+          );
+        }),
+        'Restoring foo content should succeed',
+      );
+      await fooRestored;
+    } catch (error) {
+      testError = error;
     }
+
+    let restoreError: unknown;
+    try {
+      await revertTextDocument(fooDoc);
+      const rootRestored = waitForDiagnostics(barDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-explicit-any'),
+        ),
+      );
+      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+      await triggerRelint(await vscode.window.showTextDocument(barDoc));
+      await rootRestored;
+    } catch (error) {
+      restoreError = error;
+    }
+
+    if (testError && restoreError) {
+      throw new AggregateError(
+        [testError, restoreError],
+        'Root-config deletion test and restoration both failed',
+      );
+    }
+    if (testError) throw testError;
+    if (restoreError) throw restoreError;
   });
 
   test('changing root config should update bar file diagnostics (no sub-config)', async () => {

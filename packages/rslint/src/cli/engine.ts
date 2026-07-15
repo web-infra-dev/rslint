@@ -14,6 +14,67 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { IpcClient } from '../ipc/index.js';
 import type { IpcMessage } from '../ipc/index.js';
+import {
+  CONFIG_DISCOVERY_PROTOCOL_VERSION,
+  ConfigModuleHost,
+  type ActivateConfigsRequest,
+  type LoadConfigsRequest,
+} from '../config/config-loader.js';
+
+interface PluginLintHost {
+  lint(req: unknown): Promise<unknown>;
+  shutdown(): Promise<void>;
+}
+
+type CreatePluginLintHost = (
+  configs: Array<{ configPath: string; configDirectory: string }>,
+  onLog?: (rec: { level: string; source: string; text: string }) => void,
+  singleThreaded?: boolean,
+) => Promise<PluginLintHost>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPluginHostFactoryModule(
+  value: unknown,
+): value is { createPluginLintHost: CreatePluginLintHost } {
+  return isRecord(value) && typeof value.createPluginLintHost === 'function';
+}
+
+function isConfigModuleCandidate(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.configPath === 'string' &&
+    typeof value.configDirectory === 'string'
+  );
+}
+
+function isLoadConfigsRequest(value: unknown): value is LoadConfigsRequest {
+  return (
+    isRecord(value) &&
+    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
+    typeof value.transactionId === 'string' &&
+    (value.loadMode === 'cached' || value.loadMode === 'fresh') &&
+    (value.singleThreaded === undefined ||
+      typeof value.singleThreaded === 'boolean') &&
+    Array.isArray(value.candidates) &&
+    value.candidates.every(isConfigModuleCandidate)
+  );
+}
+
+function isActivateConfigsRequest(
+  value: unknown,
+): value is ActivateConfigsRequest {
+  return (
+    isRecord(value) &&
+    value.protocolVersion === CONFIG_DISCOVERY_PROTOCOL_VERSION &&
+    typeof value.transactionId === 'string' &&
+    Array.isArray(value.effectiveConfigIds) &&
+    value.effectiveConfigIds.every((id) => typeof id === 'string')
+  );
+}
 
 // POSIX: a process killed by signal N exits 128+N. Node reports the signal
 // NAME, so map the ones we can receive; collapsing all to 130 would mislabel
@@ -31,12 +92,6 @@ export interface EngineRunOptions {
   binPath: string;
   /** Args forwarded to the Go binary (user CLI flags, --start-time, files). */
   goArgs: string[];
-  /**
-   * Configs sent in the `init` payload (JS/TS-config entries, each shaped
-   * `{configDirectory, configPath?, entries}`). Empty means "no JS config —
-   * let Go load JSON config from disk itself".
-   */
-  configs: unknown[];
   /** Working directory (defaults to process.cwd()). */
   cwd?: string;
   /** Runtime hints forwarded in the `init` payload's `runtime` block. */
@@ -51,17 +106,10 @@ export interface EngineRunOptions {
   stdout?: NodeJS.WritableStream;
   /** stderr sink (default process.stderr). */
   stderr?: NodeJS.WritableStream;
-  /**
-   * ESLint-plugin {prefix, ruleNames} metadata forwarded to Go in the
-   * `init` payload so it registers placeholder rules for plugin rule names.
-   */
-  eslintPluginEntries?: Array<{ prefix: string; ruleNames: string[] }>;
-  /**
-   * Per-config descriptors (configPath + configDirectory) for configs that
-   * mount ESLint plugins; used to init the worker pool that answers Go's
-   * reverse `pluginLint` requests. Empty ⇒ no pool, zero overhead.
-   */
-  pluginConfigs?: Array<{ configPath: string; configDirectory: string }>;
+  /** @internal Dependency seam for activation-race and cleanup tests. */
+  createPluginLintHost?: CreatePluginLintHost;
+  /** @internal Dependency seam for post-prepare lifecycle tests. */
+  configModuleHost?: ConfigModuleHost;
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -131,40 +179,77 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // `webpackIgnore` keeps rslib from bundling it into the engine chunk — it
   // must stay a sibling so the worker's `import.meta.url` resolution finds
   // lint-worker.js. Resolves at runtime to dist/eslint-plugin/index.js.
-  let pluginHost: {
-    lint(req: unknown): Promise<unknown>;
-    shutdown(): Promise<void>;
-  } | null = null;
-  const pluginConfigs = opts.pluginConfigs ?? [];
-  if (pluginConfigs.length > 0) {
-    const pluginEntry: string = './eslint-plugin/index.js';
-    try {
-      const mod: {
-        createPluginLintHost: (
-          configs: Array<{ configPath: string; configDirectory: string }>,
-          onLog?: (rec: {
-            level: string;
-            source: string;
-            text: string;
-          }) => void,
-          singleThreaded?: boolean,
-        ) => Promise<{
-          lint(req: unknown): Promise<unknown>;
-          shutdown(): Promise<void>;
-        }>;
-      } = await import(/* webpackIgnore: true */ pluginEntry);
-      pluginHost = await mod.createPluginLintHost(
+  let pluginHost: PluginLintHost | null = null;
+  const configModuleHost = opts.configModuleHost ?? new ConfigModuleHost();
+  const configTransactions = new Set<string>();
+  let shuttingDown = false;
+  const pendingPluginHostBuilds = new Set<Promise<PluginLintHost | null>>();
+  const stagedPluginHosts = new Set<PluginLintHost>();
+  const pluginHostShutdowns = new WeakMap<PluginLintHost, Promise<void>>();
+
+  const shutdownPluginHost = async (
+    host: PluginLintHost | null,
+  ): Promise<void> => {
+    if (!host) return;
+    stagedPluginHosts.delete(host);
+    let shutdown = pluginHostShutdowns.get(host);
+    if (!shutdown) {
+      shutdown = host.shutdown();
+      pluginHostShutdowns.set(host, shutdown);
+    }
+    await shutdown;
+  };
+
+  const publishPluginHost = async (
+    host: PluginLintHost | null,
+  ): Promise<void> => {
+    if (!host) return;
+    if (shuttingDown) {
+      await shutdownPluginHost(host).catch(() => undefined);
+      return;
+    }
+    stagedPluginHosts.delete(host);
+    pluginHost = host;
+  };
+
+  const buildPluginHost = async (
+    pluginConfigs: Array<{ configPath: string; configDirectory: string }>,
+  ): Promise<PluginLintHost | null> => {
+    const build = (async () => {
+      if (pluginConfigs.length === 0 || shuttingDown) return null;
+      let createPluginLintHost = opts.createPluginLintHost;
+      if (!createPluginLintHost) {
+        const pluginEntry: string = './eslint-plugin/index.js';
+        const mod: unknown = await import(
+          /* webpackIgnore: true */ pluginEntry
+        );
+        if (!isPluginHostFactoryModule(mod)) {
+          throw new Error(
+            'rslint ESLint-plugin entry does not export createPluginLintHost',
+          );
+        }
+        createPluginLintHost = mod.createPluginLintHost;
+      }
+      const host = await createPluginLintHost(
         pluginConfigs,
         (rec) => stderr.write(`[rslint:plugin] ${rec.text}\n`),
         opts.runtime?.singleThreaded,
       );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      stderr.write(`rslint: failed to start ESLint-plugin worker: ${msg}\n`);
-      safeKillGo(child);
-      return 2;
-    }
-  }
+      if (shuttingDown) {
+        await shutdownPluginHost(host).catch(() => undefined);
+        return null;
+      }
+      stagedPluginHosts.add(host);
+      return host;
+    })();
+    pendingPluginHostBuilds.add(build);
+    void build.then(
+      () => pendingPluginHostBuilds.delete(build),
+      () => pendingPluginHostBuilds.delete(build),
+    );
+    const host = await build;
+    return host;
+  };
 
   // Without our own SIGINT handler Node's default action _exit(130)s
   // immediately, leaving the Go child to discover the disconnect via stdin EOF
@@ -173,8 +258,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     // No log: a user Ctrl-C (SIGINT) or a normal SIGTERM/SIGHUP teardown is the
     // expected path, not an error — forward the kill to the Go child and tear
     // the worker pool down so its threads don't outlive us.
+    shuttingDown = true;
     safeKillGo(child);
-    void pluginHost?.shutdown();
+    void Promise.allSettled([
+      shutdownPluginHost(pluginHost),
+      ...[...stagedPluginHosts].map(shutdownPluginHost),
+    ]);
   };
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
@@ -197,15 +286,62 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     // Wire handlers BEFORE start so the first frame Go writes is routable.
     ipc.setInboundHandler(async (msg) => {
       switch (msg.kind) {
+        case 'loadConfigs': {
+          if (!isLoadConfigsRequest(msg.data)) {
+            throw new Error('engine: invalid loadConfigs request');
+          }
+          const request = msg.data;
+          const response = await configModuleHost.loadConfigs(request);
+          configTransactions.add(request.transactionId);
+          return response;
+        }
+        case 'activateConfigs': {
+          if (!isActivateConfigsRequest(msg.data)) {
+            throw new Error('engine: invalid activateConfigs request');
+          }
+          const request = msg.data;
+          let stagedPluginHost: PluginLintHost | null = null;
+          try {
+            const response = await configModuleHost.activateConfigs(
+              request,
+              undefined,
+              async (activation) => {
+                if (pluginHost) return;
+                const createdHost = await buildPluginHost(
+                  activation.pluginConfigs,
+                );
+                if (shuttingDown) {
+                  await shutdownPluginHost(createdHost).catch(() => undefined);
+                  return;
+                }
+                stagedPluginHost = createdHost;
+              },
+            );
+            // Do not expose a worker that re-imported the config until the
+            // post-prepare fingerprint check has accepted the activation.
+            const preparedHost = stagedPluginHost;
+            await publishPluginHost(preparedHost);
+            stagedPluginHost = null;
+            return response;
+          } catch (error) {
+            await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
+            throw error;
+          }
+        }
         case 'shutdown':
           // Go signals it's done; teardown happens via the 'exit' event below.
           return { ok: true };
         case 'pluginLint':
           // Go dispatched a plugin-lint batch in parallel with native linting.
-          // Answer from the worker pool; an absent pool (no plugins configured)
-          // yields empty results. Never throws — per-file/-rule failures travel
-          // inside the result payload.
-          return pluginHost ? pluginHost.lint(msg.data) : { results: [] };
+          // Go only dispatches after activation returned plugin metadata, so a
+          // missing published host is a protocol/lifecycle failure. Surface it
+          // instead of returning an empty false-green result.
+          if (!pluginHost) {
+            throw new Error(
+              'engine: pluginLint requested without an activated plugin host',
+            );
+          }
+          return pluginHost.lint(msg.data);
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }
@@ -226,8 +362,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         outcome = await raceWithExit(
           ipc.sendRequest('init', {
             ...(opts.extraInit ?? {}),
-            configs: opts.configs,
-            eslintPlugins: opts.eslintPluginEntries,
             runtime: {
               stdoutIsTTY,
               singleThreaded: opts.runtime?.singleThreaded,
@@ -279,7 +413,15 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     // pluginHost?.shutdown() is null-safe + idempotent), so this is safe
     // even on the normal path and after the signal handler already fired.
     removeSignalHandlers();
-    await pluginHost?.shutdown();
+    shuttingDown = true;
+    await Promise.allSettled([...pendingPluginHostBuilds]);
+    await Promise.allSettled([
+      shutdownPluginHost(pluginHost),
+      ...[...stagedPluginHosts].map(shutdownPluginHost),
+    ]);
+    for (const transactionId of configTransactions) {
+      configModuleHost.deleteSession(transactionId);
+    }
   }
 }
 
