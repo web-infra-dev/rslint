@@ -56,12 +56,19 @@ const (
 	KindGetAstInfo ipc.MessageKind = "getAstInfo"
 	// KindPluginLint is sent from Go to JS to run community ESLint plugin rules.
 	KindPluginLint ipc.MessageKind = "pluginLint"
+	// KindLoadConfigs asks a capable Node host to evaluate one Go-discovered
+	// config frontier.
+	KindLoadConfigs ipc.MessageKind = "loadConfigs"
+	// KindActivateConfigs asks Node to validate and prepare the final effective
+	// config/plugin generation before Go commits it.
+	KindActivateConfigs ipc.MessageKind = "activateConfigs"
 )
 
 // Version is the IPC protocol version.
 const Version = "2.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
+const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
 
 // HandshakeRequest represents a handshake request
 type HandshakeRequest struct {
@@ -83,13 +90,17 @@ type LintRequest struct {
 	// identity. Go uses these paths for this request instead of repeating realpath
 	// calls; omitted by lower-level clients that have no pre-resolved identity.
 	CanonicalFiles []string `json:"canonicalFiles,omitempty"`
-	// Final resolved config — a serialized RslintConfig (RslintConfigEntry[]).
-	// The JS side does ALL of overrideConfig / config-file / auto-discovery /
-	// normalize and hands Go only this object; --api never reads config from
-	// disk. Empty/absent means "no config" (zero rules). Rules AND
-	// languageOptions live in the config entries — there is no separate
-	// ruleOptions / languageOptions override surface.
+	// Config is the low-level, already-resolved RslintConfig path used by WASM
+	// and custom service clients. High-level native callers normally leave it
+	// empty and use ConfigDiscovery: Go then discovers candidates/ownership and
+	// asks the bidirectional Node host only to evaluate and normalize exact
+	// JS/TS modules. Empty/absent without ConfigDiscovery means "no config"
+	// (zero rules). Rules and languageOptions live in the entries; there is no
+	// separate ruleOptions/languageOptions override surface.
 	Config json.RawMessage `json:"config,omitempty"`
+	// ConfigDiscovery enables the high-level host-filesystem path. It is
+	// mutually exclusive with Config and intentionally unsupported by WASM.
+	ConfigDiscovery *ConfigDiscoveryRequest `json:"configDiscovery,omitempty"`
 	// Anchor directory for resolving the config's relative
 	// files / ignores / parserOptions.project. Defaults to the working dir.
 	ConfigDirectory string `json:"configDirectory,omitempty"`
@@ -109,6 +120,18 @@ type LintRequest struct {
 	// when they need post-fix diagnostics.
 	Fix                       bool `json:"fix,omitempty"`
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+}
+
+// ConfigDiscoveryRequest is the API-facing scope for Go's shared staged
+// discovery coordinator. Files themselves remain in LintRequest.Files.
+type ConfigDiscoveryRequest struct {
+	Mode               string `json:"mode"`
+	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
+	// Directories are static roots for the already-expanded Files set. Go limits
+	// config discovery below them to branches that can govern those files.
+	Directories    []string        `json:"directories,omitempty"`
+	ExplicitFiles  []bool          `json:"explicitFiles,omitempty"`
+	OverrideConfig json.RawMessage `json:"overrideConfig,omitempty"`
 }
 
 // EslintPluginEntry is the wire metadata for one object-form ESLint plugin.
@@ -205,6 +228,26 @@ type Requester interface {
 	SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error)
 }
 
+// PeerCapabilityRequester augments Requester with the capabilities declared by
+// the remote peer during the API handshake. Direct/embedded callers may keep
+// implementing Requester alone; the API Service always supplies this richer
+// view so a handler can validate capabilities learned only after a reverse
+// operation (for example object-form plugins discovered from a config module).
+type PeerCapabilityRequester interface {
+	Requester
+	PeerSupportsCapability(capability string) bool
+}
+
+type serviceRequester struct {
+	Requester
+	peerCapabilities map[string]struct{}
+}
+
+func (requester serviceRequester) PeerSupportsCapability(capability string) bool {
+	_, ok := requester.peerCapabilities[capability]
+	return ok
+}
+
 // BidirectionalHandler is an optional extension to Handler. Existing handlers
 // continue to receive HandleLint; handlers that implement this interface also
 // receive the request context and reverse-RPC transport.
@@ -291,7 +334,10 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 		}
 		var capabilities []string
 		if _, ok := s.handler.(BidirectionalHandler); ok {
-			capabilities = []string{CapabilityReversePluginLint}
+			capabilities = []string{
+				CapabilityReversePluginLint,
+				CapabilityReverseConfigLoad,
+			}
 		}
 		return HandshakeResponse{
 			Version:      Version,
@@ -316,8 +362,19 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 				return nil, errors.New("API peer does not advertise reversePluginLint capability")
 			}
 		}
+		if req.ConfigDiscovery != nil {
+			if !bidirectional {
+				return nil, errors.New("API handler does not support reverseConfigLoad requests")
+			}
+			if _, ok := s.peerCapabilities[CapabilityReverseConfigLoad]; !ok {
+				return nil, errors.New("API peer does not advertise reverseConfigLoadV1 capability")
+			}
+		}
 		if bidirectional {
-			return handler.HandleLintWithContext(ctx, req, s.channel)
+			return handler.HandleLintWithContext(ctx, req, serviceRequester{
+				Requester:        s.channel,
+				peerCapabilities: s.peerCapabilities,
+			})
 		}
 		return s.handler.HandleLint(req)
 

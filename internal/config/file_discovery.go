@@ -374,20 +374,6 @@ func discoverLintTargetsWithStopDirs(
 	return targetFiles
 }
 
-func relativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
-	compareOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          configDir,
-		UseCaseSensitiveFileNames: useCaseSensitive,
-	}
-	if tspath.ComparePaths(filePath, configDir, compareOptions) == 0 {
-		return "", true
-	}
-	if !tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
-		return "", false
-	}
-	return tspath.GetRelativePathFromDirectory(configDir, filePath, compareOptions), true
-}
-
 func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive bool) []string {
 	if len(stopDirs) == 0 {
 		return nil
@@ -578,7 +564,7 @@ func resolvePathThroughAllowedDirectories(
 	lexicalPath := filePath
 	canonicalPath := ""
 	for _, dir := range allowDirs {
-		if relative, within := relativePathWithinConfigRoot(filePath, dir.lexicalPath, useCaseSensitive); within {
+		if relative, within := RelativePathWithinConfigRoot(filePath, dir.lexicalPath, useCaseSensitive); within {
 			inScope = true
 			if dir.lexicalPath != dir.canonicalPath && len(dir.lexicalPath) > bestLexicalLength {
 				bestLexicalLength = len(dir.lexicalPath)
@@ -588,9 +574,9 @@ func resolvePathThroughAllowedDirectories(
 		if dir.lexicalPath == dir.canonicalPath || len(dir.canonicalPath) <= bestCanonicalLength {
 			continue
 		}
-		relative, within := relativePathWithinConfigRoot(filePath, dir.canonicalPath, true)
+		relative, within := RelativePathWithinConfigRoot(filePath, dir.canonicalPath, true)
 		if !within && matchPath != filePath {
-			relative, within = relativePathWithinConfigRoot(matchPath, dir.canonicalPath, true)
+			relative, within = RelativePathWithinConfigRoot(matchPath, dir.canonicalPath, true)
 		}
 		if within {
 			inScope = true
@@ -661,7 +647,7 @@ func discoverWalkRoots(configDir string, allowDirs []string, fsys vfs.FS) []stri
 			tspath.StartsWithDirectory(configDir, dir, true) {
 			return []string{"."}
 		}
-		if relative, within := relativePathWithinConfigRoot(dir, configDir, true); within {
+		if relative, within := RelativePathWithinConfigRoot(dir, configDir, true); within {
 			addRoot(relative)
 			continue
 		}
@@ -677,7 +663,7 @@ func discoverWalkRoots(configDir string, allowDirs []string, fsys vfs.FS) []stri
 			tspath.StartsWithDirectory(canonicalConfigDir, canonicalDir, true) {
 			return []string{"."}
 		}
-		if relative, within := relativePathWithinConfigRoot(canonicalDir, canonicalConfigDir, true); within {
+		if relative, within := RelativePathWithinConfigRoot(canonicalDir, canonicalConfigDir, true); within {
 			addRoot(relative)
 		}
 	}
@@ -777,14 +763,6 @@ func patternsIncludeAllDefaultExtensions(patterns []string) bool {
 	return true
 }
 
-// LintDiscoveryScope records explicit-file provenance supplied by the config
-// host. ExplicitOnly keeps a config loaded solely for an explicit file out of
-// directory discovery.
-type LintDiscoveryScope struct {
-	Files        []string
-	ExplicitOnly bool
-}
-
 // DiscoveredLintTarget preserves the config owner established during the
 // directory walk so later stages do not need to infer ownership from paths.
 type DiscoveredLintTarget struct {
@@ -794,7 +772,7 @@ type DiscoveredLintTarget struct {
 }
 
 // DiscoverLintTargetsMultiConfig resolves owned lint targets across a config
-// map. Scope files are already assigned to their config by the JS host.
+// map. Scope files are already assigned to their config by the discovery catalog.
 func DiscoverLintTargetsMultiConfig(
 	configMap map[string]RslintConfig,
 	scopes map[string]LintDiscoveryScope,
@@ -807,12 +785,19 @@ func DiscoverLintTargetsMultiConfig(
 		return nil
 	}
 
-	index := newConfigDirectoryIndex(configMap, fsys)
 	configDirs := make([]string, 0, len(configMap))
 	for configDir := range configMap {
 		configDirs = append(configDirs, configDir)
 	}
 	sort.Strings(configDirs)
+
+	// A config found only because a literal file bypassed its parent's global
+	// ignore is not a general ownership boundary. Build automatic ownership and
+	// subtree handoff decisions from the normally reachable config set; the full
+	// map is still processed below so catalog-scoped literal files use their
+	// explicit-only config.
+	automaticConfigMap := configMapForAutomaticTargets(configMap, scopes)
+	automaticIndex := newConfigDirectoryIndex(automaticConfigMap, fsys)
 
 	// Explicit files are assigned to their nearest config once. Passing the
 	// complete list to every config makes lint-staged-style invocations
@@ -820,7 +805,7 @@ func DiscoverLintTargetsMultiConfig(
 	// it cannot own. A non-nil empty bucket is preserved below so the explicit
 	// file-only fast path still suppresses directory walking for configs that own
 	// no requested files.
-	hostAssignedFileOwners := make(map[tspath.Path]string)
+	scopedFileOwners := make(map[tspath.Path]string)
 	for _, configDir := range configDirs {
 		scope, ok := scopes[configDir]
 		if !ok || scope.Files == nil {
@@ -828,22 +813,22 @@ func DiscoverLintTargetsMultiConfig(
 		}
 		for _, filePath := range scope.Files {
 			key := tspath.ToPath(tspath.NormalizePath(filePath), "", true)
-			if _, exists := hostAssignedFileOwners[key]; !exists {
-				hostAssignedFileOwners[key] = configDir
+			if _, exists := scopedFileOwners[key]; !exists {
+				scopedFileOwners[key] = configDir
 			}
 		}
 	}
 	unscopedAllowFiles := allowFiles
-	if len(hostAssignedFileOwners) > 0 {
+	if len(scopedFileOwners) > 0 {
 		unscopedAllowFiles = make([]string, 0, len(allowFiles))
 		for _, filePath := range allowFiles {
 			key := tspath.ToPath(tspath.NormalizePath(filePath), "", true)
-			if _, scoped := hostAssignedFileOwners[key]; !scoped {
+			if _, scoped := scopedFileOwners[key]; !scoped {
 				unscopedAllowFiles = append(unscopedAllowFiles, filePath)
 			}
 		}
 	}
-	filesByConfig := index.assignExplicitFiles(unscopedAllowFiles)
+	filesByConfig := automaticIndex.assignExplicitFiles(unscopedAllowFiles)
 	filesSpecifiedByConfig := make(map[string]bool, len(configDirs))
 	if allowFiles != nil {
 		for _, configDir := range configDirs {
@@ -854,7 +839,12 @@ func DiscoverLintTargetsMultiConfig(
 		if scope.Files == nil {
 			continue
 		}
-		filesByConfig[configDir] = append([]string(nil), scope.Files...)
+		// A directory can be reached both automatically and through a literal
+		// target whose parent-ignore exception selected another candidate. Config
+		// discovery resolves that collision to one automatic boundary; retain its
+		// automatically assigned files when adding the catalog-owned literal scope.
+		merged := append([]string(nil), filesByConfig[configDir]...)
+		filesByConfig[configDir] = deduplicate(append(merged, scope.Files...))
 		filesSpecifiedByConfig[configDir] = true
 	}
 
@@ -874,8 +864,8 @@ func DiscoverLintTargetsMultiConfig(
 		}
 		targets := discoverLintTargetsForConfigInMap(
 			configMap,
-			index,
-			hostAssignedFileOwners,
+			automaticIndex,
+			scopedFileOwners,
 			configDir,
 			fsys,
 			configAllowFiles,
@@ -943,7 +933,7 @@ func DiscoverLintFilesForConfigInMap(
 func discoverLintTargetsForConfigInMap(
 	configMap map[string]RslintConfig,
 	index *configDirectoryIndex,
-	hostAssignedFileOwners map[tspath.Path]string,
+	scopedFileOwners map[tspath.Path]string,
 	configDir string,
 	fsys vfs.FS,
 	allowFiles []string,
@@ -964,8 +954,8 @@ func discoverLintTargetsForConfigInMap(
 	ownedTargets := make([]DiscoveredLintTarget, 0, len(targets))
 	for _, target := range targets {
 		targetID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
-		if hostOwner, assigned := hostAssignedFileOwners[targetID]; assigned {
-			if hostOwner == configDir {
+		if scopedOwner, assigned := scopedFileOwners[targetID]; assigned {
+			if scopedOwner == configDir {
 				target.ConfigDirectory = configDir
 				ownedTargets = append(ownedTargets, target)
 			}

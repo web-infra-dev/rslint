@@ -36,37 +36,75 @@ type ConfigEntry struct {
 	FilePatternGroups [][]string       `json:"-"`
 	Ignores           []string         `json:"ignores,omitempty"`
 	LanguageOptions   *LanguageOptions `json:"languageOptions,omitempty"`
-	Rules             Rules            `json:"rules"`
-	Plugins           []string         `json:"plugins,omitempty"`
-	Settings          Settings         `json:"settings,omitempty"`
+	// Omit an absent rules map when marshaling. Emitting an invented
+	// `"rules": null` changes flat-config object-shape semantics when the JSON
+	// is decoded again: an ignores-only global entry becomes an entry-local
+	// ignore. Authored `rules: null` is still preserved as non-global on decode.
+	Rules    Rules    `json:"rules,omitempty"`
+	Plugins  []string `json:"plugins,omitempty"`
+	Settings Settings `json:"settings,omitempty"`
+
+	// gitignoreSemantics marks the process-local synthetic entry prepended by
+	// ConfigWithGitignore. Git patterns need slightly different directory
+	// classification from authored flat-config ignores, while remaining in the
+	// same ordered ignore sequence so later config negations can re-include.
+	gitignoreSemantics       bool
+	gitignoreCaseInsensitive bool
 }
 
 func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
 	type configEntryAlias ConfigEntry
-	if len(entry.FilePatternGroups) == 0 {
-		return json.Marshal(configEntryAlias(entry))
-	}
-
 	encoded, err := json.Marshal(configEntryAlias(entry))
 	if err != nil {
 		return nil, err
+	}
+	if len(entry.FilePatternGroups) == 0 && entry.Rules == nil && entry.Plugins == nil && entry.Settings == nil {
+		return encoded, nil
 	}
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(encoded, &object); err != nil {
 		return nil, err
 	}
-	selectors := make([]any, 0, len(entry.Files)+len(entry.FilePatternGroups))
-	for _, pattern := range entry.Files {
-		selectors = append(selectors, pattern)
+	if entry.Rules != nil {
+		rulesJSON, err := json.Marshal(entry.Rules)
+		if err != nil {
+			return nil, err
+		}
+		object["rules"] = rulesJSON
 	}
-	for _, group := range entry.FilePatternGroups {
-		selectors = append(selectors, group)
+	// Empty maps/slices are meaningful at the flat-config boundary: their key
+	// presence keeps an ignores-bearing object entry-local. encoding/json's
+	// omitempty drops them, so restore the authored shape explicitly. Settings{}
+	// also serves as the decoder's sentinel for a currently unsupported key or
+	// an authored null field whose presence made the object non-global.
+	if entry.Plugins != nil {
+		pluginsJSON, err := json.Marshal(entry.Plugins)
+		if err != nil {
+			return nil, err
+		}
+		object["plugins"] = pluginsJSON
 	}
-	filesJSON, err := json.Marshal(selectors)
-	if err != nil {
-		return nil, err
+	if entry.Settings != nil {
+		settingsJSON, err := json.Marshal(entry.Settings)
+		if err != nil {
+			return nil, err
+		}
+		object["settings"] = settingsJSON
 	}
-	object["files"] = filesJSON
+	if len(entry.FilePatternGroups) > 0 {
+		selectors := make([]any, 0, len(entry.Files)+len(entry.FilePatternGroups))
+		for _, pattern := range entry.Files {
+			selectors = append(selectors, pattern)
+		}
+		for _, group := range entry.FilePatternGroups {
+			selectors = append(selectors, group)
+		}
+		filesJSON, err := json.Marshal(selectors)
+		if err != nil {
+			return nil, err
+		}
+		object["files"] = filesJSON
+	}
 	return json.Marshal(object)
 }
 
@@ -671,13 +709,18 @@ type MergedConfig struct {
 }
 
 func extractConfigIgnores(config RslintConfig) []IgnorePattern {
-	var ignores []string
+	var ignores []IgnorePattern
 	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			ignores = append(ignores, entry.Ignores...)
+		if !isGlobalIgnoreEntry(entry) {
+			continue
+		}
+		if entry.gitignoreSemantics {
+			ignores = append(ignores, parseCollectedGitignorePatterns(entry.Ignores, entry.gitignoreCaseInsensitive)...)
+		} else {
+			ignores = append(ignores, ParseIgnorePatterns(entry.Ignores)...)
 		}
 	}
-	return ParseIgnorePatterns(ignores)
+	return ignores
 }
 
 // IsFileIgnored reports whether filePath is excluded by the config's global
@@ -708,23 +751,29 @@ func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 // After global ignore check, entries are merged in order if their files match and ignores don't.
 // cwd is the directory the config lives in; file paths are resolved relative to it.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
+	// Collect all global ignore patterns and evaluate once. This allows `!`
+	// negation patterns in separate entries to work correctly, aligned with
+	// ESLint v10 which merges all global ignores before evaluating. Callers
+	// resolving many files against the same config (FileConfigResolver)
+	// should precompute this once via extractConfigIgnores and call
+	// getConfigForFileWithIgnores directly instead of re-parsing every
+	// pattern string on every call.
+	return config.getConfigForFileWithIgnores(filePath, cwd, extractConfigIgnores(config))
+}
+
+// getConfigForFileWithIgnores is GetConfigForFile with the global ignore
+// patterns supplied by the caller, so repeated calls against the same config
+// (one per lint target) don't re-parse the same ignore pattern strings.
+func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
 	merged := &MergedConfig{
 		Rules:   make(map[string]*RuleConfig),
 		Plugins: make(map[string]struct{}),
 	}
 
-	// 1. Collect all global ignore patterns and evaluate once.
-	// This allows `!` negation patterns in separate entries to work correctly,
-	// aligned with ESLint v10 which merges all global ignores before evaluating.
-	globalIgnorePatterns := extractConfigIgnores(config)
 	if len(globalIgnorePatterns) > 0 {
-		// Phase 1: directory-level check. Patterns like `dir/**` block the
-		// directory entirely — `!` negation cannot undo this. Aligned with
-		// ESLint v10's isDirectoryIgnored behavior.
 		if isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
 			return nil
 		}
-		// Phase 2: file-level check with sequential `!` negation support.
 		if isFileIgnored(filePath, globalIgnorePatterns, cwd) {
 			return nil
 		}

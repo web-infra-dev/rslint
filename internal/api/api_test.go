@@ -33,6 +33,24 @@ type reverseServiceTestHandler struct {
 	requests     chan LintRequest
 }
 
+type configDiscoveryServiceTestHandler struct {
+	serviceTestHandler
+	configDiscoveryCalls atomic.Int32
+	sawCapabilityView    atomic.Bool
+	configLoadCapability atomic.Bool
+	pluginLintCapability atomic.Bool
+}
+
+func (h *configDiscoveryServiceTestHandler) HandleLintWithContext(_ context.Context, _ LintRequest, requester Requester) (*LintResponse, error) {
+	h.configDiscoveryCalls.Add(1)
+	if capabilityRequester, ok := requester.(PeerCapabilityRequester); ok {
+		h.sawCapabilityView.Store(true)
+		h.configLoadCapability.Store(capabilityRequester.PeerSupportsCapability(CapabilityReverseConfigLoad))
+		h.pluginLintCapability.Store(capabilityRequester.PeerSupportsCapability(CapabilityReversePluginLint))
+	}
+	return &LintResponse{Diagnostics: []Diagnostic{}, LintedFiles: []string{}}, nil
+}
+
 func (h *reverseServiceTestHandler) HandleLintWithContext(ctx context.Context, req LintRequest, requester Requester) (*LintResponse, error) {
 	h.reverseCalls.Add(1)
 	if h.requests != nil {
@@ -150,8 +168,10 @@ func TestService_BidirectionalLintKeepsReadLoopRunning(t *testing.T) {
 	if !handshakeResult.OK || handshakeResult.Version != Version {
 		t.Fatalf("unexpected handshake response: %+v", handshakeResult)
 	}
-	if len(handshakeResult.Capabilities) != 1 || handshakeResult.Capabilities[0] != CapabilityReversePluginLint {
-		t.Fatalf("bidirectional handler did not advertise reverse lint: %+v", handshakeResult.Capabilities)
+	if len(handshakeResult.Capabilities) != 2 ||
+		handshakeResult.Capabilities[0] != CapabilityReversePluginLint ||
+		handshakeResult.Capabilities[1] != CapabilityReverseConfigLoad {
+		t.Fatalf("bidirectional handler did not advertise both reverse capabilities: %+v", handshakeResult.Capabilities)
 	}
 
 	msg, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{EslintPlugins: []EslintPluginEntry{{
@@ -308,6 +328,65 @@ func TestService_RequiresPeerCapabilityForPluginLint(t *testing.T) {
 		t.Fatalf("expected missing-capability error, got %v", err)
 	}
 	_, _ = pair.peer.SendRequest(ctx, ipc.KindExit, struct{}{})
+}
+
+func TestService_ConfigDiscoveryRequiresAdvertisedCapability(t *testing.T) {
+	tests := []struct {
+		name         string
+		capabilities []string
+		wantError    string
+		wantCalls    int32
+	}{
+		{
+			name:      "missing capability",
+			wantError: CapabilityReverseConfigLoad,
+		},
+		{
+			name:         "advertised capability",
+			capabilities: []string{CapabilityReverseConfigLoad},
+			wantCalls:    1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler := &configDiscoveryServiceTestHandler{}
+			pair := newServiceChannelPair(t, handler, nil)
+			ctx := requestContext(t)
+			if _, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{
+				Version:      Version,
+				Capabilities: test.capabilities,
+			}); err != nil {
+				t.Fatalf("handshake: %v", err)
+			}
+
+			_, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{
+				ConfigDiscovery: &ConfigDiscoveryRequest{Mode: "auto"},
+			})
+			if test.wantError == "" {
+				if err != nil {
+					t.Fatalf("lint with config discovery capability: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("error = %v, want capability error containing %q", err, test.wantError)
+			}
+			if got := handler.configDiscoveryCalls.Load(); got != test.wantCalls {
+				t.Fatalf("config discovery handler calls = %d, want %d", got, test.wantCalls)
+			}
+			if test.wantCalls > 0 {
+				if !handler.sawCapabilityView.Load() {
+					t.Fatal("bidirectional handler did not receive the peer capability view")
+				}
+				if !handler.configLoadCapability.Load() {
+					t.Fatal("peer capability view lost reverseConfigLoadV1")
+				}
+				if handler.pluginLintCapability.Load() {
+					t.Fatal("peer capability view invented reversePluginLint")
+				}
+			}
+			_, _ = pair.peer.SendRequest(ctx, ipc.KindExit, struct{}{})
+		})
+	}
 }
 
 func TestService_RejectsPluginMetadataForLegacyHandler(t *testing.T) {

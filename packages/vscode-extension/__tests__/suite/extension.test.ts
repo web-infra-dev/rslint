@@ -142,13 +142,10 @@ suite('rslint extension', function () {
 
   // Helper function to open a test fixture
   async function openFixture(filename: string): Promise<vscode.TextDocument> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(workspaceFolder, 'Expected an isolated fixture workspace');
     return vscode.workspace.openTextDocument(
-      path.resolve(
-        require.resolve('@rslint/core'),
-        '../..',
-        `fixtures/src/`,
-        filename,
-      ),
+      path.resolve(workspaceFolder.uri.fsPath, 'src', filename),
     );
   }
 
@@ -710,14 +707,7 @@ suite('rslint extension', function () {
   });
 
   test('no diagnostics for non-TypeScript files', async () => {
-    const doc = await vscode.workspace.openTextDocument(
-      path.resolve(
-        require.resolve('@rslint/core'),
-        '../..',
-        'fixtures/src/',
-        'styles.css',
-      ),
-    );
+    const doc = await openFixture('styles.css');
     await vscode.window.showTextDocument(doc);
 
     // Wait a reasonable amount of time — diagnostics should NOT appear

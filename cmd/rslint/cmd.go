@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,6 +30,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/term"
 )
 
@@ -40,7 +40,6 @@ import (
 type lintArgs struct {
 	Init           bool
 	Config         string
-	ConfigStdin    bool // true → executeLintPipeline reads stdin as a config payload
 	Fix            bool
 	TypeCheck      bool
 	TypeCheckOnly  bool
@@ -53,7 +52,7 @@ type lintArgs struct {
 	// StdoutIsTTY is the TTY fact for the real output destination, reported
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
-	// unknown (old peer, wasm build).
+	// unavailable (for example in the wasm build).
 	StdoutIsTTY bool
 	Quiet       bool
 	MaxWarnings int
@@ -62,11 +61,14 @@ type lintArgs struct {
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
-	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
-	// plugins mounted via the config's object-form `plugins`. Used to register
-	// placeholder rules so plugin rule names resolve; the live plugins run
-	// in the Node worker.
-	EslintPlugins []rslintconfig.EslintPluginEntry
+	// FS is an optional run-scoped filesystem shared with Go config discovery.
+	// Native CLI supplies one cached instance so the later target/program phases
+	// reuse directory entries already read by the staged frontier.
+	FS vfs.FS
+	// ConfigCatalog is the immutable result of Go-owned JS/TS config discovery.
+	// A nil or empty automatic catalog selects the native JSON/JSONC loader;
+	// explicit catalogs remain authoritative even when their config is empty.
+	ConfigCatalog *discovery.ConfigCatalog
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -313,13 +315,6 @@ func collectAllowFileWarnings(
 		return nil
 	}
 
-	// Reuse owner resolution by directory when many explicit files share a
-	// directory (for example, lint-staged invocations).
-	type cachedConfig struct {
-		cfgDir string
-		cfg    rslintconfig.RslintConfig
-	}
-	dirConfigCache := make(map[string]*cachedConfig)
 	var fsys vfs.FS
 	if len(filesystems) > 0 {
 		fsys = filesystems[0]
@@ -334,18 +329,9 @@ func collectAllowFileWarnings(
 		var cfgDir string
 		var cfg rslintconfig.RslintConfig
 		if configMap != nil {
-			dir := tspath.GetDirectoryPath(f)
-			cacheKey := exactFilesystemPathID(dir)
-			cached, ok := dirConfigCache[cacheKey]
-			if !ok {
-				var foundDir string
-				var foundCfg rslintconfig.RslintConfig
-				foundDir, foundCfg = configOwnerResolver.Resolve(f)
-				cached = &cachedConfig{cfgDir: foundDir, cfg: foundCfg}
-				dirConfigCache[cacheKey] = cached
-			}
-			cfgDir = cached.cfgDir
-			cfg = cached.cfg
+			// Canonical fallback is file-specific: two symlinked files in the
+			// same lexical directory can resolve to different config roots.
+			cfgDir, cfg = configOwnerResolver.Resolve(f)
 		} else {
 			cfgDir = currentDirectory
 			cfg = rslintConfig
@@ -475,7 +461,6 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.StringVar(&args.Format, "format", "default", "output format")
 	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
 	fs.StringVar(&args.Config, "c", "", "which rslint config to use")
-	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
 	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
 	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")
@@ -549,7 +534,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
 	config := args.Config
-	configStdin := args.ConfigStdin
+	configCatalog := args.ConfigCatalog
+	usesJSConfig := configCatalog != nil && (configCatalog.Explicit || len(configCatalog.Configs) > 0)
 	fix := args.Fix
 	typeCheck := args.TypeCheck
 	typeCheckOnly := args.TypeCheckOnly
@@ -632,7 +618,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 0
 	}
 
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	fs := args.FS
+	if fs == nil {
+		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	}
 
 	// Run-scoped parse cache shared by every Program built in this pipeline
 	// (initial build, gap fallback, --fix rebuilds). It is passed explicitly and
@@ -643,18 +632,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	rslintconfig.RegisterAllRules()
 	// Register placeholder rules for mounted ESLint plugins so their rule
 	// names resolve (and route to the Node worker) instead of being dropped.
-	rslintconfig.RegisterEslintPluginRules(args.EslintPlugins)
+	var eslintPlugins []rslintconfig.EslintPluginEntry
+	if usesJSConfig {
+		eslintPlugins = configCatalog.EslintPlugins
+	}
+	rslintconfig.RegisterEslintPluginRules(eslintPlugins)
 	var rslintConfig rslintconfig.RslintConfig
 
-	// configMap holds per-directory configs for multi-config (monorepo) support.
-	// Only populated in the configStdin path; nil otherwise (single-config mode).
+	// configMap holds per-directory configs for automatically discovered JS/TS
+	// configs. Explicit JS/TS and JSON/JSONC configs use rslintConfig instead.
 	var configMap map[string]rslintconfig.RslintConfig
 
-	// originalConfigDir maps each normalized configMap key back to the raw
-	// configDirectory the JS host sent, so the eslint-plugin wire configKey
-	// round-trips raw (byte-matching the worker's plugin map key). nil outside
-	// multi-config mode (single-config / JSON configs never mount plugins).
-	var originalConfigDir map[string]string
 	var configTargetScopes map[string]rslintconfig.LintDiscoveryScope
 
 	// Program-wide type checking builds every configured project. Plain linting
@@ -664,39 +652,55 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	buildAllPrograms := typeCheck || typeCheckOnly
 	needsLintTargets := !typeCheckOnly
 
-	if configStdin {
-		// Read config JSON from stdin (sent by JS config loader).
-		// Read up to maxConfigSize+1 so we can detect truncation.
-		const maxConfigSize = 50 << 20 // 50 MB
-		data, err := io.ReadAll(io.LimitReader(os.Stdin, maxConfigSize+1))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
-			return 1
-		}
-		if len(data) > maxConfigSize {
-			fmt.Fprintf(os.Stderr, "error: config from stdin exceeds maximum size of %d bytes\n", maxConfigSize)
-			return 1
-		}
+	if usesJSConfig {
+		configDirectories := configCatalog.ConfigDirectories()
+		if configCatalog.Explicit {
+			if len(configDirectories) != 1 {
+				fmt.Fprintf(os.Stderr, "error: explicit config catalog contains %d configs, want exactly one\n", len(configDirectories))
+				return 1
+			}
+			currentDirectory = configDirectories[0]
+			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
 
-		payload, parseErr := parseConfigPayload(data, fs)
-		if parseErr != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", parseErr)
-			return 1
-		}
-
-		if payload.IsMultiConfig {
-			// Multi-config format
-			configMap = payload.ConfigMap
-			originalConfigDir = payload.OriginalConfigDir
-			configTargetScopes = payload.ConfigTargetScopes
+			var exactTargetFiles []string
+			if len(allowFiles) > 0 && len(allowDirs) == 0 {
+				exactTargetFiles = allowFiles
+			}
+			if typeCheckOnly {
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			} else if buildAllPrograms {
+				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
+					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
+				)
+			} else {
+				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return 1
+			}
+		} else {
+			configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
+			configTargetScopes = make(map[string]rslintconfig.LintDiscoveryScope, len(configCatalog.Scopes))
+			for _, configDir := range configDirectories {
+				configMap[configDir] = slices.Clone(configCatalog.Configs[configDir])
+				if scope, ok := configCatalog.Scopes[configDir]; ok {
+					scope.Files = slices.Clone(scope.Files)
+					configTargetScopes[configDir] = scope
+				}
+			}
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads from its own directory downward.
-			// Direct child config directories are ownership handoff boundaries, so
-			// parent and child configs never share .gitignore patterns.
+			// Direct automatically reachable child configs are ownership handoff
+			// boundaries, so parent and child owners never share .gitignore patterns.
+			// A config loaded only for a literal target is a boundary for that scope,
+			// while automatic siblings keep their ancestor's complete ignore chain.
 			//
 			// Directories excluded by global config ignores are pruned during
 			// the .gitignore scan because files below them cannot be linted.
+			// File-only invocations collect only the exact target ancestry for each
+			// provisional owner instead of sweeping the owner's complete subtree.
 			//
 			// configMap is not mutated by gitignore workers. Results are collected
 			// and merged on this goroutine before target discovery.
@@ -708,13 +712,45 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				giResults []giResult
 				giMu      sync.Mutex
 			)
+			fileOnlyTargets := len(allowFiles) > 0 && len(allowDirs) == 0
+			var targetFilesByOwner map[string][]string
+			if needsLintTargets && fileOnlyTargets {
+				targetFilesByOwner = configTargetFilesByOwner(
+					configMap,
+					configTargetScopes,
+					fs,
+					allowFiles,
+					singleThreaded,
+				)
+			}
 			giWG := core.NewWorkGroup(singleThreaded)
 			if needsLintTargets {
-				configResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
+				automaticResolver := rslintconfig.NewConfigOwnerResolverForAutomaticTargets(
+					configMap,
+					configTargetScopes,
+					fs,
+				)
+				completeResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
 				for configDir, entries := range configMap {
-					stopDirs := configResolver.ChildConfigDirs(configDir)
+					scope := configTargetScopes[configDir]
+					resolver := automaticResolver
+					if scope.ExplicitOnly {
+						resolver = completeResolver
+					}
+					stopDirs := resolver.ChildConfigDirs(configDir)
 					giWG.Queue(func() {
-						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, nil, stopDirs)
+						var ownerFiles []string
+						if fileOnlyTargets {
+							ownerFiles = targetFilesByOwner[configDir]
+							if ownerFiles == nil {
+								ownerFiles = []string{}
+							}
+						} else if scope.ExplicitOnly {
+							// Mixed file+directory invocations must not turn a config
+							// loaded only for a literal into a full subtree scan.
+							ownerFiles = append([]string{}, scope.Files...)
+						}
+						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, ownerFiles, stopDirs)
 						giMu.Lock()
 						giResults = append(giResults, giResult{configDir, augmented})
 						giMu.Unlock()
@@ -737,24 +773,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
 				return 1
 			}
-		} else {
-			// Legacy single-config format
-			rslintConfig = payload.SingleConfig
-			currentDirectory = payload.SingleConfigDir
-
-			if typeCheckOnly {
-				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
-			} else if buildAllPrograms {
-				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-					rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
-				)
-			} else {
-				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
-			}
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
@@ -771,14 +789,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = workingDirectory
 		}
 
+		var exactTargetFiles []string
+		if len(allowFiles) > 0 && len(allowDirs) == 0 {
+			exactTargetFiles = allowFiles
+		}
 		if typeCheckOnly {
 			realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
 		} else if buildAllPrograms {
 			rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, parseCache,
+				rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
 			)
 		} else {
-			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, nil)
+			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -931,7 +953,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}()
 
-	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	enforcePlugins := usesJSConfig
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap:                  configMap,
 		Config:                     rslintConfig,
@@ -996,10 +1018,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
 	// over every file) is skipped so the native-only path pays nothing for the
 	// feature.
-	hasEslintPlugins := len(args.EslintPlugins) > 0
+	hasEslintPlugins := len(eslintPlugins) > 0
 	pluginResolver := pluginConfigResolver{
-		lintResolver:      fileConfigResolver,
-		originalConfigDir: originalConfigDir,
+		lintResolver: fileConfigResolver,
 	}
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
@@ -1136,8 +1157,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			var fixPluginCh <-chan []rule.RuleDiagnostic
 			if hasEslintPlugins {
 				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
-					lintResolver:      fixConfigResolver,
-					originalConfigDir: originalConfigDir,
+					lintResolver: fixConfigResolver,
 				})
 				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
 			}

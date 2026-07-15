@@ -14,37 +14,29 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// TestPluginConfigResolver_NormalizedMatchRawWireKey proves the routing split on
-// the Go side (no Programs / fs needed): the resolver matches files against Go's
-// NORMALIZED config key but emits the RAW configDirectory the host sent as the
-// wire configKey (what the worker keys its plugin map on). This is the exact
-// assertion that fails under a normalize-the-wire-key design and passes here.
-func TestPluginConfigResolver_NormalizedMatchRawWireKey(t *testing.T) {
-	data := []byte(`{"configs":[{"configDirectory":"C:\\proj","entries":[{"rules":{"no-debugger":"error"}}]}]}`)
-	p, err := parseConfigPayload(data)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
+// TestPluginConfigResolver_UsesGoOwnedCatalogKey proves the routing identity is
+// the same normalized key Go published in its typed discovery catalog. Node
+// treats that key as opaque when activating the matching plugin host.
+func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
+	configDir := tspath.NormalizePath(`C:\proj`)
+	configMap := map[string]rslintconfig.RslintConfig{
+		configDir: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
 	}
-	raw := `C:\proj`
-	norm := tspath.NormalizePath(raw) // "C:/proj"
-
-	// Windows: file matches on the normalized key, wire key is the RAW string.
 	r := pluginConfigResolver{
-		lintResolver:      newLintConfigResolver(lintConfigResolverOptions{ConfigMap: p.ConfigMap}),
-		originalConfigDir: p.OriginalConfigDir,
+		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
 	}
-	wireKey, merged := r.resolve(norm + "/src/a.ts")
-	if wireKey != raw {
-		t.Errorf("wire configKey = %q, want RAW %q (not the normalized %q)", wireKey, raw, norm)
+	wireKey, merged := r.resolve(configDir + "/src/a.ts")
+	if wireKey != configDir {
+		t.Errorf("wire configKey = %q, want Go-owned catalog key %q", wireKey, configDir)
 	}
 	if merged == nil {
 		t.Fatal("expected a merged config for the matched file")
 	}
 
-	// POSIX / no raw mapping: wireKey falls back to the (already-slash) key.
+	// With no low-level API routing override, the owner key is used directly.
 	posix := pluginConfigResolver{
 		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": p.ConfigMap[norm]},
+			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": configMap[configDir]},
 		}),
 	}
 	if wk, m := posix.resolve("/posix/proj/a.ts"); wk != "/posix/proj" || m == nil {
@@ -110,16 +102,13 @@ func TestDispatchPluginLintAsync_NoInputsNoDiagnostic(t *testing.T) {
 // TestPluginConfigResolver_Branches covers resolve()'s non-match and
 // single-config (configMap==nil) fallback branches.
 func TestPluginConfigResolver_Branches(t *testing.T) {
-	data := []byte(`{"configs":[{"configDirectory":"/proj","entries":[{"rules":{"no-debugger":"error"}}]}]}`)
-	p, err := parseConfigPayload(data)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
+	configMap := map[string]rslintconfig.RslintConfig{
+		"/proj": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
 	}
 
 	// Multi-config, file under no config -> ("", nil).
 	r := pluginConfigResolver{
-		lintResolver:      newLintConfigResolver(lintConfigResolverOptions{ConfigMap: p.ConfigMap}),
-		originalConfigDir: p.OriginalConfigDir,
+		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
 	}
 	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
 		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
@@ -128,7 +117,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
 	single := pluginConfigResolver{
 		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			Config:           p.ConfigMap["/proj"],
+			Config:           configMap["/proj"],
 			CurrentDirectory: "/proj",
 		}),
 	}

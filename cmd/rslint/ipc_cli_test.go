@@ -62,6 +62,22 @@ func TestClassifyPaths(t *testing.T) {
 	}
 }
 
+func TestMarkCLIInterruptedUsesCanceledDiscoveryContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	state := &runCLIState{}
+	if !markCLIInterrupted(ctx, state) {
+		t.Fatal("canceled discovery context was not classified as an interrupt")
+	}
+	if !state.signalled.Load() {
+		t.Fatal("canceled discovery context did not publish the signal state")
+	}
+
+	if markCLIInterrupted(context.Background(), &runCLIState{}) {
+		t.Fatal("live discovery context was classified as an interrupt")
+	}
+}
+
 // TestDrainStdoutToIPC_DiscardsOnClosedPeer pins #4: once the channel is
 // closed (peer gone) the drain stops forwarding but keeps reading r — so the
 // lint pipeline never blocks on a full stdout pipe — and exits cleanly on EOF.
@@ -144,6 +160,26 @@ func TestRunCLI_StdoutIsTTYWireToANSI(t *testing.T) {
 	}
 }
 
+func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(dir, "rslint.config.mjs"),
+		[]byte("export default [];\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	code, output := runCLIInitForTest(t, map[string]any{
+		"workingDirectory": dir,
+		"format":           "stylish",
+		"configDiscovery":  map[string]any{"mode": "auto"},
+	})
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; output=%q", code, output)
+	}
+}
+
 func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	// Truly unset NO_COLOR/FORCE_COLOR (set-but-empty would trip tiers 3/4);
 	// t.Setenv first arranges restoration and marks the test non-parallel,
@@ -172,18 +208,15 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	}
 	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
 	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
+	writeFixture("rslint.json", `[{
+  "files": ["**/*.ts"],
+  "rules": {"@typescript-eslint/ban-ts-comment": "error"},
+  "plugins": ["@typescript-eslint"]
+}]`)
 
 	code, text := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"runtime":          map[string]any{"stdoutIsTTY": tty},
-		"configs": []map[string]any{{
-			"configDirectory": dir,
-			"entries": []map[string]any{{
-				"files":   []string{"**/*.ts"},
-				"rules":   map[string]any{"@typescript-eslint/ban-ts-comment": "error"},
-				"plugins": []string{"@typescript-eslint"},
-			}},
-		}},
 	})
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1 (one lint error)", code)
@@ -214,6 +247,13 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(realDir, "index.ts"), []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatalf("write lint target: %v", err)
 	}
+	if err := os.WriteFile(
+		filepath.Join(realDir, "rslint.jsonc"),
+		[]byte("[{\n  // Resolve this config through both physical and alias cwd spellings.\n  \"files\": [\"**/*.ts\"],\n  \"rules\": {\"no-debugger\": \"error\"}\n}]\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write lint config: %v", err)
+	}
 	createWorkingDirectoryAlias(t, realDir, aliasDir)
 
 	for _, test := range []struct {
@@ -230,13 +270,6 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			t.Setenv("NO_COLOR", "1")
 			code, text := runCLIInitForTest(t, map[string]any{
 				"workingDirectory": test.workingDirectory,
-				"configs": []map[string]any{{
-					"configDirectory": realDir,
-					"entries": []map[string]any{{
-						"files": []string{"**/*.ts"},
-						"rules": map[string]any{"no-debugger": "error"},
-					}},
-				}},
 			})
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)

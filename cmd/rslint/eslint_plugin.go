@@ -13,18 +13,17 @@ import (
 
 // pluginConfigResolver resolves the eslint-plugin wire configKey plus the
 // cached merged config for a file. lintResolver uses the target binding's
-// owning config when available; originalConfigDir maps a normalized config dir
-// back to the raw key the JS host registered its worker pool under.
+// owning config when available. The low-level API may supply a distinct opaque
+// plugin routing identity through pluginConfigDirByOwner; CLI discovery already
+// uses its Go-owned config directory as that identity and leaves the map nil.
 type pluginConfigResolver struct {
-	lintResolver      *lintConfigResolver
-	originalConfigDir map[string]string
+	lintResolver           *lintConfigResolver
+	pluginConfigDirByOwner map[string]string
 }
 
 // resolve returns the worker wire configKey + merged config for filePath. Go
-// resolves the file against its normalized owning-config key, then echoes the
-// RAW configDirectory the JS host sent as the wire configKey —
-// that is what the Node worker keys its plugin map on. POSIX / single-config
-// fall back to the normalized key, where raw == normalized.
+// resolves the file against its owning-config key, then substitutes the
+// low-level API's opaque plugin routing identity when one was supplied.
 func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
 	if r.lintResolver == nil {
 		return "", nil
@@ -35,8 +34,8 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 		return "", nil
 	}
 	wireKey = cfgDir
-	if raw, ok := r.originalConfigDir[cfgDir]; ok {
-		wireKey = raw
+	if pluginConfigDir, ok := r.pluginConfigDirByOwner[cfgDir]; ok {
+		wireKey = pluginConfigDir
 	}
 	return wireKey, resolver.ConfigForFile(configPath)
 }

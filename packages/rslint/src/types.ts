@@ -1,6 +1,11 @@
 /**
  * Shared types for rslint IPC protocol across all environments
  */
+import type {
+  ActivateConfigsRequest,
+  LoadConfigsRequest,
+} from './config/config-discovery-protocol.js';
+
 export interface Position {
   line: number;
   column: number;
@@ -62,15 +67,30 @@ export interface LintOptions {
   // Optional physical paths parallel to files. High-level Node APIs provide
   // these after target planning so Go does not repeat realpath resolution.
   canonicalFiles?: string[];
-  // Final resolved config — normalized config entries (normalizeConfig output:
-  // plain objects, plugins as string[], no live functions). The JS side
-  // resolves overrideConfig / config-file / discovery / normalize into this;
-  // Go (`--api`) never reads config from disk. Empty/absent = no config.
+  // A caller-supplied, already normalized config (normalizeConfig output:
+  // plain objects, plugins as string[], no live functions). High-level Node
+  // APIs normally use configDiscovery instead; overrideConfigFile:true uses
+  // this self-contained path. Empty/absent = no config.
   //
   // Listing a plugin does NOT auto-enable its rules: every rule must be named
   // explicitly under an entry's `rules` (or pulled in via a preset that does
   // so), matching ESLint flat-config semantics.
   config?: Record<string, unknown>[];
+  /**
+   * Ask native Go to discover and route JS/TS configs for this lint request.
+   * `config` and `configDiscovery` are mutually exclusive. Browser/WASM
+   * backends intentionally do not advertise this host-filesystem capability.
+   */
+  configDiscovery?: {
+    mode: 'auto' | 'explicit';
+    explicitConfigPath?: string;
+    /** Static glob roots; Go visits only branches leading to the supplied files. */
+    directories?: string[];
+    /** Parallel to `files`; true only for caller-literal file targets. */
+    explicitFiles?: boolean[];
+    /** Normalized API override entries appended to every selected config. */
+    overrideConfig?: Record<string, unknown>[];
+  };
   // Community ESLint-plugin rules available to this request. Go registers
   // request-scoped placeholder rules from this metadata, then asks the Node
   // peer to execute them through a reverse `pluginLint` request.
@@ -112,6 +132,8 @@ export type InboundRequestHandler = (message: IpcMessage) => unknown;
 /** Reverse-request handlers that are scoped to one outer lint request. */
 export interface LintInboundHandlers {
   pluginLint?: (request: unknown) => unknown;
+  loadConfigs?: (request: LoadConfigsRequest) => unknown;
+  activateConfigs?: (request: ActivateConfigsRequest) => unknown;
 }
 
 // Service interface that all implementations must follow

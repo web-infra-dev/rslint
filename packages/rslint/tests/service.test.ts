@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@rstest/core';
 
 import { RSLintService } from '../src/service/service.js';
+import { API_REVERSE_CONFIG_LOAD_CAPABILITY } from '../src/service/protocol.js';
 import type {
   InboundRequestHandler,
   IpcMessage,
@@ -90,6 +91,36 @@ class HangingLintBackend extends ReverseLintBackend {
   }
 }
 
+class ReverseConfigBackend extends ReverseLintBackend {
+  handshakeCapabilities: string[] = [];
+
+  override async sendMessage(kind: string, data: any): Promise<any> {
+    if (kind === 'handshake') {
+      this.handshakeCapabilities = [...(data.capabilities ?? [])];
+      return {
+        version: '2.0.0',
+        ok: true,
+        capabilities: [API_REVERSE_CONFIG_LOAD_CAPABILITY],
+      };
+    }
+    if (kind === 'lint') {
+      if (!this.inbound) throw new Error('missing inbound handler');
+      const loaded = await this.inbound({
+        id: 101,
+        kind: 'loadConfigs',
+        data: { transactionId: 'tx-service', candidates: ['candidate'] },
+      });
+      const activated = await this.inbound({
+        id: 102,
+        kind: 'activateConfigs',
+        data: { transactionId: 'tx-service', effectiveConfigIds: ['config'] },
+      });
+      return { loaded, activated };
+    }
+    return super.sendMessage(kind, data);
+  }
+}
+
 describe('RSLintService reverse lint request scoping', () => {
   test('forwards eslintPlugins and dispatches pluginLint to the call handler', async () => {
     const backend = new ReverseLintBackend();
@@ -166,6 +197,65 @@ describe('RSLintService reverse lint request scoping', () => {
         { pluginLint: () => ({ diagnostics: [] }) },
       ),
     ).rejects.toThrow(/does not support reverse pluginLint/);
+    await service.close();
+  });
+
+  test('negotiates and dispatches reverse config discovery requests', async () => {
+    const backend = new ReverseConfigBackend();
+    const service = new RSLintService(backend);
+
+    await expect(
+      service.lint(
+        { configDiscovery: { mode: 'auto' } },
+        {
+          loadConfigs: (request) => ({ loaded: request }),
+          activateConfigs: (request) => ({ activated: request }),
+        },
+      ),
+    ).resolves.toEqual({
+      loaded: {
+        loaded: {
+          transactionId: 'tx-service',
+          candidates: ['candidate'],
+        },
+      },
+      activated: {
+        activated: {
+          transactionId: 'tx-service',
+          effectiveConfigIds: ['config'],
+        },
+      },
+    });
+    expect(backend.handshakeCapabilities).toEqual([
+      API_REVERSE_CONFIG_LOAD_CAPABILITY,
+    ]);
+    expect(backend.lintPayloads).toEqual([]);
+    await service.close();
+  });
+
+  test('requires negotiated reverse config loading support', async () => {
+    const backend = new ReverseLintBackend();
+    const service = new RSLintService(backend);
+    await expect(
+      service.lint(
+        { configDiscovery: { mode: 'auto' } },
+        {
+          loadConfigs: () => ({ results: [] }),
+          activateConfigs: () => ({ eslintPluginEntries: [] }),
+        },
+      ),
+    ).rejects.toThrow(/does not support reverse config loading/);
+    await service.close();
+  });
+
+  test('requires reverse config handlers as an atomic pair', async () => {
+    const service = new RSLintService(new ReverseConfigBackend());
+    await expect(
+      service.lint(
+        { configDiscovery: { mode: 'auto' } },
+        { loadConfigs: () => ({ results: [] }) },
+      ),
+    ).rejects.toThrow(/loadConfigs and activateConfigs handlers together/);
     await service.close();
   });
 

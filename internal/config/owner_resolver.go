@@ -5,6 +5,34 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
+// LintDiscoveryScope records explicit-file provenance supplied by config
+// discovery. ExplicitOnly keeps a config loaded solely for an explicit file out
+// of automatic ownership, handoff, and directory-discovery decisions. Files in
+// the scope remain owned by that config.
+type LintDiscoveryScope struct {
+	Files        []string
+	ExplicitOnly bool
+}
+
+func configMapForAutomaticTargets(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+) map[string]RslintConfig {
+	for configDir := range configMap {
+		if !scopes[configDir].ExplicitOnly {
+			continue
+		}
+		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
+		for candidateDir, candidateConfig := range configMap {
+			if !scopes[candidateDir].ExplicitOnly {
+				automaticConfigMap[candidateDir] = candidateConfig
+			}
+		}
+		return automaticConfigMap
+	}
+	return configMap
+}
+
 // ConfigOwnerResolver snapshots an already-loaded config catalog and resolves
 // which config object governs a runtime file path. It never discovers, reads,
 // or parses config files. Construction is linear in config count. Each lookup
@@ -24,6 +52,18 @@ func NewConfigOwnerResolver(configMap map[string]RslintConfig, fsys vfs.FS) *Con
 		configMap: configSnapshot,
 		index:     newConfigDirectoryIndex(configSnapshot, fsys),
 	}
+}
+
+// NewConfigOwnerResolverForAutomaticTargets excludes configs that were loaded
+// only for catalog-scoped literal files. Those configs own their literal scope,
+// but they are not ownership handoff or .gitignore source boundaries for files
+// reached through an automatic directory/glob walk.
+func NewConfigOwnerResolverForAutomaticTargets(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+	fsys vfs.FS,
+) *ConfigOwnerResolver {
+	return NewConfigOwnerResolver(configMapForAutomaticTargets(configMap, scopes), fsys)
 }
 
 func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintConfig) {
@@ -78,10 +118,10 @@ func resolveConfigPathSpace(
 	physicalConfigDir string,
 	fsys vfs.FS,
 ) string {
-	if relative, ok := relativeConfigPath(filePath, configDir, true); ok {
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, true); ok {
 		return tspath.ResolvePath(physicalConfigDir, relative)
 	}
-	if relative, ok := relativeConfigPath(filePath, configDir, false); ok && fsys != nil {
+	if relative, ok := RelativePathWithinConfigRoot(filePath, configDir, false); ok && fsys != nil {
 		aliasRoot := filePath
 		for remaining := relative; remaining != ""; remaining = tspath.GetDirectoryPath(remaining) {
 			aliasRoot = tspath.GetDirectoryPath(aliasRoot)
@@ -108,13 +148,15 @@ func resolveConfigPathSpace(
 			}
 		}
 	}
-	if relative, ok := relativeConfigPath(physicalFilePath, physicalConfigDir, true); ok {
+	if relative, ok := RelativePathWithinConfigRoot(physicalFilePath, physicalConfigDir, true); ok {
 		return tspath.ResolvePath(physicalConfigDir, relative)
 	}
 	return physicalFilePath
 }
 
-func relativeConfigPath(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+// RelativePathWithinConfigRoot returns filePath relative to configDir when it
+// is inside the config's lexical path space.
+func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
 	options := tspath.ComparePathsOptions{
 		CurrentDirectory:          configDir,
 		UseCaseSensitiveFileNames: useCaseSensitive,

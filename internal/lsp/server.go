@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -167,12 +166,29 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	jsConfigs map[string]config.RslintConfig // configDirectory URI -> config entries (from JS/TS configs)
+	// jsConfigs is keyed by the catalog's absolute filesystem directory
+	// byte-for-byte so Go ownership and Node plugin routing share one identity.
+	jsConfigs map[string]config.RslintConfig
 	// The resolver is rebuilt atomically with each config transaction. Its keys
-	// are filesystem paths; jsConfigKeyByPath maps them back to protocol URIs.
+	// are the same filesystem paths stored in jsConfigs.
 	jsConfigOwnerResolver *config.ConfigOwnerResolver
-	jsConfigKeyByPath     map[string]string
-	// jsUnavailableConfigs contains config-directory protocol keys for failed
+	// configDiscoveryActive becomes true after the first structurally valid
+	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
+	// config-scoped .gitignore watchers trigger a fresh transaction without
+	// sending reverse requests before the client installs its handlers. The
+	// extension remains the sole refresh owner for workspace/descendant JS and
+	// JSON changes.
+	configDiscoveryActive bool
+	// configDiscoveryHasLastGood distinguishes a committed catalog with at
+	// least one usable JS config from an empty catalog or the synthetic
+	// unavailable boundaries used to keep LSP alive when every JS config is
+	// broken. Refresh failures preserve only the usable JS catalog as last-good.
+	configDiscoveryHasLastGood bool
+	// configSnapshotIncludesGitignore means the current catalog already contains
+	// the .gitignore view captured during its transaction. Before the first
+	// committed snapshot, the JSON startup config still uses the live policy.
+	configSnapshotIncludesGitignore bool
+	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
 	jsonConfig           config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
@@ -201,14 +217,22 @@ type Server struct {
 
 	// eslintPluginDispatch sends one plugin-lint batch to the Node host over
 	// the `rslint/pluginLint` reverse request and decodes its result.
-	// nil until the first config update installs it. Safe to call from a
+	// nil until the first committed config transaction installs it. Safe to call from a
 	// goroutine (it only touches sendRequest, which is goroutine-safe).
 	eslintPluginDispatch linter.EslintPluginDispatcher
 	// eslintPluginConfigGeneration identifies the JS config and Node worker
 	// generation that must serve reverse plugin-lint requests. It changes only
-	// on the serialized configUpdate path and is captured before dispatching
-	// work to a goroutine.
+	// on a serialized config transaction and is captured before dispatching work
+	// to a goroutine.
 	eslintPluginConfigGeneration string
+	// eslintPluginRules contains exactly the object-form plugin rule names
+	// activated for eslintPluginConfigGeneration. GlobalRuleRegistry keeps
+	// placeholders process-wide, so this generation-local gate prevents a
+	// placeholder left by an older config from being dispatched to the current
+	// Node host. nil preserves the unscoped behavior used by isolated tests and
+	// before the first config transaction; every committed generation installs
+	// a non-nil set, including an empty one.
+	eslintPluginRules map[string]struct{}
 
 	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
 	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
@@ -721,30 +745,15 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
 
-	// Custom rslint config update. New clients send a request so the Node side
-	// can commit its staged plugin host only after Go accepts the same config
-	// generation. Notifications remain supported for older clients.
-	handlers[lsproto.Method("rslint/configUpdate")] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
-		if err := s.handleConfigUpdate(ctx, req.Params); err != nil {
-			if req.ID == nil {
-				log.Printf("[rslint] Error handling config update: %v", err)
-				return nil
-			}
+	handlers[methodConfigRefresh] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
+		if req.ID == nil {
+			return fmt.Errorf("%w: rslint/configRefresh must be a request", lsproto.ErrorCodeInvalidRequest)
+		}
+		response, err := s.handleConfigRefresh(ctx, req.Params)
+		if err != nil {
 			return err
 		}
-		if req.ID != nil {
-			s.sendResult(req.ID, struct {
-				Generation string `json:"generation"`
-			}{Generation: s.eslintPluginConfigGeneration})
-		}
-		return nil
-	}
-	handlers[lsproto.Method("rslint/configCapabilities")] = func(s *Server, _ context.Context, req *lsproto.RequestMessage) error {
-		if req.ID != nil {
-			s.sendResult(req.ID, struct {
-				TransactionVersion int `json:"transactionVersion"`
-			}{TransactionVersion: 1})
-		}
+		s.sendResult(req.ID, response)
 		return nil
 	}
 
@@ -835,10 +844,9 @@ func isBlockingMethod(method lsproto.Method) bool {
 		lsproto.MethodTextDocumentDidClose,
 		lsproto.MethodWorkspaceDidChangeWatchedFiles,
 		lsproto.MethodTextDocumentCodeAction,
-		// rslint/configUpdate writes to s.jsConfigs, which is read by handlers
-		// dispatched on the main loop (e.g. didOpen/didChange). Running it on
-		// the same serialized dispatch loop avoids a data race without locks.
-		lsproto.Method("rslint/configUpdate"):
+		// Config commits write maps that document handlers read lock-free, so
+		// refresh transactions run on the same serialized dispatch loop.
+		methodConfigRefresh:
 		return true
 	}
 	return false

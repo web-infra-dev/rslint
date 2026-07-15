@@ -164,7 +164,7 @@ suite('rslint no config fallback', function () {
 `;
       fs.writeFileSync(jsConfigPath, jsConfig, 'utf8');
 
-      // Wait for JS config watcher to detect and send rslint/configUpdate
+      // Wait for config discovery to detect and commit the JS config.
       await new Promise((resolve) => setTimeout(resolve, 3000));
       await triggerDiagnosticRefresh(doc);
 
