@@ -19,16 +19,15 @@ var NoInterpolationInSnapshotsRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := utils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeExpect {
-					return
-				}
 
-				if !utils.INLINE_SNAPSHOT_MATCHERS[jestFnCall.Matcher] {
+				if jestFnCall == nil ||
+					jestFnCall.Kind != utils.JestFnTypeExpect ||
+					!utils.INLINE_SNAPSHOT_MATCHERS[jestFnCall.Matcher] {
 					return
 				}
 
 				for _, arg := range node.Arguments() {
-					if arg != nil && arg.Kind == ast.KindTemplateExpression {
+					if arg := ast.SkipParentheses(arg); arg != nil && arg.Kind == ast.KindTemplateExpression {
 						ctx.ReportNode(arg, buildNoInterpolationMessage())
 					}
 				}
