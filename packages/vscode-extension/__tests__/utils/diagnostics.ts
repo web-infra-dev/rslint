@@ -24,7 +24,17 @@ function describeDiagnostics(
     .join(' | ');
 }
 
-/** Subscribe before the initial read, filter by source, and reject on timeout. */
+const diagnosticsPollIntervalMs = 100;
+
+/**
+ * Wait for matching rslint diagnostics.
+ *
+ * VS Code may coalesce diagnostic-change notifications when multiple documents
+ * are updated in one language-server publish cycle. Keep the event subscription
+ * for the fast path, but also sample the authoritative diagnostics collection so
+ * a missed notification cannot turn an already-satisfied predicate into a
+ * timeout. The timeout performs one final read for the same reason.
+ */
 export function waitForRslintDiagnostics(
   document: vscode.TextDocument,
   predicate: (diagnostics: vscode.Diagnostic[]) => boolean = (diagnostics) =>
@@ -35,6 +45,8 @@ export function waitForRslintDiagnostics(
     const uriString = document.uri.toString();
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let poller: ReturnType<typeof setInterval> | undefined;
+    let subscription: vscode.Disposable | undefined;
 
     const finish = (
       diagnostics: vscode.Diagnostic[] | undefined,
@@ -42,24 +54,32 @@ export function waitForRslintDiagnostics(
     ): void => {
       if (settled) return;
       settled = true;
-      subscription.dispose();
+      subscription?.dispose();
       if (timer) clearTimeout(timer);
+      if (poller) clearInterval(poller);
       if (error) reject(error);
       else resolve(diagnostics ?? []);
     };
-    const check = (): void => {
+    const check = (): boolean => {
+      if (settled) return true;
       const diagnostics = getRslintDiagnostics(document);
       try {
-        if (predicate(diagnostics)) finish(diagnostics);
+        if (predicate(diagnostics)) {
+          finish(diagnostics);
+          return true;
+        }
       } catch (error) {
         finish(undefined, error);
+        return true;
       }
+      return false;
     };
-    const subscription = vscode.languages.onDidChangeDiagnostics((event) => {
+    subscription = vscode.languages.onDidChangeDiagnostics((event) => {
       if (event.uris.some((uri) => uri.toString() === uriString)) check();
     });
 
     timer = setTimeout(() => {
+      if (check()) return;
       const diagnostics = getRslintDiagnostics(document);
       finish(
         undefined,
@@ -69,6 +89,7 @@ export function waitForRslintDiagnostics(
         ),
       );
     }, timeoutMs);
+    poller = setInterval(check, diagnosticsPollIntervalMs);
     check();
   });
 }

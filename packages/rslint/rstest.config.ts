@@ -3,6 +3,11 @@ import { defineConfig } from '@rstest/core';
 export default defineConfig({
   testEnvironment: 'node',
   globals: true,
+  // Each eslint-plugin test process can spawn up to eight Worker threads.
+  // Run Windows test files serially so Rstest's CPU-count process pool cannot
+  // multiply that inner concurrency and starve Worker startup/shutdown. Keep
+  // the existing per-test timeouts as real hang sentinels.
+  pool: process.platform === 'win32' ? { maxWorkers: 1 } : undefined,
   // The self-hosted Windows runner can stall under concurrent main CI. Keep
   // ordinary async tests from tripping Rstest's 5s default.
   testTimeout: 30_000,
