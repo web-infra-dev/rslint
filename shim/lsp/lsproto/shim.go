@@ -761,6 +761,9 @@ type ProjectInfoTelemetryEvent = lsproto.ProjectInfoTelemetryEvent
 type ProjectInfoTelemetryMeasurements = lsproto.ProjectInfoTelemetryMeasurements
 type PublishDiagnosticsClientCapabilities = lsproto.PublishDiagnosticsClientCapabilities
 type PublishDiagnosticsParams = lsproto.PublishDiagnosticsParams
+func UnmarshalParams[T any](req *lsproto.RequestMessage) (T, error) {
+	return lsproto.UnmarshalParams[T](req)
+}
 type Range = lsproto.Range
 type RangeOrEditRangeWithInsertReplace = lsproto.RangeOrEditRangeWithInsertReplace
 type RangeOrPrepareRenamePlaceholderOrPrepareRenameDefaultBehaviorOrNull = lsproto.RangeOrPrepareRenamePlaceholderOrPrepareRenameDefaultBehaviorOrNull

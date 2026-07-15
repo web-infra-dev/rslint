@@ -3,6 +3,13 @@ import * as vscode from 'vscode';
 import fs from 'node:fs';
 import path from 'node:path';
 import { waitForContentChange } from '../suite/fixall-helpers';
+import { saveDocumentOnce } from '../utils/codeActionRegistry';
+import { withCodeActionsOnSave } from '../utils/configuration';
+import { waitForRslintDiagnostics } from '../utils/diagnostics';
+import {
+  closeAndDeleteTemporaryDocument,
+  temporaryFilePath,
+} from '../utils/documents';
 
 // End-to-end VS Code coverage for the object-form `plugins` reverse-dispatch
 // path: the LSP server lints natively but dispatches rules mounted via a
@@ -17,7 +24,9 @@ suite('rslint object-form plugins integration', function () {
   this.timeout(120000);
 
   function workspaceRoot(): string {
-    return vscode.workspace.workspaceFolders![0].uri.fsPath;
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) throw new Error('Test workspace is unavailable');
+    return workspaceFolder.uri.fsPath;
   }
 
   // LSP diagnostic messages are formatted as `[<ruleName>] <description>`
@@ -26,103 +35,84 @@ suite('rslint object-form plugins integration', function () {
     return diags.map((d) => d.message).join(' | ');
   }
 
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate?: (diags: vscode.Diagnostic[]) => boolean,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate ? predicate(diagnostics) : diagnostics.length > 0) {
-        return diagnostics;
-      }
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
-      });
-    }
-    return vscode.languages.getDiagnostics(doc.uri);
-  }
-
   // Keep the original flaky scenario first: no preceding test may warm the
   // diagnostics or code-action-on-save path in this fresh extension host.
   test('plugin auto-fix participates in source.fixAll on save', async () => {
-    const tmpFile = path.join(
-      workspaceRoot(),
-      'src',
-      `_fixall_plugin_${Date.now()}.ts`,
+    const tmpFile = temporaryFilePath(
+      path.join(workspaceRoot(), 'src'),
+      '_fixall_plugin_',
     );
     fs.writeFileSync(tmpFile, '// placeholder\n', 'utf-8');
 
-    const editorConfig = vscode.workspace.getConfiguration('editor');
-    const previous = editorConfig.get('codeActionsOnSave');
+    let doc: vscode.TextDocument | undefined;
+    let testError: unknown;
     try {
-      await editorConfig.update(
-        'codeActionsOnSave',
+      const openedDocument = await vscode.workspace.openTextDocument(tmpFile);
+      doc = openedDocument;
+      const editor = await vscode.window.showTextDocument(openedDocument);
+      await withCodeActionsOnSave(
+        openedDocument,
         { 'source.fixAll': 'explicit' },
-        vscode.ConfigurationTarget.Workspace,
-      );
+        async () => {
+          await editor.edit((b) =>
+            b.replace(
+              new vscode.Range(
+                openedDocument.positionAt(0),
+                openedDocument.positionAt(openedDocument.getText().length),
+              ),
+              'const numbers = [1, 2, 3];\nconst ok = numbers.filter((n) => n > 0).length > 0;\nexport { ok };\n',
+            ),
+          );
 
-      const doc = await vscode.workspace.openTextDocument(tmpFile);
-      const editor = await vscode.window.showTextDocument(doc);
-      await editor.edit((b) =>
-        b.replace(
-          new vscode.Range(
-            doc.positionAt(0),
-            doc.positionAt(doc.getText().length),
-          ),
-          'const numbers = [1, 2, 3];\nconst ok = numbers.filter((n) => n > 0).length > 0;\nexport { ok };\n',
-        ),
-      );
+          const diagnostics = await waitForRslintDiagnostics(
+            openedDocument,
+            (diags) =>
+              diags.some((d) => d.message.includes('local/prefer-array-some')),
+          );
+          assert.ok(
+            diagnostics.some((d) =>
+              d.message.includes('local/prefer-array-some'),
+            ),
+            `prefer-array-some did not appear; cannot exercise fixAll. Got: ${messages(diagnostics)}`,
+          );
 
-      const diagnostics = await waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('local/prefer-array-some')),
-      );
-      assert.ok(
-        diagnostics.some((d) => d.message.includes('local/prefer-array-some')),
-        `prefer-array-some did not appear; cannot exercise fixAll. Got: ${messages(diagnostics)}`,
-      );
+          await saveDocumentOnce(
+            openedDocument,
+            'Document should complete the plugin code-action-on-save pipeline',
+          );
+          await waitForContentChange(
+            openedDocument,
+            (content) => !content.includes('.filter('),
+            60000,
+          );
 
-      assert.ok(
-        await doc.save(),
-        'Document should complete the plugin code-action-on-save pipeline',
+          assert.ok(
+            !openedDocument.getText().includes('.filter('),
+            `Plugin fix (filter -> some) should apply via source.fixAll on save.\nContent: ${openedDocument.getText()}`,
+          );
+          assert.ok(
+            openedDocument.getText().includes('.some('),
+            `Expected '.some(' after fixAll.\nContent: ${openedDocument.getText()}`,
+          );
+        },
       );
-      await waitForContentChange(
-        doc,
-        (content) => !content.includes('.filter('),
-        60000,
-      );
+    } catch (error) {
+      testError = error;
+    }
 
-      assert.ok(
-        !doc.getText().includes('.filter('),
-        `Plugin fix (filter -> some) should apply via source.fixAll on save.\nContent: ${doc.getText()}`,
+    const errors: unknown[] = [];
+    if (testError) errors.push(testError);
+    try {
+      await closeAndDeleteTemporaryDocument(doc, tmpFile);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(
+        errors,
+        'Plugin on-save test and temporary-file cleanup failed',
       );
-      assert.ok(
-        doc.getText().includes('.some('),
-        `Expected '.some(' after fixAll.\nContent: ${doc.getText()}`,
-      );
-    } finally {
-      await editorConfig.update(
-        'codeActionsOnSave',
-        previous,
-        vscode.ConfigurationTarget.Workspace,
-      );
-      if (vscode.window.activeTextEditor?.document.uri.fsPath === tmpFile) {
-        await vscode.commands.executeCommand(
-          'workbench.action.closeActiveEditor',
-        );
-      }
-      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
     }
   });
 
@@ -131,7 +121,7 @@ suite('rslint object-form plugins integration', function () {
     const doc = await vscode.workspace.openTextDocument(filePath);
     await vscode.window.showTextDocument(doc);
 
-    const diagnostics = await waitForDiagnostics(doc, (diags) =>
+    const diagnostics = await waitForRslintDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('local/no-null')),
     );
     const msgs = messages(diagnostics);

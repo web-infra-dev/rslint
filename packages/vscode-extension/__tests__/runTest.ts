@@ -1,201 +1,189 @@
-import * as path from 'path';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { runTests } from '@vscode/test-electron';
+
+interface TestSuite {
+  name: string;
+  workspace: string;
+  tests: string;
+}
+
+const workspaceMarkerFile = '.rslint-vscode-test-sandbox.json';
 
 function resolveFixture(name: string): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', name);
 }
 
-function copyToIsolatedWorkspace(source: string): {
-  workspace: string;
-  userDataDir: string;
-  extensionsDir: string;
-  dispose(): void;
-} {
-  // Go discovery intentionally searches strict cwd ancestors. Keeping an E2E
-  // fixture under this repository would therefore inherit the repository's
-  // root config (whose global ignores exclude __tests__) and correctly prune
-  // the fixture config. A physical temp copy gives the fixture the same clean
-  // ancestry as a real standalone user workspace.
-  // VS Code and the language client create Unix sockets below these paths.
-  // macOS's os.tmpdir() is already long enough to exceed the 103-byte socket
-  // limit once VS Code appends its own names, so keep every test-owned path
-  // directly below a short /tmp container. Windows has no Unix socket limit.
+async function findPackageRoot(startPath: string): Promise<string> {
+  let current = path.resolve(startPath);
+  while (true) {
+    try {
+      await fs.promises.access(path.join(current, 'package.json'));
+      return current;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        throw new Error(`Could not find a package boundary above ${startPath}`);
+      }
+      current = parent;
+    }
+  }
+}
+
+async function runIsolatedSuite(
+  extensionDevelopmentPath: string,
+  suite: TestSuite,
+): Promise<void> {
+  // Go discovery intentionally searches strict cwd ancestors, so keep each
+  // fixture in a clean physical workspace outside this repository. Use short
+  // paths on Unix as VS Code and the language client append socket names that
+  // can otherwise exceed macOS's Unix-domain socket path limit.
   const tempRoot = process.platform === 'win32' ? os.tmpdir() : '/tmp';
-  const container = fs.mkdtempSync(path.join(tempRoot, 'rsv-'));
-  const workspace = path.join(container, 'w');
-  const userDataDir = path.join(container, 'u');
-  const extensionsDir = path.join(container, 'e');
-  try {
-    fs.cpSync(source, workspace, { recursive: true });
-    fs.mkdirSync(userDataDir);
-    fs.mkdirSync(extensionsDir);
-  } catch (error) {
-    fs.rmSync(container, { recursive: true, force: true });
-    throw error;
-  }
-  return {
-    workspace,
-    userDataDir,
-    extensionsDir,
-    dispose() {
-      fs.rmSync(container, { recursive: true, force: true });
-    },
-  };
-}
+  const profileRoot = await fs.promises.mkdtemp(path.join(tempRoot, 'rsv-'));
+  const userDataDir = path.join(profileRoot, 'u');
+  const extensionsDir = path.join(profileRoot, 'e');
+  const workspaceCopy = path.join(profileRoot, 'w');
 
-async function runIsolatedFixtureTests(options: {
-  source: string;
-  name: string;
-  extensionDevelopmentPath: string;
-  extensionTestsPath: string;
-}): Promise<boolean> {
-  let isolatedWorkspace: ReturnType<typeof copyToIsolatedWorkspace> | undefined;
+  let testError: unknown;
   try {
-    isolatedWorkspace = copyToIsolatedWorkspace(options.source);
-    await runTests({
-      extensionDevelopmentPath: options.extensionDevelopmentPath,
-      extensionTestsPath: options.extensionTestsPath,
-      launchArgs: [
-        '--disable-extensions',
-        `--user-data-dir=${isolatedWorkspace.userDataDir}`,
-        `--extensions-dir=${isolatedWorkspace.extensionsDir}`,
-        isolatedWorkspace.workspace,
-      ],
-      version: 'stable',
+    // Suites intentionally create, rewrite, and delete config files. Run them
+    // against a private copy so even an Extension Host crash cannot mutate a
+    // tracked fixture in the checkout.
+    await fs.promises.cp(suite.workspace, workspaceCopy, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
     });
-    return true;
-  } catch (err) {
-    console.error(`${options.name} failed:`, err);
-    return false;
-  } finally {
-    isolatedWorkspace?.dispose();
+    await fs.promises.writeFile(
+      path.join(workspaceCopy, workspaceMarkerFile),
+      JSON.stringify({
+        version: 1,
+        nonce: randomUUID(),
+        sourceWorkspace: await fs.promises.realpath(suite.workspace),
+        expectedWorkspace: await fs.promises.realpath(workspaceCopy),
+      }),
+      { encoding: 'utf8', flag: 'wx', mode: 0o600 },
+    );
+
+    // Preserve the source workspace's package boundary and dependency lookup
+    // without placing a writable node_modules link inside the test workspace.
+    const packageRoot = await findPackageRoot(suite.workspace);
+    await fs.promises.copyFile(
+      path.join(packageRoot, 'package.json'),
+      path.join(profileRoot, 'package.json'),
+    );
+    await fs.promises.symlink(
+      path.join(packageRoot, 'node_modules'),
+      path.join(profileRoot, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: suite.tests,
+      launchArgs: [
+        workspaceCopy,
+        '--disable-extensions',
+        '--disable-updates',
+        '--disable-workspace-trust',
+        '--force-disable-user-env',
+        '--skip-release-notes',
+        '--skip-welcome',
+        `--user-data-dir=${userDataDir}`,
+        `--extensions-dir=${extensionsDir}`,
+      ],
+      // Omit `version`: @vscode/test-electron resolves the current stable
+      // release on every run instead of pinning a VS Code build.
+    });
+  } catch (error) {
+    testError = error;
   }
+
+  let cleanupError: unknown;
+  try {
+    await fs.promises.rm(profileRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  if (testError && cleanupError) {
+    throw new AggregateError(
+      [testError, cleanupError],
+      `${suite.name} failed and its isolated sandbox could not be removed`,
+    );
+  }
+  if (testError) throw testError;
+  if (cleanupError) throw cleanupError;
 }
 
-async function main() {
+async function main(): Promise<void> {
   const extensionDevelopmentPath = path.resolve(__dirname, '../..');
-  let failed = false;
-
-  // --- Existing tests (JSON config workspace) ---
-  const extensionTestsPath = path.resolve(__dirname, './suite');
-  if (
-    !(await runIsolatedFixtureTests({
-      source: resolveFixture('fixtures'),
-      name: 'JSON config tests (stable)',
-      extensionDevelopmentPath,
-      extensionTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // try {
-  //   await runTests({
-  //     extensionDevelopmentPath,
-  //     extensionTestsPath,
-  //     launchArgs: ['--disable-extensions', testWorkspace],
-  //     version: '1.106.3',
-  //   });
-  // } catch (err) {
-  //   console.error('JSON config tests (1.106.3) failed:', err);
-  //   failed = true;
-  // }
-
-  // --- JS config tests ---
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
-  const jsConfigTestsPath = path.resolve(__dirname, './suite-jsconfig');
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
+  const suites: TestSuite[] = [
+    {
+      name: 'JSON config tests',
+      workspace: resolveFixture('fixtures'),
+      tests: path.resolve(__dirname, './suite'),
+    },
+    {
       name: 'JS config tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: jsConfigTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // --- Monorepo multi-config tests ---
-  const monorepoTestsPath = path.resolve(__dirname, './suite-monorepo');
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-monorepo'),
+      workspace: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
+      tests: path.resolve(__dirname, './suite-jsconfig'),
+    },
+    {
       name: 'Monorepo config tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: monorepoTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // --- No config fallback tests ---
-  const noConfigTestsPath = path.resolve(__dirname, './suite-noconfig');
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-noconfig'),
+      workspace: path.resolve(testsSourceDir, 'fixtures-monorepo'),
+      tests: path.resolve(__dirname, './suite-monorepo'),
+    },
+    {
       name: 'No config tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: noConfigTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // --- Type-aware rule scope tests ---
-  const typeAwareScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-type-aware-scope',
-  );
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-type-aware-scope'),
+      workspace: path.resolve(testsSourceDir, 'fixtures-noconfig'),
+      tests: path.resolve(__dirname, './suite-noconfig'),
+    },
+    {
       name: 'Type-aware scope tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: typeAwareScopeTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // --- projectService type-aware scope tests ---
-  const projectServiceScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-project-service-scope',
-  );
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-project-service-scope'),
+      workspace: path.resolve(testsSourceDir, 'fixtures-type-aware-scope'),
+      tests: path.resolve(__dirname, './suite-type-aware-scope'),
+    },
+    {
       name: 'projectService scope tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: projectServiceScopeTestsPath,
-    }))
-  ) {
-    failed = true;
-  }
-
-  // --- eslintPlugins reverse-dispatch tests ---
-  const eslintPluginsTestsPath = path.resolve(
-    __dirname,
-    './suite-eslint-plugins',
-  );
-  if (
-    !(await runIsolatedFixtureTests({
-      source: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
+      workspace: path.resolve(testsSourceDir, 'fixtures-project-service-scope'),
+      tests: path.resolve(__dirname, './suite-project-service-scope'),
+    },
+    {
       name: 'eslintPlugins tests',
-      extensionDevelopmentPath,
-      extensionTestsPath: eslintPluginsTestsPath,
-    }))
-  ) {
-    failed = true;
+      workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
+      tests: path.resolve(__dirname, './suite-eslint-plugins'),
+    },
+  ];
+
+  const failures: unknown[] = [];
+  for (const suite of suites) {
+    try {
+      await runIsolatedSuite(extensionDevelopmentPath, suite);
+    } catch (error) {
+      console.error(`${suite.name} failed:`, error);
+      failures.push(error);
+    }
   }
 
-  if (failed) {
-    console.error('Some test suites failed');
-    process.exit(1);
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `${failures.length} VS Code suite(s) failed`,
+    );
   }
 }
 
-main();
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
