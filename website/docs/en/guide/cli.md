@@ -101,12 +101,12 @@ rslint src/ --rule 'no-console: off' --format github
 
 - CLI rules have the **highest precedence** and override all config file entries, including per-file overrides.
 - When the same rule is specified multiple times, the **last one wins**.
-- Rules that don't exist in the registry are silently ignored.
+- An unknown rule name (a typo, an unregistered plugin, or a rule missing from a mounted plugin) fails the run with exit code 1, matching ESLint's `--rule` behavior. As with config file rules, setting the rule to `"off"` is exempt from this check.
 
 ## Exit Codes
 
-| Code | Meaning                                           |
-| ---- | ------------------------------------------------- |
-| `0`  | No errors (warnings may be present)               |
-| `1`  | Errors found, or warnings exceed `--max-warnings` |
-| `2`  | Invalid command-line usage or flag combinations   |
+| Code | Meaning                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | No errors (warnings may be present)                                                                                                        |
+| `1`  | Errors found, warnings exceed `--max-warnings`, or the config (including `--rule`) references an unknown rule name or invalid rule options |
+| `2`  | Invalid command-line usage or flag combinations                                                                                            |

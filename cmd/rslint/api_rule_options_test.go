@@ -43,6 +43,41 @@ func TestHandleLintFirstRequestValidatesRuleOptions(t *testing.T) {
 	}
 }
 
+func TestHandleLintValidatesUnknownRuleNames(t *testing.T) {
+	root := t.TempDir()
+	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[{
+			"rules": { "non-existent-rule-name": "error" }
+		}]`),
+		ConfigDirectory:  root,
+		WorkingDirectory: root,
+	})
+	if err == nil || !strings.Contains(err.Error(), `unknown rule "non-existent-rule-name"`) {
+		t.Fatalf("API request did not validate rule names: %v", err)
+	}
+}
+
+func TestHandleLintResolvesMountedPluginRuleNames(t *testing.T) {
+	// A rule mounted via the request's own plugin entries must pass name
+	// validation even though it never has a native implementation — the
+	// entries are the source of truth, not the process-global registry.
+	root := t.TempDir()
+	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[{
+			"plugins": ["test-mounted"],
+			"rules": { "test-mounted/no-foo": "error" }
+		}]`),
+		EslintPlugins: []api.EslintPluginEntry{
+			{Prefix: "test-mounted", RuleNames: []string{"no-foo"}},
+		},
+		ConfigDirectory:  root,
+		WorkingDirectory: root,
+	})
+	if err != nil {
+		t.Fatalf("mounted plugin rule failed name validation: %v", err)
+	}
+}
+
 func TestHandleLintDiscoveredConfigValidatesRuleOptions(t *testing.T) {
 	root := t.TempDir()
 	writeProgramTestFiles(t, root, map[string]string{

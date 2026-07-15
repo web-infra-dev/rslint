@@ -258,6 +258,11 @@ func (s *Server) reloadConfig() error {
 	return nil
 }
 
+// validateRuleOptionsForConfig runs options-only validation (not the
+// unknown-name check the CLI and API also run): an LSP config transaction
+// can commit a catalog without ESLint-plugin entries when the plugin host is
+// unavailable, and rejecting the snapshot over then-unresolvable rule names
+// would discard a perfectly valid config.
 func validateRuleOptionsForConfig(entries config.RslintConfig, configDirectory string) error {
 	optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
 	if len(optionsErrs) == 0 {

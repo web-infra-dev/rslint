@@ -382,10 +382,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if configMap == nil {
 		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	}
-	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
-		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
-	}
-
 	// The plugin registry is process-global, but execution is request-gated by
 	// requestPluginRules below so metadata from an earlier API request cannot
 	// make a later request dispatch stale plugin rules.
@@ -396,6 +392,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			RuleNames: append([]string(nil), plugin.RuleNames...),
 		})
 	}
+
+	if messages := validateResolvedRules(configMap, rslintConfig, pluginEntries); len(messages) > 0 {
+		return nil, fmt.Errorf("invalid rule configuration:\n%s", strings.Join(messages, "\n"))
+	}
+
 	var requestPluginRules map[string]struct{}
 	if len(pluginEntries) > 0 {
 		requestPluginRules = make(map[string]struct{})

@@ -359,6 +359,61 @@ describe('CLI JS config error handling', () => {
       await cleanupTempDir(tempDir);
     }
   });
+
+  test('should fail with exit code 1 for unknown rule name in config', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'export const x = 1;\n',
+      'rslint.config.js': jsConfig({
+        rules: { 'non-existent-rule-name': 'error' },
+        plugins: [],
+      }),
+    });
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('unknown rule "non-existent-rule-name"');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('should fail with exit code 1 for unknown plugin rule in config', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'export const x = 1;\n',
+      'rslint.config.js': jsConfig({
+        rules: { 'some-plugin/non-existent-rule': 'error' },
+        plugins: [],
+      }),
+    });
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain(
+        'unknown rule "some-plugin/non-existent-rule": plugin "some-plugin" is not registered',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('unknown rule set to "off" in config should not fail the run', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'export const x = 1;\n',
+      'rslint.config.js': jsConfig({
+        rules: { 'non-existent-rule-name': 'off' },
+        plugins: [],
+      }),
+    });
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
 });
 
 describe('JSON config regression', () => {
