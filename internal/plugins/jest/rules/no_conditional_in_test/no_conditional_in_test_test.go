@@ -211,6 +211,12 @@ func TestNoConditionalInTestRule(t *testing.T) {
         if ('bar') {}
       })
     `},
+		{Code: `
+      import { fit as focusedTest } from '@jest/globals';
+      focusedTest.concurrent('x', () => {
+        if (condition) {}
+      });
+    `},
 		{Code: `const x = obj?.foo`},
 		{Code: `
       it('foo', () => {
@@ -881,6 +887,18 @@ func TestNoConditionalInTestRule(t *testing.T) {
 		},
 		{
 			Code: `
+        it('x', () => {
+          obj?.method(arg?.value);
+        });
+      `,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+				{MessageId: "conditionalInTest", Line: 2, Column: 15},
+			},
+		},
+		{
+			Code: `
         it('foo', () => {
           obj?.[key];
         })
@@ -888,6 +906,39 @@ func TestNoConditionalInTestRule(t *testing.T) {
 			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+			},
+		},
+		{
+			Code: `
+        it('foo', () => {
+          obj?.foo!.bar;
+        })
+      `,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+			},
+		},
+		{
+			Code: `
+        it('foo', () => {
+          obj?.foo!();
+        })
+      `,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+			},
+		},
+		{
+			Code: `
+        it('foo', () => {
+          (obj?.foo)!.bar;
+        })
+      `,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 2, Column: 4},
 			},
 		},
 		{

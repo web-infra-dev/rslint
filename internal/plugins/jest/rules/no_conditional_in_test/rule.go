@@ -36,9 +36,25 @@ func buildConditionalInTestMessage() rule.RuleMessage {
 }
 
 func isOutermostOptionalChain(node *ast.Node) bool {
-	return ast.IsOptionalChain(node) &&
-		ast.IsOutermostOptionalChain(node) &&
-		(node.Parent == nil || !ast.IsOptionalChain(node.Parent))
+	if !ast.IsOptionalChain(node) || !ast.IsOutermostOptionalChain(node) {
+		return false
+	}
+
+	parent := node.Parent
+	if parent == nil || !ast.IsOptionalChain(parent) {
+		return true
+	}
+
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Expression != node
+	case ast.KindElementAccessExpression:
+		return parent.AsElementAccessExpression().Expression != node
+	case ast.KindCallExpression:
+		return parent.AsCallExpression().Expression != node
+	default:
+		return true
+	}
 }
 
 var NoConditionalInTestRule = rule.Rule{
@@ -76,11 +92,12 @@ var NoConditionalInTestRule = rule.Rule{
 			ast.KindElementAccessExpression:  reportOptionalChain,
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				isUnsupportedFitConcurrent := call != nil &&
-					jestUtils.CalleeChainName(call.Expression) == "fit.concurrent"
-				if !isUnsupportedFitConcurrent &&
-					jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeTest) {
+				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				isUnsupportedFitConcurrent := parsed != nil &&
+					parsed.Name == "fit" &&
+					len(parsed.Members) == 1 &&
+					parsed.Members[0] == "concurrent"
+				if !isUnsupportedFitConcurrent && parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest {
 					testCalls[node] = true
 					testCallDepth++
 				}
