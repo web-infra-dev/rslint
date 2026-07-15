@@ -25,7 +25,6 @@ import fs from 'node:fs';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
-  JS_CONFIG_FILES,
   type ActivateConfigsRequest,
   type ConfigModuleActivationPlan,
   type LoadConfigsRequest,
@@ -48,12 +47,7 @@ const LOCKFILE_NAMES = [
   'yarn.lock',
 ] as const;
 
-export const CONFIG_REFRESH_WATCH_GLOB = `**/{${[
-  ...JS_CONFIG_FILES,
-  'rslint.json',
-  'rslint.jsonc',
-  ...LOCKFILE_NAMES,
-].join(',')}}`;
+export const CONFIG_REFRESH_WATCH_GLOB = `**/{rslint.config.js,rslint.config.mjs,rslint.config.ts,rslint.config.mts,rslint.json,rslint.jsonc,${LOCKFILE_NAMES.join(',')}}`;
 
 export type ConfigRefreshReason =
   | 'initial'
