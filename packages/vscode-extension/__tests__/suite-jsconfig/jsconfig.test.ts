@@ -2,74 +2,14 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
-import { selectUnavailableConfigBoundaryDirectories } from '../../src/Rslint';
+import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
+import { closeTextEditor, revertTextDocument } from '../utils/documents';
 
 suite('rslint JS config support', function () {
   this.timeout(120_000);
 
   function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
-  }
-
-  /**
-   * Race-free `onDidChangeDiagnostics` waiter.
-   *
-   * Compared to a polling `getDiagnostics` + `setTimeout` loop, this
-   * subscribes BEFORE checking the initial state, eliminating the
-   * subscribe-after-check window where an event fired between the
-   * synchronous read and the listener registration would be lost.
-   *
-   * The waiter returns as soon as `predicate` accepts a snapshot — no
-   * file edits, no nudges, no sleeps. It relies on the server's own
-   * push channel: `internal/lsp/service.go::handleConfigUpdate` ends
-   * with `s.RefreshDiagnostics(ctx)`, which signals `refreshCh`; the
-   * dispatch loop in `internal/lsp/server.go` consumes that signal and
-   * calls `pushDiagnostics(uri)` for every open document. So the LSP
-   * server already publishes new diagnostics after a config reload —
-   * tests just need to listen for them.
-   *
-   * Default 60s timeout (vs the older helper's 30s × 20 polling
-   * budget) gives headroom for slow CI runners where the JS-config
-   * reload chain (ESM dynamic import + IO) can take 10s+.
-   */
-  function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate?: (diags: vscode.Diagnostic[]) => boolean,
-    timeoutMs = 60_000,
-  ): Promise<vscode.Diagnostic[]> {
-    const matches = predicate ?? ((ds) => ds.length > 0);
-    return new Promise<vscode.Diagnostic[]>((resolve, reject) => {
-      let done = false;
-      const finish = (
-        value: vscode.Diagnostic[] | undefined,
-        err?: Error,
-      ): void => {
-        if (done) return;
-        done = true;
-        sub.dispose();
-        clearTimeout(timer);
-        if (err) reject(err);
-        else resolve(value!);
-      };
-      const sub = vscode.languages.onDidChangeDiagnostics((e) => {
-        if (!e.uris.some((u) => u.toString() === doc.uri.toString())) return;
-        const ds = vscode.languages.getDiagnostics(doc.uri);
-        if (matches(ds)) finish(ds);
-      });
-      const timer = setTimeout(
-        () =>
-          finish(
-            undefined,
-            new Error('waitForDiagnostics: timeout waiting for predicate'),
-          ),
-        timeoutMs,
-      );
-      // Check current state in case the matching publish already
-      // happened before subscription. Safe because finish() is
-      // idempotent.
-      const initial = vscode.languages.getDiagnostics(doc.uri);
-      if (matches(initial)) finish(initial);
-    });
   }
 
   async function openFixture(filename: string): Promise<vscode.TextDocument> {
@@ -83,40 +23,50 @@ suite('rslint JS config support', function () {
     await editor.edit((edit) => edit.delete(new vscode.Range(0, 0, 0, 1)));
   }
 
-  test('unavailable config boundaries preserve JS ownership without hiding valid ancestors', () => {
-    const root = path.resolve('/workspace');
-    const app = path.join(root, 'packages', 'app');
-    const broken = path.join(root, 'packages', 'broken');
+  async function waitForFile(filePath: string, timeoutMs = 10_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(filePath)) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`Timed out waiting for file: ${filePath}`);
+  }
 
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([app], [root]),
-      [root],
-      'a valid descendant must not expose JSON through an unavailable root',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([root], [broken]),
-      [],
-      'an unavailable child must fall back to its usable JS ancestor',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([], [broken]),
-      [broken],
-      'a lone unavailable nested config protects only its own subtree',
-    );
-    assert.deepStrictEqual(
-      selectUnavailableConfigBoundaryDirectories([], [root, broken]),
-      [root],
-      'an outer empty boundary makes a nested duplicate unnecessary',
-    );
-  });
+  async function withFailClosedCleanup(
+    testFn: () => Promise<void>,
+    cleanupFn: () => Promise<void>,
+    description: string,
+  ): Promise<void> {
+    let testError: unknown;
+    try {
+      await testFn();
+    } catch (error) {
+      testError = error;
+    }
+
+    let cleanupError: unknown;
+    try {
+      await cleanupFn();
+    } catch (error) {
+      cleanupError = error;
+    }
+
+    if (testError && cleanupError) {
+      throw new AggregateError(
+        [testError, cleanupError],
+        `${description}: test and cleanup both failed`,
+      );
+    }
+    if (testError) throw testError;
+    if (cleanupError) throw cleanupError;
+  }
 
   test('JS config should produce diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // Wait specifically for JS config diagnostics. JSON config may load first
-    // (server-side) before JS config arrives via rslint/configUpdate, so we
-    // must use a predicate to avoid returning early with JSON config results.
+    // Wait specifically for JS config diagnostics. The startup snapshot may
+    // publish JSON fallback results before JS config activation commits.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -135,8 +85,8 @@ suite('rslint JS config support', function () {
     await vscode.window.showTextDocument(doc);
 
     // Wait specifically for JS config diagnostics (no-unsafe-member-access).
-    // JSON config may load first with no-explicit-any, but JS config should
-    // override via rslint/configUpdate notification.
+    // JSON config may load first with no-explicit-any, but the committed JS
+    // config catalog should override it.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -162,8 +112,7 @@ suite('rslint JS config support', function () {
 
     // 2. Subscribe BEFORE writing the new config — eliminates the
     //    "publish fires between write and subscribe" race window. The
-    //    waiter listens; the server pushes after handleConfigUpdate
-    //    via RefreshDiagnostics; we resolve.
+    //    waiter listens; the server pushes after committing the refresh.
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
     const newConfig = `export default [
@@ -183,29 +132,101 @@ suite('rslint JS config support', function () {
   },
 ];
 `;
-    const reloaded = waitForDiagnostics(
-      doc,
-      (diags) =>
-        diags.some((d) => d.message.includes('no-explicit-any')) &&
-        !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    await withFailClosedCleanup(
+      async () => {
+        const reloaded = waitForDiagnostics(
+          doc,
+          (diags) =>
+            diags.some((d) => d.message.includes('no-explicit-any')) &&
+            !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.writeFileSync(configPath, newConfig, 'utf8');
+        const updatedDiags = await reloaded;
+        assert.ok(
+          updatedDiags.some((d) => d.message.includes('no-explicit-any')),
+          'After hot reload, diagnostics should include no-explicit-any',
+        );
+        assert.ok(
+          !updatedDiags.some((d) =>
+            d.message.includes('no-unsafe-member-access'),
+          ),
+          'After hot reload, no-unsafe-member-access should be gone',
+        );
+      },
+      async () => {
+        const restored = waitForDiagnostics(doc, (diags) =>
+          diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.writeFileSync(configPath, originalConfig, 'utf8');
+        await restored;
+      },
+      'Config hot-reload test',
+    );
+  });
+
+  test('one workspace config edit evaluates exactly one transaction', async () => {
+    const root = getWorkspaceRoot();
+    const configPath = path.join(root, 'rslint.config.js');
+    const markerPath = path.join(root, '.rslint-config-refresh-count');
+    const originalConfig = fs.readFileSync(configPath, 'utf8');
+    const doc = await openFixture('index.ts');
+    await vscode.window.showTextDocument(doc);
+    await waitForDiagnostics(doc, (diags) =>
+      diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
 
-    try {
-      fs.writeFileSync(configPath, newConfig, 'utf8');
-      const updatedDiags = await reloaded;
-      assert.ok(
-        updatedDiags.some((d) => d.message.includes('no-explicit-any')),
-        'After hot reload, diagnostics should include no-explicit-any',
-      );
-      assert.ok(
-        !updatedDiags.some((d) =>
-          d.message.includes('no-unsafe-member-access'),
-        ),
-        'After hot reload, no-unsafe-member-access should be gone',
-      );
-    } finally {
-      fs.writeFileSync(configPath, originalConfig, 'utf8');
-    }
+    const countedConfig = `import fs from 'node:fs';
+fs.appendFileSync(${JSON.stringify(markerPath)}, 'x');
+export default [{
+  files: ['**/*.ts'],
+  languageOptions: {
+    parserOptions: { projectService: false, project: ['./tsconfig.json'] },
+  },
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unsafe-member-access': 'off',
+  },
+  plugins: ['@typescript-eslint'],
+}];
+`;
+
+    await withFailClosedCleanup(
+      async () => {
+        const reloaded = waitForDiagnostics(
+          doc,
+          (diags) =>
+            diags.some((d) => d.message.includes('no-explicit-any')) &&
+            !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.rmSync(markerPath, { force: true });
+        fs.writeFileSync(configPath, countedConfig, 'utf8');
+        await reloaded;
+
+        // A duplicate didChangeWatchedFiles transaction used to race the
+        // direct watcher. Let any queued 300ms debounce finish before reading
+        // the config module's observable evaluation count.
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        assert.strictEqual(
+          fs.readFileSync(markerPath, 'utf8'),
+          'x',
+          'one edit must evaluate one config-discovery transaction',
+        );
+      },
+      async () => {
+        await withFailClosedCleanup(
+          async () => {
+            const restored = waitForDiagnostics(doc, (diags) =>
+              diags.some((d) => d.message.includes('no-unsafe-member-access')),
+            );
+            fs.writeFileSync(configPath, originalConfig, 'utf8');
+            await restored;
+          },
+          async () => fs.rmSync(markerPath, { force: true }),
+          'Config-transaction cleanup',
+        );
+      },
+      'Config-transaction test',
+    );
   });
 
   test('deleting JS config should clear diagnostics', async () => {
@@ -219,30 +240,32 @@ suite('rslint JS config support', function () {
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
 
-    const cleared = waitForDiagnostics(
-      doc,
-      (diags) =>
-        !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    await withFailClosedCleanup(
+      async () => {
+        const cleared = waitForDiagnostics(
+          doc,
+          (diags) =>
+            !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.unlinkSync(configPath);
+        const afterDeleteDiags = await cleared;
+        assert.ok(
+          !afterDeleteDiags.some((d) =>
+            d.message.includes('no-unsafe-member-access'),
+          ),
+          'After deleting JS config, no-unsafe-member-access should be gone',
+        );
+      },
+      async () => {
+        // Subscribe before restoring so the next test starts from a known state.
+        const restored = waitForDiagnostics(doc, (diags) =>
+          diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.writeFileSync(configPath, originalConfig, 'utf8');
+        await restored;
+      },
+      'JS-config deletion test',
     );
-
-    try {
-      fs.unlinkSync(configPath);
-      const afterDeleteDiags = await cleared;
-      assert.ok(
-        !afterDeleteDiags.some((d) =>
-          d.message.includes('no-unsafe-member-access'),
-        ),
-        'After deleting JS config, no-unsafe-member-access should be gone',
-      );
-    } finally {
-      // Restore config and wait for the reload to settle so the next
-      // test starts from a known state. Subscribe first, then write.
-      const restored = waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      ).catch(() => undefined);
-      fs.writeFileSync(configPath, originalConfig, 'utf8');
-      await restored;
-    }
   });
 
   test('creating a new JS config should load it and produce diagnostics', async () => {
@@ -251,16 +274,23 @@ suite('rslint JS config support', function () {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // Step 1: delete existing config and wait until its diagnostics drop.
-    const cleared = waitForDiagnostics(doc, (diags) =>
-      diags.every((d) => !d.message.includes('no-unsafe-member-access')),
+    // Establish a positive publication first, so clearing cannot pass on the
+    // document's not-yet-linted initial empty snapshot.
+    await waitForDiagnostics(doc, (diags) =>
+      diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
-    fs.unlinkSync(configPath);
-    await cleared;
 
-    try {
-      // Step 2: subscribe for the new rule, then create the file.
-      const newConfig = `export default [
+    await withFailClosedCleanup(
+      async () => {
+        // Step 1: delete existing config and observe its diagnostics drop.
+        const cleared = waitForDiagnostics(doc, (diags) =>
+          diags.every((d) => !d.message.includes('no-unsafe-member-access')),
+        );
+        fs.unlinkSync(configPath);
+        await cleared;
+
+        // Step 2: subscribe for the new rule, then create the file.
+        const newConfig = `export default [
   {
     files: ['**/*.ts'],
     languageOptions: {
@@ -276,22 +306,25 @@ suite('rslint JS config support', function () {
   },
 ];
 `;
-      const created = waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-explicit-any')),
-      );
-      fs.writeFileSync(configPath, newConfig, 'utf8');
-      const afterCreateDiags = await created;
-      assert.ok(
-        afterCreateDiags.some((d) => d.message.includes('no-explicit-any')),
-        'After creating new JS config, should see no-explicit-any diagnostic',
-      );
-    } finally {
-      const restored = waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      ).catch(() => undefined);
-      fs.writeFileSync(configPath, originalConfig, 'utf8');
-      await restored;
-    }
+        const created = waitForDiagnostics(doc, (diags) =>
+          diags.some((d) => d.message.includes('no-explicit-any')),
+        );
+        fs.writeFileSync(configPath, newConfig, 'utf8');
+        const afterCreateDiags = await created;
+        assert.ok(
+          afterCreateDiags.some((d) => d.message.includes('no-explicit-any')),
+          'After creating new JS config, should see no-explicit-any diagnostic',
+        );
+      },
+      async () => {
+        const restored = waitForDiagnostics(doc, (diags) =>
+          diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.writeFileSync(configPath, originalConfig, 'utf8');
+        await restored;
+      },
+      'JS-config creation test',
+    );
   });
 
   test('a newly discovered broken nested config keeps valid ancestor config active', async () => {
@@ -301,7 +334,11 @@ suite('rslint JS config support', function () {
     const nestedDir = path.join(root, 'broken-nested-config');
     const nestedFilePath = path.join(nestedDir, 'index.ts');
     const nestedConfigPath = path.join(nestedDir, 'rslint.config.js');
+    const attemptedLoadPath = path.join(nestedDir, 'config-load-attempted');
+    const postFailureFilePath = path.join(nestedDir, 'post-failure.ts');
     const rootDoc = await openFixture('index.ts');
+    let nestedDoc: vscode.TextDocument | undefined;
+    let postFailureDoc: vscode.TextDocument | undefined;
 
     const rootConfigWithMarker = `export default [{
   files: ['**/*.ts'],
@@ -309,58 +346,114 @@ suite('rslint JS config support', function () {
     parserOptions: { projectService: false, project: ['./tsconfig.json'] },
   },
   rules: {
-    '@typescript-eslint/no-unsafe-member-access': 'error',
+    '@typescript-eslint/no-unsafe-member-access': 'warn',
     'no-debugger': 'error',
   },
   plugins: ['@typescript-eslint'],
 }];
 `;
 
-    try {
-      fs.mkdirSync(nestedDir, { recursive: true });
-      fs.writeFileSync(nestedFilePath, 'debugger;\n', 'utf8');
-      fs.writeFileSync(rootConfigPath, rootConfigWithMarker, 'utf8');
+    await withFailClosedCleanup(
+      async () => {
+        fs.mkdirSync(nestedDir, { recursive: true });
+        fs.writeFileSync(nestedFilePath, 'debugger;\n', 'utf8');
+        fs.writeFileSync(rootConfigPath, rootConfigWithMarker, 'utf8');
 
-      await vscode.window.showTextDocument(rootDoc);
-      const nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
-      await vscode.window.showTextDocument(nestedDoc);
-      await waitForDiagnostics(nestedDoc, (diags) =>
-        diags.some((d) => d.message.includes('no-debugger')),
-      );
+        await vscode.window.showTextDocument(rootDoc);
+        await waitForDiagnostics(rootDoc, (diags) =>
+          diags.some(
+            (diagnostic) =>
+              diagnostic.message.includes('no-unsafe-member-access') &&
+              diagnostic.severity === vscode.DiagnosticSeverity.Warning,
+          ),
+        );
+        nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
+        await vscode.window.showTextDocument(nestedDoc);
+        await waitForDiagnostics(nestedDoc, (diags) =>
+          diags.some(
+            (diagnostic) =>
+              diagnostic.message.includes('no-debugger') &&
+              diagnostic.severity === vscode.DiagnosticSeverity.Error,
+          ),
+        );
+        await closeTextEditor(nestedDoc);
+        nestedDoc = undefined;
 
-      fs.writeFileSync(
-        nestedConfigPath,
-        'export default [BROKEN SYNTAX;',
-        'utf8',
-      );
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      await triggerRelint(nestedDoc);
+        fs.writeFileSync(
+          nestedConfigPath,
+          `import fs from 'node:fs';
+fs.writeFileSync(${JSON.stringify(attemptedLoadPath)}, 'attempted', 'utf8');
+throw new Error('intentional broken nested config');
+export default [];
+`,
+          'utf8',
+        );
+        await waitForFile(attemptedLoadPath);
+        assert.strictEqual(
+          fs.readFileSync(attemptedLoadPath, 'utf8'),
+          'attempted',
+          'The broken nested config must be evaluated before fallback is asserted',
+        );
 
-      const nestedDiagnostics = await waitForDiagnostics(nestedDoc, (diags) =>
-        diags.some((d) => d.message.includes('no-debugger')),
-      );
-      assert.ok(
-        nestedDiagnostics.some((d) => d.message.includes('no-debugger')),
-        'The broken nested config should be skipped so the root config remains active',
-      );
-
-      const rootDiagnostics = await waitForDiagnostics(rootDoc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      );
-      assert.ok(
-        rootDiagnostics.some((d) =>
-          d.message.includes('no-unsafe-member-access'),
-        ),
-        'The valid root config must remain active outside the broken nested config',
-      );
-    } finally {
-      const rootRestored = waitForDiagnostics(rootDoc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      ).catch(() => undefined);
-      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-      fs.rmSync(nestedDir, { recursive: true, force: true });
-      await rootRestored;
-    }
+        // This URI does not exist until after the broken module has executed,
+        // so its diagnostics cannot be a stale snapshot from before the failed
+        // refresh. Its first lint must run after the blocking config transaction
+        // and resolve through the still-valid ancestor config.
+        fs.writeFileSync(postFailureFilePath, 'debugger;\n', 'utf8');
+        postFailureDoc =
+          await vscode.workspace.openTextDocument(postFailureFilePath);
+        await vscode.window.showTextDocument(postFailureDoc);
+        const postFailureDiagnostics = await waitForDiagnostics(
+          postFailureDoc,
+          (diags) =>
+            diags.some(
+              (diagnostic) =>
+                diagnostic.message.includes('no-debugger') &&
+                diagnostic.severity === vscode.DiagnosticSeverity.Error,
+            ),
+        );
+        assert.deepStrictEqual(
+          postFailureDiagnostics
+            .filter((diagnostic) => diagnostic.message.includes('no-debugger'))
+            .map((diagnostic) => diagnostic.severity),
+          [vscode.DiagnosticSeverity.Error],
+          'The valid ancestor must lint a file opened after the broken child was evaluated',
+        );
+      },
+      async () => {
+        const temporaryDocuments = [nestedDoc, postFailureDoc].filter(
+          (document): document is vscode.TextDocument => document !== undefined,
+        );
+        await withFailClosedCleanup(
+          async () => {
+            await Promise.all(
+              temporaryDocuments.map((document) => closeTextEditor(document)),
+            );
+          },
+          async () => {
+            // The temporary root config deliberately lowers this rule to a
+            // warning. Waiting for Error makes restoration an observable
+            // config-transaction barrier before the next test starts.
+            const rootRestored = waitForDiagnostics(rootDoc, (diags) =>
+              diags.some(
+                (diagnostic) =>
+                  diagnostic.message.includes('no-unsafe-member-access') &&
+                  diagnostic.severity === vscode.DiagnosticSeverity.Error,
+              ),
+            );
+            fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+            fs.rmSync(nestedDir, { recursive: true, force: true });
+            assert.ok(
+              !fs.existsSync(nestedDir),
+              'Broken nested-config fixtures must be deleted during cleanup',
+            );
+            await rootRestored;
+          },
+          'Broken nested-config resource cleanup',
+        );
+      },
+      'Broken nested-config test',
+    );
   });
 
   test('parent global ignores remove nested configs from the effective catalog', async () => {
@@ -383,70 +476,76 @@ suite('rslint JS config support', function () {
         "'@typescript-eslint/no-explicit-any': 'warn'",
       );
 
-    try {
-      fs.mkdirSync(nestedDir, { recursive: true });
-      fs.writeFileSync(nestedFilePath, 'console.log("nested");\n', 'utf8');
-      fs.writeFileSync(
-        nestedConfigPath,
-        `import fs from 'node:fs';
+    await withFailClosedCleanup(
+      async () => {
+        fs.mkdirSync(nestedDir, { recursive: true });
+        fs.writeFileSync(nestedFilePath, 'console.log("nested");\n', 'utf8');
+        fs.writeFileSync(
+          nestedConfigPath,
+          `import fs from 'node:fs';
 fs.appendFileSync(${JSON.stringify(loadMarkerPath)}, 'x');
 export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
 `,
-        'utf8',
-      );
+          'utf8',
+        );
 
-      const nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
-      await vscode.window.showTextDocument(nestedDoc);
-      await waitForDiagnostics(nestedDoc, (diagnostics) =>
-        diagnostics.some((diagnostic) =>
-          diagnostic.message.includes('Unexpected console statement'),
-        ),
-      );
-
-      await vscode.window.showTextDocument(rootDoc);
-      const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
-        diagnostics.some((diagnostic) =>
-          diagnostic.message.includes('no-explicit-any'),
-        ),
-      );
-      const nestedCleared = waitForDiagnostics(
-        nestedDoc,
-        (diagnostics) =>
-          !diagnostics.some((diagnostic) =>
-            diagnostic.message.includes('Unexpected console statement'),
-          ),
-      );
-
-      fs.writeFileSync(rootConfigPath, ignoredRootConfig, 'utf8');
-      await Promise.all([parentApplied, nestedCleared]);
-
-      assert.ok(
-        fs.readFileSync(loadMarkerPath, 'utf8').length >= 2,
-        'The ignored nested candidate should still be scanned and loaded',
-      );
-      assert.ok(
-        !vscode.languages
-          .getDiagnostics(nestedDoc.uri)
-          .some((diagnostic) =>
-            diagnostic.message.includes('Unexpected console statement'),
-          ),
-        'The ignored nested config must not be sent in the effective catalog',
-      );
-    } finally {
-      const restored = waitForDiagnostics(
-        rootDoc,
-        (diagnostics) =>
+        const nestedDoc =
+          await vscode.workspace.openTextDocument(nestedFilePath);
+        await vscode.window.showTextDocument(nestedDoc);
+        await waitForDiagnostics(nestedDoc, (diagnostics) =>
           diagnostics.some((diagnostic) =>
-            diagnostic.message.includes('no-unsafe-member-access'),
-          ) &&
-          !diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('Unexpected console statement'),
+          ),
+        );
+
+        await vscode.window.showTextDocument(rootDoc);
+        const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
+          diagnostics.some((diagnostic) =>
             diagnostic.message.includes('no-explicit-any'),
           ),
-      ).catch(() => undefined);
-      fs.rmSync(nestedDir, { recursive: true, force: true });
-      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-      await restored;
-    }
+        );
+        const nestedCleared = waitForDiagnostics(
+          nestedDoc,
+          (diagnostics) =>
+            !diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('Unexpected console statement'),
+            ),
+        );
+
+        fs.writeFileSync(rootConfigPath, ignoredRootConfig, 'utf8');
+        await Promise.all([parentApplied, nestedCleared]);
+
+        assert.strictEqual(
+          fs.readFileSync(loadMarkerPath, 'utf8'),
+          'x',
+          'The ignored nested candidate must not be evaluated again',
+        );
+        assert.ok(
+          !vscode.languages
+            .getDiagnostics(nestedDoc.uri)
+            .some((diagnostic) =>
+              diagnostic.message.includes('Unexpected console statement'),
+            ),
+          'The ignored nested config must not be sent in the effective catalog',
+        );
+      },
+      async () => {
+        const restored = waitForDiagnostics(
+          rootDoc,
+          (diagnostics) =>
+            diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('no-unsafe-member-access'),
+            ) &&
+            !diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('no-explicit-any'),
+            ),
+        );
+        fs.rmSync(nestedDir, { recursive: true, force: true });
+        fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+        await restored;
+      },
+      'Parent-ignore catalog test',
+    );
   });
 
   test('config search excludes node_modules and .git', async () => {
@@ -466,55 +565,59 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       "'@typescript-eslint/no-explicit-any': 'warn'",
     );
 
-    try {
-      for (let index = 0; index < probes.length; index++) {
-        fs.mkdirSync(probes[index], { recursive: true });
-        fs.writeFileSync(
-          path.join(probes[index], 'rslint.config.mjs'),
-          `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(markerPaths[index])}, 'loaded'); export default [];`,
-          'utf8',
-        );
-      }
+    await withFailClosedCleanup(
+      async () => {
+        for (let index = 0; index < probes.length; index++) {
+          fs.mkdirSync(probes[index], { recursive: true });
+          fs.writeFileSync(
+            path.join(probes[index], 'rslint.config.mjs'),
+            `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(markerPaths[index])}, 'loaded'); export default [];`,
+            'utf8',
+          );
+        }
 
-      await vscode.window.showTextDocument(rootDoc);
-      const reloaded = waitForDiagnostics(rootDoc, (diagnostics) =>
-        diagnostics.some((diagnostic) =>
-          diagnostic.message.includes('no-explicit-any'),
-        ),
-      );
-      fs.writeFileSync(rootConfigPath, changedRootConfig, 'utf8');
-      await reloaded;
-
-      for (const markerPath of markerPaths) {
-        assert.ok(
-          !fs.existsSync(markerPath),
-          `Excluded config was unexpectedly loaded: ${markerPath}`,
-        );
-      }
-    } finally {
-      const restored = waitForDiagnostics(
-        rootDoc,
-        (diagnostics) =>
+        await vscode.window.showTextDocument(rootDoc);
+        const reloaded = waitForDiagnostics(rootDoc, (diagnostics) =>
           diagnostics.some((diagnostic) =>
-            diagnostic.message.includes('no-unsafe-member-access'),
-          ) &&
-          !diagnostics.some((diagnostic) =>
             diagnostic.message.includes('no-explicit-any'),
           ),
-      ).catch(() => undefined);
-      for (const probe of probes) {
-        fs.rmSync(probe, { recursive: true, force: true });
-      }
-      if (!gitDirectoryExisted) {
-        try {
-          fs.rmdirSync(gitDirectory);
-        } catch {
-          // Leave a concurrently populated directory intact.
+        );
+        fs.writeFileSync(rootConfigPath, changedRootConfig, 'utf8');
+        await reloaded;
+
+        for (const markerPath of markerPaths) {
+          assert.ok(
+            !fs.existsSync(markerPath),
+            `Excluded config was unexpectedly loaded: ${markerPath}`,
+          );
         }
-      }
-      fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-      await restored;
-    }
+      },
+      async () => {
+        const restored = waitForDiagnostics(
+          rootDoc,
+          (diagnostics) =>
+            diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('no-unsafe-member-access'),
+            ) &&
+            !diagnostics.some((diagnostic) =>
+              diagnostic.message.includes('no-explicit-any'),
+            ),
+        );
+        for (const probe of probes) {
+          fs.rmSync(probe, { recursive: true, force: true });
+        }
+        if (!gitDirectoryExisted) {
+          try {
+            fs.rmdirSync(gitDirectory);
+          } catch {
+            // Leave a concurrently populated directory intact.
+          }
+        }
+        fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+        await restored;
+      },
+      'Excluded-config search test',
+    );
   });
 
   test('same-directory configs use .js > .mjs > .ts > .mts priority', async () => {
@@ -549,14 +652,19 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
 ];
 `;
 
-    const expectWarning = async (ruleName: string): Promise<void> => {
-      const diagnostics = await waitForDiagnostics(doc, (diags) =>
+    const mutateAndExpectWarning = async (
+      ruleName: string,
+      mutate: () => void,
+    ): Promise<void> => {
+      const result = waitForDiagnostics(doc, (diags) =>
         diags.some(
           (d) =>
             d.message.includes(ruleName) &&
             d.severity === vscode.DiagnosticSeverity.Warning,
         ),
       );
+      mutate();
+      const diagnostics = await result;
       const diagnostic = diagnostics.find((d) => d.message.includes(ruleName));
       assert.strictEqual(
         diagnostic?.severity,
@@ -565,62 +673,65 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       );
     };
 
-    try {
-      fs.writeFileSync(
-        mjsPath,
-        configFor('@typescript-eslint/no-explicit-any'),
-        'utf8',
-      );
-      fs.writeFileSync(
-        tsPath,
-        configFor('@typescript-eslint/no-unsafe-member-access'),
-        'utf8',
-      );
-      fs.writeFileSync(
-        mtsPath,
-        configFor('@typescript-eslint/no-explicit-any'),
-        'utf8',
-      );
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    await waitForDiagnostics(doc, (diags) =>
+      diags.some(
+        (diagnostic) =>
+          diagnostic.message.includes('no-unsafe-member-access') &&
+          diagnostic.severity === vscode.DiagnosticSeverity.Error,
+      ),
+    );
 
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      assert.ok(
-        diagnostics.some(
-          (d) =>
-            d.message.includes('no-unsafe-member-access') &&
-            d.severity === vscode.DiagnosticSeverity.Error,
-        ),
-        '.js should remain selected while lower-priority configs coexist',
-      );
+    await withFailClosedCleanup(
+      async () => {
+        fs.writeFileSync(
+          mjsPath,
+          configFor('@typescript-eslint/no-explicit-any'),
+          'utf8',
+        );
+        fs.writeFileSync(
+          tsPath,
+          configFor('@typescript-eslint/no-unsafe-member-access'),
+          'utf8',
+        );
+        fs.writeFileSync(
+          mtsPath,
+          configFor('@typescript-eslint/no-explicit-any'),
+          'utf8',
+        );
 
-      fs.unlinkSync(jsPath);
-      await expectWarning('no-explicit-any');
-
-      fs.unlinkSync(mjsPath);
-      await expectWarning('no-unsafe-member-access');
-
-      fs.unlinkSync(tsPath);
-      await expectWarning('no-explicit-any');
-    } finally {
-      const restored = waitForDiagnostics(doc, (diags) =>
-        diags.some(
-          (d) =>
-            d.message.includes('no-unsafe-member-access') &&
-            d.severity === vscode.DiagnosticSeverity.Error,
-        ),
-      ).catch(() => undefined);
-      fs.writeFileSync(jsPath, originalJS, 'utf8');
-      fs.rmSync(mjsPath, { force: true });
-      fs.rmSync(tsPath, { force: true });
-      fs.rmSync(mtsPath, { force: true });
-      await restored;
-    }
+        await mutateAndExpectWarning('no-explicit-any', () =>
+          fs.unlinkSync(jsPath),
+        );
+        await mutateAndExpectWarning('no-unsafe-member-access', () =>
+          fs.unlinkSync(mjsPath),
+        );
+        await mutateAndExpectWarning('no-explicit-any', () =>
+          fs.unlinkSync(tsPath),
+        );
+      },
+      async () => {
+        const restored = waitForDiagnostics(doc, (diags) =>
+          diags.some(
+            (d) =>
+              d.message.includes('no-unsafe-member-access') &&
+              d.severity === vscode.DiagnosticSeverity.Error,
+          ),
+        );
+        fs.writeFileSync(jsPath, originalJS, 'utf8');
+        fs.rmSync(mjsPath, { force: true });
+        fs.rmSync(tsPath, { force: true });
+        fs.rmSync(mtsPath, { force: true });
+        await restored;
+      },
+      'Same-directory config-priority test',
+    );
   });
 
   test('broken higher-priority config preserves last-good and does not load a lower variant', async () => {
     const root = getWorkspaceRoot();
     const jsPath = path.join(root, 'rslint.config.js');
     const mjsPath = path.join(root, 'rslint.config.mjs');
+    const attemptedLoadPath = path.join(root, 'broken-config-attempted.txt');
     const originalJS = fs.readFileSync(jsPath, 'utf8');
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -638,30 +749,77 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
 }];
 `;
 
-    try {
-      fs.writeFileSync(mjsPath, lowerPriorityConfig, 'utf8');
-      fs.writeFileSync(jsPath, 'export default [BROKEN SYNTAX;', 'utf8');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await triggerRelint(doc);
+    await withFailClosedCleanup(
+      async () => {
+        fs.writeFileSync(mjsPath, lowerPriorityConfig, 'utf8');
+        fs.writeFileSync(
+          jsPath,
+          `import fs from 'node:fs';
+fs.writeFileSync(${JSON.stringify(attemptedLoadPath)}, 'attempted');
+throw new Error('intentional broken higher-priority config');
+export default [];
+`,
+          'utf8',
+        );
+        await waitForFile(attemptedLoadPath);
 
-      const diagnostics = await waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      );
-      assert.ok(
-        diagnostics.some((d) => d.message.includes('no-unsafe-member-access')),
-        'The last-good .js config should remain active',
-      );
-      assert.ok(
-        !diagnostics.some((d) => d.message.includes('no-explicit-any')),
-        'A broken .js must not fall through to .mjs or JSON',
-      );
-    } finally {
-      const restored = waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      ).catch(() => undefined);
-      fs.writeFileSync(jsPath, originalJS, 'utf8');
-      fs.rmSync(mjsPath, { force: true });
-      await restored;
-    }
+        // Request fresh diagnostics only after the failing module was actually
+        // evaluated. A stale pre-reload snapshot cannot satisfy both content
+        // transitions, and falling through to .mjs would report another rule.
+        const originalContent = doc.getText();
+        const editor = await vscode.window.showTextDocument(doc);
+        const cleared = waitForDiagnostics(
+          doc,
+          (diagnostics) => diagnostics.length === 0,
+        );
+        assert.ok(
+          await editor.edit((edit) => {
+            edit.replace(
+              new vscode.Range(
+                doc.positionAt(0),
+                doc.positionAt(doc.getText().length),
+              ),
+              'const safe = 1;\n',
+            );
+          }),
+          'Editing the last-good config probe to clean content should succeed',
+        );
+        await cleared;
+
+        const lastGoodApplied = waitForDiagnostics(doc, (diagnostics) =>
+          diagnostics.some((diagnostic) =>
+            diagnostic.message.includes('no-unsafe-member-access'),
+          ),
+        );
+        assert.ok(
+          await editor.edit((edit) => {
+            edit.replace(
+              new vscode.Range(
+                doc.positionAt(0),
+                doc.positionAt(doc.getText().length),
+              ),
+              originalContent,
+            );
+          }),
+          'Restoring the last-good config probe content should succeed',
+        );
+        const diagnostics = await lastGoodApplied;
+        assert.ok(
+          !diagnostics.some((d) => d.message.includes('no-explicit-any')),
+          'A broken .js must not fall through to .mjs or JSON',
+        );
+      },
+      async () => {
+        await revertTextDocument(doc);
+        const restored = waitForDiagnostics(doc, (diags) =>
+          diags.some((d) => d.message.includes('no-unsafe-member-access')),
+        );
+        fs.writeFileSync(jsPath, originalJS, 'utf8');
+        fs.rmSync(mjsPath, { force: true });
+        fs.rmSync(attemptedLoadPath, { force: true });
+        await restored;
+      },
+      'Broken higher-priority config test',
+    );
   });
 });

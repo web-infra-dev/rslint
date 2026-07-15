@@ -1,4 +1,6 @@
 import { describe, test, expect } from '@rstest/core';
+import fs from 'node:fs';
+import path from 'node:path';
 import { runRslint, createTempDir, cleanupTempDir } from './helpers.js';
 
 interface Diagnostic {
@@ -240,6 +242,24 @@ describe('Gitignore: nested .gitignore files', () => {
     }
   });
 
+  test('child bare negation re-includes a parent-ignored directory', async () => {
+    const { diagnostics, cleanup } = await lintJsonline({
+      '.gitignore': 'debug/\n',
+      'packages/app/.gitignore': '!debug\n',
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'debug/root.ts': 'console.log("test");\n',
+      'packages/app/debug/app.ts': 'console.log("test");\n',
+    });
+    try {
+      expect(diagsAt(diagnostics, 'debug/root.ts').length).toBe(0);
+      expect(
+        diagsAt(diagnostics, 'packages/app/debug/app.ts').length,
+      ).toBeGreaterThan(0);
+    } finally {
+      await cleanup();
+    }
+  });
+
   test('three-level nested .gitignore cascade', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\n',
@@ -285,10 +305,7 @@ describe('Gitignore: interaction with config ignores', () => {
     }
   });
 
-  test('config ! negation CAN override .gitignore (both in global ignores)', async () => {
-    // .gitignore patterns are prepended to global ignores. Config ignores
-    // come after, so config ! negation can override gitignore patterns
-    // (sequential evaluation: later patterns win).
+  test('config ! negation can override .gitignore', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'dist/\n',
       'rslint.config.mjs': `export default [
@@ -301,9 +318,7 @@ describe('Gitignore: interaction with config ignores', () => {
     });
     try {
       expect(diagsAt(diagnostics, 'src/index.ts').length).toBeGreaterThan(0);
-      // dist/keep.ts re-included by config !dist/keep.ts (overrides gitignore)
       expect(diagsAt(diagnostics, 'dist/keep.ts').length).toBeGreaterThan(0);
-      // dist/other.ts still ignored (no negation for it)
       expect(diagsAt(diagnostics, 'dist/other.ts').length).toBe(0);
     } finally {
       await cleanup();
@@ -475,7 +490,10 @@ describe('Gitignore: edge cases', () => {
 
   test('gitignore negation re-includes subdirectory', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
-      '.gitignore': 'dist/\n!dist/types/\n',
+      // Keep dist itself reachable: Git cannot re-include anything below an
+      // ignored parent directory, but a later rule can reopen a child that a
+      // wildcard ignored.
+      '.gitignore': 'dist/*\n!dist/types/\n',
       'rslint.config.mjs': CONFIG_NO_CONSOLE,
       'dist/bundle.ts': 'console.log("test");\n',
       'dist/types/index.ts': 'console.log("test");\n',
@@ -493,23 +511,55 @@ describe('Gitignore: edge cases', () => {
     }
   });
 
-  test('gitignore ignoring config file does not break loading', async () => {
-    const { diagnostics, cleanup } = await lintJsonline({
+  test('automatic and explicit discovery both load a gitignored config', async () => {
+    const tempDir = await createTempDir({
       '.gitignore': 'rslint.config.mjs\n',
-      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'rslint.config.mjs': `
+        import { writeFileSync } from 'node:fs';
+        writeFileSync(new URL('./config-loaded.marker', import.meta.url), 'loaded');
+        ${CONFIG_NO_CONSOLE}
+      `,
       'src/index.ts': 'console.log("test");\n',
     });
+    const marker = path.join(tempDir, 'config-loaded.marker');
     try {
-      // Config should still load and lint should work
-      expect(diagsAt(diagnostics, 'src/index.ts').length).toBeGreaterThan(0);
+      const automatic = await runRslint(['--format', 'jsonline'], tempDir);
+      expect(fs.existsSync(marker)).toBe(true);
+      expect(automatic.stdout).toContain('no-console');
+
+      fs.rmSync(marker);
+
+      const explicit = await runRslint(
+        [
+          '--config',
+          'rslint.config.mjs',
+          '--format',
+          'jsonline',
+          'src/index.ts',
+        ],
+        tempDir,
+      );
+      const diagnostics = explicit.stdout
+        .trim()
+        .split('\n')
+        .filter((line) => line.trim().startsWith('{'))
+        .map((line) => JSON.parse(line) as Diagnostic);
+      expect(fs.existsSync(marker)).toBe(true);
+      expect(
+        diagsAt(diagnostics, 'src/index.ts').some(
+          (diagnostic) => diagnostic.ruleName === 'no-console',
+        ),
+      ).toBe(true);
     } finally {
-      await cleanup();
+      await cleanupTempDir(tempDir);
     }
   });
 
   test('trailing whitespace in patterns is stripped', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
-      '.gitignore': '  dist/  \n  \n# comment\n  coverage/\n',
+      // Leading whitespace is significant in Git patterns. Exercise only
+      // unescaped trailing spaces and tabs here.
+      '.gitignore': 'dist/  \n\t  \n# comment\ncoverage/\t \n',
       'rslint.config.mjs': CONFIG_NO_CONSOLE,
       'src/index.ts': 'console.log("test");\n',
       'dist/bundle.ts': 'console.log("test");\n',

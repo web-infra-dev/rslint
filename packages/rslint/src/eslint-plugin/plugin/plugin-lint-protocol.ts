@@ -53,8 +53,8 @@ export interface EslintPluginLintRequest {
     languageOptions?: unknown;
     settings?: Record<string, unknown>;
     /**
-     * The owning config's directory in the SAME form the host used as
-     * its `ConfigDescriptor.configDirectory` (CLI: fs path; LSP: URI).
+     * The owning config's absolute filesystem directory in the same form the
+     * host used as its `ConfigDescriptor.configDirectory`.
      * The worker uses it to pick the right `LoadedPlugins`. Empty when
      * no JS config governs the file.
      */

@@ -1,8 +1,11 @@
 package gitignore_test
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -12,6 +15,128 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"gotest.tools/v3/assert"
 )
+
+// For representative reachable patterns, ConfigWithGitignore should make the
+// same final file decision as Git. Excluded-parent re-inclusion is covered by
+// the product-level ordered-global-ignore tests below instead: once a rule is
+// collected, rslint intentionally lets later negations re-include it.
+func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git is unavailable")
+	}
+	tests := []struct {
+		name       string
+		gitignores map[string]string
+		files      []string
+	}{
+		{
+			name:       "rooted unrooted wildcards and classes",
+			gitignores: map[string]string{".gitignore": "/root.ts\nloose.ts\nlogs/**/debug?.[jt]s\n"},
+			files:      []string{"root.ts", "nested/root.ts", "nested/loose.ts", "logs/debug1.js", "logs/deep/debug2.ts", "logs/deep/debug22.ts"},
+		},
+		{
+			name:       "case follows repository filesystem mode",
+			gitignores: map[string]string{".gitignore": "CASE-SENSITIVE.ts\n"},
+			files:      []string{"case-sensitive.ts"},
+		},
+		{
+			name:       "escaping significant spaces and literal braces",
+			gitignores: map[string]string{".gitignore": "\\!important.ts\n\\#generated.ts\ntrailing\\ \n leading.ts\nliteral\\*.ts\n{one,two}.ts\n"},
+			files:      []string{"!important.ts", "#generated.ts", "trailing ", "trailing", " leading.ts", "leading.ts", "literal*.ts", "literal-one.ts", "{one,two}.ts", "one.ts"},
+		},
+		{
+			name:       "directory parent propagation",
+			gitignores: map[string]string{".gitignore": "cache/\nbuild/*\n!build/keep.ts\n"},
+			files:      []string{"cache/deep/file.ts", "build/keep.ts", "build/drop.ts", "build/drop/child.ts"},
+		},
+		{
+			name:       "trailing doublestar remains reversible",
+			gitignores: map[string]string{".gitignore": "build/**\n!build/keep.ts\n"},
+			files:      []string{"build/keep.ts", "build/drop.ts", "build/deep/drop.ts"},
+		},
+		{
+			name: "reachable nested source overrides ancestor",
+			gitignores: map[string]string{
+				".gitignore":     "*.generated.ts\n",
+				"pkg/.gitignore": "!keep.generated.ts\n",
+			},
+			files: []string{"pkg/keep.generated.ts", "pkg/drop.generated.ts"},
+		},
+		{
+			name: "nested source anchoring",
+			gitignores: map[string]string{
+				"pkg/.gitignore": "/only.ts\nsub/dir.ts\nloose.ts\n",
+			},
+			files: []string{
+				"pkg/only.ts",
+				"pkg/nested/only.ts",
+				"pkg/sub/dir.ts",
+				"pkg/nested/sub/dir.ts",
+				"pkg/nested/loose.ts",
+			},
+		},
+		{
+			name: "ignored nested source is unreachable",
+			gitignores: map[string]string{
+				".gitignore":         "blocked/\n",
+				"blocked/.gitignore": "!keep.ts\n",
+			},
+			files: []string{"blocked/keep.ts"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := setupGitignoreFixture(t, test.gitignores)
+			command := exec.Command(git, "init", "--quiet", root)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("git init: %v: %s", err, output)
+			}
+			for _, relative := range test.files {
+				// Windows cannot materialize a file whose name contains `*`.
+				// The platform-independent collector unit test still pins the
+				// escaped pattern conversion to `literal[*].ts`; this Git parity
+				// integration case can only exercise the literal filename where
+				// the host filesystem supports it.
+				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+					continue
+				}
+				path := filepath.Join(root, filepath.FromSlash(relative))
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, nil, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+			full := config.ConfigWithGitignore(base, root, osvfs.FS(), nil)
+			for _, relative := range test.files {
+				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+					continue
+				}
+				path := filepath.Join(root, filepath.FromSlash(relative))
+				command := exec.Command(git, "-C", root, "check-ignore", "--no-index", "--quiet", "--", filepath.FromSlash(relative))
+				err := command.Run()
+				want := err == nil
+				var exitError *exec.ExitError
+				if err != nil && (!errors.As(err, &exitError) || exitError.ExitCode() != 1) {
+					t.Fatalf("git check-ignore %q: %v", relative, err)
+				}
+				if got := full.IsFileIgnored(path, root); got != want {
+					t.Errorf("%q: ConfigWithGitignore ignored=%v, git ignored=%v", relative, got, want)
+				}
+
+				explicit := config.ConfigWithGitignore(base, root, osvfs.FS(), []string{path})
+				if got := explicit.IsFileIgnored(path, root); got != want {
+					t.Errorf("%q explicit: ConfigWithGitignore ignored=%v, git ignored=%v", relative, got, want)
+				}
+			}
+		})
+	}
+}
 
 // gitignoreSpyFS wraps a real VFS and tracks which directories GetAccessibleEntries was called on.
 type gitignoreSpyFS struct {
@@ -116,6 +241,29 @@ func TestConfigWithGitignore_DoesNotReadParentOfConfigDir(t *testing.T) {
 	}
 }
 
+func TestConfigWithGitignore_ExplicitTargetOutsideConfigTreeDoesNotReadExternalGitignore(t *testing.T) {
+	workspace := t.TempDir()
+	configDir := filepath.Join(workspace, "app")
+	targetDir := filepath.Join(workspace, "sibling")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(targetDir, "outside.ts")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, ".gitignore"), []byte("outside.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	effective := config.ConfigWithGitignore(base, configDir, osvfs.FS(), []string{target})
+	assert.Equal(t, len(effective), len(base))
+	assert.Assert(t, !effective.IsFileIgnored(target, configDir))
+}
+
 func TestConfigWithGitignore_ExplicitMatchesDefaultPruning(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                   "dist/\n!dist/types/\n",
@@ -130,6 +278,87 @@ func TestConfigWithGitignore_ExplicitMatchesDefaultPruning(t *testing.T) {
 	explicit := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
 	assert.Equal(t, explicit.IsFileIgnored(target, dir), full.IsFileIgnored(target, dir))
 	assert.Assert(t, !explicit.IsFileIgnored(target, dir))
+}
+
+func TestConfigWithGitignore_FullWalkHonorsOrderedDirectoryReinclude(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":              "coverage\n!rstest/coverage/\n",
+		"coverage/drop.ts":        "debugger;\n",
+		"rstest/coverage/keep.ts": "debugger;\n",
+	})
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	effective := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+
+	files := config.DiscoverLintFiles(effective, dir, osvfs.FS(), nil, nil, true)
+	assert.DeepEqual(t, files, []string{tspath.ResolvePath(dir, "rstest/coverage/keep.ts")})
+}
+
+func TestConfigWithGitignore_ConfigNegationCanOverride(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":        "dist/\n",
+		"dist/important.ts": "debugger;\n",
+	})
+	target := tspath.ResolvePath(dir, "dist/important.ts")
+	base := config.RslintConfig{
+		{Ignores: []string{"!dist/important.ts"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
+	}
+
+	for _, effective := range []config.RslintConfig{
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
+	} {
+		assert.Assert(t, !effective.IsFileIgnored(target, dir))
+		assert.Assert(t, effective.GetConfigForFile(target, dir) != nil)
+	}
+}
+
+func TestConfigWithGitignore_ConfigNegationCanOverrideBareGitPattern(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":    "build\n",
+		"build/keep.ts": "debugger;\n",
+	})
+	target := tspath.ResolvePath(dir, "build/keep.ts")
+	base := config.RslintConfig{
+		{Ignores: []string{"!build/keep.ts"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
+	}
+
+	for _, effective := range []config.RslintConfig{
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
+	} {
+		assert.Assert(t, !effective.IsFileIgnored(target, dir))
+		assert.Assert(t, effective.GetConfigForFile(target, dir) != nil)
+	}
+}
+
+func TestConfigWithGitignore_GitNegationCannotOverrideConfigIgnore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":           "!ignored-by-config.ts\n",
+		"ignored-by-config.ts": "debugger;\n",
+	})
+	target := tspath.ResolvePath(dir, "ignored-by-config.ts")
+	base := config.RslintConfig{
+		{Ignores: []string{"ignored-by-config.ts"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
+	}
+
+	for _, effective := range []config.RslintConfig{
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
+	} {
+		assert.Assert(t, effective.IsFileIgnored(target, dir))
+		assert.Assert(t, effective.GetConfigForFile(target, dir) == nil)
+		assert.Equal(t, len(config.DiscoverLintTargets(
+			effective,
+			dir,
+			osvfs.FS(),
+			[]string{target},
+			nil,
+			false,
+		)), 0)
+	}
 }
 
 func TestConfigWithGitignore_RejectsPatternsOutsideSourceScope(t *testing.T) {

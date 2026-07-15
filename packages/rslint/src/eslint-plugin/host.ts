@@ -53,8 +53,8 @@ export async function createPluginLintHost(
   });
   await pool.init();
   // The worker keys its plugin map on configDirectory verbatim, and the wire
-  // configKey Go sends is byte-identical to it (CLI: the raw string Go echoes
-  // back; LSP: the same URI) — so no normalization is needed or wanted here.
+  // configKey Go sends is byte-identical to the opaque routing identity it
+  // supplied for every adapter, so no normalization is needed or wanted here.
   const configDirSet = new Set(configs.map((c) => c.configDirectory));
   return {
     async lint(req, signal) {

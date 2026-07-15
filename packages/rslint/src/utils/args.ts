@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { parseArgs as nodeParseArgs } from 'node:util';
 
 // Keep this list in sync with cmd/rslint/internal/output/format.go.
@@ -100,32 +98,4 @@ export function parseArgs(argv: string[]) {
     rest,
     positionals,
   };
-}
-
-/**
- * Classify positional args into files and directories.
- * Keeps the caller's absolute lexical path. Config discovery and Go target
- * binding resolve physical identity separately, after lexical ownership has
- * had the first opportunity to match.
- */
-export function classifyArgs(
-  positionals: string[],
-  cwd: string,
-): { files: string[]; dirs: string[] } {
-  const files: string[] = [];
-  const dirs: string[] = [];
-  for (const arg of positionals) {
-    const resolved = path.resolve(cwd, arg);
-    try {
-      if (fs.statSync(resolved).isDirectory()) {
-        dirs.push(resolved);
-      } else {
-        files.push(resolved);
-      }
-    } catch {
-      // Non-existent path: treat as file (Go will handle the error)
-      files.push(resolved);
-    }
-  }
-  return { files, dirs };
 }

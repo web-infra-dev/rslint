@@ -116,8 +116,8 @@ func (r *lintConfigResolver) resolverForFile(sourcePath string, configPath strin
 			return ownerConfigDir, resolver, resolver != nil
 		}
 
-		// Compatibility fallback for callers that do not provide a target binding
-		// (for example the legacy plugin protocol and focused resolver tests).
+		// Path-based fallback for current low-level callers that do not provide a
+		// target binding, and for focused resolver tests.
 		cfgDir, cfg := r.configOwnerResolver.Resolve(sourcePath)
 		if cfg != nil {
 			resolver := r.configResolver(cfgDir)

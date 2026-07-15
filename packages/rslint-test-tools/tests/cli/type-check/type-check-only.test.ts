@@ -132,6 +132,56 @@ describe('--type-check-only basic', () => {
       await cleanupTempDir(tempDir);
     }
   });
+
+  test('gitignored nested config still contributes a type-check Program', async () => {
+    const tempDir = await createTempDir({
+      '.gitignore': 'packages/ignored/\n',
+      'rslint.config.mjs': makeConfigPlain(),
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        files: ['root.ts'],
+      }),
+      'root.ts': "export const root: number = 'wrong';\n",
+      'packages/ignored/rslint.config.mjs': makeConfigPlain(),
+      'packages/ignored/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        files: ['bad.ts'],
+      }),
+      'packages/ignored/bad.ts': "export const bad: number = 'wrong';\n",
+    });
+    try {
+      const r = await runRslint(
+        ['--type-check-only', '--format', 'jsonline'],
+        tempDir,
+      );
+      const diags = parseJsonline(r.stdout);
+      expect(
+        diags.some(
+          (diagnostic) =>
+            diagnostic.filePath?.includes('root.ts') &&
+            diagnostic.ruleName.includes('TS2322'),
+        ),
+      ).toBe(true);
+      expect(
+        diags.some(
+          (diagnostic) =>
+            diagnostic.filePath?.includes('packages/ignored/bad.ts') &&
+            diagnostic.ruleName.includes('TS2322'),
+        ),
+      ).toBe(true);
+      expect(r.exitCode).not.toBe(0);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
 });
 
 describe('--type-check-only flag compatibility', () => {

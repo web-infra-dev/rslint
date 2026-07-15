@@ -2,9 +2,10 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
 import fs from 'node:fs';
+import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
 
 suite('rslint no config fallback', function () {
-  this.timeout(60000);
+  this.timeout(120000);
 
   function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
@@ -15,34 +16,63 @@ suite('rslint no config fallback', function () {
     return vscode.workspace.openTextDocument(filePath);
   }
 
-  async function waitForDiagnostics(
-    doc: vscode.TextDocument,
-    predicate?: (diags: vscode.Diagnostic[]) => boolean,
-  ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate ? predicate(diagnostics) : diagnostics.length > 0) {
-        return diagnostics;
-      }
+  const jsonConfig = JSON.stringify(
+    [
+      {
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
+          },
+        },
+        rules: {
+          '@typescript-eslint/no-explicit-any': 'error',
+          '@typescript-eslint/no-unsafe-member-access': 'off',
+        },
+        plugins: ['@typescript-eslint'],
+      },
+    ],
+    null,
+    2,
+  );
 
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
-      });
+  async function withConfigFilesAbsent(
+    testFn: (paths: { json: string; js: string }) => Promise<void>,
+  ): Promise<void> {
+    const paths = {
+      json: path.join(getWorkspaceRoot(), 'rslint.json'),
+      js: path.join(getWorkspaceRoot(), 'rslint.config.js'),
+    };
+    const removeConfigs = (): void => {
+      fs.rmSync(paths.json, { force: true });
+      fs.rmSync(paths.js, { force: true });
+      if (fs.existsSync(paths.json) || fs.existsSync(paths.js)) {
+        throw new Error('No-config fixture cleanup left a config file behind');
+      }
+    };
+
+    let testError: unknown;
+    try {
+      removeConfigs();
+      await testFn(paths);
+    } catch (error) {
+      testError = error;
     }
 
-    return vscode.languages.getDiagnostics(doc.uri);
+    let cleanupError: unknown;
+    try {
+      removeConfigs();
+    } catch (error) {
+      cleanupError = error;
+    }
+    if (testError && cleanupError) {
+      throw new AggregateError(
+        [testError, cleanupError],
+        'No-config test and config cleanup both failed',
+      );
+    }
+    if (testError) throw testError;
+    if (cleanupError) throw cleanupError;
   }
 
   /**
@@ -60,92 +90,63 @@ suite('rslint no config fallback', function () {
     });
   }
 
-  test('extension should start without config file and produce no diagnostics', async () => {
-    const doc = await openFixture('index.ts');
-    await vscode.window.showTextDocument(doc);
+  test('removing the last config reaches an observed no-config state', async () => {
+    await withConfigFilesAbsent(async ({ json }) => {
+      const doc = await openFixture('index.ts');
+      await vscode.window.showTextDocument(doc);
 
-    // Wait a reasonable time for diagnostics to appear (they shouldn't)
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+      // Establish a positive rslint publication first. The subsequent empty
+      // snapshot therefore cannot be the document's not-yet-linted state.
+      const configured = waitForDiagnostics(doc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-explicit-any'),
+        ),
+      );
+      fs.writeFileSync(json, jsonConfig, 'utf8');
+      await triggerDiagnosticRefresh(doc);
+      await configured;
 
-    const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-
-    // Without any config, no rslint rules are enabled, so no diagnostics
-    assert.strictEqual(
-      diagnostics.filter((d) => d.source === 'rslint').length,
-      0,
-      'Should have no rslint diagnostics when no config file exists',
-    );
+      const cleared = waitForDiagnostics(
+        doc,
+        (diagnostics) => diagnostics.length === 0,
+      );
+      fs.rmSync(json);
+      await triggerDiagnosticRefresh(doc);
+      const diagnostics = await cleared;
+      assert.strictEqual(
+        diagnostics.length,
+        0,
+        'Removing the last config should publish an empty rslint snapshot',
+      );
+    });
   });
 
   test('config lifecycle: no config → JSON → JS override → delete JS → delete JSON', async () => {
-    const root = getWorkspaceRoot();
-    const jsonConfigPath = path.join(root, 'rslint.json');
-    const jsConfigPath = path.join(root, 'rslint.config.js');
-
-    // Ensure clean state — remove any leftover config files
-    try {
-      fs.unlinkSync(jsonConfigPath);
-    } catch {
-      /* ignore */
-    }
-    try {
-      fs.unlinkSync(jsConfigPath);
-    } catch {
-      /* ignore */
-    }
-
-    const doc = await openFixture('index.ts');
-    await vscode.window.showTextDocument(doc);
-
-    try {
-      // ── Step 1: No config → no diagnostics ──
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      let diags = vscode.languages.getDiagnostics(doc.uri);
-      assert.strictEqual(
-        diags.filter((d) => d.source === 'rslint').length,
-        0,
-        'Step 1: Should have no rslint diagnostics without config',
+    await withConfigFilesAbsent(async ({ json, js }) => {
+      const doc = await openFixture('index.ts');
+      await vscode.window.showTextDocument(doc);
+      assert.ok(
+        !fs.existsSync(json) && !fs.existsSync(js),
+        'The lifecycle must start with no config files',
       );
 
-      // ── Step 2: Create rslint.json → no-explicit-any diagnostics ──
-      const jsonConfig = JSON.stringify(
-        [
-          {
-            languageOptions: {
-              parserOptions: {
-                projectService: false,
-                project: ['./tsconfig.json'],
-              },
-            },
-            rules: {
-              '@typescript-eslint/no-explicit-any': 'error',
-              '@typescript-eslint/no-unsafe-member-access': 'off',
-            },
-            plugins: ['@typescript-eslint'],
-          },
-        ],
-        null,
-        2,
-      );
-      fs.writeFileSync(jsonConfigPath, jsonConfig, 'utf8');
-
-      // Wait for file watcher to detect JSON config creation
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await triggerDiagnosticRefresh(doc);
-
-      diags = await waitForDiagnostics(doc, (ds) =>
+      // ── Step 1: Create rslint.json → no-explicit-any diagnostics ──
+      let transition = waitForDiagnostics(doc, (ds) =>
         ds.some((d) => d.message.includes('no-explicit-any')),
       );
+      fs.writeFileSync(json, jsonConfig, 'utf8');
+      await triggerDiagnosticRefresh(doc);
+      let diags = await transition;
       assert.ok(
         diags.some((d) => d.message.includes('no-explicit-any')),
-        'Step 2: Should see no-explicit-any after JSON config created',
+        'Step 1: Should see no-explicit-any after JSON config created',
       );
       assert.ok(
         !diags.some((d) => d.message.includes('no-unsafe-member-access')),
-        'Step 2: Should NOT see no-unsafe-member-access (turned off in JSON)',
+        'Step 1: Should NOT see no-unsafe-member-access (turned off in JSON)',
       );
 
-      // ── Step 3: Create rslint.config.js → JS overrides JSON ──
+      // ── Step 2: Create rslint.config.js → JS overrides JSON ──
       const jsConfig = `export default [
   {
     languageOptions: {
@@ -162,94 +163,79 @@ suite('rslint no config fallback', function () {
   },
 ];
 `;
-      fs.writeFileSync(jsConfigPath, jsConfig, 'utf8');
-
-      // Wait for JS config watcher to detect and send rslint/configUpdate
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await triggerDiagnosticRefresh(doc);
-
-      diags = await waitForDiagnostics(doc, (ds) =>
-        ds.some((d) => d.message.includes('no-unsafe-member-access')),
+      transition = waitForDiagnostics(
+        doc,
+        (ds) =>
+          ds.some((d) => d.message.includes('no-unsafe-member-access')) &&
+          !ds.some((d) => d.message.includes('no-explicit-any')),
       );
+      fs.writeFileSync(js, jsConfig, 'utf8');
+      await triggerDiagnosticRefresh(doc);
+      diags = await transition;
       assert.ok(
         diags.some((d) => d.message.includes('no-unsafe-member-access')),
-        'Step 3: Should see no-unsafe-member-access from JS config',
+        'Step 2: Should see no-unsafe-member-access from JS config',
       );
       assert.ok(
         !diags.some((d) => d.message.includes('no-explicit-any')),
-        'Step 3: JS config should override JSON — no-explicit-any should be off',
+        'Step 2: JS config should override JSON — no-explicit-any should be off',
       );
 
-      // ── Step 4: Delete JS config → JSON config restored ──
-      fs.unlinkSync(jsConfigPath);
-
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // ── Step 3: Delete JS config → JSON config restored ──
+      transition = waitForDiagnostics(
+        doc,
+        (ds) =>
+          ds.some((d) => d.message.includes('no-explicit-any')) &&
+          !ds.some((d) => d.message.includes('no-unsafe-member-access')),
+      );
+      fs.rmSync(js);
       await triggerDiagnosticRefresh(doc);
-
-      diags = await waitForDiagnostics(doc, (ds) =>
-        ds.some((d) => d.message.includes('no-explicit-any')),
-      );
+      diags = await transition;
       assert.ok(
         diags.some((d) => d.message.includes('no-explicit-any')),
-        'Step 4: After deleting JS config, JSON config should restore no-explicit-any',
+        'Step 3: After deleting JS config, JSON config should restore no-explicit-any',
       );
       assert.ok(
         !diags.some((d) => d.message.includes('no-unsafe-member-access')),
-        'Step 4: no-unsafe-member-access should be gone (JS config deleted)',
+        'Step 3: no-unsafe-member-access should be gone (JS config deleted)',
       );
 
-      // ── Step 5: Broken JS with no last-good → explicit no-lint state ──
+      // ── Step 4: Broken JS with no last-good → explicit no-lint state ──
       const disabledByBrokenJS = waitForDiagnostics(
         doc,
-        (ds) => ds.filter((d) => d.source === 'rslint').length === 0,
+        (ds) => ds.length === 0,
       );
-      fs.writeFileSync(jsConfigPath, 'export default [BROKEN SYNTAX;', 'utf8');
+      fs.writeFileSync(js, 'export default [BROKEN SYNTAX;', 'utf8');
+      await triggerDiagnosticRefresh(doc);
       diags = await disabledByBrokenJS;
       assert.strictEqual(
-        diags.filter((d) => d.source === 'rslint').length,
+        diags.length,
         0,
-        'Step 5: A broken discovered JS config must not fall back to JSON',
+        'Step 4: A broken discovered JS config must not fall back to JSON',
       );
 
-      // ── Step 6: Delete broken JS → legitimate deletion restores JSON ──
+      // ── Step 5: Delete broken JS → legitimate deletion restores JSON ──
       const jsonRestored = waitForDiagnostics(doc, (ds) =>
         ds.some((d) => d.message.includes('no-explicit-any')),
       );
-      fs.unlinkSync(jsConfigPath);
+      fs.rmSync(js);
+      await triggerDiagnosticRefresh(doc);
       diags = await jsonRestored;
       assert.ok(
         diags.some((d) => d.message.includes('no-explicit-any')),
-        'Step 6: Deleting all JS configs should restore the JSON fallback',
+        'Step 5: Deleting all JS configs should restore the JSON fallback',
       );
 
-      // ── Step 7: Delete JSON config → no diagnostics ──
-      fs.unlinkSync(jsonConfigPath);
-
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // ── Step 6: Delete JSON config → no diagnostics ──
+      const cleared = waitForDiagnostics(doc, (ds) => ds.length === 0);
+      fs.rmSync(json);
       await triggerDiagnosticRefresh(doc);
-
-      // Wait for diagnostics to clear
-      diags = await waitForDiagnostics(
-        doc,
-        (ds) => ds.filter((d) => d.source === 'rslint').length === 0,
-      );
+      diags = await cleared;
       assert.strictEqual(
-        diags.filter((d) => d.source === 'rslint').length,
+        diags.length,
         0,
-        'Step 7: After deleting all configs, should have no rslint diagnostics',
+        'Step 6: After deleting all configs, should have no rslint diagnostics',
       );
-    } finally {
-      // Clean up — ensure no config files remain for other test runs
-      try {
-        fs.unlinkSync(jsonConfigPath);
-      } catch {
-        /* ignore */
-      }
-      try {
-        fs.unlinkSync(jsConfigPath);
-      } catch {
-        /* ignore */
-      }
-    }
+    });
   });
 });

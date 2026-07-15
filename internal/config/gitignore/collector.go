@@ -19,6 +19,18 @@ func matchGlob(pattern string, path string) bool {
 	return err == nil && matched
 }
 
+func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool {
+	if !useCaseSensitive {
+		pattern = strings.ToLower(pattern)
+		path = strings.ToLower(path)
+	}
+	// Git's trailing /** matches contents, not the directory itself.
+	if strings.HasSuffix(pattern, "/**") && matchGlob(strings.TrimSuffix(pattern, "/**"), path) {
+		return false
+	}
+	return matchGlob(pattern, path)
+}
+
 func isDefaultExcludedDirName(name string, useCaseSensitive bool) bool {
 	for _, excluded := range utils.DefaultExcludeDirNames {
 		if name == excluded || (!useCaseSensitive && strings.EqualFold(name, excluded)) {
@@ -257,6 +269,7 @@ func parseGitignorePrunePatterns(content string) []gitignorePrunePattern {
 		if line == "" {
 			continue
 		}
+		line = gitignorePatternForConfigGlob(line)
 		patterns = append(patterns, gitignorePrunePattern{
 			negated: negated,
 			rooted:  rooted,
@@ -274,7 +287,7 @@ func isDirIgnoredByPruneRules(dir string, rules []gitignorePruneRule, useCaseSen
 			continue
 		}
 		for _, pattern := range rule.patterns {
-			if gitignorePrunePatternCoversDir(pattern, rel) {
+			if gitignorePrunePatternCoversDir(pattern, rel, useCaseSensitive) {
 				ignored = !pattern.negated
 			}
 		}
@@ -282,21 +295,21 @@ func isDirIgnoredByPruneRules(dir string, rules []gitignorePruneRule, useCaseSen
 	return ignored
 }
 
-func gitignorePrunePatternCoversDir(pattern gitignorePrunePattern, relDir string) bool {
+func gitignorePrunePatternCoversDir(pattern gitignorePrunePattern, relDir string, useCaseSensitive bool) bool {
 	for current := relDir; current != ""; current = parentDir(current) {
-		if gitignorePrunePatternMatchesPath(pattern, current) {
+		if gitignorePrunePatternMatchesPath(pattern, current, useCaseSensitive) {
 			return true
 		}
 	}
 	return false
 }
 
-func gitignorePrunePatternMatchesPath(pattern gitignorePrunePattern, relPath string) bool {
+func gitignorePrunePatternMatchesPath(pattern gitignorePrunePattern, relPath string, useCaseSensitive bool) bool {
 	if pattern.rooted {
-		return matchGlob(pattern.pattern, relPath)
+		return matchGitignoreGlob(pattern.pattern, relPath, useCaseSensitive)
 	}
 	for _, part := range splitPathComponents(relPath) {
-		if matchGlob(pattern.pattern, part) {
+		if matchGitignoreGlob(pattern.pattern, part, useCaseSensitive) {
 			return true
 		}
 	}
@@ -546,17 +559,17 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 // patterns. baseDir is the directory containing the .gitignore relative to
 // the config root (empty for root .gitignore).
 //
-// Conversion rules (aligned with git spec):
+// The compatibility glob view uses these projections:
 //
-//	"dist/"     → "**/dist/**"        (unrooted dir, matches at any depth)
-//	"/dist"     → "dist/**"           (root-anchored)
+//	"dist/"     → "**/dist/**/*"      (unrooted dir, matches at any depth)
+//	"/dist"     → "dist"              (root-anchored)
 //	"*.log"     → "**/*.log"          (unrooted file pattern)
-//	"src/dist"  → "src/dist/**"       (contains /, implicitly rooted)
-//	"!dist/"    → "!**/dist/**"       (negation preserved)
+//	"src/dist"  → "src/dist"          (contains /, implicitly rooted)
+//	"!dist/"    → "!**/dist/**/*"     (negation preserved)
 //
 // For nested .gitignore (baseDir != ""), patterns are prefixed:
 //
-//	baseDir="pkg/app", "tmp/" → "pkg/app/**/tmp/**"
+//	baseDir="pkg/app", "tmp/" → "pkg/app/**/tmp/**/*"
 func convertGitignoreToGlobs(content string, baseDir string) []string {
 	var globs []string
 	for _, line := range strings.Split(content, "\n") {
@@ -573,19 +586,35 @@ func convertGitignoreToGlobs(content string, baseDir string) []string {
 }
 
 func normalizeGitignoreLine(line string) (string, bool) {
-	// Strip trailing whitespace (git spec)
-	line = strings.TrimRight(line, " \t\r")
-	if line == "" || strings.HasPrefix(line, "#") {
-		return "", false
-	}
-	// Strip leading whitespace
-	line = strings.TrimLeft(line, " \t")
+	// A CR from CRLF is a line terminator, not pattern text. Git otherwise
+	// preserves leading whitespace and removes only unescaped trailing
+	// whitespace. In particular, ` leading` is a real filename pattern and
+	// `trailing\ ` retains its final space.
+	line = strings.TrimSuffix(line, "\r")
+	line = trimUnescapedTrailingGitignoreWhitespace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
 		return "", false
 	}
 	return line, true
 }
 
+func trimUnescapedTrailingGitignoreWhitespace(line string) string {
+	for len(line) > 0 {
+		last := line[len(line)-1]
+		if last != ' ' && last != '\t' {
+			break
+		}
+		backslashes := 0
+		for index := len(line) - 2; index >= 0 && line[index] == '\\'; index-- {
+			backslashes++
+		}
+		if backslashes%2 == 1 {
+			break
+		}
+		line = line[:len(line)-1]
+	}
+	return line
+}
 func splitPathComponents(p string) []string {
 	var parts []string
 	for _, part := range strings.Split(p, "/") {
@@ -628,6 +657,7 @@ func convertSinglePattern(line string, baseDir string) string {
 	if line == "" {
 		return ""
 	}
+	line = gitignorePatternForConfigGlob(line)
 
 	// Build the glob pattern
 	var glob string
@@ -647,24 +677,80 @@ func convertSinglePattern(line string, baseDir string) string {
 	}
 
 	// Append /**/* for directory patterns to match all contents.
-	// Use /**/* (file-level) instead of /** (directory-level) because gitignore
-	// directories must stay `!`-reversible. The config matcher treats
-	// `dir/**/*` as a file-level cover while `dir/**` is an absolute directory
-	// block, so `.gitignore` directory patterns require the former.
-	if dirOnly {
-		if !strings.HasSuffix(glob, "/**/*") {
-			glob = glob + "/**/*"
-		}
+	// Use /**/* (file-level) instead of /** (directory-level) because collected
+	// rules participate in one ordered global-ignore sequence and later
+	// negations must be able to re-include descendants.
+	if dirOnly && !strings.HasSuffix(glob, "/**/*") {
+		glob += "/**/*"
 	}
 
 	if negated {
 		glob = "!" + glob
+	} else if strings.HasPrefix(glob, "!") {
+		// A leading `\!` is a literal exclamation mark. Keep the raw config glob
+		// from looking like an rslint negation; NormalizePath later removes `./`
+		// without changing the matcher.
+		glob = "./" + glob
 	}
 	return glob
 }
 
+// gitignorePatternForConfigGlob removes Git's backslash quoting before a
+// pattern enters rslint's generic glob pipeline. That pipeline normalizes
+// backslashes as path separators, so escaped glob metacharacters must instead
+// be represented as one-character classes. Doublestar supports brace
+// alternation while Git does not, therefore unescaped braces are quoted too.
+func gitignorePatternForConfigGlob(pattern string) string {
+	var result strings.Builder
+	result.Grow(len(pattern))
+	inClass := false
+	for index := 0; index < len(pattern); index++ {
+		character := pattern[index]
+		if character == '\\' && index+1 < len(pattern) {
+			index++
+			appendConfigGlobLiteral(&result, pattern[index])
+			continue
+		}
+		if character == '[' {
+			inClass = true
+			result.WriteByte(character)
+			continue
+		}
+		if character == ']' && inClass {
+			inClass = false
+			result.WriteByte(character)
+			continue
+		}
+		if !inClass && (character == '{' || character == '}') {
+			appendConfigGlobLiteral(&result, character)
+			continue
+		}
+		result.WriteByte(character)
+	}
+	return result.String()
+}
+
+func appendConfigGlobLiteral(result *strings.Builder, character byte) {
+	switch character {
+	case '*':
+		result.WriteString("[*]")
+	case '?':
+		result.WriteString("[?]")
+	case '[':
+		result.WriteString("[[]")
+	case '{':
+		result.WriteString("[{]")
+	case '}':
+		result.WriteString("[}]")
+	default:
+		result.WriteByte(character)
+	}
+}
+
 func containsParentPathComponent(pattern string) bool {
-	for _, component := range strings.Split(strings.ReplaceAll(pattern, "\\", "/"), "/") {
+	// Git patterns always use `/` as the separator; backslash quotes the next
+	// byte even on Windows and must not manufacture a parent component.
+	for _, component := range strings.Split(pattern, "/") {
 		if component == ".." {
 			return true
 		}

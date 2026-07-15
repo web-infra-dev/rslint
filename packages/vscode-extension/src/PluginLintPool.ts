@@ -46,11 +46,12 @@ type PluginHostFactory = (
   onLog: (rec: { level: string; source: string; text: string }) => void,
 ) => Promise<PluginLintHost>;
 
-// Keep enough history for requests already dispatched by the previous two
-// configs, while bounding grace-retained WorkerPools to two plus the active
-// pool. Hosts with an acquired lint lease may temporarily exceed this bound
-// until their in-flight requests drain.
-const MAX_RETAINED_GENERATIONS = 2;
+// One predecessor is retained without a timer so an active commit can be
+// rolled back if its JSON-RPC response is lost and Go subsequently aborts.
+// Keep one additional grace generation for already-dispatched requests: the
+// bound remains two old pools plus the active pool. Hosts with an acquired
+// lint lease may temporarily exceed this bound until requests drain.
+const MAX_GRACE_GENERATIONS = 1;
 
 let modPromise: Promise<EslintPluginModule> | undefined;
 
@@ -95,6 +96,14 @@ export class PluginLintPool {
   >();
   private activeGeneration: string | undefined;
   private activeState: HostGeneration | undefined;
+  /**
+   * The active generation's compensating rollback record. JSON-RPC has no
+   * response acknowledgement, so commit cannot discard this predecessor: Go
+   * may keep last-good and send abort when the commit response is lost or
+   * invalid. A later successful commit proves Go accepted this generation and
+   * moves its predecessor into the ordinary grace-retirement queue.
+   */
+  private activeCommitRollback: ActiveCommitRollback | undefined;
   private readonly liveStates = new Set<HostGeneration>();
   private readonly shutdowns = new Set<Promise<void>>();
   /**
@@ -133,17 +142,20 @@ export class PluginLintPool {
   }
 
   /**
-   * Prepare a generation without making it active. The caller commits only
-   * after Go acknowledges the matching config payload, so reverse requests
-   * can never observe a worker from a config generation Go has not accepted.
+   * Prepare a generation without making it the active fallback for requests
+   * without a key. The transport commits it at the matching config
+   * transaction's commit point;
+   * an abort after commit can still compensate for a lost response and return
+   * to the prior Go last-good generation.
    *
    * Returns whether the requested host state is active. Rebuilds are
    * transactional: a failed replacement leaves the previous host available so
    * the caller can preserve the matching last-good config payload.
    *
-   * Empty `descriptors` needs no host. `lint` already returns an empty result
-   * without one, avoiding a module load and worker-pool allocation when no
-   * object-form community plugins are configured.
+   * Empty `descriptors` needs no host, avoiding a module load and worker-pool
+   * allocation when no object-form community plugins are configured. The
+   * matching activation publishes no plugin metadata, so Go must never issue
+   * a plugin-lint request for that generation without a host.
    */
   async prepare(
     descriptors: ConfigDescriptor[],
@@ -243,16 +255,25 @@ export class PluginLintPool {
       if (this.disposed) return;
       const next = this.generations.get(generation);
       if (!next) return;
+      if (generation === this.activeGeneration) {
+        committed = true;
+        return;
+      }
 
       const previousGeneration = this.activeGeneration;
       const previous = this.activeState;
+      this.finalizeActiveCommitRollback();
+      if (previousGeneration) {
+        this.cancelGenerationRetirement(previousGeneration);
+      }
       this.activeGeneration = generation;
       this.activeState = next;
+      this.activeCommitRollback = {
+        generation,
+        previousGeneration,
+        previousState: previous,
+      };
       committed = true;
-
-      if (previousGeneration && previousGeneration !== generation) {
-        this.scheduleGenerationRetirement(previousGeneration, previous);
-      }
     });
     return committed;
   }
@@ -260,7 +281,26 @@ export class PluginLintPool {
   /** Discard a staged generation when source validation or Go commit fails. */
   async abort(generation: string): Promise<void> {
     await this.enqueue(async () => {
-      if (generation === this.activeGeneration) return;
+      if (generation === this.activeGeneration) {
+        const rollback = this.activeCommitRollback;
+        if (!rollback || rollback.generation !== generation) return;
+        const aborted = this.activeState;
+        this.activeGeneration = rollback.previousGeneration;
+        this.activeState = rollback.previousState;
+        this.activeCommitRollback = undefined;
+        if (rollback.previousGeneration) {
+          this.cancelGenerationRetirement(rollback.previousGeneration);
+        }
+        this.generations.delete(generation);
+        if (
+          aborted &&
+          aborted !== this.activeState &&
+          !this.hasGenerationReference(aborted)
+        ) {
+          this.retire(aborted);
+        }
+        return;
+      }
       const state = this.generations.get(generation);
       if (!state) return;
       this.generations.delete(generation);
@@ -270,11 +310,7 @@ export class PluginLintPool {
     });
   }
 
-  /**
-   * Answer one reverse `rslint/pluginLint` request. If no host is up
-   * (init pending / failed, or never configured) return empty results so Go's
-   * plugin-rule diagnostics simply come back empty rather than erroring.
-   */
+  /** Answer one reverse `rslint/pluginLint` request. */
   async lint(
     req: EslintPluginLintRequest,
     token?: CancellationToken,
@@ -300,7 +336,18 @@ export class PluginLintPool {
     }
     if (!state) return { results: [] };
     const host = state.host;
-    if (!host) return { results: [] };
+    if (!host) {
+      // Generations without a host are valid committed states for native-only or
+      // degraded catalogs, but their activation exposes no plugin metadata.
+      // Reaching this branch therefore means Go and the extension disagree on
+      // the committed lifecycle. Do not turn that protocol failure into a
+      // false-green empty diagnostic set. Cancellation remains benign.
+      if (token?.isCancellationRequested) return { results: [] };
+      const generation = req.generation ?? this.activeGeneration;
+      throw new Error(
+        `LSP pluginLint requested for config generation ${JSON.stringify(generation)} without an activated plugin host`,
+      );
+    }
 
     // Take the lease before yielding. Retirement removes future routing
     // references, but cannot shut this state down until the lease is released.
@@ -364,6 +411,25 @@ export class PluginLintPool {
     if (state.activeLints === 0) this.startShutdown(state);
   }
 
+  private finalizeActiveCommitRollback(): void {
+    const rollback = this.activeCommitRollback;
+    if (!rollback) return;
+    this.activeCommitRollback = undefined;
+    if (rollback.previousGeneration) {
+      this.scheduleGenerationRetirement(
+        rollback.previousGeneration,
+        rollback.previousState,
+      );
+    }
+  }
+
+  private cancelGenerationRetirement(generation: string): void {
+    const timer = this.generationRetirementTimers.get(generation);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.generationRetirementTimers.delete(generation);
+  }
+
   private scheduleGenerationRetirement(
     generation: string,
     state: HostGeneration | undefined,
@@ -378,7 +444,7 @@ export class PluginLintPool {
     // A burst of config updates must not retain one complete WorkerPool per
     // generation for the full production grace period. Expire the oldest
     // routing generation immediately once the bounded history is full.
-    while (this.generationRetirementTimers.size > MAX_RETAINED_GENERATIONS) {
+    while (this.generationRetirementTimers.size > MAX_GRACE_GENERATIONS) {
       const oldest = this.generationRetirementTimers.keys().next().value;
       if (oldest === undefined) break;
       this.completeGenerationRetirement(oldest, this.generations.get(oldest));
@@ -441,6 +507,7 @@ export class PluginLintPool {
       this.generationRetirementTimers.clear();
       this.activeGeneration = undefined;
       this.activeState = undefined;
+      this.activeCommitRollback = undefined;
       for (const state of states) {
         // Terminal disposal intentionally forces shutdown even if a request is
         // still active; WorkerPool turns those tasks into benign cancellation.
@@ -458,4 +525,10 @@ interface HostGeneration {
   activeLints: number;
   retiring: boolean;
   shutdown?: Promise<void>;
+}
+
+interface ActiveCommitRollback {
+  generation: string;
+  previousGeneration: string | undefined;
+  previousState: HostGeneration | undefined;
 }

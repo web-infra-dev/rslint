@@ -9,6 +9,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	api "github.com/web-infra-dev/rslint/internal/api"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
 
 func TestCLIAndAPIIgnoreConformance(t *testing.T) {
@@ -217,46 +219,23 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry := map[string]any{
-		"files": []string{"**/*.ts"},
-		"rules": map[string]string{"no-debugger": "error"},
-	}
-	payload, err := json.Marshal(map[string]any{
-		"configs": []any{
-			map[string]any{
-				"configDirectory": firstDir,
-				"entries":         []any{entry},
-				"targetFiles":     []string{firstTarget},
-				"explicitOnly":    true,
-			},
-			map[string]any{
-				"configDirectory": secondDir,
-				"entries":         []any{entry},
-				"targetFiles":     []string{secondTarget},
-				"explicitOnly":    true,
-			},
+	entry := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
+	}}
+	catalog := &discovery.ConfigCatalog{
+		Configs: map[string]rslintconfig.RslintConfig{
+			tspath.NormalizePath(firstDir):  entry,
+			tspath.NormalizePath(secondDir): entry,
 		},
-	})
-	if err != nil {
-		t.Fatal(err)
+		Scopes: map[string]rslintconfig.LintDiscoveryScope{
+			tspath.NormalizePath(firstDir):  {Files: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
+			tspath.NormalizePath(secondDir): {Files: []string{tspath.NormalizePath(secondTarget)}, ExplicitOnly: true},
+		},
 	}
-	payloadPath := filepath.Join(workspace, "config-payload.json")
-	if err := os.WriteFile(payloadPath, payload, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	stdin, err := os.Open(payloadPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	originalStdin := os.Stdin
-	os.Stdin = stdin
-	t.Cleanup(func() {
-		os.Stdin = originalStdin
-		_ = stdin.Close()
-	})
 
 	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
-		ConfigStdin:    true,
+		ConfigCatalog:  catalog,
 		Format:         "jsonline",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -269,6 +248,55 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "packages/second/source.ts") {
 		t.Fatalf("second config lost its independently lintable target: stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
+	workspace := t.TempDir()
+	ignoredDir := filepath.Join(workspace, "ignored")
+	explicitTarget := filepath.Join(ignoredDir, "explicit.js")
+	automaticTarget := filepath.Join(ignoredDir, "automatic.js")
+	if err := os.MkdirAll(ignoredDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ignoredDir, ".gitignore"), []byte("automatic.js\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(explicitTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(automaticTarget, []byte("console.log('automatic');\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	catalog := &discovery.ConfigCatalog{
+		Configs: map[string]rslintconfig.RslintConfig{
+			tspath.NormalizePath(workspace):  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
+			tspath.NormalizePath(ignoredDir): {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		},
+		Scopes: map[string]rslintconfig.LintDiscoveryScope{
+			tspath.NormalizePath(ignoredDir): {
+				Files:        []string{tspath.NormalizePath(explicitTarget)},
+				ExplicitOnly: true,
+			},
+		},
+	}
+	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+		ConfigCatalog:  catalog,
+		AllowFiles:     []string{tspath.NormalizePath(explicitTarget)},
+		AllowDirs:      []string{tspath.NormalizePath(ignoredDir)},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 {
+		t.Fatalf("explicit target should fail lint: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "automatic.js") {
+		t.Fatalf("parent-owned target escaped nested .gitignore: stdout=%q stderr=%q", stdout, stderr)
+	}
+	if !strings.Contains(stdout, "explicit.js") || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("explicit-only target lost its config: stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -293,32 +321,28 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry := map[string]any{
-		"files": []string{"**/*.ts"},
-		"rules": map[string]string{"no-debugger": "error"},
-	}
-	payload, err := json.Marshal(map[string]any{
-		"configs": []any{
-			map[string]any{
-				"configDirectory": workspace,
-				"entries":         []any{entry},
-				"targetFiles":     []string{parentOwnedTarget, parentIgnoredTarget},
-				"explicitOnly":    true,
+	entry := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
+	}}
+	catalog := &discovery.ConfigCatalog{
+		Configs: map[string]rslintconfig.RslintConfig{
+			tspath.NormalizePath(workspace): entry,
+			tspath.NormalizePath(childDir):  entry,
+		},
+		Scopes: map[string]rslintconfig.LintDiscoveryScope{
+			tspath.NormalizePath(workspace): {
+				Files: []string{
+					tspath.NormalizePath(parentOwnedTarget),
+					tspath.NormalizePath(parentIgnoredTarget),
+				},
+				ExplicitOnly: true,
 			},
-			map[string]any{
-				"configDirectory": childDir,
-				"entries":         []any{entry},
-				"targetFiles":     []string{childOwnedTarget},
-				"explicitOnly":    true,
+			tspath.NormalizePath(childDir): {
+				Files:        []string{tspath.NormalizePath(childOwnedTarget)},
+				ExplicitOnly: true,
 			},
 		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	payloadPath := filepath.Join(workspace, "config-payload.json")
-	if err := os.WriteFile(payloadPath, payload, 0o644); err != nil {
-		t.Fatal(err)
 	}
 	for _, test := range []struct {
 		name           string
@@ -328,19 +352,8 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		{name: "concurrent"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			stdin, err := os.Open(payloadPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			originalStdin := os.Stdin
-			os.Stdin = stdin
-			t.Cleanup(func() {
-				os.Stdin = originalStdin
-				_ = stdin.Close()
-			})
-
 			code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
-				ConfigStdin:    true,
+				ConfigCatalog:  catalog,
 				Format:         "jsonline",
 				NoColor:        true,
 				SingleThreaded: test.singleThreaded,

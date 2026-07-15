@@ -169,10 +169,10 @@ Each `LintMessage`:
 
 `new Rslint(options)` accepts:
 
-| Option               | Type                                               | Default     | Description                                                                                                                            |
-| -------------------- | -------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                | `string`                                           | current cwd | Base directory for config discovery and relative path resolution                                                                       |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfigEntry[] \| null` | —           | Extra config appended after the resolved/discovered config (ESLint's `overrideConfig`)                                                 |
-| `overrideConfigFile` | `string \| true \| null`                           | `null`      | `string`: use this config file (no discovery); `true`: use only `overrideConfig` (no file, no discovery); `null`/absent: auto-discover |
-| `fix`                | `boolean`                                          | `false`     | Apply rule auto-fixes; results carry `output`                                                                                          |
-| `virtualFiles`       | `Record<string, string>`                           | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                        |
+| Option               | Type                                               | Default     | Description                                                                                                                                    |
+| -------------------- | -------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                | `string`                                           | current cwd | Base directory for config discovery and relative path resolution                                                                               |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfigEntry[] \| null` | —           | Extra config appended after the resolved/discovered config (ESLint's `overrideConfig`)                                                         |
+| `overrideConfigFile` | `string \| true \| null`                           | `null`      | `string`: use this JS/TS config module (no discovery); `true`: use only `overrideConfig` (no file, no discovery); `null`/absent: auto-discover |
+| `fix`                | `boolean`                                          | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                  |
+| `virtualFiles`       | `Record<string, string>`                           | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                |
