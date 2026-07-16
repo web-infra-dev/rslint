@@ -38,6 +38,11 @@ func TestNoConditionalInTestRule(t *testing.T) {
         switch('bar') {}
       })
     `},
+		{Code: `
+      xit.concurrent('foo', () => {
+        if (x) {}
+      });
+    `},
 		{Code: `it('foo', () => {})`},
 		{Code: `
       switch (true) {
@@ -252,6 +257,14 @@ func TestNoConditionalInTestRule(t *testing.T) {
     `},
 		{
 			Code:    `const x = obj?.foo`,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+		},
+		{
+			Code:    `it?.('foo', () => {});`,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+		},
+		{
+			Code:    `test?.('foo', () => {});`,
 			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
 		},
 		{

@@ -92,16 +92,12 @@ var NoConditionalInTestRule = rule.Rule{
 			ast.KindElementAccessExpression:  reportOptionalChain,
 
 			ast.KindCallExpression: func(node *ast.Node) {
+				reportOptionalChain(node)
 				parsed := jestUtils.ParseJestFnCall(node, ctx)
-				isUnsupportedFitConcurrent := parsed != nil &&
-					parsed.Name == "fit" &&
-					len(parsed.Members) == 1 &&
-					parsed.Members[0] == "concurrent"
-				if !isUnsupportedFitConcurrent && parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest {
+				if parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest {
 					testCalls[node] = true
 					testCallDepth++
 				}
-				reportOptionalChain(node)
 			},
 			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
 				if !testCalls[node] {
