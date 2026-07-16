@@ -72,6 +72,7 @@
     "espree": "11.2.0",
     "esquery": "1.7.0",
     "globals": "17.7.0",
+    "json-schema-to-typescript": "^15.0.4",
     "tinyglobby": "0.2.15",
     "typescript": "5.9.3"
   },

@@ -26,7 +26,7 @@ const DIST_INDEX_DTS = path.join(PACKAGE_ROOT, 'dist/index.d.ts');
 
 interface RuleSchemaEntry {
   name: string;
-  // JSON Schema (draft-07), as compiled by json-schema-to-typescript.
+  // JSON Schema (draft-04), as compiled by json-schema-to-typescript.
   schema: any;
 }
 
