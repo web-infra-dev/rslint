@@ -356,7 +356,7 @@ jobs:
       # GOOS/GOARCH override, it runs natively rather than being cross-built.
       - name: Dump rule schemas
         if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
-        run: go run ./cmd/dump-rule-schemas > rule-schemas.json
+        run: go run ./tools/dump-rule-schemas > rule-schemas.json
 
       - name: Upload rule schemas
         if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
