@@ -35,10 +35,6 @@ function isMusl() {
   }
 }
 
-/**
- * The `@rslint/native-<tuple>` platform tuple for the host, e.g.
- * `darwin-arm64`, `linux-x64-musl`, `win32-x64-msvc`.
- */
 function hostTuple() {
   const { platform, arch } = process;
   if (platform === 'darwin') return `darwin-${arch}`;
@@ -47,57 +43,33 @@ function hostTuple() {
   throw new Error(`unsupported host platform ${platform}-${arch}`);
 }
 
-function main() {
-  const what = process.argv[2];
-  const tuple = hostTuple();
-  const pkgDir = path.join(repoRoot, 'npm', 'rslint', tuple);
-  fs.mkdirSync(pkgDir, { recursive: true });
+const what = process.argv[2];
+const tuple = hostTuple();
+const pkgDir = path.join(repoRoot, 'npm', 'rslint', tuple);
+fs.mkdirSync(pkgDir, { recursive: true });
 
-  if (what === 'bin') {
-    const debug = process.argv.includes('--debug');
-    const ext = process.platform === 'win32' ? '.exe' : '';
-    const out = path.join(pkgDir, `rslint${ext}`);
-    const args = ['build', '-v'];
-    if (debug) args.push('-gcflags=all=-N -l');
-    args.push('-o', out, './cmd/rslint');
-    execFileSync('go', args, {
-      cwd: repoRoot,
-      stdio: 'inherit',
-      env: debug ? { ...process.env, GOEXPERIMENT: 'noregabi' } : process.env,
-    });
-
-    // Also dump every native rule's options JSON Schema (see
-    // tools/dump_rule_schemas) to the fixed path
-    // scripts/generate-rule-option-types.mjs reads at `build:js` time — kept
-    // here rather than in that script so the Go toolchain requirement stays
-    // confined to build:bin; CI legs without Go instead fetch this file as
-    // a prebuilt artifact.
-    const schemasOut = path.join(
-      repoRoot,
-      'packages',
-      'rslint',
-      'rule-schemas.json',
+if (what === 'bin') {
+  const debug = process.argv.includes('--debug');
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const out = path.join(pkgDir, `rslint${ext}`);
+  const args = ['build', '-v'];
+  if (debug) args.push('-gcflags=all=-N -l');
+  args.push('-o', out, './cmd/rslint');
+  execFileSync('go', args, {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: debug ? { ...process.env, GOEXPERIMENT: 'noregabi' } : process.env,
+  });
+} else if (what === 'node') {
+  const file = `rslint.${tuple}.node`;
+  const src = path.join(repoRoot, 'crates', 'rslint-native', file);
+  if (!fs.existsSync(src)) {
+    throw new Error(
+      `napi build output not found: ${src}\n` +
+        `run \`pnpm --filter @rslint/native build\` first`,
     );
-    const schemas = execFileSync('go', ['run', './tools/dump_rule_schemas'], {
-      cwd: repoRoot,
-      encoding: 'utf-8',
-    });
-    fs.writeFileSync(schemasOut, schemas);
-  } else if (what === 'node') {
-    const file = `rslint.${tuple}.node`;
-    const src = path.join(repoRoot, 'crates', 'rslint-native', file);
-    if (!fs.existsSync(src)) {
-      throw new Error(
-        `napi build output not found: ${src}\n` +
-          `run \`pnpm --filter @rslint/native build\` first`,
-      );
-    }
-    fs.copyFileSync(src, path.join(pkgDir, file));
-  } else {
-    throw new Error('usage: place-host-build.mjs <bin|node> [--debug]');
   }
-}
-
-if (fileURLToPath(import.meta.url) === process.argv[1]) {
-  main();
+  fs.copyFileSync(src, path.join(pkgDir, file));
+} else {
+  throw new Error('usage: place-host-build.mjs <bin|node> [--debug]');
 }

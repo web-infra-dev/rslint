@@ -3,10 +3,10 @@
 // Reads every registered native rule's options JSON Schema from
 // packages/rslint/rule-schemas.json — a `{name, schema}[]` dump produced by
 // tools/dump_rule_schemas (which walks internal/config.GlobalRuleRegistry, the
-// single source of truth for rule IDs, prefixes, and declared schemas; see
-// scripts/place-host-build.mjs's `bin` mode, which writes this file, and CI's
-// per-workflow equivalents for jobs without a Go toolchain), compiles each
-// schema into a TypeScript type via json-schema-to-typescript, and injects
+// single source of truth for rule IDs, prefixes, and declared schemas). That
+// dump isn't produced automatically — if it's missing, this script skips.
+// Otherwise it compiles each schema into a TypeScript type via
+// json-schema-to-typescript, and injects
 // the result into a built `dist/index.d.ts` at the `@__RULE_OPTIONS__`
 // marker inside `RulesRecord` (see packages/rslint/src/config/define-config.ts).
 // Rules that haven't declared a schema yet (internal/rule.Rule.Schema == nil)
@@ -53,8 +53,8 @@ export async function collectRuleSchemas(
     if (err.code === 'ENOENT') {
       const notFound = new Error(
         `generate-rule-option-types: rule schemas dump not found at ${schemasPath} — ` +
-          'run `pnpm build:bin` first (or, in CI jobs without a Go toolchain, ' +
-          'fetch the prebuilt rule-schemas artifact)',
+          'run `go run ./tools/dump_rule_schemas > ' +
+          `${path.relative(REPO_ROOT, DEFAULT_SCHEMAS_PATH)}\` first`,
       );
       notFound.code = 'RULE_SCHEMAS_NOT_FOUND';
       throw notFound;
