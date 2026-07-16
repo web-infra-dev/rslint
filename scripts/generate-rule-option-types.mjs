@@ -2,7 +2,7 @@
 //
 // Reads every registered native rule's options JSON Schema from
 // packages/rslint/rule-schemas.json — a `{name, schema}[]` dump produced by
-// tools/dump-rule-schemas (which walks internal/config.GlobalRuleRegistry, the
+// tools/dump_rule_schemas (which walks internal/config.GlobalRuleRegistry, the
 // single source of truth for rule IDs, prefixes, and declared schemas; see
 // scripts/place-host-build.mjs's `bin` mode, which writes this file, and CI's
 // per-workflow equivalents for jobs without a Go toolchain), compiles each
@@ -36,7 +36,7 @@ const DEFAULT_DIST_INDEX_DTS = path.join(
 const MARKER = '/** @__RULE_OPTIONS__ */';
 
 /**
- * Reads the `{name, schema}[]` dump written by `tools/dump-rule-schemas` —
+ * Reads the `{name, schema}[]` dump written by `tools/dump_rule_schemas` —
  * including rules that only reference the shared `rule.EmptyArraySchema`
  * (no options, no on-disk `.schema.json` file), which a filesystem scan of
  * `*.schema.json` alone can't see.

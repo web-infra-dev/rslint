@@ -67,7 +67,7 @@ function main() {
     });
 
     // Also dump every native rule's options JSON Schema (see
-    // tools/dump-rule-schemas) to the fixed path
+    // tools/dump_rule_schemas) to the fixed path
     // scripts/generate-rule-option-types.mjs reads at `build:js` time — kept
     // here rather than in that script so the Go toolchain requirement stays
     // confined to build:bin; CI legs without Go instead fetch this file as
@@ -78,7 +78,7 @@ function main() {
       'rslint',
       'rule-schemas.json',
     );
-    const schemas = execFileSync('go', ['run', './tools/dump-rule-schemas'], {
+    const schemas = execFileSync('go', ['run', './tools/dump_rule_schemas'], {
       cwd: repoRoot,
       encoding: 'utf-8',
     });

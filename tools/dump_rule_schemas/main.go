@@ -1,4 +1,4 @@
-// Command dump-rule-schemas registers every native rule and dumps each one's
+// Command dump_rule_schemas registers every native rule and dumps each one's
 // name and options JSON Schema as JSON on stdout, straight from
 // internal/config.GlobalRuleRegistry — the single source of truth for rule
 // IDs/prefixes and declared schemas. It's a build-time tool invocation for
