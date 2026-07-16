@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type DirectiveConfig struct {
@@ -138,12 +137,12 @@ func parseDirectiveConfig(value interface{}) *DirectiveConfig {
 
 // processComments scans real comment trivia and checks for banned directives.
 func processComments(ctx rule.RuleContext, text string, configs map[string]*DirectiveConfig, minDescLength int, firstStatementPos int) {
-	utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
+	for _, comment := range ctx.Comments {
 		if comment == nil {
-			return
+			continue
 		}
 		if comment.Pos() < 0 || comment.End() > len(text) || comment.Pos() >= comment.End() {
-			return
+			continue
 		}
 
 		commentText := text[comment.Pos():comment.End()]
@@ -154,7 +153,7 @@ func processComments(ctx rule.RuleContext, text string, configs map[string]*Dire
 		case ast.KindMultiLineCommentTrivia:
 			checkMultiLineComment(ctx, commentText, comment.Pos(), configs, minDescLength)
 		}
-	}, ctx.SourceFile)
+	}
 }
 
 // checkSingleLineComment handles single-line comments (// or /// style).

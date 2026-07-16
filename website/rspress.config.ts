@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 import { pluginSass } from '@rsbuild/plugin-sass';
 import { defineConfig } from '@rspress/core';
 import { pluginGoogleAnalytics } from 'rsbuild-plugin-google-analytics';
@@ -71,6 +72,13 @@ export default defineConfig({
       },
     },
     plugins: [
+      pluginNodePolyfill({
+        include: ['buffer'],
+        globals: {
+          Buffer: false,
+          process: false,
+        },
+      }),
       pluginSass(),
       pluginGoogleAnalytics({
         // cspell:disable-next-line

@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import { RslintBinPath } from './utils';
-export function setupStatusBar(context: vscode.ExtensionContext) {
+export function setupStatusBar(): vscode.StatusBarItem {
   const statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100,
   );
-  const binPathConfig = vscode.workspace
-    .getConfiguration()
-    .get<RslintBinPath>('rslint.binPath')!;
-  statusBar.text = `$(wrench) Rslint`;
-  statusBar.tooltip = `Rslint Language Server (${binPathConfig})`;
-  statusBar.command = 'rslint.showMenu';
-  statusBar.show();
-
-  context.subscriptions.push(statusBar);
+  try {
+    statusBar.text = `$(wrench) Rslint`;
+    statusBar.tooltip = 'Rslint Language Server';
+    statusBar.command = 'rslint.showMenu';
+    statusBar.show();
+    return statusBar;
+  } catch (error) {
+    statusBar.dispose();
+    throw error;
+  }
 }

@@ -1,163 +1,140 @@
 import {
-  ExtensionContext,
-  Disposable,
-  workspace,
-  WorkspaceFolder,
-  ExtensionMode,
-  OutputChannel,
   window,
+  workspace,
+  type Disposable,
+  type ExtensionContext,
+  type OutputChannel,
 } from 'vscode';
-import { State } from 'vscode-languageclient/node';
-import { LogLevel, Logger } from './logger';
+import { Logger } from './logger';
 import { Rslint } from './Rslint';
 import { setupStatusBar } from './statusBar';
-import { RegisterCommands } from './commands';
+import { registerCommands } from './commands';
+import { WorkspaceDocumentRouter } from './WorkspaceDocumentRouter';
+import { WorkspaceRslintCoordinator } from './WorkspaceRslintCoordinator';
 
-export class Extension implements Disposable {
-  private readonly rslintInstances = new Map<string, Rslint>();
-  private disposables: Disposable[] = [];
+/** Extension-wide owner for shared UI, channels and workspace runtimes. */
+export class Extension {
   private readonly logger: Logger;
-  public context: ExtensionContext;
+  private readonly globalDisposables: Disposable[] = [];
+  private outputChannel: OutputChannel | undefined;
+  private lspOutputChannel: OutputChannel | undefined;
+  private workspaceFolderListener: Disposable | undefined;
+  private router: WorkspaceDocumentRouter | undefined;
+  private coordinator: WorkspaceRslintCoordinator | undefined;
+  private closePromise: Promise<void> | undefined;
+  private activated = false;
 
-  constructor(context: ExtensionContext) {
+  constructor(private readonly context: ExtensionContext) {
     Logger.setDefaultLogLevel(context);
-    this.context = context;
     this.logger = new Logger('Rslint (extension)').useDefaultLogLevel();
   }
 
   public async activate(): Promise<void> {
+    if (this.activated) return;
+    this.activated = true;
     this.logger.info('Rslint extension activating...');
 
-    const folders = workspace.workspaceFolders ?? [];
-    const outputChannel = window.createOutputChannel(
+    const outputChannel = (this.outputChannel = window.createOutputChannel(
       'Rslint Language Server',
       'log',
+    ));
+    const lspOutputChannel = (this.lspOutputChannel =
+      window.createOutputChannel('Rslint Language Server(LSP)'));
+
+    const router = new WorkspaceDocumentRouter();
+    const coordinator = new WorkspaceRslintCoordinator(
+      router,
+      (workspaceFolder, rootKey) =>
+        new Rslint({
+          rootKey,
+          extensionUri: this.context.extensionUri,
+          workspaceFolder,
+          outputChannel,
+          lspOutputChannel,
+          router,
+        }),
+      this.logger,
     );
-    const lspOutputChannel = window.createOutputChannel(
-      'Rslint Language Server(LSP)',
+    this.router = router;
+    this.coordinator = coordinator;
+
+    // Install every global facility before awaiting a root. A slow or broken
+    // config must not create an event-listener gap or hide commands/channels.
+    this.globalDisposables.push(setupStatusBar());
+    this.globalDisposables.push(
+      ...registerCommands(outputChannel, lspOutputChannel),
+    );
+    this.workspaceFolderListener = workspace.onDidChangeWorkspaceFolders(
+      (event) => {
+        coordinator.handleWorkspaceFoldersChanged(
+          event,
+          workspace.workspaceFolders ?? [],
+        );
+      },
     );
 
-    for (const folder of folders) {
-      const workspaceRslint = this.createRslintInstance(
-        folder.name,
-        folder,
-        outputChannel,
-        lspOutputChannel,
-      );
-      await workspaceRslint.start();
-      this.setupStateChangeMonitoring(workspaceRslint, folder.name);
-    }
-    setupStatusBar(this.context);
-    RegisterCommands(this.context, outputChannel, lspOutputChannel);
+    await coordinator.initialize(workspace.workspaceFolders ?? []);
     this.logger.info('Rslint extension activated successfully');
   }
 
   public async deactivate(): Promise<void> {
-    this.logger.info('Rslint extension deactivating...');
+    await this.close();
+  }
 
-    const stopPromises = Array.from(this.rslintInstances.values()).map(
-      async (instance) => instance.stop(),
-    );
+  public async close(): Promise<void> {
+    await (this.closePromise ??= this.closeImpl());
+  }
+
+  private async closeImpl(): Promise<void> {
+    this.logger.info('Rslint extension deactivating...');
+    const errors: unknown[] = [];
+    // Stop accepting topology changes before withdrawing any active root.
+    try {
+      this.workspaceFolderListener?.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    this.workspaceFolderListener = undefined;
 
     try {
-      await Promise.all(stopPromises);
-      this.logger.info('All Rslint instances stopped');
-    } catch (err: unknown) {
-      this.logger.error('Error stopping some Rslint instances', err);
+      await this.coordinator?.close();
+    } catch (error) {
+      errors.push(error);
     }
 
-    this.dispose();
-    this.logger.info('Rslint extension deactivated');
-  }
-
-  public createRslintInstance(
-    id: string,
-    workspaceFolder: WorkspaceFolder,
-    outputChannel: OutputChannel,
-    lspOutputChannel: OutputChannel,
-  ): Rslint {
-    if (this.rslintInstances.has(id)) {
-      this.logger.warn(`Rslint instance with id '${id}' already exists`);
-      return this.rslintInstances.get(id)!;
-    }
-
-    // TODO: single file mode
-    const rslint = new Rslint(
-      this,
-      workspaceFolder,
-      outputChannel,
-      lspOutputChannel,
-    );
-    this.rslintInstances.set(id, rslint);
-    this.logger.debug(`Created Rslint instance with id: ${id}`);
-    return rslint;
-  }
-
-  public getRslintInstance(id: string): Rslint | undefined {
-    return this.rslintInstances.get(id);
-  }
-
-  public async removeRslintInstance(id: string): Promise<void> {
-    const instance = this.rslintInstances.get(id);
-    if (!instance) {
-      this.logger.warn(`Rslint instance with id '${id}' not found`);
-      return;
-    }
-
-    await instance.stop();
-    instance.dispose();
-    this.rslintInstances.delete(id);
-
-    this.logger.debug(`Removed Rslint instance with id: ${id}`);
-  }
-
-  public getAllRslintInstances(): Map<string, Rslint> {
-    return new Map(this.rslintInstances);
-  }
-
-  public dispose(): void {
-    this.rslintInstances.forEach((instance) => {
-      instance.dispose();
-    });
-    this.rslintInstances.clear();
-
-    this.disposables.forEach((disposable) => {
-      disposable.dispose();
-    });
-    this.disposables = [];
-
-    this.logger.dispose();
-  }
-
-  private setupLogging(): void {
-    this.logger.setLogLevel(
-      this.context.extensionMode === ExtensionMode.Development
-        ? LogLevel.DEBUG
-        : LogLevel.INFO,
-    );
-  }
-
-  private setupStateChangeMonitoring(rslint: Rslint, instanceId: string): void {
-    const stateChangeDisposable = rslint.onDidChangeState((event) => {
-      this.logger.debug(
-        `Rslint client state changed for instance '${instanceId}':`,
-        event.oldState,
-        '->',
-        event.newState,
-      );
-
-      if (event.newState === State.Running) {
-        this.logger.info(
-          `Rslint language server started for instance '${instanceId}'`,
-        );
-      } else if (event.newState === State.Stopped) {
-        this.logger.info(
-          `Rslint language server stopped for instance '${instanceId}'`,
-        );
+    for (const disposable of this.globalDisposables.splice(0).reverse()) {
+      try {
+        disposable.dispose();
+      } catch (error) {
+        errors.push(error);
       }
-    });
+    }
+    try {
+      this.outputChannel?.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    this.outputChannel = undefined;
+    try {
+      this.lspOutputChannel?.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    this.lspOutputChannel = undefined;
+    this.coordinator = undefined;
+    this.router = undefined;
 
-    this.disposables.push(stateChangeDisposable);
-    this.context.subscriptions.push(stateChangeDisposable);
+    for (const error of errors) {
+      this.logger.error('Failed to close an extension resource', error);
+    }
+    this.logger.info('Rslint extension deactivated');
+    try {
+      this.logger.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, 'failed to deactivate Rslint extension');
+    }
   }
 }

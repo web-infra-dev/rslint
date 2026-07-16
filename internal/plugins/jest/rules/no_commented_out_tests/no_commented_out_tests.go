@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Port of eslint-plugin-jest no-commented-out-tests:
@@ -47,19 +46,19 @@ var NoCommentedOutTestsRule = rule.Rule{
 	Name: "jest/no-commented-out-tests",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		text := ctx.SourceFile.Text()
-		utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
+		for _, comment := range ctx.Comments {
 			if comment == nil {
-				return
+				continue
 			}
 			inner := commentInnerText(text, comment)
 			if inner == "" || !commentedTestRegexp.MatchString(inner) {
-				return
+				continue
 			}
 			ctx.ReportRange(
 				core.NewTextRange(comment.Pos(), comment.End()),
 				buildCommentedTestsMessage(),
 			)
-		}, ctx.SourceFile)
+		}
 		return rule.RuleListeners{}
 	},
 }

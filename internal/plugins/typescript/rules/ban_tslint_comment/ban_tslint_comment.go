@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // tslint regex
@@ -25,10 +24,10 @@ var BanTslintCommentRule = rule.CreateRule(rule.Rule{
 func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	text := ctx.SourceFile.Text()
 
-	utils.ForEachComment(&ctx.SourceFile.Node, func(comment *ast.CommentRange) {
+	for _, comment := range ctx.Comments {
 		commentValue := extractCommentValue(text, comment)
 		if !enableDisableRegex.MatchString(commentValue) {
-			return
+			continue
 		}
 
 		commentText := extractCommentText(text, comment)
@@ -46,7 +45,7 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			message,
 			fix,
 		)
-	}, ctx.SourceFile)
+	}
 
 	return rule.RuleListeners{}
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const tsIgnoreDirective = "@ts-ignore"
@@ -110,21 +109,21 @@ var PreferTsExpectErrorRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-ts-expect-error",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		fullText := ctx.SourceFile.Text()
-		utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
+		for _, comment := range ctx.Comments {
 			if comment == nil {
-				return
+				continue
 			}
 			commentText := fullText[comment.Pos():comment.End()]
 			start, end, ok := findTsIgnoreDirective(commentText, comment.Kind)
 			if !ok {
-				return
+				continue
 			}
 
 			fixRange := core.NewTextRange(comment.Pos()+start, comment.Pos()+end)
 			fix := rule.RuleFixReplaceRange(fixRange, tsExpectErrorDirective)
 			commentRange := core.NewTextRange(comment.Pos(), comment.End())
 			ctx.ReportRangeWithFixes(commentRange, buildPreferExpectErrorMessage(), fix)
-		}, ctx.SourceFile)
+		}
 
 		return rule.RuleListeners{}
 	},

@@ -549,9 +549,42 @@ The transport and target phase differ by surface:
   do not require that handler. Every long-lived API call uses a
   fresh entry-module load so rewritten config bytes cannot be paired with stale
   normalized exports or a newer plugin-worker topology.
-- The extension binds each language client and its document selectors to one VS
-  Code workspace folder, starts `rslint/configRefresh`, and Go scans that
-  process cwd with a transaction-scoped cached VFS. Go sends
+- The extension owns shared UI, commands, and output channels once. Its
+  `WorkspaceRslintCoordinator` keys desired and active roots by workspace-folder
+  URI (not display name), subscribes to folder changes before awaiting any root,
+  and independently starts or closes one `Rslint` runtime per URI generation.
+  One slow or failed root therefore cannot serialize healthy roots; terminal
+  shutdown still attempts every per-root close before releasing shared
+  resources. If an old generation does not confirm that it closed, its URI slot
+  remains quarantined: no replacement starts, and the retained error is
+  included in terminal shutdown. Each runtime owns its native server children,
+  config watcher, transaction adapter, plugin pool, request handlers, and
+  workspace logger. A process owner covers automatic LanguageClient restarts,
+  terminates any still-live prior child before a restart spawn, blocks new
+  spawns once closing begins, and awaits stdio close after bounded forced
+  termination of any child that survives protocol shutdown. A closing-aware
+  client error handler forbids restart, and per-root close waits for the pending
+  initialize/state tail before extension-wide channels are released.
+- Every runtime keeps a workspace-relative document selector, while
+  `WorkspaceDocumentRouter` is the single authority for overlapping selectors.
+  Among ready roots it assigns an open supported document to the longest
+  matching URI root. A root activation or removal performs an ordered
+  `didClose`/diagnostic-clear/`didOpen` handoff using the document's current
+  in-memory text, without requiring the editor to close. Middleware admits
+  changes, saves, diagnostics, and code actions only for the exact active
+  runtime that currently owns the server-open document. Exact runtime identity
+  rejects diagnostics from a replaced same-URI client, while a document epoch
+  rejects code actions that finish after an ownership change. When the
+  LanguageClient automatically restarts a native server, the router invalidates
+  every recorded server-open session for that runtime—including documents that
+  closed during the feature-listener gap—before LanguageClient replays
+  `didOpen`, so the replacement process receives every still-open document
+  exactly once and a later same-URI reopen cannot inherit stale ownership. The
+  reset is queued as soon as a running transport exits and repeated at the next
+  `Running` transition; root removal also drains any exact-runtime session that
+  disappeared from VS Code's open-document list during that gap.
+- Each root starts `rslint/configRefresh`, and Go scans that process cwd with a
+  transaction-scoped cached VFS. Go sends
   `rslint/loadConfigs` and
   `rslint/activateConfigs`, then commits or aborts the matching plugin-host state
   through `rslint/commitConfigs` / `rslint/abortConfigs`. `fresh` loads cache-bust the config entry
@@ -1054,11 +1087,14 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │                                LSP PATH                                      │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  VS Code Extension                                                           │
-│     └───────────────► rslint/configRefresh ────────────────┐                 │
+│  VS Code Extension (shared UI / channels)                                   │
+│     ├── WorkspaceRslintCoordinator (URI identity + generations)             │
+│     ├── WorkspaceDocumentRouter (longest-ready-root ownership)               │
+│     └── Rslint runtime per active root                                       │
+│             └──────── rslint/configRefresh ────────────────┐                 │
 │             ◄──────── load / activate / commit / abort     │                 │
 │                                                            ▼                 │
-│                                                   cmd/rslint --lsp            │
+│                                             cmd/rslint --lsp per root         │
 │     │                                                                        │
 │     ▼                                                                        │
 │  internal/lsp + ts-go project.Session                                        │

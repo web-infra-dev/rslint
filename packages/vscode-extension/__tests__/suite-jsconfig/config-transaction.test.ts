@@ -223,7 +223,11 @@ function loadRequest(transactionId = 'tx-1'): LoadConfigsRequest {
 
 suite('LSP config discovery transactions', () => {
   test('the extension watcher leaves gitignore ownership to Go', () => {
+    assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.js/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.mjs/);
+    assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.ts/);
+    assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.mts/);
+    assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.\*/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.jsonc/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /pnpm-lock\.yaml/);
     assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /\.gitignore/);

@@ -1,0 +1,8 @@
+{
+  "folders": [
+    { "path": "parent" },
+    { "path": "sentinel" },
+    { "name": "app", "path": "twins/left/app" },
+    { "name": "app", "path": "twins/right/app" },
+  ],
+}

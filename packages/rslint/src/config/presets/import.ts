@@ -8,13 +8,13 @@ const recommended: RslintConfigEntry = {
     // errors
     // 'import/no-unresolved': 'error', // not implemented
     // 'import/named': 'error', // not implemented
-    // 'import/namespace': 'error', // not implemented
-    // 'import/default': 'error', // not implemented
+    'import/namespace': 'error',
+    'import/default': 'error',
     // 'import/export': 'error', // not implemented
     // warnings
     // 'import/no-named-as-default': 'warn', // not implemented
     // 'import/no-named-as-default-member': 'warn', // not implemented
-    // 'import/no-duplicates': 'warn', // not implemented
+    'import/no-duplicates': 'warn',
   },
 };
 

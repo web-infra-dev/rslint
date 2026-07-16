@@ -11,7 +11,7 @@ const recommended: RslintConfigEntry = {
     'no-dupe-class-members': 'error',
     'no-dupe-else-if': 'error',
     'no-empty-character-class': 'error',
-    // 'no-empty-static-block': 'error', // not implemented
+    'no-empty-static-block': 'error',
     'no-ex-assign': 'error',
     'no-extra-boolean-cast': 'error',
     'no-fallthrough': 'error',
@@ -21,12 +21,12 @@ const recommended: RslintConfigEntry = {
     'no-invalid-regexp': 'error',
     'no-irregular-whitespace': 'error',
     'no-misleading-character-class': 'error',
-    // 'no-new-native-nonconstructor': 'error', // not implemented
+    'no-new-native-nonconstructor': 'error',
     'no-nonoctal-decimal-escape': 'error',
     'no-obj-calls': 'error',
     'no-octal': 'error',
     'no-prototype-builtins': 'error',
-    // 'no-redeclare': 'error', // not implemented
+    'no-redeclare': 'error',
     'no-regex-spaces': 'error',
     'no-self-assign': 'error',
     'no-setter-return': 'error',
@@ -38,10 +38,10 @@ const recommended: RslintConfigEntry = {
     'no-unsafe-finally': 'error',
     'no-unsafe-negation': 'error',
     'no-unsafe-optional-chaining': 'error',
-    // 'no-unused-labels': 'error', // not implemented
-    // 'no-unused-private-class-members': 'error', // not implemented
+    'no-unused-labels': 'error',
+    'no-unused-private-class-members': 'error',
     // 'no-unused-vars': 'error', // not implemented
-    // 'no-unassigned-vars': 'error', // not implemented
+    'no-unassigned-vars': 'error',
     // 'no-useless-assignment': 'error', // not implemented
     'no-useless-backreference': 'error',
     'no-useless-catch': 'error',

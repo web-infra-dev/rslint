@@ -1,0 +1,7 @@
+{
+  "folders": [
+    { "path": "parent" },
+    { "path": "parent/nested" },
+    { "path": "sentinel" },
+  ],
+}

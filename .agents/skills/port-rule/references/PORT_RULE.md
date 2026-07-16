@@ -16,6 +16,8 @@ Your job is porting the **rule's semantics** — given equivalent input, produce
 
 Note: `languageOptions.globals` and `/*global ...*/` comments are automatically parsed by rslint and exposed through `ctx.Globals`. When porting rules that reference global variables, do not skip these test cases; instead, check `ctx.Globals` (e.g., `ctx.Globals[name]`).
 
+Note: every comment in the file is already collected once by the linter and exposed through `ctx.Comments` (`[]*ast.CommentRange`, sorted, deduplicated). If your rule needs to scan all of a file's comments (directive comments, "is this line comment-only", etc.), iterate `ctx.Comments` directly — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
+
 When an upstream test case depends on other unsupported concepts (like `env` or `/*eslint*/` configurations):
 
 - **Don't** reimplement the concept inside your rule.

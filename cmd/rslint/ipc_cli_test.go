@@ -3,8 +3,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +14,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -174,9 +175,12 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 		"workingDirectory": dir,
 		"format":           "stylish",
 		"configDiscovery":  map[string]any{"mode": "auto"},
-	})
+	}, false)
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2; output=%q", code, output)
+	}
+	if output != "" {
+		t.Fatalf("invalid format unexpectedly produced stdout: %q", output)
 	}
 }
 
@@ -217,7 +221,7 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	code, text := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"runtime":          map[string]any{"stdoutIsTTY": tty},
-	})
+	}, true)
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1 (one lint error)", code)
 	}
@@ -270,7 +274,7 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			t.Setenv("NO_COLOR", "1")
 			code, text := runCLIInitForTest(t, map[string]any{
 				"workingDirectory": test.workingDirectory,
-			})
+			}, true)
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)
 			}
@@ -300,7 +304,114 @@ func createWorkingDirectoryAlias(t *testing.T, target, alias string) {
 	})
 }
 
-func runCLIInitForTest(t *testing.T, payload any) (int, string) {
+const cliTestInitRequestID = 1
+
+type cliTestPeerResult struct {
+	output           string
+	initReplies      int
+	shutdownRequests int
+	err              error
+}
+
+// serveCLITestPeer models the ordering that matters in the real Node peer:
+// output notifications are handled synchronously as frames are decoded, and
+// only then can a later shutdown request be acknowledged. Using ipc.Channel
+// here would be incorrect because its Go-side notification and request
+// handlers intentionally run in independent goroutines and may overtake one
+// another.
+func serveCLITestPeer(fromCLI io.Reader, toCLI io.Writer) cliTestPeerResult {
+	reader := bufio.NewReader(fromCLI)
+	var output bytes.Buffer
+	result := cliTestPeerResult{}
+	shutdownSeen := false
+	recordError := func(err error) {
+		if result.err == nil {
+			result.err = err
+		}
+	}
+
+	for {
+		msg, err := ipc.ReadFrame(reader)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				recordError(fmt.Errorf("read CLI frame: %w", err))
+			}
+			result.output = output.String()
+			return result
+		}
+
+		switch {
+		case (msg.Kind == ipc.KindResponse || msg.Kind == ipc.KindError) && msg.ID == cliTestInitRequestID:
+			result.initReplies++
+			if msg.Kind == ipc.KindError {
+				var response ipc.ErrorResponseData
+				if err := msg.Decode(&response); err != nil {
+					recordError(fmt.Errorf("decode init error response: %w", err))
+				} else {
+					recordError(fmt.Errorf("init rejected: %s", response.Message))
+				}
+				continue
+			}
+			var response struct {
+				OK bool `json:"ok"`
+			}
+			if err := msg.Decode(&response); err != nil {
+				recordError(fmt.Errorf("decode init response: %w", err))
+			} else if !response.OK {
+				recordError(errors.New("init response did not acknowledge the request"))
+			}
+
+		case msg.ID == 0 && msg.Kind == kindOutput:
+			if shutdownSeen {
+				recordError(errors.New("received output after shutdown"))
+			}
+			var notification struct {
+				Stream string `json:"stream"`
+				Text   string `json:"text"`
+			}
+			if err := msg.Decode(&notification); err != nil {
+				recordError(fmt.Errorf("decode output notification: %w", err))
+				continue
+			}
+			if notification.Stream != "stdout" {
+				recordError(fmt.Errorf("output stream = %q, want stdout", notification.Stream))
+			}
+			output.WriteString(notification.Text)
+
+		case msg.ID > 0 && msg.Kind == kindShutdown:
+			result.shutdownRequests++
+			if shutdownSeen {
+				recordError(errors.New("received duplicate shutdown request"))
+			}
+			shutdownSeen = true
+			response, err := ipc.NewMessage(ipc.KindResponse, msg.ID, map[string]any{"ok": true})
+			if err != nil {
+				recordError(fmt.Errorf("build shutdown response: %w", err))
+				continue
+			}
+			if err := ipc.WriteFrame(toCLI, response); err != nil {
+				recordError(fmt.Errorf("write shutdown response: %w", err))
+			}
+
+		default:
+			recordError(fmt.Errorf("unexpected CLI frame kind=%q id=%d", msg.Kind, msg.ID))
+			if msg.ID > 0 && msg.Kind != ipc.KindResponse && msg.Kind != ipc.KindError {
+				response, responseErr := ipc.NewMessage(ipc.KindError, msg.ID, ipc.ErrorResponseData{
+					Message: fmt.Sprintf("unexpected test-peer request kind %q", msg.Kind),
+				})
+				if responseErr != nil {
+					recordError(fmt.Errorf("build unexpected-frame response: %w", responseErr))
+					continue
+				}
+				if responseErr := ipc.WriteFrame(toCLI, response); responseErr != nil {
+					recordError(fmt.Errorf("write unexpected-frame response: %w", responseErr))
+				}
+			}
+		}
+	}
+}
+
+func runCLIInitForTest(t *testing.T, payload any, wantShutdown bool) (int, string) {
 	t.Helper()
 
 	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
@@ -330,38 +441,20 @@ func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 		_ = stdoutW.Close()
 	})
 
-	// The test plays the Node peer on the other pipe ends.
-	peer := ipc.NewChannel(stdoutR, stdinW)
-	var outMu sync.Mutex
-	var out bytes.Buffer
-	peer.RegisterNotification(kindOutput, func(msg *ipc.Message) {
-		var d struct {
-			Text string `json:"text"`
-		}
-		if err := msg.Decode(&d); err != nil {
-			return
-		}
-		outMu.Lock()
-		out.WriteString(d.Text)
-		outMu.Unlock()
-	})
-	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
-		if msg.Kind == kindShutdown {
-			return map[string]any{"ok": true}, nil
-		}
-		return nil, fmt.Errorf("unexpected inbound kind %q", msg.Kind)
-	})
-	peer.Start()
-	t.Cleanup(func() { _ = peer.Close() })
+	peerDone := make(chan cliTestPeerResult, 1)
+	go func() {
+		peerDone <- serveCLITestPeer(stdoutR, stdinW)
+	}()
 
 	codeCh := make(chan int, 1)
 	go func() { codeCh <- runCLI(nil) }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	_, err = peer.SendRequest(ctx, kindInit, payload)
+	initRequest, err := ipc.NewMessage(kindInit, cliTestInitRequestID, payload)
 	if err != nil {
-		t.Fatalf("init request failed: %v", err)
+		t.Fatalf("build init request: %v", err)
+	}
+	if err := ipc.WriteFrame(stdinW, initRequest); err != nil {
+		t.Fatalf("write init request: %v", err)
 	}
 
 	var code int
@@ -371,10 +464,36 @@ func runCLIInitForTest(t *testing.T, payload any) (int, string) {
 		t.Fatal("runCLI did not return within 60s")
 	}
 
-	// runCLI returns only after finalizeStdout drained every output frame and
-	// the shutdown round-trip completed, so `out` is complete here.
-	outMu.Lock()
-	text := out.String()
-	outMu.Unlock()
-	return code, text
+	// runCLI has stopped writing frames. Closing its test stdout publishes EOF
+	// to the ordered peer so we can join it before inspecting captured output.
+	// The join, rather than a sleep or retry, is the happens-before edge that
+	// makes the capture complete.
+	os.Stdin, os.Stdout = origStdin, origStdout
+	if err := stdoutW.Close(); err != nil {
+		t.Fatalf("close CLI stdout: %v", err)
+	}
+
+	var peerResult cliTestPeerResult
+	select {
+	case peerResult = <-peerDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("test peer did not finish after CLI stdout closed")
+	}
+	if err := stdinW.Close(); err != nil {
+		t.Fatalf("close test peer output: %v", err)
+	}
+	if peerResult.err != nil {
+		t.Fatalf("test peer protocol error: %v", peerResult.err)
+	}
+	if peerResult.initReplies != 1 {
+		t.Fatalf("init replies = %d, want 1", peerResult.initReplies)
+	}
+	wantShutdownRequests := 0
+	if wantShutdown {
+		wantShutdownRequests = 1
+	}
+	if peerResult.shutdownRequests != wantShutdownRequests {
+		t.Fatalf("shutdown requests = %d, want %d", peerResult.shutdownRequests, wantShutdownRequests)
+	}
+	return code, peerResult.output
 }
