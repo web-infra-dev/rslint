@@ -31,7 +31,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/filename-case': 'error',
     // 'unicorn/import-style': 'error', // not implemented
     // 'unicorn/isolated-functions': 'error', // not implemented
-    // 'unicorn/new-for-builtins': 'error', // not implemented
+    'unicorn/new-for-builtins': 'error',
     // 'unicorn/no-abusive-eslint-disable': 'error', // not implemented
     // 'unicorn/no-accessor-recursion': 'error', // not implemented
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
@@ -49,7 +49,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-for-loop': 'error', // not implemented
     // 'unicorn/no-hex-escape': 'error', // not implemented
     // 'unicorn/no-immediate-mutation': 'error', // not implemented
-    // 'unicorn/no-instanceof-builtins': 'error', // not implemented
+    'unicorn/no-instanceof-builtins': 'error',
     // 'unicorn/no-invalid-fetch-options': 'error', // not implemented
     // 'unicorn/no-invalid-remove-event-listener': 'error', // not implemented
     // 'unicorn/no-keyword-prefix': 'off', // not implemented
@@ -66,7 +66,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-process-exit': 'error', // not implemented
     // 'unicorn/no-single-promise-in-promise-methods': 'error', // not implemented
     'unicorn/no-static-only-class': 'error',
-    // 'unicorn/no-thenable': 'error', // not implemented
+    'unicorn/no-thenable': 'error',
     // 'unicorn/no-this-assignment': 'error', // not implemented
     // 'unicorn/no-typeof-undefined': 'error', // not implemented
     // 'unicorn/no-unnecessary-array-flat-depth': 'error', // not implemented
@@ -84,7 +84,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-length-check': 'error', // not implemented
     // 'unicorn/no-useless-promise-resolve-reject': 'error', // not implemented
     // 'unicorn/no-useless-spread': 'error', // not implemented
-    // 'unicorn/no-useless-switch-case': 'error', // not implemented
+    'unicorn/no-useless-switch-case': 'error',
     // 'unicorn/no-useless-undefined': 'error', // not implemented
     // 'unicorn/no-zero-fractions': 'error', // not implemented
     // 'unicorn/number-literal-case': 'error', // not implemented
@@ -92,7 +92,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-add-event-listener': 'error', // not implemented
     // 'unicorn/prefer-array-find': 'error', // not implemented
     // 'unicorn/prefer-array-flat': 'error', // not implemented
-    // 'unicorn/prefer-array-flat-map': 'error', // not implemented
+    'unicorn/prefer-array-flat-map': 'error',
     // 'unicorn/prefer-array-index-of': 'error', // not implemented
     // 'unicorn/prefer-array-some': 'error', // not implemented
     // 'unicorn/prefer-at': 'error', // not implemented
@@ -123,7 +123,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-native-coercion-functions': 'error', // not implemented
     // 'unicorn/prefer-negative-index': 'error', // not implemented
     // 'unicorn/prefer-node-protocol': 'error', // not implemented
-    // 'unicorn/prefer-number-properties': 'error', // not implemented
+    'unicorn/prefer-number-properties': 'error',
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
     // 'unicorn/prefer-optional-catch-binding': 'error', // not implemented
     // 'unicorn/prefer-prototype-methods': 'error', // not implemented
