@@ -43,7 +43,7 @@ describe('RuleEntry / RulesRecord typing', () => {
   // (type-stripping) test runner. Locks in that `RuleEntry<Options>`
   // distributes a union-of-tuples `Options` over the severity + rest-args
   // shape, matching the `generate-rule-option-types` rslib plugin's output
-  // (rslib.config.ts).
+  // (../generate-rule-option-types.ts).
   test('RuleEntry<Options> distributes options over severities', () => {
     type Options = [] | [{ allow?: string[] }];
     const bareSeverity: RuleEntry<Options> = 'error';

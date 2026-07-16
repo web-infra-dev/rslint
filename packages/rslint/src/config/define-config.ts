@@ -68,21 +68,18 @@ export type RuleOptions = Record<string, any>;
  *
  * - `RuleSeverity` — just toggle the rule.
  * - `[RuleSeverity, ...Options]` — ESLint-style array form. `Options` is the
- *   rule's own options-array type, generated from its JSON Schema for rules
- *   that declare one (see the `generate-rule-option-types` rslib plugin in
- *   `rslib.config.ts`); rules without a generated schema default to `any[]`.
+ *   rule's own options-array type for rules with a precisely-typed entry in
+ *   `RulesRecord`; other rules default to `any[]`.
  */
 export type RuleEntry<Options extends any[] = any[]> =
   | RuleSeverity
   | readonly [RuleSeverity, ...Options];
 
 /**
- * Map of rule name → rule configuration. Known native rules that declare an
- * options JSON Schema get a named, precisely-typed property here — injected
- * into the built `dist/index.d.ts` by the `generate-rule-option-types` rslib
- * plugin (`rslib.config.ts`). The index signature is the fallback for every
- * other rule name (not-yet-migrated native rules, and community/plugin
- * rules), which stays untyped (`any[]`).
+ * Map of rule name → rule configuration. Rules with a known options shape
+ * get a named, precisely-typed property here; every other rule name (not
+ * yet typed, or a community/plugin rule) falls back to the untyped index
+ * signature (`any[]`).
  */
 export interface RulesRecord {
   [key: string]: RuleEntry<any[]> | undefined;
