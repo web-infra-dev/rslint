@@ -143,16 +143,16 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native build
+        run: pnpm --filter @rslint/native run build
 
       - name: Format
         run: pnpm format:check
 
       - name: Build
-        run: pnpm build
+        run: pnpm run build
 
       - name: Dogfooding
-        run: pnpm lint --format github
+        run: pnpm run lint --format github
 
       - name: TypeCheck
         run: pnpm typecheck
@@ -173,7 +173,7 @@ jobs:
             vscode-distributions-v2-${{ matrix.os }}-
 
       - name: Test
-        run: xvfb-run -a pnpm test
+        run: xvfb-run -a pnpm run test
 
   test-node-windows:
     name: Test npm packages (rspack-windows-2022-large)
@@ -199,7 +199,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native build
+        run: pnpm --filter @rslint/native run build
 
       - name: Build rslint.exe
         shell: pwsh
@@ -240,7 +240,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
-        run: pnpm --filter @rslint/native build
+        run: pnpm --filter @rslint/native run build
 
       - name: Download rslint.exe
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -248,18 +248,15 @@ jobs:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
 
-      # Skip @rslint/core's build:bin, which invokes `go build` directly -
-      # this job has no Go toolchain set up and shouldn't need one. The host
-      # rslint.exe was already built on the self-hosted Windows runner and
-      # downloaded above into npm/rslint/win32-x64-msvc/, the same path
-      # build:bin would have placed it. No rule-schemas.json either — this
-      # job only runs vscode-extension tests, which don't need typed rule
-      # options; build:js's onAfterBuild hook just skips with a warning.
+      # build:js only - skip @rslint/core's build:bin, which invokes `go
+      # build` directly. The host rslint.exe was already built on the
+      # self-hosted Windows runner and downloaded above; this job has no Go
+      # toolchain set up and shouldn't need one.
       - name: Build
         shell: bash
         run: |
           pnpm --filter @rslint/api build
-          pnpm --filter @rslint/core build:js
+          pnpm --filter @rslint/core run build:js
           pnpm --filter rslint build
 
       - name: VSCode Test Cache

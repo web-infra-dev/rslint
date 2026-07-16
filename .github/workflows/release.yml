@@ -100,13 +100,8 @@ jobs:
       # subpackages, populated from the napi-build artifacts by move-artifacts
       # above. core's loader resolves them at runtime, so no napi build / Rust is
       # needed here — build:js just bundles the worker (loader + types live in core).
-      # build:js's onAfterBuild hook (packages/rslint/rslib.config.ts) then
-      # splices typed rule options into dist/index.d.ts, reading the
-      # rule-schemas.json move-artifacts placed above (dumped by the `build`
-      # job's Go toolchain — no Go toolchain needed here).
       - name: Build @rslint/core dist
-        run: |
-          pnpm --filter @rslint/core build:js
+        run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
@@ -267,7 +262,7 @@ jobs:
         run: pnpm --filter @rslint/native build
 
       - name: Build
-        run: pnpm build
+        run: pnpm run build
 
       - name: TypeCheck
         run: pnpm typecheck
