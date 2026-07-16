@@ -144,7 +144,7 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 
 	// export { local as exported }: only `local` can read a runtime value.
 	if parent.Kind == ast.KindExportSpecifier {
-		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || isReExportSpecifier(parent) {
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || IsReExportSpecifier(parent) {
 			return true
 		}
 		es := parent.AsExportSpecifier()
@@ -281,9 +281,9 @@ func IsUndefinedIdentifier(node *ast.Node) bool {
 	return node != nil && ast.IsIdentifier(node) && node.AsIdentifier().Text == "undefined"
 }
 
-// isReExportSpecifier checks if an ExportSpecifier is part of a re-export
+// IsReExportSpecifier checks if an ExportSpecifier is part of a re-export
 // declaration (export { ... } from 'mod').
-func isReExportSpecifier(exportSpec *ast.Node) bool {
+func IsReExportSpecifier(exportSpec *ast.Node) bool {
 	// ExportSpecifier → NamedExports → ExportDeclaration
 	namedExports := exportSpec.Parent
 	if namedExports == nil {
@@ -294,4 +294,23 @@ func isReExportSpecifier(exportSpec *ast.Node) bool {
 		return false
 	}
 	return exportDecl.AsExportDeclaration().ModuleSpecifier != nil
+}
+
+// IsClassExtendsHeritageClause reports whether an ExpressionWithTypeArguments
+// node sits inside a class (not interface) `extends` clause — a value
+// context, since the superclass expression is actually evaluated at runtime.
+// Every other heritage use (interface extends, class implements) is a pure
+// type position.
+func IsClassExtendsHeritageClause(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindHeritageClause {
+		return false
+	}
+	clause := parent.AsHeritageClause()
+	if clause.Token != ast.KindExtendsKeyword {
+		return false
+	}
+	grandparent := parent.Parent
+	return grandparent != nil &&
+		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
 }

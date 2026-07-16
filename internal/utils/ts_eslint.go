@@ -1404,13 +1404,15 @@ func NormalizeNumericLiteral(text string) string {
 // NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
 // representation, matching ESLint's String(node.value) behavior.
 // e.g., "1n" -> "1", "0x1n" -> "1", "0o1n" -> "1", "0b1n" -> "1"
+//
+// Uses big.Int (not strconv.ParseInt) since BigInt literals are arbitrary
+// precision and routinely exceed int64, e.g. 0x10000000000000000n (2^64).
 func NormalizeBigIntLiteral(text string) string {
 	s := strings.TrimSuffix(text, "n")
-	i, err := strconv.ParseInt(s, 0, 64)
-	if err != nil {
-		return s
+	if n, ok := new(big.Int).SetString(s, 0); ok {
+		return n.String()
 	}
-	return strconv.FormatInt(i, 10)
+	return s
 }
 
 // GetStaticExpressionValue returns the static string value of a literal expression,
@@ -1428,10 +1430,13 @@ func NormalizeBigIntLiteral(text string) string {
 //   - NoSubstitutionTemplateLiteral: returns the template text
 //   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
 //     matching JavaScript's implicit toString coercion when used as a property key
+//   - NullKeyword / TrueKeyword / FalseKeyword: return "null" / "true" / "false"
+//   - BigIntLiteral: returns the normalized decimal string (e.g. "1n" → "1")
 //
 // This is the expression-level complement to [GetStaticPropertyName]:
 // use GetStaticPropertyName for property name nodes (object keys, class members),
 // and GetStaticExpressionValue for value positions (element access arguments, etc.).
+// Mirrors ESLint's `astUtils.getStaticStringValue`.
 func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
@@ -1445,6 +1450,14 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:
 		return node.AsRegularExpressionLiteral().Text, true
+	case ast.KindNullKeyword:
+		return "null", true
+	case ast.KindTrueKeyword:
+		return "true", true
+	case ast.KindFalseKeyword:
+		return "false", true
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(node.AsBigIntLiteral().Text), true
 	}
 	return "", false
 }

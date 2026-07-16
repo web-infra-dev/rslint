@@ -1,0 +1,562 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-globals > invalid 1`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 2`] = `
+{
+  "code": "function fn() { foo; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 3`] = `
+{
+  "code": "event",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'event'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 4`] = `
+{
+  "code": "foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 5`] = `
+{
+  "code": "foo.bar()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 6`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 7`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'. Use bar instead.",
+      "messageId": "customMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 8`] = `
+{
+  "code": "var foo = obj => hasOwnProperty(obj, 'name');",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'hasOwnProperty'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 9`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 10`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 11`] = `
+{
+  "code": "foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'. Use bar instead.",
+      "messageId": "customMessage",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 12`] = `
+{
+  "code": "window.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 13`] = `
+{
+  "code": "self.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 14`] = `
+{
+  "code": "window.window.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 15`] = `
+{
+  "code": "globalThis.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 16`] = `
+{
+  "code": "myGlobal.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 17`] = `
+{
+  "code": "window["foo"]",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 18`] = `
+{
+  "code": "window?.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 19`] = `
+{
+  "code": "window.foo(); myGlobal.foo()",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+    {
+      "message": "Unexpected use of 'foo'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 20`] = `
+{
+  "code": "function onClick(event) { console.log(event); console.log(window.event); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'event'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-globals > invalid 21`] = `
+{
+  "code": "const x: Promise<any> = Promise.resolve();",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'Promise'.",
+      "messageId": "defaultMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
