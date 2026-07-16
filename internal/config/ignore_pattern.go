@@ -3,9 +3,9 @@ package config
 import (
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
@@ -188,26 +188,17 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 }
 
 // ignorePatternMatches reports whether path matches pattern.Glob, applying the
-// case fold for case-insensitive patterns. It uses MatchUnvalidated instead of
-// matchGlob's doublestar.Match: doublestar's own algorithm only ever consults
-// pattern validity to decide which "no match" error to report (ErrBadPattern
-// vs nil) — every validate-gated branch in doMatchWithSeparator/
-// isZeroLengthPattern already returns matched=false regardless of the
-// validate flag, and malformed-syntax errors hit mid-walk (unclosed `[`/`{`)
-// return false unconditionally, validate or not. So an invalid pattern can
-// never make Match report true, with or without validation, which means
-// skipping validation is always safe for a boolean-only caller — no cached
-// "is this pattern valid" flag is needed to gate it. Re-validating on every
-// call (the common case being a non-match, since most patterns don't apply to
-// most files) dominated profiles of the per-file ignore check once file
-// collection was parallelized; MatchUnvalidated skips exactly that dead work.
+// case fold for case-insensitive patterns. See utils.MatchGlob for why this is
+// safe and still fast despite doublestar.Match's own re-validation dominating
+// profiles of the per-file ignore check once file collection was
+// parallelized.
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
 		glob = strings.ToLower(glob)
 		path = strings.ToLower(path)
 	}
-	return doublestar.MatchUnvalidated(glob, path)
+	return utils.MatchGlob(glob, path)
 }
 
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).

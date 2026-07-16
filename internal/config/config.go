@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
@@ -20,6 +19,7 @@ import (
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	coreRules "github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -662,15 +662,6 @@ func registerAllCoreEslintRules() {
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
-// matchGlob matches a glob pattern against a path using doublestar.
-// MatchUnvalidated skips doublestar's re-validation of the pattern on every
-// call: an invalid pattern can never make Match report true (its own
-// validate-gated branches all resolve to matched=false regardless of the
-// validate flag), so a boolean-only caller loses nothing by skipping it.
-func matchGlob(pattern, path string) bool {
-	return doublestar.MatchUnvalidated(pattern, path)
-}
-
 func normalizePattern(pattern string) string {
 	return tspath.NormalizePath(pattern)
 }
@@ -969,17 +960,17 @@ func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) b
 
 	normalizedPattern := normalizePattern(pattern)
 
-	if doublestar.MatchUnvalidated(normalizedPattern, normalizedPath) {
+	if utils.MatchGlob(normalizedPattern, normalizedPath) {
 		return true
 	}
 	if normalizedPath != filePath {
-		if doublestar.MatchUnvalidated(normalizedPattern, filePath) {
+		if utils.MatchGlob(normalizedPattern, filePath) {
 			return true
 		}
 	}
 	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
-		if doublestar.MatchUnvalidated(normalizedPattern, unixPath) {
+		if utils.MatchGlob(normalizedPattern, unixPath) {
 			return true
 		}
 	}

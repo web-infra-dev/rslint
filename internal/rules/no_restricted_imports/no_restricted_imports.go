@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -148,12 +147,12 @@ func (m *ignoreMatcher) ignores(path string) bool {
 // all their contents). We skip empty-segment boundaries from "//" so that
 // doublestar's `*` (which matches zero chars) doesn't produce false positives.
 func matchIgnore(glob, path string) bool {
-	if doublestar.MatchUnvalidated(glob, path) {
+	if utils.MatchGlob(glob, path) {
 		return true
 	}
 	for i := len(path) - 1; i > 0; i-- {
 		if path[i] == '/' && path[i-1] != '/' {
-			if doublestar.MatchUnvalidated(glob, path[:i]) {
+			if utils.MatchGlob(glob, path[:i]) {
 				return true
 			}
 		}
