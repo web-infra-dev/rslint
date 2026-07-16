@@ -39,9 +39,9 @@ jobs:
       # package (the CLI benchmarks mainly exercise the Go binary, but may spawn
       # the worker).
       - name: Build napi parser
-        run: pnpm --filter @rslint/native build
+        run: pnpm --filter @rslint/native run build
       - name: Build JS package
-        run: pnpm --filter @rslint/core build:bin && pnpm --filter @rslint/core build:js
+        run: pnpm --filter @rslint/core run build:bin && pnpm --filter @rslint/core run build:js
 
       - name: Run CLI benchmarks
         uses: CodSpeedHQ/action@d872884a306dd4853acf0f584f4b706cf0cc72a2
@@ -53,6 +53,6 @@ jobs:
           GH_STRATEGY: '${{ toJson(strategy) }}'
         with:
           mode: walltime
-          run: pnpm bench:cli
+          run: pnpm run bench:cli
           runner-version: 4.13.0
           go-runner-version: 1.1.0
