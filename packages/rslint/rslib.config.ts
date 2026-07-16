@@ -1,4 +1,39 @@
-import { defineConfig } from '@rslib/core';
+import { defineConfig, type RsbuildPlugin } from '@rslib/core';
+import { generateRuleOptionTypes } from '../../scripts/generate-rule-option-types.mjs';
+
+/**
+ * Splices typed rule options into `dist/index.d.ts` once the whole
+ * (multi-`lib`-entry) build finishes — `onAfterBuild` fires once for the
+ * entire rslib build, not per entry, so by the time it runs `librarySurface`'s
+ * `dist/index.d.ts` already exists. See scripts/generate-rule-option-types.mjs.
+ *
+ * A missing rule-schemas dump only skips with a warning, rather than failing
+ * the build: unlike `build:bin`-driven builds (local dev, CI's Go-toolchain
+ * jobs) and CI jobs that fetch the prebuilt artifact, `build:website`'s
+ * `build:js` (no Go, no artifact fetch — it only needs the JS runtime, not
+ * typed rule options) never produces or fetches that file.
+ */
+const generateRuleOptionTypesPlugin = (): RsbuildPlugin => ({
+  name: 'generate-rule-option-types',
+  setup(api) {
+    api.onAfterBuild(async () => {
+      try {
+        const count = await generateRuleOptionTypes();
+        api.logger.log(
+          `generate-rule-option-types: injected ${count} typed rule(s) into dist/index.d.ts`,
+        );
+      } catch (err) {
+        if (err.code === 'RULE_SCHEMAS_NOT_FOUND') {
+          api.logger.warn(
+            `generate-rule-option-types: skipped — ${err.message}`,
+          );
+          return;
+        }
+        throw err;
+      }
+    });
+  },
+});
 
 /**
  * Single rslib build for all of `@rslint/core`'s JS: the public library surface
@@ -51,6 +86,7 @@ const librarySurface = {
     },
   },
   dts: { bundle: true },
+  plugins: [generateRuleOptionTypesPlugin()],
 };
 
 const workerBase = {

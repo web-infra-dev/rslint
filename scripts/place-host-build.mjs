@@ -37,11 +37,9 @@ function isMusl() {
 
 /**
  * The `@rslint/native-<tuple>` platform tuple for the host, e.g.
- * `darwin-arm64`, `linux-x64-musl`, `win32-x64-msvc`. Shared with
- * packages/rslint/scripts/generate-rule-option-types.mjs, which needs to
- * find the host `rslint` binary this script places under `npm/rslint/`.
+ * `darwin-arm64`, `linux-x64-musl`, `win32-x64-msvc`.
  */
-export function hostTuple() {
+function hostTuple() {
   const { platform, arch } = process;
   if (platform === 'darwin') return `darwin-${arch}`;
   if (platform === 'win32') return `win32-${arch}-msvc`;
@@ -67,6 +65,24 @@ function main() {
       stdio: 'inherit',
       env: debug ? { ...process.env, GOEXPERIMENT: 'noregabi' } : process.env,
     });
+
+    // Also dump every native rule's options JSON Schema (see
+    // cmd/dump-rule-schemas) to the fixed path
+    // scripts/generate-rule-option-types.mjs reads at `build:js` time — kept
+    // here rather than in that script so the Go toolchain requirement stays
+    // confined to build:bin; CI legs without Go instead fetch this file as
+    // a prebuilt artifact.
+    const schemasOut = path.join(
+      repoRoot,
+      'packages',
+      'rslint',
+      'rule-schemas.json',
+    );
+    const schemas = execFileSync('go', ['run', './cmd/dump-rule-schemas'], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+    fs.writeFileSync(schemasOut, schemas);
   } else if (what === 'node') {
     const file = `rslint.${tuple}.node`;
     const src = path.join(repoRoot, 'crates', 'rslint-native', file);

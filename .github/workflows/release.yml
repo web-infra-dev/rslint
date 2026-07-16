@@ -100,15 +100,12 @@ jobs:
       # subpackages, populated from the napi-build artifacts by move-artifacts
       # above. core's loader resolves them at runtime, so no napi build / Rust is
       # needed here — build:js just bundles the worker (loader + types live in core).
-      # build:types then shells out to the linux-x64 rslint binary
-      # move-artifacts placed at npm/rslint/linux-x64-gnu/rslint (built by the
-      # `build` job, statically linked so it runs on this ubuntu-22.04 runner)
-      # via its hidden --dump-rule-schemas flag — no Go toolchain needed here —
-      # to splice typed rule options into dist/index.d.ts before it's published.
+      # build:js's onAfterBuild hook (packages/rslint/rslib.config.ts) then
+      # splices typed rule options into dist/index.d.ts, reading the
+      # rule-schemas.json move-artifacts placed above (dumped by the `build`
+      # job's Go toolchain — no Go toolchain needed here).
       - name: Build @rslint/core dist
-        run: |
-          pnpm --filter @rslint/core build:js
-          pnpm --filter @rslint/core build:types
+        run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
@@ -354,6 +351,23 @@ jobs:
       - name: Go Build tsgo
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo ./cmd/tsgo
+
+      # Rule options JSON Schema dump for scripts/generate-rule-option-types.mjs
+      # (see packages/rslint/rslib.config.ts's onAfterBuild hook), read by
+      # publish-npm once move-artifacts places it. The dump is
+      # platform-independent JSON, so it only needs to run once, on this
+      # matrix leg's host (ubuntu-22.04, not a cross-compile target) — no
+      # GOOS/GOARCH override, it runs natively rather than being cross-built.
+      - name: Dump rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        run: go run ./cmd/dump-rule-schemas > rule-schemas.json
+
+      - name: Upload rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rule-schemas
+          path: rule-schemas.json
 
       - name: Upload rslint artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

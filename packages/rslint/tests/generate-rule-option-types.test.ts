@@ -1,18 +1,42 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect, beforeAll, afterAll } from '@rstest/core';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   collectRuleSchemas,
   ruleIdToTypeName,
   injectIntoDts,
-} from '../scripts/generate-rule-option-types.mjs';
+} from '../../../scripts/generate-rule-option-types.mjs';
+
+const REPO_ROOT = path.resolve(__dirname, '../../..');
 
 describe('collectRuleSchemas', () => {
-  // Exercises the real host `rslint --dump-rule-schemas` boundary (requires
-  // `pnpm build:bin` to have already placed the binary under npm/rslint/ —
-  // see package.json's `build` script chain) rather than mocking it, since
-  // the whole point of going through Go's rule registry is that it's the
-  // single source of truth for rule IDs/prefixes and declared schemas.
-  test('includes rules with a custom schema and the shared EmptyArraySchema, omits not-yet-migrated rules', () => {
-    const rules = collectRuleSchemas();
+  // Exercises the real `go run ./cmd/dump-rule-schemas` boundary (requires a
+  // Go toolchain) rather than mocking it, since the whole point of going
+  // through Go's rule registry is that it's the single source of truth for
+  // rule IDs/prefixes and declared schemas. collectRuleSchemas() itself is
+  // just a JSON file read, so this dumps into a temp file to exercise it.
+  let schemasPath: string;
+
+  beforeAll(() => {
+    schemasPath = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'rule-schemas-')),
+      'rule-schemas.json',
+    );
+    const output = execFileSync('go', ['run', './cmd/dump-rule-schemas'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf-8',
+    });
+    fs.writeFileSync(schemasPath, output);
+  });
+
+  afterAll(() => {
+    fs.rmSync(path.dirname(schemasPath), { recursive: true, force: true });
+  });
+
+  test('includes rules with a custom schema and the shared EmptyArraySchema, omits not-yet-migrated rules', async () => {
+    const rules = await collectRuleSchemas(schemasPath);
     const byName = new Map(rules.map((r) => [r.name, r]));
 
     expect(byName.has('eqeqeq')).toBe(true);
@@ -29,6 +53,14 @@ describe('collectRuleSchemas', () => {
     // A rule with no declared Schema at all must be omitted, not present
     // with a null/empty schema.
     expect(byName.has('no-var')).toBe(false);
+  });
+
+  test('throws a clear, tagged error when the schemas dump is missing', async () => {
+    await expect(
+      collectRuleSchemas(
+        path.join(REPO_ROOT, 'packages/rslint/does-not-exist.json'),
+      ),
+    ).rejects.toMatchObject({ code: 'RULE_SCHEMAS_NOT_FOUND' });
   });
 });
 

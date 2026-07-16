@@ -1,3 +1,10 @@
+// Command dump-rule-schemas registers every native rule and dumps each one's
+// name and options JSON Schema as JSON on stdout, straight from
+// internal/config.GlobalRuleRegistry — the single source of truth for rule
+// IDs/prefixes and declared schemas. It's a build-time tool invocation for
+// scripts/generate-rule-option-types.mjs, not part of the rslint CLI surface
+// (see cmd/rslint), which is why it's a standalone command rather than a
+// flag on that binary.
 package main
 
 import (
@@ -43,17 +50,10 @@ func collectRuleSchemas() []ruleSchemaEntry {
 	return entries
 }
 
-// runDumpRuleSchemas implements the hidden `--dump-rule-schemas` flag: it
-// dumps every registered native rule's name and options JSON Schema as JSON
-// on stdout, for packages/rslint/scripts/generate-rule-option-types.mjs to
-// compile into TypeScript types via json-schema-to-typescript. Deliberately
-// left out of `usage` — it's a build-time tool invocation, not a supported
-// end-user CLI mode.
-func runDumpRuleSchemas() int {
+func main() {
 	entries := collectRuleSchemas()
 	if err := json.NewEncoder(os.Stdout).Encode(entries); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		os.Exit(1)
 	}
-	return 0
 }

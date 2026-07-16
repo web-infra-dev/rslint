@@ -1,77 +1,67 @@
 // scripts/generate-rule-option-types.mjs
 //
-// Dumps every registered native rule's options JSON Schema from the host
-// `rslint` binary's hidden `--dump-rule-schemas` flag (see
-// cmd/rslint/dump_rule_schemas.go — it walks internal/config.GlobalRuleRegistry,
-// the single source of truth for rule IDs, prefixes, and declared schemas),
-// compiles each schema into a TypeScript type via json-schema-to-typescript,
-// and injects the result into the built `dist/index.d.ts` at the
-// `@__RULE_OPTIONS__` marker inside `RulesRecord` (see
-// src/config/define-config.ts). Rules that haven't declared a schema yet
-// (internal/rule.Rule.Schema == nil) are omitted by the Go side and keep
-// falling back to RulesRecord's untyped index signature.
+// Reads every registered native rule's options JSON Schema from
+// packages/rslint/rule-schemas.json — a `{name, schema}[]` dump produced by
+// cmd/dump-rule-schemas (which walks internal/config.GlobalRuleRegistry, the
+// single source of truth for rule IDs, prefixes, and declared schemas; see
+// scripts/place-host-build.mjs's `bin` mode, which writes this file, and CI's
+// per-workflow equivalents for jobs without a Go toolchain), compiles each
+// schema into a TypeScript type via json-schema-to-typescript, and injects
+// the result into a built `dist/index.d.ts` at the `@__RULE_OPTIONS__`
+// marker inside `RulesRecord` (see packages/rslint/src/config/define-config.ts).
+// Rules that haven't declared a schema yet (internal/rule.Rule.Schema == nil)
+// are omitted by the Go side and keep falling back to RulesRecord's untyped
+// index signature.
 //
-// Requires the host binary already placed by `pnpm build:bin` (see
-// scripts/place-host-build.mjs) — this script does not compile Go itself, so
-// it errors out with a pointer to that command if the binary is missing.
-//
-// Run after `rslib build` (dist/index.d.ts must already exist) as part of
-// `pnpm build` — see the `build:types` script in package.json.
+// Invoked automatically via the `generate-rule-option-types` rslib plugin's
+// `onAfterBuild` hook (see packages/rslint/rslib.config.ts) as part of
+// `pnpm --filter @rslint/core build:js` — no separate `build:types` script.
 import { compile } from 'json-schema-to-typescript';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hostTuple } from '../../../scripts/place-host-build.mjs';
 
-const PACKAGE_ROOT = path.resolve(fileURLToPath(import.meta.url), '../..');
-const REPO_ROOT = path.resolve(PACKAGE_ROOT, '../..');
-const DIST_INDEX_DTS = path.join(PACKAGE_ROOT, 'dist/index.d.ts');
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+);
+const DEFAULT_SCHEMAS_PATH = path.join(
+  REPO_ROOT,
+  'packages/rslint/rule-schemas.json',
+);
+const DEFAULT_DIST_INDEX_DTS = path.join(
+  REPO_ROOT,
+  'packages/rslint/dist/index.d.ts',
+);
 const MARKER = '/** @__RULE_OPTIONS__ */';
 
 /**
- * Resolves the host `rslint` binary placed by `place-host-build.mjs bin`
- * (`pnpm build:bin`) under `npm/rslint/<tuple>/`. Throws rather than falling
- * back to `go run` — the binary is expected to already exist by the time
- * `build:types` runs in the `build` script chain
- * (`build:bin && build:js && build:types`), and CI jobs that only
- * download a prebuilt binary (no Go toolchain, e.g. test-vscode-windows)
- * rely on that same placement.
- */
-function resolveHostBinary() {
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const bin = path.join(
-    REPO_ROOT,
-    'npm',
-    'rslint',
-    hostTuple(),
-    `rslint${ext}`,
-  );
-  if (!existsSync(bin)) {
-    throw new Error(
-      `generate-rule-option-types: host rslint binary not found at ${bin} — ` +
-        'run `pnpm build:bin` first',
-    );
-  }
-  return bin;
-}
-
-/**
- * Runs `<rslint> --dump-rule-schemas`, which registers every native rule and
- * returns `{name, schema}` for each one that declares an options JSON
- * Schema — including a rule that only references the shared
- * `rule.EmptyArraySchema` (no options, no on-disk `.schema.json` file),
- * which a filesystem scan of `*.schema.json` alone can't see.
+ * Reads the `{name, schema}[]` dump written by `cmd/dump-rule-schemas` —
+ * including rules that only reference the shared `rule.EmptyArraySchema`
+ * (no options, no on-disk `.schema.json` file), which a filesystem scan of
+ * `*.schema.json` alone can't see.
  *
- * @returns {{ name: string, schema: import('json-schema').JSONSchema4 }[]}
+ * @returns {Promise<{ name: string, schema: import('json-schema').JSONSchema4 }[]>}
  */
-export function collectRuleSchemas() {
-  const output = execFileSync(resolveHostBinary(), ['--dump-rule-schemas'], {
-    encoding: 'utf-8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return JSON.parse(output);
+export async function collectRuleSchemas(
+  schemasPath = DEFAULT_SCHEMAS_PATH,
+) {
+  let raw;
+  try {
+    raw = await fs.readFile(schemasPath, 'utf-8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      const notFound = new Error(
+        `generate-rule-option-types: rule schemas dump not found at ${schemasPath} — ` +
+          'run `pnpm build:bin` first (or, in CI jobs without a Go toolchain, ' +
+          'fetch the prebuilt rule-schemas artifact)',
+      );
+      notFound.code = 'RULE_SCHEMAS_NOT_FOUND';
+      throw notFound;
+    }
+    throw err;
+  }
+  return JSON.parse(raw);
 }
 
 /**
@@ -128,8 +118,8 @@ function getRuleDocUrl(ruleId) {
   }
 }
 
-async function compileRuleOptionTypes() {
-  const rules = collectRuleSchemas();
+async function compileRuleOptionTypes(schemasPath) {
+  const rules = await collectRuleSchemas(schemasPath);
 
   const typeDeclarations = [];
   const recordProperties = [];
@@ -236,13 +226,26 @@ export function injectIntoDts(dts, { typeDeclarations, recordProperties }) {
   );
 }
 
+/**
+ * Reads `distIndexDtsPath`, splices in the generated rule-option types, and
+ * writes it back. Called by the rslib `onAfterBuild` plugin
+ * (packages/rslint/rslib.config.ts) once `dist/index.d.ts` exists, and by
+ * this file's own CLI entrypoint for manual/debug runs.
+ */
+export async function generateRuleOptionTypes({
+  distIndexDtsPath = DEFAULT_DIST_INDEX_DTS,
+  schemasPath = DEFAULT_SCHEMAS_PATH,
+} = {}) {
+  const generated = await compileRuleOptionTypes(schemasPath);
+  const dts = await fs.readFile(distIndexDtsPath, 'utf-8');
+  await fs.writeFile(distIndexDtsPath, injectIntoDts(dts, generated));
+  return generated.recordProperties.length;
+}
+
 async function main() {
-  const generated = await compileRuleOptionTypes();
-  const dts = await fs.readFile(DIST_INDEX_DTS, 'utf-8');
-  await fs.writeFile(DIST_INDEX_DTS, injectIntoDts(dts, generated));
+  const count = await generateRuleOptionTypes();
   console.log(
-    `generate-rule-option-types: injected ${generated.recordProperties.length} ` +
-      'typed rule(s) into dist/index.d.ts',
+    `generate-rule-option-types: injected ${count} typed rule(s) into dist/index.d.ts`,
   );
 }
 

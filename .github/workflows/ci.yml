@@ -205,6 +205,13 @@ jobs:
         shell: pwsh
         run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
 
+      # Rule options JSON Schema dump for scripts/generate-rule-option-types.mjs
+      # (see packages/rslint/rslib.config.ts's onAfterBuild hook) — uploaded so
+      # test-vscode-windows, which has no Go toolchain, can pick it up below.
+      - name: Dump rule schemas
+        shell: bash
+        run: go run ./cmd/dump-rule-schemas > rule-schemas.json
+
       # vscode-extension (package "rslint") is excluded here - it's tested on
       # windows-latest instead, since the vscode-extension test does not run
       # reliably on this self-hosted runner.
@@ -219,6 +226,14 @@ jobs:
         with:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload rule schemas
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rule-schemas
+          path: rule-schemas.json
           retention-days: 1
           if-no-files-found: error
 
@@ -248,19 +263,25 @@ jobs:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
 
+      # Rule options JSON Schema dump built by test-node-windows's Go
+      # toolchain — packages/rslint/rslib.config.ts's onAfterBuild hook reads
+      # this during build:js below (see scripts/generate-rule-option-types.mjs).
+      - name: Download rule schemas
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rule-schemas
+          path: packages/rslint
+
       # Skip @rslint/core's build:bin, which invokes `go build` directly -
       # this job has no Go toolchain set up and shouldn't need one. The host
       # rslint.exe was already built on the self-hosted Windows runner and
       # downloaded above into npm/rslint/win32-x64-msvc/, the same path
-      # build:bin would have placed it, so build:types (which shells out to
-      # that binary's hidden --dump-rule-schemas flag, not to Go) can still
-      # run here.
+      # build:bin would have placed it.
       - name: Build
         shell: bash
         run: |
           pnpm --filter @rslint/api build
           pnpm --filter @rslint/core build:js
-          pnpm --filter @rslint/core build:types
           pnpm --filter rslint build
 
       - name: VSCode Test Cache
