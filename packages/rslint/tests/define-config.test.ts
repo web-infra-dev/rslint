@@ -42,8 +42,8 @@ describe('RuleEntry / RulesRecord typing', () => {
   // Compile-time only — checked by `pnpm typecheck`, not by rstest's
   // (type-stripping) test runner. Locks in that `RuleEntry<Options>`
   // distributes a union-of-tuples `Options` over the severity + rest-args
-  // shape, matching a rule-options generator's output
-  // (scripts/generate-rule-option-types.mjs).
+  // shape, matching the `generate-rule-option-types` rslib plugin's output
+  // (rslib.config.ts).
   test('RuleEntry<Options> distributes options over severities', () => {
     type Options = [] | [{ allow?: string[] }];
     const bareSeverity: RuleEntry<Options> = 'error';
