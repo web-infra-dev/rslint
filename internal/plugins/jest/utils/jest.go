@@ -56,6 +56,11 @@ var EQUALITY_METHOD_NAMES = map[string]bool{
 	"toStrictEqual": true,
 }
 
+var INLINE_SNAPSHOT_MATCHERS = map[string]bool{
+	"toMatchInlineSnapshot":              true,
+	"toThrowErrorMatchingInlineSnapshot": true,
+}
+
 var EXPECT_MODIFIER_NAMES = map[string]bool{
 	"not":      true,
 	"rejects":  true,

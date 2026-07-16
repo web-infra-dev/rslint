@@ -503,6 +503,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
+    './tests/eslint-plugin-jest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/eslint-plugin-jest/rules/no-jasmine-globals.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
     './tests/eslint-plugin-jest/rules/no-restricted-jest-methods.test.ts',
