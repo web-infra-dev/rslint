@@ -188,10 +188,7 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 }
 
 // ignorePatternMatches reports whether path matches pattern.Glob, applying the
-// case fold for case-insensitive patterns. See utils.MatchGlob for why this is
-// safe and still fast despite doublestar.Match's own re-validation dominating
-// profiles of the per-file ignore check once file collection was
-// parallelized.
+// case fold for case-insensitive patterns.
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
