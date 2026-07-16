@@ -6,7 +6,25 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
-var globValidityCache sync.Map // map[string]bool
+var (
+	globValidityCacheMu sync.RWMutex
+	globValidityCache   = make(map[string]bool)
+)
+
+func isValidGlob(pattern string) bool {
+	globValidityCacheMu.RLock()
+	valid, ok := globValidityCache[pattern]
+	globValidityCacheMu.RUnlock()
+	if ok {
+		return valid
+	}
+
+	valid = doublestar.ValidatePattern(pattern)
+	globValidityCacheMu.Lock()
+	globValidityCache[pattern] = valid
+	globValidityCacheMu.Unlock()
+	return valid
+}
 
 // MatchGlob reports whether path matches the doublestar glob pattern,
 // matching doublestar.Match's boolean result. Pattern validity is checked
@@ -14,12 +32,7 @@ var globValidityCache sync.Map // map[string]bool
 // false, and valid ones are matched with MatchUnvalidated to skip
 // doublestar's per-call re-validation.
 func MatchGlob(pattern, path string) bool {
-	valid, ok := globValidityCache.Load(pattern)
-	if !ok {
-		valid = doublestar.ValidatePattern(pattern)
-		globValidityCache.Store(pattern, valid)
-	}
-	if !valid.(bool) {
+	if !isValidGlob(pattern) {
 		return false
 	}
 	return doublestar.MatchUnvalidated(pattern, path)
