@@ -105,7 +105,8 @@ jobs:
       # rule-schemas.json move-artifacts placed above (dumped by the `build`
       # job's Go toolchain — no Go toolchain needed here).
       - name: Build @rslint/core dist
-        run: pnpm --filter @rslint/core build:js
+        run: |
+          pnpm --filter @rslint/core build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |

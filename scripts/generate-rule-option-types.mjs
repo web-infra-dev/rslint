@@ -249,7 +249,7 @@ async function main() {
   );
 }
 
-if (fileURLToPath(import.meta.url) === process.argv[1]) {
+if (import.meta.main) {
   main().catch((err) => {
     console.error(err);
     process.exitCode = 1;
