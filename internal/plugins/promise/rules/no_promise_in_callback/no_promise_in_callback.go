@@ -1,11 +1,15 @@
 package no_promise_in_callback
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no-promise-in-callback.schema.json
+var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
 
@@ -13,15 +17,13 @@ type Options struct {
 	ExemptDeclarations bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	if value, ok := optsMap["exemptDeclarations"].(bool); ok {
-		opts.ExemptDeclarations = value
-	}
+	optsMap := options[0].(map[string]interface{})
+	opts.ExemptDeclarations, _ = optsMap["exemptDeclarations"].(bool)
 	return opts
 }
 
@@ -125,9 +127,9 @@ func findCallbackAncestor(node *ast.Node, opts Options) *ast.Node {
 }
 
 var NoPromiseInCallbackRule = rule.Rule{
-	Name: "promise/no-promise-in-callback",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/no-promise-in-callback",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

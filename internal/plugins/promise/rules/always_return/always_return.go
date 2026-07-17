@@ -1,6 +1,7 @@
 package always_return
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed always-return.schema.json
+var schemaJSON []byte
+
 const skipTransparent = ast.OEKParentheses
 
 type Options struct {
@@ -16,21 +20,17 @@ type Options struct {
 	IgnoreAssignmentVariable []string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{IgnoreAssignmentVariable: []string{"globalThis"}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["ignoreLastCallback"].(bool); ok {
-		opts.IgnoreLastCallback = v
-	}
+	optsMap := options[0].(map[string]interface{})
+	opts.IgnoreLastCallback, _ = optsMap["ignoreLastCallback"].(bool)
 	if arr, ok := optsMap["ignoreAssignmentVariable"].([]interface{}); ok {
-		opts.IgnoreAssignmentVariable = make([]string, 0, len(arr))
-		for _, item := range arr {
-			if s, ok := item.(string); ok {
-				opts.IgnoreAssignmentVariable = append(opts.IgnoreAssignmentVariable, s)
-			}
+		opts.IgnoreAssignmentVariable = make([]string, len(arr))
+		for i, item := range arr {
+			opts.IgnoreAssignmentVariable[i] = item.(string)
 		}
 	}
 	return opts
@@ -185,9 +185,9 @@ func rootObjectName(node *ast.Node) string {
 }
 
 var AlwaysReturnRule = rule.Rule{
-	Name: "promise/always-return",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/always-return",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {
