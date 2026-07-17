@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
@@ -20,6 +19,7 @@ import (
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	coreRules "github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -662,12 +662,6 @@ func registerAllCoreEslintRules() {
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
-// matchGlob matches a glob pattern against a path using doublestar.
-func matchGlob(pattern, path string) bool {
-	m, err := doublestar.Match(pattern, path)
-	return err == nil && m
-}
-
 func normalizePattern(pattern string) string {
 	return tspath.NormalizePath(pattern)
 }
@@ -966,17 +960,17 @@ func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) b
 
 	normalizedPattern := normalizePattern(pattern)
 
-	if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
+	if utils.MatchGlob(normalizedPattern, normalizedPath) {
 		return true
 	}
 	if normalizedPath != filePath {
-		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
+		if utils.MatchGlob(normalizedPattern, filePath) {
 			return true
 		}
 	}
 	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
-		if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
+		if utils.MatchGlob(normalizedPattern, unixPath) {
 			return true
 		}
 	}

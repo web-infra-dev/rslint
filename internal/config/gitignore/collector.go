@@ -4,7 +4,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -14,21 +13,16 @@ func normalizeGlobPath(path string) string {
 	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
-func matchGlob(pattern string, path string) bool {
-	matched, err := doublestar.Match(pattern, path)
-	return err == nil && matched
-}
-
 func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool {
 	if !useCaseSensitive {
 		pattern = strings.ToLower(pattern)
 		path = strings.ToLower(path)
 	}
 	// Git's trailing /** matches contents, not the directory itself.
-	if strings.HasSuffix(pattern, "/**") && matchGlob(strings.TrimSuffix(pattern, "/**"), path) {
+	if strings.HasSuffix(pattern, "/**") && utils.MatchGlob(strings.TrimSuffix(pattern, "/**"), path) {
 		return false
 	}
-	return matchGlob(pattern, path)
+	return utils.MatchGlob(pattern, path)
 }
 
 func isDefaultExcludedDirName(name string, useCaseSensitive bool) bool {

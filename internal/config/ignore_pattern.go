@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
@@ -186,13 +187,15 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 	return ignored
 }
 
+// ignorePatternMatches reports whether path matches pattern.Glob, applying the
+// case fold for case-insensitive patterns.
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
 		glob = strings.ToLower(glob)
 		path = strings.ToLower(path)
 	}
-	return matchGlob(glob, path)
+	return utils.MatchGlob(glob, path)
 }
 
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).
