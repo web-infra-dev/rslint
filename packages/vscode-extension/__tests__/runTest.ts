@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { runTests } from '@vscode/test-electron';
+import { downloadAndUnzipVSCode, runTests } from '@vscode/test-electron';
 
 interface TestSuite {
   name: string;
@@ -50,6 +50,7 @@ async function findPackageRoot(startPath: string): Promise<string> {
 
 async function runIsolatedSuite(
   extensionDevelopmentPath: string,
+  vscodeExecutablePath: string,
   suite: TestSuite,
 ): Promise<void> {
   // Go discovery intentionally searches strict cwd ancestors, so keep each
@@ -105,6 +106,7 @@ async function runIsolatedSuite(
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: suite.tests,
+      vscodeExecutablePath,
       launchArgs: [
         suite.workspaceEntry
           ? resolveSandboxEntry(workspaceCopy, suite.workspaceEntry)
@@ -118,8 +120,6 @@ async function runIsolatedSuite(
         `--user-data-dir=${userDataDir}`,
         `--extensions-dir=${extensionsDir}`,
       ],
-      // Omit `version`: @vscode/test-electron resolves the current stable
-      // release on every run instead of pinning a VS Code build.
     });
   } catch (error) {
     testError = error;
@@ -149,6 +149,12 @@ async function runIsolatedSuite(
 
 async function main(): Promise<void> {
   const extensionDevelopmentPath = path.resolve(__dirname, '../..');
+  // Resolve the compatible stable release once so every suite explicitly uses
+  // the same executable and repeated runTests() calls avoid redundant
+  // compatibility/cache resolution.
+  const vscodeExecutablePath = await downloadAndUnzipVSCode({
+    extensionDevelopmentPath,
+  });
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
   const suites: TestSuite[] = [
     {
@@ -210,7 +216,11 @@ async function main(): Promise<void> {
   const failures: unknown[] = [];
   for (const suite of suites) {
     try {
-      await runIsolatedSuite(extensionDevelopmentPath, suite);
+      await runIsolatedSuite(
+        extensionDevelopmentPath,
+        vscodeExecutablePath,
+        suite,
+      );
     } catch (error) {
       console.error(`${suite.name} failed:`, error);
       failures.push(error);
