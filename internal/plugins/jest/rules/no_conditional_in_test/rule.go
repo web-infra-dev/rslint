@@ -61,17 +61,17 @@ var NoConditionalInTestRule = rule.Rule{
 	Name: "jest/no-conditional-in-test",
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
-		testCallDepth := 0
+		inTestCase := false
 		testCalls := map[*ast.Node]bool{}
 
 		reportConditional := func(node *ast.Node) {
-			if testCallDepth > 0 {
+			if inTestCase {
 				ctx.ReportNode(node, buildConditionalInTestMessage())
 			}
 		}
 
 		reportOptionalChain := func(node *ast.Node) {
-			if testCallDepth > 0 &&
+			if inTestCase &&
 				!opts.allowOptionalChaining &&
 				isOutermostOptionalChain(node) {
 				ctx.ReportNode(node, buildConditionalInTestMessage())
@@ -96,7 +96,7 @@ var NoConditionalInTestRule = rule.Rule{
 				parsed := jestUtils.ParseJestFnCall(node, ctx)
 				if parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest {
 					testCalls[node] = true
-					testCallDepth++
+					inTestCase = true
 				}
 			},
 			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
@@ -104,7 +104,7 @@ var NoConditionalInTestRule = rule.Rule{
 					return
 				}
 				delete(testCalls, node)
-				testCallDepth--
+				inTestCase = false
 			},
 		}
 	},

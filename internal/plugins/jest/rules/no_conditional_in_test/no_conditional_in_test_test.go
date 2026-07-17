@@ -1046,6 +1046,18 @@ func TestNoConditionalInTestRule(t *testing.T) {
 				{MessageId: "conditionalInTest", Line: 2, Column: 41},
 			},
 		},
+		{
+			Code: `
+        it('outer', () => {
+          switch (x) { case 1: break; }
+          it('inner', () => { doThing(); });
+          if (y) {}
+        });
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+			},
+		},
 	}
 
 	for index := range valid {
