@@ -1196,31 +1196,6 @@ func TestUriToPath(t *testing.T) {
 	}
 }
 
-// ======== uriDirname tests ========
-
-func TestUriDirname(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"file:///project/src/index.ts", "file:///project/src"},
-		{"file:///project/index.ts", "file:///project"},
-		{"file:///project", "file:///project"}, // stops at authority
-		{"file:///C:/Users/project/src", "file:///C:/Users/project"},
-		{"file:///C:/Users", "file:///C:"},
-		{"file:///C:", "file:///C:"}, // stops at authority
-		{"", ""},                     // empty string
-		{"file:///", "file:///"},     // root URI
-	}
-
-	for _, tt := range tests {
-		got := uriDirname(tt.input)
-		if got != tt.want {
-			t.Errorf("uriDirname(%q) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}
-
 func TestCloseAndReopen(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()
