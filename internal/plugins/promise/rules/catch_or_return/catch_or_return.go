@@ -1,13 +1,16 @@
 package catch_or_return
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed catch-or-return.schema.json
+var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
 
@@ -18,31 +21,24 @@ type Options struct {
 	TerminationMethod []string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{TerminationMethod: []string{"catch"}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["allowThen"].(bool); ok {
-		opts.AllowThen = v
-	}
-	if v, ok := optsMap["allowThenStrict"].(bool); ok {
-		opts.AllowThenStrict = v
-	}
-	if v, ok := optsMap["allowFinally"].(bool); ok {
-		opts.AllowFinally = v
-	}
-	if v, ok := optsMap["terminationMethod"].(string); ok {
+	optsMap := options[0].(map[string]interface{})
+	opts.AllowThen, _ = optsMap["allowThen"].(bool)
+	opts.AllowThenStrict, _ = optsMap["allowThenStrict"].(bool)
+	opts.AllowFinally, _ = optsMap["allowFinally"].(bool)
+	switch v := optsMap["terminationMethod"].(type) {
+	case string:
 		opts.TerminationMethod = []string{v}
-	} else if arr, ok := optsMap["terminationMethod"].([]interface{}); ok {
-		methods := make([]string, 0, len(arr))
-		for _, m := range arr {
-			if s, ok := m.(string); ok {
-				methods = append(methods, s)
+	case []interface{}:
+		if len(v) > 0 {
+			methods := make([]string, len(v))
+			for i, m := range v {
+				methods[i] = m.(string)
 			}
-		}
-		if len(methods) > 0 {
 			opts.TerminationMethod = methods
 		}
 	}
@@ -106,9 +102,9 @@ func isAllowedPromiseTermination(expression *ast.Node, opts Options) bool {
 }
 
 var CatchOrReturnRule = rule.Rule{
-	Name: "promise/catch-or-return",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/catch-or-return",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {

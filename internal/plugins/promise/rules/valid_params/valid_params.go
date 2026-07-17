@@ -1,14 +1,17 @@
 package valid_params
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed valid-params.schema.json
+var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
 
@@ -16,18 +19,16 @@ type Options struct {
 	Exclude map[string]bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{Exclude: map[string]bool{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap := options[0].(map[string]interface{})
 	switch arr := optsMap["exclude"].(type) {
 	case []interface{}:
 		for _, item := range arr {
-			if name, ok := item.(string); ok {
-				opts.Exclude[name] = true
-			}
+			opts.Exclude[item.(string)] = true
 		}
 	case []string:
 		for _, name := range arr {
@@ -86,9 +87,9 @@ func calledMemberName(node *ast.Node) string {
 }
 
 var ValidParamsRule = rule.Rule{
-	Name: "promise/valid-params",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/valid-params",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

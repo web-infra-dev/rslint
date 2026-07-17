@@ -1,0 +1,19 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "resolvePattern": {
+          "type": "string"
+        },
+        "rejectPattern": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

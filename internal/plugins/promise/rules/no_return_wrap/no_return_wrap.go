@@ -1,11 +1,15 @@
 package no_return_wrap
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no-return-wrap.schema.json
+var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
 
@@ -13,15 +17,13 @@ type Options struct {
 	AllowReject bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["allowReject"].(bool); ok {
-		opts.AllowReject = v
-	}
+	optsMap := options[0].(map[string]interface{})
+	opts.AllowReject, _ = optsMap["allowReject"].(bool)
 	return opts
 }
 
@@ -143,9 +145,9 @@ func isExpressionBodyArrowCall(node *ast.Node) bool {
 }
 
 var NoReturnWrapRule = rule.Rule{
-	Name: "promise/no-return-wrap",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/no-return-wrap",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
