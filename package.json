@@ -41,7 +41,7 @@
     "ajv": "6.15.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "3.8.1",
+    "prettier": "3.9.4",
     "typescript": "5.9.3",
     "zx": "8.8.5",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"

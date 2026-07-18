@@ -1108,9 +1108,9 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // checked range non-adjacency; ESLint returns false there since
       // the comment sits flush against both sides. Real rules
       // (spacing, formatting plugins) rely on the ESLint behavior.
-      if (
-        !(left.range[1] <= right.range[0] || right.range[1] <= left.range[0])
-      ) {
+      if (!(
+        left.range[1] <= right.range[0] || right.range[1] <= left.range[0]
+      )) {
         return false;
       }
       const [startNode, endNode] =

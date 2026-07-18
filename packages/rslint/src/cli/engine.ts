@@ -156,8 +156,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   });
 
   type RaceResult<T> =
-    | { kind: 'task'; value: T }
-    | { kind: 'exit'; state: ChildExit };
+    { kind: 'task'; value: T } | { kind: 'exit'; state: ChildExit };
   const raceWithExit = async <T>(task: Promise<T>): Promise<RaceResult<T>> =>
     Promise.race<RaceResult<T>>([
       task.then((value) => ({ kind: 'task' as const, value })),
