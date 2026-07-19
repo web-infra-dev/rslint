@@ -263,14 +263,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
 				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
 			}
-			// Reject invalid native-rule options before evaluating any user
-			// config module. Besides failing earlier, this guarantees a malformed
-			// request cannot trigger load/activation side effects. The resolved
-			// catalog is still validated below so options from loaded modules are
-			// covered as well.
-			if messages := validateResolvedRuleOptions(nil, overrideConfig); len(messages) > 0 {
-				return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
-			}
 		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,

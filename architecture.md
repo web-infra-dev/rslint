@@ -573,10 +573,10 @@ The transport and target phase differ by surface:
   do not require that handler. Every long-lived API call uses a
   fresh entry-module load so rewritten config bytes cannot be paired with stale
   normalized exports or a newer plugin-worker topology. API `overrideConfig`
-  entries are validated before that load and attached at the loader boundary as
-  the final suffix of every successful config. Their global ignores and
-  negations therefore participate in staged reachability and are published
-  exactly once; an empty catalog uses the same override directly.
+  entries are structurally validated before that load and attached at the
+  loader boundary as the final suffix of every successful config. Their global
+  ignores and negations therefore participate in staged reachability and are
+  published exactly once; an empty catalog uses the same override directly.
 - The extension owns shared UI, commands, and output channels once. Its
   `WorkspaceRslintCoordinator` keys desired and active roots by workspace-folder
   URI (not display name), subscribes to folder changes before awaiting any root,

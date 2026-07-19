@@ -604,30 +604,6 @@ func discoverLintFilesMultiConfig(
 	return rslintconfig.DiscoverLintTargetsMultiConfig(configMap, configTargetScopes, fs, allowFiles, allowDirs, singleThreaded)
 }
 
-func configTargetFilesByOwner(
-	configMap map[string]rslintconfig.RslintConfig,
-	scopes map[string]rslintconfig.LintDiscoveryScope,
-	fs vfs.FS,
-	allowedFiles []string,
-	singleThreaded bool,
-) map[string][]string {
-	filesByOwner := make(map[string][]string, len(configMap))
-	for _, target := range discoverLintFilesMultiConfig(
-		configMap,
-		scopes,
-		fs,
-		allowedFiles,
-		nil,
-		singleThreaded,
-	) {
-		filesByOwner[target.ConfigDirectory] = append(
-			filesByOwner[target.ConfigDirectory],
-			target.Path,
-		)
-	}
-	return filesByOwner
-}
-
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
 // programs must be excluded from the type-check phase. A program is skipped
 // when it was NOT built from a real tsconfig on disk — i.e. its CompilerOptions
