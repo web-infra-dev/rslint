@@ -361,7 +361,7 @@ func TestService_ConfigDiscoveryRequiresAdvertisedCapability(t *testing.T) {
 			}
 
 			_, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{
-				ConfigDiscovery: &ConfigDiscoveryRequest{Mode: "auto"},
+				ConfigDiscovery: &ConfigDiscoveryRequest{},
 			})
 			if test.wantError == "" {
 				if err != nil {

@@ -133,7 +133,7 @@ describe('--type-check-only basic', () => {
     }
   });
 
-  test('gitignored nested config still contributes a type-check Program', async () => {
+  test('gitignored nested config does not contribute a type-check Program', async () => {
     const tempDir = await createTempDir({
       '.gitignore': 'packages/ignored/\n',
       'rslint.config.mjs': makeConfigPlain(),
@@ -176,7 +176,7 @@ describe('--type-check-only basic', () => {
             diagnostic.filePath?.includes('packages/ignored/bad.ts') &&
             diagnostic.ruleName.includes('TS2322'),
         ),
-      ).toBe(true);
+      ).toBe(false);
       expect(r.exitCode).not.toBe(0);
     } finally {
       await cleanupTempDir(tempDir);

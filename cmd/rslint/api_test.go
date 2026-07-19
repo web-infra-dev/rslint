@@ -1509,7 +1509,7 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{rootTarget, nestedTarget},
 		WorkingDirectory: root,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 	}, requester)
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
@@ -1610,7 +1610,7 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 				Files:            []string{target},
 				WorkingDirectory: root,
-				ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+				ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 			}, requester)
 			if test.wantCapErr {
 				if err == nil || !strings.Contains(err.Error(), "does not advertise reversePluginLint capability required by discovered ESLint plugins") {
@@ -1684,7 +1684,6 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:          "auto",
 			Directories:   []string{root},
 			ExplicitFiles: []bool{false},
 		},
@@ -1744,7 +1743,6 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 			Files:            files,
 			WorkingDirectory: root,
 			ConfigDiscovery: &api.ConfigDiscoveryRequest{
-				Mode:          "auto",
 				Directories:   []string{root},
 				ExplicitFiles: make([]bool, len(files)),
 			},
@@ -1763,6 +1761,80 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 	if withBar.FileCount != 1 || len(withBar.Diagnostics) != 1 ||
 		withBar.Diagnostics[0].FilePath != "foo.js" || withBar.Diagnostics[0].RuleName != "no-debugger" {
 		t.Fatalf("config negation restored the wrong gitignored target: %+v", withBar)
+	}
+}
+
+func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *testing.T) {
+	root := t.TempDir()
+	ignoredDir := filepath.Join(root, "ignored")
+	rootConfigPath := filepath.Join(root, "rslint.config.js")
+	nestedConfigPath := filepath.Join(ignoredDir, "rslint.config.js")
+	target := filepath.Join(ignoredDir, "index.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js":         "export default [];\n",
+		".gitignore":               "ignored/\n",
+		"ignored/rslint.config.js": "export default [];\n",
+		"ignored/index.js":         "debugger;\n",
+	})
+
+	rootEntries := mustAPIConfig(t, `[{"rules":{"no-console":"error"}}]`)
+	nestedEntries := mustAPIConfig(t, `[{"rules":{"no-debugger":"error"}}]`)
+	var requestedPaths []string
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			response := discovery.ConfigLoadBatchResponse{TransactionID: request.TransactionID}
+			for _, candidate := range request.Candidates {
+				requestedPaths = append(requestedPaths, filepath.Clean(candidate.ConfigPath))
+				result := discovery.ConfigLoadResult{
+					ID:     candidate.ID,
+					Status: "loaded",
+				}
+				switch filepath.Clean(candidate.ConfigPath) {
+				case filepath.Clean(rootConfigPath):
+					result.Entries = rootEntries
+				case filepath.Clean(nestedConfigPath):
+					result.Entries = nestedEntries
+				default:
+					return nil, fmt.Errorf("unexpected config candidate %q", candidate.ConfigPath)
+				}
+				response.Results = append(response.Results, result)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, response)
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+			})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{target},
+		WorkingDirectory: root,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			Directories:    []string{root},
+			ExplicitFiles:  []bool{false},
+			OverrideConfig: json.RawMessage(`[{"ignores":["!ignored/**"]}]`),
+		},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext: %v", err)
+	}
+	wantRequestedPaths := []string{
+		filepath.Clean(rootConfigPath),
+		filepath.Clean(nestedConfigPath),
+	}
+	if !reflect.DeepEqual(requestedPaths, wantRequestedPaths) {
+		t.Fatalf("requested config paths = %v, want %v", requestedPaths, wantRequestedPaths)
+	}
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 ||
+		response.Diagnostics[0].FilePath != filepath.ToSlash(filepath.Join("ignored", "index.js")) ||
+		response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("override negation did not restore the nested config owner: %+v", response)
 	}
 }
 
@@ -1831,7 +1903,6 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 			Files:            files,
 			WorkingDirectory: root,
 			ConfigDiscovery: &api.ConfigDiscoveryRequest{
-				Mode:          "auto",
 				Directories:   []string{ignoredDir},
 				ExplicitFiles: explicitFiles,
 			},
@@ -1898,7 +1969,6 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 		Files:            []string{targetPath},
 		WorkingDirectory: workingDirectory,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:               "explicit",
 			ExplicitConfigPath: configPath,
 			ExplicitFiles:      []bool{true},
 		},
@@ -1920,7 +1990,7 @@ func TestHandleLint_ConfigAndConfigDiscoveryAreMutuallyExclusive(t *testing.T) {
 
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Config:           json.RawMessage(`[]`),
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 		WorkingDirectory: t.TempDir(),
 	}, requester)
 	if err == nil || !strings.Contains(err.Error(), "config and configDiscovery are mutually exclusive") {
@@ -1943,7 +2013,6 @@ func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
 		Files:            []string{filepath.Join(dir, "a.js"), filepath.Join(dir, "b.js")},
 		WorkingDirectory: dir,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:          "auto",
 			ExplicitFiles: []bool{true},
 		},
 	}, requester)
@@ -1992,7 +2061,6 @@ func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *t
 				Files:            []string{target},
 				WorkingDirectory: dir,
 				ConfigDiscovery: &api.ConfigDiscoveryRequest{
-					Mode:           "auto",
 					OverrideConfig: test.override,
 				},
 			}, requester)
@@ -2045,7 +2113,7 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(dir, "input.js")},
 		WorkingDirectory: dir,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 	}, requester)
 	if !errors.Is(err, discovery.ErrAllConfigsFailed) {
 		t.Fatalf("error = %v, want ErrAllConfigsFailed", err)

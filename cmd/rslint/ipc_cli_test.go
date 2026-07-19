@@ -174,7 +174,7 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 	code, output := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"format":           "stylish",
-		"configDiscovery":  map[string]any{"mode": "auto"},
+		"configDiscovery":  map[string]any{},
 	}, false)
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2; output=%q", code, output)

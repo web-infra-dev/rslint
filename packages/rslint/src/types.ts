@@ -82,7 +82,6 @@ export interface LintOptions {
    * backends intentionally do not advertise this host-filesystem capability.
    */
   configDiscovery?: {
-    mode: 'auto' | 'explicit';
     explicitConfigPath?: string;
     /** Static glob roots; Go visits only branches leading to the supplied files. */
     directories?: string[];

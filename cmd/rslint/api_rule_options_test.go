@@ -83,7 +83,7 @@ func TestHandleLintDiscoveredConfigValidatesRuleOptions(t *testing.T) {
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(root, "input.js")},
 		WorkingDirectory: root,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 	}, requester)
 	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
 		t.Fatalf("discovered config did not validate rule options: %v", err)
@@ -104,11 +104,37 @@ func TestHandleLintDiscoveryOverrideValidatesRuleOptionsWithoutCandidate(t *test
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:           "auto",
 			OverrideConfig: json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
 		},
 	}, requester)
 	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
 		t.Fatalf("discovery override did not validate rule options: %v", err)
+	}
+}
+
+func TestHandleLintDiscoveryInvalidOverrideDoesNotLoadCandidate(t *testing.T) {
+	root := t.TempDir()
+	writeProgramTestFiles(t, root, map[string]string{
+		"rslint.config.js": "export default [];\n",
+		"input.js":         "console.log('test');\n",
+	})
+	reverseCalls := 0
+	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
+		reverseCalls++
+		return nil, errors.New("invalid override must fail before reverse config loading")
+	})
+
+	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{filepath.Join(root, "input.js")},
+		WorkingDirectory: root,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			OverrideConfig: json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
+		},
+	}, requester)
+	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
+		t.Fatalf("discovery override did not validate rule options: %v", err)
+	}
+	if reverseCalls != 0 {
+		t.Fatalf("invalid override issued %d reverse calls", reverseCalls)
 	}
 }

@@ -33,6 +33,30 @@ func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDi
 	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
 }
 
+// ReopensDirectoryNode reports whether the ordered authored global-ignore
+// patterns leave directory itself re-included. A pattern must match the current
+// node: `!dir`, `!dir/`, and `!dir/**` reopen dir, while `!dir/**/*` and
+// `!dir/file.ts` do not. Descendant patterns can still reopen a matching child.
+//
+// Positive authored directory blocks remain absolute under rslint's existing
+// semantics and are checked by BlocksDirectory before callers consult this
+// method.
+func (matcher GlobalIgnoreMatcher) ReopensDirectoryNode(directory string, canonicalDirectory string) bool {
+	relative, ok := matcher.relativePath(directory, canonicalDirectory)
+	if !ok || len(matcher.patterns) == 0 {
+		return false
+	}
+	relative = strings.TrimSuffix(relative, "/")
+	reopened := false
+	for _, pattern := range matcher.patterns {
+		if ignorePatternMatches(pattern, relative) ||
+			ignorePatternMatches(pattern, relative+"/") {
+			reopened = pattern.Negated
+		}
+	}
+	return reopened
+}
+
 // IgnoresPath reports whether global ignores exclude a config candidate.
 func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
 	relative, ok := matcher.relativePath(filePath, canonicalPath)

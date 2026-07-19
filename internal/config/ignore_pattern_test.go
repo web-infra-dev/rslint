@@ -203,6 +203,51 @@ func TestCanPruneDir(t *testing.T) {
 	}
 }
 
+func TestGlobalIgnoreMatcherReopensMatchingDirectoryNode(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		pattern string
+		want    bool
+	}{
+		{name: "bare directory node", pattern: "!ignored", want: true},
+		{name: "rooted directory does not match relative node", pattern: "!/ignored", want: false},
+		{name: "directory-only node", pattern: "!ignored/", want: true},
+		{name: "directory and contents", pattern: "!ignored/**", want: true},
+		{name: "directory files", pattern: "!ignored/**/*", want: false},
+		{name: "one file", pattern: "!ignored/keep.ts", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			matcher := NewGlobalIgnoreMatcher(
+				RslintConfig{{Ignores: []string{test.pattern}}},
+				"/repo",
+				nil,
+			)
+			assert.Equal(t, matcher.ReopensDirectoryNode("/repo/ignored", ""), test.want)
+		})
+	}
+
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		want     bool
+	}{
+		{name: "single-level descendant", patterns: []string{"!dir/*"}, want: true},
+		{name: "recursive descendant", patterns: []string{"!dir/**/*"}, want: true},
+		{name: "exact descendant", patterns: []string{"!dir/child"}, want: true},
+		{name: "later positive wins", patterns: []string{"!dir/child/", "dir/*"}, want: false},
+		{name: "later negation wins", patterns: []string{"dir/*", "!dir/child/"}, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			matcher := NewGlobalIgnoreMatcher(
+				RslintConfig{{Ignores: test.patterns}},
+				"/repo",
+				nil,
+			)
+			assert.Equal(t, matcher.ReopensDirectoryNode("/repo/dir/child", ""), test.want)
+		})
+	}
+}
+
 // --- Unit: ParseIgnorePattern remaining switch-arm inputs ---
 // TestParseIgnorePattern_Classification already pins braces/`**`/`./`/`//`. This
 // fills the glob-metachar and rooted/trailing forms the task flags: `?`,

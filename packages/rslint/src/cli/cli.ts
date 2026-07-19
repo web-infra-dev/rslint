@@ -76,16 +76,14 @@ export async function run(
     cwd,
     runtime: { singleThreaded: args.singleThreaded },
     extraInit: {
-      configDiscovery: {
-        mode: usesExplicitJSConfig
-          ? 'explicit'
-          : args.config
-            ? 'disabled'
-            : 'auto',
-        explicitConfigPath: usesExplicitJSConfig
-          ? explicitConfigPath
-          : undefined,
-      },
+      configDiscovery:
+        args.config && !usesExplicitJSConfig
+          ? undefined
+          : {
+              explicitConfigPath: usesExplicitJSConfig
+                ? explicitConfigPath
+                : undefined,
+            },
     },
   });
 }

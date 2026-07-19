@@ -87,7 +87,6 @@ type initPayload struct {
 }
 
 type configDiscoveryPayload struct {
-	Mode               string `json:"mode"`
 	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
 }
 
@@ -277,7 +276,7 @@ func runCLI(args []string) int {
 	// frontier, asks Node to evaluate exact candidates, and converts the final
 	// catalog into the shared lint pipeline input. Help/init and an
 	// explicit JSON --config do not need the JavaScript module host.
-	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil && payload.ConfigDiscovery.Mode != "disabled" {
+	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil {
 		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
 			// Discovery now includes the potentially long Go walk and reverse
 			// Node loads. A signal can cancel either before the mirror goroutine
@@ -431,22 +430,22 @@ func discoverCLIConfigCatalog(
 			Explicit: true,
 		})
 	}
-	switch payload.ConfigDiscovery.Mode {
-	case "auto", "":
-		request.Mode = discovery.ConfigDiscoveryAuto
-	case "explicit":
-		request.Mode = discovery.ConfigDiscoveryExplicit
-		request.ExplicitConfigPath = payload.ConfigDiscovery.ExplicitConfigPath
-	default:
-		return fmt.Errorf("unsupported config discovery mode %q", payload.ConfigDiscovery.Mode)
+	loader := &ipcConfigModuleLoader{channel: channel}
+	var catalog *discovery.ConfigCatalog
+	if payload.ConfigDiscovery.ExplicitConfigPath != "" {
+		catalog, err = discovery.LoadExplicitConfig(
+			ctx,
+			args.FS,
+			loader,
+			discovery.ExplicitConfigRequest{
+				CWD:            cwd,
+				ConfigPath:     payload.ConfigDiscovery.ExplicitConfigPath,
+				SingleThreaded: args.SingleThreaded,
+			},
+		)
+	} else {
+		catalog, err = discovery.DiscoverAutomatic(ctx, args.FS, loader, request)
 	}
-
-	catalog, err := discovery.Build(
-		ctx,
-		args.FS,
-		&ipcConfigModuleLoader{channel: channel},
-		request,
-	)
 	if err != nil {
 		var allFailed *discovery.AllConfigsFailedError
 		if errors.As(err, &allFailed) {
