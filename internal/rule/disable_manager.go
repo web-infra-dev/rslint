@@ -19,10 +19,10 @@ type directiveKind int
 
 const (
 	directiveNone     directiveKind = iota
-	directiveBlock                        // rslint-disable / eslint-disable (block)
-	directiveEnable                       // rslint-enable / eslint-enable
-	directiveLine                         // rslint-disable-line / eslint-disable-line
-	directiveNextLine                     // rslint-disable-next-line / eslint-disable-next-line
+	directiveBlock                  // rslint-disable / eslint-disable (block)
+	directiveEnable                 // rslint-enable / eslint-enable
+	directiveLine                   // rslint-disable-line / eslint-disable-line
+	directiveNextLine               // rslint-disable-next-line / eslint-disable-next-line
 )
 
 // directivePrefix defines the comment prefixes for disable/enable directives.
@@ -41,21 +41,52 @@ var directivePrefixes = []directivePrefix{
 // DisableManager tracks which rules are disabled at different locations in a file
 type DisableManager struct {
 	sourceFile            *ast.SourceFile
+	comments              *CommentStore
+	parsed                bool
 	blockDirectives       []blockDirective // block disable/enable events in source order
 	lineDisabledRules     map[int][]string // Rules disabled for specific lines
 	nextLineDisabledRules map[int][]string // Rules disabled for the next line
 }
 
-// NewDisableManager creates a new DisableManager for the given source file
-func NewDisableManager(sourceFile *ast.SourceFile, comments []*ast.CommentRange) *DisableManager {
-	dm := &DisableManager{
-		sourceFile:            sourceFile,
-		lineDisabledRules:     make(map[int][]string),
-		nextLineDisabledRules: make(map[int][]string),
+// NewDisableManager creates a manager whose directives are parsed on the first
+// disable check. The manager does not materialize comments without a directive.
+func NewDisableManager(sourceFile *ast.SourceFile, comments *CommentStore) *DisableManager {
+	return &DisableManager{
+		sourceFile: sourceFile,
+		comments:   comments,
 	}
+}
 
-	dm.parseDirectives(comments)
-	return dm
+func (dm *DisableManager) ensureParsed() {
+	if dm == nil || dm.parsed {
+		return
+	}
+	dm.parsed = true
+	if dm.sourceFile == nil || !mayContainDisableDirective(dm.sourceFile.Text()) {
+		return
+	}
+	dm.parseDirectives(dm.comments.All())
+}
+
+func mayContainDisableDirective(text string) bool {
+	const marker = "lint-"
+	for searchStart := 0; searchStart < len(text); {
+		offset := strings.Index(text[searchStart:], marker)
+		if offset < 0 {
+			return false
+		}
+		start := searchStart + offset
+		if start >= 2 {
+			prefix := text[start-2 : start]
+			rest := text[start+len(marker):]
+			if (prefix == "rs" || prefix == "es") &&
+				(strings.HasPrefix(rest, "disable") || strings.HasPrefix(rest, "enable")) {
+				return true
+			}
+		}
+		searchStart = start + len(marker)
+	}
+	return false
 }
 
 // parseDirectives parses disable/enable directive comments from the source text.
@@ -87,6 +118,9 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 
 		switch kind {
 		case directiveLine:
+			if dm.lineDisabledRules == nil {
+				dm.lineDisabledRules = make(map[int][]string)
+			}
 			if len(rules) == 0 {
 				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
 			} else {
@@ -94,6 +128,9 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			}
 		case directiveNextLine:
 			nextLineNum := lineNum + 1
+			if dm.nextLineDisabledRules == nil {
+				dm.nextLineDisabledRules = make(map[int][]string)
+			}
 			if len(rules) == 0 {
 				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
 			} else {
@@ -162,6 +199,14 @@ func parseRuleNames(rulesStr string) []string {
 
 // IsRuleDisabled checks if a rule is disabled at the given position
 func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
+	if dm == nil || dm.sourceFile == nil {
+		return false
+	}
+	dm.ensureParsed()
+	if len(dm.blockDirectives) == 0 && len(dm.lineDisabledRules) == 0 && len(dm.nextLineDisabledRules) == 0 {
+		return false
+	}
+
 	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
 
 	// Check block disable/enable directives (range-based)

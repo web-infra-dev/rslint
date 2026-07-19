@@ -460,13 +460,13 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, scope scopeInfo, info call
 		object := info.bindMember.AsPropertyAccessExpression().Expression
 		removeStart := scanner.SkipTrivia(text, object.End())
 		removeEnd := utils.TrimNodeTextRange(sf, info.bindCall).End()
-		if removeStart < 0 || removeStart >= removeEnd || utils.HasCommentInSpan(ctx.Comments, removeStart, removeEnd) {
+		if removeStart < 0 || removeStart >= removeEnd || utils.HasCommentInSpan(ctx.Comments.All(), removeStart, removeEnd) {
 			return nil
 		}
 		fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(removeStart, removeEnd)))
 	}
 
-	if utils.HasCommentInSpan(ctx.Comments, functionToken.End(), leftParenToken.Pos()) {
+	if utils.HasCommentInSpan(ctx.Comments.All(), functionToken.End(), leftParenToken.Pos()) {
 		fixes = append(fixes, rule.RuleFixRemoveRange(functionToken))
 		if name := node.Name(); name != nil {
 			fixes = append(fixes, rule.RuleFixRemove(sf, name))
