@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 

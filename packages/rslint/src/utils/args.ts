@@ -1,6 +1,6 @@
 import { parseArgs as nodeParseArgs } from 'node:util';
 
-// Keep this list in sync with cmd/rslint/internal/output/format.go.
+// Keep this list in sync with internal/output/format.go.
 export const OUTPUT_FORMATS = [
   'default',
   'jsonline',
