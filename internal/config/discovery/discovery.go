@@ -179,14 +179,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			// A default-excluded directory is a downward traversal boundary, not a
 			// reason to discard still-reachable configuration outside it. Skip the
 			// root and every default-excluded ancestor, then resolve normally.
-			searchDirectory = tspath.GetDirectoryPath(directory)
+			searchDirectory = configDiscoveryParent(directory)
 			for searchDirectory != "" && isDefaultDiscoveryExcluded(searchDirectory, cwd, useCaseSensitive) {
-				parent := tspath.GetDirectoryPath(searchDirectory)
-				if parent == searchDirectory {
-					searchDirectory = ""
-					break
-				}
-				searchDirectory = parent
+				searchDirectory = configDiscoveryParent(searchDirectory)
 			}
 			if searchDirectory == "" {
 				continue
@@ -573,8 +568,23 @@ func (builder *configCatalogBuilder) advanceDirectorySeedGit(
 		)
 
 		nextDirectory := tspath.CombinePaths(current, component)
-		var gitBlocked bool
-		resolution.gitCursor, gitBlocked = resolution.gitCursor.Enter(nextDirectory)
+		nextCursor, gitBlocked := resolution.gitCursor.Enter(nextDirectory)
+		if nextCursor.SourceReachable() {
+			entries := builder.fs.GetAccessibleEntries(current)
+			parentRealPath := ""
+			if entries.Symlinks == nil {
+				parentRealPath = builder.fs.Realpath(current)
+			}
+			if builder.isSymlinkDirectoryChild(
+				current,
+				parentRealPath,
+				component,
+				entries,
+			) {
+				nextCursor = nextCursor.BlockSourceTraversal()
+			}
+		}
+		resolution.gitCursor = nextCursor
 		resolution.gitDirectory = nextDirectory
 
 		if builder.isGloballyIgnoredDirectory(
@@ -601,17 +611,32 @@ func (builder *configCatalogBuilder) advanceDirectorySeedGit(
 	return resolution.configReachable, false
 }
 
+// configDiscoveryParent returns the lexical filesystem parent without walking
+// above a UNC share. tspath's generic root parser treats only the server as the
+// root, which is appropriate for URLs but not for filesystem config discovery.
+func configDiscoveryParent(directory string) string {
+	directory = tspath.NormalizePath(directory)
+	if strings.HasPrefix(directory, "//") {
+		serverAndRest := strings.Trim(directory[2:], "/")
+		serverEnd := strings.IndexByte(serverAndRest, '/')
+		if serverEnd < 0 || !strings.Contains(serverAndRest[serverEnd+1:], "/") {
+			return ""
+		}
+	}
+	parent := tspath.GetDirectoryPath(directory)
+	if parent == directory {
+		return ""
+	}
+	return parent
+}
+
 func (builder *configCatalogBuilder) findCandidateChain(startDirectory string) []configCandidate {
 	var reverse []configCandidate
 	for directory := tspath.NormalizePath(startDirectory); directory != ""; {
 		if candidate, ok := builder.findCandidate(directory); ok {
 			reverse = append(reverse, candidate)
 		}
-		parent := tspath.GetDirectoryPath(directory)
-		if parent == directory {
-			break
-		}
-		directory = parent
+		directory = configDiscoveryParent(directory)
 	}
 	candidates := make([]configCandidate, len(reverse))
 	for index := range reverse {
@@ -671,8 +696,8 @@ func (builder *configCatalogBuilder) resolveSeedOwners(seeds []*discoverySeed) e
 				seed.done = true
 				continue
 			}
-			seed.searchDir = tspath.GetDirectoryPath(candidate.directory)
-			if seed.searchDir == candidate.directory || seed.searchDir == "" {
+			seed.searchDir = configDiscoveryParent(candidate.directory)
+			if seed.searchDir == "" {
 				seed.done = true
 			}
 		}
@@ -684,11 +709,7 @@ func (builder *configCatalogBuilder) findCandidateUp(startDirectory string) (con
 		if candidate, ok := builder.findCandidate(directory); ok {
 			return candidate, true
 		}
-		parent := tspath.GetDirectoryPath(directory)
-		if parent == directory {
-			break
-		}
-		directory = parent
+		directory = configDiscoveryParent(directory)
 	}
 	return configCandidate{}, false
 }

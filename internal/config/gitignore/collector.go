@@ -267,6 +267,15 @@ func (cursor Cursor) SourceReachable() bool {
 	return cursor.sourceReachable
 }
 
+// BlockSourceTraversal preserves already-observed matching rules while making
+// .gitignore sources at the current directory and its descendants unreachable.
+// A successfully loaded child config starts a new cursor and therefore a new
+// source boundary.
+func (cursor Cursor) BlockSourceTraversal() Cursor {
+	cursor.sourceReachable = false
+	return cursor
+}
+
 // Enter advances to directory and reports whether the already-observed raw Git
 // patterns ignore that exact directory node. The returned cursor keeps raw
 // source reachability monotonic: a negation below an ignored parent cannot make

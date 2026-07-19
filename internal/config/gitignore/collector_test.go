@@ -605,6 +605,22 @@ func TestCursorDirectoryReachability(t *testing.T) {
 	}
 }
 
+func TestCursorBlockSourceTraversalPreservesInheritedRules(t *testing.T) {
+	cursor := NewCursor("/repo", true)
+	cursor, _ = cursor.AppendSource("/repo", "ignored/\n")
+	cursor = cursor.BlockSourceTraversal()
+
+	next, blocked := cursor.Enter("/repo/ignored")
+	assert.Assert(t, blocked)
+	assert.Assert(t, !next.SourceReachable())
+
+	next, globs := cursor.AppendSource("/repo", "must-not-apply/\n")
+	assert.Assert(t, !next.SourceReachable())
+	assert.Equal(t, len(globs), 0)
+	_, blocked = next.Enter("/repo/must-not-apply")
+	assert.Assert(t, !blocked)
+}
+
 func TestCursorRejectsPathsOutsideOwnerVolume(t *testing.T) {
 	for _, test := range []struct {
 		name      string
