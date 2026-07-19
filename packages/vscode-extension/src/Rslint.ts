@@ -59,9 +59,7 @@ const LOCKFILE_NAMES = [
 export const CONFIG_REFRESH_WATCH_GLOB = `**/{rslint.config.js,rslint.config.mjs,rslint.config.ts,rslint.config.mts,rslint.json,rslint.jsonc,${LOCKFILE_NAMES.join(',')}}`;
 
 export type ConfigRefreshReason =
-  | 'initial'
-  | 'config-change'
-  | 'dependency-change';
+  'initial' | 'config-change' | 'dependency-change';
 
 interface ConfigRefreshRequest {
   protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;

@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]bool, []InlineGlobal) {
@@ -18,11 +17,7 @@ func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]bool, []
 		Path:     "/test.ts",
 	}, source, core.ScriptKindTS)
 
-	var comments []*ast.CommentRange
-	utils.ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
-		comments = append(comments, comment)
-	}, sourceFile)
-	return ParseInlineGlobals(sourceFile, comments)
+	return ParseInlineGlobals(sourceFile, NewCommentStore(sourceFile))
 }
 
 func assertInlineGlobals(t *testing.T, source string, got []InlineGlobal, want []struct {
@@ -76,6 +71,23 @@ func TestParseInlineGlobals_MetadataAndSourceFiltering(t *testing.T) {
 		{name: "Array", declared: true, positions: []int{strings.Index(source, "Array:readonly")}},
 		{name: "offName", declared: true, positions: []int{strings.Index(source, "offName:off"), strings.LastIndex(source, "offName, foo")}},
 	})
+}
+
+func TestParseInlineGlobalsKeepsOrdinaryCommentsLazy(t *testing.T) {
+	source := "// ordinary comment\nconst value = 1;\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+	store := NewCommentStore(sourceFile)
+
+	values, globals := ParseInlineGlobals(sourceFile, store)
+	if values != nil || globals != nil {
+		t.Fatalf("ParseInlineGlobals returned (%#v, %#v), want nil results", values, globals)
+	}
+	if store.scanned {
+		t.Fatal("ordinary comment caused inline-global parsing to scan comments")
+	}
 }
 
 func TestParseInlineGlobals_DuplicateAndOverrideSemantics(t *testing.T) {

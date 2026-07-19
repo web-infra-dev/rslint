@@ -31,27 +31,31 @@ type inlineGlobalName struct {
 	nameRange core.TextRange
 }
 
-// ParseInlineGlobals scans `/* global ... */` / `/* globals ... */` block
-// comments once and returns both the final name -> declared map and ordered
-// declaration metadata for rules that need to distinguish comment globals
-// from configured globals.
+// ParseInlineGlobals returns both the final name -> declared map and ordered
+// declaration metadata for `/* global ... */` / `/* globals ... */` comments.
+// A source-text candidate check keeps the shared comment store lazy unless such a
+// directive may be present.
 //
 // Only real block-comment ranges supplied by the TypeScript scanner are read,
 // so lookalike text in strings, templates, regexes, or line comments is ignored.
 // Within a comment, duplicate names use the last setting and retain the first
 // name range. Across comments, the last setting wins and every comment range is
 // preserved. As in the existing globals API, only "off" un-declares a name.
-func ParseInlineGlobals(sourceFile *ast.SourceFile, comments []*ast.CommentRange) (map[string]bool, []InlineGlobal) {
-	if sourceFile == nil || sourceFile.Text() == "" || len(comments) == 0 {
+func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map[string]bool, []InlineGlobal) {
+	if sourceFile == nil || sourceFile.Text() == "" || !mayContainInlineGlobalDirective(sourceFile.Text()) {
 		return nil, nil
 	}
 
 	text := sourceFile.Text()
+	sourceComments := comments.All()
+	if len(sourceComments) == 0 {
+		return nil, nil
+	}
 	var values map[string]bool
 	var globals []InlineGlobal
 	var globalIndexes map[string]int
 
-	for _, comment := range comments {
+	for _, comment := range sourceComments {
 		entries := parseInlineGlobalComment(text, comment)
 		if len(entries) == 0 {
 			continue
@@ -93,6 +97,34 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments []*ast.CommentRange
 	}
 
 	return values, globals
+}
+
+func mayContainInlineGlobalDirective(text string) bool {
+	for searchStart := 0; searchStart < len(text); {
+		markerOffset := strings.Index(text[searchStart:], "/*")
+		if markerOffset < 0 {
+			return false
+		}
+
+		contentStart := searchStart + markerOffset + len("/*")
+		contentStart, _ = trimECMAScriptWhitespaceRange(text, contentStart, len(text))
+		for _, keyword := range inlineGlobalsKeywords {
+			if !strings.HasPrefix(text[contentStart:], keyword) {
+				continue
+			}
+			restStart := contentStart + len(keyword)
+			if restStart == len(text) || strings.HasPrefix(text[restStart:], "*/") {
+				return true
+			}
+			r, _ := utf8.DecodeRuneInString(text[restStart:])
+			if isECMAScriptWhitespace(r) {
+				return true
+			}
+		}
+
+		searchStart = contentStart
+	}
+	return false
 }
 
 func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGlobalName {

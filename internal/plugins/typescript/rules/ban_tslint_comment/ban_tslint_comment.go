@@ -23,8 +23,11 @@ var BanTslintCommentRule = rule.CreateRule(rule.Rule{
 
 func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	text := ctx.SourceFile.Text()
+	if !strings.Contains(text, "tslint:") {
+		return rule.RuleListeners{}
+	}
 
-	for _, comment := range ctx.Comments {
+	for _, comment := range ctx.Comments.All() {
 		commentValue := extractCommentValue(text, comment)
 		if !enableDisableRegex.MatchString(commentValue) {
 			continue

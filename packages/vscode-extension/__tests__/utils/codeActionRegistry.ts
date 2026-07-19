@@ -129,8 +129,7 @@ export class CodeActionRegistryProbe implements vscode.Disposable {
   private activeQuietWindowMs = defaultQuietWindowMs;
   private activeAttempt = 0;
   private activeAttemptHook:
-    | ((attempt: number, probeUri: vscode.Uri) => void)
-    | undefined;
+    ((attempt: number, probeUri: vscode.Uri) => void) | undefined;
 
   constructor() {
     const id = randomUUID().replaceAll('-', '');

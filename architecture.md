@@ -220,7 +220,7 @@ Important characteristics:
 - **Node Objects**: `*ast.Node` and `*ast.SourceFile`
 - **Traversal Style**: `ForEachChild(...)` with depth-first recursion
 - **Source Locations**: node ranges and source-file-aware line/column conversion via scanner helpers
-- **Comments**: collected separately and used for directives and comment-based rules
+- **Comments**: exposed through one lazy per-file store for directives and comment-based rules
 
 ### Key AST Properties
 
@@ -271,6 +271,7 @@ type RuleContext struct {
     ConfigGlobals              map[string]bool
     InlineGlobals              []InlineGlobal
     Globals                    map[string]bool
+    Comments                   *CommentStore
     Program                    *compiler.Program
     TypeChecker                *checker.Checker
     DisableManager             *DisableManager
@@ -283,7 +284,12 @@ type RuleContext struct {
 }
 ```
 
-The linter parses `/* global */` comments once per file before rules run.
+The linter creates one short-lived `CommentStore` per file. `Comments.All()`
+materializes the scanner-backed, source-ordered, deduplicated comment list only
+for the first consumer; later consumers share that list. A source without `//`
+or `/*` takes a cheap byte-scan fast path. Inline-global parsing first checks
+for an exact raw-text directive candidate, so ordinary files do not force
+comment collection.
 `ConfigGlobals` preserves the effective `languageOptions.globals` source,
 `InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
 resolved map after inline settings override configuration. Rules consume this
@@ -723,7 +729,10 @@ Rslint supports inline directives with both `rslint-` and `eslint-` prefixes:
 - `/* rslint-disable @typescript-eslint/no-unsafe-assignment */`
 - `// eslint-disable-next-line`
 
-The `DisableManager` in `internal/rule/disable_manager.go` parses and applies these directives before diagnostics are emitted.
+The `DisableManager` in `internal/rule/disable_manager.go` applies these
+directives before diagnostics are emitted. It defers parsing until the first
+disable check and uses an exact directive-text candidate check, so files without a
+supported directive retain an empty manager without scanning comments.
 
 ## 9. CLI Flow
 
@@ -886,6 +895,7 @@ goroutines remain outside that guarantee.
 - **Gap-File Degradation**: fallback gap-file Programs skip type-aware rules and semantic diagnostics instead of paying unreliable semantic costs
 - **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint workers and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
+- **Lazy Shared Comments**: each file owns one `CommentStore`; directive consumers and comment-aware rules materialize its canonical comment list only when needed and reuse the result. Rule-specific text checks avoid scanner work when their comment syntax cannot occur
 
 ### Caching Strategy
 
@@ -901,7 +911,7 @@ goroutines remain outside that guarantee.
 ### Memory Management
 
 - **ts-go Owns the Heavy Graphs**: AST nodes, checker state, `Program` graphs, and session state are primarily owned by ts-go; rslint adds listener maps, diagnostics, and config-derived rule lists on top
-- **Short-Lived Per-File Structures**: comment slices, disable managers, and registered listener maps are allocated per file and dropped after traversal; `clear(registeredListeners)` helps release references promptly
+- **Short-Lived Per-File Structures**: comment stores, disable managers, and registered listener maps are allocated per file and dropped after traversal. A comment slice is allocated only if requested; `clear(registeredListeners)` helps release references promptly
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels
@@ -1129,6 +1139,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 
 - **AST**: Abstract Syntax Tree produced directly by ts-go
 - **Code Action**: LSP action derived from diagnostics, suggestions, or bulk-fix operations such as quick fix and fix all
+- **Comment Store**: short-lived per-file provider that lazily computes and shares the canonical source comment list
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
 - **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
