@@ -12,9 +12,9 @@ import (
 type DiagnosticSeverity int
 
 const (
-	SeverityError DiagnosticSeverity = iota
+	SeverityOff DiagnosticSeverity = iota
 	SeverityWarning
-	SeverityOff
+	SeverityError
 )
 
 // String returns the string representation of the severity

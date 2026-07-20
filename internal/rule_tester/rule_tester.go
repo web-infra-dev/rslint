@@ -149,10 +149,6 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			// The zero value of rule.DiagnosticSeverity is SeverityError (not
-			// SeverityOff), so this must be set explicitly — otherwise every
-			// rule test would implicitly enable --report-unused-disable-directives.
-			ReportUnusedDisableDirectives: rule.SeverityOff,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
