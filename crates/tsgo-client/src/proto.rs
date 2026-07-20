@@ -10,6 +10,8 @@ pub struct ProjectResponse<'base> {
     pub root_files: Vec<&'base str>,
     pub source_files: Vec<&'base Bytes>,
     pub module_list: Vec<&'base str>,
+    #[serde(default)]
+    pub module_exports: Vec<Vec<u32>>,
     pub semantic: Semantic,
     pub diagnostics: Vec<Diagnostic>,
     pub source_file_extra: Vec<SourceFileExtra>,
