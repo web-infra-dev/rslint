@@ -319,9 +319,8 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	// generation's path identity snapshot.
 	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
-	catalog, err := discovery.Build(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
+	catalog, err := discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
 		CWD:         tspath.NormalizePath(s.cwd),
-		Mode:        discovery.ConfigDiscoveryAuto,
 		ImplicitCWD: true,
 		Fresh:       true,
 	})
@@ -526,22 +525,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		snapshot.tsConfigPaths[configDir] = nil
 		snapshot.unavailableConfigs[configDir] = struct{}{}
 	}
-	// Build all ownership and unavailable boundaries before collecting any
-	// .gitignore source. This prevents a parent config from reading into a child
-	// boundary merely because that child happened to be processed later.
-	boundaryResolver := config.NewConfigOwnerResolver(snapshot.configs, fsys)
-	for configDir, entries := range snapshot.configs {
-		snapshot.configs[configDir] = config.ConfigWithGitignoreWithBoundaries(
-			entries,
-			configDir,
-			fsys,
-			nil,
-			boundaryResolver.ChildConfigDirs(configDir),
-		)
-	}
 	// ConfigOwnerResolver snapshots both the path index and config values. Build
-	// the committed resolver only after ignore injection so Resolve never returns
-	// a pre-snapshot config that differs from snapshot.configs.
+	// it only after all successful and unavailable boundaries are present.
+	// Successful automatic catalog entries already contain the Git sources read
+	// by their discovery generation; unavailable boundaries intentionally remain
+	// empty and only stop JSON fallback ownership.
 	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
 
 	jsonConfig, jsonPath, jsonTsConfigs, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)

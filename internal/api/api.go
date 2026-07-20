@@ -125,7 +125,6 @@ type LintRequest struct {
 // ConfigDiscoveryRequest is the API-facing scope for Go's shared staged
 // discovery coordinator. Files themselves remain in LintRequest.Files.
 type ConfigDiscoveryRequest struct {
-	Mode               string `json:"mode"`
 	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
 	// Directories are static roots for the already-expanded Files set. Go limits
 	// config discovery below them to branches that can govern those files.

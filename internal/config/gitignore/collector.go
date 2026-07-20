@@ -229,6 +229,129 @@ type gitignorePrunePattern struct {
 	pattern string
 }
 
+// Cursor is an immutable, filesystem-independent view of the .gitignore
+// sources on one config owner's directory chain. It deliberately
+// separates two questions:
+//
+//   - Enter reports whether the already-observed Git patterns ignore one
+//     directory node. Config discovery may still reopen that node with a later
+//     authored global-ignore negation.
+//   - SourceReachable reports whether raw Git traversal can read the current
+//     directory's .gitignore. Authored config never changes this state; only a
+//     successfully loaded child config creates a new cursor/root.
+//
+// Values are safe to copy between discovery workers. Enter only changes scalar
+// state; AppendSource clones the rule slice before extending it, so siblings
+// never share a writable backing array.
+type Cursor struct {
+	rootDir          string
+	useCaseSensitive bool
+	sourceReachable  bool
+	rules            []gitignorePruneRule
+}
+
+// NewCursor starts a config-scoped Git view. The owner directory itself is
+// always source-reachable; parent .gitignore files are intentionally excluded.
+func NewCursor(ownerRoot string, useCaseSensitive bool) Cursor {
+	ownerRoot = normalizeGlobPath(ownerRoot)
+	return Cursor{
+		rootDir:          ownerRoot,
+		useCaseSensitive: useCaseSensitive,
+		sourceReachable:  ownerRoot != "",
+	}
+}
+
+// SourceReachable reports whether raw Git traversal permits reading the
+// current directory's .gitignore.
+func (cursor Cursor) SourceReachable() bool {
+	return cursor.sourceReachable
+}
+
+// BlockSourceTraversal preserves already-observed matching rules while making
+// .gitignore sources at the current directory and its descendants unreachable.
+// A successfully loaded child config starts a new cursor and therefore a new
+// source boundary.
+func (cursor Cursor) BlockSourceTraversal() Cursor {
+	cursor.sourceReachable = false
+	return cursor
+}
+
+// Enter advances to directory and reports whether the already-observed raw Git
+// patterns ignore that exact directory node. The returned cursor keeps raw
+// source reachability monotonic: a negation below an ignored parent cannot make
+// nested .gitignore sources visible.
+func (cursor Cursor) Enter(directory string) (Cursor, bool) {
+	directory = normalizeGlobPath(directory)
+	if _, ok := relativeDir(cursor.rootDir, directory, cursor.useCaseSensitive); !ok {
+		next := cursor
+		next.sourceReachable = false
+		return next, true
+	}
+	blocked := cursor.blocksDirectoryNode(directory)
+	next := cursor
+	next.sourceReachable = cursor.sourceReachable && !blocked
+	return next, blocked
+}
+
+// AppendSource extends the cursor with directory's .gitignore and returns the
+// source projected into the config owner's target path space. Callers keep the
+// source IO path separate and pass the matching-space directory explicitly so
+// lexical and canonical discovery routes cannot be mixed accidentally.
+func (cursor Cursor) AppendSource(directory string, content string) (Cursor, []string) {
+	if !cursor.sourceReachable {
+		return cursor, nil
+	}
+	directory = normalizeGlobPath(directory)
+	relative, ok := relativeDir(cursor.rootDir, directory, cursor.useCaseSensitive)
+	if !ok {
+		next := cursor
+		next.sourceReachable = false
+		return next, nil
+	}
+
+	next := cursor
+	if rule, ok := newGitignorePruneRule(directory, content); ok {
+		next.rules = append(append([]gitignorePruneRule(nil), cursor.rules...), rule)
+	}
+	globs := convertGitignoreToGlobs(content, relative)
+	return next, globs
+}
+
+func (cursor Cursor) blocksDirectoryNode(directory string) bool {
+	if cursor.rootDir == "" || directory == "" {
+		return false
+	}
+	ignored := false
+	for _, rule := range cursor.rules {
+		relative, ok := relativeDir(rule.baseDir, directory, cursor.useCaseSensitive)
+		if !ok || relative == "" {
+			continue
+		}
+		for _, pattern := range rule.patterns {
+			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, cursor.useCaseSensitive) {
+				ignored = !pattern.negated
+			}
+		}
+	}
+	return ignored
+}
+
+// gitignorePrunePatternMatchesDirectoryNode matches only the current directory
+// node. The existing collector predicate additionally checks ancestors because
+// a raw Git walk can never enter an ignored parent; config discovery cannot use
+// that shortcut because a later authored `!dir/` may reopen the parent node
+// while raw nested-source reachability remains blocked.
+func gitignorePrunePatternMatchesDirectoryNode(pattern gitignorePrunePattern, relative string, useCaseSensitive bool) bool {
+	if pattern.rooted {
+		return matchGitignoreGlob(pattern.pattern, relative, useCaseSensitive)
+	}
+	parts := splitPathComponents(relative)
+	if len(parts) == 0 {
+		return false
+	}
+	return matchGitignoreGlob(pattern.pattern, parts[len(parts)-1], useCaseSensitive)
+}
+
 func newGitignorePruneRule(baseDir string, content string) (gitignorePruneRule, bool) {
 	patterns := parseGitignorePrunePatterns(content)
 	if len(patterns) == 0 {

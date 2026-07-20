@@ -22,13 +22,6 @@ var AutoJSConfigFileNames = []string{
 	"rslint.config.mts",
 }
 
-type ConfigDiscoveryMode uint8
-
-const (
-	ConfigDiscoveryAuto ConfigDiscoveryMode = iota
-	ConfigDiscoveryExplicit
-)
-
 // DiscoveryFile is a file target that may participate in config discovery.
 // CanonicalPath is consulted only when the complete lexical ancestry contains
 // no config candidate.
@@ -46,11 +39,9 @@ type DiscoveryFile struct {
 // bounds them to an already-expanded target set. When ImplicitCWD is true and
 // no files or directories are supplied, CWD is used as the sole directory root.
 type ConfigDiscoveryRequest struct {
-	CWD                string
-	Mode               ConfigDiscoveryMode
-	ExplicitConfigPath string
-	Files              []DiscoveryFile
-	Directories        []string
+	CWD         string
+	Files       []DiscoveryFile
+	Directories []string
 	// LimitDirectoryWalkToFiles is used when a host has already expanded its
 	// directory/glob inputs to an exact target set. Only target-ancestor branches
 	// can govern that request. CLI/LSP directory roots leave this false and retain
@@ -59,6 +50,17 @@ type ConfigDiscoveryRequest struct {
 	ImplicitCWD               bool
 	Fresh                     bool
 	SingleThreaded            bool
+}
+
+// ExplicitConfigRequest loads one invocation-wide JS/TS config. It is a
+// separate operation from automatic discovery: absence of this request means
+// automatic discovery, while absence of config discovery at the adapter means
+// the low-level/JSON path.
+type ExplicitConfigRequest struct {
+	CWD            string
+	ConfigPath     string
+	Fresh          bool
+	SingleThreaded bool
 }
 
 type configSource struct {
@@ -84,7 +86,9 @@ type ConfigDiscoveryStats struct {
 // ConfigCatalog is the deterministic snapshot produced by one build. Configs
 // contains only effective, successfully loaded ownership boundaries. Requested
 // failures remain in Failures/Stats; ignored or unreachable candidates are
-// omitted because their modules are never requested.
+// omitted because their modules are never requested. Automatic catalogs freeze
+// each owner's observed Git projection into Configs before publication;
+// explicit catalogs leave invocation-scoped Git collection to their adapter.
 type ConfigCatalog struct {
 	TransactionID      string
 	Configs            map[string]rslintconfig.RslintConfig
@@ -156,12 +160,34 @@ func nextConfigDiscoveryTransactionID() string {
 	)
 }
 
-// Build discovers and loads one immutable config catalog. Transaction IDs are
-// unique across concurrent builds and native-process restarts so adapters can
-// stage load/activate/commit as one operation. The operation itself is
-// intentionally stateless; long-lived lifecycle and rollback belong to the
-// CLI/API/LSP adapters that own the transport.
-func Build(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ConfigDiscoveryRequest) (*ConfigCatalog, error) {
+// DiscoverAutomatic discovers and loads one immutable hierarchical config
+// catalog. Transaction IDs are unique across concurrent builds and native
+// process restarts so adapters can stage load/activate/commit as one operation.
+func DiscoverAutomatic(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ConfigDiscoveryRequest) (*ConfigCatalog, error) {
+	return buildConfigCatalog(ctx, fsys, loader, request, "")
+}
+
+// LoadExplicitConfig loads one exact invocation-wide config path. Automatic
+// candidate discovery and Git reachability never participate in this operation.
+func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ExplicitConfigRequest) (*ConfigCatalog, error) {
+	if request.ConfigPath == "" {
+		return nil, errors.New("explicit config discovery requires a config path")
+	}
+	automatic := ConfigDiscoveryRequest{
+		CWD:            request.CWD,
+		Fresh:          request.Fresh,
+		SingleThreaded: request.SingleThreaded,
+	}
+	return buildConfigCatalog(ctx, fsys, loader, automatic, request.ConfigPath)
+}
+
+func buildConfigCatalog(
+	ctx context.Context,
+	fsys vfs.FS,
+	loader ConfigModuleLoader,
+	request ConfigDiscoveryRequest,
+	explicitConfigPath string,
+) (*ConfigCatalog, error) {
 	if fsys == nil {
 		return nil, errors.New("config discovery requires a filesystem")
 	}
@@ -172,6 +198,7 @@ func Build(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request 
 		fs:                  fsys,
 		loader:              loader,
 		request:             request,
+		explicitConfigPath:  explicitConfigPath,
 		transactionID:       transactionID,
 		loadStates:          make(map[string]*configLoadState),
 		loadStateByIdentity: make(map[tspath.Path]*configLoadState),

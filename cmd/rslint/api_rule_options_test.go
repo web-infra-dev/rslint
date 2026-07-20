@@ -83,7 +83,7 @@ func TestHandleLintDiscoveredConfigValidatesRuleOptions(t *testing.T) {
 	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(root, "input.js")},
 		WorkingDirectory: root,
-		ConfigDiscovery:  &api.ConfigDiscoveryRequest{Mode: "auto"},
+		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 	}, requester)
 	if err == nil || !strings.Contains(err.Error(), `invalid options for rule "no-console"`) {
 		t.Fatalf("discovered config did not validate rule options: %v", err)
@@ -104,7 +104,6 @@ func TestHandleLintDiscoveryOverrideValidatesRuleOptionsWithoutCandidate(t *test
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
-			Mode:           "auto",
 			OverrideConfig: json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
 		},
 	}, requester)

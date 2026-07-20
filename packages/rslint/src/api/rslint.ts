@@ -153,27 +153,14 @@ function staticGlobRoot(pattern: string, cwd: string): string {
   return current || cwd;
 }
 
-function compactScanDirectories(directories: Iterable<string>): string[] {
+function deduplicateScanDirectories(directories: Iterable<string>): string[] {
   const byIdentity = new Map<string, string>();
   for (const directory of directories) {
     const normalized = path.normalize(directory);
     const key = nativePathIdentity.key(normalized);
     if (!byIdentity.has(key)) byIdentity.set(key, normalized);
   }
-  const sorted = [...byIdentity.values()].sort(
-    (a, b) => a.length - b.length || nativePathIdentity.compare(a, b),
-  );
-  const compact: string[] = [];
-  for (const directory of sorted) {
-    if (
-      !compact.some((parent) =>
-        nativePathIdentity.isSameOrChild(parent, directory),
-      )
-    ) {
-      compact.push(directory);
-    }
-  }
-  return compact;
+  return [...byIdentity.values()].sort(nativePathIdentity.compare);
 }
 
 function normalizeGlobPatternForCwd(pattern: string, cwd: string): string {
@@ -262,7 +249,7 @@ async function classifyLintPatterns(
   return {
     literalFilePatterns,
     literalDirectorySymlinks,
-    scanDirectories: compactScanDirectories(scanDirectories),
+    scanDirectories: deduplicateScanDirectories(scanDirectories),
   };
 }
 
@@ -319,10 +306,6 @@ export class Rslint {
           config: usesNativeDiscovery ? undefined : overrideConfig,
           configDiscovery: usesNativeDiscovery
             ? {
-                mode:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? 'explicit'
-                    : 'auto',
                 explicitConfigPath:
                   typeof this.#overrideConfigFile === 'string'
                     ? path.resolve(this.#cwd, this.#overrideConfigFile)
@@ -459,10 +442,6 @@ export class Rslint {
           config: usesNativeDiscovery ? undefined : overrideConfig,
           configDiscovery: usesNativeDiscovery
             ? {
-                mode:
-                  typeof this.#overrideConfigFile === 'string'
-                    ? 'explicit'
-                    : 'auto',
                 explicitConfigPath:
                   typeof this.#overrideConfigFile === 'string'
                     ? path.resolve(this.#cwd, this.#overrideConfigFile)

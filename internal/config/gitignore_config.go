@@ -38,12 +38,20 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 		}
 	}
 	globs := gitignore.CollectWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
+	caseInsensitive := fsys != nil && !fsys.UseCaseSensitiveFileNames()
+	return ConfigWithCollectedGitignore(config, globs, caseInsensitive)
+}
+
+// ConfigWithCollectedGitignore prepends one already-collected Git projection
+// without retaining a filesystem. Both the standalone collector path and
+// staged config discovery use this constructor so private Git matching metadata
+// cannot diverge between them.
+func ConfigWithCollectedGitignore(config RslintConfig, globs []string, caseInsensitive bool) RslintConfig {
 	if len(globs) == 0 {
 		return config
 	}
-	caseInsensitive := fsys != nil && !fsys.UseCaseSensitiveFileNames()
 	gitignoreEntry := ConfigEntry{
-		Ignores:                  globs,
+		Ignores:                  append([]string(nil), globs...),
 		gitignoreSemantics:       true,
 		gitignoreCaseInsensitive: caseInsensitive,
 	}

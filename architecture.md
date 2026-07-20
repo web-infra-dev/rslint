@@ -109,8 +109,8 @@ The directory map below folds the high-level module relationships into the packa
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                                                       | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                |
 | `internal/api/`                | stdio IPC protocol and service types for JS/WASM integration                                                                                | Shared protocol layer for `cmd/rslint --api`; used by `packages/rslint`, `packages/rslint-wasm`, `internal/linter`, and `internal/inspector`                                                                                                                                           |
 | `internal/config/`             | Configuration models, JSON loading, matching/merging, runtime ownership resolution, lint-target planning, and centralized rule registration | Owns the shared authored-global-ignore matcher consumed by both discovery phases. `RegisterAllRules()` orchestrates rule registration; `rule_registry.go` implements registry/query logic used by `cmd/rslint/programs.go` and `internal/linter`                                       |
-| `internal/config/discovery/`   | Go-owned JS/TS config candidate discovery and immutable catalog construction                                                                | Imports the parent config model/matching policy, batches exact candidates to a host-supplied Node loader, and returns configs/scopes/failures/effective IDs. CLI, API, and LSP call its one-shot `Build`; the parent package never imports this child package                          |
-| `internal/config/gitignore/`   | Config-scoped `.gitignore` source discovery and pattern conversion                                                                          | Shared by lint-target admission across CLI, IPC API, and LSP; collection starts at the governing config directory, stops at automatic ownership handoff boundaries (or the exact literal chain for an explicit-only config), and never participates in config candidate discovery      |
+| `internal/config/discovery/`   | Go-owned JS/TS config candidate discovery and immutable catalog construction                                                                | Imports the parent config model/matching policy, batches exact candidates to a host-supplied Node loader, and returns configs/scopes/failures/effective IDs. CLI, API, and LSP call `DiscoverAutomatic` or `LoadExplicitConfig`; the parent package never imports this child package   |
+| `internal/config/gitignore/`   | Config-scoped `.gitignore` parsing, directory reachability, and pattern projection                                                          | Automatic catalog discovery carries a filesystem-independent cursor through its existing walk, pruning Git-inaccessible config subtrees and freezing observed patterns for lint-target admission; explicit/JSON fallback paths reuse the standalone collector                          |
 | `internal/inspector/`          | AST/type/symbol/signature/flow inspection for Playground                                                                                    | Auxiliary backend used mainly by website Playground inspect panels; builds rich semantic data from `typescript-go` programs                                                                                                                                                            |
 | `internal/linter/`             | Core lint engine, traversal, and fix application                                                                                            | Consumes rules from `internal/rule`, file config from `internal/config`, and `Program` / `TypeChecker` data from `typescript-go`; also serves `internal/api` and `internal/lsp`                                                                                                        |
 | `internal/lsp/`                | Language Server Protocol implementation                                                                                                     | Wraps `typescript-go project.Session`, owns transactional config discovery and last-good commit state with `packages/vscode-extension` as the module/plugin host, and invokes `internal/linter` on session-backed programs                                                             |
@@ -450,12 +450,14 @@ The loading flow differs by config type:
 **JS/TS staged catalog discovery**:
 
 CLI, the native JavaScript API path, and transactional LSP refreshes reuse
-the one-shot `internal/config/discovery.Build` operation. It builds an immutable
-config/ownership catalog; it does not collect lint targets or read `.gitignore`.
-Go owns candidate discovery, default exclusions, config hierarchy, authored
-global-ignore reachability, and final effective IDs. Node only executes the
-exact JS/TS modules requested by Go, normalizes their entries, retains live
-third-party plugin objects, and returns serializable entries. Source
+the one-shot `internal/config/discovery.DiscoverAutomatic` operation (or
+`LoadExplicitConfig` for an exact path). Automatic discovery builds an immutable
+config/ownership catalog and observes `.gitignore` sources during the same
+directory walk; it does not collect lint targets. Go owns candidate discovery,
+default exclusions, config hierarchy, authored and Git directory reachability,
+the frozen Git projection for each owner, and final effective IDs. Node only
+executes the exact JS/TS modules requested by Go, normalizes their entries,
+retains live third-party plugin objects, and returns serializable entries. Source
 fingerprints stay in the Node transaction session; after Go selects the final
 effective IDs, activation revalidates those fingerprints and returns only the
 effective plugin metadata.
@@ -464,10 +466,11 @@ The package boundary is deliberate: `internal/config/discovery` imports the
 parent `internal/config` model and its narrow authored-global-ignore matcher;
 the parent never imports discovery. Runtime file routing stays in the parent
 `ConfigOwnerResolver`, while CLI/API/LSP adapters own transport, commit/abort,
-and last-good lifecycle. `Build` has no reusable session, mutex, or generation
-state because every production request is one transaction; a process-random
-nonce plus atomic sequence allocates IDs that cannot collide with a stale host
-session after a native-process restart. The returned catalog
+and last-good lifecycle. Discovery has no cross-transaction session,
+synchronization, or generation state because every production request is one
+transaction; request-local coordination only freezes concurrent observations.
+A process-random nonce plus atomic sequence allocates IDs that cannot collide
+with a stale host session after a native-process restart. The returned catalog
 publishes final configs, scopes, failures, effective IDs, plugin metadata, and
 whether the invocation used an explicit config. Candidate fingerprints and
 plugin-aggregation scratch remain private to the Node transaction session;
@@ -477,17 +480,27 @@ Automatic discovery uses these rules:
 
 1. `.git` and `node_modules` are default discovery boundaries. Within one
    directory, automatic filename priority is `.js` → `.mjs` → `.ts` → `.mts`.
-   `.gitignore` is deliberately not consulted: a config candidate is discovered
-   and loaded even when its directory or filename is gitignored. When a requested
-   directory root is itself default-excluded, Go skips downward traversal but
-   still resolves reachable ancestors outside the boundary.
+   After the first successful JS/TS owner, Git-inaccessible directory nodes are
+   config-discovery boundaries. Git never filters a candidate filename, so a
+   local or ancestor pattern naming `rslint.config.js` does not change priority
+   or fall through to `.mjs`. A directly supplied directory/static-glob root
+   reopens that root's inherited Git gate, but not hidden intermediate configs;
+   overlapping supplied roots retain independent reachability. When a requested
+   root is default-excluded, Go skips downward traversal but still resolves
+   reachable ancestors outside the boundary.
 2. A directory target's config ancestry is evaluated outer-to-inner. The
    current successful ancestor's standalone global ignores can therefore stop
    a nested config before it executes. An absolute directory cover such as
    `dir/**` prunes the frontier. A file cover such as `dir/**/*` keeps the
-   directory traversable for later negations, but an automatic config candidate
-   that still matches that cover is not executed; filename priority falls
-   through to the first non-ignored candidate. CLI/LSP directory roots (including mixed
+   directory traversable for later authored negations, but an automatic config
+   candidate that still matches that authored cover is not executed; filename
+   priority falls through to the first non-ignored candidate. Ordered authored
+   patterns may reopen a Git-blocked node when they match that exact directory:
+   `!dir`, `!dir/`, and `!dir/**` reopen `dir`, while `!dir/**/*` and
+   `!dir/file.ts` do not. Descendant patterns such as `!dir/*` can reopen a
+   child node they directly match, and a later matching positive pattern closes
+   the node again.
+   CLI/LSP directory roots (including mixed
    CLI file-and-directory input) recursively scan reachable sibling frontiers
    with a bounded worker pool. When the native API supplies an already-expanded
    exact file set plus static glob roots, Go builds a lexical target-ancestor
@@ -499,7 +512,8 @@ Automatic discovery uses these rules:
    fails. Lexical ancestry is authoritative; canonical ancestry is consulted
    only when the complete lexical ancestry has no candidate. A default-excluded
    literal file is not lintable and cannot escape through canonical fallback.
-   `.gitignore` is applied only after ownership is known. A config reached only
+   Git is not used to choose that literal's owner; `.gitignore` is applied after
+   ownership is known. A config reached only
    through the literal exception is marked explicit-only: it owns its
    discovery-scoped literal files and uses its directory as the `.gitignore`
    source boundary for that scope, but is excluded from automatic lint-target
@@ -525,7 +539,12 @@ Automatic discovery uses these rules:
    rechecks the same effective sources before publishing the activation. This
    prevents a worker re-import during preparation from observing different
    config bytes than the normalized entries Go is about to commit.
-5. A failed candidate is recorded and discovery continues with the last
+5. A successful child config resets Git scope at its own directory: parent Git
+   rules stop at that ownership handoff, then the child's local `.gitignore` is
+   read. A failed child does not form a boundary and inherits the parent cursor.
+   Config evaluation always precedes reading that directory's local Git source,
+   and a Git-inaccessible branch's nested `.gitignore` is never read.
+6. A failed candidate is recorded and discovery continues with the last
    reachable successful owner. If candidates existed but none loaded,
    discovery returns `ErrAllConfigsFailed` and does not activate Node state.
    Partial failures remain in `catalog.Failures`: CLI and native API emit
@@ -537,11 +556,10 @@ The transport and target phase differ by surface:
 
 - CLI sends `loadConfigs` / `activateConfigs` as reverse framed-IPC requests
   during initialization. The resulting catalog and the later Go lint-target
-  walker are separate traversals, but they share the catalog and the same
-  run-scoped cached VFS.
-  File-only invocations first resolve provisional owners and collect only the
-  `.gitignore` sources on each owner's exact target chains, avoiding an eager
-  subtree scan in lint-staged-style runs.
+  walker are separate traversals, but config discovery already freezes the Git
+  sources observed on its reachable frontier. There is no second per-owner
+  directory sweep. Literal-only and mixed literal targets contribute only their
+  exact owner-to-target source chains to the same source-keyed projection.
 - `Rslint.lintFiles()` still expands target globs with `tinyglobby`, preserves
   literal provenance and canonical identities, and sends the resulting files
   plus their static config-scan roots in one API lint request. Go bounds catalog
@@ -554,7 +572,11 @@ The transport and target phase differ by surface:
   `reversePluginLint` capability at the request boundary; plugin-free catalogs
   do not require that handler. Every long-lived API call uses a
   fresh entry-module load so rewritten config bytes cannot be paired with stale
-  normalized exports or a newer plugin-worker topology.
+  normalized exports or a newer plugin-worker topology. API `overrideConfig`
+  entries are structurally validated before that load and attached at the
+  loader boundary as the final suffix of every successful config. Their global
+  ignores and negations therefore participate in staged reachability and are
+  published exactly once; an empty catalog uses the same override directly.
 - The extension owns shared UI, commands, and output channels once. Its
   `WorkspaceRslintCoordinator` keys desired and active roots by workspace-folder
   URI (not display name), subscribes to folder changes before awaiting any root,
@@ -623,8 +645,10 @@ diagnostics after edits, closes, or config commits.
 
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. The invocation cwd remains its
-matching directory. Automatic and explicit config modules are both independent
-of `.gitignore`; lint targets are filtered only after the catalog is established.
+matching directory. The exact config path is never gated by `.gitignore`;
+lint targets are filtered afterward with the existing invocation-scoped
+collector. Automatic candidates instead use the Git directory reachability
+rules above.
 
 No-candidate behavior is surface-specific. CLI performs no Node activation and
 continues through its normal JSON fallback. Native API discovery performs no
@@ -677,10 +701,13 @@ allowed alias.
 Additional current behaviors:
 
 - `.gitignore` is injected as a global-ignore entry through the shared
-  `ConfigWithGitignore` policy. The governing config directory is a hard upper
-  boundary: its own and nested `.gitignore` files apply, while parent
-  `.gitignore` files do not. In multi-config CLI mode, direct automatically
-  reachable child config directories are downward ownership handoff boundaries.
+  `ConfigWithCollectedGitignore`/`ConfigWithGitignore` policy. The governing
+  config directory is a hard upper boundary: its own and nested `.gitignore`
+  files apply, while parent `.gitignore` files do not. In automatic catalogs,
+  the staged walk records sources by owner and case-aware source identity,
+  orders them parent-before-child, and materializes the synthetic Git entry
+  before publishing. Direct automatically reachable child config directories
+  are downward ownership handoff boundaries.
   Configs loaded only for explicit targets bound only their literal target
   chains, so adding a literal cannot truncate an ancestor-owned automatic
   target's `.gitignore` sources. This preserves ESLint v10's per-target global
@@ -701,9 +728,9 @@ Additional current behaviors:
 - the VS Code extension preserves last-good JS configs during reloads; a newly
   unavailable config with no usable JS ancestor contributes an empty boundary,
   preventing JSON fallback only in that authored config subtree. A normal
-  transactional refresh prepares all successful and unavailable boundaries
-  before collecting config-scoped `.gitignore` sources, then freezes and commits
-  the Go catalog and Node plugin host under one transaction ID. Failures preserve
+  transactional refresh receives successful entries with their Git projection
+  already frozen, adds unavailable boundaries, then freezes and commits the Go
+  catalog and Node plugin host under one transaction ID. Failures preserve
   a usable last-good catalog and ignore view together; the first-start all-broken
   recovery instead commits unavailable boundaries.
   If the first valid catalog cannot initialize its optional community-plugin
@@ -715,10 +742,10 @@ Additional current behaviors:
 - native and third-party plugin rules are gated by their normalized prefixes for JS/TS configs; third-party rules use process-wide Go registry placeholders, but LSP additionally filters those placeholders through the exact rule-name set committed for the current Node generation so metadata retained from an older generation cannot be dispatched to a newer worker
 - CLI/API lint target selection is independent from TypeScript `Program` membership and considers only rslint-supported script extensions. The `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` default baseline is always selected; explicit config `files` contributes candidates only within the supported set. Global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
 - selected CLI/API targets can still appear as 0-rule lint results when no config entry contributes rules; this applies to default-baseline directory discovery and explicit supported files, and syntax diagnostics remain available in that state
-- under automatic discovery, each selected file is governed by its nearest loadable config; explicit config modes use the selected config directly. In either mode, a target can bind only to a tsconfig declared by its governing config, and the first declared project containing the file wins
+- under automatic discovery, each selected file is governed by its nearest loadable config; an explicitly selected config is used directly. In either case, a target can bind only to a tsconfig declared by its governing config, and the first declared project containing the file wins
 - `files`/`ignores` matching uses the stable target path in the governing config's path space; a Program source alias is used only to locate the AST and type information, so moving a target into or out of a tsconfig cannot change its rule configuration
 - within each Program-registry build, normalized declared tsconfig paths are deduplicated across config associations; CLI fix passes create a new registry build. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected files outside the governing config's Programs receive a non-project-backed fallback Program, and targets whose names collide under a case-insensitive ts-go path key are partitioned across fallback Programs so distinct physical files remain distinct
-- `--type-check` and `--type-check-only` build every real tsconfig declared by the effective loaded config catalog. Once that catalog is established, program-wide checking is not filtered by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments; synthetic fallback Programs never participate. `--type-check-only` skips lint-target and `.gitignore` collection.
+- `--type-check` and `--type-check-only` build every real tsconfig declared by the effective loaded config catalog. Git reachability may change which automatic configs enter that catalog; once it is established, program-wide checking is not filtered by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments. Synthetic fallback Programs never participate, and `--type-check-only` skips the separate lint-target walk.
 - for LSP, an open supported script is a per-file target independent of Program membership. Global config ignores, `.gitignore`, default-excluded paths, and unavailable config boundaries suppress native rules, plugin rules, and fixes; an available zero-rule config still parses the target and can report syntax diagnostics
 
 ### Inline Directives
@@ -747,7 +774,7 @@ rslint [options] [files...]
 The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
 1. **Node.js Wrapper**: parses args, starts the Go engine, and hosts JS/TS module evaluation plus live third-party plugin objects
-2. **Config Catalog**: for automatic or explicit JS/TS config mode, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
+2. **Config Catalog**: for automatic JS/TS discovery or an explicitly selected JS/TS config, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
 3. **Mode Selection**:
    - `--lsp`: starts the LSP server
    - `--api`: starts the IPC API server
@@ -786,10 +813,11 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      result, so only sibling branches leading to supplied files enter those
      frontiers. CLI/LSP directory roots, including CLI mixed file+directory
      invocations, remain recursively unbounded within ignore boundaries.
-   - Directory-root ancestry is loaded outer-to-inner before the root frontier;
-     each successful owner's authored global ignores control continuation below
-     that boundary. `.gitignore` is not read during this phase. Literal files use
-     the separate nearest-first exception described above.
+   - Directory-root ancestry is loaded outer-to-inner before the root frontier.
+     Each successful owner's authored global ignores and Git cursor control
+     continuation below that boundary; local Git sources are observed only after
+     the directory's config decision. Literal files use the separate
+     nearest-first ownership exception described above.
    - Discovery commits only the config catalog in stable order. Plain lint then
      runs the separate lint-target walker and constructs Programs only for
      represented configs. `--type-check` and `--type-check-only` construct

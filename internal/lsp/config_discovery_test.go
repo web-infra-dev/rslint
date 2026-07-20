@@ -346,8 +346,19 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	catalog := &discovery.ConfigCatalog{
 		TransactionID: "snapshot-boundaries",
 		Configs: map[string]config.RslintConfig{
-			root:  {{Rules: config.Rules{"no-console": "error"}}},
-			child: {{Rules: config.Rules{"no-debugger": "error"}}},
+			root: config.ConfigWithGitignoreWithBoundaries(
+				config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}},
+				root,
+				fsys,
+				nil,
+				[]string{child},
+			),
+			child: config.ConfigWithGitignore(
+				config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+				child,
+				fsys,
+				nil,
+			),
 		},
 	}
 	s := newTestServer()

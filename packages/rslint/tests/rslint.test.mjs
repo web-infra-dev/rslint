@@ -1214,7 +1214,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles scopes .gitignore to config ownership boundaries', async () => {
+  test('lintFiles lets a literal target bypass Git-hidden config discovery but prunes a glob target', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-gitignore-'));
     try {
       await writeFile(
@@ -1238,10 +1238,16 @@ module.exports = config;`
           path.join('ignored', 'index.ts'),
         );
 
+        const rootedGlob = await rslint.lintFiles('ignored/**/*.ts');
+        expect(rootedGlob).toHaveLength(1);
+        expect(path.relative(tmp, rootedGlob[0].filePath)).toBe(
+          path.join('ignored', 'index.ts'),
+        );
+
         const results = await rslint.lintFiles('**/*.ts');
         expect(
           results.map((result) => path.relative(tmp, result.filePath)).sort(),
-        ).toEqual([path.join('ignored', 'index.ts'), 'visible.ts'].sort());
+        ).toEqual(['visible.ts']);
       } finally {
         await rslint.close();
       }

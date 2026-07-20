@@ -701,6 +701,54 @@ describe('Gitignore: tsconfig + gitignore interaction', () => {
 });
 
 describe('Gitignore: monorepo gap file interaction', () => {
+  test('automatic discovery prunes a Git-hidden child config, while an explicit directory root reopens it', async () => {
+    const tempDir = await createTempDir({
+      '.gitignore': 'packages/ignored/\n',
+      'rslint.config.mjs': CONFIG_NO_CONSOLE,
+      'packages/ignored/rslint.config.mjs': `
+        import { writeFileSync } from 'node:fs';
+        writeFileSync(new URL('./config-loaded.marker', import.meta.url), 'loaded');
+        ${CONFIG_NO_CONSOLE}
+      `,
+      'packages/ignored/index.ts': 'console.log("test");\n',
+    });
+    const marker = path.join(tempDir, 'packages/ignored/config-loaded.marker');
+    try {
+      await runRslint(['--format', 'jsonline'], tempDir);
+      expect(fs.existsSync(marker)).toBe(false);
+
+      await runRslint(['--format', 'jsonline', 'packages/ignored'], tempDir);
+      expect(fs.existsSync(marker)).toBe(true);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('an authored directory-matching negation reopens Git-hidden config discovery', async () => {
+    const tempDir = await createTempDir({
+      '.gitignore': 'packages/ignored/\n',
+      'rslint.config.mjs': `
+        export default [
+          { ignores: ["!packages/ignored/**"] },
+          { rules: { "no-console": "error" } },
+        ];
+      `,
+      'packages/ignored/rslint.config.mjs': `
+        import { writeFileSync } from 'node:fs';
+        writeFileSync(new URL('./config-loaded.marker', import.meta.url), 'loaded');
+        ${CONFIG_NO_CONSOLE}
+      `,
+      'packages/ignored/index.ts': 'console.log("test");\n',
+    });
+    const marker = path.join(tempDir, 'packages/ignored/config-loaded.marker');
+    try {
+      await runRslint(['--format', 'jsonline'], tempDir);
+      expect(fs.existsSync(marker)).toBe(true);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('root .gitignore does not prune child config discovery', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       '.gitignore': 'build/\n',
