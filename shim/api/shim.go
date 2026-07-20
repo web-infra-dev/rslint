@@ -202,6 +202,7 @@ const MethodStopCPUProfile = api.MethodStopCPUProfile
 const MethodTypeToString = api.MethodTypeToString
 const MethodTypeToTypeNode = api.MethodTypeToTypeNode
 const MethodUpdateSnapshot = api.MethodUpdateSnapshot
+const MethodUpdateTemporarySnapshot = api.MethodUpdateTemporarySnapshot
 //go:linkname NewAsyncConn github.com/microsoft/typescript-go/internal/api.NewAsyncConn
 func NewAsyncConn(rwc io.ReadWriteCloser, handler api.Handler) *api.AsyncConn
 //go:linkname NewAsyncConnWithProtocol github.com/microsoft/typescript-go/internal/api.NewAsyncConnWithProtocol
@@ -272,5 +273,6 @@ type TypeResponse = api.TypeResponse
 type TypeToTypeNodeParams = api.TypeToTypeNodeParams
 type UpdateSnapshotParams = api.UpdateSnapshotParams
 type UpdateSnapshotResponse = api.UpdateSnapshotResponse
+type UpdateTemporarySnapshotParams = api.UpdateTemporarySnapshotParams
 type WellKnownSignaturesResponse = api.WellKnownSignaturesResponse
 type WellKnownSymbolsResponse = api.WellKnownSymbolsResponse
