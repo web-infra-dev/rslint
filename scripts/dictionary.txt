@@ -63,6 +63,7 @@ brailleroledescription
 bref
 brefs
 Buttom
+butwhy
 cachedvfs
 callbackify
 callees
@@ -486,6 +487,7 @@ shadowable
 shouldnt
 SIGSEGV
 smajobber
+somethingelse
 sonarjs
 sourcegraph
 spinbutton
@@ -573,6 +575,7 @@ Unregisterations
 Unregistration
 unrepresentable
 unrooted
+unshadowed
 unshift
 unstarted
 unstrict
