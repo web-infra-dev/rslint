@@ -56,7 +56,7 @@ require (
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.21.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 	golang.org/x/tools v0.47.0
 	gotest.tools/v3 v3.5.2
 )
