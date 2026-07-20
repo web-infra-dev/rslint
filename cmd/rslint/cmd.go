@@ -659,19 +659,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			currentDirectory = configDirectories[0]
 			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
-
-			var exactTargetFiles []string
-			if len(allowFiles) > 0 && len(allowDirs) == 0 {
-				exactTargetFiles = allowFiles
-			}
-			if typeCheckOnly {
+			if buildAllPrograms {
 				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
-			} else if buildAllPrograms {
-				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
-				)
-			} else {
-				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)

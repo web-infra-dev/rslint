@@ -146,7 +146,8 @@ func createProgramSetForConfig(
 }
 
 // parallelGitignoreAndPrograms reads gitignore state and builds the Program
-// registry for an invocation-wide config (explicit JS/TS and JSON/JSONC).
+// registry for an invocation-wide JSON/JSONC config. Staged JS/TS catalogs
+// already contain their frozen Git projection before the lint pipeline starts.
 //
 // When singleThreaded is true, both run sequentially in the calling goroutine
 // — honoring the user's --singleThreaded flag (no concurrency at all).

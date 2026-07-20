@@ -34,7 +34,7 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 	} else if fsys != nil && len(targetFiles) > 0 {
 		collectionFiles = make([]string, len(targetFiles))
 		for i, file := range targetFiles {
-			collectionFiles[i] = gitignoreCollectionFilePath(file, configDir, fsys)
+			collectionFiles[i] = ResolveGitignoreCollectionPath(file, "", configDir, fsys)
 		}
 	}
 	globs := gitignore.CollectWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
@@ -100,9 +100,12 @@ func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []Ign
 	return patterns
 }
 
-func gitignoreCollectionFilePath(filePath string, configDir string, fsys vfs.FS) string {
+// ResolveGitignoreCollectionPath maps one exact target into the config root's
+// lexical path space. This keeps Git source lookup stable when the config root
+// and target use different symlink, casing, or canonical spellings.
+func ResolveGitignoreCollectionPath(filePath string, canonicalPath string, configDir string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
-	matchFile, matchDir := ResolveConfigPathSpace(filePath, configDir, fsys)
+	matchFile, matchDir := ResolveConfigPathSpaceWithCanonical(filePath, canonicalPath, configDir, fsys)
 	if relative, ok := RelativePathWithinConfigRoot(matchFile, matchDir, true); ok {
 		return tspath.ResolvePath(configDir, relative)
 	}

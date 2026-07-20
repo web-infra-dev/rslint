@@ -153,6 +153,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		if err := builder.activate(state, false); err != nil {
 			return nil, err
 		}
+		if err := builder.projectExplicitConfigGitignore(state); err != nil {
+			return nil, err
+		}
 		return builder.catalog()
 	}
 
@@ -259,7 +262,7 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		scope.Files = appendUniqueSortedPath(scope.Files, seed.path)
 		builder.scopes[seed.ownerDir] = scope
 	}
-	builder.collectExplicitSeedGitignore(explicitSeeds)
+	builder.collectExactTargetGitignore(explicitSeeds)
 
 	walkRoots := make([]discoveryWalkNode, 0, len(directorySeedByPath))
 	for _, directory := range directoryRoots {
@@ -286,6 +289,51 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		return nil, builder.allConfigsFailedError()
 	}
 	return builder.catalog()
+}
+
+// projectExplicitConfigGitignore freezes the invocation-scoped Git projection
+// after the exact config has loaded. Config selection is already complete:
+// full-subtree projection uses the catalog's bounded parallel frontier with one
+// fixed owner, while exact targets reuse the source-chain path used by literal
+// automatic targets. Neither path performs automatic candidate discovery.
+func (builder *configCatalogBuilder) projectExplicitConfigGitignore(state *configLoadState) error {
+	if state == nil || state.failure != nil {
+		return nil
+	}
+	if builder.request.Files != nil {
+		files := builder.normalizedFiles()
+		seeds := make([]*discoverySeed, 0, len(files))
+		for _, file := range files {
+			seed := &discoverySeed{
+				path: rslintconfig.ResolveGitignoreCollectionPath(
+					file.Path,
+					file.CanonicalPath,
+					state.candidate.directory,
+					builder.fs,
+				),
+				ownerDir:  state.candidate.directory,
+				ownerPath: state.candidate.path,
+			}
+			seeds = append(seeds, seed)
+		}
+		builder.collectExactTargetGitignore(seeds)
+		return builder.ctx.Err()
+	}
+
+	root := state.candidate.directory
+	canonicalRoot := builder.fs.Realpath(root)
+	if discoveryPathsEqual(root, canonicalRoot, builder.fs.UseCaseSensitiveFileNames()) {
+		canonicalRoot = ""
+	}
+	return builder.walkDirectories([]discoveryWalkNode{{
+		directory:          root,
+		canonicalDirectory: canonicalRoot,
+		ownerDir:           root,
+		ownerPath:          state.candidate.path,
+		gitDirectory:       root,
+		gitCursor:          gitignore.NewCursor(root, builder.fs.UseCaseSensitiveFileNames()),
+		gitActive:          true,
+	}})
 }
 
 func (builder *configCatalogBuilder) normalizedDirectoryRoots() []string {
@@ -1058,27 +1106,29 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	}
 	result := discoveryWalkResult{}
 
-	if candidate, found := builder.findCandidateForOwner(
-		node.directory,
-		node.ownerPath,
-		node.canonicalDirectory,
-	); found && candidate.directory != node.ownerDir {
-		result.discoveredCandidate = true
-		state, resolved := builder.loadStates[candidate.path]
-		if !resolved {
-			result.pending = &suspendedDiscoveryNode{node: node, candidate: candidate}
-			return result
-		}
-		if state.failure == nil {
-			result.activation = state
-			node.ownerDir = state.candidate.directory
-			node.ownerPath = state.candidate.path
-			node.gitCursor = gitignore.NewCursor(
-				state.candidate.directory,
-				builder.fs.UseCaseSensitiveFileNames(),
-			)
-			node.gitDirectory = state.candidate.directory
-			node.gitActive = true
+	if builder.explicitConfigPath == "" {
+		if candidate, found := builder.findCandidateForOwner(
+			node.directory,
+			node.ownerPath,
+			node.canonicalDirectory,
+		); found && candidate.directory != node.ownerDir {
+			result.discoveredCandidate = true
+			state, resolved := builder.loadStates[candidate.path]
+			if !resolved {
+				result.pending = &suspendedDiscoveryNode{node: node, candidate: candidate}
+				return result
+			}
+			if state.failure == nil {
+				result.activation = state
+				node.ownerDir = state.candidate.directory
+				node.ownerPath = state.candidate.path
+				node.gitCursor = gitignore.NewCursor(
+					state.candidate.directory,
+					builder.fs.UseCaseSensitiveFileNames(),
+				)
+				node.gitDirectory = state.candidate.directory
+				node.gitActive = true
+			}
 		}
 	}
 	result.directoriesVisited = 1
@@ -1315,12 +1365,13 @@ func splitDiscoveryPath(path string) []string {
 	return components
 }
 
-// collectExplicitSeedGitignore records the exact directory chain for a literal
-// target. Literal files bypass Git only while choosing their nearest config;
-// the resulting target still uses that config owner's ordinary Git ignores.
-// Keeping these observations source-scoped lets mixed directory+literal input
-// merge them with the automatic walk without duplicating parent patterns.
-func (builder *configCatalogBuilder) collectExplicitSeedGitignore(seeds []*discoverySeed) {
+// collectExactTargetGitignore records the exact directory chain for targets
+// whose owner is already known. Automatic literal files bypass Git only while
+// choosing their nearest config, while explicit-config targets start with their
+// fixed invocation-wide owner. Both still use that owner's ordinary Git
+// ignores. Keeping observations source-scoped lets exact chains merge with a
+// directory walk without duplicating parent patterns.
+func (builder *configCatalogBuilder) collectExactTargetGitignore(seeds []*discoverySeed) {
 	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
 	cursorByOwnerAndDirectory := make(map[string]map[tspath.Path]gitignore.Cursor)
 	barrierByOwnerAndDirectory := make(map[string]map[tspath.Path]struct{})
@@ -1338,7 +1389,7 @@ func (builder *configCatalogBuilder) collectExplicitSeedGitignore(seeds []*disco
 			ownerBarriers = make(map[tspath.Path]struct{})
 			barrierByOwnerAndDirectory[seed.ownerDir] = ownerBarriers
 		}
-		builder.collectExplicitSeedGitignoreChain(
+		builder.collectExactTargetGitignoreChain(
 			seed,
 			ownerCursors,
 			ownerBarriers,
@@ -1347,7 +1398,7 @@ func (builder *configCatalogBuilder) collectExplicitSeedGitignore(seeds []*disco
 	}
 }
 
-func (builder *configCatalogBuilder) collectExplicitSeedGitignoreChain(
+func (builder *configCatalogBuilder) collectExactTargetGitignoreChain(
 	seed *discoverySeed,
 	cursorByDirectory map[tspath.Path]gitignore.Cursor,
 	barriers map[tspath.Path]struct{},
@@ -1509,9 +1560,7 @@ func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
 	if err := builder.validateConfigDirectoryIdentities(); err != nil {
 		return nil, err
 	}
-	if builder.explicitConfigPath == "" {
-		builder.materializeGitignoreConfigs()
-	}
+	builder.materializeGitignoreConfigs()
 	// ExplicitOnly is derived from every activation path, not just from the
 	// explicit-file scope itself. Publish the final source value with the scope
 	// so target discovery can keep this config out of automatic ownership and

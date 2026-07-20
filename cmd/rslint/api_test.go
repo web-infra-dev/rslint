@@ -1930,15 +1930,21 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 	}
 }
 
-func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testing.T) {
+func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetDirectory := t.TempDir()
 	configPath := filepath.Join(workingDirectory, "custom.config.mjs")
 	targetPath := filepath.Join(targetDirectory, "outside.js")
+	insideIgnoredPath := filepath.Join(workingDirectory, "src/ignored.js")
 	writeProgramTestFiles(t, workingDirectory, map[string]string{
 		"custom.config.mjs": "export default [];\n",
+		".gitignore":        "src/ignored.js\n",
+		"src/ignored.js":    "debugger;\n",
 	})
 	if err := os.WriteFile(targetPath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDirectory, ".gitignore"), []byte("outside.js\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1966,18 +1972,21 @@ func TestHandleLint_ExplicitConfigGovernsTargetOutsideWorkingDirectory(t *testin
 	})
 
 	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
-		Files:            []string{targetPath},
+		Files:            []string{targetPath, insideIgnoredPath},
 		WorkingDirectory: workingDirectory,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
 			ExplicitConfigPath: configPath,
-			ExplicitFiles:      []bool{true},
+			ExplicitFiles:      []bool{true, true},
 		},
 	}, requester)
 	if err != nil {
 		t.Fatalf("HandleLintWithContext: %v", err)
 	}
-	if response.FileCount != 1 || len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("explicit config did not govern outside target: %+v", response)
+	if response.FileCount != 1 ||
+		len(response.Diagnostics) != 1 ||
+		response.Diagnostics[0].RuleName != "no-debugger" ||
+		filepath.Base(response.Diagnostics[0].FilePath) != "outside.js" {
+		t.Fatalf("explicit config Git projection crossed its working-directory boundary: %+v", response)
 	}
 }
 

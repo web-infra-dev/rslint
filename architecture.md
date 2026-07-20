@@ -110,7 +110,7 @@ The directory map below folds the high-level module relationships into the packa
 | `internal/api/`                | stdio IPC protocol and service types for JS/WASM integration                                                                                | Shared protocol layer for `cmd/rslint --api`; used by `packages/rslint`, `packages/rslint-wasm`, `internal/linter`, and `internal/inspector`                                                                                                                                           |
 | `internal/config/`             | Configuration models, JSON loading, matching/merging, runtime ownership resolution, lint-target planning, and centralized rule registration | Owns the shared authored-global-ignore matcher consumed by both discovery phases. `RegisterAllRules()` orchestrates rule registration; `rule_registry.go` implements registry/query logic used by `cmd/rslint/programs.go` and `internal/linter`                                       |
 | `internal/config/discovery/`   | Go-owned JS/TS config candidate discovery and immutable catalog construction                                                                | Imports the parent config model/matching policy, batches exact candidates to a host-supplied Node loader, and returns configs/scopes/failures/effective IDs. CLI, API, and LSP call `DiscoverAutomatic` or `LoadExplicitConfig`; the parent package never imports this child package   |
-| `internal/config/gitignore/`   | Config-scoped `.gitignore` parsing, directory reachability, and pattern projection                                                          | Automatic catalog discovery carries a filesystem-independent cursor through its existing walk, pruning Git-inaccessible config subtrees and freezing observed patterns for lint-target admission; explicit/JSON fallback paths reuse the standalone collector                          |
+| `internal/config/gitignore/`   | Config-scoped `.gitignore` parsing, directory reachability, and pattern projection                                                          | Staged JS/TS catalogs carry a filesystem-independent cursor through their existing walk, pruning Git-inaccessible subtrees and freezing observed patterns for lint-target admission; JSON/JSONC and low-level fallback paths reuse the standalone collector                            |
 | `internal/inspector/`          | AST/type/symbol/signature/flow inspection for Playground                                                                                    | Auxiliary backend used mainly by website Playground inspect panels; builds rich semantic data from `typescript-go` programs                                                                                                                                                            |
 | `internal/linter/`             | Core lint engine, traversal, and fix application                                                                                            | Consumes rules from `internal/rule`, file config from `internal/config`, and `Program` / `TypeChecker` data from `typescript-go`; also serves `internal/api` and `internal/lsp`                                                                                                        |
 | `internal/lsp/`                | Language Server Protocol implementation                                                                                                     | Wraps `typescript-go project.Session`, owns transactional config discovery and last-good commit state with `packages/vscode-extension` as the module/plugin host, and invokes `internal/linter` on session-backed programs                                                             |
@@ -453,9 +453,12 @@ CLI, the native JavaScript API path, and transactional LSP refreshes reuse
 the one-shot `internal/config/discovery.DiscoverAutomatic` operation (or
 `LoadExplicitConfig` for an exact path). Automatic discovery builds an immutable
 config/ownership catalog and observes `.gitignore` sources during the same
-directory walk; it does not collect lint targets. Go owns candidate discovery,
-default exclusions, config hierarchy, authored and Git directory reachability,
-the frozen Git projection for each owner, and final effective IDs. Node only
+directory walk. Explicit loading first selects the exact module unconditionally,
+then freezes that invocation-wide owner's Git projection with the same frontier
+without probing nested config candidates. Neither path collects lint targets.
+Go owns candidate discovery, default exclusions, config hierarchy, authored and
+Git directory reachability, the frozen Git projection for each owner, and final
+effective IDs. Node only
 executes the exact JS/TS modules requested by Go, normalizes their entries,
 retains live third-party plugin objects, and returns serializable entries. Source
 fingerprints stay in the Node transaction session; after Go selects the final
@@ -556,10 +559,11 @@ The transport and target phase differ by surface:
 
 - CLI sends `loadConfigs` / `activateConfigs` as reverse framed-IPC requests
   during initialization. The resulting catalog and the later Go lint-target
-  walker are separate traversals, but config discovery already freezes the Git
-  sources observed on its reachable frontier. There is no second per-owner
-  directory sweep. Literal-only and mixed literal targets contribute only their
-  exact owner-to-target source chains to the same source-keyed projection.
+  walker are separate traversals, but the staged catalog already freezes the
+  Git sources observed on its reachable frontier. There is no second per-owner
+  directory sweep. Automatic literal scopes and explicit file-only invocations
+  contribute only their exact owner-to-target source chains to the same
+  source-keyed projection.
 - `Rslint.lintFiles()` still expands target globs with `tinyglobby`, preserves
   literal provenance and canonical identities, and sends the resulting files
   plus their static config-scan roots in one API lint request. Go bounds catalog
@@ -646,9 +650,10 @@ diagnostics after edits, closes, or config commits.
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. The invocation cwd remains its
 matching directory. The exact config path is never gated by `.gitignore`;
-lint targets are filtered afterward with the existing invocation-scoped
-collector. Automatic candidates instead use the Git directory reachability
-rules above.
+only after it loads does a fixed-owner frontier freeze the invocation-scoped
+Git projection used to filter lint targets. That frontier never probes or
+activates nested config candidates. Automatic candidates instead use Git
+directory reachability while selecting ownership.
 
 No-candidate behavior is surface-specific. CLI performs no Node activation and
 continues through its normal JSON fallback. Native API discovery performs no
@@ -703,11 +708,12 @@ Additional current behaviors:
 - `.gitignore` is injected as a global-ignore entry through the shared
   `ConfigWithCollectedGitignore`/`ConfigWithGitignore` policy. The governing
   config directory is a hard upper boundary: its own and nested `.gitignore`
-  files apply, while parent `.gitignore` files do not. In automatic catalogs,
-  the staged walk records sources by owner and case-aware source identity,
-  orders them parent-before-child, and materializes the synthetic Git entry
-  before publishing. Direct automatically reachable child config directories
-  are downward ownership handoff boundaries.
+  files apply, while parent `.gitignore` files do not. In staged JS/TS catalogs,
+  the walk records sources by owner and case-aware source identity, orders them
+  parent-before-child, and materializes the synthetic Git entry before
+  publishing. Direct automatically reachable child config directories are
+  downward ownership handoff boundaries; an explicitly selected config remains
+  the fixed invocation-wide owner and never creates nested handoffs.
   Configs loaded only for explicit targets bound only their literal target
   chains, so adding a literal cannot truncate an ancestor-owned automatic
   target's `.gitignore` sources. This preserves ESLint v10's per-target global

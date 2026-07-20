@@ -247,6 +247,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		configTargetScopes     map[string]rslintconfig.LintDiscoveryScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigDirByOwner map[string]string
+		configGitignoreFrozen  bool
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -297,14 +298,25 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		var catalog *discovery.ConfigCatalog
 		var err error
 		if configDiscovery.ExplicitConfigPath != "" {
+			var targetFiles []discovery.DiscoveryFile
+			if allowedFiles != nil {
+				targetFiles = make([]discovery.DiscoveryFile, 0, len(allowedFiles))
+				for _, filePath := range allowedFiles {
+					targetFiles = append(targetFiles, discovery.DiscoveryFile{
+						Path:          filePath,
+						CanonicalPath: canonicalPaths[exactFilesystemPathID(filePath)],
+					})
+				}
+			}
 			catalog, err = discovery.LoadExplicitConfig(
 				ctx,
 				fs,
 				loader,
 				discovery.ExplicitConfigRequest{
-					CWD:        currentDirectory,
-					ConfigPath: resolveRequestPath(configDiscovery.ExplicitConfigPath),
-					Fresh:      true,
+					CWD:         currentDirectory,
+					ConfigPath:  resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles: targetFiles,
+					Fresh:       true,
 				},
 			)
 		} else {
@@ -333,6 +345,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), catalog.Configs[configDirectory]...)
 				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
+				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(catalog.Configs))
 				pluginConfigDirByOwner = make(map[string]string, len(catalog.Configs))
@@ -357,7 +370,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		catalogPlugins = catalog.EslintPlugins
 	}
 
-	if configMap == nil {
+	if configMap == nil && !configGitignoreFrozen {
 		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	}
 	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {

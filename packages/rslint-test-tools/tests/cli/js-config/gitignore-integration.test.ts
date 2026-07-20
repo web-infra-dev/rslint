@@ -555,6 +555,41 @@ describe('Gitignore: edge cases', () => {
     }
   });
 
+  test('explicit config projects nested gitignore without discovering nested configs', async () => {
+    const tempDir = await createTempDir({
+      'custom.config.mjs': CONFIG_NO_CONSOLE,
+      'nested/.gitignore': 'ignored.ts\n',
+      'nested/rslint.config.mjs': `
+        import { writeFileSync } from 'node:fs';
+        writeFileSync(new URL('./nested-config-loaded.marker', import.meta.url), 'loaded');
+        ${CONFIG_NO_CONSOLE}
+      `,
+      'nested/visible.ts': 'console.log("visible");\n',
+      'nested/ignored.ts': 'console.log("ignored");\n',
+    });
+    const marker = path.join(tempDir, 'nested/nested-config-loaded.marker');
+    try {
+      const result = await runRslint(
+        ['--config', 'custom.config.mjs', '--format', 'jsonline'],
+        tempDir,
+      );
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((line) => line.trim().startsWith('{'))
+        .map((line) => JSON.parse(line) as Diagnostic);
+      expect(fs.existsSync(marker)).toBe(false);
+      expect(
+        diagsAt(diagnostics, 'nested/visible.ts').some(
+          (diagnostic) => diagnostic.ruleName === 'no-console',
+        ),
+      ).toBe(true);
+      expect(diagsAt(diagnostics, 'nested/ignored.ts')).toHaveLength(0);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('trailing whitespace in patterns is stripped', async () => {
     const { diagnostics, cleanup } = await lintJsonline({
       // Leading whitespace is significant in Git patterns. Exercise only

@@ -23,8 +23,11 @@ var AutoJSConfigFileNames = []string{
 }
 
 // DiscoveryFile is a file target that may participate in config discovery.
-// CanonicalPath is consulted only when the complete lexical ancestry contains
-// no config candidate.
+// CanonicalPath supplies an optional physical identity for path-space
+// resolution. Automatic ownership falls back to canonical ancestry only when
+// the complete lexical ancestry contains no candidate; fixed-owner exact Git
+// projection may use it directly to map the target into the owner's lexical
+// space.
 type DiscoveryFile struct {
 	Path          string
 	CanonicalPath string
@@ -57,8 +60,13 @@ type ConfigDiscoveryRequest struct {
 // automatic discovery, while absence of config discovery at the adapter means
 // the low-level/JSON path.
 type ExplicitConfigRequest struct {
-	CWD            string
-	ConfigPath     string
+	CWD        string
+	ConfigPath string
+	// TargetFiles limits Git projection to the directory chains between CWD
+	// and an exact target set. A nil slice projects the complete CWD-owned
+	// subtree; a non-nil empty slice projects nothing, as used by
+	// --type-check-only.
+	TargetFiles    []DiscoveryFile
 	Fresh          bool
 	SingleThreaded bool
 }
@@ -86,9 +94,10 @@ type ConfigDiscoveryStats struct {
 // ConfigCatalog is the deterministic snapshot produced by one build. Configs
 // contains only effective, successfully loaded ownership boundaries. Requested
 // failures remain in Failures/Stats; ignored or unreachable candidates are
-// omitted because their modules are never requested. Automatic catalogs freeze
-// each owner's observed Git projection into Configs before publication;
-// explicit catalogs leave invocation-scoped Git collection to their adapter.
+// omitted because their modules are never requested. Every staged catalog
+// freezes each owner's invocation-scoped Git projection into Configs before
+// publication, so automatic and explicit JS/TS adapters consume the same
+// finalized-config contract.
 type ConfigCatalog struct {
 	TransactionID      string
 	Configs            map[string]rslintconfig.RslintConfig
@@ -167,14 +176,17 @@ func DiscoverAutomatic(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoad
 	return buildConfigCatalog(ctx, fsys, loader, request, "")
 }
 
-// LoadExplicitConfig loads one exact invocation-wide config path. Automatic
-// candidate discovery and Git reachability never participate in this operation.
+// LoadExplicitConfig loads one exact invocation-wide config path. Git
+// reachability never gates that exact source and automatic candidates are not
+// discovered. After the source loads, its invocation-scoped Git projection is
+// frozen into the returned catalog.
 func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ExplicitConfigRequest) (*ConfigCatalog, error) {
 	if request.ConfigPath == "" {
 		return nil, errors.New("explicit config discovery requires a config path")
 	}
 	automatic := ConfigDiscoveryRequest{
 		CWD:            request.CWD,
+		Files:          request.TargetFiles,
 		Fresh:          request.Fresh,
 		SingleThreaded: request.SingleThreaded,
 	}
