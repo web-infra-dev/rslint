@@ -1,0 +1,1255 @@
+// Rstest Snapshot v1
+
+exports[`prefer-destructuring > invalid 1`] = `
+{
+  "code": "var foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 2`] = `
+{
+  "code": "foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 3`] = `
+{
+  "code": "var foo = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 4`] = `
+{
+  "code": "var foo = (a, b).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 5`] = `
+{
+  "code": "var length = (() => {}).length;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 6`] = `
+{
+  "code": "var foo = (a = b).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 7`] = `
+{
+  "code": "var foo = (a || b).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 8`] = `
+{
+  "code": "var foo = (f()).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 9`] = `
+{
+  "code": "var foo = object.bar.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 10`] = `
+{
+  "code": "var foobar = object.bar;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 11`] = `
+{
+  "code": "var foobar = object.bar;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 12`] = `
+{
+  "code": "var foo = object[bar];",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 13`] = `
+{
+  "code": "var foo = object[bar];",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 14`] = `
+{
+  "code": "var foo = object[foo];",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 15`] = `
+{
+  "code": "var foo = object['foo'];",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 16`] = `
+{
+  "code": "foo = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 17`] = `
+{
+  "code": "foo = object['foo'];",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 18`] = `
+{
+  "code": "var foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 19`] = `
+{
+  "code": "foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 20`] = `
+{
+  "code": "var foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 21`] = `
+{
+  "code": "var foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 22`] = `
+{
+  "code": "foo = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 23`] = `
+{
+  "code": "foo = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 24`] = `
+{
+  "code": "class Foo extends Bar { static foo() {var bar = super.foo.bar} }",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 25`] = `
+{
+  "code": "var /* comment */ foo = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 26`] = `
+{
+  "code": "var a, /* comment */foo = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 27`] = `
+{
+  "code": "var foo /* comment */ = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 28`] = `
+{
+  "code": "var a, foo /* comment */ = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 29`] = `
+{
+  "code": "var foo /* comment */ = object.foo, a;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 30`] = `
+{
+  "code": "var foo // comment
+ = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 31`] = `
+{
+  "code": "var foo = /* comment */ object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 32`] = `
+{
+  "code": "var foo = // comment
+ object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 33`] = `
+{
+  "code": "var foo = (/* comment */ object).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 34`] = `
+{
+  "code": "var foo = (object /* comment */).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 35`] = `
+{
+  "code": "var foo = bar(/* comment */).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 36`] = `
+{
+  "code": "var foo = bar/* comment */.baz.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 37`] = `
+{
+  "code": "var foo = bar[// comment
+baz].foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 38`] = `
+{
+  "code": "var foo // comment
+ = bar(/* comment */).foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 39`] = `
+{
+  "code": "var foo = bar/* comment */.baz/* comment */.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 40`] = `
+{
+  "code": "var foo = object// comment
+.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 41`] = `
+{
+  "code": "var foo = object./* comment */foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 42`] = `
+{
+  "code": "var foo = (/* comment */ object.foo);",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 43`] = `
+{
+  "code": "var foo = (object.foo /* comment */);",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 44`] = `
+{
+  "code": "var foo = object.foo/* comment */;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 45`] = `
+{
+  "code": "var foo = object.foo// comment",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 46`] = `
+{
+  "code": "var foo = object.foo/* comment */, a;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 47`] = `
+{
+  "code": "var foo = object.foo// comment
+, a;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 48`] = `
+{
+  "code": "var foo = object.foo, /* comment */ a;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
