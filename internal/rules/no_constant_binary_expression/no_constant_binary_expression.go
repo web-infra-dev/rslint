@@ -622,6 +622,12 @@ func hasConstantNullishness(ctx *rule.RuleContext, node *ast.Node, nonNullish bo
 			return hasConstantNullishness(ctx, binary.Right, true)
 		}
 
+		// Logical && / ||: mirrors upstream ESLint, which only special-cases ??
+		// here and treats any other logical operator as not constant nullishness.
+		if op == ast.KindBarBarToken || op == ast.KindAmpersandAmpersandToken {
+			return false
+		}
+
 		// Comma: check last expression
 		if op == ast.KindCommaToken {
 			return hasConstantNullishness(ctx, binary.Right, nonNullish)
@@ -642,7 +648,7 @@ func hasConstantNullishness(ctx *rule.RuleContext, node *ast.Node, nonNullish bo
 			return true
 		}
 
-		// All remaining binary operators (comparison, arithmetic, bitwise, instanceof, in)
+		// All remaining binary operators (comparison, instanceof, in)
 		// produce non-nullish values (numbers, booleans, or strings)
 		return true
 

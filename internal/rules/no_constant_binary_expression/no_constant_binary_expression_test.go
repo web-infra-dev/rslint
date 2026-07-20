@@ -47,6 +47,18 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 			// --- Nullish coalescing edge cases ---
 			{Code: `foo ?? null ?? bar`},
 
+			// --- ?? over a ||/&& chain: never constant, matching upstream ESLint,
+			// which only special-cases the "??" operator in hasConstantNullishness
+			// and treats any other logical operator as not constant, regardless of
+			// operands (regression: this used to fall through to "always
+			// non-nullish" for any &&/|| operator) ---
+			{Code: `(a || b || c) ?? fallback`},
+			{Code: `(a && b) ?? fallback`},
+			{Code: `(a && b.x) ?? fallback`},
+			{Code: `((a || b) && (c || d)) ?? fallback`},
+			{Code: `(a || b || "literal") ?? fallback`},
+			{Code: `(String(x) && Number(x)) ?? fallback`},
+
 			// --- Shadowed built-in functions ---
 			{Code: `function Boolean(n: any) { return n; } Boolean(x) ?? foo`},
 			{Code: `function Boolean(n: any) { return n; } Boolean(x) && foo`},
