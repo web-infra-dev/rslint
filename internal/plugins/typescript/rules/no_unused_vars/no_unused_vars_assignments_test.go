@@ -88,6 +88,39 @@ for (var prop in box) {
 		{Code: `let a: any = null; a ??= 1; console.log(a);`},
 		{Code: `let a: any = ""; a ||= "default"; console.log(a);`},
 		{Code: `let a: any = true; a &&= false; console.log(a);`},
+
+		// --- accumulator pattern: self-referencing assignment inside a loop is a
+		// real use, since the value can be observed on the next iteration ---
+		{Code: `
+let x: any = 0;
+for (let i = 0; i < 10; i++) {
+  x = foo(x);
+}
+`},
+		{Code: `
+let x: any = 0;
+for (const item of [1, 2, 3]) {
+  x = foo(x, item);
+}
+`},
+
+		// --- accumulator pattern: self-referencing assignment inside a nested
+		// closure is a real use, since the value can be observed after the
+		// closure runs (e.g. read by another call, or captured state) ---
+		{Code: `
+let x: any = 0;
+function run() {
+  x = foo(x);
+}
+run();
+`},
+		{Code: `
+let found: any = false;
+declare function forEachItem(cb: (item: any) => void): void;
+forEachItem(item => {
+  found = found || item;
+});
+`},
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
@@ -349,6 +382,25 @@ let x = null;
 x = foo(x);
 `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 1}},
+		},
+		// self-referencing logical assignment, same scope, no loop: still self-modifying
+		{
+			Code: `
+let x: any = false;
+x = x || true;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 1}},
+		},
+		// self-referencing accumulator, same function scope, no loop: still self-modifying
+		{
+			Code: `
+function run() {
+  let x: any = 0;
+  x = foo(x);
+}
+run();
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 4, Column: 3}},
 		},
 
 		// --- sequence expression: self-modification (comma operator) ---
