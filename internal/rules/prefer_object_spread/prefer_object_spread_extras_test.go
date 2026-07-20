@@ -156,6 +156,46 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 				Output: []string{`this.setState({ ...this.state, loading: true});`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 15}},
 			},
+
+			// ---- Branch lock-in: a multi-byte UTF-8 property name butts
+			// directly against the object literal's closing brace — the
+			// boundary walk must decode whole runes, not individual UTF-8
+			// bytes, or it corrupts the fix into invalid UTF-8 ----
+			{
+				Code:   "Object.assign({}, {à})",
+				Output: []string{"({ à})"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Branch lock-in: a comment sits between the last property
+			// and the object argument's own trailing comma — the
+			// trailing-comma probe must skip comments (like the
+			// separator-comma probe already does), not just whitespace, or
+			// it leaves a stray double comma in the fix ----
+			{
+				Code:   "Object.assign({a: 1 /* x */,}, {b: 2})",
+				Output: []string{"({a: 1 /* x */, b: 2})"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Branch lock-in: TS assertion on the whole `Object.assign`
+			// callee (not just the `Object` receiver, already covered above)
+			// ----
+			{
+				Code:   `(Object.assign as any)({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Branch lock-in: needsWrappingParens for a
+			// ComputedPropertyName parent — tsgo wraps a computed key's
+			// expression in its own node, unlike a normal property value, so
+			// it needs its own no-wrap case alongside PropertyAssignment ----
+			{
+				Code:   `const o = {[Object.assign({}, a)]: 1};`,
+				Output: []string{`const o = {[{ ...a}]: 1};`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 13}},
+			},
 		},
 	)
 }

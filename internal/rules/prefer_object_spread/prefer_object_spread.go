@@ -1,8 +1,6 @@
 package prefer_object_spread
 
 import (
-	"unicode"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -46,11 +44,12 @@ func isGlobalIdentifier(node *ast.Node, name string, globals map[string]bool) bo
 // isObjectAssignCallee reports whether callee is a member access naming
 // `assign` on the global `Object`, reached either directly (`Object.assign`)
 // or through `globalThis.Object.assign`. Both dot and computed-static-string
-// forms are accepted, transparently unwrapping parentheses and optional
-// chaining (via utils.IsSpecificMemberAccess), matching ESLint's
-// ReferenceTracker tracking of the global `Object.assign` API.
+// forms are accepted, transparently unwrapping parentheses, TS assertions
+// (e.g. `(Object.assign as any)(...)`), and optional chaining (via
+// utils.IsSpecificMemberAccess), matching ESLint's ReferenceTracker tracking
+// of the global `Object.assign` API.
 func isObjectAssignCallee(callee *ast.Node, globals map[string]bool) bool {
-	callee = ast.SkipParentheses(callee)
+	callee = utils.SkipAssertionsAndParens(callee)
 	if callee == nil || !utils.IsSpecificMemberAccess(callee, "", "assign") {
 		return false
 	}
@@ -58,7 +57,7 @@ func isObjectAssignCallee(callee *ast.Node, globals map[string]bool) bool {
 	if isGlobalIdentifier(object, "Object", globals) {
 		return true
 	}
-	object = ast.SkipParentheses(object)
+	object = utils.SkipAssertionsAndParens(object)
 	if object == nil || !utils.IsSpecificMemberAccess(object, "", "Object") {
 		return false
 	}
@@ -137,7 +136,8 @@ func needsWrappingParens(node *ast.Node) bool {
 		ast.KindArrayLiteralExpression,
 		ast.KindReturnStatement,
 		ast.KindCallExpression,
-		ast.KindPropertyAssignment:
+		ast.KindPropertyAssignment,
+		ast.KindComputedPropertyName:
 		return false
 	case ast.KindBinaryExpression:
 		bin := parent.AsBinaryExpression()
@@ -177,16 +177,9 @@ func needsSpreadParens(argNode *ast.Node) bool {
 	}
 }
 
-func isJSSpace(b byte) bool {
-	return unicode.IsSpace(rune(b))
-}
-
 // extendForwardOverSpace advances pos over a run of whitespace characters.
 func extendForwardOverSpace(text string, pos int) int {
-	for pos < len(text) && isJSSpace(text[pos]) {
-		pos++
-	}
-	return pos
+	return utils.SkipLeadingWhitespace(text, pos, len(text))
 }
 
 // extendBackwardOverSpace mirrors extendForwardOverSpace but walks backward,
@@ -195,10 +188,7 @@ func extendForwardOverSpace(text string, pos int) int {
 // line and doesn't swallow the following token. Mirrors upstream's
 // getStartWithSpaces, which special-cases a preceding Line comment token.
 func extendBackwardOverSpace(text string, comments []*ast.CommentRange, pos int) int {
-	boundary := pos
-	for boundary > 0 && isJSSpace(text[boundary-1]) {
-		boundary--
-	}
+	boundary := utils.SkipTrailingWhitespace(text, 0, pos)
 	if boundary == pos {
 		return pos
 	}
@@ -279,7 +269,7 @@ func buildObjectArgumentFixes(sf *ast.SourceFile, comments []*ast.CommentRange, 
 	}
 	hasTrailingComma := len(props) == 0
 	if !hasTrailingComma {
-		afterLastProp := extendForwardOverSpace(text, props[len(props)-1].End())
+		afterLastProp := scanner.SkipTrivia(text, props[len(props)-1].End())
 		hasTrailingComma = afterLastProp < len(text) && text[afterLastProp] == ','
 	}
 	if hasTrailingComma {
