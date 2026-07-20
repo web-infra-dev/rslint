@@ -1,0 +1,880 @@
+// Rstest Snapshot v1
+
+exports[`dot-notation > invalid 1`] = `
+{
+  "code": "a.true;",
+  "diagnostics": [
+    {
+      "message": ".true is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 2`] = `
+{
+  "code": "a['true'];",
+  "diagnostics": [
+    {
+      "message": "["true"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 3`] = `
+{
+  "code": "a[\`time\`];",
+  "diagnostics": [
+    {
+      "message": "[\`time\`] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 4`] = `
+{
+  "code": "a[null];",
+  "diagnostics": [
+    {
+      "message": "[null] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 5`] = `
+{
+  "code": "a[true];",
+  "diagnostics": [
+    {
+      "message": "[true] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 6`] = `
+{
+  "code": "a[false];",
+  "diagnostics": [
+    {
+      "message": "[false] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 7`] = `
+{
+  "code": "a['b'];",
+  "diagnostics": [
+    {
+      "message": "["b"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 8`] = `
+{
+  "code": "a.b['c'];",
+  "diagnostics": [
+    {
+      "message": "["c"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 9`] = `
+{
+  "code": "a['_dangle'];",
+  "diagnostics": [
+    {
+      "message": "["_dangle"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 10`] = `
+{
+  "code": "a['SHOUT_CASE'];",
+  "diagnostics": [
+    {
+      "message": "["SHOUT_CASE"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 11`] = `
+{
+  "code": "a
+  ['SHOUT_CASE'];",
+  "diagnostics": [
+    {
+      "message": "["SHOUT_CASE"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 4,
+          "line": 2,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 12`] = `
+{
+  "code": "getResource()
+    .then(function(){})
+    ["catch"](function(){})
+    .then(function(){})
+    ["catch"](function(){});",
+  "diagnostics": [
+    {
+      "message": "["catch"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+    {
+      "message": "["catch"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 5,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 13`] = `
+{
+  "code": "foo
+  .while;",
+  "diagnostics": [
+    {
+      "message": ".while is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 4,
+          "line": 2,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 14`] = `
+{
+  "code": "foo[ /* comment */ 'bar' ]",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 15`] = `
+{
+  "code": "foo[ 'bar' /* comment */ ]",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 16`] = `
+{
+  "code": "foo[    'bar'    ];",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 17`] = `
+{
+  "code": "foo. /* comment */ while",
+  "diagnostics": [
+    {
+      "message": ".while is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 18`] = `
+{
+  "code": "foo[('bar')]",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 19`] = `
+{
+  "code": "foo[(null)]",
+  "diagnostics": [
+    {
+      "message": "[null] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 20`] = `
+{
+  "code": "(foo)['bar']",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 21`] = `
+{
+  "code": "1['toString']",
+  "diagnostics": [
+    {
+      "message": "["toString"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 22`] = `
+{
+  "code": "foo['bar']instanceof baz",
+  "diagnostics": [
+    {
+      "message": "["bar"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 23`] = `
+{
+  "code": "let.if()",
+  "diagnostics": [
+    {
+      "message": ".if is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 24`] = `
+{
+  "code": "5['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 25`] = `
+{
+  "code": "-5['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 26`] = `
+{
+  "code": "5_000['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 27`] = `
+{
+  "code": "5_000_00['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 28`] = `
+{
+  "code": "5.000_000['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 29`] = `
+{
+  "code": "0b1010_1010['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 30`] = `
+{
+  "code": "obj?.['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 31`] = `
+{
+  "code": "0?.['prop']",
+  "diagnostics": [
+    {
+      "message": "["prop"] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 32`] = `
+{
+  "code": "obj?.true",
+  "diagnostics": [
+    {
+      "message": ".true is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 33`] = `
+{
+  "code": "let?.true",
+  "diagnostics": [
+    {
+      "message": ".true is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
+	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
@@ -157,6 +158,7 @@ func GetAllRules() []rule.Rule {
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
+		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
