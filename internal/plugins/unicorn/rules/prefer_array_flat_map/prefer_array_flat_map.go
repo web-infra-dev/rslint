@@ -1,8 +1,6 @@
 package prefer_array_flat_map
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -48,37 +46,8 @@ func hasNoDepthOrRawDepthOne(sf *ast.SourceFile, call *ast.Node) bool {
 }
 
 func isIgnoredMapObject(node *ast.Node) bool {
-	return nodeMatchesPath(node, "Children") || nodeMatchesPath(node, "React.Children")
-}
-
-// nodeMatchesPath mirrors unicorn's isNodeMatches for the React.Children
-// exception: parentheses are transparent, while computed and optional members
-// are not. That keeps React["Children"].map(...).flat() reportable.
-func nodeMatchesPath(node *ast.Node, path string) bool {
-	parts := strings.Split(path, ".")
-	return nodeMatchesPathParts(ast.SkipParentheses(node), parts)
-}
-
-func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
-	if node == nil || len(parts) == 0 {
-		return false
-	}
-	if len(parts) == 1 {
-		return ast.IsIdentifier(node) && node.AsIdentifier().Text == parts[0]
-	}
-	if !ast.IsPropertyAccessExpression(node) {
-		return false
-	}
-
-	propAccess := node.AsPropertyAccessExpression()
-	if propAccess.QuestionDotToken != nil {
-		return false
-	}
-	name := propAccess.Name()
-	if name == nil || !ast.IsIdentifier(name) || name.AsIdentifier().Text != parts[len(parts)-1] {
-		return false
-	}
-	return nodeMatchesPathParts(ast.SkipParentheses(propAccess.Expression), parts[:len(parts)-1])
+	return unicornutil.NodeMatchesPath(node, "Children") ||
+		unicornutil.NodeMatchesPath(node, "React.Children")
 }
 
 func buildFixes(sf *ast.SourceFile, flatCall dotMethodCall, mapCall dotMethodCall) []rule.RuleFix {

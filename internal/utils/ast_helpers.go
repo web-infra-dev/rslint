@@ -18,6 +18,23 @@ func SkipAssertionsAndParens(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, skipTransparentKinds)
 }
 
+// OutermostParenthesizedExpression returns node's outermost
+// ParenthesizedExpression wrapper, or node itself when it is not wrapped.
+// Unlike ast.WalkUpParenthesizedExpressions, this preserves the wrapper that
+// the containing non-parenthesized node sees as its direct child.
+func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil &&
+		ast.IsParenthesizedExpression(current.Parent) {
+		parent := current.Parent.AsParenthesizedExpression()
+		if parent == nil || parent.Expression != current {
+			break
+		}
+		current = current.Parent
+	}
+	return current
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
