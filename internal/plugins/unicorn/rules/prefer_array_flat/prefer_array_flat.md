@@ -49,6 +49,8 @@ Adds custom flattening functions. `_.flatten()`, `lodash.flatten()`, and
 }
 ```
 
+Examples of **incorrect** code for this rule with this option:
+
 ```javascript
 const first = flatArray(array);
 const second = utils.flat(array);
