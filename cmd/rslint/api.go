@@ -591,6 +591,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		// outside this set and withholds the project TypeChecker from them.
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
+		// The zero value of rule.DiagnosticSeverity is SeverityError (not
+		// SeverityOff); --api has no reportUnusedDisableDirectives request
+		// field, so this must be set explicitly to keep the check off by default.
+		ReportUnusedDisableDirectives: rule.SeverityOff,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
