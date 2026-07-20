@@ -22,7 +22,7 @@ func parseOptions(options []any) Options {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap := options[0].(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
 	opts.AllowReject, _ = optsMap["allowReject"].(bool)
 	return opts
 }

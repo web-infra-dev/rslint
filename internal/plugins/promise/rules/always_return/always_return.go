@@ -25,13 +25,10 @@ func parseOptions(options []any) Options {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap := options[0].(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
 	opts.IgnoreLastCallback, _ = optsMap["ignoreLastCallback"].(bool)
-	if arr, ok := optsMap["ignoreAssignmentVariable"].([]interface{}); ok {
-		opts.IgnoreAssignmentVariable = make([]string, len(arr))
-		for i, item := range arr {
-			opts.IgnoreAssignmentVariable[i] = item.(string)
-		}
+	if raw, ok := optsMap["ignoreAssignmentVariable"]; ok {
+		opts.IgnoreAssignmentVariable = utils.ToStringSlice(raw)
 	}
 	return opts
 }
