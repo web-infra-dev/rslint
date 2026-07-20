@@ -1,0 +1,6327 @@
+{
+  "upstream": {
+    "rule": "no-unused-vars",
+    "eslintVersion": "10.7.0",
+    "eslintCommit": "fb09aa8ff09730d3ccf68859e065f99666b52466",
+    "source": "https://github.com/eslint/eslint/blob/fb09aa8ff09730d3ccf68859e065f99666b52466/tests/lib/rules/no-unused-vars.js"
+  },
+  "valid": [
+    {
+      "code": "var foo = 5;\n\nlabel: while (true) {\n  console.log(foo);\n  break label;\n}"
+    },
+    {
+      "code": "var foo = 5;\n\nwhile (true) {\n  console.log(foo);\n  break;\n}"
+    },
+    {
+      "code": "for (let prop in box) {\n        box[prop] = parseInt(box[prop]);\n}"
+    },
+    {
+      "code": "var box = {a: 2};\n    for (var prop in box) {\n        box[prop] = parseInt(box[prop]);\n}"
+    },
+    {
+      "code": "f({ set foo(a) { return; } });"
+    },
+    {
+      "code": "a; var a;",
+      "options": ["all"]
+    },
+    {
+      "code": "var a=10; alert(a);",
+      "options": ["all"]
+    },
+    {
+      "code": "var a=10; (function() { alert(a); })();",
+      "options": ["all"]
+    },
+    {
+      "code": "var a=10; (function() { setTimeout(function() { alert(a); }, 0); })();",
+      "options": ["all"]
+    },
+    {
+      "code": "var a=10; d[a] = 0;",
+      "options": ["all"]
+    },
+    {
+      "code": "(function() { var a=10; return a; })();",
+      "options": ["all"]
+    },
+    {
+      "code": "(function g() {})()",
+      "options": ["all"]
+    },
+    {
+      "code": "function f(a) {alert(a);}; f();",
+      "options": ["all"]
+    },
+    {
+      "code": "var c = 0; function f(a){ var b = a; return b; }; f(c);",
+      "options": ["all"]
+    },
+    {
+      "code": "function a(x, y){ return y; }; a();",
+      "options": ["all"]
+    },
+    {
+      "code": "var arr1 = [1, 2]; var arr2 = [3, 4]; for (var i in arr1) { arr1[i] = 5; } for (var i in arr2) { arr2[i] = 10; }",
+      "options": ["all"]
+    },
+    {
+      "code": "var a=10;",
+      "options": ["local"]
+    },
+    {
+      "code": "var min = \"min\"; Math[min];",
+      "options": ["all"]
+    },
+    {
+      "code": "Foo.bar = function(baz) { return baz; };",
+      "options": ["all"]
+    },
+    {
+      "code": "myFunc(function foo() {}.bind(this))"
+    },
+    {
+      "code": "myFunc(function foo(){}.toString())"
+    },
+    {
+      "code": "function foo(first, second) {\ndoStuff(function() {\nconsole.log(second);});}; foo()"
+    },
+    {
+      "code": "(function() { var doSomething = function doSomething() {}; doSomething() }())"
+    },
+    {
+      "code": "/*global a */ a;"
+    },
+    {
+      "code": "var a=10; (function() { alert(a); })();",
+      "options": [
+        {
+          "vars": "all"
+        }
+      ]
+    },
+    {
+      "code": "function g(bar, baz) { return baz; }; g();",
+      "options": [
+        {
+          "vars": "all"
+        }
+      ]
+    },
+    {
+      "code": "function g(bar, baz) { return baz; }; g();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "after-used"
+        }
+      ]
+    },
+    {
+      "code": "function g(bar, baz) { return bar; }; g();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "none"
+        }
+      ]
+    },
+    {
+      "code": "function g(bar, baz) { return 2; }; g();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "none"
+        }
+      ]
+    },
+    {
+      "code": "function g(bar, baz) { return bar + baz; }; g();",
+      "options": [
+        {
+          "vars": "local",
+          "args": "all"
+        }
+      ]
+    },
+    {
+      "code": "var g = function(bar, baz) { return 2; }; g();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "none"
+        }
+      ]
+    },
+    {
+      "code": "(function z() { z(); })();"
+    },
+    {
+      "code": " ",
+      "globals": {
+        "a": true
+      }
+    },
+    {
+      "code": "var who = \"Paul\";\nmodule.exports = `Hello ${who}!`;"
+    },
+    {
+      "code": "export var foo = 123;"
+    },
+    {
+      "code": "export function foo () {}"
+    },
+    {
+      "code": "let toUpper = (partial) => partial.toUpperCase; export {toUpper}"
+    },
+    {
+      "code": "export class foo {}"
+    },
+    {
+      "code": "class Foo{}; var x = new Foo(); x.foo()"
+    },
+    {
+      "code": "const foo = \"hello!\";function bar(foobar = foo) {  foobar.replace(/!$/, \" world!\");}\nbar();"
+    },
+    {
+      "code": "function Foo(){}; var x = new Foo(); x.foo()"
+    },
+    {
+      "code": "function foo() {var foo = 1; return foo}; foo();"
+    },
+    {
+      "code": "function foo(foo) {return foo}; foo(1);"
+    },
+    {
+      "code": "function foo() {function foo() {return 1;}; return foo()}; foo();"
+    },
+    {
+      "code": "function foo() {var foo = 1; return foo}; foo();"
+    },
+    {
+      "code": "function foo(foo) {return foo}; foo(1);"
+    },
+    {
+      "code": "function foo() {function foo() {return 1;}; return foo()}; foo();"
+    },
+    {
+      "code": "const x = 1; const [y = x] = []; foo(y);"
+    },
+    {
+      "code": "const x = 1; const {y = x} = {}; foo(y);"
+    },
+    {
+      "code": "const x = 1; const {z: [y = x]} = {}; foo(y);"
+    },
+    {
+      "code": "const x = []; const {z: [y] = x} = {}; foo(y);"
+    },
+    {
+      "code": "const x = 1; let y; [y = x] = []; foo(y);"
+    },
+    {
+      "code": "const x = 1; let y; ({z: [y = x]} = {}); foo(y);"
+    },
+    {
+      "code": "const x = []; let y; ({z: [y] = x} = {}); foo(y);"
+    },
+    {
+      "code": "const x = 1; function foo(y = x) { bar(y); } foo();"
+    },
+    {
+      "code": "const x = 1; function foo({y = x} = {}) { bar(y); } foo();"
+    },
+    {
+      "code": "const x = 1; function foo(y = function(z = x) { bar(z); }) { y(); } foo();"
+    },
+    {
+      "code": "const x = 1; function foo(y = function() { bar(x); }) { y(); } foo();"
+    },
+    {
+      "code": "var x = 1; var [y = x] = []; foo(y);"
+    },
+    {
+      "code": "var x = 1; var {y = x} = {}; foo(y);"
+    },
+    {
+      "code": "var x = 1; var {z: [y = x]} = {}; foo(y);"
+    },
+    {
+      "code": "var x = []; var {z: [y] = x} = {}; foo(y);"
+    },
+    {
+      "code": "var x = 1, y; [y = x] = []; foo(y);"
+    },
+    {
+      "code": "var x = 1, y; ({z: [y = x]} = {}); foo(y);"
+    },
+    {
+      "code": "var x = [], y; ({z: [y] = x} = {}); foo(y);"
+    },
+    {
+      "code": "var x = 1; function foo(y = x) { bar(y); } foo();"
+    },
+    {
+      "code": "var x = 1; function foo({y = x} = {}) { bar(y); } foo();"
+    },
+    {
+      "code": "var x = 1; function foo(y = function(z = x) { bar(z); }) { y(); } foo();"
+    },
+    {
+      "code": "var x = 1; function foo(y = function() { bar(x); }) { y(); } foo();"
+    },
+    {
+      "code": "/*exported toaster*/ var toaster = 'great'",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+    },
+    {
+      "code": "/*exported toaster, poster*/ var toaster = 1; poster = 0;",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+    },
+    {
+      "code": "/*exported x*/ var { x } = y",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+    },
+    {
+      "code": "/*exported x, y*/  var { x, y } = z",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+    },
+    {
+      "code": "/*eslint custom/use-every-a:1*/ var a;",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not expose ESLint markVariableAsUsed across rules"
+    },
+    {
+      "code": "/*eslint custom/use-every-a:1*/ !function(a) { return 1; }",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not expose ESLint markVariableAsUsed across rules"
+    },
+    {
+      "code": "/*eslint custom/use-every-a:1*/ !function() { var a; return 1 }",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not expose ESLint markVariableAsUsed across rules"
+    },
+    {
+      "code": "var _a;",
+      "options": [
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "var a; function foo() { var _b; } foo();",
+      "options": [
+        {
+          "vars": "local",
+          "varsIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "function foo(_a) { } foo();",
+      "options": [
+        {
+          "args": "all",
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "function foo(a, _b) { return a; } foo();",
+      "options": [
+        {
+          "args": "after-used",
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "var [ firstItemIgnored, secondItem ] = items;\nconsole.log(secondItem);",
+      "options": [
+        {
+          "vars": "all",
+          "varsIgnorePattern": "[iI]gnored"
+        }
+      ]
+    },
+    {
+      "code": "const [ a, _b, c ] = items;\nconsole.log(a+c);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "const [ [a, _b, c] ] = items;\nconsole.log(a+c);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "const { x: [_a, foo] } = bar;\nconsole.log(foo);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "function baz([_b, foo]) { foo; };\nbaz()",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "function baz({x: [_b, foo]}) {foo};\nbaz()",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "function baz([{x: [_b, foo]}]) {foo};\nbaz()",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "\n            let _a, b;\n            foo.forEach(item => {\n                [_a, b] = item;\n                doSomething(b);\n            });\n            ",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "\n            // doesn't report _x\n            let _x, y;\n            _x = 1;\n            [_x, y] = foo;\n            y;\n\n            // doesn't report _a\n            let _a, b;\n            [_a, b] = foo;\n            _a = 1;\n            b;\n            ",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "\n            // doesn't report _x\n            let _x, y;\n            _x = 1;\n            [_x, y] = foo;\n            y;\n\n            // doesn't report _a\n            let _a, b;\n            _a = 1;\n            ({_a, ...b } = foo);\n            b;\n            ",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "ignoreRestSiblings": true
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ([firstError]) {}",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "Error$"
+        }
+      ]
+    },
+    {
+      "code": "(function(obj) { var name; for ( name in obj ) return; })({});"
+    },
+    {
+      "code": "(function(obj) { var name; for ( name in obj ) { return; } })({});"
+    },
+    {
+      "code": "(function(obj) { for ( var name in obj ) { return true } })({})"
+    },
+    {
+      "code": "(function(obj) { for ( var name in obj ) return true })({})"
+    },
+    {
+      "code": "(function(obj) { let name; for ( name in obj ) return; })({});"
+    },
+    {
+      "code": "(function(obj) { let name; for ( name in obj ) { return; } })({});"
+    },
+    {
+      "code": "(function(obj) { for ( let name in obj ) { return true } })({})"
+    },
+    {
+      "code": "(function(obj) { for ( let name in obj ) return true })({})"
+    },
+    {
+      "code": "(function(obj) { for ( const name in obj ) { return true } })({})"
+    },
+    {
+      "code": "(function(obj) { for ( const name in obj ) return true })({})"
+    },
+    {
+      "code": "(function(iter) { let name; for ( name of iter ) return; })({});"
+    },
+    {
+      "code": "(function(iter) { let name; for ( name of iter ) { return; } })({});"
+    },
+    {
+      "code": "(function(iter) { for ( let name of iter ) { return true } })({})"
+    },
+    {
+      "code": "(function(iter) { for ( let name of iter ) return true })({})"
+    },
+    {
+      "code": "(function(iter) { for ( const name of iter ) { return true } })({})"
+    },
+    {
+      "code": "(function(iter) { for ( const name of iter ) return true })({})"
+    },
+    {
+      "code": "let x = 0; foo = (0, x++);"
+    },
+    {
+      "code": "let x = 0; foo = (0, x += 1);"
+    },
+    {
+      "code": "let x = 0; foo = (0, x = x + 1);"
+    },
+    {
+      "code": "try{}catch(err){}",
+      "options": [
+        {
+          "caughtErrors": "none"
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){console.error(err);}",
+      "options": [
+        {
+          "caughtErrors": "all"
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(ignoreErr){}",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "^ignore"
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(ignoreErr){}",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "caughtErrorsIgnorePattern": "^ignore"
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ message, stack }) {}",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "message|stack"
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ errors: [firstError] }) {}",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "Error$"
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){}",
+      "options": [
+        {
+          "caughtErrors": "none",
+          "vars": "all",
+          "args": "all"
+        }
+      ]
+    },
+    {
+      "code": "const data = { type: 'coords', x: 1, y: 2 };\nconst { type, ...coords } = data;\n console.log(coords);",
+      "options": [
+        {
+          "ignoreRestSiblings": true
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ foo, ...bar }) { console.log(bar); }",
+      "options": [
+        {
+          "ignoreRestSiblings": true
+        }
+      ]
+    },
+    {
+      "code": "var a = 0, b; b = a = a + 1; foo(b);"
+    },
+    {
+      "code": "var a = 0, b; b = a += a + 1; foo(b);"
+    },
+    {
+      "code": "var a = 0, b; b = a++; foo(b);"
+    },
+    {
+      "code": "function foo(a) { var b = a = a + 1; bar(b) } foo();"
+    },
+    {
+      "code": "function foo(a) { var b = a += a + 1; bar(b) } foo();"
+    },
+    {
+      "code": "function foo(a) { var b = a++; bar(b) } foo();"
+    },
+    {
+      "code": "var unregisterFooWatcher;\n// ...\nunregisterFooWatcher = $scope.$watch( \"foo\", function() {\n    // ...some code..\n    unregisterFooWatcher();\n});"
+    },
+    {
+      "code": "var ref;\nref = setInterval(\n    function(){\n        clearInterval(ref);\n    }, 10);"
+    },
+    {
+      "code": "var _timer;\nfunction f() {\n    _timer = setTimeout(function () {}, _timer ? 100 : 0);\n}\nf();"
+    },
+    {
+      "code": "function foo(cb) { cb = function() { function something(a) { cb(1 + a); } register(something); }(); } foo();"
+    },
+    {
+      "code": "function* foo(cb) { cb = yield function(a) { cb(1 + a); }; } foo();"
+    },
+    {
+      "code": "function foo(cb) { cb = tag`hello${function(a) { cb(1 + a); }}`; } foo();"
+    },
+    {
+      "code": "function foo(cb) { var b; cb = b = function(a) { cb(1 + a); }; b(); } foo();"
+    },
+    {
+      "code": "function someFunction() {\n    var a = 0, i;\n    for (i = 0; i < 2; i++) {\n        a = myFunction(a);\n    }\n}\nsomeFunction();"
+    },
+    {
+      "code": "(function(a, b, {c, d}) { d })",
+      "options": [
+        {
+          "argsIgnorePattern": "c"
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, {c, d}) { c })",
+      "options": [
+        {
+          "argsIgnorePattern": "d"
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, c) { c })",
+      "options": [
+        {
+          "argsIgnorePattern": "c"
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, {c, d}) { c })",
+      "options": [
+        {
+          "argsIgnorePattern": "[cd]"
+        }
+      ]
+    },
+    {
+      "code": "(class { set foo(UNUSED) {} })"
+    },
+    {
+      "code": "class Foo { set bar(UNUSED) {} } console.log(Foo)"
+    },
+    {
+      "code": "(({a, ...rest}) => rest)",
+      "options": [
+        {
+          "args": "all",
+          "ignoreRestSiblings": true
+        }
+      ]
+    },
+    {
+      "code": "let foo, rest;\n({ foo, ...rest } = something);\nconsole.log(rest);",
+      "options": [
+        {
+          "ignoreRestSiblings": true
+        }
+      ]
+    },
+    {
+      "code": "/*eslint custom/use-every-a:1*/ !function(b, a) { return 1 }",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not expose ESLint markVariableAsUsed across rules"
+    },
+    {
+      "code": "var a = function () { a(); }; a();"
+    },
+    {
+      "code": "var a = function(){ return function () { a(); } }; a();"
+    },
+    {
+      "code": "const a = () => { a(); }; a();"
+    },
+    {
+      "code": "const a = () => () => { a(); }; a();"
+    },
+    {
+      "code": "export * as ns from \"source\""
+    },
+    {
+      "code": "import.meta"
+    },
+    {
+      "code": "var a; a ||= 1;"
+    },
+    {
+      "code": "var a; a &&= 1;"
+    },
+    {
+      "code": "var a; a ??= 1;"
+    },
+    {
+      "code": "class Foo { static {} }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static {} }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true,
+          "varsIgnorePattern": "^_"
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static {} }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": false,
+          "varsIgnorePattern": "^Foo"
+        }
+      ]
+    },
+    {
+      "code": "const a = 5; const _c = a + 5;",
+      "options": [
+        {
+          "args": "all",
+          "varsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ]
+    },
+    {
+      "code": "(function foo(a, _b) { return a + 5 })(5)",
+      "options": [
+        {
+          "args": "all",
+          "argsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ]
+    },
+    {
+      "code": "const [ a, _b, c ] = items;\nconsole.log(a+c);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ]
+    },
+    {
+      "code": "using resource = getResource();\nresource;"
+    },
+    {
+      "code": "using resource = getResource();",
+      "options": [
+        {
+          "ignoreUsingDeclarations": true
+        }
+      ]
+    },
+    {
+      "code": "await using resource = getResource();",
+      "options": [
+        {
+          "ignoreUsingDeclarations": true
+        }
+      ]
+    },
+    {
+      "code": "const MyComponent = () => <div />; <MyComponent />;",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "function Header() { return <header />; } <Header />;",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "import { Card } from './card.jsx'; <Card />",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "const components = { Button: () => <button /> }; <components.Button />;",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "import * as Icons from './icons'; <Icons.Close />;",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "import React from 'react'; <React.Fragment></React.Fragment>;",
+      "fileName": "react.tsx",
+      "tsx": true
+    },
+    {
+      "code": "import { Card, Button } from './components.jsx'; export const Component = () => <Card><Button /></Card>;",
+      "fileName": "react.tsx",
+      "tsx": true
+    }
+  ],
+  "invalid": [
+    {
+      "code": "function foox() { return foox(); }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foox' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function() { function foox() { if (true) { return foox(); } } }())",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foox' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 28,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function() {  }())"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f() { var a = 1; return function(){ f(a *= 2); }; }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f() { var a = 1; return function(){ f(++a); }; }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "/*global a */",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11
+        }
+      ]
+    },
+    {
+      "code": "function foo(first, second) {\ndoStuff(function() {\nconsole.log(second);});}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10;",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10; a=20;",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12
+        }
+      ]
+    },
+    {
+      "code": "var a=10; (function() { var a = 1; alert(a); })();",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": " (function() { var a = 1; alert(a); })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10, b=0, c=null; alert(a+b)",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var a=10, b=0; alert(a+b)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10, b=0, c=null; setTimeout(function() { var b=2; alert(a+b+c); }, 0);",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var a=10, c=null; setTimeout(function() { var b=2; alert(a+b+c); }, 0);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a=10, b=0, c=null; setTimeout(function() { var b=2; var c=2; alert(a+b+c); }, 0);",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var a=10, c=null; setTimeout(function() { var b=2; var c=2; alert(a+b+c); }, 0);"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var a=10, b=0; setTimeout(function() { var b=2; var c=2; alert(a+b+c); }, 0);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f(){var a=[];return a.map(function(){});}",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f(){var a=[];return a.map(function g(){});}",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo() {function foo(x) {\nreturn x; }; return function() {return foo; }; }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f(){var x;function a(){x=42;}function b(){alert(x);}}",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 30,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function f(){var x;function b(){alert(x);}}"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 48,
+          "endLine": 1,
+          "endColumn": 49,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function f(){var x;function a(){x=42;}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f(a) {}; f();",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function f() {}; f();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a(x, y, z){ return y; }; a();",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'z' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a(x, y){ return y; }; a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var min = Math.min",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'min' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var min = {min: 1}",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'min' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "Foo.bar = function(baz) { return 1; }",
+      "options": ["all"],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'baz' is defined but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "Foo.bar = function() { return 1; }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var min = {min: 1}",
+      "options": [
+        {
+          "vars": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'min' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function gg(baz, bar) { return baz; }; gg();",
+      "options": [
+        {
+          "vars": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function gg(baz) { return baz; }; gg();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(foo, baz, bar) { return baz; })();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "after-used"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(foo, baz) { return baz; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(foo, baz, bar) { return baz; })();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function( baz, bar) { return baz; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(foo, baz) { return baz; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function z(foo) { var bar = 33; })();",
+      "options": [
+        {
+          "vars": "all",
+          "args": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function z() { var bar = 33; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is assigned a value but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 27,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function z(foo) {  })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function z(foo) { z(); })();",
+      "options": [{}],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function z() { z(); })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function f() { var a = 1; return function(){ f(a = 2); }; }",
+      "options": [{}],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'f' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 21
+        }
+      ]
+    },
+    {
+      "code": "import x from \"y\";",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import \"y\";"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export function fn2({ x, y }) {\n console.log(x); \n};",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'y' is defined but never used.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 27,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export function fn2({ x }) {\n console.log(x); \n};"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export function fn2( x, y ) {\n console.log(x); \n};",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'y' is defined but never used.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 26,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export function fn2( x ) {\n console.log(x); \n};"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "/*exported max*/ var max = 1, min = {min: 1}",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'min' is assigned a value but never used.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 34,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "/*exported max*/ var max = 1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "/*exported x*/ var { x, y } = z",
+      "skip": true,
+      "skipReason": "SKIP: rslint does not support ESLint exported directive comments",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'y' is assigned a value but never used.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 26,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "/*exported x*/ var { x } = z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var _a; var b;",
+      "options": [
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used. Allowed unused vars must match /^_/u.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var _a; "
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a; function foo() { var _b; var c_; } foo();",
+      "options": [
+        {
+          "vars": "local",
+          "varsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'c_' is defined but never used. Allowed unused vars must match /^_/u.",
+          "line": 1,
+          "column": 37,
+          "endLine": 1,
+          "endColumn": 39,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var a; function foo() { var _b;  } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(a, _b) { } foo();",
+      "options": [
+        {
+          "args": "all",
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used. Allowed unused args must match /^_/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo( _b) { } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(a, _b, c) { return a; } foo();",
+      "options": [
+        {
+          "args": "after-used",
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used. Allowed unused args must match /^_/u.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo(a, _b) { return a; } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(_a) { } foo();",
+      "options": [
+        {
+          "args": "all",
+          "argsIgnorePattern": "[iI]gnored"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is defined but never used. Allowed unused args must match /[iI]gnored/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo() { } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var [ firstItemIgnored, secondItem ] = items;",
+      "options": [
+        {
+          "vars": "all",
+          "varsIgnorePattern": "[iI]gnored"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'secondItem' is assigned a value but never used. Allowed unused vars must match /[iI]gnored/u.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 35,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "var [ firstItemIgnored ] = items;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const array = ['a', 'b', 'c']; const [a, _b, c] = array; const newArray = [a, c];",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'newArray' is assigned a value but never used.",
+          "line": 1,
+          "column": 64,
+          "endLine": 1,
+          "endColumn": 72,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c']; const [a, _b, c] = array; "
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const array = ['a', 'b', 'c', 'd', 'e']; const [a, _b, c] = array;",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
+          "line": 1,
+          "column": 49,
+          "endLine": 1,
+          "endColumn": 50,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c', 'd', 'e']; const [, _b, c] = array;"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
+          "line": 1,
+          "column": 56,
+          "endLine": 1,
+          "endColumn": 57,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c', 'd', 'e']; const [a, _b] = array;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const array = ['a', 'b', 'c'];\nconst [a, _b, c] = array;\nconst fooArray = ['foo'];\nconst barArray = ['bar'];\nconst ignoreArray = ['ignore'];",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "varsIgnorePattern": "ignore"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
+          "line": 2,
+          "column": 8,
+          "endLine": 2,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c'];\nconst [, _b, c] = array;\nconst fooArray = ['foo'];\nconst barArray = ['bar'];\nconst ignoreArray = ['ignore'];"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
+          "line": 2,
+          "column": 15,
+          "endLine": 2,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c'];\nconst [a, _b] = array;\nconst fooArray = ['foo'];\nconst barArray = ['bar'];\nconst ignoreArray = ['ignore'];"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'fooArray' is assigned a value but never used. Allowed unused vars must match /ignore/u.",
+          "line": 3,
+          "column": 7,
+          "endLine": 3,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c'];\nconst [a, _b, c] = array;\n\nconst barArray = ['bar'];\nconst ignoreArray = ['ignore'];"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'barArray' is assigned a value but never used. Allowed unused vars must match /ignore/u.",
+          "line": 4,
+          "column": 7,
+          "endLine": 4,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = ['a', 'b', 'c'];\nconst [a, _b, c] = array;\nconst fooArray = ['foo'];\n\nconst ignoreArray = ['ignore'];"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const array = [obj]; const [{_a, foo}] = array; console.log(foo);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is assigned a value but never used.",
+          "line": 1,
+          "column": 30,
+          "endLine": 1,
+          "endColumn": 32,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const array = [obj]; const [{ foo}] = array; console.log(foo);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo([{_a, bar}]) {bar;}foo();",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is defined but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo([{ bar}]) {bar;}foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let _a, b; foo.forEach(item => { [a, b] = item; });",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is defined but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 7,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let  b; foo.forEach(item => { [a, b] = item; });"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10
+        }
+      ]
+    },
+    {
+      "code": "(function(obj) { var name; for ( name in obj ) { i(); return; } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 34,
+          "endLine": 1,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "code": "(function(obj) { var name; for ( name in obj ) { } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 34,
+          "endLine": 1,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "code": "(function(obj) { for ( var name in obj ) { } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 28,
+          "endLine": 1,
+          "endColumn": 32
+        }
+      ]
+    },
+    {
+      "code": "for ( var { foo } in bar ) { }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "for ( var [ foo ] in bar ) { }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "(function(iter) { var name; for ( name of iter ) { i(); return; } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 39
+        }
+      ]
+    },
+    {
+      "code": "(function(iter) { var name; for ( name of iter ) { } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 39
+        }
+      ]
+    },
+    {
+      "code": "(function(iter) { for ( var name of iter ) { } })({});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'name' is assigned a value but never used.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 33
+        }
+      ]
+    },
+    {
+      "code": "for ( var { foo } of bar ) { }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "for ( var [ foo ] of bar ) { }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "\n/* global foobar, foo, bar */\nfoobar;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 2,
+          "column": 19,
+          "endLine": 2,
+          "endColumn": 22
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 2,
+          "column": 24,
+          "endLine": 2,
+          "endColumn": 27
+        }
+      ]
+    },
+    {
+      "code": "\n/* global foobar,\n   foo,\n   bar\n */\nfoobar;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 3,
+          "column": 4,
+          "endLine": 3,
+          "endColumn": 7
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 4,
+          "column": 4,
+          "endLine": 4,
+          "endColumn": 7
+        }
+      ]
+    },
+    {
+      "code": "const data = { type: 'coords', x: 1, y: 2 };\nconst { type, ...coords } = data;\n console.log(coords);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'type' is assigned a value but never used.",
+          "line": 2,
+          "column": 9,
+          "endLine": 2,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const data = { type: 'coords', x: 1, y: 2 };\nconst {  ...coords } = data;\n console.log(coords);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const data = { type: 'coords', x: 2, y: 2 };\nconst { type, ...coords } = data;\n console.log(type)",
+      "options": [
+        {
+          "ignoreRestSiblings": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'coords' is assigned a value but never used.",
+          "line": 2,
+          "column": 18,
+          "endLine": 2,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const data = { type: 'coords', x: 2, y: 2 };\nconst { type } = data;\n console.log(type)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let type, coords;\n({ type, ...coords } = data);\n console.log(type)",
+      "options": [
+        {
+          "ignoreRestSiblings": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'coords' is assigned a value but never used.",
+          "line": 2,
+          "column": 13,
+          "endLine": 2,
+          "endColumn": 19
+        }
+      ]
+    },
+    {
+      "code": "const data = { type: 'coords', x: 3, y: 2 };\nconst { type, ...coords } = data;\n console.log(type)",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'coords' is assigned a value but never used.",
+          "line": 2,
+          "column": 18,
+          "endLine": 2,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const data = { type: 'coords', x: 3, y: 2 };\nconst { type } = data;\n console.log(type)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const data = { vars: ['x','y'], x: 1, y: 2 };\nconst { vars: [x], ...coords } = data;\n console.log(coords)",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 2,
+          "column": 16,
+          "endLine": 2,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const data = { vars: ['x','y'], x: 1, y: 2 };\nconst {  ...coords } = data;\n console.log(coords)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const data = { defaults: { x: 0 }, x: 1, y: 2 };\nconst { defaults: { x }, ...coords } = data;\n console.log(coords)",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 2,
+          "column": 21,
+          "endLine": 2,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const data = { defaults: { x: 0 }, x: 1, y: 2 };\nconst {  ...coords } = data;\n console.log(coords)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(({a, ...rest}) => {})",
+      "options": [
+        {
+          "args": "all",
+          "ignoreRestSiblings": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(({a}) => {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "/* global a$fooz,$foo */\na$fooz;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'$foo' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "/* globals a$fooz, $ */\na$fooz;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'$' is defined but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 21
+        }
+      ]
+    },
+    {
+      "code": "/*globals $foo*/",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'$foo' is defined but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "/* global global*/",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'global' is defined but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 17
+        }
+      ]
+    },
+    {
+      "code": "/*global foo:true*/",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "/*global 変数, 数*/\n変数;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'数' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "/*global 𠮷𩸽, 𠮷*/\n\\u{20BB7}\\u{29E3D};",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'𠮷' is defined but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 18
+        }
+      ]
+    },
+    {
+      "code": "export default function(a) {}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 26,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default function() {}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export default function(a, b) { console.log(a); }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 28,
+          "endLine": 1,
+          "endColumn": 29,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default function(a) { console.log(a); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export default (function(a) {});",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 27,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default (function() {});"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export default (function(a, b) { console.log(a); });",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 30,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default (function(a) { console.log(a); });"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export default (a) => {};",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default () => {};"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "export default (a, b) => { console.log(a); };",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "export default (a) => { console.log(a); };"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "caughtErrorsIgnorePattern": "^ignore"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "varsIgnorePattern": "^err"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "varsIgnorePattern": "^."
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(ignoreErr){}try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "caughtErrorsIgnorePattern": "^ignore"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(error){}try{}catch(err){};",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "caughtErrorsIgnorePattern": "^ignore"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'error' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 17
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 34
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "vars": "all",
+          "args": "all",
+          "caughtErrors": "all"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(err){};",
+      "options": [
+        {
+          "vars": "all",
+          "args": "all",
+          "caughtErrors": "all",
+          "argsIgnorePattern": "^er"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'err' is defined but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "var a = 0; a = a + 1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "var a = 0; a = a + a;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "var a = 0; a += a + 1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "var a = 0; a++;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "function foo(a) { a = a + 1 } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "function foo(a) { a += a + 1 } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "function foo(a) { a++ } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "var a = 3; a = a * 5 + 6;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "var a = 2, b = 4; a = a * 2 + b;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "function foo(cb) { cb = function(a) { cb(1 + a); }; bar(not_cb); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'cb' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "function foo(cb) { cb = function(a) { return cb(1 + a); }(); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'cb' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "function foo(cb) { cb = (function(a) { cb(1 + a); }, cb); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'cb' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "function foo(cb) { cb = (0, function(a) { cb(1 + a); }); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'cb' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "while (a) {\n    function foo(b) {\n        b = b + 1;\n    }\n    foo()\n}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 3,
+          "column": 9,
+          "endLine": 3,
+          "endColumn": 10
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, c) {})",
+      "options": [
+        {
+          "argsIgnorePattern": "c"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used. Allowed unused args must match /c/u.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function( b, c) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used. Allowed unused args must match /c/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, c) {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, {c, d}) {})",
+      "options": [
+        {
+          "argsIgnorePattern": "[cd]"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used. Allowed unused args must match /[cd]/u.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function( b, {c, d}) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used. Allowed unused args must match /[cd]/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, {c, d}) {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, {c, d}) {})",
+      "options": [
+        {
+          "argsIgnorePattern": "c"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used. Allowed unused args must match /c/u.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function( b, {c, d}) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used. Allowed unused args must match /c/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, {c, d}) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'d' is defined but never used. Allowed unused args must match /c/u.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, b, {c}) {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(a, b, {c, d}) {})",
+      "options": [
+        {
+          "argsIgnorePattern": "d"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used. Allowed unused args must match /d/u.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function( b, {c, d}) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used. Allowed unused args must match /d/u.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, {c, d}) {})"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used. Allowed unused args must match /d/u.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function(a, b, { d}) {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "/*global\rfoo*/",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 4
+        }
+      ]
+    },
+    {
+      "code": "(function ({ a }, b ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ( b ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function ({ a }, { b, c } ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ( { b, c } ) { return b; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ({ a }, { b } ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let x = 0;\nx++, x = 0;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 2,
+          "column": 6,
+          "endLine": 2,
+          "endColumn": 7
+        }
+      ]
+    },
+    {
+      "code": "let x = 0;\nx++, x = 0;\nx=3;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 2
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; x++, 0;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, x++;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, (1, x++);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = (x++, 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = ((0, x++), 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 23,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; x += 1, 0;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, x += 1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, (1, x += 1);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = (x += 1, 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = ((0, x += 1), 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 23,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "let z = 0;\nz = z + 1, z = 2;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'z' is assigned a value but never used.",
+          "line": 2,
+          "column": 12,
+          "endLine": 2,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "let z = 0;\nz = z+1, z = 2;\nz = 3;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'z' is assigned a value but never used.",
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 2
+        }
+      ]
+    },
+    {
+      "code": "let z = 0;\nz = z+1, z = 2;\nz = z+3;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'z' is assigned a value but never used.",
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 2
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, x = x+1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; x = x+1, 0;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = ((0, x = x + 1), 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 23,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; foo = (x = x+1, 0);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "let x = 0; 0, (1, x=x+1);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "code": "(function ({ a, b }, { c } ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ({  b }, { c } ) { return b; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ({ a, b } ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function ([ a ], b ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ( b ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function ([ a ], [ b, c ] ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ( [ b, c ] ) { return b; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ([ a ], [ b ] ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function ([ a, b ], [ c ] ) { return b; })();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ([ , b ], [ c ] ) { return b; })();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function ([ a, b ] ) { return b; })();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(_a) {})();",
+      "options": [
+        {
+          "args": "all",
+          "varsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is defined but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function() {})();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "(function(_a) {})();",
+      "options": [
+        {
+          "args": "all",
+          "caughtErrorsIgnorePattern": "^_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_a' is defined but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "(function() {})();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a = function() { a(); };",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a = function(){ return function() { a(); } };",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const a = () => () => { a(); };",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let myArray = [1,2,3,4].filter((x) => x == 0);\nmyArray = myArray.filter((x) => x == 1);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'myArray' is assigned a value but never used.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 8
+        }
+      ]
+    },
+    {
+      "code": "const a = 1; a += 1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "const a = () => { a(); };",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let x = [];\nx = x.concat(x);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 2
+        }
+      ]
+    },
+    {
+      "code": "let a = 'a';\na = 10;\nfunction foo(){a = 11;a = () => {a = 13}}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 2
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 3,
+          "column": 10,
+          "endLine": 3,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let a = 'a';\na = 10;\n"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let foo;\ninit();\nfoo = foo + 2;\nfunction init() {foo = 1;}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is assigned a value but never used.",
+          "line": 3,
+          "column": 1,
+          "endLine": 3,
+          "endColumn": 4
+        }
+      ]
+    },
+    {
+      "code": "function foo(n) {\nif (n < 2) return 1;\nreturn n * foo(n - 1);}",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let c = 'c';\nc = 10;\nfunction foo1() {c = 11; c = () => { c = 13 }} c = foo1",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used.",
+          "line": 3,
+          "column": 48,
+          "endLine": 3,
+          "endColumn": 49
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static {} }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": false
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Foo' is defined but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static {} }",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Foo' is defined but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static { var bar; } }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 29,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "class Foo { static {  } }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "class Foo {}",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Foo' is defined but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static bar; }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Foo' is defined but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "class Foo { static bar() {} }",
+      "options": [
+        {
+          "ignoreClassWithStaticInitBlock": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Foo' is defined but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const _a = 5;const _b = _a + 5",
+      "options": [
+        {
+          "args": "all",
+          "varsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_a' is marked as ignored but is used. Used vars must not match /^_/u.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 9
+        }
+      ]
+    },
+    {
+      "code": "const _a = 42; foo(() => _a);",
+      "options": [
+        {
+          "args": "all",
+          "varsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_a' is marked as ignored but is used. Used vars must not match /^_/u.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 9
+        }
+      ]
+    },
+    {
+      "code": " (function foo(_a) { return _a + 5 })(5)",
+      "options": [
+        {
+          "args": "all",
+          "argsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_a' is marked as ignored but is used. Used args must not match /^_/u.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 18
+        }
+      ]
+    },
+    {
+      "code": "const [ a, _b ] = items;\nconsole.log(a+_b);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_b' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 14
+        }
+      ]
+    },
+    {
+      "code": "let _x;\n[_x] = arr;\nfoo(_x);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true,
+          "varsIgnorePattern": "[iI]gnored"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_x' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 7
+        }
+      ]
+    },
+    {
+      "code": "const [ignored] = arr;\nfoo(ignored);",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true,
+          "varsIgnorePattern": "[iI]gnored"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'ignored' is marked as ignored but is used. Used vars must not match /[iI]gnored/u.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 15
+        }
+      ]
+    },
+    {
+      "code": "try{}catch(_err){console.error(_err)}",
+      "options": [
+        {
+          "caughtErrors": "all",
+          "caughtErrorsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_err' is marked as ignored but is used. Used caught errors must not match /^_/u.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 16
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ message }) { console.error(message); }",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "message",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'message' is marked as ignored but is used. Used caught errors must not match /message/u.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ([_a, _b]) { doSomething(_a, _b); }",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_a' is marked as ignored but is used. Used caught errors must not match /^_/u.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 18
+        },
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_b' is marked as ignored but is used. Used caught errors must not match /^_/u.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ([_a, _b]) { doSomething(_a, _b); }",
+      "options": [
+        {
+          "destructuredArrayIgnorePattern": "^_",
+          "reportUsedIgnorePattern": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_a' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 18
+        },
+        {
+          "messageId": "usedIgnoredVar",
+          "message": "'_b' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 22
+        }
+      ]
+    },
+    {
+      "code": "\ntry {\n} catch (_) {\n  _ = 'foo'\n}\n            ",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "foo"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_' is assigned a value but never used. Allowed unused caught errors must match /foo/u.",
+          "line": 4,
+          "column": 3,
+          "endLine": 4,
+          "endColumn": 4
+        }
+      ]
+    },
+    {
+      "code": "\ntry {\n} catch (_) {\n  _ = 'foo'\n}\n            ",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "ignored",
+          "varsIgnorePattern": "_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_' is assigned a value but never used. Allowed unused caught errors must match /ignored/u.",
+          "line": 4,
+          "column": 3,
+          "endLine": 4,
+          "endColumn": 4
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ message, errors: [firstError] }) {}",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "foo"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'message' is defined but never used. Allowed unused caught errors must match /foo/u.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "try {} catch ({  errors: [firstError] }) {}"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'firstError' is defined but never used. Allowed unused caught errors must match /foo/u.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 45,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "try {} catch ({ message }) {}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "try {} catch ({ stack: $ }) { $ = 'Something broke: ' + $; }",
+      "options": [
+        {
+          "caughtErrorsIgnorePattern": "\\w"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'$' is assigned a value but never used. Allowed unused caught errors must match /\\w/u.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 32
+        }
+      ]
+    },
+    {
+      "code": "_ => { _ = _ + 1 };",
+      "options": [
+        {
+          "argsIgnorePattern": "ignored",
+          "varsIgnorePattern": "_"
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'_' is assigned a value but never used. Allowed unused args must match /ignored/u.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9
+        }
+      ]
+    },
+    {
+      "code": "const [a, b, c] = foo; alert(a + c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a, , c] = foo; alert(a + c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a = aDefault] = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[a = aDefault]]= foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[a = aDefault], b]= foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [, b]= foo;"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[a = aDefault]]= foo;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a = aDefault, b] = foo; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [, b] = foo; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([a = aDefault]) { } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a() { } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([[a = aDefault]]) { } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a() { } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([a = aDefault, b]) { alert(b); } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a([, b]) { alert(b); } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([[a = aDefault, b]]) { alert(b); } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a([[, b]]) { alert(b); } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: a1 } = foo",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a1' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: a1, b: b1 } = foo; alert(b1);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a1' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const {  b: b1 } = foo; alert(b1);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: a1, b: b1 } = foo; alert(a1);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b1' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { a: a1 } = foo; alert(a1);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a({ a: a1 }) {} a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a1' is defined but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a() {} a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: a1 = aDefault } = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a1' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [{ a: a1 = aDefault }] = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a1' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a = aDefault } = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a = aDefault, b } = foo; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const {  b } = foo; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a, b = bDefault } = foo; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { a } = foo; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a, b = bDefault, c } = foo; alert(a + c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { a, c } = foo; alert(a + c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { [key]: a } = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [...{ a, b }] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [...{ a }] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo (...rest) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo () {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo (a, ...rest) { alert(a); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo (a) { alert(a); } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const {...rest} = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const {a, ...rest} = foo; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const {a} = foo; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const {...rest} = foo, a = bar; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const  a = bar; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const a = bar, {...rest} = foo; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const a = bar; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo ({...rest}) { } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo () { } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo (a, {...rest}) { alert(a); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 26,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo (a) { alert(a); } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo ({...rest}, a) { alert(a); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo ( a) { alert(a); } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [...rest] = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[...rest]] = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...rest] = foo; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = foo; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo ([...rest]) { } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'rest' is defined but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo () { } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...{ b }] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[a, ...{ b }]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [...[a]] = array;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[...[a]]] = array;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [...[a, b]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [...[a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...[b]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[a, ...[b]]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...[b]] = array; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [, ...[b]] = array; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...[[ b ]]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, ...[{ b }]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo([a, ...[[ b ]]]) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo([, ...[[ b ]]]) {} foo();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo([a]) {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo([a, ...[{ b }]]) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo([, ...[{ b }]]) {} foo();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo([a]) {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(...[[ a ]]) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo() {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(...[{ a }]) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo() {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(a, ...[b]) { alert(a); } foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo(a) { alert(a); } foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, [b]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 12,
+          "endLine": 1,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[a, [b]]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [a, [[b]]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([[b]]) {} a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a() {} a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([[b], c]) { alert(c); } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a([, c]) { alert(c); } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [{b}, a] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [, a] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[{b}, a]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[, a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [[[{b}], a]] = array; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 11,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [[, a]] = array; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([{b}]) {} a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a() {} a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function a([{b}, c]) { alert(c); } a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function a([, c]) { alert(c); } a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: { b }, c } = foo; alert(c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const {  c } = foo; alert(c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { c, a: { b } } = foo; alert(c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { c } = foo; alert(c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: { b: { c }, d } } = foo; alert(d);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'c' is assigned a value but never used.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 20,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { a: {  d } } = foo; alert(d);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: { b: { c: { e } }, d } } = foo; alert(d);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'e' is assigned a value but never used.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const { a: {  d } } = foo; alert(d);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [{ a: { b }, c }] = foo; alert(c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const [{  c }] = foo; alert(c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: [{ b }]} = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: [[ b ]]} = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const [{ a: [{ b }]}] = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const { a: [{ b }], c} = foo; alert(c);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "const {  c} = foo; alert(c);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo({ a: [{ b }]}) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo() {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo({ a: [[ b ]]}) {} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo() {} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let a = foo, b = 'bar'; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let  b = 'bar'; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let a = foo, b = 'bar'; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let a = foo; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let { a } = foo, bar = 'hello'; alert(bar);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let  bar = 'hello'; alert(bar);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let bar = 'hello', { a } = foo; alert(bar);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "let bar = 'hello'; alert(bar);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import a from 'module';",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import 'module';"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import * as foo from 'module';",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import 'module';"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import a, * as foo from 'module'; a();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import a from 'module'; a();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import a, * as foo from 'module'; foo.hello;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import  * as foo from 'module'; foo.hello;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a } from 'module';",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a, b } from 'module'; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import {  b } from 'module'; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a, b } from 'module'; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import { a } from 'module'; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a as foo } from 'module';",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a as foo, b } from 'module'; alert(b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import {  b } from 'module'; alert(b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { a, b as foo } from 'module'; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import { a } from 'module'; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { default as foo, a } from 'module'; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import {  a } from 'module'; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import foo, { a } from 'module'; alert(a);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import  { a } from 'module'; alert(a);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import foo, { a } from 'module'; foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import foo from 'module'; foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "let a; a = foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 9
+        }
+      ]
+    },
+    {
+      "code": "array.forEach(a => {})",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "array.forEach(() => {})"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "if (foo()) var bar;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'bar' is defined but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "if (foo()) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "for (;;) var foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "for (;;) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "for (a in b) var foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "for (a in b) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "for (a of b) var foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "for (a of b) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "while (a) var foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 15,
+          "endLine": 1,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "while (a) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "do var foo; while (b);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 11,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "do ; while (b);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "with (a) var foo;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'foo' is defined but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 17,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "with (a) ;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "var a;'use strict';b(00);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6
+        }
+      ],
+      "skip": true,
+      "skipReason": "SKIP: tsgo rejects legacy octal literals in strict-mode source before rule execution"
+    },
+    {
+      "code": "var [a] = foo;'use strict';b(00);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 6,
+          "endLine": 1,
+          "endColumn": 7
+        }
+      ],
+      "skip": true,
+      "skipReason": "SKIP: tsgo rejects legacy octal literals in strict-mode source before rule execution"
+    },
+    {
+      "code": "var [...a] = foo;'use strict';b(00);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 9,
+          "endLine": 1,
+          "endColumn": 10
+        }
+      ],
+      "skip": true,
+      "skipReason": "SKIP: tsgo rejects legacy octal literals in strict-mode source before rule execution"
+    },
+    {
+      "code": "var {a} = foo;'use strict';b(00);",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 6,
+          "endLine": 1,
+          "endColumn": 7
+        }
+      ],
+      "skip": true,
+      "skipReason": "SKIP: tsgo rejects legacy octal literals in strict-mode source before rule execution"
+    },
+    {
+      "code": "console.log('foo')\nvar a\n+b > 0 ? bar() : baz()",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is defined but never used.",
+          "line": 2,
+          "column": 5,
+          "endLine": 2,
+          "endColumn": 6
+        }
+      ]
+    },
+    {
+      "code": "console.log('foo')\nvar [a] = foo;\n+b > 0 ? bar() : baz()",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 2,
+          "column": 6,
+          "endLine": 2,
+          "endColumn": 7
+        }
+      ]
+    },
+    {
+      "code": "console.log('foo')\nvar {a} = foo;\n+b > 0 ? bar() : baz()",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 2,
+          "column": 6,
+          "endLine": 2,
+          "endColumn": 7
+        }
+      ]
+    },
+    {
+      "code": "let x;\n() => x = 1;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'x' is assigned a value but never used.",
+          "line": 1,
+          "column": 5,
+          "endLine": 1,
+          "endColumn": 6
+        }
+      ]
+    },
+    {
+      "code": "let [a = 1] = arr;\na = 2;",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 2,
+          "column": 1,
+          "endLine": 2,
+          "endColumn": 2
+        }
+      ]
+    },
+    {
+      "code": "function foo(a = 1, b){alert(b);} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 14,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo( b){alert(b);} foo();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "function foo(a = 1) {a = 2;} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 23
+        }
+      ]
+    },
+    {
+      "code": "function foo(a = 1, b) {a = 2;} foo();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'b' is defined but never used.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "function foo(a = 1) {a = 2;} foo();"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'a' is assigned a value but never used.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 26
+        }
+      ]
+    },
+    {
+      "code": "using resource = getResource();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'resource' is assigned a value but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 15,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "await using resource = getResource();",
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'resource' is assigned a value but never used.",
+          "line": 1,
+          "column": 13,
+          "endLine": 1,
+          "endColumn": 21,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "const UnusedComponent = () => <div />;",
+      "fileName": "react.tsx",
+      "tsx": true,
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'UnusedComponent' is assigned a value but never used.",
+          "line": 1,
+          "column": 7,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { Card } from './card.jsx'; <MyCard />;",
+      "fileName": "react.tsx",
+      "tsx": true,
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Card' is defined but never used.",
+          "line": 1,
+          "column": 10,
+          "endLine": 1,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": " <MyCard />;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { Card, Button } from './components.jsx'; <Card />;",
+      "fileName": "react.tsx",
+      "tsx": true,
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Button' is defined but never used.",
+          "line": 1,
+          "column": 16,
+          "endLine": 1,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import { Card } from './components.jsx'; <Card />;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import Card from './Card'; const Button = () => <button />;",
+      "fileName": "react.tsx",
+      "tsx": true,
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'Card' is defined but never used.",
+          "line": 1,
+          "column": 8,
+          "endLine": 1,
+          "endColumn": 12,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import './Card'; const Button = () => <button />;"
+            }
+          ]
+        },
+        {
+          "messageId": "unusedVar",
+          "message": "'Button' is assigned a value but never used.",
+          "line": 1,
+          "column": 34,
+          "endLine": 1,
+          "endColumn": 40,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": "import Card from './Card'; "
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "import { Card as MyCard } from './card.jsx'; <Card />;",
+      "fileName": "react.tsx",
+      "tsx": true,
+      "errors": [
+        {
+          "messageId": "unusedVar",
+          "message": "'MyCard' is defined but never used.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 24,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "output": " <Card />;"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
