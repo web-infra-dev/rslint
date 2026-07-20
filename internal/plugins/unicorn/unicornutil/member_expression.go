@@ -26,7 +26,6 @@ func ShouldAddParenthesesToMemberExpressionObject(
 	case ast.KindIdentifier,
 		ast.KindPropertyAccessExpression,
 		ast.KindElementAccessExpression,
-		ast.KindCallExpression,
 		ast.KindNoSubstitutionTemplateLiteral,
 		ast.KindTemplateExpression,
 		ast.KindThisKeyword,
@@ -39,6 +38,12 @@ func ShouldAddParenthesesToMemberExpressionObject(
 		ast.KindFalseKeyword,
 		ast.KindNullKeyword:
 		return false
+	case ast.KindCallExpression:
+		// ESTree represents dynamic import as ImportExpression, which falls
+		// through to the conservative parenthesized form upstream. tsgo
+		// represents it as a CallExpression whose callee is `import`.
+		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+		return callee != nil && callee.Kind == ast.KindImportKeyword
 	case ast.KindNewExpression:
 		return node.AsNewExpression().Arguments == nil
 	case ast.KindNumericLiteral:

@@ -11,7 +11,11 @@ func isProblematicKeywordToken(token utils.SourceToken) bool {
 	if token.Text == "of" || token.Text == "await" {
 		return true
 	}
-	if token.Kind < ast.KindFirstKeyword || token.Kind > ast.KindLastKeyword ||
+	// @typescript-eslint/parser exposes only ECMAScript keywords through
+	// ESLint's `Keyword` token type. TypeScript-only contextual keywords such
+	// as `as` and `satisfies` remain identifiers and need no inserted space.
+	if token.Kind < ast.KindFirstKeyword ||
+		token.Kind > ast.KindLastFutureReservedWord ||
 		token.Text == "" {
 		return false
 	}

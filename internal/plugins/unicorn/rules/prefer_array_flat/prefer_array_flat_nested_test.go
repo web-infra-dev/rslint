@@ -174,5 +174,52 @@ Items.flat();`,
 		},
 	})
 
+	// Nested member receivers, switch-to-array fixes, and direct member-object
+	// fixes all settle one non-overlapping replacement per pass, in the same
+	// range order as ESLint's SourceCodeFixer.
+	nestedMemberCode := `array.flatMap(value => value).flatMap(value => value)`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code: nestedMemberCode,
+		Output: []string{
+			`array.flat().flatMap(value => value)`,
+			`array.flat().flat()`,
+		},
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(nestedMemberCode, nestedMemberCode, `Array#flatMap()`, 0),
+			upstreamError(
+				nestedMemberCode,
+				`array.flatMap(value => value)`,
+				`Array#flatMap()`,
+				0,
+			),
+		},
+	})
+
+	nestedSwitchCode := `[].concat(_.flatten(value))`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code: nestedSwitchCode,
+		Output: []string{
+			`[_.flatten(value)].flat()`,
+			`[value.flat()].flat()`,
+		},
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(nestedSwitchCode, nestedSwitchCode, `[].concat()`, 0),
+			upstreamError(nestedSwitchCode, `_.flatten(value)`, `_.flatten()`, 0),
+		},
+	})
+
+	nestedDirectCode := `_.flatten([].concat(value))`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code: nestedDirectCode,
+		Output: []string{
+			`[].concat(value).flat()`,
+			`[value].flat().flat()`,
+		},
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(nestedDirectCode, nestedDirectCode, `_.flatten()`, 0),
+			upstreamError(nestedDirectCode, `[].concat(value)`, `[].concat()`, 0),
+		},
+	})
+
 	suite.run(t)
 }

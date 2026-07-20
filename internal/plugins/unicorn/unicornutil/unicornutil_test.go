@@ -134,6 +134,7 @@ func TestShouldAddParenthesesToMemberExpressionObject(t *testing.T) {
 	}{
 		{name: "identifier", code: "consume(value)", want: false},
 		{name: "call", code: "consume(getValue())", want: false},
+		{name: "dynamic import", code: "consume(import('value'))", want: true},
 		{name: "function expression", code: "consume(function(){})", want: false},
 		{name: "new with arguments", code: "consume(new Value())", want: false},
 		{name: "new without arguments", code: "consume(new Value)", want: true},
@@ -166,6 +167,62 @@ func TestShouldAddParenthesesToMemberExpressionObject(t *testing.T) {
 			); got != test.want {
 				t.Fatalf("ShouldAddParenthesesToMemberExpressionObject(%q) = %v, want %v",
 					test.code, got, test.want)
+			}
+		})
+	}
+}
+
+func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
+	tests := []struct {
+		name      string
+		code      string
+		target    string
+		wantFixes int
+	}{
+		{
+			name:   "TypeScript as stays identifier-like",
+			code:   "const result = consume(value)as unknown;",
+			target: "consume(value)",
+		},
+		{
+			name:   "TypeScript satisfies stays identifier-like",
+			code:   "const result = consume(value)satisfies unknown;",
+			target: "consume(value)",
+		},
+		{
+			name:      "ECMAScript keyword after",
+			code:      "const result = consume(value)instanceof Array;",
+			target:    "consume(value)",
+			wantFixes: 1,
+		},
+		{
+			name:      "contextual of before",
+			code:      "for (const item of[].concat(value)) {}",
+			target:    "[].concat(value)",
+			wantFixes: 1,
+		},
+		{
+			name:      "contextual await before",
+			code:      "async function consume() { await[].concat(value); }",
+			target:    "[].concat(value)",
+			wantFixes: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parseTestSource(test.code)
+			node := findTestCall(t, sourceFile, test.target)
+			fixes := SpaceAroundKeywordFixes(sourceFile, node)
+			if len(fixes) != test.wantFixes {
+				t.Fatalf("SpaceAroundKeywordFixes(%q) returned %d fixes, want %d",
+					test.code, len(fixes), test.wantFixes)
+			}
+			for _, fix := range fixes {
+				if fix.Text != " " {
+					t.Fatalf("SpaceAroundKeywordFixes(%q) inserted %q, want one space",
+						test.code, fix.Text)
+				}
 			}
 		})
 	}
