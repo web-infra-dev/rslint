@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed valid-params.schema.json
@@ -24,11 +25,11 @@ func parseOptions(options []any) Options {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap := options[0].(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
 	switch arr := optsMap["exclude"].(type) {
 	case []interface{}:
-		for _, item := range arr {
-			opts.Exclude[item.(string)] = true
+		for _, name := range utils.ToStringSlice(arr) {
+			opts.Exclude[name] = true
 		}
 	case []string:
 		for _, name := range arr {

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed catch-or-return.schema.json
@@ -26,7 +27,7 @@ func parseOptions(options []any) Options {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap := options[0].(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
 	opts.AllowThen, _ = optsMap["allowThen"].(bool)
 	opts.AllowThenStrict, _ = optsMap["allowThenStrict"].(bool)
 	opts.AllowFinally, _ = optsMap["allowFinally"].(bool)
@@ -34,11 +35,7 @@ func parseOptions(options []any) Options {
 	case string:
 		opts.TerminationMethod = []string{v}
 	case []interface{}:
-		if len(v) > 0 {
-			methods := make([]string, len(v))
-			for i, m := range v {
-				methods[i] = m.(string)
-			}
+		if methods := utils.ToStringSlice(v); methods != nil {
 			opts.TerminationMethod = methods
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no-callback-in-promise.schema.json
@@ -26,14 +27,9 @@ func parseOptions(options []any) Options {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap := options[0].(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
 	opts.TimeoutsErr, _ = optsMap["timeoutsErr"].(bool)
-	if arr, ok := optsMap["exceptions"].([]interface{}); ok {
-		opts.Exceptions = make([]string, len(arr))
-		for i, e := range arr {
-			opts.Exceptions[i] = e.(string)
-		}
-	}
+	opts.Exceptions = utils.ToStringSlice(optsMap["exceptions"])
 	return opts
 }
 
