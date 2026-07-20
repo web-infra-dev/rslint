@@ -174,6 +174,66 @@ func TestNamingConventionRule(t *testing.T) {
 		// Parameter
 		{Code: `function fn(myParam: string) {}`},
 
+		// Regression: parameter names inside type-only signatures create no
+		// binding, so the "parameter" selector must not validate them — matches
+		// the real-world false positive where `System` in
+		// `as (System: any, ...globalArgs: any[]) => void` (a cast, not a real
+		// function declaration) was incorrectly flagged.
+		{
+			Code: `const evaluateThunk = (0, eval)("") as (System: any, ...globalArgs: any[]) => void;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+		{
+			Code: `type Cast = (System: any) => void;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+		{
+			Code: `interface Foo { method(System: any): void; }`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+		{
+			Code: `interface Foo { (System: any): void; }`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+		{
+			Code: `interface Foo { new (System: any): void; }`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+		{
+			Code: `interface Foo { [System: string]: any; }`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "parameter",
+					"format":   []interface{}{"camelCase"},
+				},
+			},
+		},
+
 		// Destructured variable
 		{
 			Code: `const { myProp } = ({} as any);`,
