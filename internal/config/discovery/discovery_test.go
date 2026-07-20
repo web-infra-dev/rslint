@@ -1373,8 +1373,10 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 	})
 }
 
-func TestConfigDiscoveryExplicitConfigDoesNotConsultGitignore(t *testing.T) {
+func TestConfigDiscoveryExplicitConfigLoadsBeforeProjectingGitignore(t *testing.T) {
 	root := t.TempDir()
+	ignoredTarget := writeDiscoveryFixture(t, root, "ignored/index.ts", "export {};\n")
+	visibleTarget := writeDiscoveryFixture(t, root, "src/index.ts", "export {};\n")
 	writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
 	loader := newFixtureConfigLoader()
 	configPath := writeConfigCandidate(t, root, "ignored/custom.config.cjs")
@@ -1401,6 +1403,307 @@ func TestConfigDiscoveryExplicitConfigDoesNotConsultGitignore(t *testing.T) {
 	}
 	if got := loader.batches[0].Candidates[0].ConfigDirectory; got != root {
 		t.Fatalf("wire configDirectory = %q, want cwd %q", got, root)
+	}
+	config := catalog.Configs[root]
+	if got := config.GetConfigForFile(ignoredTarget, root); got != nil {
+		t.Fatalf("Git-ignored target received explicit config: %+v", got)
+	}
+	if got := config.GetConfigForFile(visibleTarget, root); got == nil {
+		t.Fatal("visible target did not receive explicit config")
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigDoesNotDiscoverNestedCandidates(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	nestedConfigPath := writeConfigCandidate(t, root, "nested/rslint.config.js")
+	loader.configs[configPath] = namedConfig("explicit")
+	loader.configs[nestedConfigPath] = namedConfig("must-not-load")
+	writeDiscoveryFixture(t, root, "nested/.gitignore", "generated.ts\n")
+	ignoredTarget := writeDiscoveryFixture(t, root, "nested/generated.ts", "export {};\n")
+
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		discoveryTestFS(),
+		loader,
+		ExplicitConfigRequest{CWD: root, ConfigPath: configPath},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
+		t.Fatalf("explicit projection requested nested configs: %v", got)
+	}
+	root = tspath.NormalizePath(root)
+	if got := catalog.Configs[root].GetConfigForFile(ignoredTarget, root); got != nil {
+		t.Fatalf("nested Git-ignored target received explicit config: %+v", got)
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigTargetFileProjection(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	loader.configs[configPath] = namedConfig("explicit")
+	target := writeDiscoveryFixture(t, root, "src/index.ts", "export {};\n")
+	writeDiscoveryFixture(t, root, "src/.gitignore", "index.ts\n")
+	writeDiscoveryFixture(t, root, "unrelated/.gitignore", "other.ts\n")
+
+	spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		spyFS,
+		loader,
+		ExplicitConfigRequest{
+			CWD:         root,
+			ConfigPath:  configPath,
+			TargetFiles: []DiscoveryFile{{Path: target}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	root = tspath.NormalizePath(root)
+	if got := catalog.Configs[root].GetConfigForFile(target, root); got != nil {
+		t.Fatalf("target-chain Git ignore was not projected: %+v", got)
+	}
+	wantReads := []string{
+		tspath.CombinePaths(root, ".gitignore"),
+		tspath.CombinePaths(root, "src/.gitignore"),
+	}
+	if got := spyFS.gitignorePaths; !reflect.DeepEqual(got, wantReads) {
+		t.Fatalf("exact projection Git reads = %v, want %v", got, wantReads)
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigTargetProjectionUsesConfigPathSpace(t *testing.T) {
+	physicalRoot := t.TempDir()
+	writeConfigCandidate(t, physicalRoot, "custom.config.cjs")
+	writeDiscoveryFixture(t, physicalRoot, ".gitignore", "src/index.ts\n")
+	physicalTarget := writeDiscoveryFixture(t, physicalRoot, "src/index.ts", "export {};\n")
+	aliasRoot := filepath.Join(t.TempDir(), "workspace-alias")
+	if err := os.Symlink(physicalRoot, aliasRoot); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasRoot = tspath.NormalizePath(aliasRoot)
+	aliasTarget := tspath.CombinePaths(aliasRoot, "src/index.ts")
+	externalSpelling := writeDiscoveryFixture(t, t.TempDir(), "index.ts", "export {};\n")
+	canonicalTarget := discoveryTestFS().Realpath(physicalTarget)
+
+	for _, test := range []struct {
+		name      string
+		cwd       string
+		target    string
+		canonical string
+	}{
+		{name: "aliased CWD and physical target", cwd: aliasRoot, target: physicalTarget},
+		{name: "physical CWD and aliased target", cwd: physicalRoot, target: aliasTarget},
+		{
+			name:      "canonical target hint maps an external spelling",
+			cwd:       physicalRoot,
+			target:    externalSpelling,
+			canonical: canonicalTarget,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := tspath.CombinePaths(test.cwd, "custom.config.cjs")
+			loader := newFixtureConfigLoader()
+			loader.configs[configPath] = namedConfig("explicit")
+			spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+			catalog, err := LoadExplicitConfig(
+				context.Background(),
+				spyFS,
+				loader,
+				ExplicitConfigRequest{
+					CWD:        test.cwd,
+					ConfigPath: configPath,
+					TargetFiles: []DiscoveryFile{{
+						Path:          test.target,
+						CanonicalPath: test.canonical,
+					}},
+				},
+			)
+			if err != nil {
+				t.Fatalf("LoadExplicitConfig: %v", err)
+			}
+			cwd := tspath.NormalizePath(test.cwd)
+			matchFile, matchDir := rslintconfig.ResolveConfigPathSpaceWithCanonical(
+				test.target,
+				test.canonical,
+				cwd,
+				spyFS,
+			)
+			if got := catalog.Configs[cwd].GetConfigForFile(matchFile, matchDir); got != nil {
+				t.Fatalf(
+					"path-space Git ignore was not projected: config=%+v match=(%q,%q) reads=%v",
+					catalog.Configs[cwd],
+					matchFile,
+					matchDir,
+					spyFS.gitignorePaths,
+				)
+			}
+			wantReads := []string{
+				tspath.CombinePaths(cwd, ".gitignore"),
+				tspath.CombinePaths(cwd, "src/.gitignore"),
+			}
+			if got := spyFS.gitignorePaths; !reflect.DeepEqual(got, wantReads) {
+				t.Fatalf("path-space Git reads = %v, want %v", got, wantReads)
+			}
+		})
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigEmptyTargetSetSkipsGitProjection(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	loader.configs[configPath] = namedConfig("explicit")
+	writeDiscoveryFixture(t, root, ".gitignore", "*.ts\n")
+
+	spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		spyFS,
+		loader,
+		ExplicitConfigRequest{
+			CWD:         root,
+			ConfigPath:  configPath,
+			TargetFiles: []DiscoveryFile{},
+		},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	if spyFS.gitignoreReads != 0 {
+		t.Fatalf("empty target projection read %d .gitignore files: %v", spyFS.gitignoreReads, spyFS.gitignorePaths)
+	}
+	root = tspath.NormalizePath(root)
+	if got := namedConfigEntry(catalog.Configs[root]).Name; got != "explicit" {
+		t.Fatalf("explicit config missing after empty projection: %q", got)
+	}
+}
+
+func TestConfigDiscoveryExplicitGitProjectionMatchesStandalonePolicy(t *testing.T) {
+	tests := []struct {
+		name          string
+		files         map[string]string
+		configIgnores []string
+		exactTargets  []string
+		exact         bool
+		check         []string
+	}{
+		{
+			name: "full nested sources and Git negation",
+			files: map[string]string{
+				".gitignore":              "*.generated.ts\n",
+				"src/.gitignore":          "ignored.ts\n!keep.generated.ts\n",
+				"src/index.ts":            "export {};\n",
+				"src/ignored.ts":          "export {};\n",
+				"src/drop.generated.ts":   "export {};\n",
+				"src/keep.generated.ts":   "export {};\n",
+				"other/keep.generated.ts": "export {};\n",
+			},
+			check: []string{
+				"src/index.ts",
+				"src/ignored.ts",
+				"src/drop.generated.ts",
+				"src/keep.generated.ts",
+				"other/keep.generated.ts",
+			},
+		},
+		{
+			name: "authored global negation after Git projection",
+			files: map[string]string{
+				".gitignore":    "dist/\n",
+				"dist/index.ts": "export {};\n",
+				"src/index.ts":  "export {};\n",
+			},
+			configIgnores: []string{"!dist/**"},
+			check:         []string{"dist/index.ts", "src/index.ts"},
+		},
+		{
+			name: "exact chains exclude unrelated sources",
+			files: map[string]string{
+				".gitignore":              "*.generated.ts\n",
+				"src/.gitignore":          "index.ts\n",
+				"src/index.ts":            "export {};\n",
+				"unrelated/.gitignore":    "index.ts\n",
+				"unrelated/index.ts":      "export {};\n",
+				"unrelated/generated.ts":  "export {};\n",
+				"outside-target/index.ts": "export {};\n",
+			},
+			exactTargets: []string{"src/index.ts"},
+			exact:        true,
+			check: []string{
+				"src/index.ts",
+				"unrelated/index.ts",
+				"unrelated/generated.ts",
+				"outside-target/index.ts",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			for relativePath, content := range test.files {
+				writeDiscoveryFixture(t, root, relativePath, content)
+			}
+			configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+			entries := rslintconfig.RslintConfig{}
+			if test.configIgnores != nil {
+				entries = append(entries, rslintconfig.ConfigEntry{
+					Ignores: append([]string(nil), test.configIgnores...),
+				})
+			}
+			entries = append(entries, namedConfig("explicit")...)
+			loader := newFixtureConfigLoader()
+			loader.configs[configPath] = entries
+
+			var requestTargets []DiscoveryFile
+			var standaloneTargets []string
+			if test.exact {
+				requestTargets = make([]DiscoveryFile, 0, len(test.exactTargets))
+				standaloneTargets = make([]string, 0, len(test.exactTargets))
+				for _, relativePath := range test.exactTargets {
+					path := tspath.NormalizePath(filepath.Join(root, filepath.FromSlash(relativePath)))
+					requestTargets = append(requestTargets, DiscoveryFile{Path: path})
+					standaloneTargets = append(standaloneTargets, path)
+				}
+			}
+			fsys := discoveryTestFS()
+			catalog, err := LoadExplicitConfig(
+				context.Background(),
+				fsys,
+				loader,
+				ExplicitConfigRequest{
+					CWD:         root,
+					ConfigPath:  configPath,
+					TargetFiles: requestTargets,
+				},
+			)
+			if err != nil {
+				t.Fatalf("LoadExplicitConfig: %v", err)
+			}
+			root = tspath.NormalizePath(root)
+			projected := catalog.Configs[root]
+			standalone := rslintconfig.ConfigWithGitignore(entries, root, fsys, standaloneTargets)
+			for _, relativePath := range test.check {
+				path := tspath.NormalizePath(filepath.Join(root, filepath.FromSlash(relativePath)))
+				gotSelected := projected.GetConfigForFile(path, root) != nil
+				wantSelected := standalone.GetConfigForFile(path, root) != nil
+				if gotSelected != wantSelected {
+					t.Errorf(
+						"%s selected by staged projection = %t, standalone policy = %t",
+						relativePath,
+						gotSelected,
+						wantSelected,
+					)
+				}
+			}
+		})
 	}
 }
 
