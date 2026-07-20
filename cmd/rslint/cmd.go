@@ -57,6 +57,10 @@ type lintArgs struct {
 	MaxWarnings int
 	StartTimeMs int64
 	RuleFlags   []string
+	// ReportUnusedDisableDirectives / ReportUnusedDisableDirectivesSeverity
+	// are mutually exclusive; see validateReportUnusedDisableDirectivesFlags.
+	ReportUnusedDisableDirectives         bool
+	ReportUnusedDisableDirectivesSeverity string
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
@@ -93,6 +97,11 @@ Options:
   --quiet               Report errors only
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
+  --report-unused-disable-directives
+                         Report unused eslint-disable directives as warnings
+  --report-unused-disable-directives-severity SEVERITY
+                         Report unused eslint-disable directives at this
+                         severity: off | warn | error
   -h, --help            Show help
 `
 
@@ -396,6 +405,50 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 	return 0, ""
 }
 
+// validateReportUnusedDisableDirectivesFlags rejects the CLI-flag combination
+// ESLint itself rejects: the boolean shorthand and the explicit severity
+// flag are mutually exclusive, and the severity value must be recognized.
+// Returns (0, "") when the combination is valid.
+func validateReportUnusedDisableDirectivesFlags(reportUnused bool, severity string) (int, string) {
+	if reportUnused && severity != "" {
+		return 2, "error: --report-unused-disable-directives cannot be combined with --report-unused-disable-directives-severity"
+	}
+	switch severity {
+	case "", "off", "warn", "error":
+		return 0, ""
+	default:
+		return 2, fmt.Sprintf("error: invalid --report-unused-disable-directives-severity value %q (expected off, warn, or error)", severity)
+	}
+}
+
+// resolveReportUnusedDisableDirectivesSeverity computes the single effective
+// severity for --report-unused-disable-directives for the whole invocation.
+// CLI flags always win; the config fallback only applies in single-config
+// mode (configMap == nil) since linterOptions is resolved once globally
+// rather than per-file — see RunLinterOptions.ReportUnusedDisableDirectives.
+func resolveReportUnusedDisableDirectivesSeverity(
+	flagBool bool,
+	flagSeverity string,
+	configMap map[string]rslintconfig.RslintConfig,
+	rslintConfig rslintconfig.RslintConfig,
+) rule.DiagnosticSeverity {
+	if flagSeverity != "" {
+		return rule.ParseSeverity(flagSeverity)
+	}
+	if flagBool {
+		return rule.SeverityWarning
+	}
+	if configMap != nil {
+		return rule.SeverityOff
+	}
+	for i := len(rslintConfig) - 1; i >= 0; i-- {
+		if lo := rslintConfig[i].LinterOptions; lo != nil && lo.ReportUnusedDisableDirectives != nil {
+			return *lo.ReportUnusedDisableDirectives
+		}
+	}
+	return rule.SeverityOff
+}
+
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
 	if configMap == nil {
 		return nil
@@ -470,6 +523,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
+	fs.BoolVar(&args.ReportUnusedDisableDirectives, "report-unused-disable-directives", false, "report unused eslint-disable directives as warnings")
+	fs.StringVar(&args.ReportUnusedDisableDirectivesSeverity, "report-unused-disable-directives-severity", "", "report unused eslint-disable directives at this severity: off|warn|error")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
 	fs.StringVar(&args.CpuprofOut, "cpuprof", "", "file to put cpu profiling to")
@@ -491,6 +546,10 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	}
 	if args.TypeCheckOnly {
 		args.TypeCheck = true
+	}
+	if code, msg := validateReportUnusedDisableDirectivesFlags(args.ReportUnusedDisableDirectives, args.ReportUnusedDisableDirectivesSeverity); code != 0 {
+		fmt.Fprintln(os.Stderr, msg)
+		return args, help, code
 	}
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
@@ -543,6 +602,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	singleThreaded := args.SingleThreaded
 	quiet := args.Quiet
 	maxWarnings := args.MaxWarnings
+	reportUnusedDisableDirectivesFlag := args.ReportUnusedDisableDirectives
+	reportUnusedDisableDirectivesSeverityFlag := args.ReportUnusedDisableDirectivesSeverity
 	startTimeMs := args.StartTimeMs
 	ruleFlags := args.RuleFlags
 	allowFiles := args.AllowFiles
@@ -765,6 +826,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 1
 	}
 
+	reportUnusedDisableDirectivesSeverity := resolveReportUnusedDisableDirectivesSeverity(
+		reportUnusedDisableDirectivesFlag,
+		reportUnusedDisableDirectivesSeverityFlag,
+		configMap,
+		rslintConfig,
+	)
+
 	// Use CWD for display paths (not any config directory).
 	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
 	// so it already holds the normalized CWD.
@@ -921,15 +989,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	runOpts := linter.RunLinterOptions{
-		Programs:              programs,
-		SingleThreaded:        singleThreaded,
-		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-		TargetFiles:           targetsByProgram,
-		GetRulesForFile:       rulesForFile,
-		TypeInfoFiles:         typeInfoFiles,
-		SyntaxErrorFiles:      syntaxErrorFiles,
-		TypeCheck:             typeCheck,
-		SkipTypeCheckPrograms: skipTypeCheck,
+		Programs:                      programs,
+		SingleThreaded:                singleThreaded,
+		Scope:                         linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+		TargetFiles:                   targetsByProgram,
+		GetRulesForFile:               rulesForFile,
+		TypeInfoFiles:                 typeInfoFiles,
+		SyntaxErrorFiles:              syntaxErrorFiles,
+		TypeCheck:                     typeCheck,
+		SkipTypeCheckPrograms:         skipTypeCheck,
+		ReportUnusedDisableDirectives: reportUnusedDisableDirectivesSeverity,
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -1058,15 +1127,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
-				Programs:              newPrograms,
-				SingleThreaded:        singleThreaded,
-				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				TargetFiles:           fixTargetsByProgram,
-				GetRulesForFile:       fixRulesForFile,
-				TypeInfoFiles:         fixTypeInfoFiles,
-				SyntaxErrorFiles:      fixSyntaxErrorFiles,
-				TypeCheck:             typeCheck,
-				SkipTypeCheckPrograms: fixSkipMask,
+				Programs:                      newPrograms,
+				SingleThreaded:                singleThreaded,
+				Scope:                         linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+				TargetFiles:                   fixTargetsByProgram,
+				GetRulesForFile:               fixRulesForFile,
+				TypeInfoFiles:                 fixTypeInfoFiles,
+				SyntaxErrorFiles:              fixSyntaxErrorFiles,
+				TypeCheck:                     typeCheck,
+				SkipTypeCheckPrograms:         fixSkipMask,
+				ReportUnusedDisableDirectives: reportUnusedDisableDirectivesSeverity,
 				OnDiagnostic: func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)

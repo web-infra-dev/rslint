@@ -1649,3 +1649,191 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 		t.Fatalf("write error must identify the target path, got %v", err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// --report-unused-disable-directives / --report-unused-disable-directives-severity
+// ---------------------------------------------------------------------------
+
+func TestValidateReportUnusedDisableDirectivesFlags_BothUnsetIsOK(t *testing.T) {
+	code, msg := validateReportUnusedDisableDirectivesFlags(false, "")
+	if code != 0 || msg != "" {
+		t.Errorf("expected no error, got (%d, %q)", code, msg)
+	}
+}
+
+func TestValidateReportUnusedDisableDirectivesFlags_BooleanAloneIsOK(t *testing.T) {
+	code, msg := validateReportUnusedDisableDirectivesFlags(true, "")
+	if code != 0 || msg != "" {
+		t.Errorf("expected no error, got (%d, %q)", code, msg)
+	}
+}
+
+func TestValidateReportUnusedDisableDirectivesFlags_SeverityAloneIsOK(t *testing.T) {
+	for _, severity := range []string{"off", "warn", "error"} {
+		code, msg := validateReportUnusedDisableDirectivesFlags(false, severity)
+		if code != 0 || msg != "" {
+			t.Errorf("severity=%q: expected no error, got (%d, %q)", severity, code, msg)
+		}
+	}
+}
+
+func TestValidateReportUnusedDisableDirectivesFlags_RejectsBothFlags(t *testing.T) {
+	code, msg := validateReportUnusedDisableDirectivesFlags(true, "warn")
+	if code != 2 {
+		t.Errorf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(msg, "--report-unused-disable-directives") || !strings.Contains(msg, "--report-unused-disable-directives-severity") {
+		t.Errorf("expected message to mention both flags, got %q", msg)
+	}
+}
+
+func TestValidateReportUnusedDisableDirectivesFlags_RejectsUnknownSeverity(t *testing.T) {
+	code, msg := validateReportUnusedDisableDirectivesFlags(false, "critical")
+	if code != 2 {
+		t.Errorf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(msg, "critical") {
+		t.Errorf("expected message to name the invalid value, got %q", msg)
+	}
+}
+
+func TestResolveReportUnusedDisableDirectivesSeverity(t *testing.T) {
+	warn := rule.SeverityWarning
+	errSev := rule.SeverityError
+	configWithSeverity := func(s rule.DiagnosticSeverity) rslintconfig.RslintConfig {
+		return rslintconfig.RslintConfig{{LinterOptions: &rslintconfig.LinterOptions{ReportUnusedDisableDirectives: &s}}}
+	}
+
+	tests := []struct {
+		name         string
+		flagBool     bool
+		flagSeverity string
+		configMap    map[string]rslintconfig.RslintConfig
+		rslintConfig rslintconfig.RslintConfig
+		want         rule.DiagnosticSeverity
+	}{
+		{name: "nothing set defaults to off", want: rule.SeverityOff},
+		{name: "boolean flag means warn", flagBool: true, want: rule.SeverityWarning},
+		{name: "severity flag wins over boolean default", flagSeverity: "error", want: rule.SeverityError},
+		{
+			name:         "severity flag overrides config",
+			flagSeverity: "off",
+			rslintConfig: configWithSeverity(errSev),
+			want:         rule.SeverityOff,
+		},
+		{
+			name:         "boolean flag overrides config",
+			flagBool:     true,
+			rslintConfig: configWithSeverity(errSev),
+			want:         rule.SeverityWarning,
+		},
+		{
+			name:         "falls back to config when no flag given",
+			rslintConfig: configWithSeverity(errSev),
+			want:         rule.SeverityError,
+		},
+		{
+			name:         "later config entry wins",
+			rslintConfig: append(configWithSeverity(warn), configWithSeverity(errSev)...),
+			want:         rule.SeverityError,
+		},
+		{
+			name:      "multi-config mode does not fall back to config",
+			configMap: map[string]rslintconfig.RslintConfig{"/a": configWithSeverity(errSev)},
+			want:      rule.SeverityOff,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveReportUnusedDisableDirectivesSeverity(tt.flagBool, tt.flagSeverity, tt.configMap, tt.rslintConfig)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReportUnusedDisableDirectivesCLI(t *testing.T) {
+	dir := t.TempDir()
+	target := tspath.NormalizePath(filepath.Join(dir, "index.js"))
+	source := "debugger; // eslint-disable-line no-debugger\n" +
+		"// eslint-disable-line no-debugger\n"
+	if err := os.WriteFile(target, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dir, "rslint.json"),
+		[]byte(`[{"rules":{"no-debugger":"error"}}]`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("off by default", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			AllowFiles:     []string{target},
+			Format:         "jsonline",
+			NoColor:        true,
+			SingleThreaded: true,
+		})
+		if code != 0 {
+			t.Fatalf("expected exit 0 (no-debugger suppressed on line 1), got %d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if strings.Contains(stdout, "unused-disable-directive") {
+			t.Fatalf("did not expect an unused-disable-directive diagnostic without the flag, got %q", stdout)
+		}
+	})
+
+	t.Run("boolean flag reports the unused directive as a warning", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			AllowFiles:                    []string{target},
+			Format:                        "jsonline",
+			NoColor:                       true,
+			SingleThreaded:                true,
+			MaxWarnings:                   -1,
+			ReportUnusedDisableDirectives: true,
+		})
+		if code != 0 {
+			t.Fatalf("expected exit 0 (unused directive is a warning by default), got %d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if got := strings.Count(stdout, "unused-disable-directive"); got != 1 {
+			t.Fatalf("expected exactly 1 unused-disable-directive diagnostic (line 1's directive is used), got %d: stdout=%q", got, stdout)
+		}
+		if !strings.Contains(stdout, `"severity":"warn"`) {
+			t.Fatalf("expected the unused directive to be reported at warn severity, got stdout=%q", stdout)
+		}
+	})
+
+	t.Run("severity=error affects the exit code", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			AllowFiles:                            []string{target},
+			Format:                                "jsonline",
+			NoColor:                               true,
+			SingleThreaded:                        true,
+			ReportUnusedDisableDirectivesSeverity: "error",
+		})
+		if code != 1 {
+			t.Fatalf("expected exit 1 (unused directive reported as error), got %d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if !strings.Contains(stdout, "unused-disable-directive") {
+			t.Fatalf("expected an unused-disable-directive diagnostic, got stdout=%q stderr=%q", stdout, stderr)
+		}
+	})
+
+	t.Run("severity=off matches the default", func(t *testing.T) {
+		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			AllowFiles:                            []string{target},
+			Format:                                "jsonline",
+			NoColor:                               true,
+			SingleThreaded:                        true,
+			ReportUnusedDisableDirectivesSeverity: "off",
+		})
+		if code != 0 {
+			t.Fatalf("expected exit 0, got %d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if strings.Contains(stdout, "unused-disable-directive") {
+			t.Fatalf("did not expect an unused-disable-directive diagnostic at severity=off, got %q", stdout)
+		}
+	})
+}

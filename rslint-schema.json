@@ -49,6 +49,10 @@
           "$ref": "#/definitions/LanguageOptions",
           "description": "Language-specific configuration options"
         },
+        "linterOptions": {
+          "$ref": "#/definitions/LinterOptions",
+          "description": "Linter-behavior configuration"
+        },
         "rules": {
           "$ref": "#/definitions/Rules",
           "description": "Linting rules configuration",
@@ -76,6 +80,21 @@
         "settings": {
           "type": "object",
           "description": "Shared settings exposed to enabled rules"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LinterOptions": {
+      "type": "object",
+      "description": "Linter-behavior configuration, distinct from languageOptions (parsing) and rules (per-rule severity/options)",
+      "properties": {
+        "reportUnusedDisableDirectives": {
+          "description": "Report eslint-disable / eslint-disable-line / eslint-disable-next-line directives that suppressed no diagnostic. `true` reports at \"warn\". Only covers rslint's native (Go) rules, not third-party ESLint plugin rules.",
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "string", "enum": ["off", "warn", "error"] }
+          ],
+          "default": false
         }
       },
       "additionalProperties": false

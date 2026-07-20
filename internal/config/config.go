@@ -36,6 +36,7 @@ type ConfigEntry struct {
 	FilePatternGroups [][]string       `json:"-"`
 	Ignores           []string         `json:"ignores,omitempty"`
 	LanguageOptions   *LanguageOptions `json:"languageOptions,omitempty"`
+	LinterOptions     *LinterOptions   `json:"linterOptions,omitempty"`
 	// Omit an absent rules map when marshaling. Emitting an invented
 	// `"rules": null` changes flat-config object-shape semantics when the JSON
 	// is decoded again: an ignores-only global entry becomes an entry-local
@@ -187,7 +188,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 				break
 			}
 		}
-		if hasNonGlobalKey && decoded.Files == nil && decoded.FilePatternGroups == nil && decoded.Rules == nil && decoded.Plugins == nil && decoded.Settings == nil && decoded.LanguageOptions == nil {
+		if hasNonGlobalKey && decoded.Files == nil && decoded.FilePatternGroups == nil && decoded.Rules == nil && decoded.Plugins == nil && decoded.Settings == nil && decoded.LanguageOptions == nil && decoded.LinterOptions == nil {
 			decoded.Settings = Settings{}
 		}
 		entries = append(entries, ConfigEntry(decoded))
@@ -335,6 +336,73 @@ func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
 	lo.ParserOptions = ps.ParserOptions
 	lo.Raw = raw
 	return nil
+}
+
+// LinterOptions holds linter-behavior configuration, distinct from
+// LanguageOptions (parsing) and Rules (per-rule severity/options).
+type LinterOptions struct {
+	// ReportUnusedDisableDirectives mirrors ESLint's flat-config field of the
+	// same name. nil means unset (falls through to a lower-precedence source
+	// or the off default); see rule.DiagnosticSeverity for the resolved values.
+	ReportUnusedDisableDirectives *rule.DiagnosticSeverity `json:"reportUnusedDisableDirectives,omitempty"`
+}
+
+// MarshalJSON emits reportUnusedDisableDirectives in its canonical string
+// form ("off"/"warn"/"error"), so a config round-tripped through
+// Unmarshal→Marshal→Unmarshal is stable (the numeric DiagnosticSeverity
+// encoding is a Go-internal detail, not a config-file shape).
+func (lo LinterOptions) MarshalJSON() ([]byte, error) {
+	if lo.ReportUnusedDisableDirectives == nil {
+		return []byte(`{}`), nil
+	}
+	return json.Marshal(struct {
+		ReportUnusedDisableDirectives string `json:"reportUnusedDisableDirectives"`
+	}{ReportUnusedDisableDirectives: lo.ReportUnusedDisableDirectives.String()})
+}
+
+// UnmarshalJSON accepts ESLint's `reportUnusedDisableDirectives` shapes:
+// `true` (warn), `false`/`"off"` (off), `"warn"`, or `"error"`.
+func (lo *LinterOptions) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ReportUnusedDisableDirectives *json.RawMessage `json:"reportUnusedDisableDirectives"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if raw.ReportUnusedDisableDirectives == nil {
+		return nil
+	}
+
+	var asBool bool
+	if err := json.Unmarshal(*raw.ReportUnusedDisableDirectives, &asBool); err == nil {
+		severity := rule.SeverityOff
+		if asBool {
+			severity = rule.SeverityWarning
+		}
+		lo.ReportUnusedDisableDirectives = &severity
+		return nil
+	}
+
+	var asString string
+	if err := json.Unmarshal(*raw.ReportUnusedDisableDirectives, &asString); err == nil {
+		switch asString {
+		case "off":
+			severity := rule.SeverityOff
+			lo.ReportUnusedDisableDirectives = &severity
+			return nil
+		case "warn":
+			severity := rule.SeverityWarning
+			lo.ReportUnusedDisableDirectives = &severity
+			return nil
+		case "error":
+			severity := rule.SeverityError
+			lo.ReportUnusedDisableDirectives = &severity
+			return nil
+		}
+		return fmt.Errorf("key \"linterOptions.reportUnusedDisableDirectives\": invalid value %q; expected a boolean, \"off\", \"warn\", or \"error\"", asString)
+	}
+
+	return errors.New("key \"linterOptions.reportUnusedDisableDirectives\": expected a boolean, \"off\", \"warn\", or \"error\"")
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -699,6 +767,7 @@ type MergedConfig struct {
 	Rules           map[string]*RuleConfig
 	Settings        Settings
 	LanguageOptions *LanguageOptions
+	LinterOptions   *LinterOptions
 	Plugins         map[string]struct{}
 }
 
@@ -834,6 +903,12 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 
 		// 7. LanguageOptions: deep merge
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+
+		// 8. LinterOptions: later entries override earlier ones (single
+		// scalar setting, no deep merge needed).
+		if entry.LinterOptions != nil {
+			merged.LinterOptions = entry.LinterOptions
+		}
 	}
 
 	// No entry matched this file — do not lint it
