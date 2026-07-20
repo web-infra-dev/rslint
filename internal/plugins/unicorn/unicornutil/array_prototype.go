@@ -15,7 +15,7 @@ func IsArrayPrototypeProperty(node *ast.Node, property string) bool {
 	}
 
 	propertyAccess := node.AsPropertyAccessExpression()
-	if propertyAccess == nil || propertyAccess.QuestionDotToken != nil ||
+	if propertyAccess == nil || ast.IsOptionalChainRoot(node) ||
 		!isIdentifierNamed(propertyAccess.Name(), property) {
 		return false
 	}
@@ -32,7 +32,7 @@ func IsArrayPrototypeProperty(node *ast.Node, property string) bool {
 		return false
 	}
 	prototypeAccess := object.AsPropertyAccessExpression()
-	if prototypeAccess == nil || prototypeAccess.QuestionDotToken != nil ||
+	if prototypeAccess == nil || ast.IsOptionalChainRoot(object) ||
 		!isIdentifierNamed(prototypeAccess.Name(), "prototype") {
 		return false
 	}

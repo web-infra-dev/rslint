@@ -9,7 +9,8 @@ import (
 
 // NodeMatchesPath mirrors unicorn's isNodeMatchesNameOrPath helper. It accepts
 // dotted, non-computed, non-optional paths rooted at an identifier, this,
-// super, or a meta property.
+// super, or a meta property. ast.IsDottedName is intentionally not used
+// because it also accepts property accesses containing optional-chain links.
 func NodeMatchesPath(node *ast.Node, path string) bool {
 	parts := strings.Split(strings.TrimSpace(path), ".")
 	return nodeMatchesPathParts(ast.SkipParentheses(node), parts)
@@ -46,7 +47,7 @@ func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
 	}
 
 	propertyAccess := node.AsPropertyAccessExpression()
-	if propertyAccess == nil || propertyAccess.QuestionDotToken != nil {
+	if propertyAccess == nil || ast.IsOptionalChainRoot(node) {
 		return false
 	}
 	name := propertyAccess.Name()

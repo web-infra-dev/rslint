@@ -3,14 +3,11 @@ package prefer_array_flat
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -21,8 +18,6 @@ const messageID = "prefer-array-flat"
 var (
 	//go:embed prefer_array_flat.schema.json
 	schemaJSON []byte
-
-	decimalIntegerPattern = regexp.MustCompile(`^(?:0|0[0-7]*[89][0-9]*|[1-9](?:_?[0-9])*)$`)
 
 	lodashFlattenFunctions = []string{
 		"_.flatten",
@@ -46,33 +41,6 @@ func message(description string) rule.RuleMessage {
 	}
 }
 
-func simpleParameterIdentifier(parameter *ast.Node) *ast.Node {
-	if parameter == nil || parameter.Kind != ast.KindParameter {
-		return nil
-	}
-	declaration := parameter.AsParameterDeclaration()
-	if declaration == nil || declaration.DotDotDotToken != nil || declaration.Initializer != nil {
-		return nil
-	}
-	name := declaration.Name()
-	if name == nil || !ast.IsIdentifier(name) {
-		return nil
-	}
-	return name
-}
-
-func isSameIdentifier(left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	return left != nil && right != nil &&
-		ast.IsIdentifier(left) && ast.IsIdentifier(right) &&
-		left.AsIdentifier().Text == right.AsIdentifier().Text
-}
-
-func isAsync(node *ast.Node) bool {
-	return utils.IncludesModifier(node, ast.KindAsyncKeyword)
-}
-
 func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool) {
 	oneArgument := 1
 	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
@@ -89,7 +57,7 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 		return flattenMatch{}, false
 	}
 	callback := ast.SkipParentheses(arguments[0])
-	if callback == nil || callback.Kind != ast.KindArrowFunction || isAsync(callback) {
+	if callback == nil || !ast.IsArrowFunction(callback) || ast.IsAsyncFunction(callback) {
 		return flattenMatch{}, false
 	}
 
@@ -98,8 +66,8 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 		arrow.Body == nil {
 		return flattenMatch{}, false
 	}
-	parameter := simpleParameterIdentifier(arrow.Parameters.Nodes[0])
-	if parameter == nil || !isSameIdentifier(parameter, arrow.Body) ||
+	parameter := unicornutil.PlainParameterIdentifier(arrow.Parameters.Nodes[0])
+	if parameter == nil || !unicornutil.IsSameIdentifier(parameter, arrow.Body) ||
 		isObviouslyNonArrayFlatMapReceiver(call.Object, ctx) {
 		return flattenMatch{}, false
 	}
@@ -107,7 +75,7 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 	return flattenMatch{
 		array:       call.Object,
 		description: "Array#flatMap()",
-		optional:    call.Callee.AsPropertyAccessExpression().QuestionDotToken != nil,
+		optional:    ast.IsOptionalChainRoot(call.Callee),
 	}, true
 }
 
@@ -130,7 +98,7 @@ func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
 	}
 
 	callback := ast.SkipParentheses(arguments[0])
-	if callback == nil || callback.Kind != ast.KindArrowFunction || isAsync(callback) {
+	if callback == nil || !ast.IsArrowFunction(callback) || ast.IsAsyncFunction(callback) {
 		return flattenMatch{}, false
 	}
 	arrow := callback.AsArrowFunction()
@@ -139,8 +107,8 @@ func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
 		return flattenMatch{}, false
 	}
 
-	firstParameter := simpleParameterIdentifier(arrow.Parameters.Nodes[0])
-	secondParameter := simpleParameterIdentifier(arrow.Parameters.Nodes[1])
+	firstParameter := unicornutil.PlainParameterIdentifier(arrow.Parameters.Nodes[0])
+	secondParameter := unicornutil.PlainParameterIdentifier(arrow.Parameters.Nodes[1])
 	if firstParameter == nil || secondParameter == nil {
 		return flattenMatch{}, false
 	}
@@ -154,7 +122,7 @@ func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
 	return flattenMatch{
 		array:       call.Object,
 		description: "Array#reduce()",
-		optional:    call.Callee.AsPropertyAccessExpression().QuestionDotToken != nil,
+		optional:    ast.IsOptionalChainRoot(call.Callee),
 	}, true
 }
 
@@ -170,8 +138,8 @@ func matchesConcatReducer(body *ast.Node, firstParameter *ast.Node, secondParame
 	arguments := body.Arguments()
 	return len(arguments) == 1 &&
 		!ast.IsSpreadElement(arguments[0]) &&
-		isSameIdentifier(firstParameter, call.Object) &&
-		isSameIdentifier(secondParameter, arguments[0])
+		unicornutil.IsSameIdentifier(firstParameter, call.Object) &&
+		unicornutil.IsSameIdentifier(secondParameter, arguments[0])
 }
 
 func matchesSpreadReducer(body *ast.Node, firstParameter *ast.Node, secondParameter *ast.Node) bool {
@@ -188,7 +156,7 @@ func matchesSpreadReducer(body *ast.Node, firstParameter *ast.Node, secondParame
 		if element == nil || element.Kind != ast.KindSpreadElement {
 			return false
 		}
-		if !isSameIdentifier(parameters[index], element.AsSpreadElement().Expression) {
+		if !unicornutil.IsSameIdentifier(parameters[index], element.AsSpreadElement().Expression) {
 			return false
 		}
 	}
@@ -272,7 +240,8 @@ func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, boo
 	}
 	call := node.AsCallExpression()
 	arguments := node.Arguments()
-	if call.QuestionDotToken != nil || len(arguments) != 1 || ast.IsSpreadElement(arguments[0]) {
+	if ast.IsOptionalChainRoot(node) || len(arguments) != 1 ||
+		ast.IsSpreadElement(arguments[0]) {
 		return flattenMatch{}, false
 	}
 
@@ -288,32 +257,15 @@ func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, boo
 	return flattenMatch{}, false
 }
 
-func getConstVariableInitializer(node *ast.Node, ctx rule.RuleContext) *ast.Node {
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsIdentifier(node) || ctx.TypeChecker == nil {
-		return nil
-	}
-
-	symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
-	if symbol == nil || len(symbol.Declarations) != 1 {
-		return nil
-	}
-	declaration := symbol.Declarations[0]
-	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration ||
-		declaration.Parent == nil ||
-		utils.GetVarDeclListKind(declaration.Parent) != "const" {
-		return nil
-	}
-	return declaration.AsVariableDeclaration().Initializer
-}
-
+// Upstream checks only whether the first Unicode rune is an uppercase letter;
+// this is not intended to validate the rest of a PascalCase name.
 func isPascalCaseIdentifier(node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
 	if node == nil || !ast.IsIdentifier(node) {
 		return false
 	}
 	first, _ := utf8.DecodeRuneInString(node.AsIdentifier().Text)
-	return first != utf8.RuneError && unicode.IsUpper(first)
+	return first != utf8.RuneError && unicode.Is(unicode.Lu, first)
 }
 
 func isDefinitelyArrayExpression(node *ast.Node) bool {
@@ -321,10 +273,10 @@ func isDefinitelyArrayExpression(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	if node.Kind == ast.KindArrayLiteralExpression {
+	if ast.IsArrayLiteralExpression(node) {
 		return true
 	}
-	if node.Kind != ast.KindNewExpression {
+	if !ast.IsNewExpression(node) {
 		return false
 	}
 	callee := ast.SkipParentheses(node.AsNewExpression().Expression)
@@ -362,62 +314,24 @@ func isDefinitelyNonArrayExpression(node *ast.Node) bool {
 }
 
 func isObviouslyNonArrayFlatMapReceiver(node *ast.Node, ctx rule.RuleContext) bool {
-	initializer := getConstVariableInitializer(node, ctx)
+	// Deliberately keep Unicorn's syntactic classification. Following only a
+	// single const initializer avoids broadening reports based on inferred
+	// TypeScript types.
+	initializer := utils.GetConstVariableInitializer(node, ctx.TypeChecker)
 	isConstArray := initializer != nil && isDefinitelyArrayExpression(initializer)
 	isConstNonArray := initializer != nil && isDefinitelyNonArrayExpression(initializer)
 	return (isPascalCaseIdentifier(node) && !isConstArray) || isConstNonArray
 }
 
-func countCommentsInside(comments []*ast.CommentRange, textRange core.TextRange) int {
-	count := 0
-	for _, comment := range comments {
-		if comment.Pos() >= textRange.Pos() && comment.End() <= textRange.End() {
-			count++
-		}
-	}
-	return count
-}
-
 func canFix(node *ast.Node, array *ast.Node, ctx rule.RuleContext) bool {
 	nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-	// ESTree drops parentheses, so comments inside a parenthesized argument but
-	// outside the argument expression suppress the upstream fix.
 	arrayRange := utils.TrimNodeTextRange(ctx.SourceFile, ast.SkipParentheses(array))
 	comments := ctx.Comments.All()
-	return countCommentsInside(comments, nodeRange) ==
-		countCommentsInside(comments, arrayRange)
-}
-
-func shouldParenthesizeMemberObject(node *ast.Node, sourceText string) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return false
-	}
-
-	switch node.Kind {
-	case ast.KindIdentifier,
-		ast.KindPropertyAccessExpression,
-		ast.KindElementAccessExpression,
-		ast.KindCallExpression,
-		ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindTemplateExpression,
-		ast.KindThisKeyword,
-		ast.KindArrayLiteralExpression,
-		ast.KindFunctionExpression,
-		ast.KindStringLiteral,
-		ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral,
-		ast.KindTrueKeyword,
-		ast.KindFalseKeyword,
-		ast.KindNullKeyword:
-		return false
-	case ast.KindNewExpression:
-		return node.AsNewExpression().Arguments == nil
-	case ast.KindNumericLiteral:
-		return decimalIntegerPattern.MatchString(sourceText)
-	default:
-		return true
-	}
+	// Upstream fixes only when every comment in the matched call belongs to the
+	// selected array expression. Since array is nested in node, check the two
+	// surrounding spans. Skip its parentheses because ESTree drops them.
+	return !utils.HasCommentInSpan(comments, nodeRange.Pos(), arrayRange.Pos()) &&
+		!utils.HasCommentInSpan(comments, arrayRange.End(), nodeRange.End())
 }
 
 func replacementText(sourceFile *ast.SourceFile, match flattenMatch) string {
@@ -426,7 +340,7 @@ func replacementText(sourceFile *ast.SourceFile, match flattenMatch) string {
 	if match.switchToArray {
 		fixed = "[" + fixed + "]"
 	} else if match.array.Kind != ast.KindParenthesizedExpression &&
-		shouldParenthesizeMemberObject(match.array, arrayText) {
+		unicornutil.ShouldAddParenthesesToMemberExpressionObject(sourceFile, match.array) {
 		fixed = "(" + fixed + ")"
 	}
 	if match.optional {
@@ -435,152 +349,16 @@ func replacementText(sourceFile *ast.SourceFile, match flattenMatch) string {
 	return fixed + ".flat()"
 }
 
-func outerParenthesizedNode(node *ast.Node) *ast.Node {
-	outer := node
-	for outer != nil && outer.Parent != nil &&
-		outer.Parent.Kind == ast.KindParenthesizedExpression {
-		parent := outer.Parent.AsParenthesizedExpression()
-		if parent == nil || parent.Expression != outer {
-			break
-		}
-		outer = outer.Parent
-	}
-	return outer
-}
-
-func adjacentWordBefore(source string, position int) string {
-	if position <= 0 || position > len(source) ||
-		source[position-1] < 'a' || source[position-1] > 'z' {
-		return ""
-	}
-	start := position - 1
-	for start > 0 && source[start-1] >= 'a' && source[start-1] <= 'z' {
-		start--
-	}
-	return source[start:position]
-}
-
-func adjacentWordAfter(source string, position int) string {
-	if position < 0 || position >= len(source) ||
-		source[position] < 'a' || source[position] > 'z' {
-		return ""
-	}
-	end := position + 1
-	for end < len(source) && source[end] >= 'a' && source[end] <= 'z' {
-		end++
-	}
-	return source[position:end]
-}
-
-func isProblematicKeyword(word string) bool {
-	if word == "" {
-		return false
-	}
-	kind := scanner.StringToToken(word)
-	return (kind >= ast.KindFirstKeyword && kind <= ast.KindLastKeyword) ||
-		word == "of" || word == "await"
-}
-
-func keywordSpacingFixes(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
-	outer := outerParenthesizedNode(node)
-	textRange := utils.TrimNodeTextRange(sourceFile, outer)
-	source := sourceFile.Text()
-	var fixes []rule.RuleFix
-	if isProblematicKeyword(adjacentWordBefore(source, textRange.Pos())) {
-		fixes = append(fixes, rule.RuleFixReplaceRange(
-			core.NewTextRange(textRange.Pos(), textRange.Pos()),
-			" ",
-		))
-	}
-	if isProblematicKeyword(adjacentWordAfter(source, textRange.End())) {
-		fixes = append(fixes, rule.RuleFixReplaceRange(
-			core.NewTextRange(textRange.End(), textRange.End()),
-			" ",
-		))
-	}
-	return fixes
-}
-
-func startsWithSemicolonHazard(text string) bool {
-	if text == "" {
-		return false
-	}
-	return strings.ContainsRune("[(/`+-*,.", rune(text[0]))
-}
-
-func previousTokenKind(sourceFile *ast.SourceFile, position int) ast.Kind {
-	token := ast.KindUnknown
-	s := scanner.GetScannerForSourceFile(sourceFile, 0)
-	for s.Token() != ast.KindEndOfFile && s.TokenStart() < position {
-		if s.TokenEnd() <= position {
-			token = s.Token()
-		}
-		s.Scan()
-	}
-	return token
-}
-
-func isEmbeddedStatement(statement *ast.Node) bool {
-	if statement == nil || statement.Parent == nil {
-		return false
-	}
-	parent := statement.Parent
-	switch parent.Kind {
-	case ast.KindIfStatement:
-		ifStatement := parent.AsIfStatement()
-		return ifStatement.ThenStatement == statement || ifStatement.ElseStatement == statement
-	case ast.KindForStatement:
-		return parent.AsForStatement().Statement == statement
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		return parent.AsForInOrOfStatement().Statement == statement
-	case ast.KindWhileStatement:
-		return parent.AsWhileStatement().Statement == statement
-	case ast.KindDoStatement:
-		return parent.AsDoStatement().Statement == statement
-	case ast.KindWithStatement:
-		return parent.AsWithStatement().Statement == statement
-	default:
-		return false
-	}
-}
-
-func needsSemicolonBefore(sourceFile *ast.SourceFile, node *ast.Node, fixed string) bool {
-	if !startsWithSemicolonHazard(fixed) || outerParenthesizedNode(node) != node ||
-		node.Parent == nil || node.Parent.Kind != ast.KindExpressionStatement ||
-		isEmbeddedStatement(node.Parent) {
-		return false
-	}
-
-	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
-	switch previousTokenKind(sourceFile, nodeRange.Pos()) {
-	case ast.KindCloseBracketToken,
-		ast.KindCloseParenToken,
-		ast.KindIdentifier,
-		ast.KindStringLiteral,
-		ast.KindNumericLiteral,
-		ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral,
-		ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindTemplateTail,
-		ast.KindTrueKeyword,
-		ast.KindFalseKeyword,
-		ast.KindNullKeyword:
-		return true
-	default:
-		return false
-	}
-}
-
 func buildFixes(node *ast.Node, match flattenMatch, ctx rule.RuleContext) []rule.RuleFix {
 	fixed := replacementText(ctx.SourceFile, match)
-	if needsSemicolonBefore(ctx.SourceFile, node, fixed) {
+	if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, node, fixed) {
 		fixed = ";" + fixed
 	}
 
 	fixes := []rule.RuleFix{
 		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(ctx.SourceFile, node), fixed),
 	}
-	return append(fixes, keywordSpacingFixes(ctx.SourceFile, node)...)
+	return append(fixes, unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, node)...)
 }
 
 func parseFunctions(options []any) []string {

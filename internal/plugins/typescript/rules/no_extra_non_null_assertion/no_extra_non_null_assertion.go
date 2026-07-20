@@ -4,39 +4,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-// hasOwnQuestionDotToken checks if a node has its own ?. token (not inherited through chain).
-func hasOwnQuestionDotToken(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		return node.AsPropertyAccessExpression().QuestionDotToken != nil
-	case ast.KindElementAccessExpression:
-		return node.AsElementAccessExpression().QuestionDotToken != nil
-	case ast.KindCallExpression:
-		return node.AsCallExpression().QuestionDotToken != nil
-	}
-	return false
-}
-
-// walkUpParens walks up through ParenthesizedExpression nodes to find the effective parent.
-func walkUpParens(node *ast.Node) *ast.Node {
-	current := node.Parent
-	for current != nil && current.Kind == ast.KindParenthesizedExpression {
-		current = current.Parent
-	}
-	return current
-}
-
-// walkUpParensFromNode walks up from a node through ParenthesizedExpression nodes,
-// returning the outermost ParenthesizedExpression or the node itself.
-func walkUpParensFromNode(node *ast.Node) *ast.Node {
-	current := node
-	for current.Parent != nil && current.Parent.Kind == ast.KindParenthesizedExpression {
-		current = current.Parent
-	}
-	return current
-}
 
 var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-extra-non-null-assertion",
@@ -55,14 +24,13 @@ var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindNonNullExpression: func(node *ast.Node) {
-				// Walk up through parens to find the effective parent
-				effectiveParent := walkUpParens(node)
-				if effectiveParent == nil {
+				// Keep the outermost parentheses as the child seen by the
+				// containing expression, matching ESTree's transparent parens.
+				wrappedNode := utils.OutermostParenthesizedExpression(node)
+				if wrappedNode == nil || wrappedNode.Parent == nil {
 					return
 				}
-
-				// The node wrapped in parens (what the effective parent sees as child)
-				wrappedNode := walkUpParensFromNode(node)
+				effectiveParent := wrappedNode.Parent
 
 				// Case 1: TSNonNullExpression > TSNonNullExpression (e.g., foo!! or (foo!)!)
 				if effectiveParent.Kind == ast.KindNonNullExpression {
@@ -78,7 +46,8 @@ var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
 					effectiveParent.Kind == ast.KindCallExpression
 
 				if isOptionalChainParent {
-					if hasOwnQuestionDotToken(effectiveParent) && effectiveParent.Expression() == wrappedNode {
+					if ast.IsOptionalChainRoot(effectiveParent) &&
+						effectiveParent.Expression() == wrappedNode {
 						reportExtraNonNull(node)
 						return
 					}
