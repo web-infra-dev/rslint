@@ -62,6 +62,47 @@ import * as foo from 'foo';
 					"types": "never",
 				},
 			},
+			// Reference-directive-looking text inside a multi-line block comment
+			{
+				Code: `
+/*
+/// <reference types="foo" />
+*/
+import * as foo from 'foo';
+`,
+				Options: map[string]interface{}{
+					"lib":   "never",
+					"path":  "never",
+					"types": "never",
+				},
+			},
+			// Reference-directive-looking text inside a template literal (not a real comment)
+			{
+				Code: "const content = `/// <reference types=\"foo\" />`;\nimport * as foo from 'foo';\n",
+				Options: map[string]interface{}{
+					"lib":   "never",
+					"path":  "never",
+					"types": "never",
+				},
+			},
+			// Reference-directive-looking text inside a tagged template literal
+			{
+				Code: "const content = dedent`/// <reference types=\"foo\" />`;\nimport * as foo from 'foo';\n",
+				Options: map[string]interface{}{
+					"lib":   "never",
+					"path":  "never",
+					"types": "never",
+				},
+			},
+			// Reference-directive-looking text inside a regular string literal
+			{
+				Code: `const content = '/// <reference path="foo" />';`,
+				Options: map[string]interface{}{
+					"lib":   "never",
+					"path":  "never",
+					"types": "never",
+				},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Triple-slash types with prefer-import (ES6 import)
@@ -114,6 +155,21 @@ import * as foo from 'foo';
 				Code: `/// <reference lib="foo" />`,
 				Options: map[string]interface{}{
 					"lib": "never",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "tripleSlashReference",
+						Line:      1,
+						Column:    1,
+					},
+				},
+			},
+			// A real triple-slash reference is still reported when a lookalike
+			// string literal appears elsewhere in the same file.
+			{
+				Code: "/// <reference path=\"foo\" />\nconst content = '/// <reference path=\"bar\" />';\n",
+				Options: map[string]interface{}{
+					"path": "never",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
