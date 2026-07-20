@@ -254,10 +254,45 @@ func hasAssignment(definition *ast.Node, sym *ast.Symbol, writeRefs map[*ast.Sym
 	return false
 }
 
+// isInsideLoop checks whether node is lexically inside a loop construct (for,
+// for-in, for-of, while, do-while) without crossing a function boundary first.
+// Mirrors ESLint's astUtils.isInLoop, used to decide whether a self-referencing
+// accumulator assignment (`x = f(x)` inside a loop) can still be observed on a
+// later iteration — and so counts as a real use rather than self-modification.
+func isInsideLoop(node *ast.Node) bool {
+	for current := node; current != nil && !ast.IsFunctionLike(current); current = current.Parent {
+		switch current.Kind {
+		case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
+			ast.KindWhileStatement, ast.KindDoStatement:
+			return true
+		}
+	}
+	return false
+}
+
+// nearestVariableScope returns the nearest enclosing function-like node containing
+// node, or nil if node sits at the top level (module/global scope). Blocks don't
+// introduce a new variable scope, matching escope's notion of a "variable scope".
+func nearestVariableScope(node *ast.Node) *ast.Node {
+	for current := node.Parent; current != nil; current = current.Parent {
+		if ast.IsFunctionLike(current) {
+			return current
+		}
+	}
+	return nil
+}
+
 // isSelfModifyingReference checks if a read reference to a variable is ONLY
 // used to modify the same variable, with the result not used elsewhere.
 // Examples: `a = a + 1;`, `a++;`, `a += 1;` (as statements, not sub-expressions).
-func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
+//
+// declNode anchors the variable's own declaration site. A self-referencing
+// assignment (`x = f(x)`) does NOT count as self-modification — i.e. it IS a
+// real use — when the assignment happens in a different function scope than
+// the declaration, or inside a loop: the written value can be observed later
+// (a closure capturing it, or the next loop iteration), so it's a genuine
+// read-modify-write accumulator rather than a discarded self-reference.
+func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.Checker, declNode *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
@@ -309,6 +344,9 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.
 			if bin != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
 				lhsSym := checker.GetSymbolAtLocation(bin.Left)
 				if lhsSym == sym {
+					if declNode != nil && (nearestVariableScope(p) != nearestVariableScope(declNode) || isInsideLoop(p)) {
+						return false
+					}
 					return isUnusedExpression(p)
 				}
 				break
@@ -1696,7 +1734,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			filteredUsages := []*ast.Node{}
 			for _, usage := range usageNodes {
 				if usage.Pos() != varInfo.Variable.Pos() &&
-					!isSelfModifyingReference(usage, sym, ctx.TypeChecker) &&
+					!isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode) &&
 					!isInsideAnyOwnDeclaration(usage, allDecls) {
 					filteredUsages = append(filteredUsages, usage)
 				}
