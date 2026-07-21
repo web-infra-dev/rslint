@@ -41,6 +41,9 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{Code: "switch (foo) { case 1: let a; break; case 2: { let a; } }"},
 			{Code: "for (let x in obj) { let x; }"},
 			{Code: "for (let x of obj) { let x; }"},
+			// Annex B functions nested under `if` / labels bind to the nearest
+			// block, while `var` inside that block still belongs to the program.
+			{Code: "{ var a; if (ok) function a() {} }"},
 
 			// ---- Dimension 4: graceful degradation around empty forms ----
 			{Code: "{}"},
@@ -76,6 +79,48 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{Code: "export {};\n/* globals a */ var a = 0;"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Annex B: nested function declarations use their true scope ----
+			{
+				Code: "var a;\nif (ok) function a() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 2, 18),
+				},
+			},
+			{
+				Code: "var a; if (ok) use(); else function a() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 1, 37),
+				},
+			},
+			{
+				Code: "var a; outer: inner: function a() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 1, 31),
+				},
+			},
+			{
+				Code: "function outer() {\n  var a;\n  if (ok) function a() {}\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 3, 20),
+				},
+			},
+			{
+				Code: "{\n  let a;\n  outer: if (ok) function a() {}\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 3, 27),
+				},
+			},
+			{
+				Code: "switch (value) {\ncase 0:\n  let a;\n  if (ok) function a() {}\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 4, 20),
+				},
+			},
+
+			// Deeply nested `var` declarations still resolve to the program's
+			// variable scope rather than any intervening statement or block.
+			invalidRedeclared("var deep;\ntry { label: if (ok) { switch (value) { case 0: var deep; } } } catch (error) {}", "deep", 2, 53),
+
 			// ---- Dimension 4: destructuring binding names all participate ----
 			{
 				Code: "var {a, b: a} = obj;",
@@ -149,6 +194,10 @@ func TestNoRedeclareExtras(t *testing.T) {
 
 			// Locks in upstream findVariablesInScope() detail arm: builtin declaration is first, so user syntax reports builtin-specific message.
 			invalidBuiltin("var Array = 0;", "Array", 1, 5),
+			// ESLint core treats parser-provided type declarations as variables;
+			// only the TypeScript extension excludes pure type-space declarations.
+			invalidBuiltin("interface Object {}", "Object", 1, 11),
+			invalidBuiltin("type Array = unknown;", "Array", 1, 6),
 
 			// Locks in upstream checkForBlock() arm: non-function blocks are checked as their own lexical scope.
 			invalidRedeclared("{\n  const a = 1;\n  const a = 2;\n}", "a", 3, 9),

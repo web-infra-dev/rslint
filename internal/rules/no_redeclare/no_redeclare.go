@@ -22,7 +22,7 @@ const (
 	builtinGlobalsTypeScriptLibs
 )
 
-func parseOptionsWith(opts any, defaults options, allowIgnoreDeclarationMerge bool) options {
+func parseOptionsWith(opts []any, defaults options, allowIgnoreDeclarationMerge bool) options {
 	result := defaults
 	optsMap := utils.GetOptionsMap(opts)
 	if optsMap == nil {
@@ -58,9 +58,9 @@ func RunTSESLint(ctx rule.RuleContext, opts []any) rule.RuleListeners {
 
 func runWithOptions(defaults options, allowIgnoreDeclarationMerge bool, builtinMode builtinGlobalsMode) func(rule.RuleContext, []any) rule.RuleListeners {
 	return func(ctx rule.RuleContext, opts []any) rule.RuleListeners {
-		o := parseOptionsWith(rule.LegacyUnwrapOptions(opts), defaults, allowIgnoreDeclarationMerge)
+		o := parseOptionsWith(opts, defaults, allowIgnoreDeclarationMerge)
 
-		analyzeHoist := func(bodyNode *ast.Node, params []*ast.Node, isProgram bool) {
+		analyzeVariableScope := func(bodyNode *ast.Node, params []*ast.Node, owners declarationScopeOwners, isProgram bool) {
 			s := newScopeDecls()
 			for _, p := range params {
 				if p == nil || p.Name() == nil {
@@ -70,57 +70,68 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge bool, builtinM
 					s.addSyntax(name, id, ast.KindParameter)
 				})
 			}
-			bodyNode.ForEachChild(func(child *ast.Node) bool {
-				collect(child, s, true)
-				return false
-			})
+			collectScopeDeclarations(bodyNode, s, owners)
 			reportScope(ctx, s, o, isProgram, builtinMode)
+		}
+
+		analyzeFunctionScope := func(node *ast.Node) {
+			body := node.Body()
+			if body == nil || body.Kind != ast.KindBlock {
+				// Expression-bodied arrows cannot contain declarations, and
+				// bodyless declarations do not create a runtime function scope.
+				return
+			}
+			analyzeVariableScope(body, node.Parameters(), declarationScopeOwners{
+				block:    node,
+				variable: node,
+			}, false)
 		}
 
 		// The linter never fires a KindSourceFile listener, so run the
 		// program-scope analysis eagerly here.
 		if ctx.SourceFile != nil {
-			analyzeHoist(ctx.SourceFile.AsNode(), nil, true)
+			sourceFileNode := ctx.SourceFile.AsNode()
+			analyzeVariableScope(sourceFileNode, nil, declarationScopeOwners{
+				block:    sourceFileNode,
+				variable: sourceFileNode,
+			}, true)
 		}
 
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindFunctionExpression: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindArrowFunction: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindMethodDeclaration: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindConstructor: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindGetAccessor: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
-			ast.KindSetAccessor: func(node *ast.Node) {
-				analyzeFunctionLike(node, analyzeHoist)
-			},
+			ast.KindFunctionDeclaration: analyzeFunctionScope,
+			ast.KindFunctionExpression:  analyzeFunctionScope,
+			ast.KindArrowFunction:       analyzeFunctionScope,
+			ast.KindMethodDeclaration:   analyzeFunctionScope,
+			ast.KindConstructor:         analyzeFunctionScope,
+			ast.KindGetAccessor:         analyzeFunctionScope,
+			ast.KindSetAccessor:         analyzeFunctionScope,
 			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
 				decl := node.AsClassStaticBlockDeclaration()
 				if decl == nil || decl.Body == nil || decl.Body.Kind != ast.KindBlock {
 					return
 				}
-				analyzeHoist(decl.Body, nil, false)
+				analyzeVariableScope(decl.Body, nil, declarationScopeOwners{
+					block:    node,
+					variable: node,
+				}, false)
 			},
-			ast.KindModuleBlock: func(node *ast.Node) {
-				analyzeHoist(node, nil, false)
+			ast.KindModuleDeclaration: func(node *ast.Node) {
+				declaration := node.AsModuleDeclaration()
+				if declaration == nil || declaration.Body == nil {
+					return
+				}
+				owners := declarationScopeOwners{block: node}
+				if declaration.Body.Kind == ast.KindModuleBlock {
+					owners.variable = declaration.Body
+				}
+				analyzeVariableScope(declaration.Body, nil, owners, false)
 			},
 			ast.KindBlock: func(node *ast.Node) {
 				parent := node.Parent
 				if parent == nil {
 					return
 				}
-				if isBlockBodyOwner(parent) {
+				if ast.IsFunctionLikeOrClassStaticBlockDeclaration(parent) {
 					return
 				}
 				analyzeBlockScope(ctx, node, o, builtinMode)
@@ -169,31 +180,28 @@ func (s *scopeDecls) addSyntax(name string, id *ast.Node, parentKind ast.Kind) {
 	s.add(name, declInfo{id: id, parentKind: parentKind})
 }
 
-// isBlockBodyOwner reports whether `parent` treats its Block child as the
-// body of a scope that we analyze through a dedicated listener (function-like
-// or class static block). In those cases the generic Block listener must
-// not re-analyze the same body.
-func isBlockBodyOwner(parent *ast.Node) bool {
-	return ast.IsFunctionLikeOrClassStaticBlockDeclaration(parent)
+// declarationScopeOwners identifies both scope systems that declarations use:
+// lexical declarations belong to a tsgo block-scope container, while `var`
+// declarations belong to an enclosing function, static block, module, or file.
+// Keeping both owners explicit lets one traversal handle arbitrary statement
+// nesting without approximating scope from tree depth.
+type declarationScopeOwners struct {
+	block    *ast.Node
+	variable *ast.Node
 }
 
-func analyzeFunctionLike(node *ast.Node, analyzeHoist func(*ast.Node, []*ast.Node, bool)) {
-	body := node.Body()
-	if body == nil || body.Kind != ast.KindBlock {
-		// Expression-bodied arrows have no nested declarations beyond params.
-		// Duplicate parameter names are already a parse error, so there is
-		// nothing useful to report for that case.
-		return
-	}
-	analyzeHoist(body, node.Parameters(), false)
+func (owners declarationScopeOwners) ownsBlockScoped(node *ast.Node) bool {
+	return owners.block != nil && ast.GetEnclosingBlockScopeContainer(node) == owners.block
 }
 
-// collect walks a subtree accumulating declarations into the enclosing hoist
-// scope `s`. When `immediate` is true, every declaration kind is recorded;
-// once we descend into a nested block/loop/switch, only `var` declarations
-// continue to hoist. Recursion stops at function-like boundaries (separate
-// scopes) and at type-only nodes that cannot introduce value bindings.
-func collect(node *ast.Node, s *scopeDecls, immediate bool) {
+func (owners declarationScopeOwners) ownsVariable(node *ast.Node) bool {
+	return owners.variable != nil && utils.FindEnclosingScope(node) == owners.variable
+}
+
+// collectScopeDeclarations walks a scope subtree in source order and records
+// only declarations owned by the requested scope. Function/class bodies are
+// separate declaration regions and are handled by their own listeners.
+func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationScopeOwners) {
 	if node == nil {
 		return
 	}
@@ -203,105 +211,72 @@ func collect(node *ast.Node, s *scopeDecls, immediate bool) {
 		if varStmt == nil || varStmt.DeclarationList == nil {
 			return
 		}
-		isVar := utils.IsVarKeyword(varStmt.DeclarationList)
-		if !isVar && !immediate {
-			return
+		declarationList := varStmt.DeclarationList
+		if (utils.IsVarKeyword(declarationList) && owners.ownsVariable(declarationList)) ||
+			(!utils.IsVarKeyword(declarationList) && owners.ownsBlockScoped(declarationList)) {
+			addVariableDeclarations(declarationList, s)
 		}
-		addVariableDeclarations(varStmt.DeclarationList, s)
 		return
 
 	case ast.KindVariableDeclarationList:
 		// Appears as a ForStatement / ForIn / ForOf initializer.
-		isVar := utils.IsVarKeyword(node)
-		if !isVar && !immediate {
-			return
+		if (utils.IsVarKeyword(node) && owners.ownsVariable(node)) ||
+			(!utils.IsVarKeyword(node) && owners.ownsBlockScoped(node)) {
+			addVariableDeclarations(node, s)
 		}
-		addVariableDeclarations(node, s)
 		return
 
 	case ast.KindFunctionDeclaration:
-		if !immediate {
-			return
-		}
 		// A bodyless FunctionDeclaration is a TypeScript overload signature
 		// (upstream `TSDeclareFunction`). ESLint's rule explicitly filters
 		// these out before counting declarations.
-		if node.Body() == nil {
-			return
-		}
-		if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, ast.KindFunctionDeclaration)
+		if node.Body() != nil && owners.ownsBlockScoped(node) {
+			addNamedDeclaration(node, s)
 		}
 		return
 
 	case ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration:
-		if !immediate {
-			return
-		}
-		if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, node.Kind)
+		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
+		if owners.ownsBlockScoped(node) {
+			addNamedDeclaration(node, s)
 		}
 		return
 
-	case ast.KindModuleDeclaration:
-		if !immediate {
-			return
+	case ast.KindImportDeclaration, ast.KindImportEqualsDeclaration:
+		if owners.ownsBlockScoped(node) {
+			addImportDeclarations(node, s)
 		}
-		if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, ast.KindModuleDeclaration)
-		}
-		return
-
-	case ast.KindImportDeclaration:
-		if !immediate {
-			return
-		}
-		addImportDeclarations(node, s)
-		return
-
-	case ast.KindImportEqualsDeclaration:
-		if !immediate {
-			return
-		}
-		addImportDeclarations(node, s)
-		return
-
-	// Function-like and class-like nodes introduce their own scopes — never
-	// descend into their interior while collecting for the enclosing scope.
-	case ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindConstructor,
-		ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindClassExpression, ast.KindClassStaticBlockDeclaration:
 		return
 	}
 
-	// Everything else is either a wrapper statement (if / try / while / with /
-	// labeled / switch case / for / block, …) or an expression. Recurse and
-	// mark the inner walk as non-immediate so only `var` continues to hoist.
+	if ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) || ast.IsClassLike(node) {
+		return
+	}
+	// Block-only analyses do not need to enter a nested block-scope container:
+	// declarations there belong to its listener, and there is no `var` owner
+	// whose declarations would need to hoist through the boundary.
+	if owners.variable == nil && node != owners.block && ast.IsBlockScope(node, node.Parent) {
+		return
+	}
+
 	node.ForEachChild(func(child *ast.Node) bool {
-		collect(child, s, false)
+		collectScopeDeclarations(child, s, owners)
 		return false
 	})
 }
 
+func addNamedDeclaration(node *ast.Node, s *scopeDecls) {
+	name := ast.GetNameOfDeclaration(node)
+	if name != nil && name.Kind == ast.KindIdentifier {
+		s.addSyntax(name.AsIdentifier().Text, name, node.Kind)
+	}
+}
+
 func addVariableDeclarations(declList *ast.Node, s *scopeDecls) {
-	list := declList.AsVariableDeclarationList()
-	if list == nil || list.Declarations == nil {
-		return
-	}
-	for _, decl := range list.Declarations.Nodes {
-		if decl == nil || decl.Kind != ast.KindVariableDeclaration {
-			continue
-		}
-		vd := decl.AsVariableDeclaration()
-		if vd == nil || vd.Name() == nil {
-			continue
-		}
-		utils.CollectBindingNames(vd.Name(), func(id *ast.Node, name string) {
-			s.addSyntax(name, id, ast.KindVariableDeclaration)
-		})
-	}
+	utils.ForEachVariableDeclarationBinding(declList, func(_ *ast.Node, id *ast.Node, name string) {
+		s.addSyntax(name, id, ast.KindVariableDeclaration)
+	})
 }
 
 func addImportDeclarations(node *ast.Node, s *scopeDecls) {
@@ -314,29 +289,13 @@ func addImportDeclarations(node *ast.Node, s *scopeDecls) {
 }
 
 func analyzeBlockScope(ctx rule.RuleContext, blockNode *ast.Node, o options, builtinMode builtinGlobalsMode) {
-	block := blockNode.AsBlock()
-	if block == nil || block.Statements == nil {
-		return
-	}
 	s := newScopeDecls()
-	for _, stmt := range block.Statements.Nodes {
-		collectTopLevel(stmt, s)
-	}
+	collectScopeDeclarations(blockNode, s, declarationScopeOwners{block: blockNode})
 	reportScope(ctx, s, o, false, builtinMode)
 }
 
 func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode) {
-	var initializer *ast.Node
-	switch node.Kind {
-	case ast.KindForStatement:
-		if fs := node.AsForStatement(); fs != nil {
-			initializer = fs.Initializer
-		}
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		if fs := node.AsForInOrOfStatement(); fs != nil {
-			initializer = fs.Initializer
-		}
-	}
+	initializer := node.Initializer()
 	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
 		return
 	}
@@ -344,7 +303,7 @@ func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMod
 		return
 	}
 	s := newScopeDecls()
-	addVariableDeclarations(initializer, s)
+	collectScopeDeclarations(node, s, declarationScopeOwners{block: node})
 	reportScope(ctx, s, o, false, builtinMode)
 }
 
@@ -353,62 +312,9 @@ func analyzeSwitchScope(ctx rule.RuleContext, node *ast.Node, o options, builtin
 	if sw == nil || sw.CaseBlock == nil {
 		return
 	}
-	cb := sw.CaseBlock.AsCaseBlock()
-	if cb == nil || cb.Clauses == nil {
-		return
-	}
 	s := newScopeDecls()
-	for _, clause := range cb.Clauses.Nodes {
-		cc := clause.AsCaseOrDefaultClause()
-		if cc == nil || cc.Statements == nil {
-			continue
-		}
-		for _, stmt := range cc.Statements.Nodes {
-			collectTopLevel(stmt, s)
-		}
-	}
+	collectScopeDeclarations(sw.CaseBlock, s, declarationScopeOwners{block: sw.CaseBlock})
 	reportScope(ctx, s, o, false, builtinMode)
-}
-
-// collectTopLevel records direct block-scoped declarations within the top
-// level of a block/switch/for scope. `var` is deliberately skipped because it
-// hoists to an enclosing function-like scope, not the block.
-func collectTopLevel(stmt *ast.Node, s *scopeDecls) {
-	if stmt == nil {
-		return
-	}
-	switch stmt.Kind {
-	case ast.KindVariableStatement:
-		varStmt := stmt.AsVariableStatement()
-		if varStmt == nil || varStmt.DeclarationList == nil {
-			return
-		}
-		if utils.IsVarKeyword(varStmt.DeclarationList) {
-			return
-		}
-		addVariableDeclarations(varStmt.DeclarationList, s)
-	case ast.KindFunctionDeclaration:
-		// Skip TS overload signatures (bodyless function declarations).
-		if stmt.Body() == nil {
-			return
-		}
-		if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, ast.KindFunctionDeclaration)
-		}
-	case ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration:
-		if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, stmt.Kind)
-		}
-	case ast.KindModuleDeclaration:
-		if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier {
-			s.addSyntax(n.AsIdentifier().Text, n, ast.KindModuleDeclaration)
-		}
-	case ast.KindImportDeclaration:
-		addImportDeclarations(stmt, s)
-	case ast.KindImportEqualsDeclaration:
-		addImportDeclarations(stmt, s)
-	}
 }
 
 // applyMergeFilter drops declarations that are safe to merge under
@@ -642,9 +548,10 @@ func reportProgramDeclarations(
 	isModule bool,
 ) {
 	// A module's syntax declarations live in its module scope, while config and
-	// inline globals remain in the outer global scope. Type-only declarations
-	// likewise do not collide with value-space globals.
-	if isModule || (len(syntax) > 0 && allTypeOnlyDecls(syntax)) {
+	// inline globals remain in the outer global scope. The TypeScript extension
+	// also keeps purely type-space declarations separate from lib globals; the
+	// ESLint core rule intentionally treats parser-provided variables uniformly.
+	if isModule || (globals.builtinMode == builtinGlobalsTypeScriptLibs && len(syntax) > 0 && allTypeOnlyDecls(syntax)) {
 		reportDeclarationSequence(ctx, reports, name, syntax, nil, false)
 		if len(comments) > 0 {
 			reportDeclarationSequence(ctx, reports, name, nil, comments, globals.isImplicitBuiltin(name, nil))

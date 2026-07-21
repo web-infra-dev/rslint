@@ -1640,6 +1640,35 @@ func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name
 	}
 }
 
+// ForEachVariableDeclarationBinding visits every identifier bound by a
+// VariableDeclarationList in source order. The declaration argument is the
+// top-level VariableDeclaration that owns the identifier, including when the
+// identifier is nested inside an object or array binding pattern.
+func ForEachVariableDeclarationBinding(declarationList *ast.Node, callback func(declaration *ast.Node, identifier *ast.Node, name string)) {
+	if declarationList == nil || callback == nil {
+		return
+	}
+	if declarationList.Kind != ast.KindVariableDeclarationList {
+		return
+	}
+	list := declarationList.AsVariableDeclarationList()
+	if list == nil || list.Declarations == nil {
+		return
+	}
+	for _, declaration := range list.Declarations.Nodes {
+		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+			continue
+		}
+		variable := declaration.AsVariableDeclaration()
+		if variable == nil || variable.Name() == nil {
+			continue
+		}
+		CollectBindingNames(variable.Name(), func(identifier *ast.Node, name string) {
+			callback(declaration, identifier, name)
+		})
+	}
+}
+
 // IsNullLiteral checks if a node is the null keyword, unwrapping parentheses.
 func IsNullLiteral(node *ast.Node) bool {
 	if node == nil {

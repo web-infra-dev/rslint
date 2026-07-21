@@ -387,34 +387,24 @@ func (b *builder) hoistVarOnly(node *ast.Node, s *scope) {
 // innermost BindingElement is stored as `defNode` so that the rule can reach
 // the initializer/default of that specific binding site later.
 func (b *builder) collectVariableDeclarations(declList *ast.Node, s *scope, declareMod bool) {
-	list := declList.AsVariableDeclarationList()
-	if list == nil || list.Declarations == nil {
-		return
-	}
-	for _, decl := range list.Declarations.Nodes {
-		vd := decl.AsVariableDeclaration()
-		if vd == nil || vd.Name() == nil {
-			continue
-		}
-		utils.CollectBindingNames(vd.Name(), func(id *ast.Node, name string) {
-			defNode := decl
-			for p := id.Parent; p != nil && p != decl; p = p.Parent {
-				if p.Kind == ast.KindBindingElement {
-					defNode = p
-					break
-				}
+	utils.ForEachVariableDeclarationBinding(declList, func(declaration *ast.Node, identifier *ast.Node, name string) {
+		defNode := declaration
+		for parent := identifier.Parent; parent != nil && parent != declaration; parent = parent.Parent {
+			if parent.Kind == ast.KindBindingElement {
+				defNode = parent
+				break
 			}
-			s.add(&variable{
-				name:            name,
-				id:              id,
-				defNode:         defNode,
-				parent:          defNode.Parent,
-				kind:            defVariable,
-				isValueBinding:  true,
-				declareModifier: declareMod,
-			})
+		}
+		s.add(&variable{
+			name:            name,
+			id:              identifier,
+			defNode:         defNode,
+			parent:          defNode.Parent,
+			kind:            defVariable,
+			isValueBinding:  true,
+			declareModifier: declareMod,
 		})
-	}
+	})
 }
 
 func (b *builder) collectImport(node *ast.Node, s *scope) {
