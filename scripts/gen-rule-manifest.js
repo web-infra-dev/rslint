@@ -73,8 +73,6 @@ function getPluginRuleEntries() {
 
 // Map group name to test directory name: "@typescript-eslint" -> "typescript-eslint", etc.
 function groupToTestDir(group) {
-  // The manifest uses "react", while its tests live under "eslint-plugin-react".
-  if (group === 'react') return 'eslint-plugin-react';
   return group.replace(/^@/, '');
 }
 

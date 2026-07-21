@@ -67,7 +67,7 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
   },
   {
     prefix: 'react',
-    group: 'react',
+    group: 'eslint-plugin-react',
     importName: 'reactPlugin',
     presets: [
       {
