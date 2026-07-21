@@ -1258,7 +1258,7 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo, localExportTargets 
 
 	// Local export declarations may live inside nested namespaces. The source
 	// walk records their checker-resolved targets once, so this lookup handles
-	// arbitrary nesting without rescanning the file for every variable.
+	// arbitrary nesting without scanning the file again for every variable.
 	if varInfo.Definition != nil {
 		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
 		if sym != nil && localExportTargets[sym] {
