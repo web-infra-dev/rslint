@@ -1,7 +1,7 @@
 // TestPreferDestructuringUpstream migrates the full valid/invalid suite from
 // ESLint v10.7.0 tests/lib/rules/prefer-destructuring.js 1:1. Position
 // assertions cover line/column and endLine/endColumn for every invalid case.
-// rslint-specific lock-in cases live in prefer_destructuring_extras_test.go.
+// rslint-specific lock-in cases live in the sibling extras test files.
 package prefer_destructuring
 
 import (

@@ -1,3 +1,5 @@
+// The tests in this file cover option parsing, schema validation, and runtime
+// configuration combinations independently from rule-semantic test cases.
 package prefer_destructuring
 
 import (
