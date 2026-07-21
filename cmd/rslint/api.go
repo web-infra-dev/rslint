@@ -61,7 +61,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 }
 
 type apiConfigModuleLoader struct {
-	requester api.Requester
+	requester      api.Requester
+	overrideConfig rslintconfig.RslintConfig
 }
 
 func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request discovery.ConfigLoadBatchRequest) (discovery.ConfigLoadBatchResponse, error) {
@@ -75,6 +76,22 @@ func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request di
 	var response discovery.ConfigLoadBatchResponse
 	if err := msg.Decode(&response); err != nil {
 		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs result: %w", err)
+	}
+	// API override entries are the final suffix of every loaded config. Attach
+	// them at the loader boundary so discovery reachability and the published
+	// catalog observe the same effective config; callers must not append them a
+	// second time after discovery.
+	if len(loader.overrideConfig) > 0 {
+		for index := range response.Results {
+			result := &response.Results[index]
+			if result.Status != "loaded" {
+				continue
+			}
+			effective := make(rslintconfig.RslintConfig, 0, len(result.Entries)+len(loader.overrideConfig))
+			effective = append(effective, result.Entries...)
+			effective = append(effective, loader.overrideConfig...)
+			result.Entries = effective
+		}
 	}
 	return response, nil
 }
@@ -230,6 +247,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		configTargetScopes     map[string]rslintconfig.LintDiscoveryScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigDirByOwner map[string]string
+		configGitignoreFrozen  bool
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -238,22 +256,21 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		if len(configDiscovery.ExplicitFiles) > 0 && len(configDiscovery.ExplicitFiles) != len(req.Files) {
 			return nil, errors.New("configDiscovery.explicitFiles must be parallel to files")
 		}
-
+		var overrideConfig rslintconfig.RslintConfig
+		if len(configDiscovery.OverrideConfig) > 0 {
+			if err := json.Unmarshal(configDiscovery.OverrideConfig, &overrideConfig); err != nil {
+				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
+			}
+			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
+				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
+			}
+		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
 			Fresh:                     true,
 			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
 			ImplicitCWD:               len(req.Files) == 0 && len(configDiscovery.Directories) == 0,
 			SingleThreaded:            false,
-		}
-		switch configDiscovery.Mode {
-		case "", "auto":
-			discoveryRequest.Mode = discovery.ConfigDiscoveryAuto
-		case "explicit":
-			discoveryRequest.Mode = discovery.ConfigDiscoveryExplicit
-			discoveryRequest.ExplicitConfigPath = resolveRequestPath(configDiscovery.ExplicitConfigPath)
-		default:
-			return nil, fmt.Errorf("invalid configDiscovery mode %q", configDiscovery.Mode)
 		}
 		for _, directory := range configDiscovery.Directories {
 			discoveryRequest.Directories = append(discoveryRequest.Directories, resolveRequestPath(directory))
@@ -274,12 +291,37 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			})
 		}
 
-		catalog, err := discovery.Build(
-			ctx,
-			fs,
-			&apiConfigModuleLoader{requester: requester},
-			discoveryRequest,
-		)
+		loader := &apiConfigModuleLoader{
+			requester:      requester,
+			overrideConfig: overrideConfig,
+		}
+		var catalog *discovery.ConfigCatalog
+		var err error
+		if configDiscovery.ExplicitConfigPath != "" {
+			var targetFiles []discovery.DiscoveryFile
+			if allowedFiles != nil {
+				targetFiles = make([]discovery.DiscoveryFile, 0, len(allowedFiles))
+				for _, filePath := range allowedFiles {
+					targetFiles = append(targetFiles, discovery.DiscoveryFile{
+						Path:          filePath,
+						CanonicalPath: canonicalPaths[exactFilesystemPathID(filePath)],
+					})
+				}
+			}
+			catalog, err = discovery.LoadExplicitConfig(
+				ctx,
+				fs,
+				loader,
+				discovery.ExplicitConfigRequest{
+					CWD:         currentDirectory,
+					ConfigPath:  resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles: targetFiles,
+					Fresh:       true,
+				},
+			)
+		} else {
+			catalog, err = discovery.DiscoverAutomatic(ctx, fs, loader, discoveryRequest)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
 		}
@@ -293,16 +335,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			}
 		}
 
-		var overrideConfig rslintconfig.RslintConfig
-		if len(configDiscovery.OverrideConfig) > 0 {
-			if err := json.Unmarshal(configDiscovery.OverrideConfig, &overrideConfig); err != nil {
-				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
-			}
-			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
-				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
-			}
-		}
-
 		if len(catalog.Configs) > 0 {
 			configDirectories := catalog.ConfigDirectories()
 			if len(configDirectories) == 1 && catalog.Explicit {
@@ -312,8 +344,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), catalog.Configs[configDirectory]...)
-				rslintConfig = append(rslintConfig, overrideConfig...)
 				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
+				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(catalog.Configs))
 				pluginConfigDirByOwner = make(map[string]string, len(catalog.Configs))
@@ -322,52 +354,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				if configMap == nil {
 					continue
 				}
-				effective := make(rslintconfig.RslintConfig, 0, len(entries)+len(overrideConfig))
-				effective = append(effective, entries...)
-				effective = append(effective, overrideConfig...)
-				configMap[ownerDirectory] = effective
+				configMap[ownerDirectory] = append(rslintconfig.RslintConfig(nil), entries...)
 				pluginConfigDirByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
 				configTargetScopes = catalog.Scopes
-				// The API already has an exact target set. Resolve provisional owners
-				// with authored config ignores first, then read only each owner's
-				// target ancestor chains. Configs loaded only for explicit files are
-				// boundaries for those literal scopes, not for ancestor-owned automatic
-				// siblings.
-				filesByOwner := configTargetFilesByOwner(
-					configMap,
-					configTargetScopes,
-					fs,
-					allowedFiles,
-					false,
-				)
-				automaticResolver := rslintconfig.NewConfigOwnerResolverForAutomaticTargets(
-					configMap,
-					configTargetScopes,
-					fs,
-				)
-				completeResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
-				for ownerDirectory, entries := range configMap {
-					ownerFiles := filesByOwner[ownerDirectory]
-					if ownerFiles == nil {
-						ownerFiles = []string{}
-					}
-					// An ExplicitOnly config is a boundary only for its literal
-					// scope. Automatic siblings remain owned by the ancestor and
-					// must continue reading nested .gitignore sources below it.
-					resolver := automaticResolver
-					if configTargetScopes[ownerDirectory].ExplicitOnly {
-						resolver = completeResolver
-					}
-					configMap[ownerDirectory] = rslintconfig.ConfigWithGitignoreWithBoundaries(
-						entries,
-						ownerDirectory,
-						fs,
-						ownerFiles,
-						resolver.ChildConfigDirs(ownerDirectory),
-					)
-				}
 			}
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
@@ -379,7 +370,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		catalogPlugins = catalog.EslintPlugins
 	}
 
-	if configMap == nil {
+	if configMap == nil && !configGitignoreFrozen {
 		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	}
 	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {

@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -42,7 +42,7 @@
     "ajv": "6.15.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "3.8.1",
+    "prettier": "3.9.4",
     "typescript": "5.9.3",
     "zx": "8.8.5"
   },

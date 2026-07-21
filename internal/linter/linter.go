@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"runtime"
-	"slices"
-	"sort"
 	"strings"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -136,27 +134,15 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker) {
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
-		// Computed once per file and shared via ctx.Comments so
-		// rules that need every comment in the file (directive scanning,
-		// max-lines, etc.) don't each repeat this same token-tree walk.
-		comments := make([]*ast.CommentRange, 0)
-		utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
-		// ForEachComment can surface the same physical comment twice (once as
-		// a token's trailing range, once as the next token's leading range)
-		// and isn't guaranteed strictly ordered. Sort and dedup once here so
-		// every downstream consumer can rely on a clean, ordered list instead
-		// of each re-deriving it.
-		sort.Slice(comments, func(i, j int) bool { return comments[i].Pos() < comments[j].Pos() })
-		comments = slices.CompactFunc(comments, func(a, b *ast.CommentRange) bool {
-			return a.Pos() == b.Pos() && a.End() == b.End()
-		})
+		// One lazy store is shared by directives, inline globals, and every
+		// comment-aware rule in this file. Most files never materialize it.
+		comments := rule.NewCommentStore(file)
 
-		// Create disable manager for this file
+		// Directive parsing is itself lazy and only runs when a rule reports.
 		disableManager := rule.NewDisableManager(file, comments)
 
-		// Parse inline `/* global */` comments once per file, same as
-		// DisableManager above. Rules receive both declaration metadata and the
-		// merged result instead of parsing comments or config themselves.
+		// A cheap source-text check inside ParseInlineGlobals avoids asking
+		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 		fileChecker := chk
 		if opts.TypeInfoFiles != nil {

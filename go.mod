@@ -55,8 +55,8 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/sync v0.21.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sync v0.22.0
+	golang.org/x/sys v0.47.0
 	golang.org/x/tools v0.47.0
 	gotest.tools/v3 v3.5.2
 )
@@ -75,6 +75,6 @@ require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
-	github.com/microsoft/typescript-go v0.0.0-20260714195723-448614f8f409 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260717215938-61aabc2f4577 // indirect
 	golang.org/x/text v0.38.0
 )

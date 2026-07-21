@@ -45,16 +45,32 @@ type configDiscoveryCaseSensitivityFS struct {
 	caseSensitive bool
 }
 
+type configDiscoveryNoSymlinkMetadataFS struct {
+	vfs.FS
+}
+
 type configDiscoveryReadSpyFS struct {
 	vfs.FS
 	mu             sync.Mutex
 	gitignoreReads int
+	gitignorePaths []string
+}
+
+type configDiscoveryCandidateFS struct {
+	vfs.FS
+	files map[string]struct{}
+}
+
+func (fs *configDiscoveryCandidateFS) FileExists(path string) bool {
+	_, exists := fs.files[tspath.NormalizePath(path)]
+	return exists
 }
 
 func (fs *configDiscoveryReadSpyFS) ReadFile(path string) (string, bool) {
 	if strings.EqualFold(tspath.GetBaseFileName(path), ".gitignore") {
 		fs.mu.Lock()
 		fs.gitignoreReads++
+		fs.gitignorePaths = append(fs.gitignorePaths, tspath.NormalizePath(path))
 		fs.mu.Unlock()
 	}
 	return fs.FS.ReadFile(path)
@@ -62,6 +78,12 @@ func (fs *configDiscoveryReadSpyFS) ReadFile(path string) (string, bool) {
 
 func (fs *configDiscoveryCaseSensitivityFS) UseCaseSensitiveFileNames() bool {
 	return fs.caseSensitive
+}
+
+func (fs *configDiscoveryNoSymlinkMetadataFS) GetAccessibleEntries(path string) vfs.Entries {
+	entries := fs.FS.GetAccessibleEntries(path)
+	entries.Symlinks = nil
+	return entries
 }
 
 func (fs *configDiscoveryRealpathFS) Realpath(path string) string {
@@ -242,7 +264,7 @@ func TestConfigDiscoveryPriorityDoesNotConsultGitignore(t *testing.T) {
 		loader.configs[mjsPath] = namedConfig("lower-priority")
 
 		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{CWD: root, ImplicitCWD: true})
-		if got := catalog.Configs[tspath.NormalizePath(root)][0].Name; got != "selected" {
+		if got := namedConfigEntry(catalog.Configs[tspath.NormalizePath(root)]).Name; got != "selected" {
 			t.Fatalf("selected config %q, want highest-priority .js config", got)
 		}
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{jsPath}) {
@@ -251,7 +273,7 @@ func TestConfigDiscoveryPriorityDoesNotConsultGitignore(t *testing.T) {
 	})
 }
 
-func TestConfigDiscoveryDoesNotReadGitignore(t *testing.T) {
+func TestConfigDiscoveryReadsGitignoreAndPrunesHiddenConfig(t *testing.T) {
 	root := t.TempDir()
 	writeDiscoveryFixture(t, root, ".gitignore", "ignored/\nrslint.config.js\n")
 	configPath := writeConfigCandidate(t, root, "rslint.config.js")
@@ -261,18 +283,660 @@ func TestConfigDiscoveryDoesNotReadGitignore(t *testing.T) {
 	loader.configs[tspath.CombinePaths(root, "ignored/rslint.config.js")] = namedConfig("nested")
 	fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
 
-	_, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+	catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	fsys.mu.Lock()
-	defer fsys.mu.Unlock()
-	if fsys.gitignoreReads != 0 {
-		t.Fatalf("config discovery read .gitignore %d times", fsys.gitignoreReads)
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{tspath.NormalizePath(root)}) {
+		t.Fatalf("Git-hidden config directories = %v", got)
 	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
+		t.Fatalf("Git-hidden config was evaluated: %v", got)
+	}
+	fsys.mu.Lock()
+	reads := fsys.gitignoreReads
+	fsys.mu.Unlock()
+	if reads == 0 {
+		t.Fatal("config discovery did not read the owner .gitignore")
+	}
+}
+
+func TestConfigDiscoveryGitignoreDirectoryNegation(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		gitignore  string
+		wantNested bool
+	}{
+		{
+			name:       "exact directory negation reopens",
+			gitignore:  "ignored/\n!ignored/\n",
+			wantNested: true,
+		},
+		{
+			name:       "file negation does not reopen",
+			gitignore:  "ignored/\n!ignored/keep.ts\n",
+			wantNested: false,
+		},
+		{
+			name:       "descendant negation does not reopen",
+			gitignore:  "ignored/\n!ignored/**/*\n",
+			wantNested: false,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+			nestedConfig := writeConfigCandidate(t, root, "ignored/rslint.config.js")
+			writeDiscoveryFixture(t, root, ".gitignore", test.gitignore)
+			loader := newFixtureConfigLoader()
+			loader.configs[rootConfig] = namedConfig("root")
+			loader.configs[nestedConfig] = namedConfig("nested")
+
+			catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+				CWD:         root,
+				ImplicitCWD: true,
+			})
+			wantDirectories := []string{tspath.NormalizePath(root)}
+			wantRequests := []string{rootConfig}
+			if test.wantNested {
+				wantDirectories = append(wantDirectories, tspath.CombinePaths(root, "ignored"))
+				wantRequests = append(wantRequests, nestedConfig)
+			}
+			if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, wantDirectories) {
+				t.Fatalf("config directories = %v, want %v", got, wantDirectories)
+			}
+			if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, wantRequests) {
+				t.Fatalf("requested configs = %v, want %v", got, wantRequests)
+			}
+		})
+	}
+}
+
+func TestConfigDiscoveryAuthoredNegationReopensMatchingGitDirectory(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		negation   string
+		wantNested bool
+	}{
+		{name: "bare directory node", negation: "!ignored", wantNested: true},
+		{name: "directory node", negation: "!ignored/", wantNested: true},
+		{name: "directory and contents", negation: "!ignored/**", wantNested: true},
+		{name: "contents only", negation: "!ignored/**/*", wantNested: false},
+		{name: "one file", negation: "!ignored/keep.ts", wantNested: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+			nestedConfig := writeConfigCandidate(t, root, "ignored/rslint.config.js")
+			writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
+			loader := newFixtureConfigLoader()
+			loader.configs[rootConfig] = rslintconfig.RslintConfig{
+				{Ignores: []string{test.negation}},
+				{Name: "root", Rules: rslintconfig.Rules{}},
+			}
+			loader.configs[nestedConfig] = namedConfig("nested")
+
+			catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+				CWD:         root,
+				ImplicitCWD: true,
+			})
+			gotNested := slices.Contains(
+				catalog.ConfigDirectories(),
+				tspath.CombinePaths(root, "ignored"),
+			)
+			if gotNested != test.wantNested {
+				t.Fatalf("nested config loaded = %v, want %v", gotNested, test.wantNested)
+			}
+		})
+	}
+}
+
+func TestConfigDiscoveryGitignoreDoesNotFilterCandidateFilename(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	jsConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
+	mjsConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.mjs")
+	writeDiscoveryFixture(t, root, ".gitignore", "packages/app/rslint.config.js\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[jsConfig] = namedConfig("selected-js")
+	loader.configs[mjsConfig] = namedConfig("must-not-fall-through")
+
+	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+	})
+	appDirectory := tspath.CombinePaths(root, "packages/app")
+	if got := namedConfigEntry(catalog.Configs[appDirectory]).Name; got != "selected-js" {
+		t.Fatalf("selected config = %q, want highest-priority JS candidate", got)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, jsConfig}) {
+		t.Fatalf("Git filtered a config filename or changed priority: %v", got)
+	}
+}
+
+func TestConfigDiscoveryGitignoreOwnerBoundary(t *testing.T) {
+	t.Run("successful child resets inherited Git and applies its own source", func(t *testing.T) {
+		root := t.TempDir()
+		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+		childConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
+		reachableConfig := writeConfigCandidate(t, root, "packages/app/parent-only/rslint.config.js")
+		hiddenConfig := writeConfigCandidate(t, root, "packages/app/child-only/rslint.config.js")
+		writeDiscoveryFixture(t, root, ".gitignore", "packages/app/parent-only/\n")
+		writeDiscoveryFixture(t, root, "packages/app/.gitignore", "child-only/\n")
+		loader := newFixtureConfigLoader()
+		loader.configs[rootConfig] = namedConfig("root")
+		loader.configs[childConfig] = namedConfig("child")
+		loader.configs[reachableConfig] = namedConfig("reachable-after-reset")
+		loader.configs[hiddenConfig] = namedConfig("must-not-load")
+
+		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			ImplicitCWD: true,
+		})
+		wantDirectories := []string{
+			tspath.NormalizePath(root),
+			tspath.CombinePaths(root, "packages/app"),
+			tspath.CombinePaths(root, "packages/app/parent-only"),
+		}
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, wantDirectories) {
+			t.Fatalf("owner-boundary directories = %v, want %v", got, wantDirectories)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, childConfig, reachableConfig}) {
+			t.Fatalf("owner-boundary requests = %v", got)
+		}
+	})
+
+	t.Run("failed child inherits parent Git", func(t *testing.T) {
+		root := t.TempDir()
+		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+		failedConfig := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
+		hiddenConfig := writeConfigCandidate(t, root, "packages/app/deep/rslint.config.js")
+		writeDiscoveryFixture(t, root, "packages/app/.gitignore", "deep/\n")
+		loader := newFixtureConfigLoader()
+		loader.configs[rootConfig] = namedConfig("root")
+		loader.failures[failedConfig] = ConfigModuleError{Code: "ERR", Message: "broken"}
+		loader.configs[hiddenConfig] = namedConfig("must-not-load")
+
+		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			ImplicitCWD: true,
+		})
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{tspath.NormalizePath(root)}) {
+			t.Fatalf("failed-boundary directories = %v", got)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, failedConfig}) {
+			t.Fatalf("failed child did not inherit parent Git: %v", got)
+		}
+	})
+}
+
+func TestConfigDiscoveryDoesNotReadGitignoreBelowBlockedDirectory(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	hiddenConfig := writeConfigCandidate(t, root, "ignored/deep/rslint.config.js")
+	rootGitignore := writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
+	hiddenGitignore := writeDiscoveryFixture(t, root, "ignored/.gitignore", "!deep/\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[hiddenConfig] = namedConfig("must-not-load")
+	fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+	_, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+	})
+	if err != nil {
+		t.Fatalf("DiscoverAutomatic: %v", err)
+	}
+	fsys.mu.Lock()
+	paths := append([]string(nil), fsys.gitignorePaths...)
+	fsys.mu.Unlock()
+	if !slices.Contains(paths, rootGitignore) {
+		t.Fatalf("root .gitignore was not read: %v", paths)
+	}
+	if slices.Contains(paths, hiddenGitignore) {
+		t.Fatalf("blocked nested .gitignore was read: %v", paths)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+		t.Fatalf("nested source revived a hidden config: %v", got)
+	}
+}
+
+func TestConfigDiscoveryOverlappingRootsPreserveExplicitOrigin(t *testing.T) {
+	root := t.TempDir()
+	ignoredDirectory := tspath.CombinePaths(root, "ignored")
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	childConfig := writeConfigCandidate(t, root, "ignored/rslint.config.js")
+	writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[childConfig] = namedConfig("child")
+
+	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		Directories: []string{root, ignoredDirectory},
+	})
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{tspath.NormalizePath(root), ignoredDirectory}) {
+		t.Fatalf("overlapping-root config directories = %v", got)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, childConfig}) {
+		t.Fatalf("overlapping roots executed duplicate or hidden configs: %v", got)
+	}
+}
+
+func TestConfigDiscoveryCatalogFreezesCollectedGitignore(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	target := writeDiscoveryFixture(t, root, "dist/index.ts", "export {}\n")
+	reincludedTarget := writeDiscoveryFixture(t, root, "dist/keep.ts", "export {}\n")
+	writeDiscoveryFixture(t, root, ".gitignore", "dist/\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = rslintconfig.RslintConfig{
+		{Ignores: []string{"!dist/keep.ts"}},
+		{Name: "root", Rules: rslintconfig.Rules{}},
+	}
+
+	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+	})
+	root = tspath.NormalizePath(root)
+	if !catalog.Configs[root].IsFileIgnored(target, root) {
+		t.Fatal("catalog did not materialize the discovered Git source")
+	}
+	if catalog.Configs[root].IsFileIgnored(reincludedTarget, root) {
+		t.Fatal("authored negation did not follow and override the Git projection")
+	}
+	writeDiscoveryFixture(t, root, ".gitignore", "")
+	if !catalog.Configs[root].IsFileIgnored(target, root) {
+		t.Fatal("published catalog changed after .gitignore mutation")
+	}
+	if catalog.Configs[root].IsFileIgnored(reincludedTarget, root) {
+		t.Fatal("published Git-to-authored ordering changed after source mutation")
+	}
+}
+
+func TestConfigDiscoveryMergesLiteralGitignoreChainIntoAutomaticOwner(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	automaticTarget := writeDiscoveryFixture(t, root, "automatic/index.ts", "export {}\n")
+	reincludedLiteral := writeDiscoveryFixture(t, root, "outside/keep.tmp", "export {}\n")
+	ignoredLiteral := writeDiscoveryFixture(t, root, "outside/drop.tmp", "export {}\n")
+	writeDiscoveryFixture(t, root, ".gitignore", "*.tmp\n")
+	writeDiscoveryFixture(t, root, "outside/.gitignore", "!keep.tmp\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+
+	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		Directories: []string{tspath.GetDirectoryPath(automaticTarget)},
+		Files: []DiscoveryFile{
+			{Path: automaticTarget, Explicit: false},
+			{Path: reincludedLiteral, Explicit: true},
+			{Path: ignoredLiteral, Explicit: true},
+		},
+	})
+	root = tspath.NormalizePath(root)
+	effective := catalog.Configs[root]
+	if effective.IsFileIgnored(reincludedLiteral, root) {
+		t.Fatal("nested literal-chain negation was lost or parent Git source was duplicated")
+	}
+	if !effective.IsFileIgnored(ignoredLiteral, root) {
+		t.Fatal("automatic owner did not include the literal target's Git chain")
+	}
+}
+
+func TestConfigDiscoveryCachesLiteralGitignoreSourceChains(t *testing.T) {
+	root := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	writeDiscoveryFixture(t, root, ".gitignore", "*.tmp\n")
+	writeDiscoveryFixture(t, root, "outside/.gitignore", "!keep.tmp\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	var files []DiscoveryFile
+	for _, name := range []string{"keep.tmp", "drop.tmp", "nested/one.tmp", "nested/two.tmp"} {
+		files = append(files, DiscoveryFile{
+			Path:     writeDiscoveryFixture(t, root, "outside/"+name, "export {}\n"),
+			Explicit: true,
+		})
+	}
+	fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+	_, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD:   root,
+		Files: files,
+	})
+	if err != nil {
+		t.Fatalf("DiscoverAutomatic: %v", err)
+	}
+	fsys.mu.Lock()
+	reads := append([]string(nil), fsys.gitignorePaths...)
+	fsys.mu.Unlock()
+	counts := make(map[string]int)
+	for _, path := range reads {
+		counts[path]++
+	}
+	for _, path := range []string{
+		tspath.CombinePaths(root, ".gitignore"),
+		tspath.CombinePaths(root, "outside/.gitignore"),
+		tspath.CombinePaths(root, "outside/nested/.gitignore"),
+	} {
+		if got := counts[path]; got != 1 {
+			t.Fatalf(".gitignore reads for %q = %d, want 1; all reads: %v", path, got, reads)
+		}
+	}
+}
+
+func TestConfigDiscoveryFreezesGitignoreBytesAcrossOverlappingRoutes(t *testing.T) {
+	root := t.TempDir()
+	directDirectory := tspath.CombinePaths(root, "direct")
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	directConfig := writeConfigCandidate(t, root, "direct/rslint.config.js")
+	hiddenConfig := writeConfigCandidate(t, root, "hidden/rslint.config.js")
+	hiddenTarget := writeDiscoveryFixture(t, root, "hidden/index.ts", "export {}\n")
+	gitignorePath := writeDiscoveryFixture(t, root, ".gitignore", "hidden/\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[directConfig] = namedConfig("direct")
+	loader.configs[hiddenConfig] = namedConfig("must-not-load")
+	mutated := false
+	loader.mutate = func(request ConfigLoadBatchRequest, response ConfigLoadBatchResponse) ConfigLoadBatchResponse {
+		if mutated {
+			return response
+		}
+		for _, candidate := range request.Candidates {
+			if candidate.ConfigPath == directConfig {
+				if err := os.WriteFile(filepath.FromSlash(gitignorePath), nil, 0o644); err != nil {
+					t.Fatalf("mutate .gitignore: %v", err)
+				}
+				mutated = true
+				break
+			}
+		}
+		return response
+	}
+	fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+	catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		Directories: []string{root, directDirectory},
+	})
+	if err != nil {
+		t.Fatalf("DiscoverAutomatic: %v", err)
+	}
+	if !mutated {
+		t.Fatal("fixture did not mutate .gitignore during config evaluation")
+	}
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{
+		tspath.NormalizePath(root),
+		directDirectory,
+	}) {
+		t.Fatalf("catalog used post-mutation Git bytes: %v", got)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, directConfig}) {
+		t.Fatalf("post-mutation route loaded a hidden config: %v", got)
+	}
+	if !catalog.Configs[tspath.NormalizePath(root)].IsFileIgnored(hiddenTarget, root) {
+		t.Fatal("published Git projection differs from discovery reachability")
+	}
+	fsys.mu.Lock()
+	reads := slices.Clone(fsys.gitignorePaths)
+	fsys.mu.Unlock()
+	count := 0
+	for _, path := range reads {
+		if path == gitignorePath {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("root .gitignore reads = %d, want one frozen read; all reads: %v", count, reads)
+	}
+}
+
+func TestConfigDiscoverySkipsDescendantSymlinkWithoutMetadata(t *testing.T) {
+	root := t.TempDir()
+	external := t.TempDir()
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	writeDiscoveryFixture(t, external, ".gitignore", "deep/\n")
+	writeConfigCandidate(t, external, "rslint.config.js")
+	alias := filepath.Join(root, "linked")
+	if err := os.Symlink(external, alias); err != nil {
+		t.Skipf("symlink fixture unavailable: %v", err)
+	}
+	aliasConfig := tspath.CombinePaths(alias, "rslint.config.js")
+	aliasGitignore := tspath.CombinePaths(alias, ".gitignore")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[aliasConfig] = namedConfig("must-not-load")
+	fsys := &configDiscoveryReadSpyFS{
+		FS: &configDiscoveryNoSymlinkMetadataFS{FS: discoveryTestFS()},
+	}
+
+	catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+	})
+	if err != nil {
+		t.Fatalf("DiscoverAutomatic: %v", err)
+	}
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{tspath.NormalizePath(root)}) {
+		t.Fatalf("descendant symlink config was loaded: %v", got)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+		t.Fatalf("descendant symlink candidate was evaluated: %v", got)
+	}
+	fsys.mu.Lock()
+	reads := slices.Clone(fsys.gitignorePaths)
+	fsys.mu.Unlock()
+	if slices.Contains(reads, aliasGitignore) {
+		t.Fatalf("descendant symlink .gitignore was read: %v", reads)
+	}
+}
+
+func TestConfigDiscoveryDirectorySymlinkRootPreservesGitSourceBoundary(t *testing.T) {
+	for _, withoutMetadata := range []bool{false, true} {
+		name := "symlink metadata"
+		if withoutMetadata {
+			name = "realpath fallback"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			external := t.TempDir()
+			rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+			rootGitignore := writeDiscoveryFixture(t, root, ".gitignore", "linked/scope/parent-hidden/\n")
+			writeDiscoveryFixture(t, external, ".gitignore", "scope/target-hidden/\n")
+			writeDiscoveryFixture(t, external, "scope/parent-hidden/index.ts", "export {}\n")
+			writeDiscoveryFixture(t, external, "scope/target-hidden/index.ts", "export {}\n")
+			alias := filepath.Join(root, "linked")
+			if err := os.Symlink(external, alias); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+			aliasGitignore := tspath.CombinePaths(alias, ".gitignore")
+			requestDirectory := tspath.CombinePaths(alias, "scope")
+			loader := newFixtureConfigLoader()
+			loader.configs[rootConfig] = namedConfig("root")
+			fsys := discoveryTestFS()
+			if withoutMetadata {
+				fsys = &configDiscoveryNoSymlinkMetadataFS{FS: fsys}
+			}
+			spy := &configDiscoveryReadSpyFS{FS: fsys}
+
+			catalog, err := DiscoverAutomatic(context.Background(), spy, loader, ConfigDiscoveryRequest{
+				CWD:         root,
+				Directories: []string{requestDirectory},
+			})
+			if err != nil {
+				t.Fatalf("DiscoverAutomatic: %v", err)
+			}
+			root = tspath.NormalizePath(root)
+			alias = tspath.NormalizePath(alias)
+			if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
+				t.Fatalf("symlink-root owner = %v, want ancestor %q", got, root)
+			}
+			effective := catalog.Configs[root]
+			if !effective.IsFileIgnored(tspath.CombinePaths(alias, "scope/parent-hidden/index.ts"), root) {
+				t.Fatal("ancestor .gitignore rule was lost at the symlink boundary")
+			}
+			if effective.IsFileIgnored(tspath.CombinePaths(alias, "scope/target-hidden/index.ts"), root) {
+				t.Fatal("target-side .gitignore crossed the symlink boundary")
+			}
+			spy.mu.Lock()
+			reads := slices.Clone(spy.gitignorePaths)
+			spy.mu.Unlock()
+			if !slices.Contains(reads, rootGitignore) {
+				t.Fatalf("ancestor .gitignore was not read: %v", reads)
+			}
+			if slices.Contains(reads, aliasGitignore) {
+				t.Fatalf("target-side .gitignore was read through the symlink: %v", reads)
+			}
+		})
+	}
+
+	t.Run("config at the symlink root starts a new source boundary", func(t *testing.T) {
+		root := t.TempDir()
+		external := t.TempDir()
+		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+		writeConfigCandidate(t, external, "rslint.config.js")
+		writeDiscoveryFixture(t, external, ".gitignore", "hidden/\n")
+		writeDiscoveryFixture(t, external, "hidden/index.ts", "export {}\n")
+		alias := filepath.Join(root, "linked")
+		if err := os.Symlink(external, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		alias = tspath.NormalizePath(alias)
+		aliasConfig := tspath.CombinePaths(alias, "rslint.config.js")
+		aliasGitignore := tspath.CombinePaths(alias, ".gitignore")
+		loader := newFixtureConfigLoader()
+		loader.configs[rootConfig] = namedConfig("root")
+		loader.configs[aliasConfig] = namedConfig("alias")
+		spy := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+		catalog, err := DiscoverAutomatic(context.Background(), spy, loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			Directories: []string{alias},
+		})
+		if err != nil {
+			t.Fatalf("DiscoverAutomatic: %v", err)
+		}
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{alias}) {
+			t.Fatalf("symlink-root config did not become the owner: %v", got)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{
+			rootConfig,
+			aliasConfig,
+		}) {
+			t.Fatalf("config requests = %v", got)
+		}
+		spy.mu.Lock()
+		reads := slices.Clone(spy.gitignorePaths)
+		spy.mu.Unlock()
+		if !slices.Contains(reads, aliasGitignore) {
+			t.Fatalf("symlink-root config did not start a Git source boundary: %v", reads)
+		}
+	})
+
+	t.Run("successful child config starts a new source boundary", func(t *testing.T) {
+		root := t.TempDir()
+		external := t.TempDir()
+		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+		writeDiscoveryFixture(t, external, ".gitignore", "child/\n")
+		writeConfigCandidate(t, external, "child/rslint.config.js")
+		writeDiscoveryFixture(t, external, "child/.gitignore", "hidden/\n")
+		writeDiscoveryFixture(t, external, "child/hidden/index.ts", "export {}\n")
+		alias := filepath.Join(root, "linked")
+		if err := os.Symlink(external, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		aliasGitignore := tspath.CombinePaths(alias, ".gitignore")
+		aliasChild := tspath.CombinePaths(alias, "child")
+		aliasChildConfig := tspath.CombinePaths(aliasChild, "rslint.config.js")
+		aliasChildGitignore := tspath.CombinePaths(aliasChild, ".gitignore")
+		loader := newFixtureConfigLoader()
+		loader.configs[rootConfig] = namedConfig("root")
+		loader.configs[aliasChildConfig] = namedConfig("child")
+		spy := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+		catalog, err := DiscoverAutomatic(context.Background(), spy, loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			Directories: []string{alias},
+		})
+		if err != nil {
+			t.Fatalf("DiscoverAutomatic: %v", err)
+		}
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{
+			tspath.NormalizePath(root),
+			aliasChild,
+		}) {
+			t.Fatalf("child config did not reopen its Git source boundary: %v", got)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{
+			rootConfig,
+			aliasChildConfig,
+		}) {
+			t.Fatalf("config requests = %v", got)
+		}
+		spy.mu.Lock()
+		reads := slices.Clone(spy.gitignorePaths)
+		spy.mu.Unlock()
+		if slices.Contains(reads, aliasGitignore) {
+			t.Fatalf("pre-config target .gitignore crossed the symlink boundary: %v", reads)
+		}
+		if !slices.Contains(reads, aliasChildGitignore) {
+			t.Fatalf("successful child config did not start a new Git source boundary: %v", reads)
+		}
+	})
+
+	t.Run("failed child config keeps the source boundary closed", func(t *testing.T) {
+		root := t.TempDir()
+		external := t.TempDir()
+		rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+		failedConfig := writeConfigCandidate(t, external, "child/rslint.config.js")
+		writeDiscoveryFixture(t, external, "child/.gitignore", "hidden/\n")
+		writeConfigCandidate(t, external, "child/hidden/rslint.config.js")
+		alias := filepath.Join(root, "linked")
+		if err := os.Symlink(external, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+		aliasChildConfig := tspath.CombinePaths(alias, "child/rslint.config.js")
+		aliasChildGitignore := tspath.CombinePaths(alias, "child/.gitignore")
+		aliasHiddenConfig := tspath.CombinePaths(alias, "child/hidden/rslint.config.js")
+		loader := newFixtureConfigLoader()
+		loader.configs[rootConfig] = namedConfig("root")
+		loader.failures[aliasChildConfig] = ConfigModuleError{Code: "ERR", Message: "broken"}
+		loader.configs[aliasHiddenConfig] = namedConfig("visible-through-failed-boundary")
+		spy := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+		catalog, err := DiscoverAutomatic(context.Background(), spy, loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			Directories: []string{alias},
+		})
+		if err != nil {
+			t.Fatalf("DiscoverAutomatic: %v", err)
+		}
+		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{
+			tspath.NormalizePath(root),
+			tspath.GetDirectoryPath(aliasHiddenConfig),
+		}) {
+			t.Fatalf("failed child unexpectedly changed Git source reachability: %v", got)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{
+			rootConfig,
+			aliasChildConfig,
+			aliasHiddenConfig,
+		}) {
+			t.Fatalf("config requests = %v, physical failed config %q", got, failedConfig)
+		}
+		spy.mu.Lock()
+		reads := slices.Clone(spy.gitignorePaths)
+		spy.mu.Unlock()
+		if slices.Contains(reads, aliasChildGitignore) {
+			t.Fatalf("failed child config reopened Git source traversal: %v", reads)
+		}
+	})
 }
 
 func TestConfigDiscoveryParentGlobalIgnorePrunesNestedConfig(t *testing.T) {
@@ -497,6 +1161,20 @@ func TestConfigDiscoveryGitignoredDirectoryStillLoadsNearestConfig(t *testing.T)
 				return ConfigDiscoveryRequest{CWD: target, ImplicitCWD: true}
 			},
 		},
+		{
+			name: "bounded static glob root",
+			request: func(root string, target string) ConfigDiscoveryRequest {
+				return ConfigDiscoveryRequest{
+					CWD:                       root,
+					Directories:               []string{target},
+					LimitDirectoryWalkToFiles: true,
+					Files: []DiscoveryFile{{
+						Path:     tspath.CombinePaths(target, "index.ts"),
+						Explicit: false,
+					}},
+				}
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -515,7 +1193,7 @@ func TestConfigDiscoveryGitignoredDirectoryStillLoadsNearestConfig(t *testing.T)
 			if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{nearestDir}) {
 				t.Fatalf("gitignored directory owner = %v, want nearest config", got)
 			}
-			wantRequested := []string{rootConfig, ignoredConfig, ignoredNestedConfig}
+			wantRequested := []string{rootConfig, ignoredNestedConfig}
 			if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, wantRequested) {
 				t.Fatalf("gitignored directory requested configs = %v, want %v", got, wantRequested)
 			}
@@ -630,7 +1308,7 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 		}
 	})
 
-	t.Run("gitignore does not prune a target branch before its config", func(t *testing.T) {
+	t.Run("gitignore prunes a target branch before its config", func(t *testing.T) {
 		root := t.TempDir()
 		writeDiscoveryFixture(t, root, ".gitignore", "target/deep/\n")
 		loader := newFixtureConfigLoader()
@@ -646,12 +1324,12 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 			LimitDirectoryWalkToFiles: true,
 			Files:                     []DiscoveryFile{{Path: target, Explicit: false}},
 		})
-		wantDirs := []string{tspath.NormalizePath(root), tspath.CombinePaths(root, "target/deep")}
+		wantDirs := []string{tspath.NormalizePath(root)}
 		if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, wantDirs) {
 			t.Fatalf("gitignore catalog = %v, want %v", got, wantDirs)
 		}
-		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig, nestedConfig}) {
-			t.Fatalf("gitignore must not hide nested config: %v", got)
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+			t.Fatalf("gitignore-hidden config was evaluated: %v", got)
 		}
 	})
 
@@ -695,18 +1373,24 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 	})
 }
 
-func TestConfigDiscoveryExplicitConfigDoesNotConsultGitignore(t *testing.T) {
+func TestConfigDiscoveryExplicitConfigLoadsBeforeProjectingGitignore(t *testing.T) {
 	root := t.TempDir()
+	ignoredTarget := writeDiscoveryFixture(t, root, "ignored/index.ts", "export {};\n")
+	visibleTarget := writeDiscoveryFixture(t, root, "src/index.ts", "export {};\n")
 	writeDiscoveryFixture(t, root, ".gitignore", "ignored/\n")
 	loader := newFixtureConfigLoader()
 	configPath := writeConfigCandidate(t, root, "ignored/custom.config.cjs")
 	loader.configs[configPath] = namedConfig("explicit")
 
-	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
-		CWD:                root,
-		Mode:               ConfigDiscoveryExplicit,
-		ExplicitConfigPath: configPath,
-	})
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		discoveryTestFS(),
+		loader,
+		ExplicitConfigRequest{CWD: root, ConfigPath: configPath},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
 	root = tspath.NormalizePath(root)
 	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
 		t.Fatalf("explicit config should be anchored at cwd: %v", got)
@@ -719,6 +1403,307 @@ func TestConfigDiscoveryExplicitConfigDoesNotConsultGitignore(t *testing.T) {
 	}
 	if got := loader.batches[0].Candidates[0].ConfigDirectory; got != root {
 		t.Fatalf("wire configDirectory = %q, want cwd %q", got, root)
+	}
+	config := catalog.Configs[root]
+	if got := config.GetConfigForFile(ignoredTarget, root); got != nil {
+		t.Fatalf("Git-ignored target received explicit config: %+v", got)
+	}
+	if got := config.GetConfigForFile(visibleTarget, root); got == nil {
+		t.Fatal("visible target did not receive explicit config")
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigDoesNotDiscoverNestedCandidates(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	nestedConfigPath := writeConfigCandidate(t, root, "nested/rslint.config.js")
+	loader.configs[configPath] = namedConfig("explicit")
+	loader.configs[nestedConfigPath] = namedConfig("must-not-load")
+	writeDiscoveryFixture(t, root, "nested/.gitignore", "generated.ts\n")
+	ignoredTarget := writeDiscoveryFixture(t, root, "nested/generated.ts", "export {};\n")
+
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		discoveryTestFS(),
+		loader,
+		ExplicitConfigRequest{CWD: root, ConfigPath: configPath},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
+		t.Fatalf("explicit projection requested nested configs: %v", got)
+	}
+	root = tspath.NormalizePath(root)
+	if got := catalog.Configs[root].GetConfigForFile(ignoredTarget, root); got != nil {
+		t.Fatalf("nested Git-ignored target received explicit config: %+v", got)
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigTargetFileProjection(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	loader.configs[configPath] = namedConfig("explicit")
+	target := writeDiscoveryFixture(t, root, "src/index.ts", "export {};\n")
+	writeDiscoveryFixture(t, root, "src/.gitignore", "index.ts\n")
+	writeDiscoveryFixture(t, root, "unrelated/.gitignore", "other.ts\n")
+
+	spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		spyFS,
+		loader,
+		ExplicitConfigRequest{
+			CWD:         root,
+			ConfigPath:  configPath,
+			TargetFiles: []DiscoveryFile{{Path: target}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	root = tspath.NormalizePath(root)
+	if got := catalog.Configs[root].GetConfigForFile(target, root); got != nil {
+		t.Fatalf("target-chain Git ignore was not projected: %+v", got)
+	}
+	wantReads := []string{
+		tspath.CombinePaths(root, ".gitignore"),
+		tspath.CombinePaths(root, "src/.gitignore"),
+	}
+	if got := spyFS.gitignorePaths; !reflect.DeepEqual(got, wantReads) {
+		t.Fatalf("exact projection Git reads = %v, want %v", got, wantReads)
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigTargetProjectionUsesConfigPathSpace(t *testing.T) {
+	physicalRoot := t.TempDir()
+	writeConfigCandidate(t, physicalRoot, "custom.config.cjs")
+	writeDiscoveryFixture(t, physicalRoot, ".gitignore", "src/index.ts\n")
+	physicalTarget := writeDiscoveryFixture(t, physicalRoot, "src/index.ts", "export {};\n")
+	aliasRoot := filepath.Join(t.TempDir(), "workspace-alias")
+	if err := os.Symlink(physicalRoot, aliasRoot); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasRoot = tspath.NormalizePath(aliasRoot)
+	aliasTarget := tspath.CombinePaths(aliasRoot, "src/index.ts")
+	externalSpelling := writeDiscoveryFixture(t, t.TempDir(), "index.ts", "export {};\n")
+	canonicalTarget := discoveryTestFS().Realpath(physicalTarget)
+
+	for _, test := range []struct {
+		name      string
+		cwd       string
+		target    string
+		canonical string
+	}{
+		{name: "aliased CWD and physical target", cwd: aliasRoot, target: physicalTarget},
+		{name: "physical CWD and aliased target", cwd: physicalRoot, target: aliasTarget},
+		{
+			name:      "canonical target hint maps an external spelling",
+			cwd:       physicalRoot,
+			target:    externalSpelling,
+			canonical: canonicalTarget,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := tspath.CombinePaths(test.cwd, "custom.config.cjs")
+			loader := newFixtureConfigLoader()
+			loader.configs[configPath] = namedConfig("explicit")
+			spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+
+			catalog, err := LoadExplicitConfig(
+				context.Background(),
+				spyFS,
+				loader,
+				ExplicitConfigRequest{
+					CWD:        test.cwd,
+					ConfigPath: configPath,
+					TargetFiles: []DiscoveryFile{{
+						Path:          test.target,
+						CanonicalPath: test.canonical,
+					}},
+				},
+			)
+			if err != nil {
+				t.Fatalf("LoadExplicitConfig: %v", err)
+			}
+			cwd := tspath.NormalizePath(test.cwd)
+			matchFile, matchDir := rslintconfig.ResolveConfigPathSpaceWithCanonical(
+				test.target,
+				test.canonical,
+				cwd,
+				spyFS,
+			)
+			if got := catalog.Configs[cwd].GetConfigForFile(matchFile, matchDir); got != nil {
+				t.Fatalf(
+					"path-space Git ignore was not projected: config=%+v match=(%q,%q) reads=%v",
+					catalog.Configs[cwd],
+					matchFile,
+					matchDir,
+					spyFS.gitignorePaths,
+				)
+			}
+			wantReads := []string{
+				tspath.CombinePaths(cwd, ".gitignore"),
+				tspath.CombinePaths(cwd, "src/.gitignore"),
+			}
+			if got := spyFS.gitignorePaths; !reflect.DeepEqual(got, wantReads) {
+				t.Fatalf("path-space Git reads = %v, want %v", got, wantReads)
+			}
+		})
+	}
+}
+
+func TestConfigDiscoveryExplicitConfigEmptyTargetSetSkipsGitProjection(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+	loader.configs[configPath] = namedConfig("explicit")
+	writeDiscoveryFixture(t, root, ".gitignore", "*.ts\n")
+
+	spyFS := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+	catalog, err := LoadExplicitConfig(
+		context.Background(),
+		spyFS,
+		loader,
+		ExplicitConfigRequest{
+			CWD:         root,
+			ConfigPath:  configPath,
+			TargetFiles: []DiscoveryFile{},
+		},
+	)
+	if err != nil {
+		t.Fatalf("LoadExplicitConfig: %v", err)
+	}
+	if spyFS.gitignoreReads != 0 {
+		t.Fatalf("empty target projection read %d .gitignore files: %v", spyFS.gitignoreReads, spyFS.gitignorePaths)
+	}
+	root = tspath.NormalizePath(root)
+	if got := namedConfigEntry(catalog.Configs[root]).Name; got != "explicit" {
+		t.Fatalf("explicit config missing after empty projection: %q", got)
+	}
+}
+
+func TestConfigDiscoveryExplicitGitProjectionMatchesStandalonePolicy(t *testing.T) {
+	tests := []struct {
+		name          string
+		files         map[string]string
+		configIgnores []string
+		exactTargets  []string
+		exact         bool
+		check         []string
+	}{
+		{
+			name: "full nested sources and Git negation",
+			files: map[string]string{
+				".gitignore":              "*.generated.ts\n",
+				"src/.gitignore":          "ignored.ts\n!keep.generated.ts\n",
+				"src/index.ts":            "export {};\n",
+				"src/ignored.ts":          "export {};\n",
+				"src/drop.generated.ts":   "export {};\n",
+				"src/keep.generated.ts":   "export {};\n",
+				"other/keep.generated.ts": "export {};\n",
+			},
+			check: []string{
+				"src/index.ts",
+				"src/ignored.ts",
+				"src/drop.generated.ts",
+				"src/keep.generated.ts",
+				"other/keep.generated.ts",
+			},
+		},
+		{
+			name: "authored global negation after Git projection",
+			files: map[string]string{
+				".gitignore":    "dist/\n",
+				"dist/index.ts": "export {};\n",
+				"src/index.ts":  "export {};\n",
+			},
+			configIgnores: []string{"!dist/**"},
+			check:         []string{"dist/index.ts", "src/index.ts"},
+		},
+		{
+			name: "exact chains exclude unrelated sources",
+			files: map[string]string{
+				".gitignore":              "*.generated.ts\n",
+				"src/.gitignore":          "index.ts\n",
+				"src/index.ts":            "export {};\n",
+				"unrelated/.gitignore":    "index.ts\n",
+				"unrelated/index.ts":      "export {};\n",
+				"unrelated/generated.ts":  "export {};\n",
+				"outside-target/index.ts": "export {};\n",
+			},
+			exactTargets: []string{"src/index.ts"},
+			exact:        true,
+			check: []string{
+				"src/index.ts",
+				"unrelated/index.ts",
+				"unrelated/generated.ts",
+				"outside-target/index.ts",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			for relativePath, content := range test.files {
+				writeDiscoveryFixture(t, root, relativePath, content)
+			}
+			configPath := writeConfigCandidate(t, root, "custom.config.cjs")
+			entries := rslintconfig.RslintConfig{}
+			if test.configIgnores != nil {
+				entries = append(entries, rslintconfig.ConfigEntry{
+					Ignores: append([]string(nil), test.configIgnores...),
+				})
+			}
+			entries = append(entries, namedConfig("explicit")...)
+			loader := newFixtureConfigLoader()
+			loader.configs[configPath] = entries
+
+			var requestTargets []DiscoveryFile
+			var standaloneTargets []string
+			if test.exact {
+				requestTargets = make([]DiscoveryFile, 0, len(test.exactTargets))
+				standaloneTargets = make([]string, 0, len(test.exactTargets))
+				for _, relativePath := range test.exactTargets {
+					path := tspath.NormalizePath(filepath.Join(root, filepath.FromSlash(relativePath)))
+					requestTargets = append(requestTargets, DiscoveryFile{Path: path})
+					standaloneTargets = append(standaloneTargets, path)
+				}
+			}
+			fsys := discoveryTestFS()
+			catalog, err := LoadExplicitConfig(
+				context.Background(),
+				fsys,
+				loader,
+				ExplicitConfigRequest{
+					CWD:         root,
+					ConfigPath:  configPath,
+					TargetFiles: requestTargets,
+				},
+			)
+			if err != nil {
+				t.Fatalf("LoadExplicitConfig: %v", err)
+			}
+			root = tspath.NormalizePath(root)
+			projected := catalog.Configs[root]
+			standalone := rslintconfig.ConfigWithGitignore(entries, root, fsys, standaloneTargets)
+			for _, relativePath := range test.check {
+				path := tspath.NormalizePath(filepath.Join(root, filepath.FromSlash(relativePath)))
+				gotSelected := projected.GetConfigForFile(path, root) != nil
+				wantSelected := standalone.GetConfigForFile(path, root) != nil
+				if gotSelected != wantSelected {
+					t.Errorf(
+						"%s selected by staged projection = %t, standalone policy = %t",
+						relativePath,
+						gotSelected,
+						wantSelected,
+					)
+				}
+			}
+		})
 	}
 }
 
@@ -965,7 +1950,7 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 			},
 		}
 
-		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:                       lexicalRoot,
 			Directories:               []string{lexicalRoot},
 			LimitDirectoryWalkToFiles: true,
@@ -983,6 +1968,57 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 		}
 		if got := fsys.realpathCallCount(lexicalRoot); got != 1 {
 			t.Fatalf("lexical directory realpath calls = %d, want 1", got)
+		}
+	})
+
+	t.Run("directory reads lexical Git source in canonical matching space", func(t *testing.T) {
+		lexicalRoot := t.TempDir()
+		physicalRoot := t.TempDir()
+		loader := newFixtureConfigLoader()
+		configPath := writeConfigCandidate(t, physicalRoot, "rslint.config.js")
+		lexicalIgnored := writeDiscoveryFixture(t, lexicalRoot, "lexical-hidden/index.ts", "export {}\n")
+		physicalOnly := writeDiscoveryFixture(t, lexicalRoot, "physical-hidden/index.ts", "export {}\n")
+		lexicalGitignore := writeDiscoveryFixture(t, lexicalRoot, ".gitignore", "lexical-hidden/\n")
+		physicalGitignore := writeDiscoveryFixture(t, physicalRoot, ".gitignore", "physical-hidden/\n")
+		loader.configs[configPath] = namedConfig("physical-directory")
+		fsys := &configDiscoveryReadSpyFS{FS: &configDiscoveryRealpathFS{
+			FS: discoveryTestFS(),
+			realPaths: map[string]string{
+				tspath.NormalizePath(lexicalRoot): tspath.NormalizePath(physicalRoot),
+			},
+		}}
+
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+			CWD:                       lexicalRoot,
+			Directories:               []string{lexicalRoot},
+			LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{
+				{Path: lexicalIgnored, Explicit: false},
+				{Path: physicalOnly, Explicit: false},
+			},
+		})
+		if err != nil {
+			t.Fatalf("DiscoverAutomatic: %v", err)
+		}
+		physicalRoot = tspath.NormalizePath(physicalRoot)
+		effective := catalog.Configs[physicalRoot]
+		if !effective.IsFileIgnored(
+			tspath.CombinePaths(physicalRoot, "lexical-hidden/index.ts"),
+			physicalRoot,
+		) {
+			t.Fatal("lexical .gitignore was not projected into canonical owner space")
+		}
+		if effective.IsFileIgnored(
+			tspath.CombinePaths(physicalRoot, "physical-hidden/index.ts"),
+			physicalRoot,
+		) {
+			t.Fatal("canonical-root .gitignore replaced the lexical walk source")
+		}
+		fsys.mu.Lock()
+		reads := slices.Clone(fsys.gitignorePaths)
+		fsys.mu.Unlock()
+		if !slices.Contains(reads, lexicalGitignore) || slices.Contains(reads, physicalGitignore) {
+			t.Fatalf("Git source IO paths = %v, want lexical root only", reads)
 		}
 	})
 
@@ -1016,6 +2052,117 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 	})
 }
 
+func TestConfigDiscoveryCaseInsensitiveRootsChooseStableRepresentative(t *testing.T) {
+	fsys := &configDiscoveryCaseSensitivityFS{
+		FS:            discoveryTestFS(),
+		caseSensitive: false,
+	}
+	build := func(directories []string) []string {
+		builder := configCatalogBuilder{
+			fs: fsys,
+			request: ConfigDiscoveryRequest{
+				CWD:         "C:/repo",
+				Directories: directories,
+			},
+		}
+		return builder.normalizedDirectoryRoots()
+	}
+	first := build([]string{"c:/repo", "C:/Repo"})
+	second := build([]string{"C:/Repo", "c:/repo"})
+	want := []string{"C:/Repo"}
+	if !reflect.DeepEqual(first, want) || !reflect.DeepEqual(second, want) {
+		t.Fatalf("case-insensitive roots depend on input order: first=%v second=%v", first, second)
+	}
+}
+
+func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
+	shareConfig := "//server/share/rslint.config.js"
+	serverConfig := "//server/rslint.config.js"
+
+	t.Run("parent traversal", func(t *testing.T) {
+		for _, test := range []struct {
+			directory string
+			parent    string
+		}{
+			{directory: "/repo/pkg", parent: "/repo"},
+			{directory: "/", parent: ""},
+			{directory: "C:/repo", parent: "C:/"},
+			{directory: "C:/", parent: ""},
+			{directory: "//server/share/repo", parent: "//server/share"},
+			{directory: "//server/share", parent: ""},
+			{directory: "//server/share/", parent: ""},
+			{directory: "//server", parent: ""},
+		} {
+			if got := configDiscoveryParent(test.directory); got != test.parent {
+				t.Fatalf("configDiscoveryParent(%q) = %q, want %q", test.directory, got, test.parent)
+			}
+		}
+	})
+
+	t.Run("ancestor chain includes the share root but not the server", func(t *testing.T) {
+		fsys := &configDiscoveryCandidateFS{
+			FS: discoveryTestFS(),
+			files: map[string]struct{}{
+				shareConfig:  {},
+				serverConfig: {},
+			},
+		}
+		builder := configCatalogBuilder{
+			fs:      fsys,
+			request: ConfigDiscoveryRequest{CWD: "//server/share/repo"},
+		}
+
+		candidates := builder.findCandidateChain("//server/share/repo")
+		if len(candidates) != 1 || candidates[0].path != shareConfig {
+			t.Fatalf("UNC ancestor candidates = %+v, want share root only", candidates)
+		}
+	})
+
+	t.Run("nearest search cannot escape to the server", func(t *testing.T) {
+		fsys := &configDiscoveryCandidateFS{
+			FS: discoveryTestFS(),
+			files: map[string]struct{}{
+				serverConfig: {},
+			},
+		}
+		builder := configCatalogBuilder{
+			fs:      fsys,
+			request: ConfigDiscoveryRequest{CWD: "//server/share/repo"},
+		}
+
+		if candidate, found := builder.findCandidateUp("//server/share/repo"); found {
+			t.Fatalf("UNC nearest search escaped its share: %+v", candidate)
+		}
+	})
+
+	t.Run("failed share candidate cannot fall back to the server", func(t *testing.T) {
+		fsys := &configDiscoveryCandidateFS{
+			FS: discoveryTestFS(),
+			files: map[string]struct{}{
+				shareConfig:  {},
+				serverConfig: {},
+			},
+		}
+		loader := newFixtureConfigLoader()
+		loader.failures[shareConfig] = ConfigModuleError{Code: "ERR", Message: "broken"}
+		loader.configs[serverConfig] = namedConfig("outside-share")
+
+		_, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+			CWD: "//server/share/repo",
+			Files: []DiscoveryFile{{
+				Path:     "//server/share/repo/src/index.ts",
+				Explicit: true,
+			}},
+		})
+		if !errors.Is(err, ErrAllConfigsFailed) {
+			t.Fatalf("failed share config error = %v, want ErrAllConfigsFailed", err)
+		}
+		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{shareConfig}) {
+			t.Fatalf("requested configs = %v, want failed share config only", got)
+		}
+	})
+}
+
 func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation(t *testing.T) {
 	t.Run("distinct symlink aliases are rejected", func(t *testing.T) {
 		root := t.TempDir()
@@ -1036,7 +2183,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		loader.configs[aliasAConfig] = namedConfig("owner-a")
 		loader.configs[aliasBConfig] = namedConfig("owner-b")
 
-		catalog, err := Build(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+		catalog, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{aliasA, aliasB},
 		})
@@ -1072,7 +2219,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		loader.configs[tspath.CombinePaths(upperAlias, filepath.Base(configPath))] = namedConfig("upper")
 		loader.configs[tspath.CombinePaths(lowerAlias, filepath.Base(configPath))] = namedConfig("lower")
 
-		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{upperAlias, lowerAlias},
 		})
@@ -1106,7 +2253,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		}
 		fsys := &configDiscoveryCaseSensitivityFS{FS: realpathFS, caseSensitive: false}
 
-		catalog, err := Build(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
 			CWD:         root,
 			Directories: []string{upperRoot, lowerRoot},
 		})
@@ -1209,7 +2356,7 @@ func TestConfigDiscoveryWalksSiblingFrontierConcurrentlyWithStableOutput(t *test
 	parallelLoader := newFixtureConfigLoader()
 	parallelLoader.configs[rootConfig] = namedConfig("root")
 	probeFS := newConfigDiscoveryConcurrencyFS(discoveryTestFS(), aDir, bDir)
-	parallelCatalog, err := Build(context.Background(), probeFS, parallelLoader, ConfigDiscoveryRequest{
+	parallelCatalog, err := DiscoverAutomatic(context.Background(), probeFS, parallelLoader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1269,7 +2416,7 @@ func TestConfigDiscoveryTransactionIDsAreUniqueAcrossBuilds(t *testing.T) {
 	for range builds {
 		go func() {
 			defer waitGroup.Done()
-			catalog, err := Build(context.Background(), discoveryTestFS(), nil, ConfigDiscoveryRequest{CWD: root})
+			catalog, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), nil, ConfigDiscoveryRequest{CWD: root})
 			if err != nil {
 				results <- result{err: err}
 				return
@@ -1354,7 +2501,7 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 	nestedConfigPath := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
 	loader.failures[configPath] = ConfigModuleError{Code: "ERR", Message: "nope"}
 	loader.failures[nestedConfigPath] = ConfigModuleError{Code: "ERR_NESTED", Message: "nested nope"}
-	_, err := Build(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+	_, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1378,7 +2525,7 @@ func TestConfigDiscoveryAllBrokenDoesNotSilentlyProduceEmptyCatalog(t *testing.T
 	invalidLoader := newFixtureConfigLoader()
 	invalidLoader.failures[configPath] = ConfigModuleError{Code: "invalid", Message: "not an array"}
 	invalidLoader.failures[nestedConfigPath] = ConfigModuleError{Code: "invalid", Message: "nested not an array"}
-	_, err = Build(context.Background(), discoveryTestFS(), invalidLoader, ConfigDiscoveryRequest{
+	_, err = DiscoverAutomatic(context.Background(), discoveryTestFS(), invalidLoader, ConfigDiscoveryRequest{
 		CWD:         root,
 		ImplicitCWD: true,
 	})
@@ -1400,7 +2547,7 @@ func buildFixtureCatalog(t *testing.T, root string, loader ConfigModuleLoader, r
 	if request.CWD == "" {
 		request.CWD = root
 	}
-	catalog, err := Build(context.Background(), discoveryTestFS(), loader, request)
+	catalog, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), loader, request)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -1413,6 +2560,15 @@ func discoveryTestFS() vfs.FS {
 
 func namedConfig(name string) rslintconfig.RslintConfig {
 	return rslintconfig.RslintConfig{{Name: name, Rules: rslintconfig.Rules{}}}
+}
+
+func namedConfigEntry(entries rslintconfig.RslintConfig) rslintconfig.ConfigEntry {
+	for _, entry := range entries {
+		if entry.Name != "" {
+			return entry
+		}
+	}
+	return rslintconfig.ConfigEntry{}
 }
 
 func writeConfigCandidate(t *testing.T, root string, relativePath string) string {

@@ -262,18 +262,16 @@ type RuleContext struct {
 	InlineGlobals []InlineGlobal
 	// Globals is the fully resolved set of declared global names for this
 	// file — config `languageOptions.globals` merged with inline
-	// `/* global */` comments, computed once per file by the linter (see
-	// DisableManager, built the same way). Rules should read this instead of
-	// parsing comments or config themselves. Nil only when neither source
-	// mentions any globals; a name maps to false when its final setting is "off".
+	// `/* global */` comments, resolved once per file by the linter. Rules
+	// should read this instead of parsing comments or config themselves. Nil
+	// only when neither source mentions any globals; a name maps to false when
+	// its final setting is "off".
 	Globals map[string]bool
-	// Comments holds every comment in SourceFile, in source order,
-	// computed once per file by the linter (see DisableManager, built the
-	// same way). Rules that need all of a file's comments should read this
-	// instead of walking the token tree again with utils.ForEachComment —
-	// several rules doing that independently once dominated per-file lint
-	// time (each repeats the same full tokenization the parser already did).
-	Comments                   []*ast.CommentRange
+	// Comments lazily provides every comment in SourceFile, in source order.
+	// Rules should call Comments.All instead of walking the token tree with
+	// utils.ForEachComment. The first consumer computes the list and every
+	// later consumer for this file reuses it.
+	Comments                   *CommentStore
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager

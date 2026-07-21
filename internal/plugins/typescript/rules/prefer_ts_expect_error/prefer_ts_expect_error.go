@@ -109,7 +109,10 @@ var PreferTsExpectErrorRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-ts-expect-error",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		fullText := ctx.SourceFile.Text()
-		for _, comment := range ctx.Comments {
+		if !strings.Contains(fullText, tsIgnoreDirective) {
+			return rule.RuleListeners{}
+		}
+		for _, comment := range ctx.Comments.All() {
 			if comment == nil {
 				continue
 			}

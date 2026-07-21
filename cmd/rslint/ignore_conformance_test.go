@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -225,8 +226,18 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 	}}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(firstDir):  entry,
-			tspath.NormalizePath(secondDir): entry,
+			tspath.NormalizePath(firstDir): rslintconfig.ConfigWithGitignore(
+				entry,
+				tspath.NormalizePath(firstDir),
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(firstTarget)},
+			),
+			tspath.NormalizePath(secondDir): rslintconfig.ConfigWithGitignore(
+				entry,
+				tspath.NormalizePath(secondDir),
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(secondTarget)},
+			),
 		},
 		Scopes: map[string]rslintconfig.LintDiscoveryScope{
 			tspath.NormalizePath(firstDir):  {Files: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
@@ -271,8 +282,18 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(workspace):  {{Rules: rslintconfig.Rules{"no-console": "error"}}},
-			tspath.NormalizePath(ignoredDir): {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+			tspath.NormalizePath(workspace): rslintconfig.ConfigWithGitignore(
+				rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
+				tspath.NormalizePath(workspace),
+				osvfs.FS(),
+				nil,
+			),
+			tspath.NormalizePath(ignoredDir): rslintconfig.ConfigWithGitignore(
+				rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+				tspath.NormalizePath(ignoredDir),
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(explicitTarget)},
+			),
 		},
 		Scopes: map[string]rslintconfig.LintDiscoveryScope{
 			tspath.NormalizePath(ignoredDir): {
@@ -327,8 +348,22 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 	}}
 	catalog := &discovery.ConfigCatalog{
 		Configs: map[string]rslintconfig.RslintConfig{
-			tspath.NormalizePath(workspace): entry,
-			tspath.NormalizePath(childDir):  entry,
+			tspath.NormalizePath(workspace): rslintconfig.ConfigWithGitignoreWithBoundaries(
+				entry,
+				tspath.NormalizePath(workspace),
+				osvfs.FS(),
+				[]string{
+					tspath.NormalizePath(parentOwnedTarget),
+					tspath.NormalizePath(parentIgnoredTarget),
+				},
+				[]string{tspath.NormalizePath(childDir)},
+			),
+			tspath.NormalizePath(childDir): rslintconfig.ConfigWithGitignore(
+				entry,
+				tspath.NormalizePath(childDir),
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(childOwnedTarget)},
+			),
 		},
 		Scopes: map[string]rslintconfig.LintDiscoveryScope{
 			tspath.NormalizePath(workspace): {

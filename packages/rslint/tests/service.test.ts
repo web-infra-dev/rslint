@@ -206,7 +206,7 @@ describe('RSLintService reverse lint request scoping', () => {
 
     await expect(
       service.lint(
-        { configDiscovery: { mode: 'auto' } },
+        { configDiscovery: {} },
         {
           loadConfigs: (request) => ({ loaded: request }),
           activateConfigs: (request) => ({ activated: request }),
@@ -238,7 +238,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const service = new RSLintService(backend);
     await expect(
       service.lint(
-        { configDiscovery: { mode: 'auto' } },
+        { configDiscovery: {} },
         {
           loadConfigs: () => ({ results: [] }),
           activateConfigs: () => ({ eslintPluginEntries: [] }),
@@ -252,7 +252,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const service = new RSLintService(new ReverseConfigBackend());
     await expect(
       service.lint(
-        { configDiscovery: { mode: 'auto' } },
+        { configDiscovery: {} },
         { loadConfigs: () => ({ results: [] }) },
       ),
     ).rejects.toThrow(/loadConfigs and activateConfigs handlers together/);

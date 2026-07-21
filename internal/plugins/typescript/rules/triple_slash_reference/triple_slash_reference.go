@@ -58,30 +58,35 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 	}
 
-	// Get the full text of the source file
 	text := ctx.SourceFile.Text()
-
-	// Split into lines to check for triple-slash references
-	lines := strings.Split(text, "\n")
 
 	// Check if file has imports
 	hasImport := hasImportStatements(ctx.SourceFile)
 
-	for lineNum, line := range lines {
-		trimmed := strings.TrimSpace(line)
+	// Only real single-line comment tokens can be triple-slash directives, so
+	// this walks the linter's precomputed comment list instead of scanning
+	// raw source text/lines. That avoids matching text that merely looks like
+	// a reference comment inside a string, template literal, or block comment.
+	for _, comment := range ctx.Comments.All() {
+		if comment.Kind != ast.KindSingleLineCommentTrivia {
+			continue
+		}
+		if comment.Pos() < 0 || comment.End() > len(text) {
+			continue
+		}
 
-		// Check if this is a triple-slash reference
-		if !tripleSlashRegex.MatchString(trimmed) {
+		commentText := text[comment.Pos():comment.End()]
+		if !tripleSlashRegex.MatchString(commentText) {
 			continue
 		}
 
 		// Determine the type of reference
 		var refType string
-		if strings.Contains(trimmed, `path=`) {
+		if strings.Contains(commentText, `path=`) {
 			refType = "path"
-		} else if strings.Contains(trimmed, `types=`) {
+		} else if strings.Contains(commentText, `types=`) {
 			refType = "types"
-		} else if strings.Contains(trimmed, `lib=`) {
+		} else if strings.Contains(commentText, `lib=`) {
 			refType = "lib"
 		}
 
@@ -97,14 +102,8 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 
 		if shouldReport {
-			// Calculate position (approximate - this is simplified)
-			pos := 0
-			for i := range lineNum {
-				pos += len(lines[i]) + 1 // +1 for newline
-			}
-
 			ctx.ReportRange(
-				core.NewTextRange(pos, pos+len(line)),
+				core.NewTextRange(comment.Pos(), comment.End()),
 				rule.RuleMessage{
 					Id:          "tripleSlashReference",
 					Description: "Do not use a triple slash reference for " + refType + ", use `import` style instead.",

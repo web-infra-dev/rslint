@@ -48,6 +48,11 @@ var BanTsCommentRule = rule.CreateRule(rule.Rule{
 })
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	text := ctx.SourceFile.Text()
+	if !strings.Contains(text, "@ts-") {
+		return rule.RuleListeners{}
+	}
+
 	options := rule.LegacyUnwrapOptions(_options)
 	opts := BanTsCommentOptions{
 		TsExpectError:            "allow-with-description",
@@ -106,7 +111,7 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		firstStatementPos = scanner.GetTokenPosOfNode(ctx.SourceFile.Statements.Nodes[0], ctx.SourceFile, false)
 	}
 
-	processComments(ctx, ctx.SourceFile.Text(), configs, opts.MinimumDescriptionLength, firstStatementPos)
+	processComments(ctx, text, configs, opts.MinimumDescriptionLength, firstStatementPos)
 
 	return rule.RuleListeners{}
 }
@@ -137,7 +142,7 @@ func parseDirectiveConfig(value interface{}) *DirectiveConfig {
 
 // processComments scans real comment trivia and checks for banned directives.
 func processComments(ctx rule.RuleContext, text string, configs map[string]*DirectiveConfig, minDescLength int, firstStatementPos int) {
-	for _, comment := range ctx.Comments {
+	for _, comment := range ctx.Comments.All() {
 		if comment == nil {
 			continue
 		}

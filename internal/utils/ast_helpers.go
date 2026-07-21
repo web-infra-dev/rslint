@@ -18,6 +18,23 @@ func SkipAssertionsAndParens(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, skipTransparentKinds)
 }
 
+// OutermostParenthesizedExpression returns node's outermost
+// ParenthesizedExpression wrapper, or node itself when it is not wrapped.
+// Unlike ast.WalkUpParenthesizedExpressions, this preserves the wrapper that
+// the containing non-parenthesized node sees as its direct child.
+func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil &&
+		ast.IsParenthesizedExpression(current.Parent) {
+		parent := current.Parent.AsParenthesizedExpression()
+		if parent == nil || parent.Expression != current {
+			break
+		}
+		current = current.Parent
+	}
+	return current
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
@@ -144,7 +161,7 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 
 	// export { local as exported }: only `local` can read a runtime value.
 	if parent.Kind == ast.KindExportSpecifier {
-		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || isReExportSpecifier(parent) {
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || IsReExportSpecifier(parent) {
 			return true
 		}
 		es := parent.AsExportSpecifier()
@@ -281,9 +298,9 @@ func IsUndefinedIdentifier(node *ast.Node) bool {
 	return node != nil && ast.IsIdentifier(node) && node.AsIdentifier().Text == "undefined"
 }
 
-// isReExportSpecifier checks if an ExportSpecifier is part of a re-export
+// IsReExportSpecifier checks if an ExportSpecifier is part of a re-export
 // declaration (export { ... } from 'mod').
-func isReExportSpecifier(exportSpec *ast.Node) bool {
+func IsReExportSpecifier(exportSpec *ast.Node) bool {
 	// ExportSpecifier → NamedExports → ExportDeclaration
 	namedExports := exportSpec.Parent
 	if namedExports == nil {
@@ -294,4 +311,23 @@ func isReExportSpecifier(exportSpec *ast.Node) bool {
 		return false
 	}
 	return exportDecl.AsExportDeclaration().ModuleSpecifier != nil
+}
+
+// IsClassExtendsHeritageClause reports whether an ExpressionWithTypeArguments
+// node sits inside a class (not interface) `extends` clause — a value
+// context, since the superclass expression is actually evaluated at runtime.
+// Every other heritage use (interface extends, class implements) is a pure
+// type position.
+func IsClassExtendsHeritageClause(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindHeritageClause {
+		return false
+	}
+	clause := parent.AsHeritageClause()
+	if clause.Token != ast.KindExtendsKeyword {
+		return false
+	}
+	grandparent := parent.Parent
+	return grandparent != nil &&
+		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
 }

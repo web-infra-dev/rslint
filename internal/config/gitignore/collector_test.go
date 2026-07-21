@@ -564,6 +564,84 @@ func TestSortByPathDepthTreatsUNCShareAsRoot(t *testing.T) {
 	})
 }
 
+func TestCursorDirectoryReachability(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		content     string
+		directory   string
+		wantBlocked bool
+	}{
+		{
+			name:        "directory remains ignored",
+			content:     "ignored/\n",
+			directory:   "C:/repo/ignored",
+			wantBlocked: true,
+		},
+		{
+			name:        "exact directory negation reopens",
+			content:     "ignored/\n!ignored/\n",
+			directory:   "C:/repo/ignored",
+			wantBlocked: false,
+		},
+		{
+			name:        "file negation does not reopen directory",
+			content:     "ignored/\n!ignored/keep.ts\n",
+			directory:   "C:/repo/ignored",
+			wantBlocked: true,
+		},
+		{
+			name:        "descendant negation does not reopen directory",
+			content:     "ignored/\n!ignored/**/*\n",
+			directory:   "C:/repo/ignored",
+			wantBlocked: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cursor := NewCursor("c:/REPO", false)
+			cursor, _ = cursor.AppendSource("C:/repo", test.content)
+			_, blocked := cursor.Enter(test.directory)
+			assert.Equal(t, blocked, test.wantBlocked)
+		})
+	}
+}
+
+func TestCursorBlockSourceTraversalPreservesInheritedRules(t *testing.T) {
+	cursor := NewCursor("/repo", true)
+	cursor, _ = cursor.AppendSource("/repo", "ignored/\n")
+	cursor = cursor.BlockSourceTraversal()
+
+	next, blocked := cursor.Enter("/repo/ignored")
+	assert.Assert(t, blocked)
+	assert.Assert(t, !next.SourceReachable())
+
+	next, globs := cursor.AppendSource("/repo", "must-not-apply/\n")
+	assert.Assert(t, !next.SourceReachable())
+	assert.Equal(t, len(globs), 0)
+	_, blocked = next.Enter("/repo/must-not-apply")
+	assert.Assert(t, !blocked)
+}
+
+func TestCursorRejectsPathsOutsideOwnerVolume(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		root      string
+		directory string
+	}{
+		{name: "different drive", root: "C:/repo", directory: "D:/repo"},
+		{name: "different UNC share", root: "//server/share/repo", directory: "//server/other/repo"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cursor := NewCursor(test.root, false)
+			next, blocked := cursor.Enter(test.directory)
+			assert.Assert(t, blocked)
+			assert.Assert(t, !next.SourceReachable())
+			next, globs := cursor.AppendSource(test.directory, "ignored/\n")
+			assert.Equal(t, len(globs), 0)
+			assert.Assert(t, !next.SourceReachable())
+		})
+	}
+}
+
 func TestReadGitignoreAsGlobs_StopsAtConfigDirAcrossFilesystemRoots(t *testing.T) {
 	tests := []struct {
 		name         string

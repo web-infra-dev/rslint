@@ -2,7 +2,6 @@ package max_lines_per_function
 
 import (
 	"fmt"
-	"sort"
 	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -19,7 +18,11 @@ var MaxLinesPerFunctionRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		state := newLineState(ctx.SourceFile, ctx.Comments)
+		var comments []*ast.CommentRange
+		if opts.skipComments {
+			comments = ctx.Comments.All()
+		}
+		state := newLineState(ctx.SourceFile, comments, opts.skipComments)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -177,13 +180,22 @@ type lineState struct {
 	lineComment []*ast.CommentRange
 }
 
-func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange) *lineState {
+func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange, includeComments bool) *lineState {
 	text := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)
 	if len(lineStarts) == 0 {
 		lineStarts = []core.TextPos{0}
 	}
 	nLines := len(lineStarts)
+	state := &lineState{
+		sourceFile: sourceFile,
+		text:       text,
+		lineStarts: lineStarts,
+		nLines:     nLines,
+	}
+	if !includeComments {
+		return state
+	}
 
 	var comments []*ast.CommentRange
 	// ESLint's sourceCode.getAllComments() includes the hashbang (`#!`) line,
@@ -196,13 +208,8 @@ func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange
 		})
 	}
 	comments = append(comments, sourceComments...)
-	// ForEachComment may surface a comment twice (once as a token's trailing
-	// range, once as the next token's leading range) and not strictly in source
-	// order. Sort so a deterministic "last write wins" assignment to
-	// lineComment matches ESLint's iteration order.
-	sort.Slice(comments, func(i, j int) bool {
-		return comments[i].Pos() < comments[j].Pos()
-	})
+	// CommentStore guarantees that sourceComments is ordered and deduplicated;
+	// the optional synthesized hashbang is at position zero.
 
 	// nLines lines (0-indexed) → store at index = line. We use 0-indexed lines
 	// throughout this rule for consistency with scanner.ComputeLineOfPosition.
@@ -220,13 +227,8 @@ func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange
 		}
 	}
 
-	return &lineState{
-		sourceFile:  sourceFile,
-		text:        text,
-		lineStarts:  lineStarts,
-		nLines:      nLines,
-		lineComment: lineComment,
-	}
+	state.lineComment = lineComment
+	return state
 }
 
 // nodeLineRange returns the inclusive 0-indexed line range of the node,

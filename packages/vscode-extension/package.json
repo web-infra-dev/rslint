@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "Rslint",
   "description": "Language support for Rslint",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",
@@ -21,7 +21,7 @@
     "go"
   ],
   "engines": {
-    "vscode": "^1.125.0"
+    "vscode": "^1.129.0"
   },
   "main": "./dist/main.js",
   "activationEvents": [

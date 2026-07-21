@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
@@ -30,6 +31,30 @@ func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) 
 func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
 	relative, ok := matcher.relativePath(directory, canonicalDirectory)
 	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
+}
+
+// ReopensDirectoryNode reports whether the ordered authored global-ignore
+// patterns leave directory itself re-included. A pattern must match the current
+// node: `!dir`, `!dir/`, and `!dir/**` reopen dir, while `!dir/**/*` and
+// `!dir/file.ts` do not. Descendant patterns can still reopen a matching child.
+//
+// Positive authored directory blocks remain absolute under rslint's existing
+// semantics and are checked by BlocksDirectory before callers consult this
+// method.
+func (matcher GlobalIgnoreMatcher) ReopensDirectoryNode(directory string, canonicalDirectory string) bool {
+	relative, ok := matcher.relativePath(directory, canonicalDirectory)
+	if !ok || len(matcher.patterns) == 0 {
+		return false
+	}
+	relative = strings.TrimSuffix(relative, "/")
+	reopened := false
+	for _, pattern := range matcher.patterns {
+		if ignorePatternMatches(pattern, relative) ||
+			ignorePatternMatches(pattern, relative+"/") {
+			reopened = pattern.Negated
+		}
+	}
+	return reopened
 }
 
 // IgnoresPath reports whether global ignores exclude a config candidate.
@@ -186,13 +211,15 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 	return ignored
 }
 
+// ignorePatternMatches reports whether path matches pattern.Glob, applying the
+// case fold for case-insensitive patterns.
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
 		glob = strings.ToLower(glob)
 		path = strings.ToLower(path)
 	}
-	return matchGlob(glob, path)
+	return utils.MatchGlob(glob, path)
 }
 
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).

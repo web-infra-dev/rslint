@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 )
 
 type configCandidate struct {
@@ -38,6 +39,9 @@ type discoverySeed struct {
 	explicitFile       bool
 	ownerDir           string
 	ownerPath          string
+	gitDirectory       string
+	gitCursor          gitignore.Cursor
+	gitActive          bool
 	done               bool
 }
 
@@ -46,6 +50,9 @@ type discoveryWalkNode struct {
 	canonicalDirectory string
 	ownerDir           string
 	ownerPath          string
+	gitDirectory       string
+	gitCursor          gitignore.Cursor
+	gitActive          bool
 	targets            *discoveryTargetTrie
 }
 
@@ -63,37 +70,58 @@ type suspendedDiscoveryNode struct {
 }
 
 type discoveryWalkResult struct {
-	children            []discoveryWalkNode
-	pending             *suspendedDiscoveryNode
-	activation          *configLoadState
-	directoriesVisited  int
-	directoriesPruned   int
-	discoveredCandidate bool
-	err                 error
+	children             []discoveryWalkNode
+	pending              *suspendedDiscoveryNode
+	activation           *configLoadState
+	gitignoreObservation *gitignoreObservation
+	directoriesVisited   int
+	directoriesPruned    int
+	discoveredCandidate  bool
+	err                  error
 }
 
 type directorySeedResolution struct {
-	seed       *discoverySeed
-	candidates []configCandidate
-	next       int
+	seed            *discoverySeed
+	candidates      []configCandidate
+	next            int
+	gitDirectory    string
+	gitCursor       gitignore.Cursor
+	gitActive       bool
+	configReachable bool
+}
+
+type gitignoreObservation struct {
+	ownerDirectory  string
+	sourceDirectory string
+	globs           []string
+}
+
+type gitignoreReadResult struct {
+	content string
+	exists  bool
 }
 
 type configCatalogBuilder struct {
-	ctx           context.Context
-	fs            vfs.FS
-	loader        ConfigModuleLoader
-	request       ConfigDiscoveryRequest
-	transactionID string
+	ctx                context.Context
+	fs                 vfs.FS
+	loader             ConfigModuleLoader
+	request            ConfigDiscoveryRequest
+	explicitConfigPath string
+	transactionID      string
 
-	loadStates          map[string]*configLoadState
-	loadStateByIdentity map[tspath.Path]*configLoadState
-	configs             map[string]rslintconfig.RslintConfig
-	sources             map[string]configSource
-	scopes              map[string]rslintconfig.LintDiscoveryScope
-	failureByPath       map[string]ConfigFailure
-	hadCandidates       bool
-	nextRequestID       int
-	stats               ConfigDiscoveryStats
+	loadStates           map[string]*configLoadState
+	loadStateByIdentity  map[tspath.Path]*configLoadState
+	configs              map[string]rslintconfig.RslintConfig
+	sources              map[string]configSource
+	scopes               map[string]rslintconfig.LintDiscoveryScope
+	failureByPath        map[string]ConfigFailure
+	gitignoreSources     map[string]map[tspath.Path]gitignoreObservation
+	gitignoreReadMu      sync.Mutex
+	gitignoreReadCache   map[tspath.Path]gitignoreReadResult
+	gitignoreReadPending map[tspath.Path]chan struct{}
+	hadCandidates        bool
+	nextRequestID        int
+	stats                ConfigDiscoveryStats
 }
 
 func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
@@ -107,12 +135,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 	cwd = tspath.NormalizePath(cwd)
 	builder.request.CWD = cwd
 
-	if builder.request.Mode == ConfigDiscoveryExplicit {
-		if builder.request.ExplicitConfigPath == "" {
-			return nil, errors.New("explicit config discovery requires a config path")
-		}
+	if builder.explicitConfigPath != "" {
 		candidate := configCandidate{
-			path: normalizeDiscoveryPath(builder.request.ExplicitConfigPath, cwd),
+			path: normalizeDiscoveryPath(builder.explicitConfigPath, cwd),
 			// Explicit flat configs resolve files/ignores/projects from the
 			// invocation cwd, not the module's physical directory.
 			directory: cwd,
@@ -126,6 +151,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			return nil, builder.allConfigsFailedError()
 		}
 		if err := builder.activate(state, false); err != nil {
+			return nil, err
+		}
+		if err := builder.projectExplicitConfigGitignore(state); err != nil {
 			return nil, err
 		}
 		return builder.catalog()
@@ -154,14 +182,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			// A default-excluded directory is a downward traversal boundary, not a
 			// reason to discard still-reachable configuration outside it. Skip the
 			// root and every default-excluded ancestor, then resolve normally.
-			searchDirectory = tspath.GetDirectoryPath(directory)
+			searchDirectory = configDiscoveryParent(directory)
 			for searchDirectory != "" && isDefaultDiscoveryExcluded(searchDirectory, cwd, useCaseSensitive) {
-				parent := tspath.GetDirectoryPath(searchDirectory)
-				if parent == searchDirectory {
-					searchDirectory = ""
-					break
-				}
-				searchDirectory = parent
+				searchDirectory = configDiscoveryParent(searchDirectory)
 			}
 			if searchDirectory == "" {
 				continue
@@ -239,6 +262,7 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 		scope.Files = appendUniqueSortedPath(scope.Files, seed.path)
 		builder.scopes[seed.ownerDir] = scope
 	}
+	builder.collectExactTargetGitignore(explicitSeeds)
 
 	walkRoots := make([]discoveryWalkNode, 0, len(directorySeedByPath))
 	for _, directory := range directoryRoots {
@@ -251,6 +275,9 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			canonicalDirectory: seed.canonicalWalkDir,
 			ownerDir:           seed.ownerDir,
 			ownerPath:          seed.ownerPath,
+			gitDirectory:       seed.gitDirectory,
+			gitCursor:          seed.gitCursor,
+			gitActive:          seed.gitActive,
 			targets:            targetsByRoot[directory],
 		})
 	}
@@ -264,42 +291,71 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 	return builder.catalog()
 }
 
+// projectExplicitConfigGitignore freezes the invocation-scoped Git projection
+// after the exact config has loaded. Config selection is already complete:
+// full-subtree projection uses the catalog's bounded parallel frontier with one
+// fixed owner, while exact targets reuse the source-chain path used by literal
+// automatic targets. Neither path performs automatic candidate discovery.
+func (builder *configCatalogBuilder) projectExplicitConfigGitignore(state *configLoadState) error {
+	if state == nil || state.failure != nil {
+		return nil
+	}
+	if builder.request.Files != nil {
+		files := builder.normalizedFiles()
+		seeds := make([]*discoverySeed, 0, len(files))
+		for _, file := range files {
+			seed := &discoverySeed{
+				path: rslintconfig.ResolveGitignoreCollectionPath(
+					file.Path,
+					file.CanonicalPath,
+					state.candidate.directory,
+					builder.fs,
+				),
+				ownerDir:  state.candidate.directory,
+				ownerPath: state.candidate.path,
+			}
+			seeds = append(seeds, seed)
+		}
+		builder.collectExactTargetGitignore(seeds)
+		return builder.ctx.Err()
+	}
+
+	root := state.candidate.directory
+	canonicalRoot := builder.fs.Realpath(root)
+	if discoveryPathsEqual(root, canonicalRoot, builder.fs.UseCaseSensitiveFileNames()) {
+		canonicalRoot = ""
+	}
+	return builder.walkDirectories([]discoveryWalkNode{{
+		directory:          root,
+		canonicalDirectory: canonicalRoot,
+		ownerDir:           root,
+		ownerPath:          state.candidate.path,
+		gitDirectory:       root,
+		gitCursor:          gitignore.NewCursor(root, builder.fs.UseCaseSensitiveFileNames()),
+		gitActive:          true,
+	}})
+}
+
 func (builder *configCatalogBuilder) normalizedDirectoryRoots() []string {
 	raw := builder.request.Directories
 	if len(raw) == 0 && len(builder.request.Files) == 0 && builder.request.ImplicitCWD {
 		raw = []string{builder.request.CWD}
 	}
-	seen := make(map[string]struct{}, len(raw))
-	roots := make([]string, 0, len(raw))
+	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
+	byIdentity := make(map[tspath.Path]string, len(raw))
 	for _, directory := range raw {
 		directory = normalizeDiscoveryPath(directory, builder.request.CWD)
-		if _, exists := seen[directory]; exists {
-			continue
+		identity := tspath.ToPath(directory, "", useCaseSensitive)
+		if current, exists := byIdentity[identity]; !exists || directory < current {
+			byIdentity[identity] = directory
 		}
-		seen[directory] = struct{}{}
+	}
+	roots := make([]string, 0, len(byIdentity))
+	for _, directory := range byIdentity {
 		roots = append(roots, directory)
 	}
-	sort.Slice(roots, func(i, j int) bool {
-		if len(roots[i]) != len(roots[j]) {
-			return len(roots[i]) < len(roots[j])
-		}
-		return roots[i] < roots[j]
-	})
-	compact := roots[:0]
-	for _, root := range roots {
-		covered := false
-		for _, parent := range compact {
-			if discoveryPathsEqual(root, parent, builder.fs.UseCaseSensitiveFileNames()) ||
-				tspath.StartsWithDirectory(root, parent, builder.fs.UseCaseSensitiveFileNames()) {
-				covered = true
-				break
-			}
-		}
-		if !covered {
-			compact = append(compact, root)
-		}
-	}
-	return compact
+	sort.Strings(roots)
+	return roots
 }
 
 func (builder *configCatalogBuilder) normalizedFiles() []DiscoveryFile {
@@ -324,7 +380,7 @@ func (builder *configCatalogBuilder) normalizedFiles() []DiscoveryFile {
 	return files
 }
 
-// targetAncestorTries maps each compact directory root to the lexical paths
+// targetAncestorTries maps each directory root to the lexical paths
 // that can govern a supplied target. Native API callers have already expanded
 // their globs, so configs in every other subtree cannot affect this request and
 // must not be evaluated. Directory-only CLI/LSP requests have no files and keep
@@ -363,9 +419,6 @@ func (builder *configCatalogBuilder) targetAncestorTries(
 				}
 				trie = child
 			}
-			// normalizedDirectoryRoots removes overlapping roots, so a file can
-			// belong to at most one retained lexical root.
-			break
 		}
 	}
 	return tries
@@ -410,7 +463,11 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			seed.usingCanonical = true
 			candidates = builder.findCandidateChain(seed.canonicalSearchDir)
 		}
-		resolutions = append(resolutions, directorySeedResolution{seed: seed, candidates: candidates})
+		resolutions = append(resolutions, directorySeedResolution{
+			seed:            seed,
+			candidates:      candidates,
+			configReachable: true,
+		})
 	}
 
 	for {
@@ -423,15 +480,32 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			resolution := &resolutions[index]
 			for resolution.next < len(resolution.candidates) {
 				candidateDirectory := resolution.candidates[resolution.next].directory
-				if resolution.seed.ownerPath != "" && builder.isGloballyIgnoredDirectory(
-					resolution.seed.ownerPath,
-					candidateDirectory,
-					candidateDirectory,
-				) {
-					// An authored absolute directory ignore is a permanent traversal
-					// boundary, so every deeper candidate in this ancestry is unreachable.
-					resolution.next = len(resolution.candidates)
-					break
+				if resolution.gitActive {
+					rootDirectory := resolution.seed.searchDir
+					if resolution.seed.usingCanonical {
+						rootDirectory = resolution.seed.canonicalSearchDir
+					}
+					reachable, authoredBlocked := builder.advanceDirectorySeedGit(
+						resolution,
+						candidateDirectory,
+						discoveryPathsEqual(
+							candidateDirectory,
+							rootDirectory,
+							builder.fs.UseCaseSensitiveFileNames(),
+						),
+					)
+					if authoredBlocked {
+						resolution.gitActive = false
+						resolution.next = len(resolution.candidates)
+						break
+					}
+					if !reachable {
+						// Only the supplied root itself may reopen an inherited
+						// Git-inaccessible ancestry. Hidden intermediate configs are
+						// never evaluated.
+						resolution.next++
+						continue
+					}
 				}
 				candidate, found := builder.findCandidateForOwner(
 					candidateDirectory,
@@ -457,7 +531,7 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			}
 		}
 		if len(candidates) == 0 {
-			return nil
+			break
 		}
 		if err := builder.ensureCandidates(candidates); err != nil {
 			return err
@@ -468,10 +542,140 @@ func (builder *configCatalogBuilder) resolveDirectorySeedOwners(seeds []*discove
 			if state != nil && state.failure == nil {
 				resolution.seed.ownerDir = state.candidate.directory
 				resolution.seed.ownerPath = state.candidate.path
+				resolution.gitCursor = gitignore.NewCursor(
+					state.candidate.directory,
+					builder.fs.UseCaseSensitiveFileNames(),
+				)
+				resolution.gitDirectory = state.candidate.directory
+				resolution.gitActive = true
+				resolution.configReachable = true
 			}
 			resolution.next++
 		}
 	}
+
+	for index := range resolutions {
+		resolution := &resolutions[index]
+		if !resolution.gitActive {
+			continue
+		}
+		rootDirectory := resolution.seed.searchDir
+		if resolution.seed.usingCanonical {
+			rootDirectory = resolution.seed.canonicalSearchDir
+		}
+		_, authoredBlocked := builder.advanceDirectorySeedGit(resolution, rootDirectory, true)
+		if authoredBlocked {
+			continue
+		}
+		resolution.seed.gitDirectory = resolution.gitDirectory
+		resolution.seed.gitCursor = resolution.gitCursor
+		resolution.seed.gitActive = true
+	}
+	return nil
+}
+
+// advanceDirectorySeedGit advances one requested directory root through the
+// current owner's Git path space without reading the destination's local
+// .gitignore. A candidate in the destination is therefore evaluated first; a
+// successful candidate can reset ownership before that source is observed.
+func (builder *configCatalogBuilder) advanceDirectorySeedGit(
+	resolution *directorySeedResolution,
+	destination string,
+	reopenDestination bool,
+) (reachable bool, authoredBlocked bool) {
+	if resolution == nil || !resolution.gitActive {
+		return true, false
+	}
+	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
+	destination = tspath.NormalizePath(destination)
+	if discoveryPathsEqual(resolution.gitDirectory, destination, useCaseSensitive) {
+		if reopenDestination {
+			resolution.configReachable = true
+		}
+		return resolution.configReachable, false
+	}
+	relative, within := rslintconfig.RelativePathWithinConfigRoot(
+		destination,
+		resolution.gitDirectory,
+		useCaseSensitive,
+	)
+	if !within {
+		resolution.gitCursor, _ = resolution.gitCursor.Enter(destination)
+		resolution.gitDirectory = destination
+		resolution.configReachable = false
+		return false, false
+	}
+
+	current := resolution.gitDirectory
+	for _, component := range splitDiscoveryPath(relative) {
+		resolution.gitCursor = builder.observeGitignoreSource(
+			resolution.seed.ownerDir,
+			current,
+			current,
+			resolution.gitCursor,
+		)
+
+		nextDirectory := tspath.CombinePaths(current, component)
+		nextCursor, gitBlocked := resolution.gitCursor.Enter(nextDirectory)
+		if nextCursor.SourceReachable() {
+			entries := builder.fs.GetAccessibleEntries(current)
+			parentRealPath := ""
+			if entries.Symlinks == nil {
+				parentRealPath = builder.fs.Realpath(current)
+			}
+			if builder.isSymlinkDirectoryChild(
+				current,
+				parentRealPath,
+				component,
+				entries,
+			) {
+				nextCursor = nextCursor.BlockSourceTraversal()
+			}
+		}
+		resolution.gitCursor = nextCursor
+		resolution.gitDirectory = nextDirectory
+
+		if builder.isGloballyIgnoredDirectory(
+			resolution.seed.ownerPath,
+			nextDirectory,
+			nextDirectory,
+		) {
+			resolution.configReachable = false
+			return false, true
+		}
+		if gitBlocked && !builder.reopensGitignoredDirectory(
+			resolution.seed.ownerPath,
+			nextDirectory,
+			nextDirectory,
+		) {
+			resolution.configReachable = false
+		}
+		if reopenDestination &&
+			discoveryPathsEqual(nextDirectory, destination, useCaseSensitive) {
+			resolution.configReachable = true
+		}
+		current = nextDirectory
+	}
+	return resolution.configReachable, false
+}
+
+// configDiscoveryParent returns the lexical filesystem parent without walking
+// above a UNC share. tspath's generic root parser treats only the server as the
+// root, which is appropriate for URLs but not for filesystem config discovery.
+func configDiscoveryParent(directory string) string {
+	directory = tspath.NormalizePath(directory)
+	if strings.HasPrefix(directory, "//") {
+		serverAndRest := strings.Trim(directory[2:], "/")
+		serverEnd := strings.IndexByte(serverAndRest, '/')
+		if serverEnd < 0 || !strings.Contains(serverAndRest[serverEnd+1:], "/") {
+			return ""
+		}
+	}
+	parent := tspath.GetDirectoryPath(directory)
+	if parent == directory {
+		return ""
+	}
+	return parent
 }
 
 func (builder *configCatalogBuilder) findCandidateChain(startDirectory string) []configCandidate {
@@ -480,11 +684,7 @@ func (builder *configCatalogBuilder) findCandidateChain(startDirectory string) [
 		if candidate, ok := builder.findCandidate(directory); ok {
 			reverse = append(reverse, candidate)
 		}
-		parent := tspath.GetDirectoryPath(directory)
-		if parent == directory {
-			break
-		}
-		directory = parent
+		directory = configDiscoveryParent(directory)
 	}
 	candidates := make([]configCandidate, len(reverse))
 	for index := range reverse {
@@ -544,8 +744,8 @@ func (builder *configCatalogBuilder) resolveSeedOwners(seeds []*discoverySeed) e
 				seed.done = true
 				continue
 			}
-			seed.searchDir = tspath.GetDirectoryPath(candidate.directory)
-			if seed.searchDir == candidate.directory || seed.searchDir == "" {
+			seed.searchDir = configDiscoveryParent(candidate.directory)
+			if seed.searchDir == "" {
 				seed.done = true
 			}
 		}
@@ -557,11 +757,7 @@ func (builder *configCatalogBuilder) findCandidateUp(startDirectory string) (con
 		if candidate, ok := builder.findCandidate(directory); ok {
 			return candidate, true
 		}
-		parent := tspath.GetDirectoryPath(directory)
-		if parent == directory {
-			break
-		}
-		directory = parent
+		directory = configDiscoveryParent(directory)
 	}
 	return configCandidate{}, false
 }
@@ -823,6 +1019,9 @@ func (builder *configCatalogBuilder) walkDirectories(roots []discoveryWalkNode) 
 					return err
 				}
 			}
+			if result.gitignoreObservation != nil {
+				builder.recordGitignoreObservation(*result.gitignoreObservation)
+			}
 			next = append(next, result.children...)
 			if result.pending != nil {
 				suspended = append(suspended, *result.pending)
@@ -841,11 +1040,21 @@ func (builder *configCatalogBuilder) walkDirectories(roots []discoveryWalkNode) 
 					}
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
+					item.node.gitCursor = gitignore.NewCursor(
+						state.candidate.directory,
+						builder.fs.UseCaseSensitiveFileNames(),
+					)
+					item.node.gitDirectory = state.candidate.directory
+					item.node.gitActive = true
 				}
 				next = append(next, item.node)
 			}
 		}
-		queue = deduplicateWalkNodes(next)
+		// Overlapping requested roots are intentionally independent routes. The
+		// same lexical directory can carry inherited Git state on one route and
+		// explicit-root reachability on another, so directory-only deduplication
+		// would be incorrect.
+		queue = next
 	}
 	return nil
 }
@@ -897,24 +1106,42 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	}
 	result := discoveryWalkResult{}
 
-	if candidate, found := builder.findCandidateForOwner(
-		node.directory,
-		node.ownerPath,
-		node.canonicalDirectory,
-	); found && candidate.directory != node.ownerDir {
-		result.discoveredCandidate = true
-		state, resolved := builder.loadStates[candidate.path]
-		if !resolved {
-			result.pending = &suspendedDiscoveryNode{node: node, candidate: candidate}
-			return result
-		}
-		if state.failure == nil {
-			result.activation = state
-			node.ownerDir = state.candidate.directory
-			node.ownerPath = state.candidate.path
+	if builder.explicitConfigPath == "" {
+		if candidate, found := builder.findCandidateForOwner(
+			node.directory,
+			node.ownerPath,
+			node.canonicalDirectory,
+		); found && candidate.directory != node.ownerDir {
+			result.discoveredCandidate = true
+			state, resolved := builder.loadStates[candidate.path]
+			if !resolved {
+				result.pending = &suspendedDiscoveryNode{node: node, candidate: candidate}
+				return result
+			}
+			if state.failure == nil {
+				result.activation = state
+				node.ownerDir = state.candidate.directory
+				node.ownerPath = state.candidate.path
+				node.gitCursor = gitignore.NewCursor(
+					state.candidate.directory,
+					builder.fs.UseCaseSensitiveFileNames(),
+				)
+				node.gitDirectory = state.candidate.directory
+				node.gitActive = true
+			}
 		}
 	}
 	result.directoriesVisited = 1
+	if node.gitActive {
+		nextCursor, observation := builder.readGitignoreSource(
+			node.ownerDir,
+			node.directory,
+			node.gitDirectory,
+			node.gitCursor,
+		)
+		node.gitCursor = nextCursor
+		result.gitignoreObservation = observation
+	}
 	if node.targets != nil && len(node.targets.children) == 0 {
 		return result
 	}
@@ -922,6 +1149,10 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	entries := builder.fs.GetAccessibleEntries(node.directory)
 	directories := append([]string(nil), entries.Directories...)
 	sort.Strings(directories)
+	parentRealPath := ""
+	if entries.Symlinks == nil && len(directories) > 0 {
+		parentRealPath = builder.fs.Realpath(node.directory)
+	}
 	children := make([]discoveryWalkNode, 0, len(directories))
 	for _, name := range directories {
 		var childTargets *discoveryTargetTrie
@@ -934,10 +1165,8 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 		if rslintconfig.IsDefaultExcludedPath(name, "", builder.fs.UseCaseSensitiveFileNames()) {
 			continue
 		}
-		if entries.Symlinks != nil {
-			if _, symlink := entries.Symlinks[name]; symlink {
-				continue
-			}
+		if builder.isSymlinkDirectoryChild(node.directory, parentRealPath, name, entries) {
+			continue
 		}
 		child := tspath.CombinePaths(node.directory, name)
 		canonicalChild := ""
@@ -948,11 +1177,31 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 			result.directoriesPruned++
 			continue
 		}
+		childGitDirectory := ""
+		childGitCursor := gitignore.Cursor{}
+		childGitActive := false
+		if node.gitActive {
+			childGitDirectory = tspath.CombinePaths(node.gitDirectory, name)
+			nextCursor, gitBlocked := node.gitCursor.Enter(childGitDirectory)
+			if gitBlocked && !builder.reopensGitignoredDirectory(
+				node.ownerPath,
+				child,
+				canonicalChild,
+			) {
+				result.directoriesPruned++
+				continue
+			}
+			childGitCursor = nextCursor
+			childGitActive = true
+		}
 		children = append(children, discoveryWalkNode{
 			directory:          child,
 			canonicalDirectory: canonicalChild,
 			ownerDir:           node.ownerDir,
 			ownerPath:          node.ownerPath,
+			gitDirectory:       childGitDirectory,
+			gitCursor:          childGitCursor,
+			gitActive:          childGitActive,
 			targets:            childTargets,
 		})
 	}
@@ -963,6 +1212,11 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 func (builder *configCatalogBuilder) isGloballyIgnoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
 	matcher, ok := builder.globalIgnoreMatcher(ownerPath)
 	return ok && matcher.BlocksDirectory(directory, canonicalDirectory)
+}
+
+func (builder *configCatalogBuilder) reopensGitignoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {
+	matcher, ok := builder.globalIgnoreMatcher(ownerPath)
+	return ok && matcher.ReopensDirectoryNode(directory, canonicalDirectory)
 }
 
 func (builder *configCatalogBuilder) isGloballyIgnoredCandidate(ownerPath string, candidatePath string, canonicalPath string) bool {
@@ -979,6 +1233,282 @@ func (builder *configCatalogBuilder) globalIgnoreMatcher(ownerPath string) (rsli
 		return rslintconfig.GlobalIgnoreMatcher{}, false
 	}
 	return state.ignoreMatcher, true
+}
+
+func (builder *configCatalogBuilder) readGitignoreSource(
+	ownerDirectory string,
+	sourceDirectory string,
+	matchDirectory string,
+	cursor gitignore.Cursor,
+) (gitignore.Cursor, *gitignoreObservation) {
+	if ownerDirectory == "" || sourceDirectory == "" || matchDirectory == "" || !cursor.SourceReachable() {
+		return cursor, nil
+	}
+	content := builder.readGitignoreFile(sourceDirectory)
+	if !content.exists {
+		return cursor, nil
+	}
+	next, globs := cursor.AppendSource(matchDirectory, content.content)
+	if len(globs) == 0 {
+		return next, nil
+	}
+	return next, &gitignoreObservation{
+		ownerDirectory:  ownerDirectory,
+		sourceDirectory: matchDirectory,
+		globs:           globs,
+	}
+}
+
+// readGitignoreFile freezes each lexical source for one catalog generation.
+// Config modules can have side effects, and overlapping discovery routes may
+// reach the same source on different frontiers; rereading would let one
+// transaction make ownership decisions from different bytes. Different source
+// paths still read concurrently; only duplicate in-flight reads wait for the
+// first route, including a cached miss.
+func (builder *configCatalogBuilder) readGitignoreFile(sourceDirectory string) gitignoreReadResult {
+	path := tspath.CombinePaths(sourceDirectory, ".gitignore")
+	identity := tspath.ToPath(
+		tspath.NormalizePath(path),
+		"",
+		builder.fs.UseCaseSensitiveFileNames(),
+	)
+	for {
+		builder.gitignoreReadMu.Lock()
+		if builder.gitignoreReadCache == nil {
+			builder.gitignoreReadCache = make(map[tspath.Path]gitignoreReadResult)
+		}
+		if builder.gitignoreReadPending == nil {
+			builder.gitignoreReadPending = make(map[tspath.Path]chan struct{})
+		}
+		if result, exists := builder.gitignoreReadCache[identity]; exists {
+			builder.gitignoreReadMu.Unlock()
+			return result
+		}
+		if wait, pending := builder.gitignoreReadPending[identity]; pending {
+			if wait == nil {
+				wait = make(chan struct{})
+				builder.gitignoreReadPending[identity] = wait
+			}
+			builder.gitignoreReadMu.Unlock()
+			<-wait
+			continue
+		}
+		builder.gitignoreReadPending[identity] = nil
+		builder.gitignoreReadMu.Unlock()
+		break
+	}
+
+	content, exists := builder.fs.ReadFile(path)
+	result := gitignoreReadResult{content: content, exists: exists}
+	builder.gitignoreReadMu.Lock()
+	builder.gitignoreReadCache[identity] = result
+	wait := builder.gitignoreReadPending[identity]
+	delete(builder.gitignoreReadPending, identity)
+	if wait != nil {
+		close(wait)
+	}
+	builder.gitignoreReadMu.Unlock()
+	return result
+}
+
+func (builder *configCatalogBuilder) observeGitignoreSource(
+	ownerDirectory string,
+	sourceDirectory string,
+	matchDirectory string,
+	cursor gitignore.Cursor,
+) gitignore.Cursor {
+	next, observation := builder.readGitignoreSource(
+		ownerDirectory,
+		sourceDirectory,
+		matchDirectory,
+		cursor,
+	)
+	if observation != nil {
+		builder.recordGitignoreObservation(*observation)
+	}
+	return next
+}
+
+func (builder *configCatalogBuilder) recordGitignoreObservation(observation gitignoreObservation) {
+	if observation.ownerDirectory == "" || observation.sourceDirectory == "" || len(observation.globs) == 0 {
+		return
+	}
+	if builder.gitignoreSources == nil {
+		builder.gitignoreSources = make(map[string]map[tspath.Path]gitignoreObservation)
+	}
+	sources := builder.gitignoreSources[observation.ownerDirectory]
+	if sources == nil {
+		sources = make(map[tspath.Path]gitignoreObservation)
+		builder.gitignoreSources[observation.ownerDirectory] = sources
+	}
+	identity := tspath.ToPath(
+		tspath.NormalizePath(observation.sourceDirectory),
+		"",
+		builder.fs.UseCaseSensitiveFileNames(),
+	)
+	if _, exists := sources[identity]; exists {
+		return
+	}
+	observation.globs = append([]string(nil), observation.globs...)
+	sources[identity] = observation
+}
+
+func splitDiscoveryPath(path string) []string {
+	path = strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
+	var components []string
+	for _, component := range strings.Split(path, "/") {
+		if component == "" || component == "." {
+			continue
+		}
+		components = append(components, component)
+	}
+	return components
+}
+
+// collectExactTargetGitignore records the exact directory chain for targets
+// whose owner is already known. Automatic literal files bypass Git only while
+// choosing their nearest config, while explicit-config targets start with their
+// fixed invocation-wide owner. Both still use that owner's ordinary Git
+// ignores. Keeping observations source-scoped lets exact chains merge with a
+// directory walk without duplicating parent patterns.
+func (builder *configCatalogBuilder) collectExactTargetGitignore(seeds []*discoverySeed) {
+	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
+	cursorByOwnerAndDirectory := make(map[string]map[tspath.Path]gitignore.Cursor)
+	barrierByOwnerAndDirectory := make(map[string]map[tspath.Path]struct{})
+	for _, seed := range seeds {
+		if seed == nil || seed.ownerDir == "" {
+			continue
+		}
+		ownerCursors := cursorByOwnerAndDirectory[seed.ownerDir]
+		if ownerCursors == nil {
+			ownerCursors = make(map[tspath.Path]gitignore.Cursor)
+			cursorByOwnerAndDirectory[seed.ownerDir] = ownerCursors
+		}
+		ownerBarriers := barrierByOwnerAndDirectory[seed.ownerDir]
+		if ownerBarriers == nil {
+			ownerBarriers = make(map[tspath.Path]struct{})
+			barrierByOwnerAndDirectory[seed.ownerDir] = ownerBarriers
+		}
+		builder.collectExactTargetGitignoreChain(
+			seed,
+			ownerCursors,
+			ownerBarriers,
+			useCaseSensitive,
+		)
+	}
+}
+
+func (builder *configCatalogBuilder) collectExactTargetGitignoreChain(
+	seed *discoverySeed,
+	cursorByDirectory map[tspath.Path]gitignore.Cursor,
+	barriers map[tspath.Path]struct{},
+	useCaseSensitive bool,
+) {
+	targetDirectory := tspath.GetDirectoryPath(seed.path)
+	matchDirectory := targetDirectory
+	if _, within := rslintconfig.RelativePathWithinConfigRoot(
+		matchDirectory,
+		seed.ownerDir,
+		useCaseSensitive,
+	); !within {
+		matchDirectory = seed.canonicalSearchDir
+		if matchDirectory == "" {
+			return
+		}
+		if _, within = rslintconfig.RelativePathWithinConfigRoot(
+			matchDirectory,
+			seed.ownerDir,
+			useCaseSensitive,
+		); !within {
+			return
+		}
+	}
+
+	relative, within := rslintconfig.RelativePathWithinConfigRoot(
+		matchDirectory,
+		seed.ownerDir,
+		useCaseSensitive,
+	)
+	if !within {
+		return
+	}
+	cursor := gitignore.NewCursor(seed.ownerDir, useCaseSensitive)
+	currentMatch := seed.ownerDir
+	currentSource := seed.ownerDir
+	components := splitDiscoveryPath(relative)
+	for index := 0; ; index++ {
+		identity := tspath.ToPath(currentMatch, "", useCaseSensitive)
+		if cached, exists := cursorByDirectory[identity]; exists {
+			cursor = cached
+		} else {
+			cursor = builder.observeGitignoreSource(
+				seed.ownerDir,
+				currentSource,
+				currentMatch,
+				cursor,
+			)
+			cursorByDirectory[identity] = cursor
+		}
+		if index == len(components) || !cursor.SourceReachable() {
+			return
+		}
+		component := components[index]
+		nextSource := tspath.CombinePaths(currentSource, component)
+		nextMatch := tspath.CombinePaths(currentMatch, component)
+		nextIdentity := tspath.ToPath(nextMatch, "", useCaseSensitive)
+		if _, blocked := barriers[nextIdentity]; blocked {
+			return
+		}
+		if cached, exists := cursorByDirectory[nextIdentity]; exists {
+			currentSource = nextSource
+			currentMatch = nextMatch
+			cursor = cached
+			continue
+		}
+		entries := builder.fs.GetAccessibleEntries(currentSource)
+		parentRealPath := ""
+		if entries.Symlinks == nil {
+			parentRealPath = builder.fs.Realpath(currentSource)
+		}
+		if builder.isSymlinkDirectoryChild(currentSource, parentRealPath, component, entries) {
+			barriers[nextIdentity] = struct{}{}
+			return
+		}
+		currentSource = nextSource
+		currentMatch = nextMatch
+		next, blocked := cursor.Enter(currentMatch)
+		cursor = next
+		if blocked {
+			barriers[nextIdentity] = struct{}{}
+			return
+		}
+	}
+}
+
+func (builder *configCatalogBuilder) isSymlinkDirectoryChild(
+	parentDirectory string,
+	parentRealPath string,
+	name string,
+	entries vfs.Entries,
+) bool {
+	if entries.Symlinks != nil {
+		for symlink := range entries.Symlinks {
+			if symlink == name ||
+				(!builder.fs.UseCaseSensitiveFileNames() && strings.EqualFold(symlink, name)) {
+				return true
+			}
+		}
+		return false
+	}
+	childDirectory := tspath.CombinePaths(parentDirectory, name)
+	childRealPath := builder.fs.Realpath(childDirectory)
+	if parentRealPath == "" || childRealPath == "" {
+		return false
+	}
+	expectedRealPath := tspath.CombinePaths(parentRealPath, name)
+	return tspath.ComparePaths(childRealPath, expectedRealPath, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: builder.fs.UseCaseSensitiveFileNames(),
+	}) != 0
 }
 
 func (builder *configCatalogBuilder) activate(state *configLoadState, explicitOnly bool) error {
@@ -1030,6 +1560,7 @@ func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
 	if err := builder.validateConfigDirectoryIdentities(); err != nil {
 		return nil, err
 	}
+	builder.materializeGitignoreConfigs()
 	// ExplicitOnly is derived from every activation path, not just from the
 	// explicit-file scope itself. Publish the final source value with the scope
 	// so target discovery can keep this config out of automatic ownership and
@@ -1072,8 +1603,60 @@ func (builder *configCatalogBuilder) catalog() (*ConfigCatalog, error) {
 		Scopes:             builder.scopes,
 		Failures:           failures,
 		Stats:              builder.stats,
-		Explicit:           builder.request.Mode == ConfigDiscoveryExplicit,
+		Explicit:           builder.explicitConfigPath != "",
 	}, nil
+}
+
+func (builder *configCatalogBuilder) materializeGitignoreConfigs() {
+	caseInsensitive := !builder.fs.UseCaseSensitiveFileNames()
+	for ownerDirectory, entries := range builder.configs {
+		sources := builder.gitignoreSources[ownerDirectory]
+		if len(sources) == 0 {
+			continue
+		}
+		observations := make([]gitignoreObservation, 0, len(sources))
+		for _, observation := range sources {
+			observations = append(observations, observation)
+		}
+		sort.Slice(observations, func(i, j int) bool {
+			leftDepth := builder.gitignoreSourceDepth(ownerDirectory, observations[i].sourceDirectory)
+			rightDepth := builder.gitignoreSourceDepth(ownerDirectory, observations[j].sourceDirectory)
+			if leftDepth != rightDepth {
+				return leftDepth < rightDepth
+			}
+			left := observations[i].sourceDirectory
+			right := observations[j].sourceDirectory
+			if caseInsensitive {
+				leftFolded := strings.ToLower(left)
+				rightFolded := strings.ToLower(right)
+				if leftFolded != rightFolded {
+					return leftFolded < rightFolded
+				}
+			}
+			return left < right
+		})
+		var globs []string
+		for _, observation := range observations {
+			globs = append(globs, observation.globs...)
+		}
+		builder.configs[ownerDirectory] = rslintconfig.ConfigWithCollectedGitignore(
+			entries,
+			globs,
+			caseInsensitive,
+		)
+	}
+}
+
+func (builder *configCatalogBuilder) gitignoreSourceDepth(ownerDirectory string, sourceDirectory string) int {
+	relative, within := rslintconfig.RelativePathWithinConfigRoot(
+		sourceDirectory,
+		ownerDirectory,
+		builder.fs.UseCaseSensitiveFileNames(),
+	)
+	if !within || relative == "" {
+		return 0
+	}
+	return len(splitDiscoveryPath(relative))
 }
 
 // validateConfigDirectoryIdentities rejects ambiguous ownership before Node
@@ -1157,18 +1740,6 @@ func appendUniqueSortedPath(paths []string, path string) []string {
 	paths = append(paths, path)
 	sort.Strings(paths)
 	return paths
-}
-
-func deduplicateWalkNodes(nodes []discoveryWalkNode) []discoveryWalkNode {
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].directory < nodes[j].directory })
-	result := nodes[:0]
-	for _, node := range nodes {
-		if len(result) > 0 && result[len(result)-1].directory == node.directory {
-			continue
-		}
-		result = append(result, node)
-	}
-	return result
 }
 
 func isDefaultDiscoveryExcluded(path string, cwd string, useCaseSensitive bool) bool {

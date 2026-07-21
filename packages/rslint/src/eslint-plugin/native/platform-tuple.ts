@@ -21,8 +21,7 @@ function isMuslFromFilesystem(): boolean | null {
 
 function isMuslFromReport(): boolean | null {
   const report = process.report as unknown as
-    | { getReport(): unknown; excludeNetwork?: boolean }
-    | undefined;
+    { getReport(): unknown; excludeNetwork?: boolean } | undefined;
   if (typeof report?.getReport !== 'function') {
     return null;
   }

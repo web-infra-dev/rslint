@@ -11,9 +11,10 @@ type ConfiguredRule struct {
 	Settings map[string]interface{}
 	// Globals is the config-declared `languageOptions.globals` for this file
 	// (name → declared). The linter merges this with inline `/* global */`
-	// comments (parsed once per file, same as DisableManager) before exposing
-	// the combined result to rules as ctx.Globals — rules never parse either
-	// source themselves. Nil when the config declares none.
+	// comments before exposing the combined result to rules as ctx.Globals.
+	// Inline globals and disable directives use candidate-gated lazy comment
+	// collection, so rules never parse either source themselves. Nil when the
+	// config declares none.
 	Globals          map[string]bool
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool

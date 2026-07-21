@@ -46,7 +46,7 @@ var NoCommentedOutTestsRule = rule.Rule{
 	Name: "jest/no-commented-out-tests",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		text := ctx.SourceFile.Text()
-		for _, comment := range ctx.Comments {
+		for _, comment := range ctx.Comments.All() {
 			if comment == nil {
 				continue
 			}

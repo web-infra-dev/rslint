@@ -1472,21 +1472,6 @@ func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
 	return s.tsConfigPaths
 }
 
-// uriDirname returns the parent directory of a URI string.
-// e.g. "file:///project/src/index.ts" → "file:///project/src"
-func uriDirname(uri string) string {
-	// Find the last '/' after the scheme (file://)
-	idx := strings.LastIndex(uri, "/")
-	if idx <= 0 {
-		return uri
-	}
-	// Don't strip past the authority part (file:///)
-	if strings.HasPrefix(uri, "file:///") && idx < len("file:///") {
-		return uri
-	}
-	return uri[:idx]
-}
-
 // pushDiagnostics runs the linter for the given URI and pushes results to the client.
 // Must be called synchronously from the LSP message loop (not from a goroutine)
 // because session is not goroutine-safe.

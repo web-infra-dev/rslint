@@ -126,7 +126,7 @@ func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
 
 // HasCommentInSpan reports whether any comment in sourceComments overlaps the
 // half-open source span [start, end). sourceComments must be sorted by
-// position — pass ctx.Comments, which the linter already builds
+// position — pass ctx.Comments.All(), which the linter builds lazily
 // once per file. Runs in O(log k) via binary search over the (typically
 // small) comment list, the same technique ESLint's TokenStore uses for
 // commentsExistBetween, instead of re-walking the whole file's token tree on

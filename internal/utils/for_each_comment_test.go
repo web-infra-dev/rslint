@@ -145,7 +145,7 @@ func TestHasCommentInSpan(t *testing.T) {
 	}
 
 	// HasCommentInSpan takes the file's pre-collected, sorted comment list
-	// (what ctx.Comments holds in production) rather than the source file
+	// (what ctx.Comments.All() returns in production) rather than the source file
 	// itself — mirrors how linter.go builds it once per file.
 	var comments []*ast.CommentRange
 	ForEachComment(sf.AsNode(), func(comment *ast.CommentRange) {

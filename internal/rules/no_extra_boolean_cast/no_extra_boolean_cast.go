@@ -33,9 +33,9 @@ func parseOptions(opts any) options {
 // along with the direct child of that ancestor (either node itself or the
 // outermost ParenthesizedExpression wrapping it).
 func effectiveParent(node *ast.Node) (parent, child *ast.Node) {
-	child = node
-	for child.Parent != nil && ast.IsParenthesizedExpression(child.Parent) {
-		child = child.Parent
+	child = utils.OutermostParenthesizedExpression(node)
+	if child == nil {
+		return nil, nil
 	}
 	return child.Parent, child
 }
@@ -273,7 +273,7 @@ func buildNegationFix(ctx rule.RuleContext, outerUnary *ast.Node) []rule.RuleFix
 	}
 
 	replaceRange := utils.TrimNodeTextRange(ctx.SourceFile, outerUnary)
-	if utils.HasCommentInSpan(ctx.Comments, replaceRange.Pos(), replaceRange.End()) {
+	if utils.HasCommentInSpan(ctx.Comments.All(), replaceRange.Pos(), replaceRange.End()) {
 		return nil
 	}
 
@@ -311,13 +311,13 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if parent != nil && parent.Kind == ast.KindPrefixUnaryExpression &&
 			parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
 			parentRange := utils.TrimNodeTextRange(ctx.SourceFile, parent)
-			if utils.HasCommentInSpan(ctx.Comments, parentRange.Pos(), parentRange.End()) {
+			if utils.HasCommentInSpan(ctx.Comments.All(), parentRange.Pos(), parentRange.End()) {
 				return nil
 			}
 			return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, parent, maybePrefixSpace(ctx.SourceFile, parentRange, "true"))}
 		}
 
-		if utils.HasCommentInSpan(ctx.Comments, callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.Comments.All(), callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, callNode, maybePrefixSpace(ctx.SourceFile, callRange, "false"))}
@@ -328,7 +328,7 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if ast.IsSpreadElement(arg) {
 			return nil
 		}
-		if utils.HasCommentInSpan(ctx.Comments, callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.Comments.All(), callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		// Peel parens to match ESLint's paren-less AST; see buildNegationFix.

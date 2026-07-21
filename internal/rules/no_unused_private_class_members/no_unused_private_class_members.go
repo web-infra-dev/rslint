@@ -41,7 +41,7 @@ var NoUnusedPrivateClassMembersRule = rule.Rule{
 
 		getSourceItems := func() []sourceItem {
 			if sourceItems == nil {
-				sourceItems = collectSourceItems(ctx.SourceFile, ctx.Comments)
+				sourceItems = collectSourceItems(ctx.SourceFile, ctx.Comments.All())
 			}
 			return sourceItems
 		}
@@ -56,7 +56,7 @@ var NoUnusedPrivateClassMembersRule = rule.Rule{
 			}
 			current := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			reportUnusedMembers(ctx, current, getSourceItems())
+			reportUnusedMembers(ctx, current, getSourceItems)
 		}
 
 		handlePrivateIdentifier := func(node *ast.Node) {
@@ -213,7 +213,7 @@ func isExpressionStatementParent(parent *ast.Node) bool {
 	return parent != nil && parent.Kind == ast.KindExpressionStatement
 }
 
-func reportUnusedMembers(ctx rule.RuleContext, classInfo *classMembers, items []sourceItem) {
+func reportUnusedMembers(ctx rule.RuleContext, classInfo *classMembers, getItems func() []sourceItem) {
 	for _, name := range classInfo.order {
 		member := classInfo.members[name]
 		if member == nil || member.isUsed {
@@ -226,6 +226,7 @@ func reportUnusedMembers(ctx rule.RuleContext, classInfo *classMembers, items []
 			continue
 		}
 
+		items := getItems()
 		fixes := []rule.RuleFix{
 			rule.RuleFixReplaceRange(memberRemovalRange(ctx.SourceFile, member.declNode, items), ""),
 		}

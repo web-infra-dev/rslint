@@ -6,7 +6,7 @@ import path from 'node:path';
 import {
   PluginHostLifecycle,
   stageNativeConfigActivation,
-} from '../src/api/rslint.js';
+} from '../src/api/native-config-activation.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,

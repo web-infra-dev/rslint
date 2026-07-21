@@ -2,7 +2,6 @@ package max_lines
 
 import (
 	"fmt"
-	"sort"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -104,7 +103,7 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 	}
 
 	if opts.skipComments {
-		for line := range commentOnlyLines(ctx.Comments, text, lineStarts) {
+		for line := range commentOnlyLines(ctx.Comments.All(), text, lineStarts) {
 			idx := line - 1
 			if idx >= 0 && idx < nLines {
 				keep[idx] = false
@@ -158,13 +157,8 @@ func commentOnlyLines(sourceComments []*ast.CommentRange, text string, lineStart
 	if len(comments) == 0 {
 		return nil
 	}
-	// ForEachComment may surface a comment twice (once as a token's trailing
-	// range, once as the next token's leading range) and not strictly in source
-	// order. Duplicates are harmless for this algorithm, but advancing
-	// commentIdx linearly requires sorted input.
-	sort.Slice(comments, func(i, j int) bool {
-		return comments[i].Pos() < comments[j].Pos()
-	})
+	// CommentStore guarantees that sourceComments is ordered and deduplicated;
+	// the optional synthesized hashbang is at position zero.
 
 	nLines := len(lineStarts)
 	// minCodePos[line] / maxCodeEnd[line] bound the non-comment,

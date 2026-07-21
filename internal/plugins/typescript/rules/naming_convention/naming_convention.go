@@ -1696,6 +1696,14 @@ func getIdentifiersFromFunctionExpression(node *ast.Node) []identifierInfo {
 }
 
 func getIdentifiersFromParameter(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+	// Parameters of type-only signatures (function types, call/construct/method
+	// signatures, index signatures, ...) create no binding, so real
+	// @typescript-eslint/naming-convention never validates their names. Only
+	// parameters of an actual function-like declaration/expression are checked.
+	if !ast.IsFunctionLikeDeclaration(node.Parent) {
+		return nil
+	}
+
 	// Check if this is a parameter property (constructor parameter with access modifier, readonly, or override)
 	isParamProp := ast.IsParameterPropertyDeclaration(node, node.Parent)
 

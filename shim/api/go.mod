@@ -2,7 +2,7 @@ module github.com/microsoft/typescript-go/shim/api
 
 go 1.26
 
-require github.com/microsoft/typescript-go v0.0.0-20260714195723-448614f8f409
+require github.com/microsoft/typescript-go v0.0.0-20260717215938-61aabc2f4577
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect

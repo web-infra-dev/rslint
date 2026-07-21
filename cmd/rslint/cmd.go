@@ -17,14 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/web-infra-dev/rslint/cmd/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -650,7 +649,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// that govern at least one selected target.
 	var realProgramSet lintProgramSet
 	buildAllPrograms := typeCheck || typeCheckOnly
-	needsLintTargets := !typeCheckOnly
 
 	if usesJSConfig {
 		configDirectories := configCatalog.ConfigDirectories()
@@ -661,19 +659,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			currentDirectory = configDirectories[0]
 			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
-
-			var exactTargetFiles []string
-			if len(allowFiles) > 0 && len(allowDirs) == 0 {
-				exactTargetFiles = allowFiles
-			}
-			if typeCheckOnly {
+			if buildAllPrograms {
 				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
-			} else if buildAllPrograms {
-				rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-					rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
-				)
-			} else {
-				rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -690,88 +677,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				}
 			}
 
-			// Inject .gitignore patterns as global ignores for each config.
-			// Each config independently reads from its own directory downward.
-			// Direct automatically reachable child configs are ownership handoff
-			// boundaries, so parent and child owners never share .gitignore patterns.
-			// A config loaded only for a literal target is a boundary for that scope,
-			// while automatic siblings keep their ancestor's complete ignore chain.
-			//
-			// Directories excluded by global config ignores are pruned during
-			// the .gitignore scan because files below them cannot be linted.
-			// File-only invocations collect only the exact target ancestry for each
-			// provisional owner instead of sweeping the owner's complete subtree.
-			//
-			// configMap is not mutated by gitignore workers. Results are collected
-			// and merged on this goroutine before target discovery.
-			type giResult struct {
-				configDir string
-				config    rslintconfig.RslintConfig
-			}
-			var (
-				giResults []giResult
-				giMu      sync.Mutex
-			)
-			fileOnlyTargets := len(allowFiles) > 0 && len(allowDirs) == 0
-			var targetFilesByOwner map[string][]string
-			if needsLintTargets && fileOnlyTargets {
-				targetFilesByOwner = configTargetFilesByOwner(
-					configMap,
-					configTargetScopes,
-					fs,
-					allowFiles,
-					singleThreaded,
-				)
-			}
-			giWG := core.NewWorkGroup(singleThreaded)
-			if needsLintTargets {
-				automaticResolver := rslintconfig.NewConfigOwnerResolverForAutomaticTargets(
-					configMap,
-					configTargetScopes,
-					fs,
-				)
-				completeResolver := rslintconfig.NewConfigOwnerResolver(configMap, fs)
-				for configDir, entries := range configMap {
-					scope := configTargetScopes[configDir]
-					resolver := automaticResolver
-					if scope.ExplicitOnly {
-						resolver = completeResolver
-					}
-					stopDirs := resolver.ChildConfigDirs(configDir)
-					giWG.Queue(func() {
-						var ownerFiles []string
-						if fileOnlyTargets {
-							ownerFiles = targetFilesByOwner[configDir]
-							if ownerFiles == nil {
-								ownerFiles = []string{}
-							}
-						} else if scope.ExplicitOnly {
-							// Mixed file+directory invocations must not turn a config
-							// loaded only for a literal into a full subtree scan.
-							ownerFiles = append([]string{}, scope.Files...)
-						}
-						augmented := rslintconfig.ConfigWithGitignoreWithBoundaries(entries, configDir, fs, ownerFiles, stopDirs)
-						giMu.Lock()
-						giResults = append(giResults, giResult{configDir, augmented})
-						giMu.Unlock()
-					})
-				}
-			}
-
-			var programErr error
 			if buildAllPrograms {
-				realProgramSet, programErr = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
-			}
-
-			// Join the gitignore reads and merge into configMap. Must complete
-			// before target discovery, which relies on the augmented configMap.
-			giWG.RunAndWait()
-			for _, r := range giResults {
-				configMap[r.configDir] = r.config
-			}
-			if programErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", programErr)
-				return 1
+				realProgramSet, err = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return 1
+				}
 			}
 		}
 	} else {

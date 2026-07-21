@@ -6,6 +6,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Permanent differential guard for the IgnorePattern refactor.
@@ -51,9 +52,9 @@ func mainX_isFileIgnored(filePath string, ignorePatterns []string, cwd string) b
 			pattern = pattern[1:]
 		}
 		normalizedPattern := normalizePattern(pattern)
-		matched := matchGlob(normalizedPattern, normalizedPath)
+		matched := utils.MatchGlob(normalizedPattern, normalizedPath)
 		if !matched && unixPath != normalizedPath {
-			matched = matchGlob(normalizedPattern, unixPath)
+			matched = utils.MatchGlob(normalizedPattern, unixPath)
 		}
 		if matched {
 			ignored = !negated
@@ -91,13 +92,13 @@ func mainX_isDirPathBlocked(dirPath string, ignorePatterns []string) bool {
 			continue
 		}
 		normalizedPattern := normalizePattern(pattern)
-		if matchGlob(normalizedPattern, dirPath) || matchGlob(normalizedPattern, dirPath+"/x") {
+		if utils.MatchGlob(normalizedPattern, dirPath) || utils.MatchGlob(normalizedPattern, dirPath+"/x") {
 			return true
 		}
 		segments := strings.Split(dirPath, "/")
 		for i := 1; i < len(segments); i++ {
 			partial := strings.Join(segments[:i], "/")
-			if matchGlob(normalizedPattern, partial) || matchGlob(normalizedPattern, partial+"/x") {
+			if utils.MatchGlob(normalizedPattern, partial) || utils.MatchGlob(normalizedPattern, partial+"/x") {
 				return true
 			}
 		}
