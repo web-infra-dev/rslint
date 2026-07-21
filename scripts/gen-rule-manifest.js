@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const REPO_ROOT = path.join(__dirname, '..');
+
 // Plugins root directory
 const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
 const CORE_RULES_DIR = path.join(__dirname, '../internal/rules');
@@ -76,19 +78,25 @@ function groupToTestDir(group) {
   return group.replace(/^@/, '');
 }
 
-function getIncludedRules() {
-  // Parse rstest.config.mts include list, extract rule names from all test directories
+function getIncludedRuleTests() {
+  // Parse rstest.config.mts include list and associate each rule with its
+  // enabled test files, including tests nested under a rule directory.
   const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
-  // Match any uncommented test path: ./tests/{any-group}/rules/{rule}.test.ts
+  // Match uncommented flat and nested paths:
+  //   ./tests/{testDir}/rules/{rule}.test.ts
+  //   ./tests/{testDir}/rules/{rule}/{test-file}.test.ts
   const includeRegex =
-    /^\s*'\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)\.test\.ts'/gm;
-  const included = new Set();
+    /^\s*'(\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)(?:\/[^']+)?\.test\.ts)'/gm;
+  const included = new Map();
   let match;
   while ((match = includeRegex.exec(config))) {
-    const testDir = match[1];
-    const rule = match[2].replace(/-/g, '_');
+    const testPath = path.resolve(path.dirname(TEST_CONFIG_PATH), match[1]);
+    const testDir = match[2];
+    const rule = match[3].replace(/-/g, '_');
     // Key by test-dir + rule so same-named rules in different plugins stay distinct.
-    included.add(`${testDir}:${rule}`);
+    const key = `${testDir}:${rule}`;
+    if (!included.has(key)) included.set(key, new Set());
+    included.get(key).add(testPath);
   }
   return included;
 }
@@ -229,29 +237,37 @@ function getStatementLevelSkipCases(content, relPath) {
   return skipCases;
 }
 
-function getSkipCases(rule, group) {
-  // Return skip cases as [{name, url}]
-  const testDir = groupToTestDir(group);
-  const testsDir = path.join(TESTS_BASE_DIR, testDir, 'rules');
-  const testFile = path.join(testsDir, `${rule.replace(/_/g, '-')}.test.ts`);
+function getObjectSkipCases(content, relPath) {
+  // Match statement-level `skip: true` test-case objects, whether or not they
+  // carry a `name` property; unnamed cases get a line-based placeholder.
+  const skipCases = [];
+  const skipRegex = /\bskip\s*:\s*true\b/g;
+  const state = createParserState();
+  let cursor = 0;
+  let match;
+
+  while ((match = skipRegex.exec(content))) {
+    advanceParserState(state, content, cursor, match.index);
+    if (isStatementLevel(state)) {
+      const line = content.slice(0, match.index).split('\n').length;
+      skipCases.push({
+        name: `Skipped test case at line ${line}`,
+        url: `${relPath}#L${line}`,
+      });
+    }
+    cursor = skipRegex.lastIndex;
+  }
+
+  return skipCases;
+}
+
+function getSkipCases(testFile) {
+  // Return skip cases as [{name, url}] for a single enabled test file.
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
-  const relPath = `packages/rslint-test-tools/tests/${testDir}/rules/${rule.replace(/_/g, '-')}.test.ts`;
-  const skipCases = [];
-  // 1. Object case: { ..., skip: true, name: 'xxx' }
-  const objCaseRegex =
-    /\{[^}]*skip\s*:\s*true[^}]*name\s*:\s*['"]([^'"]+)['"][^}]*}/g;
-  let m;
-  while ((m = objCaseRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
-  // 2. Top-level it.skip('name', ...) / describe.skip('name', ...)
+  const relPath = path.relative(REPO_ROOT, testFile).split(path.sep).join('/');
+  const skipCases = getObjectSkipCases(content, relPath);
+  // Also collect top-level it.skip('name', ...) / describe.skip('name', ...).
   skipCases.push(...getStatementLevelSkipCases(content, relPath));
   return skipCases;
 }
@@ -270,7 +286,7 @@ function getDocPath(rule, pluginDir) {
 }
 
 function buildManifest() {
-  const included = getIncludedRules();
+  const included = getIncludedRuleTests();
   const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
   // Deduplicate by group + rule name, keeping first entry.
   const seen = new Map();
@@ -287,10 +303,11 @@ function buildManifest() {
       let status = 'full';
       let failing_case = [];
       const group = entry.group;
-      if (!included.has(`${groupToTestDir(group)}:${rule}`)) {
+      const testFiles = included.get(`${groupToTestDir(group)}:${rule}`);
+      if (!testFiles) {
         status = 'partial-test';
       } else {
-        const skipCases = getSkipCases(rule, group);
+        const skipCases = Array.from(testFiles).flatMap(getSkipCases);
         if (skipCases.length > 0) {
           status = 'partial-impl';
           failing_case = skipCases;
