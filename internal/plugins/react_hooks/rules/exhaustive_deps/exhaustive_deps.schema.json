@@ -7,23 +7,19 @@
       "properties": {
         "additionalHooks": {
           "type": "string",
-          "format": "regex",
-          "default": ""
+          "format": "regex"
         },
         "enableDangerousAutofixThisMayCauseInfiniteLoops": {
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         },
         "experimental_autoDependenciesHooks": {
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": []
+          }
         },
         "requireExplicitEffectDeps": {
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         }
       }
     }

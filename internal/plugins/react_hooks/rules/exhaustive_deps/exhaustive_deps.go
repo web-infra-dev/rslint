@@ -372,27 +372,27 @@ type Options struct {
 
 // parseOptions parses the rule's options object.
 func parseOptions(options []any, settings map[string]interface{}) Options {
-	opts := Options{}
-	var optsMap map[string]interface{}
-	if len(options) > 0 {
-		optsMap, _ = options[0].(map[string]interface{})
+	opts := Options{
+		AutoDepsHooks:   map[string]bool{},
+		AdditionalHooks: react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks"),
 	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
 	opts.EnableDangerousAutofixThisMayCauseInfiniteLoops, _ = optsMap["enableDangerousAutofixThisMayCauseInfiniteLoops"].(bool)
 	opts.RequireExplicitEffectDeps, _ = optsMap["requireExplicitEffectDeps"].(bool)
-	opts.AutoDepsHooks = map[string]bool{}
 	for _, h := range utils.ToStringSlice(optsMap["experimental_autoDependenciesHooks"]) {
 		opts.AutoDepsHooks[h] = true
 	}
 	// Mirrors upstream's `rawOptions.additionalHooks` truthiness check: a
-	// non-empty rule-level pattern wins (even when it fails to compile —
-	// no settings fallback then); an absent or empty one falls back to
-	// `settings['react-hooks'].additionalHooks` via react_hooksutil.
+	// non-empty rule-level pattern replaces the settings fallback even when
+	// it fails to compile; absent or empty keeps the settings-derived value.
 	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
+		opts.AdditionalHooks = nil
 		if re, err := regexp.Compile(raw); err == nil {
 			opts.AdditionalHooks = re
 		}
-	} else {
-		opts.AdditionalHooks = react_hooksutil.AdditionalHooksFromSettings(settings, "additionalHooks")
 	}
 	return opts
 }
