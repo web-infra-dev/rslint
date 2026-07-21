@@ -1,7 +1,6 @@
-// TestNoUnusedVarsNestedScopesAndBindings covers ownership boundaries that are
-// easy to misclassify with ancestor-only checks: nested declarations inside
-// parameter/catch expressions, static-block variable scopes, object-rest
-// siblings, recursive initializers, inline-global shadows, and JSX tag names.
+// TestNoUnusedVarsExtrasScopes covers scope ownership and execution boundaries
+// that are easy to misclassify with ancestor-only checks. It includes nested
+// bindings, static scopes, inline globals, JSX names, and discarded self-updates.
 package no_unused_vars
 
 import (
@@ -11,7 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnusedVarsNestedScopesAndBindings(t *testing.T) {
+func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -44,6 +43,22 @@ func TestNoUnusedVarsNestedScopesAndBindings(t *testing.T) {
 
 			// Capitalized JSX tags are component references.
 			{Code: `const Component = () => null; const view = <Component />; consume(view);`, Tsx: true},
+
+			// A write in another variable scope, a later loop iteration, or a
+			// storable callback can make a self-read observable.
+			{Code: `let x = 0; function update() { x = x + 1; } update();`},
+			{Code: `let x = 0; for (let i = 0; i < 2; i++) { x = x + 1; }`},
+			{Code: `let x; x = consume({ value: () => x });`},
+			{Code: `let x; let stored; x = (stored = { value: () => x }); consume(stored);`},
+
+			// Consuming the assignment result makes the read meaningful; logical
+			// assignment is a conditional read rather than a discarded update.
+			{Code: `let x = 0; consume(x = x + 1);`},
+			{Code: `let x; x ||= 1;`},
+
+			// TypeScript wrappers retain the parser's execution semantics.
+			{Code: `const f = ((function () { return f(); }) as () => unknown);`},
+			{Code: `let x: any = 0; (x as any) = x + 1;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -173,6 +188,26 @@ func TestNoUnusedVarsNestedScopesAndBindings(t *testing.T) {
 					extraUnusedError("React", false, 1, 8, 13, "import \"react\";\nconst view = <div />;\nconsume(view);"),
 				},
 			},
+
+			// Discarded self-updates stay unused through varied expression trees.
+			extraUnusedCase(`let x = []; x = x["concat"](x);`, "x", true, 1, 13, 14, ""),
+			extraUnusedCase(`let x = []; x = x?.["concat"](x);`, "x", true, 1, 13, 14, ""),
+			extraUnusedCase(`let x = 0; x = true ? x : 1;`, "x", true, 1, 12, 13, ""),
+			extraUnusedCase(`let x = 0; x = [x][0];`, "x", true, 1, 12, 13, ""),
+			extraUnusedCase(`let x = 0; x = ({ value: x }).value;`, "x", true, 1, 12, 13, ""),
+			extraUnusedCase("let x = ''; x = `${x}`;", "x", true, 1, 13, 14, ""),
+			extraUnusedCase(`let x; x = new Box(x);`, "x", true, 1, 8, 9, ""),
+			extraUnusedCase("let x = ''; x = tag`${x}`;", "x", true, 1, 13, 14, ""),
+			extraUnusedCase(`let x; x = (() => x)();`, "x", true, 1, 8, 9, ""),
+			extraUnusedCase(`let x; x = { value: () => x };`, "x", true, 1, 8, 9, ""),
+			extraUnusedCase(`let x; x = [() => x];`, "x", true, 1, 8, 9, ""),
+			extraUnusedCase(`let x = 0; (x) += 1;`, "x", true, 1, 13, 14, ""),
+			extraUnusedCase(`let x = 0; (x)++;`, "x", true, 1, 13, 14, ""),
+
+			// TypeScript expression wrappers inside the RHS must not hide the read.
+			extraUnusedCase(`let x: any = []; x = (x as any)["concat"](x);`, "x", true, 1, 18, 19, ""),
+			extraUnusedCase(`let x: any = []; x = x!["concat"](x);`, "x", true, 1, 18, 19, ""),
+			extraUnusedCase(`let x: any = []; x = (x satisfies any)["concat"](x);`, "x", true, 1, 18, 19, ""),
 		},
 	)
 }
