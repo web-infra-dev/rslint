@@ -43,12 +43,12 @@ hasComments := utils.HasCommentsInRange(ctx.SourceFile, textRange)
 
 // Check if any comment overlaps an arbitrary [start, end) span, e.g. the gap
 // between two tokens that aren't adjacent nodes. Binary-searches the file's
-// already-collected comment list — pass ctx.Comments, don't rebuild it.
+// already-collected comment list — pass ctx.Comments.All(), don't rebuild it.
 // Prefer this over GetCommentsInRange/HasCommentsInRange when you're calling
 // it once per matching AST node across the whole file (e.g. once per boolean
 // cast, once per label) — see the "Token and Comment Iteration" section below
 // for why that distinction matters.
-hasComment := utils.HasCommentInSpan(ctx.Comments, start, end)
+hasComment := utils.HasCommentInSpan(ctx.Comments.All(), start, end)
 ```
 
 ### Type Recursion
@@ -209,23 +209,25 @@ directive-comment list for `DisableManager` and inline `/* global */` parsing
 — and hands you the result:
 
 ```go
-// ctx.Comments is every comment in the file, in source order, computed once
-// per file by the linter. Use this instead of ForEachComment(ctx.SourceFile.AsNode(), ...).
-for _, comment := range ctx.Comments {
+// ctx.Comments.All() is every comment in the file, in source order, computed
+// once per file by the linter. Use this instead of
+// ForEachComment(ctx.SourceFile.AsNode(), ...).
+for _, comment := range ctx.Comments.All() {
     // comment is *ast.CommentRange
 }
 ```
 
 Rules of thumb:
 
-- Need every comment in the file → iterate `ctx.Comments`. Don't call
+- Need every comment in the file → iterate `ctx.Comments.All()`. Don't call
   `ForEachComment` on `ctx.SourceFile.AsNode()` yourself.
 - Need to know whether a comment exists somewhere in a bounded, non-adjacent
-  span (e.g. between two tokens that aren't parent/child) → `utils.HasCommentInSpan(ctx.Comments, start, end)`.
-  It binary-searches the sorted `ctx.Comments` list (O(log k), mirrors
-  ESLint's `TokenStore#commentsExistBetween`) instead of rescanning. This
+  span (e.g. between two tokens that aren't parent/child) →
+  `utils.HasCommentInSpan(ctx.Comments.All(), start, end)`. It binary-searches
+  the sorted comment list (O(log k), mirrors
+  ESLint's `TokenStore#commentsExistBetween`) instead of scanning again. This
   matters most when the check runs once per matching AST node (once per
-  boolean cast, once per label) — a per-node full-file rescan is the
+  boolean cast, once per label) — a per-node full-file scan is the
   expensive pattern to avoid.
 - Need comments strictly inside one specific node's own span, and only call
   this a handful of times (not once per node across the file) →
@@ -326,6 +328,14 @@ contextualType := utils.GetContextualType(typeChecker, node)
 // Handles Identifier, StringLiteral, NumericLiteral, ComputedPropertyName
 // (with static string, numeric, BigInt, or template literal expressions)
 name, isStatic := utils.GetStaticPropertyName(nameNode)
+
+// Access-expression helpers for `object.key` / `object[key]`
+name, isStatic := utils.AccessExpressionStaticName(accessNode)
+object := utils.AccessExpressionObject(accessNode)
+
+// Whether an element access has a finite integer numeric-literal key.
+// Parenthesized keys are transparent; unary signs and TS assertions are not.
+isIntegerIndex := utils.IsIntegerElementAccess(accessNode)
 
 // Normalize numeric literal to its canonical form (matches ESLint's String(node.value))
 // e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"

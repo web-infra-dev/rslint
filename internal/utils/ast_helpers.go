@@ -108,7 +108,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 		return false
 	}
 
-	obj := memberAccessObject(callee)
+	obj := AccessExpressionObject(callee)
 	obj = ast.SkipParentheses(obj)
 	if obj == nil || !ast.IsIdentifier(obj) ||
 		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
@@ -123,16 +123,6 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 func isGlobalOff(globals map[string]bool, name string) bool {
 	declared, ok := globals[name]
 	return ok && !declared
-}
-
-func memberAccessObject(node *ast.Node) *ast.Node {
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		return node.AsPropertyAccessExpression().Expression
-	case ast.KindElementAccessExpression:
-		return node.AsElementAccessExpression().Expression
-	}
-	return nil
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference

@@ -130,6 +130,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_arrow_callback"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
@@ -246,6 +247,7 @@ func GetAllRules() []rule.Rule {
 		no_undef_init.NoUndefInitRule,
 		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
+		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
