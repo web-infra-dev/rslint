@@ -4,22 +4,26 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "enableDangerousAutofixThisMayCauseInfiniteLoops": false,
       "properties": {
         "additionalHooks": {
-          "type": "string"
+          "type": "string",
+          "format": "regex",
+          "default": ""
         },
         "enableDangerousAutofixThisMayCauseInfiniteLoops": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         },
         "experimental_autoDependenciesHooks": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "default": []
         },
         "requireExplicitEffectDeps": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         }
       }
     }

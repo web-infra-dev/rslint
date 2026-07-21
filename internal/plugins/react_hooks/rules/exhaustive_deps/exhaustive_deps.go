@@ -377,40 +377,21 @@ func parseOptions(options []any, settings map[string]interface{}) Options {
 	if len(options) > 0 {
 		optsMap, _ = options[0].(map[string]interface{})
 	}
-	// `addlSet` tracks whether the rule-level `additionalHooks` field was
-	// PRESENT in options (even as empty string). Mirrors upstream's
-	// `rawOptions.additionalHooks` truthiness check — falsy values fall
-	// back to the settings entry, so we record presence here and only
-	// fall back when the rule-level option is absent or empty.
-	addlSet := false
-	if optsMap != nil {
-		if raw, ok := optsMap["additionalHooks"].(string); ok {
-			addlSet = raw != ""
-			if raw != "" {
-				if re, err := regexp.Compile(raw); err == nil {
-					opts.AdditionalHooks = re
-				}
-			}
-		}
-		if v, ok := optsMap["enableDangerousAutofixThisMayCauseInfiniteLoops"].(bool); ok {
-			opts.EnableDangerousAutofixThisMayCauseInfiniteLoops = v
-		}
-		if v, ok := optsMap["requireExplicitEffectDeps"].(bool); ok {
-			opts.RequireExplicitEffectDeps = v
-		}
-		if raw, ok := optsMap["experimental_autoDependenciesHooks"].([]interface{}); ok {
-			opts.AutoDepsHooks = map[string]bool{}
-			for _, item := range raw {
-				if s, ok := item.(string); ok {
-					opts.AutoDepsHooks[s] = true
-				}
-			}
-		}
+	opts.EnableDangerousAutofixThisMayCauseInfiniteLoops, _ = optsMap["enableDangerousAutofixThisMayCauseInfiniteLoops"].(bool)
+	opts.RequireExplicitEffectDeps, _ = optsMap["requireExplicitEffectDeps"].(bool)
+	opts.AutoDepsHooks = map[string]bool{}
+	for _, h := range utils.ToStringSlice(optsMap["experimental_autoDependenciesHooks"]) {
+		opts.AutoDepsHooks[h] = true
 	}
-	// Settings fallback for additionalHooks (matches upstream's
-	// `getAdditionalEffectHooksFromSettings`, but only when the rule-level
-	// option is absent OR empty). Delegates to react_hooksutil.
-	if !addlSet && opts.AdditionalHooks == nil {
+	// Mirrors upstream's `rawOptions.additionalHooks` truthiness check: a
+	// non-empty rule-level pattern wins (even when it fails to compile —
+	// no settings fallback then); an absent or empty one falls back to
+	// `settings['react-hooks'].additionalHooks` via react_hooksutil.
+	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
+		if re, err := regexp.Compile(raw); err == nil {
+			opts.AdditionalHooks = re
+		}
+	} else {
 		opts.AdditionalHooks = react_hooksutil.AdditionalHooksFromSettings(settings, "additionalHooks")
 	}
 	return opts

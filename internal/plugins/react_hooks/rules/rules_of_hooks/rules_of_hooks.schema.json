@@ -6,7 +6,8 @@
       "additionalProperties": false,
       "properties": {
         "additionalHooks": {
-          "type": "string"
+          "type": "string",
+          "format": "regex"
         }
       }
     }
