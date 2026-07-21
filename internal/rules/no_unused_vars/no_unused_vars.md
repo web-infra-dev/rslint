@@ -60,7 +60,8 @@ options object:
 ```
 
 - `vars`: Check all variables (`"all"`, the default) or only variables in
-  non-global scopes (`"local"`).
+  non-global scopes (`"local"`). Top-level ES module bindings are local and
+  remain checked.
 - `varsIgnorePattern`: Ignore variable names matching this JavaScript regular
   expression.
 - `args`: Check all parameters (`"all"`), only parameters after the last used
@@ -71,8 +72,9 @@ options object:
   them (`"none"`).
 - `caughtErrorsIgnorePattern`: Ignore catch-clause binding names matching this
   JavaScript regular expression.
-- `destructuredArrayIgnorePattern`: Ignore names in array destructuring that
-  match this JavaScript regular expression.
+- `destructuredArrayIgnorePattern`: Ignore direct array-destructuring elements
+  that match this JavaScript regular expression. Defaulted and rest elements
+  continue to use their ordinary variable, parameter, or catch-clause option.
 - `ignoreRestSiblings`: Ignore direct object-destructuring properties that have
   a rest sibling. Bindings nested inside those properties are still checked.
 - `ignoreClassWithStaticInitBlock`: Ignore classes containing a static
@@ -87,6 +89,17 @@ For example, this configuration allows underscore-prefixed parameters:
 {
   "no-unused-vars": ["error", { "args": "all", "argsIgnorePattern": "^_" }]
 }
+```
+
+## Exported Globals
+
+In script files, an `/* exported name */` block comment marks the named global
+binding as used. Multiple names are comma-separated. The directive has no
+effect on nested bindings or in ES modules.
+
+```javascript
+/* exported publicValue */
+var publicValue = 1;
 ```
 
 ## Original Documentation

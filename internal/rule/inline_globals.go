@@ -14,6 +14,10 @@ import (
 // the longer prefix.
 var inlineGlobalsKeywords = [...]string{"globals", "global"}
 
+// exportedDirectiveKeywords is separate because `exported` uses ESLint's
+// comma-only list syntax rather than the richer `global` string config syntax.
+var exportedDirectiveKeywords = [...]string{"exported"}
+
 // InlineGlobal describes one name declared by `/* global */` comments.
 // Declared is the name's final inline state after all comments are applied.
 // NameRanges contains one exact name range per comment that mentions the name,
@@ -100,6 +104,10 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map
 }
 
 func mayContainInlineGlobalDirective(text string) bool {
+	return mayContainBlockDirective(text, inlineGlobalsKeywords[:])
+}
+
+func mayContainBlockDirective(text string, keywords []string) bool {
 	for searchStart := 0; searchStart < len(text); {
 		markerOffset := strings.Index(text[searchStart:], "/*")
 		if markerOffset < 0 {
@@ -108,7 +116,7 @@ func mayContainInlineGlobalDirective(text string) bool {
 
 		contentStart := searchStart + markerOffset + len("/*")
 		contentStart, _ = trimECMAScriptWhitespaceRange(text, contentStart, len(text))
-		for _, keyword := range inlineGlobalsKeywords {
+		for _, keyword := range keywords {
 			if !strings.HasPrefix(text[contentStart:], keyword) {
 				continue
 			}
@@ -128,13 +136,49 @@ func mayContainInlineGlobalDirective(text string) bool {
 }
 
 func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGlobalName {
-	if comment == nil || comment.Kind != ast.KindMultiLineCommentTrivia {
+	restStart, contentEnd, ok := blockDirectiveValueRange(text, comment, inlineGlobalsKeywords[:])
+	if !ok {
 		return nil
+	}
+	return parseGlobalNameListEntries(text, restStart, contentEnd)
+}
+
+// ParseExportedNames returns the names from ESLint `/* exported ... */`
+// directives. It uses the shared scanner-backed CommentStore, so lookalike
+// text in strings, templates, regular expressions, and line comments is
+// ignored. Names follow ESLint's comma-separated list format; quoted entries
+// have one matching pair of quotes removed.
+func ParseExportedNames(sourceFile *ast.SourceFile, comments *CommentStore) map[string]bool {
+	if sourceFile == nil || comments == nil || sourceFile.Text() == "" ||
+		!mayContainBlockDirective(sourceFile.Text(), exportedDirectiveKeywords[:]) {
+		return nil
+	}
+
+	text := sourceFile.Text()
+	var names map[string]bool
+	for _, comment := range comments.All() {
+		start, end, ok := blockDirectiveValueRange(text, comment, exportedDirectiveKeywords[:])
+		if !ok {
+			continue
+		}
+		for _, name := range parseCommaSeparatedDirectiveNames(text, start, end) {
+			if names == nil {
+				names = make(map[string]bool)
+			}
+			names[name] = true
+		}
+	}
+	return names
+}
+
+func blockDirectiveValueRange(text string, comment *ast.CommentRange, keywords []string) (int, int, bool) {
+	if comment == nil || comment.Kind != ast.KindMultiLineCommentTrivia {
+		return 0, 0, false
 	}
 
 	start, end := comment.Pos(), comment.End()
 	if start < 0 || end > len(text) || end-start < len("/*") || text[start:start+2] != "/*" {
-		return nil
+		return 0, 0, false
 	}
 
 	contentStart, contentEnd := start+2, end
@@ -143,18 +187,44 @@ func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGl
 	}
 	contentStart, contentEnd = trimECMAScriptWhitespaceRange(text, contentStart, contentEnd)
 	if contentStart == contentEnd {
-		return nil
+		return 0, 0, false
 	}
 
-	restStart, ok := matchInlineGlobalsDirectiveRange(text, contentStart, contentEnd)
+	restStart, ok := matchDirectiveKeywordRange(text, contentStart, contentEnd, keywords)
 	if !ok {
-		return nil
+		return 0, 0, false
 	}
 	if justificationStart := findDirectiveJustification(text, restStart, contentEnd); justificationStart >= 0 {
 		contentEnd = justificationStart
 	}
 	restStart, contentEnd = trimECMAScriptWhitespaceRange(text, restStart, contentEnd)
-	return parseGlobalNameListEntries(text, restStart, contentEnd)
+	return restStart, contentEnd, true
+}
+
+func parseCommaSeparatedDirectiveNames(text string, start int, end int) []string {
+	var names []string
+	for entryStart := start; entryStart <= end; {
+		entryEnd := entryStart
+		for entryEnd < end && text[entryEnd] != ',' {
+			entryEnd++
+		}
+		trimmedStart, trimmedEnd := trimECMAScriptWhitespaceRange(text, entryStart, entryEnd)
+		if trimmedEnd-trimmedStart >= 2 {
+			quote := text[trimmedStart]
+			if (quote == '\'' || quote == '"') && text[trimmedEnd-1] == quote {
+				trimmedStart++
+				trimmedEnd--
+			}
+		}
+		if trimmedStart < trimmedEnd {
+			names = append(names, text[trimmedStart:trimmedEnd])
+		}
+		if entryEnd == end {
+			break
+		}
+		entryStart = entryEnd + 1
+	}
+	return names
 }
 
 // matchInlineGlobalsDirective reports whether comment content begins with the
@@ -171,7 +241,11 @@ func matchInlineGlobalsDirective(content string) (string, bool) {
 }
 
 func matchInlineGlobalsDirectiveRange(text string, start int, end int) (int, bool) {
-	for _, keyword := range inlineGlobalsKeywords {
+	return matchDirectiveKeywordRange(text, start, end, inlineGlobalsKeywords[:])
+}
+
+func matchDirectiveKeywordRange(text string, start int, end int, keywords []string) (int, bool) {
+	for _, keyword := range keywords {
 		if !strings.HasPrefix(text[start:end], keyword) {
 			continue
 		}

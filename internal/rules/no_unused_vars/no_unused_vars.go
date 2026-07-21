@@ -58,6 +58,7 @@ type analysisContext struct {
 	allUsages         map[*ast.Symbol][]*ast.Node
 	writeRefs         map[*ast.Symbol][]*ast.Node
 	globalRefsByName  map[string][]*ast.Node
+	exportedNames     map[string]bool
 	refIndex          *utils.ReferenceIndex
 	seenMergedSymbols map[*ast.Symbol]bool
 	reportedUnused    map[*ast.Node]bool
@@ -244,12 +245,44 @@ func isPartOfAssignment(node *ast.Node) bool {
 	// This matches ESLint's isForInOfRef() logic (see #2342).
 	if target.Kind == ast.KindForInStatement || target.Kind == ast.KindForOfStatement {
 		forStmt := target.AsForInOrOfStatement()
-		if forStmt != nil && forStmt.Statement != nil && forInBodyStartsWithReturn(forStmt.Statement) {
+		if forStmt != nil && forStmt.Statement != nil &&
+			forInBodyStartsWithReturn(forStmt.Statement) && isDirectForInOfTarget(node, target) {
 			return false // Not write-only — the variable is meaningfully used
 		}
 		return true
 	}
 	return false
+}
+
+// isDirectForInOfTarget mirrors the narrow shape recognized by ESLint's
+// isForInOfRef: only `for (x in/of value)` and `for (let x in/of value)` get
+// the return-first-body exception. A binding nested in `[x]` or `{x}` remains
+// a write-only loop target even when the body starts with return.
+func isDirectForInOfTarget(node *ast.Node, loop *ast.Node) bool {
+	if node == nil || !ast.IsForInOrOfStatement(loop) {
+		return false
+	}
+	statement := loop.AsForInOrOfStatement()
+	if statement == nil || statement.Initializer == nil {
+		return false
+	}
+	initializer := ast.SkipParentheses(statement.Initializer)
+	if initializer == node {
+		return true
+	}
+	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
+		return false
+	}
+	declarations := initializer.AsVariableDeclarationList().Declarations
+	if declarations == nil || len(declarations.Nodes) != 1 {
+		return false
+	}
+	declaration := declarations.Nodes[0].AsVariableDeclaration()
+	if declaration == nil {
+		return false
+	}
+	name := declaration.Name()
+	return name != nil && ast.SkipParentheses(name) == node
 }
 
 // isUpdateTarget checks if the identifier is the operand of a prefix/postfix
@@ -517,7 +550,14 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 			// The function scope includes parameter initializers as well as the
 			// body, so recursive defaults such as `function f(x = f) {}` are self-use.
 			body = definition
-		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration:
+		case ast.KindClassDeclaration,
+			ast.KindInterfaceDeclaration,
+			ast.KindTypeAliasDeclaration,
+			ast.KindEnumDeclaration:
+			// Class declarations have a class-local name binding, just like
+			// ESLint's class scope. A reference from extends, a computed key,
+			// a field, method, or static block therefore does not consume the
+			// declaration in the enclosing scope.
 			// Self-referencing types/enums: `interface Foo { baz: Foo['bar'] }`,
 			// `type Foo = { bar: Foo }`, `enum Foo { B = Foo.A }`.
 			body = definition
@@ -685,27 +725,61 @@ func isForInOfDeclaration(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// hasArrayDestructuringWrite checks if the variable has any write reference
-// via array destructuring assignment (e.g., `[_x] = arr`).
-func hasArrayDestructuringWrite(writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) bool {
+// hasDirectArrayDestructuringWrite checks if the variable has any direct write
+// reference via array destructuring assignment (e.g., `[_x] = arr`).
+func hasDirectArrayDestructuringWrite(writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) bool {
 	refs, exists := writeRefs[sym]
 	if !exists {
 		return false
 	}
 	for _, ref := range refs {
-		parent := ref.Parent
-		for parent != nil {
-			if parent.Kind == ast.KindArrayLiteralExpression {
-				return true
-			}
-			if parent.Kind != ast.KindSpreadElement &&
-				parent.Kind != ast.KindParenthesizedExpression {
-				break
-			}
-			parent = parent.Parent
+		// ESTree checks `ref.identifier.parent.type === "ArrayPattern"`.
+		// A rest element or default assignment adds an intermediate parent,
+		// so those forms intentionally do not qualify.
+		if ref.Parent != nil && ref.Parent.Kind == ast.KindArrayLiteralExpression &&
+			utils.IsInDestructuringAssignment(ref.Parent) {
+			return true
 		}
 	}
 	return false
+}
+
+// isDirectArrayDestructuredIdentifier recreates ESTree's direct-parent test
+// for a declaration binding. tsgo stores defaults and rest markers on the
+// BindingElement itself, while ESTree wraps their identifiers in
+// AssignmentPattern/RestElement nodes; exclude those wrappers explicitly.
+func isDirectArrayDestructuredIdentifier(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBindingElement || node.Parent == nil ||
+		node.Parent.Kind != ast.KindArrayBindingPattern {
+		return false
+	}
+	element := node.AsBindingElement()
+	return element != nil && element.DotDotDotToken == nil && element.Initializer == nil &&
+		element.Name() != nil && ast.IsIdentifier(element.Name())
+}
+
+// hasObjectRestSiblingDefinition matches ESLint's direct Property sibling
+// shape. Nested bindings, defaults, and the rest binding itself do not qualify.
+func hasObjectRestSiblingDefinition(definition *ast.Node) bool {
+	if definition == nil || definition.Kind != ast.KindBindingElement || definition.Parent == nil ||
+		definition.Parent.Kind != ast.KindObjectBindingPattern {
+		return false
+	}
+	element := definition.AsBindingElement()
+	if element == nil || element.DotDotDotToken != nil || element.Initializer != nil ||
+		element.Name() == nil || !ast.IsIdentifier(element.Name()) {
+		return false
+	}
+	pattern := definition.Parent.AsBindingPattern()
+	if pattern == nil || pattern.Elements == nil || len(pattern.Elements.Nodes) == 0 {
+		return false
+	}
+	last := pattern.Elements.Nodes[len(pattern.Elements.Nodes)-1]
+	if last.Kind != ast.KindBindingElement {
+		return false
+	}
+	lastElement := last.AsBindingElement()
+	return lastElement != nil && lastElement.DotDotDotToken != nil
 }
 
 func hasObjectRestSiblingWrite(writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) bool {
@@ -864,8 +938,14 @@ func isCaughtErrorNode(node *ast.Node) bool {
 	return node != nil && ast.IsCatchClauseVariableDeclarationOrBindingElement(node)
 }
 
-func isUsingDeclaration(varDeclNode *ast.Node) bool {
-	return ast.IsVarUsing(varDeclNode) || ast.IsVarAwaitUsing(varDeclNode)
+func isUsingDeclaration(definition *ast.Node) bool {
+	if definition != nil && definition.Kind == ast.KindBindingElement {
+		definition = utils.EnclosingVariableDeclarationOfBindingElement(definition)
+	}
+	if definition == nil || definition.Kind != ast.KindVariableDeclaration {
+		return false
+	}
+	return ast.IsVarUsing(definition) || ast.IsVarAwaitUsing(definition)
 }
 
 func hasStaticInitBlock(classNode *ast.Node) bool {
@@ -880,24 +960,6 @@ func hasStaticInitBlock(classNode *ast.Node) bool {
 	return found
 }
 
-func isDestructuredArrayElement(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	parent := node.Parent
-	// Walk up through BindingElements to find the containing pattern.
-	for parent != nil {
-		if parent.Kind == ast.KindArrayBindingPattern {
-			return true
-		}
-		if parent.Kind != ast.KindBindingElement {
-			break
-		}
-		parent = parent.Parent
-	}
-	return false
-}
-
 // matchesIgnorePattern checks if a variable name matches its category's
 // ignore pattern, and whether the match should result in ignoring or
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
@@ -905,8 +967,17 @@ func isDestructuredArrayElement(node *ast.Node) bool {
 func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) (bool, bool, variableType) {
 	var re *regexp2.Regexp
 	kind := variableTypeVariable
+	matched := false
 
-	if isParameterNode(varInfo.Definition) {
+	// ESLint evaluates destructuredArrayIgnorePattern before the variable's
+	// ordinary category. This matters when both patterns match, and when
+	// args/caughtErrors is "none" together with reportUsedIgnorePattern.
+	if opts.destructuredArrayIgnoreRe != nil &&
+		(isDirectArrayDestructuredIdentifier(varInfo.Definition) || hasDirectArrayDestructuringWrite(writeRefs, sym)) &&
+		utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName) {
+		kind = variableTypeArrayDestructure
+		matched = true
+	} else if isParameterNode(varInfo.Definition) {
 		kind = variableTypeParameter
 		if opts.Args == "none" {
 			return true, false, kind
@@ -922,17 +993,8 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 		re = opts.varsIgnoreRe
 	}
 
-	matched := re != nil && utils.Regexp2MatchString(re, varName)
-
-	// destructuredArrayIgnorePattern applies to array-destructured elements,
-	// checking both the declaration site AND assignment sites (e.g., `let _x; [_x] = arr`).
-	if !matched && opts.destructuredArrayIgnoreRe != nil {
-		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs, sym) {
-			matched = utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName)
-			if matched {
-				kind = variableTypeArrayDestructure
-			}
-		}
+	if !matched {
+		matched = re != nil && utils.Regexp2MatchString(re, varName)
 	}
 
 	if !matched {
@@ -973,7 +1035,7 @@ func ignorePatternAdditional(kind variableType, opts Config, used bool) string {
 }
 
 func definitionVariableType(definition *ast.Node, opts Config) variableType {
-	if opts.DestructuredArrayIgnorePattern != "" && isDestructuredArrayElement(definition) {
+	if opts.DestructuredArrayIgnorePattern != "" && isDirectArrayDestructuredIdentifier(definition) {
 		return variableTypeArrayDestructure
 	}
 	if isCaughtErrorNode(definition) {
@@ -1078,9 +1140,9 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 		}
 	}
 
-	// Check if the symbol is re-exported via `export { name }`.
-	// The export specifier creates a different symbol chain, so we resolve
-	// both sides through SkipAlias and compare.
+	// Check if the symbol is re-exported via `export { name }`. The checker
+	// resolves the export specifier to its exact local target, avoiding a
+	// same-named binding from another lexical scope.
 	if varInfo.Definition != nil {
 		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
 		if sym != nil {
@@ -1095,8 +1157,7 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 }
 
 // isReExportedSymbol checks if a symbol is re-exported via `export { name }` or
-// `export { name as alias }`. Resolves both the export specifier's symbol and the
-// original symbol through SkipAlias to handle re-exports of imported bindings.
+// `export { name as alias }`.
 func isReExportedSymbol(ctx rule.RuleContext, sym *ast.Symbol, sourceFile *ast.Node) bool {
 	found := false
 	sourceFile.ForEachChild(func(child *ast.Node) bool {
@@ -1126,23 +1187,13 @@ func isReExportedSymbol(ctx rule.RuleContext, sym *ast.Symbol, sourceFile *ast.N
 			if exportSpec == nil {
 				continue
 			}
-			// When renamed (`export { join as myJoin }`), PropertyName references the local binding.
-			// When not renamed (`export { join }`), Name's symbol differs from the import binding,
-			// so we use GetSymbolAtLocation on PropertyName which resolves to the local symbol.
-			refNode := exportSpec.PropertyName
-			if refNode != nil {
-				exportSym := ctx.TypeChecker.GetSymbolAtLocation(refNode)
-				if exportSym == sym {
-					found = true
-					return true
-				}
-			} else {
-				// No rename: compare by name text since the export specifier creates a different symbol
-				exportName := exportSpec.Name()
-				if exportName != nil && ast.IsIdentifier(exportName) && sym.Name == exportName.AsIdentifier().Text {
-					found = true
-					return true
-				}
+			// Ask the checker for the local export target directly. This is more
+			// precise than a name comparison (which confuses nested shadows), works
+			// for imported aliases, and also covers `export type { Name }`, which is
+			// intentionally not a runtime reference in GetReferenceSymbol.
+			if exportSym := ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(spec); exportSym == sym {
+				found = true
+				return true
 			}
 		}
 		return false
@@ -1853,14 +1904,50 @@ func hasInlineGlobalUse(ctx rule.RuleContext, name string, references []*ast.Nod
 	return false
 }
 
+// referenceFallbackBoundary scopes the name-index fallback to the declaration's
+// actual var or lexical scope when checker symbol identity is unavailable.
+func referenceFallbackBoundary(definition *ast.Node) *ast.Node {
+	if definition == nil {
+		return nil
+	}
+	root := ast.GetRootDeclaration(definition)
+	if root != nil && root.Kind == ast.KindVariableDeclaration && root.Parent != nil &&
+		root.Parent.Kind == ast.KindVariableDeclarationList && utils.IsVarKeyword(root.Parent) {
+		// `var` escapes an enclosing block/loop/catch into its variable scope.
+		return utils.FindEnclosingScope(definition)
+	}
+	// let/const/using, block functions/classes, catch variables, and loop
+	// bindings must keep the name-based checker fallback inside their lexical
+	// scope. This prevents a later same-named export from consuming a shadow.
+	return ast.GetEnclosingBlockScopeContainer(definition)
+}
+
+// isScriptGlobalDefinition models ESLint's global scope for vars:"local" and
+// `/* exported */`. `var` uses its enclosing variable scope even when nested
+// in a block or loop; lexical declarations use tsgo's block-scope container.
+func isScriptGlobalDefinition(sourceFile *ast.SourceFile, definition *ast.Node) bool {
+	if sourceFile == nil || definition == nil || ast.IsExternalModule(sourceFile) {
+		return false
+	}
+	root := ast.GetRootDeclaration(definition)
+	if root == nil {
+		return false
+	}
+	if root.Kind == ast.KindVariableDeclaration && root.Parent != nil &&
+		root.Parent.Kind == ast.KindVariableDeclarationList && utils.IsVarKeyword(root.Parent) {
+		return utils.FindEnclosingScope(root) == sourceFile.AsNode()
+	}
+	return ast.GetEnclosingBlockScopeContainer(root) == sourceFile.AsNode()
+}
+
 // processVariable determines whether a single declared variable/parameter/import
 // is unused and, if so, reports it. The decision pipeline:
 //  1. Resolve the symbol and look up usages (original sym → SkipAlias → shared reference index)
 //  2. Filter out self-references (same position, self-modifying, inside own declaration body)
 //  3. Classify remaining usages as value or type-only
-//  4. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
-//  5. Skip exported symbols (except for reportUsedIgnorePattern)
-//  6. Apply "after-used" logic for parameters
+//  4. Apply global/directive and value-vs-type semantics
+//  5. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
+//  6. Skip exports, "after-used" parameters, and option-specific suppressions
 //  7. Report at the last write-reference position (or declaration name as fallback)
 func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts Config, ac *analysisContext, flavor ruleFlavor) {
 	varInfo := &VariableInfo{
@@ -1898,7 +1985,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// identity. Reuse the shared, shadow-aware name index as a narrow
 		// fallback and keep references inside the declaration's own container.
 		if !exists && !isImportDef && ac.refIndex != nil {
-			boundary := ast.GetDeclarationContainer(definition)
+			boundary := referenceFallbackBoundary(definition)
 			ac.refIndex.ForEachReferenceByName(name, boundary, func(ref *ast.Node) bool {
 				if boundary != nil && !ast.IsNodeDescendantOf(ref, boundary) {
 					return false
@@ -1944,18 +2031,19 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		}
 	}
 
-	// vars: "local" — skip top-level (global scope) variable declarations.
-	if opts.Vars == "local" && !isParameterNode(definition) && !isCaughtErrorNode(definition) {
-		if definition != nil && definition.Parent != nil {
-			parent := definition.Parent
-			// VariableDeclaration → VariableDeclarationList → VariableStatement → SourceFile
-			for parent != nil && (parent.Kind == ast.KindVariableDeclarationList || parent.Kind == ast.KindVariableStatement) {
-				parent = parent.Parent
-			}
-			if parent != nil && parent.Kind == ast.KindSourceFile {
-				return
-			}
-		}
+	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, definition)
+	if scriptGlobal && ac.exportedNames[name] {
+		// ESLint marks exported-directive globals as used before this rule runs.
+		// Preserve that ordering so reportUsedIgnorePattern can still diagnose a
+		// marked name that matches an ignore pattern.
+		varInfo.Used = true
+		varInfo.OnlyUsedAsType = false
+	}
+
+	// vars: "local" skips only the script global scope. ES module top-level
+	// bindings live in a module scope and must still be checked.
+	if opts.Vars == "local" && scriptGlobal {
+		return
 	}
 
 	// For type-level declarations and imports, being used in a type context
@@ -1980,10 +2068,6 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
-	if !varInfo.Used && opts.IgnoreRestSiblings && hasObjectRestSiblingWrite(ac.writeRefs, sym) {
-		return
-	}
-
 	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
 	// If the variable matches its category's pattern and is unused → ignore silently.
 	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
@@ -2018,6 +2102,19 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if !varInfo.Used && definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
 		param := definition.AsParameterDeclaration()
 		if param != nil && param.Initializer == nil && isBeforeLastUsedParam(ctx, definition, ac.allUsages) {
+			return
+		}
+	}
+
+	// These options suppress only otherwise-unused bindings. Keep them after
+	// ignore-pattern handling so reportUsedIgnorePattern can still report a
+	// used `using` binding or a used object-rest sibling.
+	if !varInfo.Used {
+		if opts.IgnoreUsingDeclarations && isUsingDeclaration(definition) {
+			return
+		}
+		if opts.IgnoreRestSiblings &&
+			(hasObjectRestSiblingDefinition(definition) || hasObjectRestSiblingWrite(ac.writeRefs, sym)) {
 			return
 		}
 	}
@@ -2103,6 +2200,7 @@ func newRule(flavor ruleFlavor) rule.Rule {
 				allUsages:         make(map[*ast.Symbol][]*ast.Node),
 				writeRefs:         make(map[*ast.Symbol][]*ast.Node),
 				globalRefsByName:  make(map[string][]*ast.Node),
+				exportedNames:     rule.ParseExportedNames(ctx.SourceFile, ctx.Comments),
 				refIndex:          utils.NewReferenceIndex(ctx.SourceFile, ctx.TypeChecker),
 				seenMergedSymbols: make(map[*ast.Symbol]bool),
 				reportedUnused:    make(map[*ast.Node]bool),
@@ -2135,29 +2233,10 @@ func newRule(flavor ruleFlavor) rule.Rule {
 					ensureCollected(definition)
 					processVariable(ctx, nameNode, identifier.Text, definition, opts, ac, flavor)
 				} else if nameNode.Kind == ast.KindObjectBindingPattern || nameNode.Kind == ast.KindArrayBindingPattern {
-					hasRestSibling := false
-					if opts.IgnoreRestSiblings && nameNode.Kind == ast.KindObjectBindingPattern {
-						nameNode.ForEachChild(func(child *ast.Node) bool {
-							if child.Kind == ast.KindBindingElement {
-								elem := child.AsBindingElement()
-								if elem != nil && elem.DotDotDotToken != nil {
-									hasRestSibling = true
-									return true
-								}
-							}
-							return false
-						})
-					}
 					nameNode.ForEachChild(func(child *ast.Node) bool {
 						if child.Kind == ast.KindBindingElement {
 							elem := child.AsBindingElement()
 							if elem != nil && elem.Name() != nil {
-								// ESLint ignores only a directly bound property beside
-								// the final object rest. Variables nested inside that
-								// property's array/object pattern are not siblings.
-								if hasRestSibling && elem.DotDotDotToken == nil && elem.Initializer == nil && ast.IsIdentifier(elem.Name()) {
-									return false
-								}
 								processBindingName(elem.Name(), child)
 							}
 						}
@@ -2175,15 +2254,12 @@ func newRule(flavor ruleFlavor) rule.Rule {
 					if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
 						return
 					}
-					if opts.IgnoreUsingDeclarations && isUsingDeclaration(node) {
-						return
-					}
 					// Skip for-in/for-of declarations whose body starts with return.
 					// E.g., `for (var name in obj) { return true; }` — the variable
 					// is considered "used" (checking property existence).
 					if forStmt := isForInOfDeclaration(node); forStmt != nil {
 						body := forStmt.AsForInOrOfStatement().Statement
-						if forInBodyStartsWithReturn(body) {
+						if ast.IsIdentifier(varDecl.Name()) && forInBodyStartsWithReturn(body) {
 							return
 						}
 					}
@@ -2493,6 +2569,9 @@ func newRule(flavor ruleFlavor) rule.Rule {
 				if opts.Vars != "local" {
 					for _, inlineGlobal := range ctx.InlineGlobals {
 						if !inlineGlobal.Declared || len(inlineGlobal.NameRanges) == 0 {
+							continue
+						}
+						if ac.exportedNames[inlineGlobal.Name] {
 							continue
 						}
 						if hasInlineGlobalUse(ctx, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {

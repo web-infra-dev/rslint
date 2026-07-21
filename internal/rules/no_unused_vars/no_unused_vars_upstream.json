@@ -271,24 +271,16 @@
       "code": "var x = 1; function foo(y = function() { bar(x); }) { y(); } foo();"
     },
     {
-      "code": "/*exported toaster*/ var toaster = 'great'",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+      "code": "/*exported toaster*/ var toaster = 'great'"
     },
     {
-      "code": "/*exported toaster, poster*/ var toaster = 1; poster = 0;",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+      "code": "/*exported toaster, poster*/ var toaster = 1; poster = 0;"
     },
     {
-      "code": "/*exported x*/ var { x } = y",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+      "code": "/*exported x*/ var { x } = y"
     },
     {
-      "code": "/*exported x, y*/  var { x, y } = z",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments"
+      "code": "/*exported x, y*/  var { x, y } = z"
     },
     {
       "code": "/*eslint custom/use-every-a:1*/ var a;",
@@ -1523,8 +1515,6 @@
     },
     {
       "code": "/*exported max*/ var max = 1, min = {min: 1}",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments",
       "errors": [
         {
           "messageId": "unusedVar",
@@ -1544,8 +1534,6 @@
     },
     {
       "code": "/*exported x*/ var { x, y } = z",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support ESLint exported directive comments",
       "errors": [
         {
           "messageId": "unusedVar",
