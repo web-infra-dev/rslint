@@ -78,10 +78,19 @@ function groupToTestDir(group) {
   return group.replace(/^@/, '');
 }
 
-function getIncludedRuleTests() {
+// Canonical manifest key. The whole file uses the `group` namespace so a
+// lookup can never accidentally mix `group` and `testDir` spellings.
+function ruleKey(group, rule) {
+  return `${group}:${rule}`;
+}
+
+function getIncludedRuleTests(groups) {
   // Parse rstest.config.mts include list and associate each rule with its
   // enabled test files, including tests nested under a rule directory.
   const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
+  // Translate the on-disk test directory back to its manifest group once here,
+  // so the returned map lives entirely in the `group` namespace.
+  const testDirToGroup = new Map(groups.map((g) => [groupToTestDir(g), g]));
   // Match uncommented flat and nested paths:
   //   ./tests/{testDir}/rules/{rule}.test.ts
   //   ./tests/{testDir}/rules/{rule}/{test-file}.test.ts
@@ -90,11 +99,11 @@ function getIncludedRuleTests() {
   const included = new Map();
   let match;
   while ((match = includeRegex.exec(config))) {
+    const group = testDirToGroup.get(match[2]);
+    if (!group) continue; // test dir with no matching plugin group
     const testPath = path.resolve(path.dirname(TEST_CONFIG_PATH), match[1]);
-    const testDir = match[2];
     const rule = match[3].replace(/-/g, '_');
-    // Key by test-dir + rule so same-named rules in different plugins stay distinct.
-    const key = `${testDir}:${rule}`;
+    const key = ruleKey(group, rule);
     if (!included.has(key)) included.set(key, new Set());
     included.get(key).add(testPath);
   }
@@ -286,14 +295,15 @@ function getDocPath(rule, pluginDir) {
 }
 
 function buildManifest() {
-  const included = getIncludedRuleTests();
   const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
   // Deduplicate by group + rule name, keeping first entry.
   const seen = new Map();
   for (const e of ruleEntries) {
-    const key = `${e.group}:${e.rule}`;
+    const key = ruleKey(e.group, e.rule);
     if (!seen.has(key)) seen.set(key, e);
   }
+  const groups = [...new Set(ruleEntries.map((e) => e.group))];
+  const included = getIncludedRuleTests(groups);
   const rules = Array.from(seen.values())
     .sort(
       (a, b) => a.rule.localeCompare(b.rule) || a.group.localeCompare(b.group),
@@ -303,7 +313,7 @@ function buildManifest() {
       let status = 'full';
       let failing_case = [];
       const group = entry.group;
-      const testFiles = included.get(`${groupToTestDir(group)}:${rule}`);
+      const testFiles = included.get(ruleKey(group, rule));
       if (!testFiles) {
         status = 'partial-test';
       } else {
