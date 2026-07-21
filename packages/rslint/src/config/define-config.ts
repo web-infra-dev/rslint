@@ -72,8 +72,7 @@ export type RuleOptions = Record<string, any>;
  *   `RulesRecord`; other rules default to `any[]`.
  */
 export type RuleEntry<Options extends any[] = any[]> =
-  | RuleSeverity
-  | readonly [RuleSeverity, ...Options];
+  RuleSeverity | readonly [RuleSeverity, ...Options];
 
 /**
  * Map of rule name → rule configuration. Rules with a known options shape
