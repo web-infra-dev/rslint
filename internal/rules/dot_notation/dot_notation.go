@@ -195,11 +195,21 @@ var DotNotationRule = rule.Rule{
 			nodeRange := utils.TrimNodeTextRange(sourceFile, node)
 			exprRange := utils.TrimNodeTextRange(sourceFile, elem.Expression)
 
-			// Locate the opening `[`; "?." (if present) and any accidental
-			// whitespace live between the object and it.
-			bracketStart := exprRange.End()
-			for bracketStart < nodeRange.End() && text[bracketStart] != '[' {
-				bracketStart++
+			// Locate the opening `[` via the real token stream (skipping
+			// comments/whitespace, and the "?." operator node when present)
+			// rather than scanning raw bytes for a literal '[' - a byte scan
+			// stops at a '[' that happens to appear inside an intervening
+			// comment, e.g. `foo /* [ */ ['bar']`.
+			var questionDotRange core.TextRange
+			hasQuestionDot := elem.QuestionDotToken != nil
+			operatorEnd := exprRange.End()
+			if hasQuestionDot {
+				questionDotRange = utils.TrimNodeTextRange(sourceFile, elem.QuestionDotToken)
+				operatorEnd = questionDotRange.End()
+			}
+			bracketStart := operatorEnd
+			if bracketTok, ok := utils.TokenAtOrAfter(sourceFile, operatorEnd); ok {
+				bracketStart = bracketTok.Start
 			}
 			bracketEnd := nodeRange.End() - 1
 			for bracketEnd > bracketStart && text[bracketEnd] != ']' {
@@ -221,26 +231,24 @@ var DotNotationRule = rule.Rule{
 				return
 			}
 
-			// Unlike the dot->bracket direction, there is no operator token in
-			// the source between the object and `[` for plain bracket access
-			// (operatorLen 0) - only an optional chain has one ("?.", 2 chars).
-			operatorLen := 0
-			sep := "."
-			if elem.QuestionDotToken != nil {
-				operatorLen = 2 // "?."
-				sep = "?."
-			} else if isDecimalIntegerLiteral(sourceFile, elem.Expression) {
-				sep = " ."
-			}
-
-			gapEnd := bracketStart - operatorLen
-			whitespace := ""
-			if gapEnd > exprRange.End() {
-				whitespace = text[exprRange.End():gapEnd]
-			}
-
 			objectText := text[exprRange.Pos():exprRange.End()]
-			replacement := objectText + whitespace + sep + value
+			var replacement string
+			if hasQuestionDot {
+				// Preserve whatever separates object/operator/bracket
+				// verbatim (whitespace, or a comment like `foo /* [ */ ['bar']`)
+				// rather than assuming the operator sits with zero gap on
+				// either side of it.
+				preOp := text[exprRange.End():questionDotRange.Pos()]
+				postOp := text[questionDotRange.End():bracketStart]
+				replacement = objectText + preOp + "?." + postOp + value
+			} else {
+				sep := "."
+				if isDecimalIntegerLiteral(sourceFile, elem.Expression) {
+					sep = " ."
+				}
+				whitespace := text[exprRange.End():bracketStart]
+				replacement = objectText + whitespace + sep + value
+			}
 
 			// Guard against the replacement identifier fusing with whatever
 			// token immediately follows the closing bracket (no existing
@@ -305,17 +313,20 @@ var DotNotationRule = rule.Rule{
 			nameRange := utils.TrimNodeTextRange(sourceFile, pae.Name())
 			objRange := utils.TrimNodeTextRange(sourceFile, pae.Expression)
 
-			// Locate the start of the access operator (either `?.` or `.`);
-			// any whitespace between the object end and the operator belongs
-			// to the replacement.
+			// Locate the access operator (either `?.` or `.`) via the real
+			// token stream rather than scanning raw bytes for a literal '?'
+			// or '.' - a byte scan stops at one of those characters if it
+			// happens to appear inside an intervening comment, e.g.
+			// `foo /* ? */ .while`.
 			accessStart := objRange.End()
-			for accessStart < nameRange.Pos() && text[accessStart] != '?' && text[accessStart] != '.' {
-				accessStart++
-			}
-
 			opLen := 1
-			if text[accessStart] == '?' {
-				opLen = 2
+			if isOptional {
+				qRange := utils.TrimNodeTextRange(sourceFile, pae.QuestionDotToken)
+				accessStart = qRange.Pos()
+				opLen = qRange.End() - qRange.Pos()
+			} else if opTok, ok := utils.TokenAtOrAfter(sourceFile, objRange.End()); ok {
+				accessStart = opTok.Start
+				opLen = opTok.End - opTok.Start
 			}
 			gapStart := accessStart + opLen
 			if gapStart > nameRange.Pos() {

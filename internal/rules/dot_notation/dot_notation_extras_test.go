@@ -117,5 +117,48 @@ func TestDotNotationExtras(t *testing.T) {
 			Output: []string{"obj.hasOwnProperty;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 5}},
 		},
+		// ---- Regression: a comment sitting between the object and the `[`
+		// must not be mistaken for the bracket itself just because it
+		// contains a literal '[' character. Locating the bracket via the
+		// real token stream (skipping trivia) instead of a raw byte scan
+		// keeps the comment intact in the fixed output, matching eslint. ----
+		{
+			Code:   "foo /* [ */ ['bar'];",
+			Output: []string{"foo /* [ */ .bar;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 14}},
+		},
+		// ---- Regression: same class of bug in the dot->bracket direction -
+		// a comment between the object and the `.` containing a literal '?'
+		// must not be mistaken for an optional-chain operator. ----
+		{
+			Code:    "foo /* ? */ .while",
+			Output:  []string{`foo /* ? */ ["while"]`},
+			Options: map[string]interface{}{"allowKeywords": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useBrackets", Line: 1, Column: 14}},
+		},
+		// ---- Regression: a comment between the object and the `.`
+		// containing a literal '.' must not be mistaken for the real
+		// operator either. ----
+		{
+			Code:    "foo /* . */ .while",
+			Output:  []string{`foo /* . */ ["while"]`},
+			Options: map[string]interface{}{"allowKeywords": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useBrackets", Line: 1, Column: 14}},
+		},
+		// ---- Regression: whitespace between an optional-chain `?.` and the
+		// following `[` must be preserved verbatim, not collapsed into a
+		// second (invalid) copy of the operator. ----
+		{
+			Code:   "obj?.  ['prop'];",
+			Output: []string{"obj?.  prop;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 9}},
+		},
+		// ---- Regression: same whitespace-preservation requirement across a
+		// newline between `?.` and `[`. ----
+		{
+			Code:   "obj?.\n['prop'];",
+			Output: []string{"obj?.\nprop;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 2, Column: 2}},
+		},
 	})
 }
