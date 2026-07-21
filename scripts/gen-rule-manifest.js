@@ -91,6 +91,19 @@ function getIncludedRuleTests(groups) {
   // Translate the on-disk test directory back to its manifest group once here,
   // so the returned map lives entirely in the `group` namespace.
   const testDirToGroup = new Map(groups.map((g) => [groupToTestDir(g), g]));
+  // Fail loudly if a group's expected test directory is missing: otherwise
+  // every rule in that group silently degrades to partial-test, and because
+  // the manifest is gitignored and built at site-build time the flip would
+  // never surface in a diff.
+  for (const [testDir] of testDirToGroup) {
+    const dir = path.join(TESTS_BASE_DIR, testDir);
+    if (!fs.existsSync(dir)) {
+      throw new Error(
+        `Expected test directory not found: ${path.relative(REPO_ROOT, dir)} ` +
+          `(group "${testDirToGroup.get(testDir)}"). Update groupToTestDir or the test layout.`,
+      );
+    }
+  }
   // Match uncommented flat and nested paths:
   //   ./tests/{testDir}/rules/{rule}.test.ts
   //   ./tests/{testDir}/rules/{rule}/{test-file}.test.ts
@@ -106,6 +119,14 @@ function getIncludedRuleTests(groups) {
     const key = ruleKey(group, rule);
     if (!included.has(key)) included.set(key, new Set());
     included.get(key).add(testPath);
+  }
+  // A non-empty include list that parses to zero entries means the regex or
+  // the config quoting drifted (e.g. a formatter switched to double quotes).
+  if (included.size === 0) {
+    throw new Error(
+      `No rule tests parsed from ${path.relative(REPO_ROOT, TEST_CONFIG_PATH)}; ` +
+        `the include-path regex is likely out of sync with the config format.`,
+    );
   }
   return included;
 }
