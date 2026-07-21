@@ -8,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed no-console.schema.json
+//go:embed no_console.schema.json
 var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-console

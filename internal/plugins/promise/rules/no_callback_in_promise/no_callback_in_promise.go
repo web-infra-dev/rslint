@@ -9,7 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed no-callback-in-promise.schema.json
+//go:embed no_callback_in_promise.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses

@@ -8,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-//go:embed no-return-wrap.schema.json
+//go:embed no_return_wrap.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses

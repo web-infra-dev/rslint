@@ -10,7 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed always-return.schema.json
+//go:embed always_return.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses

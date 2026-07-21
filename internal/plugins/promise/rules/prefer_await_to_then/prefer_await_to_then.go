@@ -7,7 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-//go:embed prefer-await-to-then.schema.json
+//go:embed prefer_await_to_then.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
