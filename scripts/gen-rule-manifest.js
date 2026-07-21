@@ -73,6 +73,8 @@ function getPluginRuleEntries() {
 
 // Map group name to test directory name: "@typescript-eslint" -> "typescript-eslint", etc.
 function groupToTestDir(group) {
+  // The manifest uses "react", while its tests live under "eslint-plugin-react".
+  if (group === 'react') return 'eslint-plugin-react';
   return group.replace(/^@/, '');
 }
 
@@ -85,8 +87,10 @@ function getIncludedRules() {
   const included = new Set();
   let match;
   while ((match = includeRegex.exec(config))) {
+    const testDir = match[1];
     const rule = match[2].replace(/-/g, '_');
-    included.add(rule);
+    // Key by test-dir + rule so same-named rules in different plugins stay distinct.
+    included.add(`${testDir}:${rule}`);
   }
   return included;
 }
@@ -270,19 +274,22 @@ function getDocPath(rule, pluginDir) {
 function buildManifest() {
   const included = getIncludedRules();
   const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
-  // Deduplicate by rule name, keeping first entry
+  // Deduplicate by group + rule name, keeping first entry.
   const seen = new Map();
   for (const e of ruleEntries) {
-    if (!seen.has(e.rule)) seen.set(e.rule, e);
+    const key = `${e.group}:${e.rule}`;
+    if (!seen.has(key)) seen.set(key, e);
   }
-  const rules = Array.from(seen.keys())
-    .sort((a, b) => a.localeCompare(b))
-    .map((rule) => {
-      const entry = seen.get(rule);
+  const rules = Array.from(seen.values())
+    .sort(
+      (a, b) => a.rule.localeCompare(b.rule) || a.group.localeCompare(b.group),
+    )
+    .map((entry) => {
+      const rule = entry.rule;
       let status = 'full';
       let failing_case = [];
       const group = entry.group;
-      if (!included.has(rule)) {
+      if (!included.has(`${groupToTestDir(group)}:${rule}`)) {
         status = 'partial-test';
       } else {
         const skipCases = getSkipCases(rule, group);

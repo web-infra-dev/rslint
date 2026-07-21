@@ -237,7 +237,10 @@ const RuleImplementationStatus: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredRules.map((rule) => (
-                  <TableRow key={rule.name} className="transition-colors">
+                  <TableRow
+                    key={`${rule.group}:${rule.name}`}
+                    className="transition-colors"
+                  >
                     <TableCell className="truncate">
                       <Button
                         variant="link"
