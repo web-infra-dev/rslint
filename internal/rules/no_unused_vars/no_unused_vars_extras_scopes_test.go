@@ -4,6 +4,7 @@
 package no_unused_vars
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,12 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 		"withThis();\n" +
 		"class ParameterProperty { constructor(private propertyArg?: string) {} }\n" +
 		"consume(ParameterProperty);"
+	parameterInitializerCode := "const outer = 1;\n" +
+		"function defaults(value = outer, unusedParam) {\n" +
+		"  var outer = 2;\n" +
+		"  return value;\n" +
+		"}\n" +
+		"consume(defaults);"
 	ambientCode := "declare namespace N { const value: string; function f(arg: number): void; }\nconsume(N);"
 	rangesCode := "let definite!: string;\n" +
 		"function f(\n" +
@@ -139,6 +146,15 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 					extraUnusedErrorWithSuggestion("implementationArg", false, 2, 21, 46, strings.Replace(overloadsCode, "implementationArg: string", "", 1)),
 					extraUnusedErrorWithSuggestion("this", false, 4, 19, 32, strings.Replace(overloadsCode, "this: unknown", "", 1)),
 					extraUnusedErrorWithSuggestion("propertyArg", false, 6, 47, 67, strings.Replace(overloadsCode, "propertyArg?: string", "", 1)),
+				},
+			},
+			// A function body's var environment cannot satisfy references from
+			// the separate default-parameter initializer environment.
+			{
+				Code: parameterInitializerCode,
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("unusedParam", false, 2, 34, 45, strings.Replace(parameterInitializerCode, ", unusedParam", "", 1)),
+					extraUnusedErrorWithSuggestion("outer", true, 3, 7, 12, strings.Replace(parameterInitializerCode, "var outer = 2;", "", 1)),
 				},
 			},
 			{
@@ -380,10 +396,14 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 	)
 }
 
-func TestNoUnusedVarsGapJavaScriptJSDoc(t *testing.T) {
+func TestNoUnusedVarsGapJavaScriptUsesBinderScopes(t *testing.T) {
 	t.Parallel()
 
-	code := `/** @param {(msg?: string) => void} logFn @returns {(level: string, msg?: string) => void} */ function logGroup(logFn) { return logFn; } consume(logGroup);
+	code := `const unusedTop = 1;
+function outer(used, unusedParam) { const nested = used; return nested; }
+consume(outer);
+{ const unusedTop = 2; consume(unusedTop); }
+/** @param {(msg?: string) => void} logFn @returns {(level: string, msg?: string) => void} */ function logGroup(logFn) { return logFn; } consume(logGroup);
 /** @template Unused @returns {number} */ function answer() { return 42; } consume(answer);`
 	tmpDir := t.TempDir()
 	filePath := tspath.NormalizePath(filepath.Join(tmpDir, "file.js"))
@@ -416,13 +436,12 @@ func TestNoUnusedVarsGapJavaScriptJSDoc(t *testing.T) {
 				return nil
 			}
 			return []linter.ConfiguredRule{{
-				Name:                NoUnusedVarsRule.Name,
-				RequiresBindingInfo: NoUnusedVarsRule.RequiresBindingInfo,
-				Severity:            rule.SeverityError,
+				Name:     NoUnusedVarsRule.Name,
+				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					ruleRan = true
-					if ctx.TypeChecker != nil || ctx.BindingChecker == nil {
-						t.Error("gap JavaScript should receive only the binding checker")
+					if ctx.TypeChecker != nil {
+						t.Error("gap JavaScript should not receive a TypeChecker")
 					}
 					return NoUnusedVarsRule.Run(ctx, nil)
 				},
@@ -439,7 +458,305 @@ func TestNoUnusedVarsGapJavaScriptJSDoc(t *testing.T) {
 	if !ruleRan {
 		t.Fatal("core no-unused-vars did not run for gap JavaScript")
 	}
-	if len(diagnostics) != 0 {
-		t.Fatalf("JSDoc function-type names must not become variables: %v", diagnostics)
+	if len(diagnostics) != 2 {
+		t.Fatalf("gap-file binder fallback produced %d diagnostics, want 2: %v", len(diagnostics), diagnostics)
+	}
+	for index, name := range []string{"unusedTop", "unusedParam"} {
+		if diagnostics[index].Message.Data["varName"] != name {
+			t.Fatalf("diagnostic %d variable = %q, want %q", index, diagnostics[index].Message.Data["varName"], name)
+		}
+	}
+}
+
+func TestNoUnusedVarsProjectAndGapFilesMatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		extension string
+		code      string
+		wantNames []string
+	}{
+		{
+			name:      "nested block and parameter scopes",
+			extension: ".js",
+			code: `const topUnused = 1;
+const topUsed = 2;
+function outer(used, unusedParam) {
+  const nested = used + topUsed;
+  { const shadow = 1; consume(shadow); const blockUnused = 2; }
+  return nested;
+}
+consume(outer);`,
+			wantNames: []string{"topUnused", "unusedParam", "blockUnused"},
+		},
+		{
+			name:      "parameter initializer excludes body var",
+			extension: ".js",
+			code: `const outer = 1;
+function defaults(value = outer, unusedParam) {
+  var outer = 2;
+  return value;
+}
+consume(defaults);`,
+			wantNames: []string{"unusedParam", "outer"},
+		},
+		{
+			name:      "named function and class expressions",
+			extension: ".js",
+			code: `const inner = 1;
+const fn = function inner(n) { return n ? inner(n - 1) : 0; };
+const classValue = class Named { clone() { return Named; } };
+consume(fn, classValue);`,
+			wantNames: []string{"inner"},
+		},
+		{
+			name:      "destructuring catch and loop scopes",
+			extension: ".js",
+			code: `const { read, unusedProperty, nested: { deep }, ...rest } = source;
+consume(read, deep, rest);
+try { consume(source); } catch (error) { consume(error); const catchUnused = 1; }
+for (let index = 0; index < 1; index++) { consume(index); }
+for (const item of items) { consume(item); }`,
+			wantNames: []string{"unusedProperty", "catchUnused"},
+		},
+		{
+			name:      "imports local exports and reexports",
+			extension: ".mjs",
+			code: `import defaultUsed, { used as alias, unusedImport } from "./dep.js";
+consume(defaultUsed, alias);
+const exported = 1;
+const localUnused = 2;
+export { exported };
+export { external as remote } from "./dep.js";`,
+			wantNames: []string{"unusedImport", "localUnused"},
+		},
+		{
+			name:      "hoisted declarations",
+			extension: ".js",
+			code: `consume(usedFunction);
+function usedFunction() { return nested(); function nested() { return 1; } }
+function unusedFunction() {}
+class UnusedClass {}`,
+			wantNames: []string{"unusedFunction", "UnusedClass"},
+		},
+		{
+			name:      "typescript type mapped infer and enum scopes",
+			extension: ".ts",
+			code: `type Pair<T, U> = { first: T };
+type UsedMapped<T> = { [K in keyof T]: T[K] };
+type UnusedMapped<T> = { [P in keyof T]: never };
+type UsedInfer<T> = T extends infer R ? R : never;
+type UnusedInfer<T> = T extends infer V ? string : never;
+enum E { A = 1, B = A, C = 3 }
+consume(null as Pair<string, number>);
+consume(null as UsedMapped<{}>);
+consume(null as UnusedMapped<{}>);
+consume(null as UsedInfer<string>);
+consume(null as UnusedInfer<string>);
+consume(E);`,
+			wantNames: []string{"U", "P", "V", "B", "C"},
+		},
+		{
+			name:      "typescript namespace export and overload scopes",
+			extension: ".ts",
+			code: `type A = {};
+namespace N { type A = {}; export type { A as B }; }
+consume(N);
+function overloaded(overloadArg: string): void;
+function overloaded(implementationArg: string) {}
+overloaded("x");`,
+			wantNames: []string{"A", "overloadArg", "implementationArg"},
+		},
+		{
+			name:      "typescript class type parameters",
+			extension: ".ts",
+			code: `class Box<T, U> { value!: T; method(arg: T) { return arg; } }
+consume(Box);`,
+			wantNames: []string{"U"},
+		},
+		{
+			name:      "function signature and body bindings",
+			extension: ".ts",
+			code: `import type { Module } from "node:vm";
+function create(): Module { const Module = class {}; return new Module(); }
+const loader = async function transform() { const transform = () => 1; return transform(); };
+consume(create, loader);`,
+			wantNames: nil,
+		},
+		{
+			name:      "function type parameters and destructuring writes",
+			extension: ".ts",
+			code: `const callbacks: Array<(...args: any[]) => void> = [];
+const plugin: (pluginId: string) => void = (pluginId) => { consume(pluginId); };
+let [discarded, scope, name] = source;
+[discarded, scope, name] = other;
+consume(scope, name, callbacks, plugin);`,
+			wantNames: []string{"args", "pluginId", "discarded"},
+		},
+		{
+			name:      "destructured parameter defaults",
+			extension: ".js",
+			code: `const handler = ({ a, b = a, j = a }) => { consume(b, j); };
+consume(handler);`,
+			wantNames: nil,
+		},
+		{
+			name:      "parameter properties before used parameter",
+			extension: ".ts",
+			code: `class Context {
+  constructor(protected src: string, protected testName: string, options: unknown) { consume(options); }
+}
+consume(Context);`,
+			wantNames: []string{"src", "testName"},
+		},
+		{
+			name:      "global augmentation type aliases",
+			extension: ".d.ts",
+			code: `declare global {
+  type Expect = unknown;
+  type Describe = unknown;
+  type Assertion<T> = T;
+}
+export {};`,
+			wantNames: []string{"Expect", "Describe", "Assertion"},
+		},
+		{
+			name:      "global augmentation beside module augmentation",
+			extension: ".d.ts",
+			code: `import type { DiffOptions } from "jest-diff";
+declare interface FileMatcherOptions { diff?: DiffOptions; }
+declare module "@rstest/core" {
+  interface Assertion {
+    toMatchFileSnapshotSync: (filename?: string, options?: FileMatcherOptions) => void;
+  }
+}
+declare global {
+  type Expect = import("@rstest/core").Expect;
+  type Describe = import("@rstest/core").Describe;
+  type Assertion<T> = import("@rstest/core").Assertion<T>;
+}
+export {};`,
+			wantNames: []string{"Assertion", "filename", "options", "Expect", "Describe", "Assertion"},
+		},
+		{
+			name:      "jsx names and lexical references",
+			extension: ".tsx",
+			code: `const div = 1;
+const title = 1;
+const prop = 1;
+const Component = () => null;
+const view = <><div /><Component title={prop} /></>;
+consume(view);`,
+			wantNames: []string{"div", "title"},
+		},
+		{
+			name:      "import attribute key",
+			extension: ".ts",
+			code: `const type = 1;
+import data from "./data.json" with { type: "json" };
+consume(data);`,
+			wantNames: []string{"type"},
+		},
+	}
+
+	type observedDiagnostic struct {
+		rangeValue  core.TextRange
+		messageID   string
+		description string
+		data        string
+		fixes       string
+		suggestions string
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			filePath := tspath.NormalizePath(filepath.Join(tmpDir, "file"+test.extension))
+			if err := os.WriteFile(filePath, []byte(test.code), 0o644); err != nil {
+				t.Fatalf("write fixture: %v", err)
+			}
+
+			run := func(expectChecker bool) ([]observedDiagnostic, []string) {
+				t.Helper()
+				fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				host := utils.CreateCompilerHost(tmpDir, fs)
+				program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+					AllowJs:      core.TSTrue,
+					CheckJs:      core.TSTrue,
+					Jsx:          core.JsxEmitPreserve,
+					Module:       core.ModuleKindESNext,
+					SkipLibCheck: core.TSTrue,
+					Target:       core.ScriptTargetESNext,
+				}, []string{filePath}, host)
+				if err != nil {
+					t.Fatalf("create program: %v", err)
+				}
+				typeInfoFiles := map[string]struct{}{filePath: {}}
+				if !expectChecker {
+					typeInfoFiles = map[string]struct{}{filepath.Join(tmpDir, "project-only.ts"): {}}
+				}
+				var diagnostics []rule.RuleDiagnostic
+				ruleRan := false
+				linter.RunLinterInProgram(
+					program,
+					nil,
+					nil,
+					utils.ExcludePaths,
+					func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+						if sourceFile.FileName() != filePath {
+							return nil
+						}
+						return []linter.ConfiguredRule{{
+							Name:     NoUnusedVarsRule.Name,
+							Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								ruleRan = true
+								if (ctx.TypeChecker != nil) != expectChecker {
+									t.Errorf("TypeChecker presence = %t, want %t", ctx.TypeChecker != nil, expectChecker)
+								}
+								return NoUnusedVarsRule.Run(ctx, nil)
+							},
+						}}
+					},
+					false,
+					func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+					typeInfoFiles,
+					nil,
+				)
+				if !ruleRan {
+					t.Fatal("core no-unused-vars did not run")
+				}
+
+				observed := make([]observedDiagnostic, 0, len(diagnostics))
+				names := make([]string, 0, len(diagnostics))
+				for _, diagnostic := range diagnostics {
+					observed = append(observed, observedDiagnostic{
+						rangeValue:  diagnostic.Range,
+						messageID:   diagnostic.Message.Id,
+						description: diagnostic.Message.Description,
+						data:        fmt.Sprint(diagnostic.Message.Data),
+						fixes:       fmt.Sprint(diagnostic.FixesPtr),
+						suggestions: fmt.Sprint(diagnostic.Suggestions),
+					})
+					names = append(names, diagnostic.Message.Data["varName"])
+				}
+				return observed, names
+			}
+
+			projectDiagnostics, _ := run(true)
+			gapDiagnostics, names := run(false)
+			if len(projectDiagnostics) != len(gapDiagnostics) {
+				t.Fatalf("gap diagnostics count = %d, project-file count = %d\ngap: %#v\nproject: %#v", len(gapDiagnostics), len(projectDiagnostics), gapDiagnostics, projectDiagnostics)
+			}
+			for index := range projectDiagnostics {
+				if projectDiagnostics[index] != gapDiagnostics[index] {
+					t.Fatalf("gap diagnostic %d differs from project-file result\ngap: %#v\nproject: %#v", index, gapDiagnostics[index], projectDiagnostics[index])
+				}
+			}
+			if strings.Join(names, ",") != strings.Join(test.wantNames, ",") {
+				t.Fatalf("unused names = %v, want %v", names, test.wantNames)
+			}
+		})
 	}
 }

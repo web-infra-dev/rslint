@@ -152,10 +152,6 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		}
 
 		for _, r := range rules {
-			var bindingChecker *checker.Checker
-			if r.RequiresBindingInfo {
-				bindingChecker = chk
-			}
 			ctx := rule.RuleContext{
 				SourceFile:     file,
 				Program:        opts.Program,
@@ -164,7 +160,6 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				Comments:       comments,
-				BindingChecker: bindingChecker,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 				ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
@@ -371,9 +366,8 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		clear(registeredListeners)
 	}
 
-	// Phase 1 parallelism is per-file within the program: files that need a
-	// semantic or binding checker are grouped by the checker associated with
-	// them (for the compiler pool this
+	// Phase 1 parallelism is per-file within the program: files are grouped
+	// by the checker the pool associated to them (for the compiler pool this
 	// is the stable index%N mapping built in checkerpool.go), and each group
 	// is linted serially by ONE worker holding that checker exclusively.
 	// This keeps three invariants:
@@ -418,7 +412,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		}
 		rulesByFile[file] = rules
 		if opts.TypeInfoFiles != nil {
-			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo && !rulesRequireBindingInfo(rules) {
+			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
 				checkerGroups[nil] = append(checkerGroups[nil], file)
 				continue
 			}
@@ -469,15 +463,6 @@ func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
 		}
 	}
 	return nativeRules
-}
-
-func rulesRequireBindingInfo(rules []ConfiguredRule) bool {
-	for _, configuredRule := range rules {
-		if configuredRule.RequiresBindingInfo {
-			return true
-		}
-	}
-	return false
 }
 
 func filterRulesForTypeInfo(rules []ConfiguredRule, fileName string, typeInfoFiles map[string]struct{}) []ConfiguredRule {

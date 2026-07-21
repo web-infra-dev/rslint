@@ -2,7 +2,6 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 // skipTransparentKinds matches parentheses + TS type assertions.
@@ -150,21 +149,6 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 		return true
 	}
 
-	// Lowercase and hyphenated JSX tag names are intrinsic elements, not
-	// variable references. Capitalized tag names still resolve to component
-	// bindings, and property access already excludes only its right-hand name.
-	if ast.IsIdentifier(node) && ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text()) {
-		return true
-	}
-
-	// JSX attribute and namespace names live in their own namespace.
-	if parent.Kind == ast.KindJsxAttribute && parent.Name() == node {
-		return true
-	}
-	if parent.Kind == ast.KindJsxNamespacedName {
-		return true
-	}
-
 	// export { local as exported }: only `local` can read a runtime value.
 	if parent.Kind == ast.KindExportSpecifier {
 		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || IsReExportSpecifier(parent) {
@@ -206,11 +190,6 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 		}
 	}
 
-	// Import-attribute keys are property names, not value references.
-	if parent.Kind == ast.KindImportAttribute && parent.Name() == node {
-		return true
-	}
-
 	// Label names: label: while(true) { break label; continue label; }
 	if parent.Kind == ast.KindLabeledStatement ||
 		parent.Kind == ast.KindBreakStatement ||
@@ -219,32 +198,6 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	}
 
 	return false
-}
-
-// IsIdentifierInTypeReference reports whether an identifier is evaluated only
-// as a type. It composes tsgo's type-node and type-query helpers, then covers
-// the leftmost identifier of qualified heritage names such as `ns.Base`, which
-// tsgo cannot recognize while walking only the right side of a property chain.
-// A class `extends` clause is deliberately excluded because its superclass is
-// evaluated at runtime; interface `extends` and class `implements` stay type-only.
-func IsIdentifierInTypeReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
-		return true
-	}
-	if node.Parent.Kind == ast.KindQualifiedName {
-		return true
-	}
-
-	current := node.Parent
-	for current != nil && current.Kind == ast.KindPropertyAccessExpression {
-		current = current.Parent
-	}
-	return current != nil &&
-		ast.IsExpressionWithTypeArguments(current) &&
-		!ast.IsExpressionWithTypeArgumentsInClassExtendsClause(current)
 }
 
 // IsInAmbientContext reports whether node was parsed inside an ambient

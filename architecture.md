@@ -185,7 +185,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 1. **Source Text Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. CLI runs and individual API requests keep a compiler-host source snapshot keyed by the exact normalized source path. The snapshot stores the first successful text read and its xxh3 hash for the current generation, allowing later Programs to skip both work items. CLI fix writes replace the entire source generation before rebuilding Programs; API snapshots end with the request. LSP does not use this one-shot layer because its `project.Session` already follows document versions and `didChange` updates.
 2. **Program Construction**: Plain CLI/API lint resolves its effective targets first and builds `Program` objects only for governing configs that own a selected target. Program-wide type-check modes build every project declared by the effective loaded config catalog. LSP reuses matching projects from ts-go `project.Session`; a declared custom tsconfig that project service has not loaded is built on demand against an isolated editor overlay.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes.
-4. **Checker Acquisition**: When needed, the linter acquires a checker from the `Program`. Project-backed type-aware rules receive it as `TypeChecker`; rules that request lexical symbol resolution can receive it as `BindingChecker` even for a gap/fallback file.
+4. **Semantic Analysis**: When needed, the linter acquires a `TypeChecker` from the `Program`.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
 6. **AST Traversal**: The linter traverses each file once using a DFS walk.
 7. **Rule Execution**: Listener callbacks inspect nodes and may use syntax only or syntax plus type information.
@@ -206,8 +206,7 @@ The parser and program builder are tolerant enough to support editor and fallbac
   semantic diagnostics from the tsconfig-backed Program boundary
 - fallback Programs for selected files outside tsconfig coverage are not
   project-backed, do not enable type-aware rules, and are intentionally skipped
-  by the type-check phase; binding-aware rules may still request their checker
-  solely for lexical symbol/reference resolution
+  by the type-check phase
 
 ## 5. Abstract Syntax Tree (AST)
 
@@ -251,19 +250,15 @@ Rules are defined in `internal/rule/rule.go`:
 
 ```go
 type Rule struct {
-    Name                string
-    RequiresBindingInfo bool
-    RequiresTypeInfo    bool
-    Run                 func(ctx RuleContext, options []any) RuleListeners
+    Name             string
+    RequiresTypeInfo bool
+    Run              func(ctx RuleContext, options []any) RuleListeners
 }
 
 type RuleListeners map[ast.Kind]func(node *ast.Node)
 ```
 
-`RequiresTypeInfo` prevents type-aware rules from running on gap-file fallback
-Programs. `RequiresBindingInfo` is narrower: it makes a checker available only
-for lexical symbol/reference resolution while `TypeChecker` remains nil, so a
-rule cannot mistake fallback semantic information for project-backed types.
+`RequiresTypeInfo` is important because gap-file fallback Programs intentionally do not run type-aware rules.
 
 ### Rule Context
 
@@ -278,7 +273,6 @@ type RuleContext struct {
     Globals                    map[string]bool
     Comments                   *CommentStore
     Program                    *compiler.Program
-    BindingChecker             *checker.Checker
     TypeChecker                *checker.Checker
     DisableManager             *DisableManager
     ReportRange                func(textRange core.TextRange, msg RuleMessage)
@@ -794,7 +788,7 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
 5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order.
 6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
-7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, filters type-aware rules off no-type-info gap files, and retains binding-aware rules with a lexical-only checker capability
+7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
 8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
@@ -929,10 +923,10 @@ goroutines remain outside that guarantee.
 
 - **Native Go Implementation**: Eliminates JavaScript runtime overhead
 - **Direct TypeScript AST**: No AST conversion between parsers
-- **Shared Checker**: `runLintRulesInProgram` acquires one checker for the lint phase and reuses it across files and eligible rules in the same `Program`. Type-aware rules receive it through `TypeChecker`; binding-aware rules may receive it through `BindingChecker`. The subsequent type-check phase (when `--type-check` is enabled) lets `GetSemanticDiagnostics` reacquire its own checker so the lint-phase checker can be released first
+- **Shared Type Checker**: `runLintRulesInProgram` acquires one checker for the lint phase and reuses it across files and rules in the same `Program`. The subsequent type-check phase (when `--type-check` is enabled) lets `GetSemanticDiagnostics` reacquire its own checker so the lint-phase checker can be released first
 - **Checker Phase Separation**: the checker is released before TypeScript semantic diagnostics run, so `GetSemanticDiagnostics` can reacquire its own checker cleanly
 - **File Filtering**: Skip node_modules and bundled files automatically
-- **Gap-File Degradation**: fallback gap-file Programs skip type-aware rules and semantic diagnostics. A binding-aware rule may still use the fallback checker's lexical symbol/reference graph, but not its semantic types
+- **Gap-File Degradation**: fallback gap-file Programs skip type-aware rules and semantic diagnostics instead of paying unreliable semantic costs
 - **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint workers and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
 - **Lazy Shared Comments**: each file owns one `CommentStore`; directive consumers and comment-aware rules materialize its canonical comment list only when needed and reuse the result. Rule-specific text checks avoid scanner work when their comment syntax cannot occur
@@ -1178,13 +1172,12 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 ## 16. Glossary
 
 - **AST**: Abstract Syntax Tree produced directly by ts-go
-- **BindingChecker**: Checker capability exposed only to binding-aware rules for lexical symbol/reference resolution; it is not a source of trusted project semantic types
 - **Code Action**: LSP action derived from diagnostics, suggestions, or bulk-fix operations such as quick fix and fix all
 - **Comment Store**: short-lived per-file provider that lazily computes and shares the canonical source comment list
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
-- **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and checker capability requirements
+- **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
-- **Fallback Program**: Extra non-project-backed `Program` created from selected lint targets that are not covered by a tsconfig Program associated with their governing config; fallback files do not enable type-aware rules or participate in program-wide type-check, but may provide binding-only symbol resolution
+- **Fallback Program**: Extra non-project-backed `Program` created from selected lint targets that are not covered by a tsconfig Program associated with their governing config; fallback files do not enable type-aware rules or participate in program-wide type-check
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file
 - **Gap File**: A selected lint target that is not present in any tsconfig Program declared by its governing config
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection

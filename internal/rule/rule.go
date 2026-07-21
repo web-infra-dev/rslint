@@ -124,13 +124,8 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
 type Rule struct {
-	Name string
-	// RequiresBindingInfo asks the linter for a checker that may be used only
-	// for lexical symbol/reference resolution. Unlike RequiresTypeInfo, it is
-	// available for inferred and other non-project-backed programs and must not
-	// be used to make semantic type decisions.
-	RequiresBindingInfo bool
-	RequiresTypeInfo    bool
+	Name             string
+	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a placeholder rule whose actual execution
 	// happens in a Node worker — an ESLint-plugin rule mounted via the
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
@@ -150,11 +145,10 @@ type Rule struct {
 
 func CreateRule(r Rule) Rule {
 	return Rule{
-		Name:                "@typescript-eslint/" + r.Name,
-		RequiresBindingInfo: r.RequiresBindingInfo,
-		RequiresTypeInfo:    r.RequiresTypeInfo,
-		Schema:              r.Schema,
-		Run:                 r.Run,
+		Name:             "@typescript-eslint/" + r.Name,
+		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema:           r.Schema,
+		Run:              r.Run,
 	}
 }
 
@@ -277,12 +271,8 @@ type RuleContext struct {
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every
 	// later consumer for this file reuses it.
-	Comments *CommentStore
-	Program  *compiler.Program
-	// BindingChecker is available to rules that declare RequiresBindingInfo.
-	// It is safe for symbol/reference resolution but may come from a synthesized
-	// fallback program, so semantic type-aware rules must use TypeChecker.
-	BindingChecker             *checker.Checker
+	Comments                   *CommentStore
+	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager
 	ReportRange                func(textRange core.TextRange, msg RuleMessage)

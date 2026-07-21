@@ -80,14 +80,13 @@ func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig
 				ruleConfigCopy := ruleConfig
 				options := rule.NormalizeOptions(ruleConfigCopy.Options)
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
-					Name:                ruleName,
-					Settings:            CloneSettings(mergedConfig.Settings),
-					Globals:             globals,
-					Severity:            ruleConfig.GetSeverity(),
-					RequiresBindingInfo: ruleImpl.RequiresBindingInfo,
-					RequiresTypeInfo:    ruleImpl.RequiresTypeInfo,
-					IsEslintPluginRule:  ruleImpl.IsEslintPluginRule,
-					Options:             options,
+					Name:               ruleName,
+					Settings:           CloneSettings(mergedConfig.Settings),
+					Globals:            globals,
+					Severity:           ruleConfig.GetSeverity(),
+					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
+					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
+					Options:            options,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, options)
 					},

@@ -160,8 +160,47 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	return false
 }
 
+// isInTypeOnlyPosition checks whether the identifier is inside a type-only
+// context by walking up the parent chain and matching against explicit
+// type-context node kinds.
+//
+// This follows the same pattern as isInTypeContext in no_unused_vars:
+// explicit Kind matching avoids false positives from the overly broad
+// ast.IsTypeNode() (which includes ExpressionWithTypeArguments).
+//
+// Note: AsExpression, TypeAssertionExpression, and SatisfiesExpression are
+// intentionally excluded. Their expression operand is a value context; only
+// the type annotation part is type-only. Since we walk up from the identifier,
+// a value operand passes through these nodes without being misclassified.
 func isInTypeOnlyPosition(node *ast.Node) bool {
-	return utils.IsIdentifierInTypeReference(node)
+	current := node.Parent
+	for current != nil {
+		switch current.Kind {
+		// Core type constructs — any identifier under these is type-only
+		case ast.KindTypeReference,
+			ast.KindTypeAliasDeclaration,
+			ast.KindInterfaceDeclaration,
+			ast.KindTypeParameter,
+			ast.KindTypeQuery,
+			ast.KindTypeOperator,
+			ast.KindIndexedAccessType,
+			ast.KindConditionalType,
+			ast.KindInferType,
+			ast.KindTypeLiteral,
+			ast.KindMappedType:
+			return true
+
+		// ExpressionWithTypeArguments wraps identifiers in heritage clauses.
+		// It is type-only EXCEPT in class extends (which is a value position).
+		case ast.KindExpressionWithTypeArguments:
+			if !utils.IsClassExtendsHeritageClause(current) {
+				return true
+			}
+			// class extends — value position, keep walking
+		}
+		current = current.Parent
+	}
+	return false
 }
 
 // isTypeOfOperand checks if the identifier is the sole operand of a typeof

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -561,7 +562,12 @@ func referenceMatchesVariable(node *ast.Node, sym *ast.Symbol, name string, type
 	if node == nil || !ast.IsIdentifier(node) || node.Text() != name {
 		return false
 	}
-	referenceSymbol := utils.GetReferenceSymbol(node, typeChecker)
+	var referenceSymbol *ast.Symbol
+	if typeChecker != nil {
+		referenceSymbol = utils.GetReferenceSymbol(node, typeChecker)
+	} else {
+		referenceSymbol = binderReferenceSymbol(node)
+	}
 	if sym != nil {
 		return referenceSymbol == sym
 	}
@@ -720,11 +726,11 @@ func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, allUsages map[*ast.Sy
 		return false
 	}
 	if ast.IsIdentifier(nameNode) {
-		sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+		sym := declarationSymbol(ctx, nameNode, nameNode.Parent)
 		if sym == nil {
 			return false
 		}
-		resolved := ctx.TypeChecker.SkipAlias(sym)
+		resolved := resolvedSymbol(ctx, sym)
 		if usageNodes, exists := allUsages[resolved]; exists {
 			for _, usage := range usageNodes {
 				if usage.Pos() != nameNode.Pos() {
@@ -1218,7 +1224,7 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo, localExportTargets 
 
 		// Declaration merging: if ANY declaration of the symbol is exported,
 		// the variable is considered exported (e.g., `interface Foo {} export const Foo = ...`)
-		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
+		sym := declarationSymbol(ctx, varInfo.Variable, varInfo.Definition)
 		if sym != nil && len(sym.Declarations) > 1 {
 			for _, decl := range sym.Declarations {
 				if !flavor.typescript && ast.GetSourceFileOfNode(decl) != ctx.SourceFile {
@@ -1260,7 +1266,7 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo, localExportTargets 
 	// walk records their checker-resolved targets once, so this lookup handles
 	// arbitrary nesting without scanning the file again for every variable.
 	if varInfo.Definition != nil {
-		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
+		sym := declarationSymbol(ctx, varInfo.Variable, varInfo.Definition)
 		if sym != nil && localExportTargets[sym] {
 			return true
 		}
@@ -1829,10 +1835,209 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 	}, true
 }
 
+func isNonReferenceIdentifier(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || utils.IsNonReferenceIdentifier(node) {
+		return true
+	}
+	parent := node.Parent
+	qualifier := node
+	for qualifier.Parent != nil && qualifier.Parent.Kind == ast.KindQualifiedName {
+		qualifier = qualifier.Parent
+	}
+	if qualifier.Parent != nil && qualifier.Parent.Kind == ast.KindImportType {
+		importType := qualifier.Parent.AsImportTypeNode()
+		if importType != nil && importType.Qualifier == qualifier {
+			return true
+		}
+	}
+	if ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text()) {
+		return true
+	}
+	if parent.Kind == ast.KindJsxAttribute || parent.Kind == ast.KindJsxNamespacedName {
+		return true
+	}
+	return parent.Kind == ast.KindImportAttribute && parent.Name() == node
+}
+
+func isIdentifierInTypeReference(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) || node.Parent.Kind == ast.KindQualifiedName {
+		return true
+	}
+	current := node.Parent
+	for current != nil && current.Kind == ast.KindPropertyAccessExpression {
+		current = current.Parent
+	}
+	return current != nil && ast.IsExpressionWithTypeArguments(current) &&
+		!ast.IsExpressionWithTypeArgumentsInClassExtendsClause(current)
+}
+
+// binderDeclarationSymbol returns the binder-owned symbol for a declaration.
+// Exported declarations may expose a separate export symbol on the node, so
+// prefer the matching symbol from the nearest Locals table.
+func binderDeclarationSymbol(nameNode *ast.Node, definition *ast.Node) *ast.Symbol {
+	if nameNode == nil || definition == nil {
+		return nil
+	}
+	name := nameNode.Text()
+	for current := definition; current != nil; current = current.Parent {
+		if !ast.IsLocalsContainer(current) {
+			continue
+		}
+		if symbol := ast.GetLocals(current)[name]; symbolOwnsDefinition(symbol, definition) {
+			return symbol
+		}
+	}
+	return definition.Symbol()
+}
+
+func symbolOwnsDefinition(symbol *ast.Symbol, definition *ast.Node) bool {
+	if symbol == nil || definition == nil {
+		return false
+	}
+	root := ast.GetRootDeclaration(definition)
+	for _, declaration := range symbol.Declarations {
+		if declaration == definition || declaration == root ||
+			ast.GetRootDeclaration(declaration) == root {
+			return true
+		}
+	}
+	return false
+}
+
+func referenceIsInFunctionSignature(node *ast.Node, function *ast.Node) bool {
+	body := function.Body()
+	return body == nil || !ast.IsNodeDescendantOf(node, body)
+}
+
+func symbolIsVisibleInFunctionSignature(symbol *ast.Symbol, function *ast.Node) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil {
+			continue
+		}
+		root := ast.GetRootDeclaration(declaration)
+		if root != nil && root.Parent == function &&
+			(root.Kind == ast.KindParameter || root.Kind == ast.KindTypeParameter) {
+			return true
+		}
+	}
+	return false
+}
+
+func namedExpressionSymbol(node *ast.Node, name string) *ast.Symbol {
+	if node == nil || (node.Kind != ast.KindFunctionExpression && node.Kind != ast.KindClassExpression) {
+		return nil
+	}
+	nameNode := node.Name()
+	if nameNode == nil || nameNode.Text() != name {
+		return nil
+	}
+	return node.Symbol()
+}
+
+func typeParameterSymbol(node *ast.Node, name string) *ast.Symbol {
+	if node == nil {
+		return nil
+	}
+	switch node.Kind {
+	case ast.KindClassDeclaration,
+		ast.KindClassExpression,
+		ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindJSTypeAliasDeclaration,
+		ast.KindJSDocTemplateTag:
+	default:
+		if !ast.IsFunctionLike(node) {
+			return nil
+		}
+	}
+	for _, parameter := range node.TypeParameters() {
+		if parameter != nil && parameter.Name() != nil && parameter.Name().Text() == name {
+			return parameter.Symbol()
+		}
+	}
+	return nil
+}
+
+func enumMemberSymbol(node *ast.Node, name string) *ast.Symbol {
+	if node == nil || node.Kind != ast.KindEnumDeclaration {
+		return nil
+	}
+	memberList := node.MemberList()
+	if memberList == nil {
+		return nil
+	}
+	for _, member := range memberList.Nodes {
+		if member != nil && member.Name() != nil && member.Name().Text() == name {
+			return member.Symbol()
+		}
+	}
+	return nil
+}
+
+// binderReferenceSymbol resolves an identifier from binder-owned Locals tables.
+// Core no-unused-vars uses this lexical path for both project and gap files.
+func binderReferenceSymbol(node *ast.Node) *ast.Symbol {
+	if node == nil || !ast.IsIdentifier(node) {
+		return nil
+	}
+	name := node.Text()
+	for current := node.Parent; current != nil; current = current.Parent {
+		if symbol := enumMemberSymbol(current, name); symbol != nil {
+			return symbol
+		}
+		if symbol := typeParameterSymbol(current, name); symbol != nil {
+			return symbol
+		}
+		if ast.IsLocalsContainer(current) {
+			symbol := ast.GetLocals(current)[name]
+			if symbol != nil {
+				if ast.IsFunctionLike(current) && referenceIsInFunctionSignature(node, current) &&
+					!symbolIsVisibleInFunctionSignature(symbol, current) {
+					// Body declarations are outside the function signature's
+					// parameter/type environment. Keep searching outward.
+				} else {
+					return symbol
+				}
+			}
+		}
+		if symbol := namedExpressionSymbol(current, name); symbol != nil {
+			return symbol
+		}
+	}
+	return nil
+}
+
+func declarationSymbol(ctx rule.RuleContext, nameNode *ast.Node, definition *ast.Node) *ast.Symbol {
+	if ctx.TypeChecker != nil {
+		return ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	}
+	return binderDeclarationSymbol(nameNode, definition)
+}
+
+func referenceSymbol(ctx rule.RuleContext, node *ast.Node) *ast.Symbol {
+	if ctx.TypeChecker != nil {
+		return utils.GetReferenceSymbol(node, ctx.TypeChecker)
+	}
+	return binderReferenceSymbol(node)
+}
+
+func resolvedSymbol(ctx rule.RuleContext, symbol *ast.Symbol) *ast.Symbol {
+	if symbol == nil || ctx.TypeChecker == nil {
+		return symbol
+	}
+	return ctx.TypeChecker.SkipAlias(symbol)
+}
+
 // collectLocalExportTargets adds the exact local symbols consumed by one named
 // export declaration. It deliberately ignores source-bearing re-exports: in
 // `export { A } from "mod"`, A does not refer to an in-scope declaration.
-func collectLocalExportTargets(typeChecker *checker.Checker, node *ast.Node, targets map[*ast.Symbol]bool) {
+func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, targets map[*ast.Symbol]bool) {
 	if node == nil || node.Kind != ast.KindExportDeclaration {
 		return
 	}
@@ -1848,9 +2053,18 @@ func collectLocalExportTargets(typeChecker *checker.Checker, node *ast.Node, tar
 		if spec.AsExportSpecifier() == nil || utils.IsReExportSpecifier(spec) {
 			continue
 		}
-		// The checker resolves aliases and lexical shadows for both
-		// `export { A as B }` and `export type { A as B }`.
-		if target := typeChecker.GetExportSpecifierLocalTargetSymbol(spec); target != nil {
+		var target *ast.Symbol
+		if ctx.TypeChecker != nil {
+			target = ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(spec)
+		} else {
+			exportSpecifier := spec.AsExportSpecifier()
+			localName := exportSpecifier.Name()
+			if exportSpecifier.PropertyName != nil {
+				localName = exportSpecifier.PropertyName
+			}
+			target = binderReferenceSymbol(localName)
+		}
+		if target != nil {
 			targets[target] = true
 		}
 	}
@@ -1870,7 +2084,7 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 			return
 		}
 		usages[sym] = append(usages[sym], node)
-		resolved := ctx.TypeChecker.SkipAlias(sym)
+		resolved := resolvedSymbol(ctx, sym)
 		if resolved != nil && resolved != sym {
 			usages[resolved] = append(usages[resolved], node)
 		}
@@ -1881,10 +2095,10 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 		if node == nil {
 			return
 		}
-		collectLocalExportTargets(ctx.TypeChecker, node, localExportTargets)
+		collectLocalExportTargets(ctx, node, localExportTargets)
 
-		if ast.IsIdentifier(node) && !utils.IsNonReferenceIdentifier(node) {
-			sym := utils.GetReferenceSymbol(node, ctx.TypeChecker)
+		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
+			sym := referenceSymbol(ctx, node)
 			if coreSemantics && (sym == nil || !utils.IsSymbolDeclaredInFile(sym, sf)) {
 				globalRefsByName[node.Text()] = append(globalRefsByName[node.Text()], node)
 			}
@@ -1929,7 +2143,7 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 	// @typescript-eslint's scope manager marks the configured JSX factory as
 	// used implicitly. Espree does not, so ESLint core still reports an otherwise
 	// unused React import; preserve that distinction between the two flavors.
-	if !coreSemantics {
+	if !coreSemantics && ctx.TypeChecker != nil {
 		markJsxFactoryUsed(ctx, sourceFile, usages)
 	}
 }
@@ -2036,24 +2250,6 @@ func hasInlineGlobalUse(ctx rule.RuleContext, name string, references []*ast.Nod
 	return false
 }
 
-// referenceFallbackBoundary scopes the name-index fallback to the declaration's
-// actual var or lexical scope when checker symbol identity is unavailable.
-func referenceFallbackBoundary(definition *ast.Node) *ast.Node {
-	if definition == nil {
-		return nil
-	}
-	root := ast.GetRootDeclaration(definition)
-	if root != nil && root.Kind == ast.KindVariableDeclaration && root.Parent != nil &&
-		root.Parent.Kind == ast.KindVariableDeclarationList && utils.IsVarKeyword(root.Parent) {
-		// `var` escapes an enclosing block/loop/catch into its variable scope.
-		return utils.FindEnclosingScope(definition)
-	}
-	// let/const/using, block functions/classes, catch variables, and loop
-	// bindings must keep the name-based checker fallback inside their lexical
-	// scope. This prevents a later same-named export from consuming a shadow.
-	return ast.GetEnclosingBlockScopeContainer(definition)
-}
-
 // coreAmbientModuleBoundary returns the lexical module/namespace scope used by
 // ESLint core when @typescript-eslint/parser supplies the scopes. The checker
 // can merge an augmentation member with an outside/global symbol, so core must
@@ -2111,7 +2307,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		Definition:     definition,
 	}
 
-	sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	sym := declarationSymbol(ctx, nameNode, definition)
 	// For declaration merging (interface + const, etc.), only process once.
 	if sym != nil && len(sym.Declarations) > 1 {
 		if ac.seenMergedSymbols[sym] {
@@ -2139,24 +2335,22 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			definition.Kind == ast.KindNamespaceImport ||
 			definition.Kind == ast.KindImportEqualsDeclaration)
 		if !exists && !isImportDef {
-			resolved := ctx.TypeChecker.SkipAlias(sym)
+			resolved := resolvedSymbol(ctx, sym)
 			if resolved != sym {
 				usageNodes, exists = ac.allUsages[resolved]
 			}
 		}
 		// Checker edge cases (notably empty namespaces) can lose symbol
-		// identity. Reuse the shared, shadow-aware name index as a narrow
-		// fallback and keep references inside the declaration's own container.
+		// identity. Reuse the shared name index, but accept a candidate only
+		// when the binder resolves it to this declaration. This also preserves
+		// the separate parameter-initializer environment of a function body.
 		if !exists && !isImportDef && !coreTypeOnlyParameter && ac.refIndex != nil {
-			boundary := referenceFallbackBoundary(definition)
-			if coreModuleBoundary != nil {
-				boundary = coreModuleBoundary
-			}
-			ac.refIndex.ForEachReferenceByName(name, boundary, func(ref *ast.Node) bool {
-				if boundary != nil && !ast.IsNodeDescendantOf(ref, boundary) {
+			ac.refIndex.ForEachReferenceByName(name, nil, func(ref *ast.Node) bool {
+				if coreModuleBoundary != nil && !ast.IsNodeDescendantOf(ref, coreModuleBoundary) {
 					return false
 				}
-				if ref.Pos() != nameNode.Pos() && !isPartOfAssignment(ref) &&
+				if symbolOwnsDefinition(binderReferenceSymbol(ref), definition) &&
+					!isNonReferenceIdentifier(ref) && ref.Pos() != nameNode.Pos() && !isPartOfAssignment(ref) &&
 					!isInsideOwnDeclaration(ref, definition) {
 					usageNodes = append(usageNodes, ref)
 					exists = true
@@ -2188,7 +2382,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			if len(filteredUsages) > 0 {
 				onlyUsedAsType := true
 				for _, usage := range filteredUsages {
-					if !utils.IsIdentifierInTypeReference(usage) {
+					if !isIdentifierInTypeReference(usage) {
 						onlyUsedAsType = false
 						break
 					}
@@ -2267,7 +2461,10 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 
 	// "after-used" for parameters: skip unused params before the last used param.
 	// Only applies to direct Parameter nodes, not destructured elements within them.
-	if !varInfo.Used && !coreTypeOnlyParameter && definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
+	coreParameterProperty := !flavor.typescript && definition != nil && definition.Kind == ast.KindParameter &&
+		ast.HasSyntacticModifier(definition, ast.ModifierFlagsParameterPropertyModifier)
+	if !varInfo.Used && !coreTypeOnlyParameter && !coreParameterProperty &&
+		definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
 		param := definition.AsParameterDeclaration()
 		if param != nil && param.Initializer == nil && isBeforeLastUsedParam(ctx, definition, ac.allUsages) {
 			return
@@ -2347,18 +2544,17 @@ func newRule(flavor ruleFlavor) rule.Rule {
 	}
 
 	return rule.Rule{
-		Name:                "no-unused-vars",
-		RequiresBindingInfo: !flavor.typescript,
-		RequiresTypeInfo:    flavor.typescript,
-		Schema:              schema,
+		Name:             "no-unused-vars",
+		RequiresTypeInfo: flavor.typescript,
+		Schema:           schema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-			if !flavor.typescript && ctx.TypeChecker == nil {
-				// Core needs lexical symbols, not trusted project type information.
-				// Gap/inferred files receive the linter's binding-only checker.
-				ctx.TypeChecker = ctx.BindingChecker
-			}
-			if ctx.TypeChecker == nil {
+			if ctx.SourceFile == nil || (flavor.typescript && ctx.TypeChecker == nil) {
 				return rule.RuleListeners{}
+			}
+			if !flavor.typescript {
+				// ESLint core uses a lexical scope graph. Resolve from tsgo's
+				// binder-owned AST data so project files and gap files behave alike.
+				ctx.TypeChecker = nil
 			}
 			opts := parseOptions(options)
 			reporter := &diagnosticReporter{
@@ -2462,9 +2658,9 @@ func newRule(flavor ruleFlavor) rule.Rule {
 						if flavor.typescript && (isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node)) {
 							return
 						}
-						sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+						sym := declarationSymbol(ctx, nameNode, node)
 						if sym != nil {
-							resolved := ctx.TypeChecker.SkipAlias(sym)
+							resolved := resolvedSymbol(ctx, sym)
 							if seenWithoutBodyFuncSymbols[resolved] {
 								return
 							}
@@ -2523,7 +2719,7 @@ func newRule(flavor ruleFlavor) rule.Rule {
 					// Skip namespace augmentations — if the namespace symbol has
 					// declarations outside this file, it's augmenting an existing
 					// namespace (e.g., `declare namespace NodeJS { ... }`).
-					sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+					sym := declarationSymbol(ctx, nameNode, node)
 					if flavor.typescript && sym != nil && len(sym.Declarations) > 1 {
 						for _, decl := range sym.Declarations {
 							if decl != node {
