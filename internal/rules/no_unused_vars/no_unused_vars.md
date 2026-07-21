@@ -73,8 +73,8 @@ options object:
   JavaScript regular expression.
 - `destructuredArrayIgnorePattern`: Ignore names in array destructuring that
   match this JavaScript regular expression.
-- `ignoreRestSiblings`: Ignore object-destructuring properties that have a rest
-  sibling.
+- `ignoreRestSiblings`: Ignore direct object-destructuring properties that have
+  a rest sibling. Bindings nested inside those properties are still checked.
 - `ignoreClassWithStaticInitBlock`: Ignore classes containing a static
   initialization block.
 - `ignoreUsingDeclarations`: Ignore `using` and `await using` declarations.

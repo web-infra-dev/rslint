@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -58,8 +57,8 @@ const (
 type analysisContext struct {
 	allUsages         map[*ast.Symbol][]*ast.Node
 	writeRefs         map[*ast.Symbol][]*ast.Node
-	unresolvedRefs    map[string][]*ast.Node
-	referencesByName  map[string][]*ast.Node
+	globalRefsByName  map[string][]*ast.Node
+	refIndex          *utils.ReferenceIndex
 	seenMergedSymbols map[*ast.Symbol]bool
 	reportedUnused    map[*ast.Node]bool
 	reporter          *diagnosticReporter
@@ -225,42 +224,6 @@ func compilePatterns(config Config) Config {
 	return config
 }
 
-// isInTypeContext checks if an identifier is inside a type-only position
-// (type reference, type alias body, interface body, etc.). Used to detect
-// variables that are "only used as a type" — runtime values referenced solely
-// in type annotations should be reported with a specific message.
-func isInTypeContext(node *ast.Node) bool {
-	parent := node.Parent
-	for parent != nil {
-		switch parent.Kind {
-		case ast.KindTypeReference,
-			ast.KindTypeAliasDeclaration,
-			ast.KindInterfaceDeclaration,
-			ast.KindTypeParameter,
-			ast.KindTypeQuery,
-			ast.KindTypeOperator,
-			ast.KindIndexedAccessType,
-			ast.KindConditionalType,
-			ast.KindInferType,
-			ast.KindTypeLiteral,
-			ast.KindMappedType:
-			return true
-			// Note: KindAsExpression, KindTypeAssertionExpression, KindSatisfiesExpression
-			// are NOT included here. Their expression operand is a value context;
-			// only the type annotation part is a type context. Since we walk up
-			// from the identifier, a value operand will pass through these nodes
-			// and continue upward without being misclassified as type-only.
-		}
-		parent = parent.Parent
-	}
-	return false
-}
-
-// isDeclarationName delegates to utils.IsDeclarationIdentifier.
-func isDeclarationName(node *ast.Node) bool {
-	return utils.IsDeclarationIdentifier(node)
-}
-
 // isPartOfAssignment checks if an identifier is a write-only target in an
 // assignment (simple =) or for-in/for-of initializer. Uses the TypeScript-go
 // public API GetAssignmentTarget which handles all destructuring patterns,
@@ -292,37 +255,37 @@ func isPartOfAssignment(node *ast.Node) bool {
 // isUpdateTarget checks if the identifier is the operand of a prefix/postfix
 // increment or decrement (++x, x++, --x, x--).
 func isUpdateTarget(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
+	return updateExpressionForTarget(node) != nil
+}
+
+func updateExpressionForTarget(node *ast.Node) *ast.Node {
+	target := ast.GetAssignmentTarget(node)
+	if target == nil {
+		return nil
 	}
-	parent := node.Parent
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		op := parent.AsPrefixUnaryExpression().Operator
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
+	if target.Kind == ast.KindPrefixUnaryExpression || target.Kind == ast.KindPostfixUnaryExpression {
+		return target
 	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		op := parent.AsPostfixUnaryExpression().Operator
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
-	}
-	return false
+	return nil
 }
 
 // isCompoundAssignmentTarget checks if the identifier is the LHS of a compound
-// assignment (+=, -=, *=, etc.) but NOT a simple = or logical assignment.
+// assignment, including logical assignments but excluding simple `=`.
 func isCompoundAssignmentTarget(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
+	return compoundAssignmentForTarget(node) != nil
+}
+
+func compoundAssignmentForTarget(node *ast.Node) *ast.Node {
+	target := ast.GetAssignmentTarget(node)
+	if target == nil || target.Kind != ast.KindBinaryExpression {
+		return nil
 	}
-	parent := node.Parent
-	if parent.Kind != ast.KindBinaryExpression {
-		return false
-	}
-	bin := parent.AsBinaryExpression()
-	if bin == nil || bin.Left != node {
-		return false
-	}
+	bin := target.AsBinaryExpression()
 	op := bin.OperatorToken.Kind
-	return ast.IsCompoundAssignment(op) && op != ast.KindEqualsToken
+	if !ast.IsCompoundAssignment(op) || op == ast.KindEqualsToken {
+		return nil
+	}
+	return target
 }
 
 // hasAssignment checks if a variable declaration has an initializer or any
@@ -383,34 +346,17 @@ func hasAssignment(definition *ast.Node, sym *ast.Symbol, writeRefs map[*ast.Sym
 // later iteration — and so counts as a real use rather than self-modification.
 func isInsideLoop(node *ast.Node) bool {
 	for current := node; current != nil && !ast.IsFunctionLike(current); current = current.Parent {
-		switch current.Kind {
-		case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-			ast.KindWhileStatement, ast.KindDoStatement:
+		if ast.IsIterationStatement(current, false) {
 			return true
 		}
 	}
 	return false
 }
 
-// nearestVariableScope returns the nearest enclosing function-like node containing
-// node, or nil if node sits at the top level (module/global scope). Blocks don't
-// introduce a new variable scope, matching escope's notion of a "variable scope".
-func nearestVariableScope(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	for current := node.Parent; current != nil; current = current.Parent {
-		if ast.IsFunctionLike(current) {
-			return current
-		}
-	}
-	return nil
-}
-
 func lastWriteInDeclarationScope(definition *ast.Node, refs []*ast.Node) *ast.Node {
-	declarationScope := nearestVariableScope(definition)
+	declarationScope := utils.FindEnclosingScope(definition)
 	for index := len(refs) - 1; index >= 0; index-- {
-		if nearestVariableScope(refs[index]) == declarationScope {
+		if utils.FindEnclosingScope(refs[index]) == declarationScope {
 			return refs[index]
 		}
 	}
@@ -437,114 +383,78 @@ func lastWriteToReport(definition *ast.Node, refs []*ast.Node, flavor ruleFlavor
 // the declaration, or inside a loop: the written value can be observed later
 // (a closure capturing it, or the next loop iteration), so it's a genuine
 // read-modify-write accumulator rather than a discarded self-reference.
-func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.Checker, declNode *ast.Node) bool {
+func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, name string, checker *checker.Checker, declNode *ast.Node, sourceFile *ast.SourceFile) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
-	parent := node.Parent
-
 	// Case 1: a++ or a-- (update expression as a statement)
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		if op := parent.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
-			return isUnusedExpression(parent)
-		}
-	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		if op := parent.AsPostfixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
-			return isUnusedExpression(parent)
-		}
+	if update := updateExpressionForTarget(node); update != nil {
+		return isUnusedExpression(update)
 	}
 
 	// Case 2: a += expr (compound assignment — the LHS identifier is both read and written).
 	// Logical assignments (??=, &&=, ||=) are NOT self-modifying because they conditionally
 	// assign and ESLint considers them as meaningful usage.
-	if parent.Kind == ast.KindBinaryExpression {
-		bin := parent.AsBinaryExpression()
-		if bin != nil && ast.IsCompoundAssignment(bin.OperatorToken.Kind) && bin.Left == node {
-			op := bin.OperatorToken.Kind
-			if op == ast.KindBarBarEqualsToken || op == ast.KindAmpersandAmpersandEqualsToken || op == ast.KindQuestionQuestionEqualsToken {
-				return false // Logical assignment — not self-modifying
-			}
-			return isUnusedExpression(parent)
+	if assignment := compoundAssignmentForTarget(node); assignment != nil {
+		op := assignment.AsBinaryExpression().OperatorToken.Kind
+		if op == ast.KindBarBarEqualsToken || op == ast.KindAmpersandAmpersandEqualsToken || op == ast.KindQuestionQuestionEqualsToken {
+			return false // Logical assignment — not self-modifying
 		}
+		return isUnusedExpression(assignment)
 	}
 
-	// Case 3: cb = (function(a) { return cb(1+a); })() — identifier inside IIFE body
-	// that's assigned back to the same variable. Walk up from the identifier to find
-	// if it's inside a function whose call result is assigned to the same variable.
-	if isInsideFunctionAssignedToSelf(node, sym, checker) {
-		return true
-	}
-
-	// Case 4: a = <expr containing a> (identifier appears in the RHS of an assignment
-	// to the same variable). Covers: `a = a + 1`, `a = a.filter(...)`, `a = a.concat(a)`.
-	// Walk up through expressions, but only when the identifier is the "subject" of the
-	// expression chain (e.g., `a.method()` where `a` is the object). Stop when the
-	// identifier is used as an argument to another function (e.g., `f(a)` or `setTimeout(fn, a)`).
-	current := node
-	for current.Parent != nil {
-		p := current.Parent
-		if p.Kind == ast.KindBinaryExpression {
-			bin := p.AsBinaryExpression()
-			if bin != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
-				lhsSym := checker.GetSymbolAtLocation(bin.Left)
-				if lhsSym == sym {
-					if declNode != nil && (nearestVariableScope(p) != nearestVariableScope(declNode) || isInsideLoop(p)) {
-						return false
-					}
-					return isUnusedExpression(p)
-				}
-				break
-			}
-			// Arithmetic/logic: keep walking
-			current = p
+	// Case 3: a = <any expression tree containing a>. Walking assignment
+	// ancestors instead of enumerating expression kinds covers element access,
+	// calls/new, templates, conditionals, containers, and TypeScript wrappers.
+	// The assignment must discard its result and execute in the declaration's
+	// variable scope; loop-carried and cross-scope updates can be observed later.
+	declarationScope := variableScope(declNode, sourceFile)
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind != ast.KindBinaryExpression {
 			continue
 		}
-		if p.Kind == ast.KindParenthesizedExpression {
-			current = p
+		binary := current.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 			continue
 		}
-		// PropertyAccessExpression: a.method — walk up only if `current` is the object (a)
-		if p.Kind == ast.KindPropertyAccessExpression {
-			pae := p.AsPropertyAccessExpression()
-			if pae != nil && pae.Expression == current {
-				current = p
-				continue
-			}
-			break
+		if !ast.IsNodeDescendantOf(node, binary.Right) ||
+			!referenceMatchesVariable(binary.Left, sym, name, checker, sourceFile) ||
+			!isUnusedExpression(current) ||
+			utils.FindEnclosingScope(current) != declarationScope ||
+			isInsideLoop(current) {
+			continue
 		}
-		// CallExpression: a.method(...) or a.method(a)
-		if p.Kind == ast.KindCallExpression {
-			ce := p.AsCallExpression()
-			if ce != nil {
-				if ce.Expression == current {
-					// current is the callee (a.method) → walk up
-					current = p
-					continue
-				}
-				// current is an argument. If the callee is a method on the same variable
-				// (e.g., x.concat(x)), continue walking — the value is still consumed
-				// by the same variable's method chain. Otherwise break.
-				if isMethodCallOnSameSymbol(ce.Expression, sym, checker) {
-					current = p
-					continue
-				}
-				// current is an argument to a function call (e.g., x in foo(x)).
-				// If the identifier is NOT inside a "storable function" (a non-IIFE function
-				// expression that could be captured as a callback), check if the call result
-				// is assigned to the same variable (e.g., x = foo(x)).
-				if !isInsideStorableFunction(node, p) {
-					current = p
-					continue
-				}
-			}
-			break
-		}
-		// Stop at other expression types (conditionals, template literals, etc.)
-		break
+		return !isInsideOfStorableFunction(node, binary.Right)
 	}
 
 	return false
+}
+
+func variableScope(declaration *ast.Node, sourceFile *ast.SourceFile) *ast.Node {
+	if declaration != nil {
+		return utils.FindEnclosingScope(declaration)
+	}
+	if sourceFile != nil {
+		return sourceFile.AsNode()
+	}
+	return nil
+}
+
+// referenceMatchesVariable compares a direct assignment target with either a
+// checker symbol or an inline-global name. Inline globals intentionally reject
+// symbols declared in this source file so shadowing never counts as global use.
+func referenceMatchesVariable(node *ast.Node, sym *ast.Symbol, name string, typeChecker *checker.Checker, sourceFile *ast.SourceFile) bool {
+	// ESTree erases parentheses around an assignment target but retains
+	// TypeScript assertion nodes. Unwrap only parentheses to keep that shape.
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsIdentifier(node) || node.Text() != name {
+		return false
+	}
+	referenceSymbol := utils.GetReferenceSymbol(node, typeChecker)
+	if sym != nil {
+		return referenceSymbol == sym
+	}
+	return referenceSymbol == nil || !utils.IsSymbolDeclaredInFile(referenceSymbol, sourceFile)
 }
 
 // isUnusedExpression checks if an expression's result is not consumed.
@@ -601,8 +511,12 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 		}
 		var body *ast.Node
 		switch definition.Kind {
-		case ast.KindModuleDeclaration, ast.KindFunctionDeclaration:
+		case ast.KindModuleDeclaration:
 			body = definition.Body()
+		case ast.KindFunctionDeclaration:
+			// The function scope includes parameter initializers as well as the
+			// body, so recursive defaults such as `function f(x = f) {}` are self-use.
+			body = definition
 		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration:
 			// Self-referencing types/enums: `interface Foo { baz: Foo['bar'] }`,
 			// `type Foo = { bar: Foo }`, `enum Foo { B = Foo.A }`.
@@ -613,9 +527,13 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 			// function expression whose body contains the self-reference.
 			varDecl := definition.AsVariableDeclaration()
 			if varDecl != nil && varDecl.Initializer != nil {
-				init := varDecl.Initializer
-				// The initializer could be a function expression or arrow function
-				body = init.Body()
+				// ESTree erases parentheses around an initializer; mirror that
+				// behavior without erasing TS assertion wrappers, which are semantic
+				// nodes in @typescript-eslint's AST.
+				initializer := ast.SkipParentheses(varDecl.Initializer)
+				if initializer != nil && ast.IsFunctionLike(initializer) {
+					body = initializer
+				}
 			}
 		default:
 			continue
@@ -623,108 +541,56 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 		if body == nil {
 			continue
 		}
-		current := usage
-		for current != nil {
-			if current == body {
-				return true
-			}
-			current = current.Parent
-		}
-	}
-	return false
-}
-
-// isInsideStorableFunction checks if the identifier `node` is inside a function
-// expression/arrow function between `node` and `boundary` that is NOT an IIFE.
-// Such a function could be stored as a callback and called later, so its reference
-// to the variable is not necessarily self-modifying.
-// Example of storable: `_timer = setTimeout(function(){ clearInterval(_timer) }, ...)`
-// Example of non-storable (IIFE): `cb = (function(a){ return cb(1+a) })()`
-func isInsideStorableFunction(node *ast.Node, boundary *ast.Node) bool {
-	current := node.Parent
-	for current != nil && current != boundary {
-		if ast.IsFunctionLike(current) {
-			// Check if this function is an IIFE (immediately invoked)
-			if ast.GetImmediatelyInvokedFunctionExpression(current) != nil {
-				// IIFE — not storable, continue walking up
-				current = current.Parent
-				continue
-			}
-			// Non-IIFE function expression — it's storable
+		if ast.IsNodeDescendantOf(usage, body) {
 			return true
 		}
-		current = current.Parent
 	}
 	return false
 }
 
-// isMethodCallOnSameSymbol checks if the callee expression is a method call
-// on the same variable (e.g., `x.concat` where `x` is the symbol).
-func isMethodCallOnSameSymbol(callee *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	obj := callee.AsPropertyAccessExpression().Expression
-	if obj == nil {
-		return false
-	}
-	objSym := checker.GetSymbolAtLocation(obj)
-	return objSym == sym
+// isInsideOfStorableFunction reports whether the nearest function containing
+// a RHS reference can escape through another value path. A function invoked as
+// the RHS callee is not storable; one passed as an argument or assigned/yielded
+// within the RHS can execute later and therefore makes the reference a real use.
+func isInsideOfStorableFunction(node *ast.Node, rhs *ast.Node) bool {
+	function := ast.FindAncestor(node.Parent, func(current *ast.Node) bool {
+		return ast.IsFunctionLike(current)
+	})
+	return function != nil && ast.IsNodeDescendantOf(function, rhs) && isStorableFunction(function, rhs)
 }
 
-// isInsideFunctionAssignedToSelf checks if the identifier is inside a function expression
-// whose result (directly or via IIFE) is assigned to the same variable.
-// Covers: `cb = (function(a) { return cb(1+a); })()` (IIFE)
-//
-//	`cb = (0, function(a) { cb(1+a); })` (non-IIFE, assigned directly)
-//	`cb = (function(a) { cb(1+a); }, cb)` (discarded in comma left operand)
-func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindFunctionExpression || current.Kind == ast.KindArrowFunction {
-			// Walk up from the function expression through parens, commas, and calls
-			// to find the enclosing assignment.
-			ancestor := current.Parent
-			for ancestor != nil {
-				if ancestor.Kind == ast.KindParenthesizedExpression {
-					ancestor = ancestor.Parent
-					continue
+func isStorableFunction(function *ast.Node, rhs *ast.Node) bool {
+	node := function
+	for parent := function.Parent; parent != nil && ast.IsNodeDescendantOf(parent, rhs); parent = parent.Parent {
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary != nil && binary.OperatorToken != nil {
+				operator := binary.OperatorToken.Kind
+				if operator == ast.KindCommaToken {
+					if binary.Right != node {
+						return false
+					}
+				} else if ast.IsAssignmentOperator(operator) {
+					return true
 				}
-				if ancestor.Kind == ast.KindBinaryExpression {
-					bin := ancestor.AsBinaryExpression()
-					if bin != nil && bin.OperatorToken.Kind == ast.KindCommaToken {
-						// Comma expression: continue walking up
-						ancestor = ancestor.Parent
-						continue
-					}
-					if bin != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
-						lhsSym := checker.GetSymbolAtLocation(bin.Left)
-						if lhsSym == sym {
-							if isInsideStorableFunction(node, current) {
-								return false
-							}
-							return isUnusedExpression(ancestor)
-						}
-					}
-					break
-				}
-				if ancestor.Kind == ast.KindCallExpression {
-					ce := ancestor.AsCallExpression()
-					// Only walk through IIFE (function is the callee), not function-as-argument
-					callee := ce.Expression
-					for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-						callee = callee.AsParenthesizedExpression().Expression
-					}
-					if callee == current {
-						ancestor = ancestor.Parent
-						continue
-					}
-					break
-				}
-				break
+			}
+		case ast.KindCallExpression:
+			return parent.AsCallExpression().Expression != node
+		case ast.KindNewExpression:
+			return parent.AsNewExpression().Expression != node
+		case ast.KindTaggedTemplateExpression, ast.KindYieldExpression:
+			return true
+		default:
+			// IsStatement includes declaration statements. Include every Block
+			// as ESTree's BlockStatement too; tsgo intentionally excludes function,
+			// try, and catch bodies from IsStatement. Do not use ast.IsDeclaration,
+			// which would also classify property assignments as declarations.
+			if parent.Kind == ast.KindBlock || ast.IsStatement(parent) {
+				return true
 			}
 		}
-		current = current.Parent
+		node = parent
 	}
 	return false
 }
@@ -847,25 +713,29 @@ func hasObjectRestSiblingWrite(writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.S
 		return false
 	}
 	for _, ref := range writeRefs[sym] {
-		isRestTarget := false
-		for current := ref.Parent; current != nil; current = current.Parent {
-			if current.Kind == ast.KindSpreadAssignment {
-				isRestTarget = true
-			}
-			if current.Kind != ast.KindObjectLiteralExpression {
-				continue
-			}
-			if !utils.IsInDestructuringAssignment(current) {
-				break
-			}
-			if isRestTarget {
-				break
-			}
-			object := current.AsObjectLiteralExpression()
-			if object == nil || object.Properties == nil || len(object.Properties.Nodes) == 0 {
-				break
-			}
-			return object.Properties.Nodes[len(object.Properties.Nodes)-1].Kind == ast.KindSpreadAssignment
+		property := ref.Parent
+		for property != nil && property.Kind == ast.KindParenthesizedExpression {
+			property = property.Parent
+		}
+		if property == nil ||
+			(property.Kind != ast.KindPropertyAssignment && property.Kind != ast.KindShorthandPropertyAssignment) {
+			continue
+		}
+		if property.Kind == ast.KindShorthandPropertyAssignment &&
+			property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+			// In ESTree the identifier is wrapped by an AssignmentPattern,
+			// so it is not the direct Property child checked by hasRestSibling.
+			continue
+		}
+		objectNode := property.Parent
+		if objectNode == nil || objectNode.Kind != ast.KindObjectLiteralExpression ||
+			!utils.IsInDestructuringAssignment(objectNode) {
+			continue
+		}
+		object := objectNode.AsObjectLiteralExpression()
+		if object != nil && object.Properties != nil && len(object.Properties.Nodes) > 0 &&
+			object.Properties.Nodes[len(object.Properties.Nodes)-1].Kind == ast.KindSpreadAssignment {
+			return true
 		}
 	}
 	return false
@@ -918,36 +788,9 @@ func isInsideAmbientModuleBlock(node *ast.Node) bool {
 		return false
 	}
 
-	// Check if the module declaration has the Ambient (declare) flag.
-	isAmbient := ast.GetCombinedModifierFlags(moduleDecl)&ast.ModifierFlagsAmbient != 0
-	// Also check if any ancestor is a global scope augmentation (declare global { ... }).
-	// GetCombinedModifierFlags doesn't walk up through ModuleBlock→ModuleDeclaration,
-	// so we need to check ancestors explicitly.
-	if !isAmbient {
-		if ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-			return ast.IsGlobalScopeAugmentation(n)
-		}) != nil {
-			isAmbient = true
-		}
-	}
-	// Also check if any ancestor ModuleDeclaration has the Ambient flag.
-	if !isAmbient {
-		if ast.FindAncestor(moduleDecl.Parent, func(n *ast.Node) bool {
-			return n.Kind == ast.KindModuleDeclaration &&
-				ast.HasSyntacticModifier(n, ast.ModifierFlagsAmbient)
-		}) != nil {
-			isAmbient = true
-		}
-	}
-	// In .d.ts files, all declarations are implicitly ambient.
-	if !isAmbient {
-		sf := ast.GetSourceFileOfNode(node)
-		if sf != nil && sf.IsDeclarationFile {
-			isAmbient = true
-		}
-	}
-
-	if !isAmbient {
+	// tsgo propagates NodeFlagsAmbient through declaration files, `declare`
+	// modules, nested namespaces, and global augmentations.
+	if !utils.IsInAmbientContext(node) {
 		return false
 	}
 	// If the module block has explicit exports, non-exported declarations
@@ -1013,29 +856,12 @@ func isInDtsWithoutExplicitExports(node *ast.Node) bool {
 	return !hasExplicit
 }
 
-func isTopLevelDeclaration(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindVariableDeclaration,
-		ast.KindFunctionDeclaration,
-		ast.KindClassDeclaration,
-		ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration,
-		ast.KindEnumDeclaration,
-		ast.KindModuleDeclaration:
-		return true
-	}
-	return false
-}
-
 func isParameterNode(node *ast.Node) bool {
-	return ast.FindAncestorKind(node, ast.KindParameter) != nil
+	return node != nil && ast.IsPartOfParameterDeclaration(node)
 }
 
 func isCaughtErrorNode(node *ast.Node) bool {
-	return ast.FindAncestorKind(node, ast.KindCatchClause) != nil
+	return node != nil && ast.IsCatchClauseVariableDeclarationOrBindingElement(node)
 }
 
 func isUsingDeclaration(varDeclNode *ast.Node) bool {
@@ -1214,6 +1040,9 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 	}
 
 	if varInfo.Definition != nil {
+		// The tsgo helper walks binding elements to their root declaration and
+		// folds flags from the declaration list and variable statement. This
+		// covers nested exported destructuring without a custom parent walk.
 		modifierFlags := ast.GetCombinedModifierFlags(varInfo.Definition)
 		if modifierFlags&ast.ModifierFlagsExport != 0 {
 			return true
@@ -1227,39 +1056,9 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 				if ast.GetCombinedModifierFlags(decl)&ast.ModifierFlagsExport != 0 {
 					return true
 				}
-				// Also check parent VariableStatement for export
-				parent := decl.Parent
-				for parent != nil && (parent.Kind == ast.KindVariableDeclarationList || parent.Kind == ast.KindVariableStatement) {
-					if ast.GetCombinedModifierFlags(parent)&ast.ModifierFlagsExport != 0 {
-						return true
-					}
-					parent = parent.Parent
-				}
-			}
-		}
-
-		if isTopLevelDeclaration(varInfo.Definition) {
-			parent := varInfo.Definition.Parent
-			for parent != nil {
-				switch parent.Kind {
-				case ast.KindVariableDeclarationList, ast.KindVariableStatement:
-					modifierFlags := ast.GetCombinedModifierFlags(parent)
-					if modifierFlags&ast.ModifierFlagsExport != 0 {
-						return true
-					}
-				case ast.KindSourceFile, ast.KindModuleBlock:
-					goto doneParentWalk
-				}
-				// Stop at function/class boundaries — a variable inside a function
-				// is not exported even if the containing function is.
-				if ast.IsFunctionLike(parent) || parent.Kind == ast.KindClassDeclaration {
-					break
-				}
-				parent = parent.Parent
 			}
 		}
 	}
-doneParentWalk:
 
 	parent := varInfo.Variable.Parent
 	for parent != nil {
@@ -1534,15 +1333,9 @@ func removeImportLine(file *ast.SourceFile, node *ast.Node) rule.RuleFix {
 }
 
 func findCommaAfter(file *ast.SourceFile, pos int) int {
-	text := file.Text()
-	for i := pos; i < len(text); i++ {
-		ch := text[i]
-		if ch == ',' {
-			return i + 1
-		}
-		if ch != ' ' && ch != '\t' {
-			break
-		}
+	token, ok := utils.TokenAtOrAfter(file, pos)
+	if ok && token.Kind == ast.KindCommaToken {
+		return token.End
 	}
 	return -1
 }
@@ -1611,19 +1404,6 @@ func removeNodeRange(sourceFile *ast.SourceFile, node *ast.Node) rule.RuleFix {
 	return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, node))
 }
 
-func isLoopKind(kind ast.Kind) bool {
-	switch kind {
-	case ast.KindForStatement,
-		ast.KindForInStatement,
-		ast.KindForOfStatement,
-		ast.KindWhileStatement,
-		ast.KindDoStatement:
-		return true
-	default:
-		return false
-	}
-}
-
 func isSingleStatementBody(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
@@ -1632,7 +1412,7 @@ func isSingleStatementBody(node *ast.Node) bool {
 	case ast.KindIfStatement, ast.KindWithStatement:
 		return true
 	default:
-		return isLoopKind(node.Parent.Kind)
+		return ast.IsIterationStatement(node.Parent, false)
 	}
 }
 
@@ -1667,7 +1447,7 @@ func fixVariableDeclaration(ctx rule.RuleContext, declaration *ast.Node, ac *ana
 	}
 
 	listParent := declarationList.Parent
-	inLoopInitializer := listParent != nil && isLoopKind(listParent.Kind)
+	inLoopInitializer := listParent != nil && ast.IsIterationStatement(listParent, false)
 	name := declaration.AsVariableDeclaration().Name()
 	if inLoopInitializer && (len(declarations) == 1 || (name != nil && ast.IsBindingPattern(name))) {
 		return rule.RuleFix{}, false
@@ -1895,121 +1675,49 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 	}, true
 }
 
-// isPropertyNameLikePosition reports whether an identifier appears in a syntactic
-// position where it names a property/label/attribute rather than referring to a
-// declared value or type. Such identifiers must NOT be added to `unresolvedRefs`
-// even when the type checker fails to resolve them — otherwise the name-based
-// fallback in processVariable will mistake them for usages of an unrelated
-// same-named local variable (e.g. `obj.name` on an `any`-typed receiver
-// polluting the lookup of an unused local `const name`).
-func isPropertyNameLikePosition(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		// `obj.name` — node is the `.name` part on the right.
-		pae := parent.AsPropertyAccessExpression()
-		return pae != nil && pae.Name() == node
-	case ast.KindQualifiedName:
-		// `Foo.Bar` in type position — node is the `.Bar` part on the right.
-		qn := parent.AsQualifiedName()
-		return qn != nil && qn.Right == node
-	case ast.KindPropertyAssignment:
-		// `{ name: value }` in object literal — node is the property key.
-		pa := parent.AsPropertyAssignment()
-		return pa != nil && pa.Name() == node
-	case ast.KindBindingElement:
-		// `const { name: alias } = obj` — node is the source property name.
-		// The destination `alias` is a declaration name (handled separately).
-		be := parent.AsBindingElement()
-		return be != nil && be.PropertyName != nil && be.PropertyName == node
-	case ast.KindImportSpecifier:
-		// `import { name as alias } from 'mod'` — node is the source export
-		// name (PropertyName), which references the module's exported binding,
-		// not any in-scope variable. When the module is unresolvable the symbol
-		// lookup fails and would otherwise pollute unresolvedRefs[name].
-		is := parent.AsImportSpecifier()
-		return is != nil && is.PropertyName != nil && is.PropertyName == node
-	case ast.KindExportSpecifier:
-		// ExportSpecifier semantics depend on whether the enclosing
-		// ExportDeclaration is a re-export (`export { ... } from 'mod'`) or
-		// a local export (no `from`):
-		//   * Local export: both `Name` and `PropertyName` are references
-		//     to in-scope locals. We must NOT exclude them — otherwise an
-		//     unresolved local `name` reference would be missed.
-		//   * Re-export: both `Name` and `PropertyName` name module-level
-		//     bindings, never in-scope locals. They must be excluded so an
-		//     unresolved module specifier does not pollute the lookup of
-		//     a same-named local elsewhere in the file.
-		es := parent.AsExportSpecifier()
-		if es == nil {
-			return false
-		}
-		exportDecl := ast.FindAncestorKind(parent, ast.KindExportDeclaration)
-		if exportDecl == nil {
-			return false
-		}
-		if exportDecl.AsExportDeclaration().ModuleSpecifier == nil {
-			return false
-		}
-		return es.PropertyName == node || es.Name() == node
-	case ast.KindJsxAttribute:
-		// `<X name="..." />` — node is the attribute name.
-		attr := parent.AsJsxAttribute()
-		return attr != nil && attr.Name() == node
-	case ast.KindJsxNamespacedName:
-		// `<X xml:lang="en" />` — both `xml` (Namespace) and `lang` (Name)
-		// are JSX-namespace components, never in-scope value references.
-		jnn := parent.AsJsxNamespacedName()
-		return jnn != nil && (jnn.Namespace == node || jnn.Name() == node)
-	case ast.KindImportAttribute:
-		// `import 'mod' with { type: 'json' }` — the `type` here is an
-		// import-attribute key, not a value reference.
-		ia := parent.AsImportAttribute()
-		return ia != nil && ia.Name() == node
-	case ast.KindLabeledStatement:
-		// `name: while(...)` — label declaration, not a value reference.
-		ls := parent.AsLabeledStatement()
-		return ls != nil && ls.Label == node
-	case ast.KindBreakStatement, ast.KindContinueStatement:
-		// `break name` / `continue name` — label reference (separate namespace).
-		return true
-	case ast.KindMetaProperty:
-		// `new.target` / `import.meta` — node is the keyword.name.
-		mp := parent.AsMetaProperty()
-		return mp != nil && mp.Name() == node
-	}
-	return false
-}
-
 // collectSymbolUsages walks the entire source file AST and collects:
 //   - usages: maps each symbol to its usage reference nodes (read references)
 //   - writeRefs: maps each symbol to its write-only reference nodes (assignments)
-//   - unresolvedRefs: maps identifier text to nodes where GetSymbolAtLocation returns nil
+//   - globalRefsByName: references that are not shadowed by a local declaration
 //
-// After the walk, it calls markJsxFactoryUsed to handle JSX factory implicit usage.
-func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, unresolvedRefs map[string][]*ast.Node, referencesByName map[string][]*ast.Node, coreSemantics bool) {
+// For the TypeScript flavor, the walk also marks implicit JSX factory usage.
+func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, globalRefsByName map[string][]*ast.Node, coreSemantics bool) {
+	sf := sourceFile.AsSourceFile()
+	addUsage := func(sym *ast.Symbol, node *ast.Node) {
+		if sym == nil {
+			return
+		}
+		usages[sym] = append(usages[sym], node)
+		resolved := ctx.TypeChecker.SkipAlias(sym)
+		if resolved != nil && resolved != sym {
+			usages[resolved] = append(usages[resolved], node)
+		}
+	}
+
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
 			return
 		}
 
-		if ast.IsIdentifier(node) && !isDeclarationName(node) {
+		if ast.IsIdentifier(node) && !utils.IsNonReferenceIdentifier(node) {
+			sym := utils.GetReferenceSymbol(node, ctx.TypeChecker)
+			if coreSemantics && (sym == nil || !utils.IsSymbolDeclaredInFile(sym, sf)) {
+				globalRefsByName[node.Text()] = append(globalRefsByName[node.Text()], node)
+			}
+
 			// Track write-only references separately for report position.
 			// Simple assignments (=) are write-only and don't count as usage.
 			if isPartOfAssignment(node) {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if sym != nil {
-					writeRefs[sym] = append(writeRefs[sym], node)
+				writeSymbol := sym
+				if !coreSemantics && node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
+					// @typescript-eslint's scope manager associates object-pattern
+					// shorthand writes with the property symbol for report-location
+					// purposes. Core resolves the shorthand's value binding instead.
+					writeSymbol = ctx.TypeChecker.GetSymbolAtLocation(node)
 				}
-				if coreSemantics && node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-					valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-					if valueSymbol != nil && valueSymbol != sym {
-						writeRefs[valueSymbol] = append(writeRefs[valueSymbol], node)
-					}
+				if writeSymbol != nil {
+					writeRefs[writeSymbol] = append(writeRefs[writeSymbol], node)
 				}
 				node.ForEachChild(func(child *ast.Node) bool {
 					walk(child)
@@ -2017,59 +1725,15 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 				})
 				return
 			}
-			if !isPropertyNameLikePosition(node) {
-				name := node.AsIdentifier().Text
-				referencesByName[name] = append(referencesByName[name], node)
-			}
 			// Compound assignments (+=, -=, etc.) and update expressions (++, --)
 			// are both read and write. Track as writeRef for report position,
 			// but don't return early — the node is still recorded as a usage below.
 			if isCompoundAssignmentTarget(node) || isUpdateTarget(node) {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
 				if sym != nil {
 					writeRefs[sym] = append(writeRefs[sym], node)
 				}
 			}
-			sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-			if sym != nil {
-				// Store usage under both the original symbol and the resolved alias.
-				// This ensures import specifiers match correctly: the declaration site
-				// uses the original (pre-alias) symbol, while re-exports or other
-				// alias chains still work via the resolved symbol.
-				usages[sym] = append(usages[sym], node)
-				resolved := ctx.TypeChecker.SkipAlias(sym)
-				if resolved != sym {
-					usages[resolved] = append(usages[resolved], node)
-				}
-			} else if !isPropertyNameLikePosition(node) {
-				// TypeChecker is the source of truth; this branch is only a
-				// narrow fallback for residual cases where GetSymbolAtLocation
-				// returns nil but the identifier IS a value/type reference
-				// (e.g., empty namespaces — see TestNoUnusedVarsPatterns'
-				// `namespace _Foo {} export const x = _Foo;` invalid case,
-				// which still depends on the name-based lookup).
-				//
-				// Identifiers in pure property/label/attribute positions can
-				// never refer to a top-level declared symbol, so excluding
-				// them here prevents `obj.name` (any-typed) from polluting
-				// the lookup of an unused local `name`.
-				idText := node.AsIdentifier().Text
-				unresolvedRefs[idText] = append(unresolvedRefs[idText], node)
-			}
-			// For shorthand properties like { stats }, the identifier serves
-			// as both the property name and the value reference. GetSymbolAtLocation
-			// returns the property symbol, but we also need the value symbol to
-			// track usage of the referenced variable (especially for imports).
-			if node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-				if valSym != nil {
-					usages[valSym] = append(usages[valSym], node)
-					resolved := ctx.TypeChecker.SkipAlias(valSym)
-					if resolved != valSym {
-						usages[resolved] = append(usages[resolved], node)
-					}
-				}
-			}
+			addUsage(sym, node)
 		}
 
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -2079,14 +1743,12 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 	}
 	walk(sourceFile)
 
-	// TypeScript only creates a reference from JSX to the factory function in
-	// the classic `jsx: "react"` runtime, and even then via an implicit
-	// `React.createElement` call that has no identifier node for the AST walk
-	// above to find. For every other mode (preserve, react-native, react-jsx)
-	// the factory import has no textual reference at all. Mark it as used,
-	// matching @typescript-eslint/parser's `jsxPragma` behavior (the factory
-	// is considered used whenever the file contains JSX, in any runtime).
-	markJsxFactoryUsed(ctx, sourceFile, usages)
+	// @typescript-eslint's scope manager marks the configured JSX factory as
+	// used implicitly. Espree does not, so ESLint core still reports an otherwise
+	// unused React import; preserve that distinction between the two flavors.
+	if !coreSemantics {
+		markJsxFactoryUsed(ctx, sourceFile, usages)
+	}
 }
 
 // markJsxFactoryUsed checks if the source file contains JSX and, if so, marks
@@ -2096,31 +1758,31 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 // reported. Mirrors @typescript-eslint/parser, which treats the jsxPragma
 // (default "React") as used whenever JSX is present, regardless of runtime.
 func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
-	if ctx.Program == nil {
-		return
-	}
-	opts := ctx.Program.Options()
-	if opts == nil {
+	if sourceFile == nil || sourceFile.SubtreeFacts()&ast.SubtreeContainsJsx == 0 {
 		return
 	}
 	firstJsx, firstFragment := findJsxNodes(sourceFile)
 	if firstJsx == nil && firstFragment == nil {
 		return
 	}
-	// Any JSX (element or fragment) marks the factory as used
-	factoryName := "React"
-	if opts.JsxFactory != "" {
-		factoryName = strings.Split(opts.JsxFactory, ".")[0]
-	}
+	// The checker folds file-level @jsx pragmas, compiler options, and the
+	// default React namespace into one public lookup. Use the source file as
+	// the location so a fragment-specific pragma cannot replace the element
+	// factory namespace when the file contains fragments only.
+	factoryName := ctx.TypeChecker.GetJsxNamespace(sourceFile)
 	refNode := firstJsx
 	if refNode == nil {
 		refNode = firstFragment
 	}
-	markImportByNameAsUsed(ctx, sourceFile, factoryName, refNode, usages)
+	if factoryName != "" {
+		markImportByNameAsUsed(ctx, sourceFile, factoryName, refNode, usages)
+	}
 	// JSX fragments additionally mark the fragment factory as used
-	if firstFragment != nil && opts.JsxFragmentFactory != "" {
-		fragmentFactoryName := strings.Split(opts.JsxFragmentFactory, ".")[0]
-		markImportByNameAsUsed(ctx, sourceFile, fragmentFactoryName, firstFragment, usages)
+	if firstFragment != nil {
+		fragmentFactoryName := ctx.TypeChecker.GetJsxFragmentFactory(firstFragment)
+		if fragmentFactoryName != "" {
+			markImportByNameAsUsed(ctx, sourceFile, fragmentFactoryName, firstFragment, usages)
+		}
 	}
 }
 
@@ -2129,67 +1791,13 @@ func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*
 // instead of the import's own name node because processVariable filters out
 // usages where usage.Pos() == declaration.Pos() (self-reference filtering).
 func markImportByNameAsUsed(ctx rule.RuleContext, sourceFile *ast.Node, name string, refNode *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
-	sf := sourceFile.AsSourceFile()
-	if sf == nil {
-		return
-	}
-	sf.AsNode().ForEachChild(func(child *ast.Node) bool {
-		// Handle import React = require('react')
-		if child.Kind == ast.KindImportEqualsDeclaration {
-			ieq := child.AsImportEqualsDeclaration()
-			if ieq != nil && ieq.Name() != nil && ieq.Name().AsIdentifier().Text == name {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(ieq.Name())
-				if sym != nil {
+	sourceFile.ForEachChild(func(child *ast.Node) bool {
+		for _, binding := range utils.GetImportBindingNodes(child) {
+			if binding != nil && binding.Text() == name {
+				if sym := ctx.TypeChecker.GetSymbolAtLocation(binding); sym != nil {
 					usages[sym] = append(usages[sym], refNode)
 				}
 				return true
-			}
-			return false
-		}
-		if child.Kind != ast.KindImportDeclaration {
-			return false
-		}
-		importDecl := child.AsImportDeclaration()
-		if importDecl == nil || importDecl.ImportClause == nil {
-			return false
-		}
-		clause := importDecl.ImportClause
-		// Check default import: import React from '...'
-		if clause.Name() != nil && clause.Name().AsIdentifier().Text == name {
-			sym := ctx.TypeChecker.GetSymbolAtLocation(clause.Name())
-			if sym != nil {
-				usages[sym] = append(usages[sym], refNode)
-			}
-			return true
-		}
-		if clause.AsImportClause().NamedBindings != nil {
-			bindings := clause.AsImportClause().NamedBindings
-			// Check namespace import: import * as React from '...'
-			if bindings.Kind == ast.KindNamespaceImport {
-				nsImport := bindings.AsNamespaceImport()
-				if nsImport != nil && nsImport.Name() != nil && nsImport.Name().AsIdentifier().Text == name {
-					sym := ctx.TypeChecker.GetSymbolAtLocation(nsImport.Name())
-					if sym != nil {
-						usages[sym] = append(usages[sym], refNode)
-					}
-					return true
-				}
-			}
-			// Check named imports: import { h } from '...'
-			if bindings.Kind == ast.KindNamedImports {
-				bindings.ForEachChild(func(spec *ast.Node) bool {
-					if spec.Kind == ast.KindImportSpecifier {
-						specName := spec.AsImportSpecifier().Name()
-						if specName != nil && specName.AsIdentifier().Text == name {
-							sym := ctx.TypeChecker.GetSymbolAtLocation(specName)
-							if sym != nil {
-								usages[sym] = append(usages[sym], refNode)
-							}
-							return true
-						}
-					}
-					return false
-				})
 			}
 		}
 		return false
@@ -2201,7 +1809,8 @@ func markImportByNameAsUsed(ctx rule.RuleContext, sourceFile *ast.Node, name str
 func findJsxNodes(node *ast.Node) (firstJsx *ast.Node, firstFragment *ast.Node) {
 	var walk func(*ast.Node)
 	walk = func(n *ast.Node) {
-		if n == nil || (firstJsx != nil && firstFragment != nil) {
+		if n == nil || n.SubtreeFacts()&ast.SubtreeContainsJsx == 0 ||
+			(firstJsx != nil && firstFragment != nil) {
 			return
 		}
 		switch n.Kind {
@@ -2228,9 +1837,25 @@ func findJsxNodes(node *ast.Node) (firstJsx *ast.Node, firstFragment *ast.Node) 
 	return
 }
 
+// hasInlineGlobalUse applies the same read semantics as declared variables to
+// `/* global name */` entries, which have no declaration node or checker symbol.
+// Local shadows were removed while collecting globalRefsByName.
+func hasInlineGlobalUse(ctx rule.RuleContext, name string, references []*ast.Node) bool {
+	for _, reference := range references {
+		if isPartOfAssignment(reference) {
+			continue
+		}
+		if isSelfModifyingReference(reference, nil, name, ctx.TypeChecker, nil, ctx.SourceFile) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 // processVariable determines whether a single declared variable/parameter/import
 // is unused and, if so, reports it. The decision pipeline:
-//  1. Resolve the symbol and look up usages (original sym → SkipAlias → unresolved fallback)
+//  1. Resolve the symbol and look up usages (original sym → SkipAlias → shared reference index)
 //  2. Filter out self-references (same position, self-modifying, inside own declaration body)
 //  3. Classify remaining usages as value or type-only
 //  4. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
@@ -2269,18 +1894,22 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 				usageNodes, exists = ac.allUsages[resolved]
 			}
 		}
-		// Fallback: check unresolved references by name.
-		// This handles cases like empty namespaces where GetSymbolAtLocation
-		// returns nil for the reference but the namespace symbol is valid.
-		if !exists && !isImportDef {
-			if unresolved, ok := ac.unresolvedRefs[name]; ok {
-				for _, ref := range unresolved {
-					if ref.Pos() != nameNode.Pos() && !isInsideOwnDeclaration(ref, definition) {
-						usageNodes = append(usageNodes, ref)
-						exists = true
-					}
+		// Checker edge cases (notably empty namespaces) can lose symbol
+		// identity. Reuse the shared, shadow-aware name index as a narrow
+		// fallback and keep references inside the declaration's own container.
+		if !exists && !isImportDef && ac.refIndex != nil {
+			boundary := ast.GetDeclarationContainer(definition)
+			ac.refIndex.ForEachReferenceByName(name, boundary, func(ref *ast.Node) bool {
+				if boundary != nil && !ast.IsNodeDescendantOf(ref, boundary) {
+					return false
 				}
-			}
+				if ref.Pos() != nameNode.Pos() && !isPartOfAssignment(ref) &&
+					!isInsideOwnDeclaration(ref, definition) {
+					usageNodes = append(usageNodes, ref)
+					exists = true
+				}
+				return false
+			})
 		}
 		// For declaration merging (e.g., multiple interfaces with same name),
 		// collect all declarations so self-references in ANY declaration body
@@ -2295,7 +1924,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			filteredUsages := []*ast.Node{}
 			for _, usage := range usageNodes {
 				if usage.Pos() != varInfo.Variable.Pos() &&
-					!isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode) &&
+					!isSelfModifyingReference(usage, sym, name, ctx.TypeChecker, nameNode, ctx.SourceFile) &&
 					!isInsideAnyOwnDeclaration(usage, allDecls) {
 					filteredUsages = append(filteredUsages, usage)
 				}
@@ -2304,7 +1933,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			if len(filteredUsages) > 0 {
 				onlyUsedAsType := true
 				for _, usage := range filteredUsages {
-					if !isInTypeContext(usage) {
+					if !utils.IsIdentifierInTypeReference(usage) {
 						onlyUsedAsType = false
 						break
 					}
@@ -2345,6 +1974,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		varInfo.OnlyUsedAsType = false
 	}
 	if !flavor.typescript && varInfo.OnlyUsedAsType {
+		// TypeScript's scope manager presents type references to ESLint's core
+		// rule as uses. Preserve that base-rule behavior; the TypeScript flavor
+		// retains its more specific "only used as a type" diagnostic.
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
@@ -2470,8 +2102,8 @@ func newRule(flavor ruleFlavor) rule.Rule {
 			ac := &analysisContext{
 				allUsages:         make(map[*ast.Symbol][]*ast.Node),
 				writeRefs:         make(map[*ast.Symbol][]*ast.Node),
-				unresolvedRefs:    make(map[string][]*ast.Node),
-				referencesByName:  make(map[string][]*ast.Node),
+				globalRefsByName:  make(map[string][]*ast.Node),
+				refIndex:          utils.NewReferenceIndex(ctx.SourceFile, ctx.TypeChecker),
 				seenMergedSymbols: make(map[*ast.Symbol]bool),
 				reportedUnused:    make(map[*ast.Node]bool),
 				reporter:          reporter,
@@ -2484,7 +2116,7 @@ func newRule(flavor ruleFlavor) rule.Rule {
 			ensureCollected := func(node *ast.Node) {
 				if !collected {
 					sourceFile := ast.GetSourceFileOfNode(node)
-					collectSymbolUsages(ctx, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.unresolvedRefs, ac.referencesByName, !flavor.typescript)
+					collectSymbolUsages(ctx, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.globalRefsByName, !flavor.typescript)
 					collected = true
 				}
 			}
@@ -2504,7 +2136,7 @@ func newRule(flavor ruleFlavor) rule.Rule {
 					processVariable(ctx, nameNode, identifier.Text, definition, opts, ac, flavor)
 				} else if nameNode.Kind == ast.KindObjectBindingPattern || nameNode.Kind == ast.KindArrayBindingPattern {
 					hasRestSibling := false
-					if opts.IgnoreRestSiblings {
+					if opts.IgnoreRestSiblings && nameNode.Kind == ast.KindObjectBindingPattern {
 						nameNode.ForEachChild(func(child *ast.Node) bool {
 							if child.Kind == ast.KindBindingElement {
 								elem := child.AsBindingElement()
@@ -2520,7 +2152,10 @@ func newRule(flavor ruleFlavor) rule.Rule {
 						if child.Kind == ast.KindBindingElement {
 							elem := child.AsBindingElement()
 							if elem != nil && elem.Name() != nil {
-								if hasRestSibling && elem.DotDotDotToken == nil {
+								// ESLint ignores only a directly bound property beside
+								// the final object rest. Variables nested inside that
+								// property's array/object pattern are not siblings.
+								if hasRestSibling && elem.DotDotDotToken == nil && elem.Initializer == nil && ast.IsIdentifier(elem.Name()) {
 									return false
 								}
 								processBindingName(elem.Name(), child)
@@ -2860,7 +2495,7 @@ func newRule(flavor ruleFlavor) rule.Rule {
 						if !inlineGlobal.Declared || len(inlineGlobal.NameRanges) == 0 {
 							continue
 						}
-						if len(ac.referencesByName[inlineGlobal.Name]) > 0 {
+						if hasInlineGlobalUse(ctx, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
 							continue
 						}
 						reporter.reportRange(

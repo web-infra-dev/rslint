@@ -45,6 +45,18 @@ func TestNoUnusedVarsJsxFactory(t *testing.T) {
 			Code: "import React from 'react';\nexport const A = () => <div />;\n",
 			Tsx:  true,
 		},
+		// File-level pragmas are resolved by the checker, including qualified
+		// factories whose first identifier names the imported binding.
+		{
+			Code:     "/** @jsx X.createElement */\nimport X from './x';\nexport const A = () => <div />;\n",
+			Tsx:      true,
+			TSConfig: "tsconfig.react-jsx.json",
+		},
+		{
+			Code:     "/** @jsx h */\n/** @jsxFrag Fragment */\nimport { h, Fragment } from './x';\nexport const A = () => <></>;\n",
+			Tsx:      true,
+			TSConfig: "tsconfig.react-jsx.json",
+		},
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
@@ -76,25 +88,6 @@ func TestNoUnusedVarsJsxFactory(t *testing.T) {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "removeUnusedImportDeclaration",
 						Output:    "export const A = () => <div />;\n",
-					}},
-				},
-			},
-		},
-		// react-jsx: documented gap — a custom pragma declared via `@jsx X` is
-		// NOT recognized (that requires eslint-plugin-react's jsx-uses-react,
-		// which is a no-op in rslint), so `X` is still reported.
-		{
-			Code:     "/** @jsx X.createElement */\nimport X from './x';\nexport const A = () => <div />;\n",
-			Tsx:      true,
-			TSConfig: "tsconfig.react-jsx.json",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar", Line: 2, Column: 8,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
-						MessageId: "removeUnusedImportDeclaration",
-						// removeImportLine starts at node.Pos(), which includes the
-						// leading `@jsx` block comment as trivia, so it is removed too.
-						Output: "export const A = () => <div />;\n",
 					}},
 				},
 			},

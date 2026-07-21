@@ -99,7 +99,7 @@ func isReadReference(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
+	if utils.IsIdentifierInTypeReference(node) {
 		return false
 	}
 	return !utils.IsNonReferenceIdentifier(node)

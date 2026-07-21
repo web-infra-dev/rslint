@@ -154,3 +154,14 @@ func extraUnusedError(name string, assigned bool, line int, column int, endColum
 	}
 	return result
 }
+
+func extraUnusedErrorWithSuggestion(name string, assigned bool, line int, column int, endColumn int, suggestionOutput string) rule_tester.InvalidTestCaseError {
+	result := extraUnusedError(name, assigned, line, column, endColumn, "")
+	result.Suggestions = []rule_tester.InvalidTestCaseSuggestion{
+		{
+			MessageId: "removeVar",
+			Output:    suggestionOutput,
+		},
+	}
+	return result
+}

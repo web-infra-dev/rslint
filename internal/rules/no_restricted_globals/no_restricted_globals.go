@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -195,105 +194,12 @@ func staticMemberProperty(node *ast.Node) (string, *ast.Node, bool) {
 	return "", nil, false
 }
 
-// shouldSkip reports whether node occupies a "name" position (declaration
-// name, member/property name, label, or the original name in an aliased
-// import/re-export specifier) rather than a genuine value-reference
-// position that ESLint's scope analysis would surface as a variable
-// reference.
 func shouldSkip(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return true
-	}
-
-	// Skip declaration names (var/let/const/function/class/enum/import/
-	// parameter names, and member names: methods, properties, accessors,
-	// signatures, object-literal keys). ShorthandPropertyAssignment names
-	// (`{foo}`) are declaration-shaped but also read the outer binding, so
-	// they must NOT be skipped.
-	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment {
-		return true
-	}
-
-	// Skip property names in member access (obj.prop -> skip "prop").
-	if parent.Kind == ast.KindPropertyAccessExpression &&
-		parent.AsPropertyAccessExpression().Name() == node {
-		return true
-	}
-
-	// Skip the destructuring source key ({key: newName} -> skip "key"); the
-	// binding target "newName" is a declaration, handled above.
-	if parent.Kind == ast.KindBindingElement && parent.PropertyName() == node {
-		return true
-	}
-
-	// Skip the original name in aliased imports (import { Original as Alias }
-	// -> skip "Original"); it names a module export, not a scope reference.
-	if parent.Kind == ast.KindImportSpecifier && parent.PropertyName() == node {
-		return true
-	}
-
-	// Skip the original name in re-export aliases (export { Original as
-	// Alias } from 'module'). Without `from`, `export { X as Y }` reads the
-	// local X, so only skip when it's an actual re-export.
-	if parent.Kind == ast.KindExportSpecifier && parent.PropertyName() == node &&
-		utils.IsReExportSpecifier(parent) {
-		return true
-	}
-
-	// Skip label identifiers; labels are a separate namespace from variables.
-	if parent.Kind == ast.KindLabeledStatement ||
-		parent.Kind == ast.KindBreakStatement ||
-		parent.Kind == ast.KindContinueStatement {
-		return true
-	}
-
-	// Skip lowercase/hyphenated JSX tag names (`<foo />`, `<foo-bar />`):
-	// these name an intrinsic HTML element, not a variable reference, and
-	// are never added as a scope reference. A capitalized tag name (`<Foo />`)
-	// *is* a reference to a component variable and must not be skipped.
-	if isJsxIntrinsicTagName(node, parent) {
-		return true
-	}
-
-	return false
+	return node == nil || node.Parent == nil || utils.IsNonReferenceIdentifier(node)
 }
 
-// isJsxIntrinsicTagName reports whether node is the bare-identifier tag name
-// of a JSX opening/self-closing/closing element that names an intrinsic
-// element (lowercase first letter, or containing a hyphen) rather than a
-// component reference.
-func isJsxIntrinsicTagName(node *ast.Node, parent *ast.Node) bool {
-	var tagName *ast.Node
-	switch parent.Kind {
-	case ast.KindJsxOpeningElement:
-		tagName = parent.AsJsxOpeningElement().TagName
-	case ast.KindJsxSelfClosingElement:
-		tagName = parent.AsJsxSelfClosingElement().TagName
-	case ast.KindJsxClosingElement:
-		tagName = parent.AsJsxClosingElement().TagName
-	default:
-		return false
-	}
-	return tagName == node && scanner.IsIntrinsicJsxName(node.Text())
-}
-
-// isInTypeContext mirrors ESLint's TYPE_NODES check: a restricted-global
-// reference is not reported when it names a type instead of a value, i.e.
-// its immediate parent is a type reference, a type query (`typeof X` in a
-// type position), a qualified type name (`NS.Test`), or a heritage clause
-// entry (`implements X` / `interface Y extends X`) — but NOT a class
-// `extends` clause, whose superclass expression is evaluated at runtime.
+// isInTypeContext excludes type-only references while retaining class
+// `extends`, whose superclass expression is evaluated at runtime.
 func isInTypeContext(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindTypeReference, ast.KindTypeQuery, ast.KindQualifiedName:
-		return true
-	case ast.KindExpressionWithTypeArguments:
-		return !utils.IsClassExtendsHeritageClause(parent)
-	}
-	return false
+	return utils.IsIdentifierInTypeReference(node)
 }
