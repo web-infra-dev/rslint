@@ -9,9 +9,9 @@
 //   - N/A access / key forms (identifier, string, numeric, private, computed,
 //     element access): property keys are not declaration names for this rule.
 //   - N/A autofix boundaries: the rule does not provide an autofix.
-//   - N/A body-absent function scope: overload / abstract / declare members
-//     have no runtime body to traverse; TypeScript declaration behavior is
-//     covered by the extension rule's suite.
+//   - Body-absent function scopes have no body to traverse. Their declarations
+//     still participate in the core rule's outer scope, while the TypeScript
+//     extension deliberately filters overload signatures.
 package no_redeclare
 
 import (
@@ -183,6 +183,23 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// ---- Dimension 4: async / generator containers have independent scopes ----
 			invalidRedeclared("async function f() {\n  var a;\n  var a;\n}", "a", 3, 7),
 			invalidRedeclared("function* f() {\n  var a;\n  var a;\n}", "a", 3, 7),
+
+			// ESLint core counts TSDeclareFunction identifiers supplied by a
+			// TypeScript parser. The extension rule keeps these overload sets
+			// valid, as locked in its own test suite.
+			{
+				Code: "function overloaded(value: string): string;\nfunction overloaded(value: number): number;\nfunction overloaded(value: unknown) { return value; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("overloaded", 2, 10),
+					redeclaredError("overloaded", 3, 10),
+				},
+			},
+			{
+				Code: "declare function ambient(value: string): string;\ndeclare function ambient(value: number): number;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("ambient", 2, 18),
+				},
+			},
 
 			// Every tsgo function-like kind maps to an upstream function scope.
 			invalidRedeclared("const fn = function () { var local; var local; };", "local", 1, 41),

@@ -54,14 +54,14 @@ func typescriptDefaults() options {
 var NoRedeclareRule = rule.Rule{
 	Name:   "no-redeclare",
 	Schema: rule.NewSchema(schemaJSON),
-	Run:    runWithOptions(coreDefaults(), false, builtinGlobalsESLintCore),
+	Run:    runWithOptions(coreDefaults(), false, true, builtinGlobalsESLintCore),
 }
 
 func RunTSESLint(ctx rule.RuleContext, opts []any) rule.RuleListeners {
-	return runWithOptions(typescriptDefaults(), true, builtinGlobalsTypeScriptLibs)(ctx, opts)
+	return runWithOptions(typescriptDefaults(), true, false, builtinGlobalsTypeScriptLibs)(ctx, opts)
 }
 
-func runWithOptions(defaults options, allowIgnoreDeclarationMerge bool, builtinMode builtinGlobalsMode) func(rule.RuleContext, []any) rule.RuleListeners {
+func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodylessFunctions bool, builtinMode builtinGlobalsMode) func(rule.RuleContext, []any) rule.RuleListeners {
 	return func(ctx rule.RuleContext, opts []any) rule.RuleListeners {
 		o := parseOptionsWith(opts, defaults, allowIgnoreDeclarationMerge)
 
@@ -75,7 +75,7 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge bool, builtinM
 					s.addSyntax(name, id, ast.KindParameter)
 				})
 			}
-			collectScopeDeclarations(bodyNode, s, owners)
+			collectScopeDeclarations(bodyNode, s, owners, includeBodylessFunctions)
 			reportScope(ctx, s, o, isProgram, builtinMode)
 		}
 
@@ -139,19 +139,19 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge bool, builtinM
 				if ast.IsFunctionLikeOrClassStaticBlockDeclaration(parent) {
 					return
 				}
-				analyzeBlockScope(ctx, node, o, builtinMode)
+				analyzeBlockScope(ctx, node, o, builtinMode, includeBodylessFunctions)
 			},
 			ast.KindForStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode)
+				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
 			},
 			ast.KindForInStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode)
+				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
 			},
 			ast.KindForOfStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode)
+				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
 			},
 			ast.KindSwitchStatement: func(node *ast.Node) {
-				analyzeSwitchScope(ctx, node, o, builtinMode)
+				analyzeSwitchScope(ctx, node, o, builtinMode, includeBodylessFunctions)
 			},
 		}
 	}
@@ -206,7 +206,7 @@ func (owners declarationScopeOwners) ownsVariable(node *ast.Node) bool {
 // collectScopeDeclarations walks a scope subtree in source order and records
 // only declarations owned by the requested scope. Function/class bodies are
 // separate declaration regions and are handled by their own listeners.
-func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationScopeOwners) {
+func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationScopeOwners, includeBodylessFunctions bool) {
 	if node == nil {
 		return
 	}
@@ -232,10 +232,11 @@ func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationS
 		return
 
 	case ast.KindFunctionDeclaration:
-		// A bodyless FunctionDeclaration is a TypeScript overload signature
-		// (upstream `TSDeclareFunction`). ESLint's rule explicitly filters
-		// these out before counting declarations.
-		if node.Body() != nil && owners.ownsBlockScoped(node) {
+		// tsgo represents a TypeScript overload signature as a bodyless
+		// FunctionDeclaration. ESLint core counts parser-provided declarations,
+		// while @typescript-eslint/no-redeclare deliberately filters
+		// TSDeclareFunction definitions. Keep that variant boundary explicit.
+		if (node.Body() != nil || includeBodylessFunctions) && owners.ownsBlockScoped(node) {
 			addNamedDeclaration(node, s)
 		}
 		return
@@ -266,7 +267,7 @@ func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationS
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		collectScopeDeclarations(child, s, owners)
+		collectScopeDeclarations(child, s, owners, includeBodylessFunctions)
 		return false
 	})
 }
@@ -293,13 +294,13 @@ func addImportDeclarations(node *ast.Node, s *scopeDecls) {
 	}
 }
 
-func analyzeBlockScope(ctx rule.RuleContext, blockNode *ast.Node, o options, builtinMode builtinGlobalsMode) {
+func analyzeBlockScope(ctx rule.RuleContext, blockNode *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
 	s := newScopeDecls()
-	collectScopeDeclarations(blockNode, s, declarationScopeOwners{block: blockNode})
+	collectScopeDeclarations(blockNode, s, declarationScopeOwners{block: blockNode}, includeBodylessFunctions)
 	reportScope(ctx, s, o, false, builtinMode)
 }
 
-func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode) {
+func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
 	initializer := node.Initializer()
 	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
 		return
@@ -308,17 +309,17 @@ func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMod
 		return
 	}
 	s := newScopeDecls()
-	collectScopeDeclarations(node, s, declarationScopeOwners{block: node})
+	collectScopeDeclarations(node, s, declarationScopeOwners{block: node}, includeBodylessFunctions)
 	reportScope(ctx, s, o, false, builtinMode)
 }
 
-func analyzeSwitchScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode) {
+func analyzeSwitchScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
 	sw := node.AsSwitchStatement()
 	if sw == nil || sw.CaseBlock == nil {
 		return
 	}
 	s := newScopeDecls()
-	collectScopeDeclarations(sw.CaseBlock, s, declarationScopeOwners{block: sw.CaseBlock})
+	collectScopeDeclarations(sw.CaseBlock, s, declarationScopeOwners{block: sw.CaseBlock}, includeBodylessFunctions)
 	reportScope(ctx, s, o, false, builtinMode)
 }
 
