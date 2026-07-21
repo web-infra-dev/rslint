@@ -42,6 +42,24 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// shadowed by an inner function parameter — the outer call still
 			// matches, the inner one must not (scope boundary correctness) ----
 			{Code: `(function (Object) { return Object.assign({}, x); })()`},
+
+			// ---- Alias tracking: a `let`-aliased Object receiver that is
+			// later reassigned must NOT be treated as a stable alias
+			// (isObjectReference relies on ResolveIdentifierInitializer's
+			// hasWrites check) ----
+			{Code: `let o = Object; o = foo; o.assign({}, bar)`},
+
+			// ---- Alias tracking: a `let`-aliased Object.assign callee that
+			// is later reassigned must NOT be treated as a stable alias ----
+			{Code: `let assign = Object.assign; assign = foo; assign({}, bar)`},
+
+			// ---- Alias tracking: destructuring a property other than
+			// "assign" off Object must not match ----
+			{Code: `const {keys} = Object; keys({}, bar)`},
+
+			// ---- Alias tracking: rest element in a destructure off Object
+			// must not match (DotDotDotToken guard) ----
+			{Code: `const {...rest} = Object; rest.assign({}, bar)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized receiver, single and multi-level ----
@@ -195,6 +213,62 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 				Code:   `const o = {[Object.assign({}, a)]: 1};`,
 				Output: []string{`const o = {[{ ...a}]: 1};`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 13}},
+			},
+
+			// ---- Alias tracking: `Object` receiver reached through a stable
+			// `let` alias (ESLint's ReferenceTracker follows this; mirrors
+			// isObjectReference's evaluator.ResolveIdentifierInitializer
+			// path) ----
+			{
+				Code:   `let o = Object; o.assign({}, foo)`,
+				Output: []string{`let o = Object; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 17}},
+			},
+
+			// ---- Alias tracking: `Object.assign` itself reached through a
+			// stable `const` alias, including across a nested function scope
+			// ----
+			{
+				Code:   `const assign = Object.assign; assign({}, foo)`,
+				Output: []string{`const assign = Object.assign; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 31}},
+			},
+			{
+				Code:   `function g() { const assign = Object.assign; return assign({}, foo); }`,
+				Output: []string{`function g() { const assign = Object.assign; return { ...foo}; }`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 53}},
+			},
+
+			// ---- Alias tracking: `assign` destructured off `Object`, both
+			// shorthand and renamed, and regardless of const/let/var ----
+			{
+				Code:   `const {assign} = Object; assign({}, foo)`,
+				Output: []string{`const {assign} = Object; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 26}},
+			},
+			{
+				Code:   `var {assign: a} = Object; a({}, foo)`,
+				Output: []string{`var {assign: a} = Object; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 27}},
+			},
+
+			// ---- Alias tracking: trailing comma-operator sequence around
+			// the Object.assign reference (`unwrapValue`'s comma-descent),
+			// including a multi-comma chain ----
+			{
+				Code:   `(0, Object.assign)({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `(1, 2, Object.assign)({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `(0, Object).assign({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
 			},
 		},
 	)
