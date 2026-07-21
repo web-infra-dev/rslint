@@ -1,6 +1,7 @@
 package no_redeclare
 
 import (
+	_ "embed"
 	"fmt"
 	"sort"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no-redeclare.schema.json
+var schemaJSON []byte
 
 type options struct {
 	builtinGlobals         bool
@@ -48,8 +52,9 @@ func typescriptDefaults() options {
 }
 
 var NoRedeclareRule = rule.Rule{
-	Name: "no-redeclare",
-	Run:  runWithOptions(coreDefaults(), false, builtinGlobalsESLintCore),
+	Name:   "no-redeclare",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    runWithOptions(coreDefaults(), false, builtinGlobalsESLintCore),
 }
 
 func RunTSESLint(ctx rule.RuleContext, opts []any) rule.RuleListeners {
