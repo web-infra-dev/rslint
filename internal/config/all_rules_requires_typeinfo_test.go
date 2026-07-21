@@ -29,8 +29,8 @@ import (
 //	if ctx.TypeChecker == nil { return rule.RuleListeners{} }
 //
 // inside its Run body is, by definition, useless without type info. It must
-// declare RequiresTypeInfo: true so the linter framework filters it out for
-// gap files and inferred-project files instead of leaving it silently broken.
+// declare RequiresTypeInfo or RequiresBindingInfo so the linter either filters
+// it or supplies the binding-only checker on gap/inferred files.
 //
 // The check resolves each registered rule's Run function pointer back to its
 // source file via runtime.FuncForPC, then walks that file's AST to inspect
@@ -56,7 +56,7 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 	var failures []string
 	for _, key := range keys {
 		impl := registry[key]
-		if impl.RequiresTypeInfo {
+		if impl.RequiresTypeInfo || impl.RequiresBindingInfo {
 			continue
 		}
 		body, file, err := parser.runBodyFor(impl.Run)
@@ -69,14 +69,14 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		}
 		if hasNilTCEarlyReturn(body) {
 			failures = append(failures, fmt.Sprintf(
-				"%s: rule %q returns rule.RuleListeners{} when ctx.TypeChecker == nil but does not declare RequiresTypeInfo: true",
+				"%s: rule %q returns rule.RuleListeners{} when ctx.TypeChecker == nil but declares neither RequiresTypeInfo nor RequiresBindingInfo",
 				file, key,
 			))
 		}
 	}
 
 	if len(failures) > 0 {
-		t.Fatalf("rules return rule.RuleListeners{} on nil TypeChecker but do not declare RequiresTypeInfo: true (LSP would still run them with an inferred-project checker, producing false positives that CLI hides):\n  %s",
+		t.Fatalf("rules return rule.RuleListeners{} on nil TypeChecker but declare neither RequiresTypeInfo nor RequiresBindingInfo:\n  %s",
 			strings.Join(failures, "\n  "))
 	}
 }

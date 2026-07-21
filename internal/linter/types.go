@@ -15,9 +15,10 @@ type ConfiguredRule struct {
 	// Inline globals and disable directives use candidate-gated lazy comment
 	// collection, so rules never parse either source themselves. Nil when the
 	// config declares none.
-	Globals          map[string]bool
-	Severity         rule.DiagnosticSeverity
-	RequiresTypeInfo bool
+	Globals             map[string]bool
+	Severity            rule.DiagnosticSeverity
+	RequiresBindingInfo bool
+	RequiresTypeInfo    bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
 	// worker (mounted via the config's object-form `plugins`) rather than natively
 	// in Go. The linter splits these out and dispatches them; its Run is a
@@ -88,8 +89,9 @@ type LintResult struct {
 //     for syntax errors before resolving or running rules. A non-nil set means
 //     the caller already performed that check and names the invalid files.
 //   - TypeInfoFiles=nil                   → no gap-file distinction. A non-nil
-//     set filters RequiresTypeInfo rules and withholds the TypeChecker for files
-//     outside it. This field never restricts program-wide type-check.
+//     set filters RequiresTypeInfo rules and withholds the semantic TypeChecker
+//     for files outside it. Rules marked RequiresBindingInfo still receive a
+//     binding-only checker. This field never restricts program-wide type-check.
 //   - TypeCheck=false                     → skip the type-check phase
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set

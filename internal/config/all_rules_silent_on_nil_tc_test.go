@@ -106,8 +106,8 @@ func TestAllRules_SilentOnNilTypeCheckerImpliesRequiresTypeInfo(t *testing.T) {
 			}
 
 			withoutTC := countDiagnosticsForRule(t, tc.fileName, tc.source, impl, false)
-			if withoutTC == 0 && !impl.RequiresTypeInfo {
-				t.Fatalf("rule %q emits %d diagnostics with TypeChecker but 0 without; it is silently useless on gap files / LSP inferred-project files and MUST declare RequiresTypeInfo: true", tc.ruleKey, withTC)
+			if withoutTC == 0 && !impl.RequiresTypeInfo && !impl.RequiresBindingInfo {
+				t.Fatalf("rule %q emits %d diagnostics with TypeChecker but 0 without; it must declare RequiresTypeInfo or RequiresBindingInfo", tc.ruleKey, withTC)
 			}
 		})
 	}
@@ -141,8 +141,9 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 	}
 
 	configured := linter.ConfiguredRule{
-		Name:     impl.Name,
-		Severity: rule.SeverityWarning,
+		Name:                impl.Name,
+		Severity:            rule.SeverityWarning,
+		RequiresBindingInfo: impl.RequiresBindingInfo,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
 			return impl.Run(ctx, nil)
 		},

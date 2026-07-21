@@ -77,6 +77,59 @@ func TestTypeInfoFiles_FileNotInSet_NilTypeChecker(t *testing.T) {
 	_ = paths
 }
 
+func TestTypeInfoFiles_FileNotInSet_BindingChecker(t *testing.T) {
+	program, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const x = 1;",
+	})
+	typeInfoFiles := map[string]struct{}{"/some/other/file.ts": {}}
+
+	bindingRuleRan := false
+	plainRuleRan := false
+	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+		func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{
+				{
+					Name:                "binding-probe",
+					Severity:            rule.SeverityWarning,
+					RequiresBindingInfo: true,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						bindingRuleRan = true
+						if ctx.TypeChecker != nil {
+							t.Error("semantic TypeChecker should stay nil for a gap file")
+						}
+						if ctx.BindingChecker == nil {
+							t.Error("binding-aware rule should receive BindingChecker")
+						}
+						return rule.RuleListeners{}
+					},
+				},
+				{
+					Name:     "plain-probe",
+					Severity: rule.SeverityWarning,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						plainRuleRan = true
+						if ctx.TypeChecker != nil || ctx.BindingChecker != nil {
+							t.Error("plain rule should not receive a checker for a gap file")
+						}
+						return rule.RuleListeners{}
+					},
+				},
+			}
+		},
+		false,
+		func(rule.RuleDiagnostic) {},
+		typeInfoFiles,
+		nil,
+	)
+
+	if !bindingRuleRan {
+		t.Fatal("binding-aware rule did not run for gap file")
+	}
+	if !plainRuleRan {
+		t.Fatal("plain rule did not run beside a binding-aware rule")
+	}
+}
+
 func TestTypeInfoFiles_FileNotInSet_FiltersTypeAwareRule(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",

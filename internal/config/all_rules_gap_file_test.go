@@ -78,8 +78,9 @@ var gapFileFixtureSources = map[string]string{
 //
 // Rules that do NOT set RequiresTypeInfo: true are scheduled on "gap files"
 // — files in the program but outside typeInfoFiles (see linter.go) — with a
-// nil ctx.TypeChecker. A rule that calls a checker-dependent helper without
-// a nil guard crashes the whole lint goroutine.
+// nil ctx.TypeChecker. Rules declaring RequiresBindingInfo additionally receive
+// ctx.BindingChecker. A rule that calls a checker-dependent helper through the
+// wrong field without a nil guard crashes the whole lint goroutine.
 //
 // This test runs EVERY currently-registered non-type-aware rule against a
 // gap-file fixture and asserts no panic. It is intentionally a sweep, not a
@@ -153,8 +154,9 @@ func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
 		}
 		ruleImpl := impl
 		out = append(out, linter.ConfiguredRule{
-			Name:     name,
-			Severity: rule.SeverityWarning,
+			Name:                name,
+			Severity:            rule.SeverityWarning,
+			RequiresBindingInfo: ruleImpl.RequiresBindingInfo,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				return ruleImpl.Run(ctx, nil)
 			},
