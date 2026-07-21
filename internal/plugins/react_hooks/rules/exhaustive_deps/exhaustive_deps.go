@@ -370,11 +370,13 @@ type Options struct {
 	AutoDepsHooks map[string]bool
 }
 
-// parseOptions parses the rule's options object. Both array and bare-object
-// shapes are supported via `utils.GetOptionsMap`.
-func parseOptions(options any, settings map[string]interface{}) Options {
+// parseOptions parses the rule's options object.
+func parseOptions(options []any, settings map[string]interface{}) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
+	var optsMap map[string]interface{}
+	if len(options) > 0 {
+		optsMap, _ = options[0].(map[string]interface{})
+	}
 	// `addlSet` tracks whether the rule-level `additionalHooks` field was
 	// PRESENT in options (even as empty string). Mirrors upstream's
 	// `rawOptions.additionalHooks` truthiness check — falsy values fall

@@ -1,6 +1,7 @@
 package rules_of_hooks
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,6 +14,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// The schema declares `additionalHooks` exactly as upstream does, but — also
+// exactly as upstream — the implementation never reads it: upstream's create()
+// only consults `settings['react-hooks'].additionalEffectHooks`.
+//
+//go:embed rules_of_hooks.schema.json
+var schemaJSON []byte
 
 // flowSuppressionRegex matches `$FlowFixMe[react-rule-hook]` comments. Used to
 // gate `hasFlowSuppression`, which mirrors upstream's same-named helper —
@@ -810,7 +818,8 @@ var _ core.TextRange
 // `$FlowFixMe[react-rule-hook]` suppression on the preceding line is
 // honored, mirroring upstream's `hasFlowSuppression` byte-for-byte.
 var RulesOfHooksRule = rule.Rule{
-	Name: "react-hooks/rules-of-hooks",
+	Name:   "react-hooks/rules-of-hooks",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		additionalRe := getAdditionalEffectHooks(ctx.Settings)
 		sf := ctx.SourceFile
