@@ -51,9 +51,21 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{Code: "function f({}) {}"},
 			{Code: "function f([]) {}"},
 			{Code: "const {} = obj; const [] = arr;"},
+			// Upstream only enters function scopes. Type parameters owned by a
+			// class or a function-type node are outside its listener set.
+			{Code: "class Generic<T, T> {}"},
+			{Code: "type Callback = <T, T>() => void;"},
 
 			// ---- Dimension 4: TypeScript wrappers in initializers do not matter ----
 			{Code: "var a = (foo as any); function f() { var a = foo satisfies string; }"},
+
+			// The upstream listener set has no TSModuleDeclaration entry. It sees a
+			// namespace's outer name in the containing scope, but does not inspect
+			// namespace/module/global-augmentation bodies as separate scopes.
+			{Code: "namespace A { var x; var x; }"},
+			{Code: "declare module 'pkg' { let x; let x; }"},
+			{Code: "namespace A.B {} namespace A.B {}"},
+			{Code: "export {}; declare global {} var global;", Options: map[string]interface{}{"builtinGlobals": false}},
 
 			// ---- Real-user: browser-global names remain option-dependent ----
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
@@ -200,6 +212,36 @@ func TestNoRedeclareExtras(t *testing.T) {
 					redeclaredError("ambient", 2, 18),
 				},
 			},
+
+			// TSESTree folds a plain binding identifier's TypeScript annotation
+			// into its range. The shared range helper preserves that observable
+			// parser contract for both the core and extension variants.
+			{
+				Code: "let value: number; let value: string;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 1, Column: 24, EndLine: 1, EndColumn: 37},
+				},
+			},
+			{
+				Code: "function f(value: number, value?: string) {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 1, Column: 27, EndLine: 1, EndColumn: 41},
+				},
+			},
+			{
+				Code: "function f(value:\n  Array<string>, value:\n  Map<string, number>) {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 2, Column: 18, EndLine: 3, EndColumn: 22},
+				},
+			},
+			// Expression-bodied arrows still create a parameter scope.
+			invalidRedeclared("const fn = (value, value) => value;", "value", 1, 20),
+			// Function-scope type parameters participate in the same variable as
+			// value parameters and locals. Scope-manager inserts value parameters
+			// first, so a type/value collision reports the earlier type parameter.
+			invalidRedeclared("function generic<T, T>() {}", "T", 1, 21),
+			invalidRedeclared("function generic<T>(T: number) {}", "T", 1, 18),
+			invalidRedeclared("class C { method<T, T>() {} }", "T", 1, 21),
 
 			// Every tsgo function-like kind maps to an upstream function scope.
 			invalidRedeclared("const fn = function () { var local; var local; };", "local", 1, 41),

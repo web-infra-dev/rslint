@@ -26,6 +26,19 @@ const (
 	builtinGlobalsTypeScriptLibs
 )
 
+// ruleVariant keeps the observable differences between the ESLint core rule
+// and the TypeScript extension explicit. In particular, the extension orders
+// directive comments before syntax declarations and does not visit class
+// static-block scopes, matching its upstream listener set.
+type ruleVariant struct {
+	defaults                    options
+	allowIgnoreDeclarationMerge bool
+	includeBodylessFunctions    bool
+	checkClassStaticBlocks      bool
+	commentsBeforeSyntax        bool
+	builtinMode                 builtinGlobalsMode
+}
+
 func parseOptionsWith(opts []any, defaults options, allowIgnoreDeclarationMerge bool) options {
 	result := defaults
 	optsMap := utils.GetOptionsMap(opts)
@@ -54,18 +67,28 @@ func typescriptDefaults() options {
 var NoRedeclareRule = rule.Rule{
 	Name:   "no-redeclare",
 	Schema: rule.NewSchema(schemaJSON),
-	Run:    runWithOptions(coreDefaults(), false, true, builtinGlobalsESLintCore),
+	Run: runWithVariant(ruleVariant{
+		defaults:                 coreDefaults(),
+		includeBodylessFunctions: true,
+		checkClassStaticBlocks:   true,
+		builtinMode:              builtinGlobalsESLintCore,
+	}),
 }
 
 func RunTSESLint(ctx rule.RuleContext, opts []any) rule.RuleListeners {
-	return runWithOptions(typescriptDefaults(), true, false, builtinGlobalsTypeScriptLibs)(ctx, opts)
+	return runWithVariant(ruleVariant{
+		defaults:                    typescriptDefaults(),
+		allowIgnoreDeclarationMerge: true,
+		commentsBeforeSyntax:        true,
+		builtinMode:                 builtinGlobalsTypeScriptLibs,
+	})(ctx, opts)
 }
 
-func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodylessFunctions bool, builtinMode builtinGlobalsMode) func(rule.RuleContext, []any) rule.RuleListeners {
+func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.RuleListeners {
 	return func(ctx rule.RuleContext, opts []any) rule.RuleListeners {
-		o := parseOptionsWith(opts, defaults, allowIgnoreDeclarationMerge)
+		o := parseOptionsWith(opts, variant.defaults, variant.allowIgnoreDeclarationMerge)
 
-		analyzeVariableScope := func(bodyNode *ast.Node, params []*ast.Node, owners declarationScopeOwners, isProgram bool) {
+		analyzeVariableScope := func(bodyNode *ast.Node, params []*ast.Node, typeParams []*ast.Node, owners declarationScopeOwners, isProgram bool) {
 			s := newScopeDecls()
 			for _, p := range params {
 				if p == nil || p.Name() == nil {
@@ -75,18 +98,33 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodyle
 					s.addSyntax(name, id, ast.KindParameter)
 				})
 			}
-			collectScopeDeclarations(bodyNode, s, owners, includeBodylessFunctions)
-			reportScope(ctx, s, o, isProgram, builtinMode)
+			// typescript-eslint's function scopes insert value parameters before
+			// type parameters. That order is observable when both use the same
+			// name: the earlier type parameter is the declaration being reported.
+			for _, typeParam := range typeParams {
+				if typeParam == nil {
+					continue
+				}
+				declaration := typeParam.AsTypeParameterDeclaration()
+				if declaration == nil || declaration.Name() == nil || declaration.Name().Kind != ast.KindIdentifier {
+					continue
+				}
+				name := declaration.Name()
+				s.addSyntax(name.Text(), name, ast.KindTypeParameter)
+			}
+			collectScopeDeclarations(bodyNode, s, owners, variant.includeBodylessFunctions)
+			reportScope(ctx, s, o, isProgram, variant)
 		}
 
 		analyzeFunctionScope := func(node *ast.Node) {
 			body := node.Body()
-			if body == nil || body.Kind != ast.KindBlock {
-				// Expression-bodied arrows cannot contain declarations, and
-				// bodyless declarations do not create a runtime function scope.
+			if body == nil {
+				// Bodyless declarations do not create a runtime function scope.
 				return
 			}
-			analyzeVariableScope(body, node.Parameters(), declarationScopeOwners{
+			// Expression-bodied arrows still need a function scope for value and
+			// type parameters, even though their expression cannot declare locals.
+			analyzeVariableScope(body, node.Parameters(), node.TypeParameters(), declarationScopeOwners{
 				block:    node,
 				variable: node,
 			}, false)
@@ -96,13 +134,13 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodyle
 		// program-scope analysis eagerly here.
 		if ctx.SourceFile != nil {
 			sourceFileNode := ctx.SourceFile.AsNode()
-			analyzeVariableScope(sourceFileNode, nil, declarationScopeOwners{
+			analyzeVariableScope(sourceFileNode, nil, nil, declarationScopeOwners{
 				block:    sourceFileNode,
 				variable: sourceFileNode,
 			}, true)
 		}
 
-		return rule.RuleListeners{
+		listeners := rule.RuleListeners{
 			ast.KindFunctionDeclaration: analyzeFunctionScope,
 			ast.KindFunctionExpression:  analyzeFunctionScope,
 			ast.KindArrowFunction:       analyzeFunctionScope,
@@ -110,27 +148,6 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodyle
 			ast.KindConstructor:         analyzeFunctionScope,
 			ast.KindGetAccessor:         analyzeFunctionScope,
 			ast.KindSetAccessor:         analyzeFunctionScope,
-			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
-				decl := node.AsClassStaticBlockDeclaration()
-				if decl == nil || decl.Body == nil || decl.Body.Kind != ast.KindBlock {
-					return
-				}
-				analyzeVariableScope(decl.Body, nil, declarationScopeOwners{
-					block:    node,
-					variable: node,
-				}, false)
-			},
-			ast.KindModuleDeclaration: func(node *ast.Node) {
-				declaration := node.AsModuleDeclaration()
-				if declaration == nil || declaration.Body == nil {
-					return
-				}
-				owners := declarationScopeOwners{block: node}
-				if declaration.Body.Kind == ast.KindModuleBlock {
-					owners.variable = declaration.Body
-				}
-				analyzeVariableScope(declaration.Body, nil, owners, false)
-			},
 			ast.KindBlock: func(node *ast.Node) {
 				parent := node.Parent
 				if parent == nil {
@@ -139,21 +156,39 @@ func runWithOptions(defaults options, allowIgnoreDeclarationMerge, includeBodyle
 				if ast.IsFunctionLikeOrClassStaticBlockDeclaration(parent) {
 					return
 				}
-				analyzeBlockScope(ctx, node, o, builtinMode, includeBodylessFunctions)
+				analyzeBlockScope(ctx, node, o, variant)
 			},
 			ast.KindForStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
+				analyzeForScope(ctx, node, o, variant)
 			},
 			ast.KindForInStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
+				analyzeForScope(ctx, node, o, variant)
 			},
 			ast.KindForOfStatement: func(node *ast.Node) {
-				analyzeForScope(ctx, node, o, builtinMode, includeBodylessFunctions)
+				analyzeForScope(ctx, node, o, variant)
 			},
 			ast.KindSwitchStatement: func(node *ast.Node) {
-				analyzeSwitchScope(ctx, node, o, builtinMode, includeBodylessFunctions)
+				analyzeSwitchScope(ctx, node, o, variant)
 			},
 		}
+
+		if variant.checkClassStaticBlocks {
+			listeners[ast.KindClassStaticBlockDeclaration] = func(node *ast.Node) {
+				decl := node.AsClassStaticBlockDeclaration()
+				if decl == nil || decl.Body == nil || decl.Body.Kind != ast.KindBlock {
+					return
+				}
+				analyzeVariableScope(decl.Body, nil, nil, declarationScopeOwners{
+					block:    node,
+					variable: node,
+				}, false)
+			}
+		}
+
+		// Neither upstream rule listens to TSModuleDeclaration. Namespace,
+		// ambient-module, and global-augmentation bodies therefore remain outside
+		// the checked scope set; adding a listener here would create false positives.
+		return listeners
 	}
 }
 
@@ -273,6 +308,16 @@ func collectScopeDeclarations(node *ast.Node, s *scopeDecls, owners declarationS
 }
 
 func addNamedDeclaration(node *ast.Node, s *scopeDecls) {
+	if node.Kind == ast.KindModuleDeclaration {
+		module := node.AsModuleDeclaration()
+		if ast.IsGlobalScopeAugmentation(node) ||
+			(module != nil && module.Body != nil && module.Body.Kind == ast.KindModuleDeclaration) {
+			// `declare global` has no local declaration name. tsgo represents a
+			// dotted namespace as nested ModuleDeclarations, while TSESTree exposes
+			// one qualified name that typescript-eslint's scope manager does not bind.
+			return
+		}
+	}
 	name := ast.GetNameOfDeclaration(node)
 	if name != nil && name.Kind == ast.KindIdentifier {
 		s.addSyntax(name.AsIdentifier().Text, name, node.Kind)
@@ -294,13 +339,13 @@ func addImportDeclarations(node *ast.Node, s *scopeDecls) {
 	}
 }
 
-func analyzeBlockScope(ctx rule.RuleContext, blockNode *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
+func analyzeBlockScope(ctx rule.RuleContext, blockNode *ast.Node, o options, variant ruleVariant) {
 	s := newScopeDecls()
-	collectScopeDeclarations(blockNode, s, declarationScopeOwners{block: blockNode}, includeBodylessFunctions)
-	reportScope(ctx, s, o, false, builtinMode)
+	collectScopeDeclarations(blockNode, s, declarationScopeOwners{block: blockNode}, variant.includeBodylessFunctions)
+	reportScope(ctx, s, o, false, variant)
 }
 
-func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
+func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, variant ruleVariant) {
 	initializer := node.Initializer()
 	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
 		return
@@ -309,18 +354,18 @@ func analyzeForScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMod
 		return
 	}
 	s := newScopeDecls()
-	collectScopeDeclarations(node, s, declarationScopeOwners{block: node}, includeBodylessFunctions)
-	reportScope(ctx, s, o, false, builtinMode)
+	collectScopeDeclarations(node, s, declarationScopeOwners{block: node}, variant.includeBodylessFunctions)
+	reportScope(ctx, s, o, false, variant)
 }
 
-func analyzeSwitchScope(ctx rule.RuleContext, node *ast.Node, o options, builtinMode builtinGlobalsMode, includeBodylessFunctions bool) {
+func analyzeSwitchScope(ctx rule.RuleContext, node *ast.Node, o options, variant ruleVariant) {
 	sw := node.AsSwitchStatement()
 	if sw == nil || sw.CaseBlock == nil {
 		return
 	}
 	s := newScopeDecls()
-	collectScopeDeclarations(sw.CaseBlock, s, declarationScopeOwners{block: sw.CaseBlock}, includeBodylessFunctions)
-	reportScope(ctx, s, o, false, builtinMode)
+	collectScopeDeclarations(sw.CaseBlock, s, declarationScopeOwners{block: sw.CaseBlock}, variant.includeBodylessFunctions)
+	reportScope(ctx, s, o, false, variant)
 }
 
 // applyMergeFilter drops declarations that are safe to merge under
@@ -407,13 +452,13 @@ func filterByKind(decls []declInfo, kind ast.Kind) []declInfo {
 }
 
 type programGlobalDeclarations struct {
-	ctx                         rule.RuleContext
-	builtinMode                 builtinGlobalsMode
-	builtinGlobals              bool
-	defaultLibraryGlobals       map[string]bool
-	defaultLibraryGlobalsLoaded bool
-	inlineByName                map[string]rule.InlineGlobal
-	inlineOrder                 []string
+	ctx                             rule.RuleContext
+	builtinMode                     builtinGlobalsMode
+	builtinGlobals                  bool
+	defaultLibraryTypeGlobals       map[string]bool
+	defaultLibraryTypeGlobalsLoaded bool
+	inlineByName                    map[string]rule.InlineGlobal
+	inlineOrder                     []string
 }
 
 func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinGlobalsMode) *programGlobalDeclarations {
@@ -441,9 +486,43 @@ func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinG
 	return result
 }
 
-func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string, syntax []declInfo) bool {
+func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bool {
 	if !declarations.builtinGlobals {
 		return false
+	}
+
+	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {
+		if declarations.ctx.Program != nil && declarations.ctx.TypeChecker != nil {
+			if !declarations.defaultLibraryTypeGlobalsLoaded {
+				declarations.defaultLibraryTypeGlobals = make(map[string]bool)
+				utils.AddDefaultLibraryTypeGlobalNames(declarations.defaultLibraryTypeGlobals, declarations.ctx.Program, declarations.ctx.TypeChecker)
+				declarations.defaultLibraryTypeGlobalsLoaded = true
+			}
+		}
+		isTypeScriptTypeGlobal := declarations.defaultLibraryTypeGlobals[name]
+		if utils.IsECMAScriptGlobal(name) || isTypeScriptTypeGlobal {
+			if configured, exists := declarations.ctx.ConfigGlobals[name]; exists && !configured {
+				if _, hasActiveDirective := declarations.inlineByName[name]; hasActiveDirective {
+					// With an active directive, typescript-eslint exposes the
+					// config's `off` setting as the variable's implicit setting.
+					return false
+				}
+			}
+			if isTypeScriptTypeGlobal {
+				// Turning off a value global does not remove the same-named
+				// TypeScript type variable from scope-manager's merged variable.
+				return true
+			}
+			if finalSetting, exists := declarations.ctx.Globals[name]; exists && !finalSetting {
+				return false
+			}
+			if configured, exists := declarations.ctx.ConfigGlobals[name]; exists {
+				return configured
+			}
+			// ECMAScript language globals use their implicit readonly setting
+			// unless an explicit config or directive replaces it.
+			return true
+		}
 	}
 
 	if finalSetting, exists := declarations.ctx.Globals[name]; exists && !finalSetting {
@@ -455,44 +534,13 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string, sy
 		return configured
 	}
 
-	if declarations.builtinMode != builtinGlobalsTypeScriptLibs || declarations.ctx.Program == nil || declarations.ctx.TypeChecker == nil {
-		return utils.IsECMAScriptGlobal(name)
+	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {
+		return false
 	}
-
-	if identifier := firstSyntaxIdentifier(syntax); identifier != nil {
-		symbol := declarations.ctx.TypeChecker.GetSymbolAtLocation(identifier)
-		return utils.IsSymbolFromDefaultLibrary(declarations.ctx.Program, symbol)
-	}
-
-	// Inline globals have no syntax node to resolve. Build the active default
-	// library set only when such a name actually needs a lookup.
-	if !declarations.defaultLibraryGlobalsLoaded {
-		declarations.defaultLibraryGlobals = make(map[string]bool)
-		utils.AddDefaultLibraryGlobals(declarations.defaultLibraryGlobals, declarations.ctx.Program, declarations.ctx.TypeChecker)
-		declarations.defaultLibraryGlobalsLoaded = true
-	}
-	return declarations.defaultLibraryGlobals[name]
+	return utils.IsECMAScriptGlobal(name)
 }
 
-func firstSyntaxIdentifier(decls []declInfo) *ast.Node {
-	for _, declaration := range decls {
-		if declaration.id != nil {
-			return declaration.id
-		}
-	}
-	return nil
-}
-
-func allTypeOnlyDecls(decls []declInfo) bool {
-	for _, d := range decls {
-		if d.parentKind != ast.KindInterfaceDeclaration && d.parentKind != ast.KindTypeAliasDeclaration {
-			return false
-		}
-	}
-	return true
-}
-
-func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool, builtinMode builtinGlobalsMode) {
+func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool, variant ruleVariant) {
 	if ctx.SourceFile == nil {
 		return
 	}
@@ -500,12 +548,12 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	if !isProgram {
 		for _, name := range s.order {
 			decls := filterMergeDeclarations(s.decls[name], o.ignoreDeclarationMerge)
-			reportDeclarationSequence(ctx, nil, name, decls, nil, false)
+			reportDeclarationSequence(ctx, nil, name, decls, nil, false, variant.commentsBeforeSyntax)
 		}
 		return
 	}
 
-	globals := newProgramGlobalDeclarations(ctx, o, builtinMode)
+	globals := newProgramGlobalDeclarations(ctx, o, variant.builtinMode)
 	isModule := ast.IsExternalModule(ctx.SourceFile)
 	handled := make(map[string]bool, len(s.order))
 	reports := make([]declarationReport, 0)
@@ -513,7 +561,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	for _, name := range s.order {
 		decls := filterMergeDeclarations(s.decls[name], o.ignoreDeclarationMerge)
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, isModule)
+		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
 		handled[name] = true
 	}
 
@@ -523,7 +571,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 			continue
 		}
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, isModule)
+		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
 	}
 
 	sort.SliceStable(reports, func(i, j int) bool {
@@ -552,30 +600,40 @@ func reportProgramDeclarations(
 	syntax []declInfo,
 	comments []core.TextRange,
 	isModule bool,
+	commentsBeforeSyntax bool,
 ) {
 	// A module's syntax declarations live in its module scope, while config and
-	// inline globals remain in the outer global scope. The TypeScript extension
-	// also keeps purely type-space declarations separate from lib globals; the
-	// ESLint core rule intentionally treats parser-provided variables uniformly.
-	if isModule || (globals.builtinMode == builtinGlobalsTypeScriptLibs && len(syntax) > 0 && allTypeOnlyDecls(syntax)) {
-		reportDeclarationSequence(ctx, reports, name, syntax, nil, false)
+	// inline globals remain in the outer global scope.
+	if isModule {
+		reportDeclarationSequence(ctx, reports, name, syntax, nil, false, commentsBeforeSyntax)
 		if len(comments) > 0 {
-			reportDeclarationSequence(ctx, reports, name, nil, comments, globals.isImplicitBuiltin(name, nil))
+			reportDeclarationSequence(ctx, reports, name, nil, comments, globals.isImplicitBuiltin(name), commentsBeforeSyntax)
 		}
 		return
 	}
-	reportDeclarationSequence(ctx, reports, name, syntax, comments, globals.isImplicitBuiltin(name, syntax))
+	reportDeclarationSequence(ctx, reports, name, syntax, comments, globals.isImplicitBuiltin(name), commentsBeforeSyntax)
 }
 
-// reportDeclarationSequence mirrors ESLint's declaration order: an implicit
-// builtin first, then syntax identifiers, then each `/* global */` comment.
-func reportDeclarationSequence(ctx rule.RuleContext, reports *[]declarationReport, name string, syntax []declInfo, comments []core.TextRange, implicitBuiltin bool) {
+// reportDeclarationSequence mirrors the selected upstream declaration order.
+// ESLint core visits syntax before directive comments; the TypeScript extension
+// deliberately visits directive comments before syntax.
+func reportDeclarationSequence(ctx rule.RuleContext, reports *[]declarationReport, name string, syntax []declInfo, comments []core.TextRange, implicitBuiltin bool, commentsBeforeSyntax bool) {
 	if implicitBuiltin {
 		for _, declaration := range syntax {
 			reportNode(ctx, reports, declaration.id, "redeclaredAsBuiltin", name)
 		}
 		for _, comment := range comments {
 			addDeclarationReport(ctx, reports, comment, "redeclaredAsBuiltin", name)
+		}
+		return
+	}
+
+	if commentsBeforeSyntax && len(comments) > 0 {
+		for _, comment := range comments[1:] {
+			addDeclarationReport(ctx, reports, comment, "redeclared", name)
+		}
+		for _, declaration := range syntax {
+			reportNode(ctx, reports, declaration.id, "redeclaredBySyntax", name)
 		}
 		return
 	}
@@ -607,11 +665,8 @@ func reportNode(ctx rule.RuleContext, reports *[]declarationReport, node *ast.No
 	if node == nil {
 		return
 	}
-	if reports == nil {
-		ctx.ReportNode(node, rule.RuleMessage{Id: messageID, Description: formatMessage(messageID, name)})
-		return
-	}
-	addDeclarationReport(ctx, reports, utils.TrimNodeTextRange(ctx.SourceFile, node), messageID, name)
+	textRange := utils.GetESTreeBindingIdentifierRange(ctx.SourceFile, node)
+	addDeclarationReport(ctx, reports, textRange, messageID, name)
 }
 
 func addDeclarationReport(ctx rule.RuleContext, reports *[]declarationReport, textRange core.TextRange, messageID string, name string) {

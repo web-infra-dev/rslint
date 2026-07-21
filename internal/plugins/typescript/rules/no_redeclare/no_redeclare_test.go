@@ -25,7 +25,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "class C { method() { let x = 1; let y = 2; } }\nlet x = 1;"},
 			// Constructor body is a separate scope.
 			{Code: "class C { constructor() { let v = 1; } method() { let v = 2; } }"},
-			// Static block is its own scope.
+			// Static-block contents are outside this extension's listener set.
 			{Code: "class C { static { let x = 1; } static { let x = 2; } }"},
 			// Getter / setter — each a separate scope.
 			{Code: "class C { get x() { let a = 1; return a; } set x(v) { let a = 2; } }"},
@@ -58,7 +58,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// builtinGlobals option.
 			// ====================================================================
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
-			// `self` / `top` live in lib.dom; `builtinGlobals: false` suppresses.
+			// Disabling builtin globals also accepts host-lib names.
 			{Code: "var self = 1;", Options: map[string]interface{}{"builtinGlobals": false}},
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
 			// Shadowing a builtin inside a function scope is fine: the function
@@ -71,16 +71,20 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "export {};\nvar top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 			{Code: "import {} from './foo';\nvar Array = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 
-			// ====================================================================
-			// ctx.Globals: an explicit `off` setting (config `Object: "off"` /
-			// `/* globals Object:off */`) un-declares the builtin, so the
-			// declaration no longer collides — even for globals resolved from
-			// the TypeScript default libraries (lib.dom etc.).
-			// ====================================================================
-			{Code: "var Object = 0;", Globals: map[string]bool{"Object": false}},
-			{Code: "/* globals Object:off */ var Object = 0;"},
+			// Value-only lib globals can be turned off. Names that also exist in
+			// TypeScript's type space (such as Object) remain implicit variables;
+			// their lock-ins live with the invalid builtin cases below.
 			{Code: "var document = 0;", Globals: map[string]bool{"document": false}},
 			{Code: "/* globals top:off */ var top = 0;"},
+			// TypeScript scope-manager does not turn pure value declarations from
+			// lib.dom into implicit globals. They only participate when configured.
+			{Code: "var top = 0;"},
+			{Code: "var self = 0;"},
+			{Code: "var console = 0;"},
+			{Code: "var document = 0;"},
+			// In a module the directive remains in the outer global scope while
+			// the syntax declaration is module-local; neither declaration repeats.
+			{Code: "export {};\n/*globals top */ var top = 0;"},
 			// A final inline `off` wins over a config-declared global.
 			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]bool{"a": true}},
 
@@ -113,7 +117,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 
 			// ====================================================================
-			// Namespaces isolate their own inner hoist scope.
+			// Namespace bodies are outside the upstream listener set.
 			// ====================================================================
 			{Code: "namespace A {\n  var x = 1;\n}\nnamespace B {\n  var x = 2;\n}"},
 
@@ -158,7 +162,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "import type { A } from './foo';\nlet B = 1;"},
 			// Separate layers: outer var hoists, inner let shadows it.
 			{Code: "for (var a = 0; a < 1; a++) {\n  let a = 1;\n}"},
-			// Nested namespace bodies are independent scopes.
+			// Nested namespace bodies are likewise not inspected.
 			{Code: "namespace N {\n  namespace Inner {\n    var x = 1;\n  }\n  namespace Inner2 {\n    var x = 2;\n  }\n}"},
 			// Re-export does not declare a local binding.
 			{Code: "export { foo } from './foo';\nlet foo = 1;"},
@@ -166,6 +170,17 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "let x = 1;\nconst C = class { m() { let x = 2; } };"},
 			// Ambient declaration only — no redeclaration.
 			{Code: "declare namespace N {\n  function foo(): void;\n  function foo(): string;\n}"},
+
+			// Upstream does not register TSModuleDeclaration or StaticBlock
+			// listeners. These declarations are therefore outside the checked
+			// scope set, even though a TypeScript compiler may reject some forms.
+			{Code: "class C { static { let a; let a; } }"},
+			{Code: "namespace A { var x; var x; type T = 1; type T = 2; }"},
+			{Code: "namespace N { namespace Inner { var x; var x; } }"},
+			{Code: "namespace Outer { class A {} class A {} }"},
+			{Code: "namespace A.B {} namespace A.B {}", Options: map[string]interface{}{"ignoreDeclarationMerge": false}},
+			{Code: "declare module 'pkg' { let x; let x; }"},
+			{Code: "export {}; declare global { var x: number; var x: string; } var global;"},
 
 			// ====================================================================
 			// Module augmentation — string-literal module name does not create
@@ -184,6 +199,10 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Same type parameter name across sibling functions / classes.
 			{Code: "function f<T>() {}\nfunction g<T>() {}"},
 			{Code: "class A<T> {}\nclass B<T> {}"},
+			// Non-function type-parameter scopes are outside the upstream
+			// listener set, even when the compiler rejects a duplicate name.
+			{Code: "class Generic<T, T> {}"},
+			{Code: "type Callback = <T, T>() => void;"},
 			// `infer U` inside a conditional type does not clash with an outer U.
 			{Code: "type U = 1;\ntype Inner<X> = X extends infer U ? U : never;"},
 			// Mapped-type key parameter does not clash with an outer K.
@@ -208,8 +227,8 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "function f(this: unknown, y: number) {}\nfunction g(this: unknown, y: number) {}"},
 
 			// ====================================================================
-			// Declaration merging inside a namespace body behaves the same as
-			// at program scope.
+			// Namespace bodies are outside the upstream listener set, so these
+			// declarations are not inspected by this rule.
 			// ====================================================================
 			{Code: "namespace Outer {\n  interface A {}\n  interface A {}\n}"},
 			{Code: "namespace Outer {\n  class A {}\n  namespace A {}\n}"},
@@ -252,24 +271,6 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "export default function () {};\nfunction foo() {}"},
 			{Code: "export default class {};\nclass Foo {}"},
 			{Code: "export default 42;\nconst foo = 1;"},
-
-			// ====================================================================
-			// Documented divergence #2 (see no_redeclare.md):
-			// A user `type T = ...` never collides with a same-named lib
-			// `interface T` because TypeScript keeps type aliases and
-			// interfaces in different declaration spaces. ESLint, which does
-			// name-level matching, flags these. We intentionally don't.
-			// ====================================================================
-			{Code: "type NodeListOf = 1;"},  // lib.dom
-			{Code: "type HTMLElement = 1;"}, // lib.dom
-			{Code: "type Array = 1;", Options: map[string]interface{}{"builtinGlobals": true}}, // lib.es5 core interface
-			// Extending a lib interface with a same-named user interface is
-			// the idiomatic TS pattern (ImportMeta augmentation, etc.) — it
-			// must not be reported as a builtin redeclaration.
-			{Code: "interface ImportMeta { foo: 1; }"},
-			{Code: "interface Array<T> { custom(): T; }", Options: map[string]interface{}{"builtinGlobals": true}},
-			// Sanity check: user-code `type T + interface T` still reports —
-			// the divergence only covers collisions with *lib* interfaces.
 		},
 		[]rule_tester.InvalidTestCase{
 			// ====================================================================
@@ -475,34 +476,11 @@ func TestNoRedeclareRule(t *testing.T) {
 					{MessageId: "redeclared", Line: 4, Column: 9},
 				},
 			},
-			// Static block.
-			{
-				Code: "class C {\n  static {\n    let a = 1;\n    let a = 2;\n  }\n}",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 4, Column: 9},
-				},
-			},
 			// Getter body.
 			{
 				Code: "class C {\n  get x() {\n    let a = 1;\n    let a = 2;\n    return a;\n  }\n}",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclared", Line: 4, Column: 9},
-				},
-			},
-
-			// ====================================================================
-			// Namespace body — hoist scope like a function.
-			// ====================================================================
-			{
-				Code: "namespace A {\n  var x = 1;\n  var x = 2;\n}",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 3, Column: 7},
-				},
-			},
-			{
-				Code: "namespace A {\n  type T = 1;\n  type T = 2;\n}",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 3, Column: 8},
 				},
 			},
 
@@ -513,13 +491,6 @@ func TestNoRedeclareRule(t *testing.T) {
 				Code: "var Object = 0;",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'Object' is already defined as a built-in global variable.", Line: 1, Column: 5},
-				},
-				Options: map[string]interface{}{"builtinGlobals": true},
-			},
-			{
-				Code: "export {};\n/*globals top */ var top = 0;",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
 				},
 				Options: map[string]interface{}{"builtinGlobals": true},
 			},
@@ -565,42 +536,97 @@ func TestNoRedeclareRule(t *testing.T) {
 				Code:    "/* globals Object */ var Object = 0;",
 				Globals: map[string]bool{"Object": false},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 12},
+					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 26, EndLine: 1, EndColumn: 32},
 				},
 			},
-			// ====================================================================
-			// Documented divergence #1 (see no_redeclare.md):
-			// `builtinGlobals` resolves against the project's `lib` configuration
-			// — DOM names and ES-extension additions count, not just the ES
-			// core subset ESLint pre-declares. These cases lock in that we
-			// detect non-ES-core lib globals the upstream rule would only see
-			// with an explicit `globals` / `env` override.
-			// ====================================================================
-			// DOM value global (lib.dom).
+			// The extension iterates directive comments before syntax identifiers,
+			// unlike ESLint core. Lock both the selected declaration and message.
 			{
-				Code: "var top = 0;",
+				Code: "/* globals a */ var a = 0;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
 				},
 			},
 			{
-				Code: "var self = 0;",
+				Code: "/* globals a */ /* globals a */ var a = 0;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+					{MessageId: "redeclared", Message: "'a' is already defined.", Line: 1, Column: 28, EndLine: 1, EndColumn: 29},
+					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 37, EndLine: 1, EndColumn: 38},
 				},
 			},
-			// Another DOM-only value binding.
 			{
-				Code: "var console = 0;",
+				Code: "/* globals a */ var a = 0; var a = 1;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
+					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 32, EndLine: 1, EndColumn: 33},
 				},
 			},
-			// Another DOM-only var binding (`declare var document: Document`).
+			// Type-space lib variables survive value-global `off` settings.
 			{
-				Code: "var document = 0;",
+				Code:    "var Object = 0;",
+				Globals: map[string]bool{"Object": false},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code: "/* globals Object:off */ var Object = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 30, EndLine: 1, EndColumn: 36},
+				},
+			},
+			// Pure value declarations from lib.dom participate only through an
+			// explicit globals setting or directive, matching scope-manager.
+			{
+				Code:    "var document = 0;",
+				Globals: map[string]bool{"document": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Message: "'document' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 13},
+				},
+			},
+			{
+				Code: "/* globals document */ var document = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredBySyntax", Message: "'document' is already defined by a variable declaration.", Line: 1, Column: 28, EndLine: 1, EndColumn: 36},
+				},
+			},
+			// DOM TYPE_VALUE names do remain implicit lib variables.
+			{
+				Code: "var AbortController = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Message: "'AbortController' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 20},
+				},
+			},
+			// Name-level parity includes pure type globals and legal interface
+			// augmentations, just as typescript-eslint's scope manager does.
+			{
+				Code: "type NodeListOf = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: "type HTMLElement = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 17},
+				},
+			},
+			{
+				Code: "type Array = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code: "interface ImportMeta { foo: 1; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11, EndLine: 1, EndColumn: 21},
+				},
+			},
+			{
+				Code: "interface Array<T> { custom(): T; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
 				},
 			},
 			// Destructuring — one user+user conflict and one user+builtin.
@@ -790,22 +816,48 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 
 			// ====================================================================
-			// Nested namespace — each body has its own scope.
-			// ====================================================================
-			{
-				Code: "namespace N {\n  namespace Inner {\n    var x = 1;\n    var x = 2;\n  }\n}",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 4, Column: 9},
-				},
-			},
-
-			// ====================================================================
 			// Parameter vs body var — ESLint reports this as redeclaration.
 			// ====================================================================
 			{
 				Code: "function f(x: number) {\n  var x = 1;\n}",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclared", Line: 2, Column: 7},
+				},
+			},
+			{
+				Code: "function f(value: number, value?: string) {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 1, Column: 27, EndLine: 1, EndColumn: 41},
+				},
+			},
+			{
+				Code: "class C { constructor(public value: number, private value?: string) {} }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 1, Column: 53, EndLine: 1, EndColumn: 67},
+				},
+			},
+			{
+				Code: "const fn = (value, value) => value;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'value' is already defined.", Line: 1, Column: 20, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code: "function generic<T, T>() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'T' is already defined.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code: "function generic<T>(T: number) {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'T' is already defined.", Line: 1, Column: 18, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code: "class C { method<T, T>() {} }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Message: "'T' is already defined.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
 				},
 			},
 
@@ -924,17 +976,6 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 
 			// ====================================================================
-			// Declaration merging is applied inside a namespace body the same
-			// way as at program scope.
-			// ====================================================================
-			{
-				Code: "namespace Outer {\n  class A {}\n  class A {}\n}",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 3, Column: 9},
-				},
-			},
-
-			// ====================================================================
 			// Class expression + outer same-named declaration — the outer
 			// declaration still counts (two program-scope bindings).
 			// ====================================================================
@@ -951,7 +992,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			{
 				Code: "declare var x: number;\ndeclare var x: string;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclared", Line: 2, Column: 13},
+					{MessageId: "redeclared", Line: 2, Column: 13, EndLine: 2, EndColumn: 22},
 				},
 			},
 

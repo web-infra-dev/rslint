@@ -350,6 +350,14 @@ normalized := utils.NormalizeBigIntLiteral(text)
 utils.CollectBindingNames(nameNode, func(ident *ast.Node, name string) {
     // Process each identifier
 })
+
+// Get the declaration-identifier range exposed by TSESTree. For plain
+// variable/parameter identifiers this includes TS `!`, `?`, and type
+// annotations where TSESTree folds them into the Identifier range.
+identifierRange := utils.GetESTreeBindingIdentifierRange(sourceFile, identifier)
+
+// Collect active TypeScript default-library names from the type space.
+utils.AddDefaultLibraryTypeGlobalNames(typeGlobals, program, typeChecker)
 ```
 
 ### Other Helpers

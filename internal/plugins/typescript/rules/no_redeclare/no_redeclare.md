@@ -48,10 +48,12 @@ namespace Foo {}
 
 ### `builtinGlobals` (default: `true`)
 
-When `true`, the rule reports redeclaring names that shadow ECMAScript built-in globals such as `Object`, `Array`, or `Number`.
-Configured `languageOptions.globals` also participate as built-ins. Active
-`/* global */` directives participate as declarations in either mode; a final
-`:off` setting removes that inline global.
+When `true`, the rule reports redeclaring ECMAScript built-in globals and names
+provided by TypeScript's active lib type definitions, such as `Object`,
+`Promise`, or `HTMLElement`. Configured `languageOptions.globals` also
+participate as built-ins. Active `/* global */` directives participate as
+declarations in either mode; a final `:off` setting removes that inline global.
+Turning off a value global does not remove a same-named TypeScript type global.
 
 ```json
 { "@typescript-eslint/no-redeclare": ["error", { "builtinGlobals": true }] }
@@ -79,12 +81,6 @@ When `true`, the rule ignores redeclarations that are legal TypeScript declarati
 function A() {}
 namespace A {}
 ```
-
-## Differences from ESLint
-
-- `builtinGlobals` covers every global visible through the project's `tsconfig.json` `lib` setting — including DOM (`top`, `self`, `HTMLElement`, …) and ES-extension names (`Promise`, `WeakRef`, …). ESLint only flags globals the active `env` / `globals` options declare.
-- A file counts as a module when it has a top-level `import` or `export`. Declarations in a module do not collide with lib globals, so `var Object = 0;` inside a module is not reported.
-- `type Foo = ...` is not reported as shadowing a lib interface named `Foo` — type aliases and interfaces live in different declaration spaces, and the collision is not a real one.
 
 ## Original Documentation
 
