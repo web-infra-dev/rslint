@@ -1,0 +1,15 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "strict": {
+          "type": "boolean"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

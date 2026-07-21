@@ -1,10 +1,14 @@
 package prefer_await_to_then
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_await_to_then.schema.json
+var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
 
@@ -12,14 +16,13 @@ type Options struct {
 	Strict bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["strict"].(bool); ok {
-			opts.Strict = v
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
+	opts.Strict, _ = optsMap["strict"].(bool)
 	return opts
 }
 
@@ -121,9 +124,9 @@ func isCypress(node *ast.Node) bool {
 }
 
 var PreferAwaitToThenRule = rule.Rule{
-	Name: "promise/prefer-await-to-then",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/prefer-await-to-then",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

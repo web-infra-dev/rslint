@@ -1,0 +1,35 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowFinally": {
+          "type": "boolean"
+        },
+        "allowThen": {
+          "type": "boolean"
+        },
+        "allowThenStrict": {
+          "type": "boolean"
+        },
+        "terminationMethod": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

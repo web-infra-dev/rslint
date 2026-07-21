@@ -1,6 +1,7 @@
 package valid_params
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 
@@ -10,24 +11,25 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed valid_params.schema.json
+var schemaJSON []byte
+
 const skipTransparent = ast.OEKParentheses
 
 type Options struct {
 	Exclude map[string]bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{Exclude: map[string]bool{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	switch arr := optsMap["exclude"].(type) {
 	case []interface{}:
-		for _, item := range arr {
-			if name, ok := item.(string); ok {
-				opts.Exclude[name] = true
-			}
+		for _, name := range utils.ToStringSlice(arr) {
+			opts.Exclude[name] = true
 		}
 	case []string:
 		for _, name := range arr {
@@ -86,9 +88,9 @@ func calledMemberName(node *ast.Node) string {
 }
 
 var ValidParamsRule = rule.Rule{
-	Name: "promise/valid-params",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/valid-params",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
