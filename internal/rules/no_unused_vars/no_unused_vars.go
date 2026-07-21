@@ -3014,9 +3014,3 @@ func newRule(flavor ruleFlavor) rule.Rule {
 
 // NoUnusedVarsRule implements ESLint core's no-unused-vars rule.
 var NoUnusedVarsRule = newRule(ruleFlavor{coreSuggestions: true})
-
-// NewTypeScriptRule returns the unprefixed base rule used by the
-// @typescript-eslint wrapper.
-func NewTypeScriptRule() rule.Rule {
-	return newRule(ruleFlavor{typescript: true})
-}
