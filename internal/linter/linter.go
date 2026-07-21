@@ -16,6 +16,23 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
+// unusedDisableDirectiveMessage builds the diagnostic text for an unused
+// eslint-disable directive, matching ESLint's own wording exactly.
+// ruleName == "" is the wildcard form (e.g. bare `eslint-disable`).
+func unusedDisableDirectiveMessage(ruleName string) rule.RuleMessage {
+	if ruleName == "" {
+		return rule.RuleMessage{
+			Id:          "unusedDisableDirective",
+			Description: "Unused eslint-disable directive (no problems were reported).",
+		}
+	}
+	return rule.RuleMessage{
+		Id:          "unusedDisableDirective",
+		Description: "Unused eslint-disable directive (no problems were reported from '" + ruleName + "').",
+		Data:        map[string]string{"ruleId": ruleName},
+	}
+}
+
 // isFileAllowed checks if fileName matches any path in allowFiles.
 // It first tries fast string equality, then falls back to os.SameFile
 // (using pre-computed FileInfo) to handle symlinks (e.g. /var vs /private/var on macOS).
@@ -84,6 +101,9 @@ type runProgramOptions struct {
 	// and remaining rules receive a nil TypeChecker. nil = no gap distinction.
 	TypeInfoFiles map[string]struct{}
 	OnDiagnostic  DiagnosticHandler
+	// ReportUnusedDisableDirectives mirrors RunLinterOptions' field of the
+	// same name; rule.SeverityOff disables the check.
+	ReportUnusedDisableDirectives rule.DiagnosticSeverity
 }
 
 type programLintResult struct {
@@ -363,6 +383,23 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 			return false
 		}
 		file.Node.ForEachChild(childVisitor)
+
+		// Every rule listener above has run and every IsRuleDisabled call for
+		// this file is done, so disableManager's usage bookkeeping is final.
+		if opts.ReportUnusedDisableDirectives != rule.SeverityOff {
+			for _, unused := range disableManager.UnusedDirectives() {
+				opts.OnDiagnostic(rule.RuleDiagnostic{
+					RuleName:   rule.UnusedDisableDirectiveRuleName,
+					Range:      unused.Range,
+					Message:    unusedDisableDirectiveMessage(unused.RuleName),
+					SourceFile: file,
+					FilePath:   file.FileName(),
+					Severity:   opts.ReportUnusedDisableDirectives,
+					Origin:     rule.DiagnosticOriginUnusedDisableDirective,
+				})
+			}
+		}
+
 		clear(registeredListeners)
 	}
 
@@ -541,18 +578,19 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			}
 
 			programOpts := runProgramOptions{
-				Program:              program,
-				Scope:                opts.Scope,
-				ExcludePaths:         opts.ExcludePaths,
-				FileFilter:           filter,
-				TargetFiles:          targetFiles,
-				HasTargetFiles:       opts.TargetFiles != nil,
-				GetRulesForFile:      opts.GetRulesForFile,
-				CollectExecutedRules: true,
-				SyntaxErrorFiles:     opts.SyntaxErrorFiles,
-				SingleThreaded:       opts.SingleThreaded,
-				TypeInfoFiles:        opts.TypeInfoFiles,
-				OnDiagnostic:         opts.OnDiagnostic,
+				Program:                       program,
+				Scope:                         opts.Scope,
+				ExcludePaths:                  opts.ExcludePaths,
+				FileFilter:                    filter,
+				TargetFiles:                   targetFiles,
+				HasTargetFiles:                opts.TargetFiles != nil,
+				GetRulesForFile:               opts.GetRulesForFile,
+				CollectExecutedRules:          true,
+				SyntaxErrorFiles:              opts.SyntaxErrorFiles,
+				SingleThreaded:                opts.SingleThreaded,
+				TypeInfoFiles:                 opts.TypeInfoFiles,
+				OnDiagnostic:                  opts.OnDiagnostic,
+				ReportUnusedDisableDirectives: opts.ReportUnusedDisableDirectives,
 			}
 			programIndex := i
 			programOptions := programOpts

@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -457,7 +458,7 @@ func TestIsBlockDisabled(t *testing.T) {
 			want:     false,
 		},
 		{
-			name: "query line 0 with no directives",
+			name:       "query line 0 with no directives",
 			directives: nil,
 			ruleName:   "no-console",
 			line:       0,
@@ -493,10 +494,10 @@ func TestIsBlockDisabled(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dm := &DisableManager{
 				blockDirectives:       tt.directives,
-				lineDisabledRules:     make(map[int][]string),
-				nextLineDisabledRules: make(map[int][]string),
+				lineDisabledRules:     make(map[int][]*directiveEntry),
+				nextLineDisabledRules: make(map[int][]*directiveEntry),
 			}
-			got := dm.isBlockDisabled(tt.ruleName, tt.line)
+			got, _ := dm.isBlockDisabled(tt.ruleName, tt.line)
 			if got != tt.want {
 				t.Errorf("isBlockDisabled(%q, %d) = %v, want %v", tt.ruleName, tt.line, got, tt.want)
 			}
@@ -510,13 +511,13 @@ func TestIsBlockDisabled(t *testing.T) {
 
 func TestDisableManagerLineLevelDirectives(t *testing.T) {
 	dm := &DisableManager{
-		lineDisabledRules: map[int][]string{
-			5:  {"no-unused-vars"},
-			10: {"*"},
+		lineDisabledRules: map[int][]*directiveEntry{
+			5:  {{rule: "no-unused-vars"}},
+			10: {{rule: ""}},
 		},
-		nextLineDisabledRules: map[int][]string{
-			8:  {"no-debugger"},
-			12: {"*"},
+		nextLineDisabledRules: map[int][]*directiveEntry{
+			8:  {{rule: "no-debugger"}},
+			12: {{rule: ""}},
 		},
 	}
 
@@ -549,16 +550,16 @@ func TestDisableManagerLineLevelDirectives(t *testing.T) {
 // isLineDisabled is a test helper that checks only line-level disables,
 // bypassing the block directive check (which needs a sourceFile for pos→line).
 func (dm *DisableManager) isLineDisabled(ruleName string, line int) bool {
-	if lineRules, exists := dm.lineDisabledRules[line]; exists {
-		for _, r := range lineRules {
-			if r == ruleName || r == "*" {
+	if lineEntries, exists := dm.lineDisabledRules[line]; exists {
+		for _, e := range lineEntries {
+			if e.rule == ruleName || e.rule == "" {
 				return true
 			}
 		}
 	}
-	if nextLineRules, exists := dm.nextLineDisabledRules[line]; exists {
-		for _, r := range nextLineRules {
-			if r == ruleName || r == "*" {
+	if nextLineEntries, exists := dm.nextLineDisabledRules[line]; exists {
+		for _, e := range nextLineEntries {
+			if e.rule == ruleName || e.rule == "" {
 				return true
 			}
 		}
@@ -576,11 +577,11 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 			{line: 0, isDisable: true, rules: []string{"no-console"}},
 			{line: 10, isDisable: false, rules: []string{"no-console"}},
 		},
-		lineDisabledRules: map[int][]string{
-			15: {"no-alert"},
+		lineDisabledRules: map[int][]*directiveEntry{
+			15: {{rule: "no-alert"}},
 		},
-		nextLineDisabledRules: map[int][]string{
-			20: {"no-debugger"},
+		nextLineDisabledRules: map[int][]*directiveEntry{
+			20: {{rule: "no-debugger"}},
 		},
 	}
 
@@ -601,7 +602,7 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := dm.isBlockDisabled(tt.ruleName, tt.line)
+			got, _ := dm.isBlockDisabled(tt.ruleName, tt.line)
 			// For line-level checks we call the helper directly
 			if !got {
 				got = dm.isLineDisabled(tt.ruleName, tt.line)
@@ -610,5 +611,126 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 				t.Errorf("rule %q at line %d: got %v, want %v", tt.ruleName, tt.line, got, tt.want)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// UnusedDirectives — --report-unused-disable-directives bookkeeping
+// ---------------------------------------------------------------------------
+
+func TestUnusedDirectivesWildcardBlockNeverUsed(t *testing.T) {
+	source := "/* eslint-disable */\nconst x = 1;\n/* eslint-enable */\n"
+	sourceFile := parseCommentStoreSource(t, source)
+	manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+
+	unused := manager.UnusedDirectives()
+	if len(unused) != 1 {
+		t.Fatalf("got %d unused directives, want 1: %#v", len(unused), unused)
+	}
+	if unused[0].RuleName != "" {
+		t.Errorf("RuleName = %q, want wildcard \"\"", unused[0].RuleName)
+	}
+	wantPos := strings.Index(source, "/* eslint-disable */")
+	if unused[0].Range.Pos() != wantPos {
+		t.Errorf("Range.Pos() = %d, want %d", unused[0].Range.Pos(), wantPos)
+	}
+}
+
+func TestUnusedDirectivesWildcardBlockUsed(t *testing.T) {
+	source := "/* eslint-disable */\nconst x = 1;\n/* eslint-enable */\n"
+	sourceFile := parseCommentStoreSource(t, source)
+	manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+
+	if !manager.IsRuleDisabled("no-unused-vars", strings.Index(source, "const x")) {
+		t.Fatal("expected the wildcard block disable to suppress the diagnostic")
+	}
+	if unused := manager.UnusedDirectives(); len(unused) != 0 {
+		t.Fatalf("got %d unused directives, want 0: %#v", len(unused), unused)
+	}
+}
+
+func TestUnusedDirectivesRuleSpecificPartialUse(t *testing.T) {
+	source := "/* eslint-disable no-console, no-alert */\nconsole.log('hi');\n/* eslint-enable */\n"
+	sourceFile := parseCommentStoreSource(t, source)
+	manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+
+	if !manager.IsRuleDisabled("no-console", strings.Index(source, "console.log")) {
+		t.Fatal("expected no-console to be suppressed")
+	}
+
+	unused := manager.UnusedDirectives()
+	if len(unused) != 1 {
+		t.Fatalf("got %d unused directives, want 1 (no-alert): %#v", len(unused), unused)
+	}
+	if unused[0].RuleName != "no-alert" {
+		t.Errorf("RuleName = %q, want %q", unused[0].RuleName, "no-alert")
+	}
+}
+
+func TestUnusedDirectivesDisableLine(t *testing.T) {
+	source := "console.log('hi'); // eslint-disable-line no-console\n"
+	tests := []struct {
+		name  string
+		check bool
+		want  int
+	}{
+		{"unused", false, 1},
+		{"used", true, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceFile := parseCommentStoreSource(t, source)
+			manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+			if tt.check {
+				if !manager.IsRuleDisabled("no-console", strings.Index(source, "console.log")) {
+					t.Fatal("expected disable-line to suppress the diagnostic")
+				}
+			}
+			if unused := manager.UnusedDirectives(); len(unused) != tt.want {
+				t.Fatalf("got %d unused directives, want %d: %#v", len(unused), tt.want, unused)
+			}
+		})
+	}
+}
+
+func TestUnusedDirectivesDisableNextLine(t *testing.T) {
+	source := "// eslint-disable-next-line no-console\nconsole.log('hi');\n"
+	tests := []struct {
+		name  string
+		check bool
+		want  int
+	}{
+		{"unused", false, 1},
+		{"used", true, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceFile := parseCommentStoreSource(t, source)
+			manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+			if tt.check {
+				if !manager.IsRuleDisabled("no-console", strings.LastIndex(source, "console.log")) {
+					t.Fatal("expected disable-next-line to suppress the diagnostic")
+				}
+			}
+			if unused := manager.UnusedDirectives(); len(unused) != tt.want {
+				t.Fatalf("got %d unused directives, want %d: %#v", len(unused), tt.want, unused)
+			}
+		})
+	}
+}
+
+func TestUnusedDirectivesEnableNeverReported(t *testing.T) {
+	source := "/* eslint-disable no-console */\nconsole.log('hi');\n/* eslint-enable no-console */\nconsole.log('there');\n"
+	sourceFile := parseCommentStoreSource(t, source)
+	manager := NewDisableManager(sourceFile, NewCommentStore(sourceFile))
+
+	// Suppress the first call so the disable directive is used; the
+	// eslint-enable directive must never appear in UnusedDirectives()
+	// regardless of what happens after it re-enables the rule.
+	if !manager.IsRuleDisabled("no-console", strings.Index(source, "console.log('hi')")) {
+		t.Fatal("expected the block disable to suppress the first call")
+	}
+	if unused := manager.UnusedDirectives(); len(unused) != 0 {
+		t.Fatalf("got %d unused directives, want 0 (enable directives are never reported): %#v", len(unused), unused)
 	}
 }

@@ -4,14 +4,52 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
+
+// directiveEntry represents one (rule, directive-occurrence) pair for a
+// disable-kind directive (block disable, disable-line, disable-next-line).
+// It exists purely for --report-unused-disable-directives bookkeeping: the
+// suppression algorithms below (isBlockDisabled, IsRuleDisabled) mark an
+// entry's Used field the first time it actually suppresses a diagnostic.
+// rule == "" means the entry is the wildcard form (e.g. `eslint-disable`
+// with no rule list), which applies to every rule.
+type directiveEntry struct {
+	rule string
+	rng  core.TextRange
+	used bool
+}
+
+// UnusedDirective describes a disable directive that never suppressed a
+// diagnostic. RuleName is "" for the wildcard form.
+type UnusedDirective struct {
+	Range    core.TextRange
+	RuleName string
+}
 
 // blockDirective represents a block-level disable or enable event at a specific line
 type blockDirective struct {
 	line      int
 	isDisable bool     // true = disable, false = enable
 	rules     []string // nil means all rules (wildcard)
+	// entries is populated only for isDisable directives, parallel to rules
+	// (or a single wildcard entry when rules is nil). Used to mark usage once
+	// isBlockDisabled determines this directive is the one suppressing a
+	// diagnostic.
+	entries []*directiveEntry
+}
+
+// entryForRule returns the tracked entry for ruleName ("" for the wildcard
+// entry), or nil if this directive carries no entries (e.g. an enable
+// directive, which is never reported as unused).
+func (d *blockDirective) entryForRule(ruleName string) *directiveEntry {
+	for _, e := range d.entries {
+		if e.rule == ruleName {
+			return e
+		}
+	}
+	return nil
 }
 
 // directiveKind represents the type of an inline directive comment.
@@ -43,9 +81,12 @@ type DisableManager struct {
 	sourceFile            *ast.SourceFile
 	comments              *CommentStore
 	parsed                bool
-	blockDirectives       []blockDirective // block disable/enable events in source order
-	lineDisabledRules     map[int][]string // Rules disabled for specific lines
-	nextLineDisabledRules map[int][]string // Rules disabled for the next line
+	blockDirectives       []blockDirective          // block disable/enable events in source order
+	lineDisabledRules     map[int][]*directiveEntry // Rules disabled for specific lines
+	nextLineDisabledRules map[int][]*directiveEntry // Rules disabled for the next line
+	// disableEntries collects every disable-kind directiveEntry (block,
+	// line, next-line) in source order, for UnusedDirectives().
+	disableEntries []*directiveEntry
 }
 
 // NewDisableManager creates a manager whose directives are parsed on the first
@@ -89,6 +130,23 @@ func mayContainDisableDirective(text string) bool {
 	return false
 }
 
+// newDisableEntries builds one directiveEntry per rule name (or a single
+// wildcard entry when rules is empty), all sharing the same comment range.
+// It also appends every entry to dm.disableEntries for UnusedDirectives().
+func (dm *DisableManager) newDisableEntries(rng core.TextRange, rules []string) []*directiveEntry {
+	var entries []*directiveEntry
+	if len(rules) == 0 {
+		entries = []*directiveEntry{{rule: "", rng: rng}}
+	} else {
+		entries = make([]*directiveEntry, len(rules))
+		for i, r := range rules {
+			entries[i] = &directiveEntry{rule: r, rng: rng}
+		}
+	}
+	dm.disableEntries = append(dm.disableEntries, entries...)
+	return entries
+}
+
 // parseDirectives parses disable/enable directive comments from the source text.
 // Both rslint- and eslint- prefixed directives are recognized.
 func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
@@ -115,32 +173,28 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		}
 
 		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
+		commentRange := core.NewTextRange(comment.Pos(), comment.End())
 
 		switch kind {
 		case directiveLine:
+			entries := dm.newDisableEntries(commentRange, rules)
 			if dm.lineDisabledRules == nil {
-				dm.lineDisabledRules = make(map[int][]string)
+				dm.lineDisabledRules = make(map[int][]*directiveEntry)
 			}
-			if len(rules) == 0 {
-				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
-			} else {
-				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], rules...)
-			}
+			dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], entries...)
 		case directiveNextLine:
 			nextLineNum := lineNum + 1
+			entries := dm.newDisableEntries(commentRange, rules)
 			if dm.nextLineDisabledRules == nil {
-				dm.nextLineDisabledRules = make(map[int][]string)
+				dm.nextLineDisabledRules = make(map[int][]*directiveEntry)
 			}
-			if len(rules) == 0 {
-				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
-			} else {
-				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], rules...)
-			}
+			dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], entries...)
 		case directiveBlock:
 			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
 				line:      lineNum,
 				isDisable: true,
 				rules:     rules,
+				entries:   dm.newDisableEntries(commentRange, rules),
 			})
 		case directiveEnable:
 			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
@@ -197,7 +251,8 @@ func parseRuleNames(rulesStr string) []string {
 	return rules
 }
 
-// IsRuleDisabled checks if a rule is disabled at the given position
+// IsRuleDisabled checks if a rule is disabled at the given position. When it
+// is, the responsible directive's usage is recorded for UnusedDirectives().
 func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 	if dm == nil || dm.sourceFile == nil {
 		return false
@@ -210,23 +265,28 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
 
 	// Check block disable/enable directives (range-based)
-	if dm.isBlockDisabled(ruleName, line) {
+	if disabled, entry := dm.isBlockDisabled(ruleName, line); disabled {
+		if entry != nil {
+			entry.used = true
+		}
 		return true
 	}
 
 	// Check if rule is disabled for this specific line
-	if lineRules, exists := dm.lineDisabledRules[line]; exists {
-		for _, disabledRule := range lineRules {
-			if disabledRule == ruleName || disabledRule == "*" {
+	if lineEntries, exists := dm.lineDisabledRules[line]; exists {
+		for _, e := range lineEntries {
+			if e.rule == ruleName || e.rule == "" {
+				e.used = true
 				return true
 			}
 		}
 	}
 
 	// Check if rule is disabled for this line via next-line directive
-	if nextLineRules, exists := dm.nextLineDisabledRules[line]; exists {
-		for _, disabledRule := range nextLineRules {
-			if disabledRule == ruleName || disabledRule == "*" {
+	if nextLineEntries, exists := dm.nextLineDisabledRules[line]; exists {
+		for _, e := range nextLineEntries {
+			if e.rule == ruleName || e.rule == "" {
+				e.used = true
 				return true
 			}
 		}
@@ -236,13 +296,17 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 }
 
 // isBlockDisabled replays block directives in source order to determine
-// whether a rule is disabled at the given line.
-func (dm *DisableManager) isBlockDisabled(ruleName string, line int) bool {
+// whether a rule is disabled at the given line. When it is, it also returns
+// the directiveEntry responsible, so the caller can mark it used.
+func (dm *DisableManager) isBlockDisabled(ruleName string, line int) (bool, *directiveEntry) {
 	allDisabled := false
 	ruleDisabled := false
 	hasRuleSpecific := false
+	var allWinner *blockDirective
+	var ruleWinner *blockDirective
 
-	for _, d := range dm.blockDirectives {
+	for i := range dm.blockDirectives {
+		d := &dm.blockDirectives[i]
 		if d.line > line {
 			break
 		}
@@ -250,11 +314,13 @@ func (dm *DisableManager) isBlockDisabled(ruleName string, line int) bool {
 		if len(d.rules) == 0 {
 			// Wildcard directive: affects all rules and resets rule-specific state
 			allDisabled = d.isDisable
+			allWinner = d
 			hasRuleSpecific = false
 		} else {
 			for _, r := range d.rules {
 				if r == ruleName {
 					ruleDisabled = d.isDisable
+					ruleWinner = d
 					hasRuleSpecific = true
 				}
 			}
@@ -262,7 +328,34 @@ func (dm *DisableManager) isBlockDisabled(ruleName string, line int) bool {
 	}
 
 	if hasRuleSpecific {
-		return ruleDisabled
+		if !ruleDisabled {
+			return false, nil
+		}
+		return true, ruleWinner.entryForRule(ruleName)
 	}
-	return allDisabled
+	if !allDisabled {
+		return false, nil
+	}
+	if allWinner == nil {
+		return false, nil
+	}
+	return true, allWinner.entryForRule("")
+}
+
+// UnusedDirectives returns every disable directive (block, line, or
+// next-line) that never suppressed a diagnostic. `eslint-enable` directives
+// are never included — ESLint only reports unused *disable* directives.
+// Must be called after all rules have finished linting the file.
+func (dm *DisableManager) UnusedDirectives() []UnusedDirective {
+	if dm == nil {
+		return nil
+	}
+	dm.ensureParsed()
+	var out []UnusedDirective
+	for _, e := range dm.disableEntries {
+		if !e.used {
+			out = append(out, UnusedDirective{Range: e.rng, RuleName: e.rule})
+		}
+	}
+	return out
 }

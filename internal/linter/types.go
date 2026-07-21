@@ -123,6 +123,14 @@ type RunLinterOptions struct {
 	TypeCheck             bool
 	SkipTypeCheckPrograms []bool
 
+	// ReportUnusedDisableDirectives controls --report-unused-disable-directives.
+	// rule.SeverityOff (the zero value) disables the check entirely; otherwise
+	// every eslint-disable/eslint-disable-line/eslint-disable-next-line
+	// directive that suppressed no diagnostic in a linted file is itself
+	// reported at this severity. Only native Go-rule directives are tracked —
+	// the eslint-plugin (Node worker) suppression path is unaffected.
+	ReportUnusedDisableDirectives rule.DiagnosticSeverity
+
 	OnDiagnostic DiagnosticHandler
 }
 

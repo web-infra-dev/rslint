@@ -12,9 +12,9 @@ import (
 type DiagnosticSeverity int
 
 const (
-	SeverityError DiagnosticSeverity = iota
+	SeverityOff DiagnosticSeverity = iota
 	SeverityWarning
-	SeverityOff
+	SeverityError
 )
 
 // String returns the string representation of the severity
@@ -213,7 +213,15 @@ type DiagnosticOrigin uint8
 const (
 	DiagnosticOriginLint DiagnosticOrigin = iota
 	DiagnosticOriginTypeScript
+	// DiagnosticOriginUnusedDisableDirective marks a synthetic diagnostic
+	// produced by --report-unused-disable-directives, not by a rule.
+	DiagnosticOriginUnusedDisableDirective
 )
+
+// UnusedDisableDirectiveRuleName is the sentinel RuleName used for
+// diagnostics with DiagnosticOriginUnusedDisableDirective. It is not a real
+// rule and cannot be configured via --rule or `rules`.
+const UnusedDisableDirectiveRuleName = "unused-disable-directive"
 
 type RuleDiagnostic struct {
 	Range    core.TextRange

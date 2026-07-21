@@ -50,3 +50,7 @@ const y: any = fn();
 - Omitting rule names disables/enables all rules.
 - Multiple rule names can be separated by commas.
 - An inline description can be added after `--` (e.g., `rslint-disable-next-line no-console -- temporary workaround`).
+
+## Detecting Unused Directives
+
+A disable directive that never actually suppresses a diagnostic (for example, a `// rslint-disable-line no-console` on a line that never triggered `no-console`) usually means the code has changed since the directive was added. Run with `--report-unused-disable-directives` to flag these as warnings — see [CLI Reference](/guide/cli#report-unused-disable-directives) for the CLI flags and the [`linterOptions.reportUnusedDisableDirectives`](/config/#linteroptions) config option.

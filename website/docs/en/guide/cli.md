@@ -8,20 +8,22 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                  | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>` | Specify which config file to use                                                               |
-| `--fix`               | Automatically fix problems                                                                     |
-| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
-| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`             | Report errors only, suppress warnings                                                          |
-| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`        | Show help information                                                                          |
+| Flag                                                     | Description                                                                                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `--init`                                                 | Generate a default config file, or migrate an existing JSON config to JS/TS                                           |
+| `-c, --config <path>`                                    | Specify which config file to use                                                                                      |
+| `--fix`                                                  | Automatically fix problems                                                                                            |
+| `--type-check`                                           | Enable TypeScript semantic type checking ([details](/guide/type-checking))                                            |
+| `--type-check-only`                                      | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))                            |
+| `--format <format>`                                      | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats))                        |
+| `--quiet`                                                | Report errors only, suppress warnings                                                                                 |
+| `--max-warnings <n>`                                     | Exit with error if warning count exceeds this number                                                                  |
+| `--rule <rule>`                                          | Override a rule's severity or options (repeatable, see [details](#rule-overrides))                                    |
+| `--report-unused-disable-directives`                     | Report unused `eslint-disable` directives as warnings ([details](#report-unused-disable-directives))                  |
+| `--report-unused-disable-directives-severity <severity>` | Report unused `eslint-disable` directives at `off`, `warn`, or `error` ([details](#report-unused-disable-directives)) |
+| `--no-color`                                             | Disable colored output ([details](/guide/environment-variables))                                                      |
+| `--force-color`                                          | Force colored output ([details](/guide/environment-variables))                                                        |
+| `--help`, `-h`                                           | Show help information                                                                                                 |
 
 ## File and Directory Arguments
 
@@ -102,6 +104,30 @@ rslint src/ --rule 'no-console: off' --format github
 - CLI rules have the **highest precedence** and override all config file entries, including per-file overrides.
 - When the same rule is specified multiple times, the **last one wins**.
 - Rules that don't exist in the registry are silently ignored.
+
+## Report Unused Disable Directives
+
+Use `--report-unused-disable-directives` (or the finer-grained `--report-unused-disable-directives-severity`) to flag `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line` comments (and their `rslint-` equivalents) that didn't actually suppress any diagnostic.
+
+```bash
+# Report unused directives as warnings
+rslint --report-unused-disable-directives
+
+# Report unused directives at a specific severity
+rslint --report-unused-disable-directives-severity error
+rslint --report-unused-disable-directives-severity warn
+rslint --report-unused-disable-directives-severity off
+```
+
+This can also be configured in `linterOptions.reportUnusedDisableDirectives` — see [Configuration Options](/config/#linteroptions).
+
+**Behavior:**
+
+- `--report-unused-disable-directives` reports unused directives as `warn`. For a specific severity, use `--report-unused-disable-directives-severity` instead — the two flags are mutually exclusive.
+- A CLI flag (either form) takes precedence over the config file's `linterOptions.reportUnusedDisableDirectives`.
+- `eslint-enable` directives are never reported as unused — only directives that disable a rule are checked.
+- Only Rslint's native (Go) rules are tracked. Directives that reference third-party ESLint plugin rules (dispatched to the Node plugin worker, see [ESLint plugin compatibility](/guide/eslint-plugins)) are not checked and are never reported as unused.
+- Reporting at `error` severity causes a non-zero exit code, same as any other error-level diagnostic.
 
 ## Exit Codes
 

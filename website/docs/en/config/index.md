@@ -253,6 +253,30 @@ A disabled value removes a declaration inherited from an earlier matching entry,
 
 Shared settings accessible to all rules. Ordinary nested objects are merged recursively; later arrays and scalar values replace earlier values.
 
+### linterOptions
+
+- **Type:** `object`
+
+#### linterOptions.reportUnusedDisableDirectives
+
+- **Type:** `boolean | 'off' | 'warn' | 'error'`
+
+Reports `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line` comments (and their `rslint-` equivalents) that didn't suppress any diagnostic, at the given severity. `true` is equivalent to `'warn'`; `false` is equivalent to `'off'`. Defaults to `'off'`.
+
+```ts
+{
+  linterOptions: {
+    reportUnusedDisableDirectives: 'error',
+  },
+}
+```
+
+A `--report-unused-disable-directives` / `--report-unused-disable-directives-severity` CLI flag takes precedence over this option — see [CLI Reference](/guide/cli#report-unused-disable-directives). Only Rslint's native (Go) rules are tracked; directives that reference third-party ESLint plugin rules are not checked. See [Inline Directives](/guide/inline-directives) for directive syntax.
+
+:::tip
+Unlike the other options on this page, `reportUnusedDisableDirectives` is not resolved per file. Rslint uses the value from the last config entry that sets it, applied to the whole run, and only when linting with a single config file — it has no effect in monorepo setups where different files use different discovered configs (use the CLI flag there instead).
+:::
+
 ## Config Merging
 
 When multiple config entries match a file, they are merged in array order:
