@@ -416,11 +416,11 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 	)
 }
 
-func TestNoUnusedVarsWithoutTypeChecker(t *testing.T) {
+func TestNoUnusedVarsWithoutSourceFile(t *testing.T) {
 	t.Parallel()
 	listeners := NoUnusedVarsRule.Run(rule.RuleContext{}, nil)
 	if len(listeners) != 0 {
-		t.Fatalf("expected graceful degradation without a type checker, got %d listeners", len(listeners))
+		t.Fatalf("expected no listeners without a source file, got %d", len(listeners))
 	}
 }
 
