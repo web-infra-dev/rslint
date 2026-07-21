@@ -1093,12 +1093,23 @@ func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
 // EslintLikePrecedence returns a numeric precedence matching ESLint's
 // astUtils.getPrecedence so behavior parity holds for tsgo nodes that ESLint
 // classifies (e.g. ArrowFunction = 1, ConditionalExpression = 3). Returns -1
-// for TypeScript-only kinds (AsExpression, etc.) so the caller wraps them in
+// for TypeScript-only kinds (AsExpression, etc.) so callers wrap them in
 // parentheses defensively, matching ESLint's behavior on unknown node types.
 func EslintLikePrecedence(node *ast.Node) int {
 	if node == nil {
 		return -1
 	}
+
+	// ESTree represents the complete optional chain with a ChainExpression.
+	// tsgo marks ordinary chain links with NodeFlagsOptionalChain; for
+	// `value?.property!`, the trailing NonNullExpression instead directly wraps
+	// the flagged link and belongs to that same ESTree ChainExpression.
+	if ast.IsOptionalChain(node) ||
+		ast.IsNonNullExpression(node) &&
+			ast.IsOptionalChain(node.AsNonNullExpression().Expression) {
+		return 18
+	}
+
 	switch node.Kind {
 	case ast.KindArrowFunction:
 		return 1
@@ -1171,7 +1182,8 @@ func EslintLikePrecedence(node *ast.Node) int {
 		ast.KindClassExpression, ast.KindParenthesizedExpression,
 		ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
 		ast.KindTaggedTemplateExpression, ast.KindSpreadElement,
-		ast.KindMetaProperty:
+		ast.KindMetaProperty, ast.KindJsxElement,
+		ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return 20
 	}
 	// TypeScript-specific (AsExpression, SatisfiesExpression,
@@ -1536,6 +1548,31 @@ func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 		return GetStaticExpressionValue(SkipAssertionsAndParens(node.AsElementAccessExpression().ArgumentExpression))
 	}
 	return "", false
+}
+
+// IsIntegerElementAccess reports whether node is an element access whose key
+// is a numeric literal with a finite integer JavaScript Number value.
+// Parentheses around the key are transparent because ESTree discards them;
+// unary signs and TypeScript assertion wrappers remain distinct expressions.
+func IsIntegerElementAccess(node *ast.Node) bool {
+	if node == nil || !ast.IsElementAccessExpression(node) {
+		return false
+	}
+
+	argument := node.AsElementAccessExpression().ArgumentExpression
+	if argument == nil {
+		return false
+	}
+	argument = ast.SkipParentheses(argument)
+	if !ast.IsNumericLiteral(argument) {
+		return false
+	}
+
+	value, err := strconv.ParseFloat(argument.AsNumericLiteral().Text, 64)
+	if err != nil || math.IsInf(value, 0) || math.IsNaN(value) {
+		return false
+	}
+	return value == math.Trunc(value)
 }
 
 // AccessExpressionObject returns the object expression of an access expression.

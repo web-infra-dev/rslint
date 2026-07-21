@@ -1,12 +1,16 @@
 package param_names
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed param_names.schema.json
+var schemaJSON []byte
 
 // skipTransparent only unwraps parens — ESLint's ESTree parser drops
 // parentheses, so `new (Promise)(...)` and `new Promise((fn))` already have
@@ -28,19 +32,20 @@ type Options struct {
 	RejectPattern  string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		ResolvePattern: defaultResolvePattern,
 		RejectPattern:  defaultRejectPattern,
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["resolvePattern"].(string); ok && v != "" {
-			opts.ResolvePattern = v
-		}
-		if v, ok := optsMap["rejectPattern"].(string); ok && v != "" {
-			opts.RejectPattern = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["resolvePattern"].(string); ok && v != "" {
+		opts.ResolvePattern = v
+	}
+	if v, ok := optsMap["rejectPattern"].(string); ok && v != "" {
+		opts.RejectPattern = v
 	}
 	return opts
 }
@@ -82,9 +87,9 @@ func paramName(param *ast.Node) string {
 }
 
 var ParamNamesRule = rule.Rule{
-	Name: "promise/param-names",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "promise/param-names",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work

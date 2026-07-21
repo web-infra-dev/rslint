@@ -1,0 +1,18 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "functions": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Additional functions to check."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

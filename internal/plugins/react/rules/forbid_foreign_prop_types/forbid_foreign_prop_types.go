@@ -31,13 +31,11 @@ func parseOptions(input any) ruleOptions {
 // ESTree's transparent-paren parent: in upstream `node.parent` already
 // skips parentheses; in tsgo we must skip them explicitly to match.
 func effectiveParent(node *ast.Node) (*ast.Node, *ast.Node) {
-	current := node
-	parent := current.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		current = parent
-		parent = current.Parent
+	current := utils.OutermostParenthesizedExpression(node)
+	if current == nil {
+		return nil, nil
 	}
-	return current, parent
+	return current, current.Parent
 }
 
 // isAssignmentLHS mirrors upstream's `ast.isAssignmentLHS`:

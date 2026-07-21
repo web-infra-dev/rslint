@@ -2378,6 +2378,36 @@ ruleTester.run('naming-convention', {
         },
       ],
     },
+
+    // Regression: parameter names inside type-only signatures create no
+    // binding, so the `parameter` selector must not validate them — matches
+    // the real-world false positive where `System` in
+    // `as (System: any, ...globalArgs: any[]) => void` (a cast, not a real
+    // function declaration) was incorrectly flagged.
+    {
+      code: 'const evaluateThunk = (0, eval)("") as (System: any, ...globalArgs: any[]) => void;',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
+    {
+      code: 'type Cast = (System: any) => void;',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
+    {
+      code: 'interface Foo { method(System: any): void; }',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
+    {
+      code: 'interface Foo { (System: any): void; }',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
+    {
+      code: 'interface Foo { new (System: any): void; }',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
+    {
+      code: 'interface Foo { [System: string]: any; }',
+      options: [{ format: ['camelCase'], selector: 'parameter' }],
+    },
   ],
 });
 

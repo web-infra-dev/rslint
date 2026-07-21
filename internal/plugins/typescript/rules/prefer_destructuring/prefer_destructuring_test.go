@@ -1102,6 +1102,22 @@ func TestPreferDestructuringRule(t *testing.T) {
 				{MessageId: "preferDestructuring", Message: "Use object destructuring."},
 			},
 		},
+		{
+			// Comment-like text inside a string is not a parser comment.
+			Code:   `const foo = ({ foo: "/* not a comment */" } as any).foo;`,
+			Output: []string{`const {foo} = { foo: "/* not a comment */" } as any;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferDestructuring", Message: "Use object destructuring."},
+			},
+		},
+		{
+			// Comment-like text inside a template is not a parser comment.
+			Code:   "const foo = ({ foo: `// not a comment` } as any).foo;",
+			Output: []string{"const {foo} = { foo: `// not a comment` } as any;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferDestructuring", Message: "Use object destructuring."},
+			},
+		},
 
 		// ---- ESLint core: comment edge cases (fix suppressed) ----
 		{

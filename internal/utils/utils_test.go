@@ -177,6 +177,115 @@ func TestAccessExpressionStaticName(t *testing.T) {
 	}
 }
 
+func TestIsIntegerElementAccess(t *testing.T) {
+	source := "array[0];\n" +
+		"array[(1e2)];\n" +
+		"array[0x10];\n" +
+		"array[1_000];\n" +
+		"array[1e-400];\n" +
+		"array?.[0];\n" +
+		"array[1.5];\n" +
+		"array[5e-324];\n" +
+		"array[1e309];\n" +
+		"array[-1];\n" +
+		"array[1n];\n" +
+		"array[\"0\"];\n" +
+		"array[0 as number];\n" +
+		"array.value;\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		text string
+		want bool
+	}{
+		{text: "array[0]", want: true},
+		{text: "array[(1e2)]", want: true},
+		{text: "array[0x10]", want: true},
+		{text: "array[1_000]", want: true},
+		// tsgo normalizes this tiny literal to zero.
+		{text: "array[1e-400]", want: true},
+		// Optionality is a separate concern for callers; the key is still an integer.
+		{text: "array?.[0]", want: true},
+		{text: "array[1.5]", want: false},
+		{text: "array[5e-324]", want: false},
+		{text: "array[1e309]", want: false},
+		{text: "array[-1]", want: false},
+		{text: "array[1n]", want: false},
+		{text: "array[\"0\"]", want: false},
+		{text: "array[0 as number]", want: false},
+		{text: "array.value", want: false},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		if got := IsIntegerElementAccess(node); got != tt.want {
+			t.Errorf("IsIntegerElementAccess(%q) = %v, want %v", tt.text, got, tt.want)
+		}
+	}
+	if IsIntegerElementAccess(nil) {
+		t.Fatal("IsIntegerElementAccess(nil) = true, want false")
+	}
+}
+
+func TestEslintLikePrecedence(t *testing.T) {
+	source := "(a, b);\n" +
+		"(a = b);\n" +
+		"(() => value);\n" +
+		"(condition ? yes : no);\n" +
+		"call();\n" +
+		"object.property;\n" +
+		"object?.property;\n" +
+		"(object?.property!);\n" +
+		"(object!);\n" +
+		"(object as any);\n" +
+		"(<div />);\n" +
+		"(<section>text</section>);\n" +
+		"(<></>);\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.tsx",
+		Path:     "/test.tsx",
+	}, source, core.ScriptKindTSX)
+
+	tests := []struct {
+		text string
+		want int
+	}{
+		{text: "a, b", want: 0},
+		{text: "a = b", want: 1},
+		{text: "() => value", want: 1},
+		{text: "condition ? yes : no", want: 3},
+		{text: "call()", want: 18},
+		{text: "object.property", want: 20},
+		{text: "object?.property", want: 18},
+		// @typescript-eslint/parser exposes this complete optional chain as a
+		// ChainExpression even though tsgo's outer node is NonNullExpression.
+		{text: "object?.property!", want: 18},
+		{text: "object!", want: -1},
+		{text: "object as any", want: -1},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		if got := EslintLikePrecedence(node); got != tt.want {
+			t.Errorf("EslintLikePrecedence(%q) = %d, want %d", tt.text, got, tt.want)
+		}
+	}
+	for _, kind := range []ast.Kind{
+		ast.KindJsxSelfClosingElement,
+		ast.KindJsxElement,
+		ast.KindJsxFragment,
+	} {
+		node := findFirstNodeOfKind(t, sourceFile, kind)
+		if got := EslintLikePrecedence(node); got != 20 {
+			t.Errorf("EslintLikePrecedence(%v) = %d, want 20", kind, got)
+		}
+	}
+	if got := EslintLikePrecedence(nil); got != -1 {
+		t.Fatalf("EslintLikePrecedence(nil) = %d, want -1", got)
+	}
+}
+
 func TestResolveLegacyMaxOption(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -277,6 +386,30 @@ func findNodeWithText(t *testing.T, sourceFile *ast.SourceFile, text string) *as
 	visit(&sourceFile.Node)
 	if found == nil {
 		t.Fatalf("missing node with text %q", text)
+	}
+	return found
+}
+
+func findFirstNodeOfKind(t *testing.T, sourceFile *ast.SourceFile, kind ast.Kind) *ast.Node {
+	t.Helper()
+	var found *ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if found != nil || node == nil {
+			return
+		}
+		if node.Kind == kind {
+			found = node
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found != nil
+		})
+	}
+	visit(&sourceFile.Node)
+	if found == nil {
+		t.Fatalf("missing node of kind %v", kind)
 	}
 	return found
 }

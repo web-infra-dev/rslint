@@ -67,8 +67,9 @@ func TokenAtOrAfter(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 	}, true
 }
 
-// TokenBeforePosition returns the last non-trivia token whose end is not after
-// pos.
+// TokenBeforePosition returns the last non-trivia parser token whose end is
+// not after pos. It corrects regular-expression literals that the standalone
+// scanner initially sees as division punctuators.
 func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 	sourceText := sourceFile.Text()
 	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
@@ -87,7 +88,47 @@ func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool
 		}
 		scan.Scan()
 	}
+	// A standalone TypeScript scanner tokenizes `/pattern/flags` as division
+	// punctuators plus identifiers; the parser is what recognizes that span as a
+	// regular-expression literal. Recover the parser token so callers observe
+	// the same token boundary ESLint's SourceCode API exposes.
+	if found {
+		container := ast.GetNodeAtPosition(sourceFile, previous.Start, false)
+		if token := parsedTokenContainingPosition(container, previous.Start); token != nil &&
+			ast.IsRegularExpressionLiteral(token) {
+			textRange := TrimNodeTextRange(sourceFile, token)
+			if textRange.End() <= pos {
+				previous = SourceToken{
+					Kind:  ast.KindRegularExpressionLiteral,
+					Start: textRange.Pos(),
+					End:   textRange.End(),
+					Text:  sourceText[textRange.Pos():textRange.End()],
+				}
+			}
+		}
+	}
 	return previous, found
+}
+
+func parsedTokenContainingPosition(node *ast.Node, pos int) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	if ast.IsTokenKind(node.Kind) {
+		if node.Pos() <= pos && pos < node.End() {
+			return node
+		}
+		return nil
+	}
+
+	var found *ast.Node
+	node.ForEachChild(func(child *ast.Node) bool {
+		if child.Pos() <= pos && pos < child.End() {
+			found = parsedTokenContainingPosition(child, pos)
+		}
+		return found != nil
+	})
+	return found
 }
 
 // PreviousTokenBefore returns the last token in node whose end is not after pos.

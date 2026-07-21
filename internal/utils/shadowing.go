@@ -116,6 +116,62 @@ func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbo
 	return typeChecker.GetSymbolAtLocation(node)
 }
 
+// GetConstVariableInitializer returns the initializer of the single const
+// variable declaration referenced by node. Destructured bindings resolve to
+// their enclosing VariableDeclaration, matching ESLint scope definitions.
+// Parentheses around the reference are transparent; TS assertion wrappers are
+// intentionally not. When typeChecker is nil, binder-owned Locals tables are
+// used as a best-effort lexical fallback for already-bound source files.
+// References with no symbol, multiple declarations, non-variable
+// declarations, or let/var declarations return nil.
+func GetConstVariableInitializer(node *ast.Node, typeChecker *checker.Checker) *ast.Node {
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsIdentifier(node) {
+		return nil
+	}
+
+	var symbol *ast.Symbol
+	if typeChecker != nil {
+		symbol = GetReferenceSymbol(node, typeChecker)
+	} else {
+		name := node.AsIdentifier().Text
+		for current := node.Parent; current != nil; current = current.Parent {
+			if current.Kind == ast.KindFunctionExpression ||
+				current.Kind == ast.KindClassExpression {
+				if expressionName := current.Name(); expressionName != nil &&
+					ast.IsIdentifier(expressionName) &&
+					expressionName.AsIdentifier().Text == name {
+					// Named function/class expressions bind their name only
+					// inside the expression. The binder stores that binding
+					// separately from the ordinary Locals table, so stop
+					// before an outer declaration with the same name wins.
+					return nil
+				}
+			}
+			if !ast.IsLocalsContainer(current) {
+				continue
+			}
+			if local := ast.GetLocals(current)[name]; local != nil {
+				symbol = local
+				break
+			}
+		}
+	}
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return nil
+	}
+
+	declaration := symbol.Declarations[0]
+	if ast.IsBindingElement(declaration) {
+		declaration = EnclosingVariableDeclarationOfBindingElement(declaration)
+	}
+	if declaration == nil || !ast.IsVariableDeclaration(declaration) ||
+		!ast.IsVarConst(declaration) {
+		return nil
+	}
+	return declaration.AsVariableDeclaration().Initializer
+}
+
 // isDirectParameterOf reports whether child is one of fn's own Parameter
 // nodes (not merely nested somewhere inside the parameter list).
 func isDirectParameterOf(fn *ast.Node, child *ast.Node) bool {
