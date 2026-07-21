@@ -148,6 +148,15 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
+      # Without this, `pnpm run build` below still succeeds but the plugin
+      # skips with a warning and dist/index.d.ts never gets typed rule
+      # options — so the vscode-extension e2e suite that exercises them
+      # (suite-rule-option-types) needs it in place first.
+      - name: Dump rule schemas
+        run: go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
+
       - name: Build
         run: pnpm run build
 
@@ -205,6 +214,14 @@ jobs:
         shell: pwsh
         run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
 
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
+      # test-vscode-windows has no Go toolchain, so it's generated here (where
+      # Go is already set up) and handed off the same way rslint.exe is below.
+      - name: Dump rule schemas
+        shell: pwsh
+        run: go run ./tools/dump_rule_schemas > rule-schemas.json
+
       # vscode-extension (package "rslint") is excluded here - it's tested on
       # windows-latest instead, since the vscode-extension test does not run
       # reliably on this self-hosted runner.
@@ -219,6 +236,14 @@ jobs:
         with:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload rule schemas
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rule-schemas-windows
+          path: rule-schemas.json
           retention-days: 1
           if-no-files-found: error
 
@@ -247,6 +272,12 @@ jobs:
         with:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
+
+      - name: Download rule schemas
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rule-schemas-windows
+          path: packages/rslint
 
       # build:js only - skip @rslint/core's build:bin, which invokes `go
       # build` directly. The host rslint.exe was already built on the

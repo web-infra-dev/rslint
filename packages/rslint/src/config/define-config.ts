@@ -67,18 +67,22 @@ export type RuleOptions = Record<string, any>;
  * rslint's own `{ level, options }` object form has been removed.
  *
  * - `RuleSeverity` — just toggle the rule.
- * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
- *   single options object (`[severity, { ... }]`); some accept positional
- *   string/object args (`[severity, "always", { ... }]`).
+ * - `[RuleSeverity, ...Options]` — ESLint-style array form. `Options` is the
+ *   rule's own options-array type for rules with a precisely-typed entry in
+ *   `RulesRecord`; other rules default to `any[]`.
  */
-export type RuleEntry = RuleSeverity | readonly [RuleSeverity, ...any[]];
+export type RuleEntry<Options extends any[] = any[]> =
+  RuleSeverity | readonly [RuleSeverity, ...Options];
 
 /**
- * Map of rule name → rule configuration. Rule names are `string` (no
- * enumeration of known rules yet); the value shape is what gives editors
- * hints when typing the array or object form.
+ * Map of rule name → rule configuration. Rules with a known options shape
+ * get a named, precisely-typed property here; every other rule name (not
+ * yet typed, or a community/plugin rule) falls back to the untyped index
+ * signature (`any[]`).
  */
-export type RulesRecord = Record<string, RuleEntry>;
+export interface RulesRecord {
+  [key: string]: RuleEntry<any[]> | undefined;
+}
 
 /**
  * TypeScript parser options. `project` may be a single tsconfig path or a list.

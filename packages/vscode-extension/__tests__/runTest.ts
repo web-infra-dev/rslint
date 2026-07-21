@@ -211,6 +211,11 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
       tests: path.resolve(__dirname, './suite-eslint-plugins'),
     },
+    {
+      name: 'Generated rule-option-types tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
+      tests: path.resolve(__dirname, './suite-rule-option-types'),
+    },
   ];
 
   const failures: unknown[] = [];

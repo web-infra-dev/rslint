@@ -163,6 +163,29 @@ async function moveArtifacts() {
       console.log(`Copied ${file} to ${targetFile}`);
     }
 
+    // Move the rule options JSON Schema dump (a single, platform-independent
+    // artifact named `rule-schemas`, uploaded once from the `build` job's
+    // linux-amd64 leg) to the fixed path
+    // scripts/generate-rule-option-types.mjs reads — see
+    // packages/rslint/rslib.config.ts's onAfterBuild hook, which runs during
+    // publish-npm's `build:js` step.
+    const ruleSchemasSrc = path.join(
+      'binaries',
+      'rule-schemas',
+      'rule-schemas.json',
+    );
+    if (fs.existsSync(ruleSchemasSrc)) {
+      const ruleSchemasTarget = path.join(
+        'packages',
+        'rslint',
+        'rule-schemas.json',
+      );
+      fs.copyFileSync(ruleSchemasSrc, ruleSchemasTarget);
+      console.log(`Copied ${ruleSchemasSrc} to ${ruleSchemasTarget}`);
+    } else {
+      console.log(`Warning: rule schemas dump not found at ${ruleSchemasSrc}`);
+    }
+
     console.log('Artifact move process completed successfully!');
   } catch (error) {
     console.error('Error:', error.message);

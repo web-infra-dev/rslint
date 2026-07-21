@@ -271,6 +271,23 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo ./cmd/tsgo
 
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/rslib.config.ts), read by
+      # publish-npm once move-artifacts places it. The dump is
+      # platform-independent JSON, so it only needs to run once, on this
+      # matrix leg's host (ubuntu-22.04, not a cross-compile target) — no
+      # GOOS/GOARCH override, it runs natively rather than being cross-built.
+      - name: Dump rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        run: go run ./tools/dump_rule_schemas > rule-schemas.json
+
+      - name: Upload rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rule-schemas
+          path: rule-schemas.json
+
       - name: Upload rslint artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
