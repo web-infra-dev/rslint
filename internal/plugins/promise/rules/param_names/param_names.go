@@ -9,7 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed param-names.schema.json
+//go:embed param_names.schema.json
 var schemaJSON []byte
 
 // skipTransparent only unwraps parens — ESLint's ESTree parser drops

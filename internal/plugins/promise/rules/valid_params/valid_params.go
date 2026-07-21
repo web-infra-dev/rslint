@@ -11,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed valid-params.schema.json
+//go:embed valid_params.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses

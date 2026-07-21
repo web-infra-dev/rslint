@@ -10,7 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed catch-or-return.schema.json
+//go:embed catch_or_return.schema.json
 var schemaJSON []byte
 
 const skipTransparent = ast.OEKParentheses
