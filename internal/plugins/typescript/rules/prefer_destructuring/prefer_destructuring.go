@@ -1,9 +1,6 @@
 package prefer_destructuring
 
 import (
-	"math"
-	"strconv"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -156,13 +153,10 @@ var PreferDestructuringRule = rule.CreateRule(rule.Rule{
 
 			// AssignmentExpression (ESTree) → BinaryExpression with = operator (tsgo)
 			ast.KindBinaryExpression: func(node *ast.Node) {
+				if !ast.IsAssignmentExpression(node, true) {
+					return
+				}
 				bin := node.AsBinaryExpression()
-				if bin == nil || bin.OperatorToken == nil {
-					return
-				}
-				if bin.OperatorToken.Kind != ast.KindEqualsToken {
-					return
-				}
 				performCheck(ctx, opts, bin.Left, bin.Right, node, false)
 			},
 		}
@@ -178,7 +172,7 @@ func performCheck(ctx rule.RuleContext, opts options, leftNode *ast.Node, rightN
 	right := ast.SkipParentheses(rightNode)
 
 	// RHS must be a member expression (property access or element access)
-	if right.Kind != ast.KindPropertyAccessExpression && right.Kind != ast.KindElementAccessExpression {
+	if !ast.IsAccessExpression(right) {
 		return
 	}
 
@@ -187,19 +181,15 @@ func performCheck(ctx rule.RuleContext, opts options, leftNode *ast.Node, rightN
 		return
 	}
 
-	// Skip super access and private identifiers
-	var objectNode *ast.Node
-	if right.Kind == ast.KindPropertyAccessExpression {
+	// Skip super access and private identifiers.
+	if ast.IsPropertyAccessExpression(right) {
 		pae := right.AsPropertyAccessExpression()
-		objectNode = pae.Expression
 		if pae.Name() != nil && ast.IsPrivateIdentifier(pae.Name()) {
 			return
 		}
-	} else {
-		eae := right.AsElementAccessExpression()
-		objectNode = eae.Expression
 	}
 
+	objectNode := utils.AccessExpressionObject(right)
 	if objectNode != nil && ast.SkipParentheses(objectNode).Kind == ast.KindSuperKeyword {
 		return
 	}
@@ -224,7 +214,7 @@ func performCheck(ctx rule.RuleContext, opts options, leftNode *ast.Node, rightN
 	}
 
 	// Check for integer-literal index access (array-like)
-	if isArrayLiteralIntegerIndexAccess(right) {
+	if utils.IsIntegerElementAccess(right) {
 		// typescript-eslint uses type info to determine if this is truly iterable
 		if ctx.TypeChecker != nil && objectNode != nil {
 			objType := ctx.TypeChecker.GetTypeAtLocation(objectNode)
@@ -302,27 +292,6 @@ func hasTypeAnnotation(node *ast.Node) bool {
 	return false
 }
 
-// isArrayLiteralIntegerIndexAccess checks if the node is a member expression
-// accessing an integer index (e.g., x[0], x[1]).
-func isArrayLiteralIntegerIndexAccess(node *ast.Node) bool {
-	if node.Kind != ast.KindElementAccessExpression {
-		return false
-	}
-	eae := node.AsElementAccessExpression()
-	if eae.ArgumentExpression == nil {
-		return false
-	}
-	arg := ast.SkipParentheses(eae.ArgumentExpression)
-	if arg.Kind != ast.KindNumericLiteral {
-		return false
-	}
-	val, err := strconv.ParseFloat(arg.Text(), 64)
-	if err != nil {
-		return false
-	}
-	return val == math.Trunc(val) && !math.IsInf(val, 0) && !math.IsNaN(val)
-}
-
 // isTypeAnyOrIterableType checks if the type is any or has [Symbol.iterator].
 // For union types, all members must be any-or-iterable.
 func isTypeAnyOrIterableType(t *checker.Type, tc *checker.Checker) bool {
@@ -343,7 +312,7 @@ func isTypeAnyOrIterableType(t *checker.Type, tc *checker.Checker) bool {
 // getIdentifierName returns the name of an Identifier node (skipping parens).
 func getIdentifierName(node *ast.Node) string {
 	n := ast.SkipParentheses(node)
-	if n.Kind == ast.KindIdentifier {
+	if n != nil && ast.IsIdentifier(n) {
 		return n.Text()
 	}
 	return ""
@@ -354,10 +323,10 @@ func getIdentifierName(node *ast.Node) string {
 // PropertyAccessExpression RHS, and matching names.
 func shouldFix(leftNode *ast.Node, rightNode *ast.Node) bool {
 	left := ast.SkipParentheses(leftNode)
-	if left.Kind != ast.KindIdentifier {
+	if left == nil || !ast.IsIdentifier(left) {
 		return false
 	}
-	if rightNode.Kind != ast.KindPropertyAccessExpression {
+	if !ast.IsPropertyAccessExpression(rightNode) {
 		return false
 	}
 	pae := rightNode.AsPropertyAccessExpression()
@@ -379,12 +348,13 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 	// 1. Between the identifier and the object expression (covers `id /* c */ = ...`)
 	// 2. Between the object expression end and the member-expr end (covers `obj /* c */ .prop`)
 	text := ctx.SourceFile.Text()
+	comments := ctx.Comments.All()
 	idRange := utils.TrimNodeTextRange(ctx.SourceFile, leftNode)
 	objRange := utils.TrimNodeTextRange(ctx.SourceFile, objectExpr)
 	nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, reportNode)
 
-	if hasCommentInText(text, idRange.End(), objRange.Pos()) ||
-		hasCommentInText(text, objRange.End(), nodeRange.End()) {
+	if utils.HasCommentInSpan(comments, idRange.End(), objRange.Pos()) ||
+		utils.HasCommentInSpan(comments, objRange.End(), nodeRange.End()) {
 		ctx.ReportNode(reportNode, buildPreferDestructuringMessage("object"))
 		return
 	}
@@ -397,8 +367,8 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 	innerRange := utils.TrimNodeTextRange(ctx.SourceFile, innerObj)
 
 	// If stripping parens would lose a comment (e.g., `(/* c */ obj)`), suppress fix.
-	if hasCommentInText(text, objRange.Pos(), innerRange.Pos()) ||
-		hasCommentInText(text, innerRange.End(), objRange.End()) {
+	if utils.HasCommentInSpan(comments, objRange.Pos(), innerRange.Pos()) ||
+		utils.HasCommentInSpan(comments, innerRange.End(), objRange.End()) {
 		ctx.ReportNode(reportNode, buildPreferDestructuringMessage("object"))
 		return
 	}
@@ -419,21 +389,4 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 	ctx.ReportNodeWithFixes(reportNode, buildPreferDestructuringMessage("object"),
 		rule.RuleFixReplaceRange(fixRange, replacement),
 	)
-}
-
-// hasCommentInText checks whether a `/*` or `//` comment literal exists in the
-// source text between positions start and end. This is a simple text scan that
-// doesn't require scanner integration, and correctly finds comments anywhere in
-// the range (unlike GetCommentsInRange which only scans from the range start).
-func hasCommentInText(text string, start, end int) bool {
-	if start < 0 || end > len(text) || start >= end {
-		return false
-	}
-	s := text[start:end]
-	for i := range len(s) - 1 {
-		if s[i] == '/' && (s[i+1] == '/' || s[i+1] == '*') {
-			return true
-		}
-	}
-	return false
 }
