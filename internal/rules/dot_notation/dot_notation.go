@@ -13,7 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed dot-notation.schema.json
+//go:embed dot_notation.schema.json
 var schemaJSON []byte
 
 // Options mirrors ESLint core's dot-notation rule options
