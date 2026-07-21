@@ -71,10 +71,10 @@ function MyComponent({theme}) {
 		return
 	}
 
-	// Settings include `additionalHooks` so the additional-hooks code
-	// path is also exercised under nil TC.
+	// Settings include `additionalEffectHooks` so the additional-hooks
+	// code path is also exercised under nil TC.
 	settings := map[string]interface{}{
-		"react-hooks": map[string]interface{}{"additionalHooks": "(useTrackedEffect)"},
+		"react-hooks": map[string]interface{}{"additionalEffectHooks": "(useTrackedEffect)"},
 	}
 
 	ctx := rule.RuleContext{
