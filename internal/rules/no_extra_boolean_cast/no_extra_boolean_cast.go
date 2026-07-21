@@ -33,9 +33,9 @@ func parseOptions(opts any) options {
 // along with the direct child of that ancestor (either node itself or the
 // outermost ParenthesizedExpression wrapping it).
 func effectiveParent(node *ast.Node) (parent, child *ast.Node) {
-	child = node
-	for child.Parent != nil && ast.IsParenthesizedExpression(child.Parent) {
-		child = child.Parent
+	child = utils.OutermostParenthesizedExpression(node)
+	if child == nil {
+		return nil, nil
 	}
 	return child.Parent, child
 }

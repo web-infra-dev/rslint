@@ -1,0 +1,24 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignoreLastCallback": {
+          "type": "boolean"
+        },
+        "ignoreAssignmentVariable": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w$]+$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

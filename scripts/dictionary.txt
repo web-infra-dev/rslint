@@ -145,6 +145,7 @@ errchkjson
 errgroup
 errrr
 esbuild
+escope
 ESLint
 esmodule
 espree

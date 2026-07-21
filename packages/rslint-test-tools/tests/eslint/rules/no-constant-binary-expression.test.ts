@@ -34,6 +34,17 @@ ruleTester.run('no-constant-binary-expression', {
     // --- Nullish coalescing edge cases ---
     'foo ?? null ?? bar',
 
+    // --- ?? over a ||/&& chain: never constant, matching upstream ESLint,
+    // which only special-cases the "??" operator in hasConstantNullishness
+    // and treats any other logical operator as not constant, regardless of
+    // operands ---
+    '(a || b || c) ?? fallback',
+    '(a && b) ?? fallback',
+    '(a && b.x) ?? fallback',
+    '((a || b) && (c || d)) ?? fallback',
+    '(a || b || "literal") ?? fallback',
+    '(String(x) && Number(x)) ?? fallback',
+
     // --- Shadowed built-in functions ---
     'function Boolean(n: any) { return n; } Boolean(x) ?? foo',
     'function Boolean(n: any) { return n; } Boolean(x) && foo',

@@ -18,6 +18,23 @@ func SkipAssertionsAndParens(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, skipTransparentKinds)
 }
 
+// OutermostParenthesizedExpression returns node's outermost
+// ParenthesizedExpression wrapper, or node itself when it is not wrapped.
+// Unlike ast.WalkUpParenthesizedExpressions, this preserves the wrapper that
+// the containing non-parenthesized node sees as its direct child.
+func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil &&
+		ast.IsParenthesizedExpression(current.Parent) {
+		parent := current.Parent.AsParenthesizedExpression()
+		if parent == nil || parent.Expression != current {
+			break
+		}
+		current = current.Parent
+	}
+	return current
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
@@ -91,7 +108,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 		return false
 	}
 
-	obj := memberAccessObject(callee)
+	obj := AccessExpressionObject(callee)
 	obj = ast.SkipParentheses(obj)
 	if obj == nil || !ast.IsIdentifier(obj) ||
 		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
@@ -106,16 +123,6 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 func isGlobalOff(globals map[string]bool, name string) bool {
 	declared, ok := globals[name]
 	return ok && !declared
-}
-
-func memberAccessObject(node *ast.Node) *ast.Node {
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		return node.AsPropertyAccessExpression().Expression
-	case ast.KindElementAccessExpression:
-		return node.AsElementAccessExpression().Expression
-	}
-	return nil
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference

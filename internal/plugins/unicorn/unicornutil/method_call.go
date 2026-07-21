@@ -31,7 +31,7 @@ func MatchDotMethodCall(node *ast.Node, options DotMethodCallOptions) (DotMethod
 	}
 
 	call := node.AsCallExpression()
-	if !options.AllowOptionalCall && call.QuestionDotToken != nil {
+	if !options.AllowOptionalCall && ast.IsOptionalChainRoot(node) {
 		return DotMethodCall{}, false
 	}
 
@@ -52,7 +52,7 @@ func MatchDotMethodCall(node *ast.Node, options DotMethodCallOptions) (DotMethod
 
 	propertyAccess := callee.AsPropertyAccessExpression()
 	if propertyAccess == nil ||
-		(!options.AllowOptionalMember && propertyAccess.QuestionDotToken != nil) {
+		(!options.AllowOptionalMember && ast.IsOptionalChainRoot(callee)) {
 		return DotMethodCall{}, false
 	}
 
