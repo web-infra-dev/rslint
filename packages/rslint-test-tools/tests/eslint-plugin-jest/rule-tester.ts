@@ -47,7 +47,7 @@ export class RuleTester {
     ruleName: string,
     rule: never,
     cases: {
-      valid: ValidTestCase[];
+      valid: (ValidTestCase | string)[];
       invalid: InvalidTestCase[];
     },
   ) {
