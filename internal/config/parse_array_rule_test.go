@@ -78,6 +78,7 @@ func TestParseArrayRuleConfig_OptionShapes(t *testing.T) {
 			rc := parseArrayRuleConfig(tt.in)
 			if rc == nil {
 				t.Fatal("parseArrayRuleConfig returned nil")
+				return
 			}
 			if rc.Level != tt.wantLevel {
 				t.Errorf("Level = %q, want %q", rc.Level, tt.wantLevel)
