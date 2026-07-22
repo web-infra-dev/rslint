@@ -1,0 +1,89 @@
+/* Lint-demo keyframes — kept in a PLAIN (non-module) stylesheet on purpose.
+   Inside styles.module.scss, dart-sass hoists every @keyframes to the top
+   level and strips the surrounding :global marker, so the CSS-Modules pass
+   hashes the keyframe names (ld-spin -> ld-spin-PRrU1x) while the bare
+   `animation: ld-spin` references inside the :global selector blocks are
+   left untouched — name mismatch, every animation silently dies. A plain
+   .scss is never module-hashed, so these names stay literal and match the
+   references. The ld- prefix keeps them out of the global namespace's way.
+
+   They animate elements inside `.lintDemo`; the referenced CSS custom
+   properties (--ld-*) resolve on those target elements, not here. */
+
+@keyframes ld-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes ld-replay-spin {
+  from {
+    transform: translateY(0.5px) rotate(0);
+  }
+  to {
+    transform: translateY(0.5px) rotate(-360deg);
+  }
+}
+
+@keyframes ld-lockin {
+  0% {
+    color: var(--ld-code-lockin-flash);
+    text-shadow: 0 0 10px var(--ld-code-lockin-glow);
+    transform: scale(1.35);
+  }
+  100% {
+    color: var(--ld-code-text);
+    text-shadow: none;
+    transform: scale(1);
+  }
+}
+
+@keyframes ld-token-tint {
+  0%,
+  100% {
+    color: var(--ld-code-text);
+  }
+  50% {
+    color: var(--ld-token-violation-tint);
+  }
+}
+
+@keyframes ld-log-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ld-log-out {
+  to {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+@keyframes ld-caret-blink {
+  0%,
+  49.99% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ld-diag-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
