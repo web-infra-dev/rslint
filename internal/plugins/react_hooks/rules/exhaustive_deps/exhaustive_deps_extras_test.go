@@ -268,7 +268,7 @@ var extrasValid = []rule_tester.ValidTestCase{
 			}
 		`,
 		Tsx:      true,
-		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalHooks": "(useTrackedEffect)"}},
+		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalEffectHooks": "(useTrackedEffect)"}},
 	},
 
 	// Lock-in: `Namespace.useFoo` is NOT recognized as a hook by the
@@ -494,7 +494,7 @@ var extrasInvalid = []rule_tester.InvalidTestCase{
 			}
 		`,
 		Tsx:      true,
-		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalHooks": "(useTrackedEffect)"}},
+		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalEffectHooks": "(useTrackedEffect)"}},
 		Errors: []rule_tester.InvalidTestCaseError{
 			{Message: "React Hook useTrackedEffect has a missing dependency: 'id'. Either include it or remove the dependency array.",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
