@@ -3,8 +3,6 @@ package require_optimization
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
@@ -2502,27 +2500,12 @@ const ArrowComp = (p) => <div />;
 		return
 	}
 
-	ctx := rule.RuleContext{
+	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
 		Program:     program,
 		Settings:    map[string]interface{}{},
 		TypeChecker: nil, // explicitly nil — this is the path under test
-		ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-			// noop — we only care that nothing panics.
-		},
-		ReportRange: func(_ core.TextRange, _ rule.RuleMessage) {
-		},
-		ReportNodeWithFixes: func(_ *ast.Node, _ rule.RuleMessage, _ ...rule.RuleFix) {
-		},
-		ReportRangeWithFixes: func(_ core.TextRange, _ rule.RuleMessage, _ ...rule.RuleFix) {
-		},
-		ReportNodeWithSuggestions: func(_ *ast.Node, _ rule.RuleMessage, _ ...rule.RuleSuggestion) {
-		},
-		ReportRangeWithSuggestions: func(_ core.TextRange, _ rule.RuleMessage, _ ...rule.RuleSuggestion) {
-		},
-		ReportNodeWithFixesAndSuggestions: func(_ *ast.Node, _ rule.RuleMessage, _ []rule.RuleFix, _ []rule.RuleSuggestion) {
-		},
-	}
+	}).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

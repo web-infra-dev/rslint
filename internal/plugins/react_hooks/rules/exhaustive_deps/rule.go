@@ -78,15 +78,8 @@ var ExhaustiveDepsRule = rule.Rule{
 				// `problem.fix = problem.suggest[0].fix`: promote the
 				// first suggestion's first fix only (singular `.fix`,
 				// not the entire FixesArr), AND keep the suggestions.
-				// `ReportNodeWithFixesAndSuggestions` is the preferred
-				// path; harnesses without it fall back to a fix-only
-				// report.
 				firstFix := []rule.RuleFix{sugs[0].FixesArr[0]}
-				if ctx.ReportNodeWithFixesAndSuggestions != nil {
-					ctx.ReportNodeWithFixesAndSuggestions(node, rule.RuleMessage{Description: msg}, firstFix, sugs)
-					return
-				}
-				ctx.ReportNodeWithFixes(node, rule.RuleMessage{Description: msg}, firstFix...)
+				ctx.ReportNodeWithFixesAndSuggestions(node, rule.RuleMessage{Description: msg}, firstFix, sugs)
 				return
 			}
 			if len(sugs) == 0 {
@@ -1182,7 +1175,7 @@ func parseDeclaredDeps(
 func flushDeferredDiagnostics(ctx rule.RuleContext, deferred []elementDiagnostic, enableDangerous bool) {
 	for _, d := range deferred {
 		if d.suggestion != nil {
-			if enableDangerous && len(d.suggestion.FixesArr) > 0 && ctx.ReportNodeWithFixesAndSuggestions != nil {
+			if enableDangerous && len(d.suggestion.FixesArr) > 0 {
 				firstFix := []rule.RuleFix{d.suggestion.FixesArr[0]}
 				ctx.ReportNodeWithFixesAndSuggestions(
 					d.node,
