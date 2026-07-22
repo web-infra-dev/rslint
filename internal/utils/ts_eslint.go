@@ -1640,6 +1640,80 @@ func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name
 	}
 }
 
+// GetESTreeBindingIdentifierRange returns the source range that TSESTree gives
+// to a declaration identifier. TSESTree folds a non-rest parameter's optional
+// marker/type annotation and a variable's definite-assignment marker/type
+// annotation into the Identifier range, while tsgo stores those pieces on the
+// parent declaration. Binding-pattern identifiers and rest parameters retain
+// the plain identifier range.
+func GetESTreeBindingIdentifierRange(sourceFile *ast.SourceFile, identifier *ast.Node) core.TextRange {
+	if identifier == nil {
+		return core.TextRange{}
+	}
+	textRange := TrimNodeTextRange(sourceFile, identifier)
+	if identifier.Kind != ast.KindIdentifier || identifier.Parent == nil {
+		return textRange
+	}
+
+	end := textRange.End()
+	switch identifier.Parent.Kind {
+	case ast.KindVariableDeclaration:
+		declaration := identifier.Parent.AsVariableDeclaration()
+		if declaration == nil || declaration.Name() != identifier {
+			return textRange
+		}
+		if declaration.ExclamationToken != nil && declaration.ExclamationToken.End() > end {
+			end = declaration.ExclamationToken.End()
+		}
+		if declaration.Type != nil && declaration.Type.End() > end {
+			end = declaration.Type.End()
+		}
+
+	case ast.KindParameter:
+		parameter := identifier.Parent.AsParameterDeclaration()
+		if parameter == nil || parameter.Name() != identifier || parameter.DotDotDotToken != nil {
+			return textRange
+		}
+		if parameter.QuestionToken != nil && parameter.QuestionToken.End() > end {
+			end = parameter.QuestionToken.End()
+		}
+		if parameter.Type != nil && parameter.Type.End() > end {
+			end = parameter.Type.End()
+		}
+	}
+
+	return core.NewTextRange(textRange.Pos(), end)
+}
+
+// ForEachVariableDeclarationBinding visits every identifier bound by a
+// VariableDeclarationList in source order. The declaration argument is the
+// top-level VariableDeclaration that owns the identifier, including when the
+// identifier is nested inside an object or array binding pattern.
+func ForEachVariableDeclarationBinding(declarationList *ast.Node, callback func(declaration *ast.Node, identifier *ast.Node, name string)) {
+	if declarationList == nil || callback == nil {
+		return
+	}
+	if declarationList.Kind != ast.KindVariableDeclarationList {
+		return
+	}
+	list := declarationList.AsVariableDeclarationList()
+	if list == nil || list.Declarations == nil {
+		return
+	}
+	for _, declaration := range list.Declarations.Nodes {
+		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+			continue
+		}
+		variable := declaration.AsVariableDeclaration()
+		if variable == nil || variable.Name() == nil {
+			continue
+		}
+		CollectBindingNames(variable.Name(), func(identifier *ast.Node, name string) {
+			callback(declaration, identifier, name)
+		})
+	}
+}
+
 // IsNullLiteral checks if a node is the null keyword, unwrapping parentheses.
 func IsNullLiteral(node *ast.Node) bool {
 	if node == nil {

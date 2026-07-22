@@ -1,7 +1,8 @@
-// TestNoRedeclareUpstream migrates the full valid/invalid suite from upstream
-// eslint/tests/lib/rules/no-redeclare.js 1:1. Position assertions cover
+// TestNoRedeclareUpstream migrates the full valid/invalid suite from ESLint
+// v10.7.0 tests/lib/rules/no-redeclare.js 1:1. Position assertions cover
 // line/column/endLine/endColumn for every invalid case that rslint can execute.
-// rslint-specific lock-in cases live in the no_redeclare_extras_test.go file.
+// Unsupported parser/scope configuration cases remain in place with Skip and
+// an explicit reason. rslint-specific lock-ins live in no_redeclare_extras_test.go.
 package no_redeclare
 
 import (
@@ -62,23 +63,30 @@ func TestNoRedeclareUpstream(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- upstream invalid: basic var/function redeclarations ----
-			invalidRedeclared("var a = 3;\nvar a = 10;", "a", 2, 5),
+			invalidRedeclared("var a = 3; var a = 10;", "a", 1, 16),
 			invalidRedeclared("switch(foo) { case a: var b = 3;\ncase b: var b = 4}", "b", 2, 13),
 			invalidRedeclared("var a = 3; var a = 10;", "a", 1, 16),
-			invalidRedeclared("var a = {};\nvar a = [];", "a", 2, 5),
-			invalidRedeclared("var a;\nfunction a() {}", "a", 2, 10),
-			invalidRedeclared("function a() {}\nfunction a() {}", "a", 2, 10),
-			invalidRedeclared("var a = function() { };\nvar a = function() { }", "a", 2, 5),
-			invalidRedeclared("var a = function() { };\nvar a = new Date();", "a", 2, 5),
+			invalidRedeclared("var a = {}; var a = [];", "a", 1, 17),
+			invalidRedeclared("var a; function a() {}", "a", 1, 17),
+			invalidRedeclared("function a() {} function a() {}", "a", 1, 26),
+			invalidRedeclared("var a = function() { }; var a = function() { }", "a", 1, 29),
+			invalidRedeclared("var a = function() { }; var a = new Date();", "a", 1, 29),
 			{
-				Code: "var a = 3;\nvar a = 10;\nvar a = 15;",
+				Code: "var a = 3; var a = 10; var a = 15;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					redeclaredError("a", 2, 5),
-					redeclaredError("a", 3, 5),
+					redeclaredError("a", 1, 16),
+					redeclaredError("a", 1, 28),
 				},
 			},
-			invalidRedeclared("var a;\nvar a;", "a", 2, 5),
-			invalidRedeclared("export var a;\nvar a;", "a", 2, 5),
+			// SKIP: rslint does not support ESLint's sourceType override without import/export syntax.
+			{
+				Code: "var a; var a;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 1, 12),
+				},
+				Skip: true,
+			},
+			invalidRedeclared("export var a; var a;", "a", 1, 19),
 
 			// ---- upstream invalid: var redeclaration in class static blocks ----
 			invalidRedeclared("class C { static { var a; var a; } }", "a", 1, 31),
@@ -90,31 +98,45 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			invalidBuiltin("var Object = 0;", "Object", 1, 5),
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"top": true}, Errors: []rule_tester.InvalidTestCaseError{builtinError("top", 1, 5)}},
 			{
-				Code:    "var a;\nvar {a = 0, b: Object = 0} = {};",
+				Code:    "var a; var {a = 0, b: Object = 0} = {};",
 				Options: map[string]interface{}{"builtinGlobals": true},
 				Errors: []rule_tester.InvalidTestCaseError{
-					redeclaredError("a", 2, 6),
-					builtinError("Object", 2, 16),
+					redeclaredError("a", 1, 13),
+					builtinError("Object", 1, 23),
 				},
 			},
 			// SKIP: rslint does not support ESLint's sourceType override without import/export syntax.
-			{Code: "var a; var {a = 0, b: Object = 0} = {};", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
-			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
-			{Code: "var a; var {a = 0, b: Object = 0} = {};", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
 			{
-				Code:    "var a;\nvar {a = 0, b: Object = 0} = {};",
+				Code:    "var a; var {a = 0, b: Object = 0} = {};",
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 1, 13),
+				},
+				Skip: true,
+			},
+			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
+			{
+				Code:    "var a; var {a = 0, b: Object = 0} = {};",
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("a", 1, 13),
+				},
+				Skip: true,
+			},
+			{
+				Code:    "var a; var {a = 0, b: Object = 0} = {};",
 				Options: map[string]interface{}{"builtinGlobals": false},
 				Errors: []rule_tester.InvalidTestCaseError{
-					redeclaredError("a", 2, 6),
+					redeclaredError("a", 1, 13),
 				},
 			},
 			invalidBuiltin("var globalThis = 0;", "globalThis", 1, 5),
 			{
-				Code:    "var a;\nvar {a = 0, b: globalThis = 0} = {};",
+				Code:    "var a; var {a = 0, b: globalThis = 0} = {};",
 				Options: map[string]interface{}{"builtinGlobals": true},
 				Errors: []rule_tester.InvalidTestCaseError{
-					redeclaredError("a", 2, 6),
-					builtinError("globalThis", 2, 16),
+					redeclaredError("a", 1, 13),
+					builtinError("globalThis", 1, 23),
 				},
 			},
 
@@ -135,7 +157,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			},
 
 			// ---- upstream invalid: function and for scopes ----
-			invalidRedeclared("function f() {\n  var a;\n  var a;\n}", "a", 3, 7),
+			invalidRedeclared("function f() { var a; var a; }", "a", 1, 27),
 			invalidRedeclared("function f(a) { var a; }", "a", 1, 21),
 			invalidRedeclared("function f() { var a; if (test) { var a; } }", "a", 1, 39),
 			invalidRedeclared("for (var a, a;;);", "a", 1, 13),

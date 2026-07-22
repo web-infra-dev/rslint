@@ -85,3 +85,27 @@ func TestAddDefaultLibraryGlobals(t *testing.T) {
 		t.Error("module-local declaration was collected as a default-library global")
 	}
 }
+
+func TestAddDefaultLibraryTypeGlobalNames(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	fs := NewOverlayVFSForFile(filePath, "export {}; type NodeListOf = 1; const localOnly = 1;")
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err, "couldn't create program")
+
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+	typeGlobals := map[string]bool{}
+	AddDefaultLibraryTypeGlobalNames(typeGlobals, program, typeChecker)
+
+	for _, name := range []string{"Object", "NodeListOf", "ImportMeta"} {
+		if !typeGlobals[name] {
+			t.Errorf("expected %q to be collected from the default-library type space", name)
+		}
+	}
+	for _, name := range []string{"top", "document", "localOnly"} {
+		if typeGlobals[name] {
+			t.Errorf("did not expect value-only/local name %q in the default-library type space", name)
+		}
+	}
+}
