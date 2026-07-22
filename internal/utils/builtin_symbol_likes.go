@@ -73,6 +73,16 @@ func IsSymbolFromDefaultLibrary(
 // source location so a same-named declaration in the linted module cannot hide
 // the global from GetSymbolsInScope.
 func AddDefaultLibraryGlobals(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker) {
+	addDefaultLibraryGlobalNames(dst, program, typeChecker, ast.SymbolFlagsValue)
+}
+
+// AddDefaultLibraryTypeGlobalNames adds the type-space subset of active
+// TypeScript default-library global names to dst.
+func AddDefaultLibraryTypeGlobalNames(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker) {
+	addDefaultLibraryGlobalNames(dst, program, typeChecker, ast.SymbolFlagsType)
+}
+
+func addDefaultLibraryGlobalNames(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker, flags ast.SymbolFlags) {
 	if dst == nil || program == nil || typeChecker == nil {
 		return
 	}
@@ -81,7 +91,7 @@ func AddDefaultLibraryGlobals(dst map[string]bool, program *compiler.Program, ty
 		if !IsSourceFileDefaultLibrary(program, sourceFile) {
 			continue
 		}
-		for _, symbol := range typeChecker.GetSymbolsInScope(sourceFile.AsNode(), ast.SymbolFlagsValue) {
+		for _, symbol := range typeChecker.GetSymbolsInScope(sourceFile.AsNode(), flags) {
 			if symbol != nil && symbol.Name != "" && IsSymbolFromDefaultLibrary(program, symbol) {
 				dst[symbol.Name] = true
 			}

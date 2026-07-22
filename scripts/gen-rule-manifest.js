@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const REPO_ROOT = path.join(__dirname, '..');
+
 // Plugins root directory
 const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
 const CORE_RULES_DIR = path.join(__dirname, '../internal/rules');
@@ -76,17 +78,55 @@ function groupToTestDir(group) {
   return group.replace(/^@/, '');
 }
 
-function getIncludedRules() {
-  // Parse rstest.config.mts include list, extract rule names from all test directories
+// Canonical manifest key. The whole file uses the `group` namespace so a
+// lookup can never accidentally mix `group` and `testDir` spellings.
+function ruleKey(group, rule) {
+  return `${group}:${rule}`;
+}
+
+function getIncludedRuleTests(groups) {
+  // Parse rstest.config.mts include list and associate each rule with its
+  // enabled test files, including tests nested under a rule directory.
   const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
-  // Match any uncommented test path: ./tests/{any-group}/rules/{rule}.test.ts
+  // Translate the on-disk test directory back to its manifest group once here,
+  // so the returned map lives entirely in the `group` namespace.
+  const testDirToGroup = new Map(groups.map((g) => [groupToTestDir(g), g]));
+  // Fail loudly if a group's expected test directory is missing: otherwise
+  // every rule in that group silently degrades to partial-test, and because
+  // the manifest is gitignored and built at site-build time the flip would
+  // never surface in a diff.
+  for (const [testDir] of testDirToGroup) {
+    const dir = path.join(TESTS_BASE_DIR, testDir);
+    if (!fs.existsSync(dir)) {
+      throw new Error(
+        `Expected test directory not found: ${path.relative(REPO_ROOT, dir)} ` +
+          `(group "${testDirToGroup.get(testDir)}"). Update groupToTestDir or the test layout.`,
+      );
+    }
+  }
+  // Match uncommented flat and nested paths:
+  //   ./tests/{testDir}/rules/{rule}.test.ts
+  //   ./tests/{testDir}/rules/{rule}/{test-file}.test.ts
   const includeRegex =
-    /^\s*'\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)\.test\.ts'/gm;
-  const included = new Set();
+    /^\s*'(\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)(?:\/[^']+)?\.test\.ts)'/gm;
+  const included = new Map();
   let match;
   while ((match = includeRegex.exec(config))) {
-    const rule = match[2].replace(/-/g, '_');
-    included.add(rule);
+    const group = testDirToGroup.get(match[2]);
+    if (!group) continue; // test dir with no matching plugin group
+    const testPath = path.resolve(path.dirname(TEST_CONFIG_PATH), match[1]);
+    const rule = match[3].replace(/-/g, '_');
+    const key = ruleKey(group, rule);
+    if (!included.has(key)) included.set(key, new Set());
+    included.get(key).add(testPath);
+  }
+  // A non-empty include list that parses to zero entries means the regex or
+  // the config quoting drifted (e.g. a formatter switched to double quotes).
+  if (included.size === 0) {
+    throw new Error(
+      `No rule tests parsed from ${path.relative(REPO_ROOT, TEST_CONFIG_PATH)}; ` +
+        `the include-path regex is likely out of sync with the config format.`,
+    );
   }
   return included;
 }
@@ -227,29 +267,37 @@ function getStatementLevelSkipCases(content, relPath) {
   return skipCases;
 }
 
-function getSkipCases(rule, group) {
-  // Return skip cases as [{name, url}]
-  const testDir = groupToTestDir(group);
-  const testsDir = path.join(TESTS_BASE_DIR, testDir, 'rules');
-  const testFile = path.join(testsDir, `${rule.replace(/_/g, '-')}.test.ts`);
+function getObjectSkipCases(content, relPath) {
+  // Match statement-level `skip: true` test-case objects, whether or not they
+  // carry a `name` property; unnamed cases get a line-based placeholder.
+  const skipCases = [];
+  const skipRegex = /\bskip\s*:\s*true\b/g;
+  const state = createParserState();
+  let cursor = 0;
+  let match;
+
+  while ((match = skipRegex.exec(content))) {
+    advanceParserState(state, content, cursor, match.index);
+    if (isStatementLevel(state)) {
+      const line = content.slice(0, match.index).split('\n').length;
+      skipCases.push({
+        name: `Skipped test case at line ${line}`,
+        url: `${relPath}#L${line}`,
+      });
+    }
+    cursor = skipRegex.lastIndex;
+  }
+
+  return skipCases;
+}
+
+function getSkipCases(testFile) {
+  // Return skip cases as [{name, url}] for a single enabled test file.
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
-  const relPath = `packages/rslint-test-tools/tests/${testDir}/rules/${rule.replace(/_/g, '-')}.test.ts`;
-  const skipCases = [];
-  // 1. Object case: { ..., skip: true, name: 'xxx' }
-  const objCaseRegex =
-    /\{[^}]*skip\s*:\s*true[^}]*name\s*:\s*['"]([^'"]+)['"][^}]*}/g;
-  let m;
-  while ((m = objCaseRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
-  // 2. Top-level it.skip('name', ...) / describe.skip('name', ...)
+  const relPath = path.relative(REPO_ROOT, testFile).split(path.sep).join('/');
+  const skipCases = getObjectSkipCases(content, relPath);
+  // Also collect top-level it.skip('name', ...) / describe.skip('name', ...).
   skipCases.push(...getStatementLevelSkipCases(content, relPath));
   return skipCases;
 }
@@ -268,24 +316,29 @@ function getDocPath(rule, pluginDir) {
 }
 
 function buildManifest() {
-  const included = getIncludedRules();
   const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
-  // Deduplicate by rule name, keeping first entry
+  // Deduplicate by group + rule name, keeping first entry.
   const seen = new Map();
   for (const e of ruleEntries) {
-    if (!seen.has(e.rule)) seen.set(e.rule, e);
+    const key = ruleKey(e.group, e.rule);
+    if (!seen.has(key)) seen.set(key, e);
   }
-  const rules = Array.from(seen.keys())
-    .sort((a, b) => a.localeCompare(b))
-    .map((rule) => {
-      const entry = seen.get(rule);
+  const groups = [...new Set(ruleEntries.map((e) => e.group))];
+  const included = getIncludedRuleTests(groups);
+  const rules = Array.from(seen.values())
+    .sort(
+      (a, b) => a.rule.localeCompare(b.rule) || a.group.localeCompare(b.group),
+    )
+    .map((entry) => {
+      const rule = entry.rule;
       let status = 'full';
       let failing_case = [];
       const group = entry.group;
-      if (!included.has(rule)) {
+      const testFiles = included.get(ruleKey(group, rule));
+      if (!testFiles) {
         status = 'partial-test';
       } else {
-        const skipCases = getSkipCases(rule, group);
+        const skipCases = Array.from(testFiles).flatMap(getSkipCases);
         if (skipCases.length > 0) {
           status = 'partial-impl';
           failing_case = skipCases;

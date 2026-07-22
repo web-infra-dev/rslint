@@ -383,11 +383,16 @@ func findBlockScope(node *ast.Node) *ast.Node {
 }
 
 // collectReferences walks the enclosing scope and collects all identifier references
-// to any of the given variables, grouped by symbol.
+// to any of the given variables, grouped by symbol. Identifiers are pre-filtered by
+// name and by position before consulting the checker: GetSymbolAtLocation is expensive
+// (it can trigger lazy type checking of whole expressions), and for a top-level var the
+// scope is the entire file.
 func collectReferences(scope *ast.Node, vars []varInfo, ctx *rule.RuleContext) map[*ast.Symbol][]*ast.Node {
 	symSet := make(map[*ast.Symbol]bool, len(vars))
+	nameSet := make(map[string]bool, len(vars))
 	for _, v := range vars {
 		symSet[v.sym] = true
+		nameSet[v.nameNode.Text()] = true
 	}
 
 	result := make(map[*ast.Symbol][]*ast.Node)
@@ -396,13 +401,13 @@ func collectReferences(scope *ast.Node, vars []varInfo, ctx *rule.RuleContext) m
 		if n == nil {
 			return
 		}
-		if n.Kind == ast.KindIdentifier {
+		// Skip declaration names (never counted as references) and positions that
+		// can never be a variable reference, e.g. the `b` in `a.b` or `{b: x}`.
+		if n.Kind == ast.KindIdentifier && nameSet[n.Text()] &&
+			!ast.IsDeclarationName(n) && !isNonReferencePosition(n) {
 			sym := ctx.TypeChecker.GetSymbolAtLocation(n)
 			if sym != nil && symSet[sym] {
-				// Skip if this is the declaration name itself
-				if !ast.IsDeclarationName(n) {
-					result[sym] = append(result[sym], n)
-				}
+				result[sym] = append(result[sym], n)
 			}
 		}
 		n.ForEachChild(func(child *ast.Node) bool {
@@ -412,6 +417,27 @@ func collectReferences(scope *ast.Node, vars []varInfo, ctx *rule.RuleContext) m
 	}
 	walk(scope)
 	return result
+}
+
+// isNonReferencePosition reports whether an identifier occupies a position that can
+// never reference a variable: the name of a property access / qualified name, or a
+// property name in an object literal / destructuring pattern.
+func isNonReferencePosition(n *ast.Node) bool {
+	p := n.Parent
+	if p == nil {
+		return false
+	}
+	switch p.Kind {
+	case ast.KindPropertyAccessExpression:
+		return p.AsPropertyAccessExpression().Name() == n
+	case ast.KindQualifiedName:
+		return p.AsQualifiedName().Right == n
+	case ast.KindPropertyAssignment:
+		return p.AsPropertyAssignment().Name() == n
+	case ast.KindBindingElement:
+		return p.AsBindingElement().PropertyName == n
+	}
+	return false
 }
 
 type varInfo struct {

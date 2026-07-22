@@ -60,10 +60,6 @@ Set `builtinGlobals` to `false` to allow redeclaring built-in global names.
 var Object = 0;
 ```
 
-## Differences from ESLint
-
-- rslint determines module files from top-level `import` / `export` syntax, not a separate `sourceType` override.
-
 ## Original Documentation
 
-[https://eslint.org/docs/latest/rules/no-redeclare](https://eslint.org/docs/latest/rules/no-redeclare)
+- [ESLint no-redeclare](https://eslint.org/docs/latest/rules/no-redeclare)

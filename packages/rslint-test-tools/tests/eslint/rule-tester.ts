@@ -62,6 +62,7 @@ export type ValidTestCase =
       code: string;
       options?: Record<string, unknown>;
       languageOptions?: TestLanguageOptions;
+      filename?: string;
       only?: boolean;
       skip?: boolean;
     };
@@ -71,6 +72,7 @@ export interface InvalidTestCase {
   errors: TsDiagnostic[];
   options?: Record<string, unknown>;
   languageOptions?: TestLanguageOptions;
+  filename?: string;
   only?: boolean;
   skip?: boolean;
 }
@@ -125,7 +127,11 @@ export class RuleTester {
             typeof validCase === 'object'
               ? validCase.languageOptions
               : undefined;
-          const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+          const filename =
+            typeof validCase === 'object'
+              ? (validCase.filename ?? 'src/virtual.ts')
+              : 'src/virtual.ts';
+          const virtual_entry = path.resolve(cwd, filename);
 
           const { config: resolvedConfig, configDirectory } =
             await buildConfigForSettings(config, undefined);
@@ -162,8 +168,8 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors, options, languageOptions } = item;
-          const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+          const { code, errors, options, languageOptions, filename } = item;
+          const virtual_entry = path.resolve(cwd, filename ?? 'src/virtual.ts');
 
           const { config: resolvedConfig, configDirectory } =
             await buildConfigForSettings(config, undefined);

@@ -109,6 +109,11 @@ fn test_tsgo_integration_simple_project() {
         !project.module_list.is_empty(),
         "Expected at least one module"
     );
+    assert_eq!(
+        project.module_exports.len(),
+        project.module_list.len(),
+        "Expected exports for every module"
+    );
 
     // Check semantic data exists
     assert!(
@@ -125,10 +130,75 @@ fn test_tsgo_integration_simple_project() {
     assert_ne!(project.semantic.primtypes.number, 0);
     assert_ne!(project.semantic.primtypes.any, 0);
 
+    let index_module = project
+        .module_list
+        .iter()
+        .position(|path| path.ends_with("/src/index.ts"))
+        .expect("Expected index.ts module");
+    let export_names = project.module_exports[index_module]
+        .iter()
+        .filter_map(|symbol_id| {
+            project
+                .semantic
+                .symtab
+                .iter()
+                .find(|(id, _)| id == symbol_id)
+                .map(|(_, data)| String::from_utf8_lossy(&data.name).into_owned())
+        })
+        .collect::<Vec<_>>();
+    assert!(export_names.iter().any(|name| name == "greet"));
+    assert!(export_names.iter().any(|name| name == "add"));
+    assert!(export_names.iter().any(|name| name == "Calculator"));
+    assert!(!export_names.iter().any(|name| name == "Person"));
+
     println!("\n✓ Integration test passed!");
     println!("  - Loaded {} source files", project.source_files.len());
     println!("  - Found {} symbols", project.semantic.symtab.len());
     println!("  - Found {} types", project.semantic.typetab.len());
+}
+
+#[test]
+fn test_runtime_module_exports() {
+    let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
+    let fixture_dir = get_fixtures_dir().join("module-exports");
+    let config_file = fixture_dir.join("tsconfig.json");
+    let options = Options {
+        cwd: Some(fixture_dir),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+    let client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+    let api = Api::with_uninitialized_client(client).expect("Failed to initialize API");
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+    let index_module = project
+        .module_list
+        .iter()
+        .position(|path| path.ends_with("/src/index.ts"))
+        .expect("Expected index.ts module");
+    let export_names = project.module_exports[index_module]
+        .iter()
+        .map(|symbol_id| {
+            project
+                .semantic
+                .symtab
+                .iter()
+                .find(|(id, _)| id == symbol_id)
+                .map(|(_, data)| String::from_utf8_lossy(&data.name).into_owned())
+                .expect("Expected exported symbol in semantic table")
+        })
+        .collect::<Vec<_>>();
+
+    assert!(export_names.iter().any(|name| name == "directValue"));
+    assert!(export_names.iter().any(|name| name == "barrelValue"));
+    assert!(export_names.iter().any(|name| name == "otherBarrelValue"));
+    assert!(!export_names.iter().any(|name| name == "DirectType"));
+    assert!(!export_names.iter().any(|name| name == "BarrelType"));
+    assert!(!export_names.iter().any(|name| name == "RuntimeTypeOnly"));
 }
 
 #[test]

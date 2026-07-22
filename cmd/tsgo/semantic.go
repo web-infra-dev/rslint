@@ -181,6 +181,18 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			End:          nodePositionMap.UTF8ToUTF16(node.End()),
 		}
 	}
+	isImportModuleSpecifier := func(node *ast.Node) bool {
+		if node == nil || node.Parent == nil {
+			return false
+		}
+		switch node.Parent.Kind {
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration, ast.KindExportDeclaration:
+			moduleSpecifier := node.Parent.ModuleSpecifier()
+			return moduleSpecifier != nil && moduleSpecifier.AsNode() == node
+		default:
+			return false
+		}
+	}
 
 	recordType := func(ty *checker.Type) checker.TypeId {
 		if ty == nil {
@@ -239,11 +251,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			}
 
 			if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
-
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
-
 					declRef := nodeReference(symbol.ValueDeclaration)
 
 					semantic.Symtab[sym_id] = SymbolInfo{
@@ -254,11 +264,12 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 						Decl:       declRef,
 					}
 					semantic.Sym2type[sym_id] = typeID
-					(semantic.Node2sym)[key] = sym_id
+					semantic.Node2sym[key] = sym_id
 					semantic.Node2type[key] = typeID
 
-					// Resolve alias symbol if this is an alias
-					if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+					// A merged symbol can contain both a local value and an imported type.
+					// Value references must keep the local symbol instead of resolving the alias.
+					if symbol.Flags&ast.SymbolFlagsAlias != 0 && symbol.Flags&ast.SymbolFlagsValue == 0 {
 						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
 							aliased_id := ast.GetSymbolId(aliasedSymbol)
 							if aliased_id != sym_id {
@@ -266,9 +277,19 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							}
 						}
 					}
+				} else if isImportModuleSpecifier(node) {
+					sym_id := ast.GetSymbolId(symbol)
+					declRef := nodeReference(symbol.ValueDeclaration)
 
+					semantic.Symtab[sym_id] = SymbolInfo{
+						Id:         sym_id,
+						Name:       sanitizeSymbolName(symbol.Name),
+						Flags:      int(symbol.Flags),
+						CheckFlags: int(symbol.CheckFlags),
+						Decl:       declRef,
+					}
+					semantic.Node2sym[key] = sym_id
 				}
-
 			}
 
 			// Collect shorthand assignment value symbol
