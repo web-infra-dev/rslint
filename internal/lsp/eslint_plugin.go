@@ -246,6 +246,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 			// rule's fix(fixer) per keystroke — small vs the lint itself.
 			true,                        // fix → collectFixes
 			linter.SuggestionsModeEager, // suggestionsMode
+			nil,                         // timing — the LSP never collects it
 			func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		)
 		// Categorize like the fixAll sibling (lintPluginRulesSync): a superseded
@@ -391,6 +392,7 @@ func (s *Server) lintPluginRulesSyncWithConfig(
 		[]linter.EslintPluginFileInput{input},
 		fix,
 		suggestionsMode,
+		nil, // timing — the LSP never collects it
 		func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 	)
 	if err != nil {

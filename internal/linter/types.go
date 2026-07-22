@@ -95,6 +95,11 @@ type LintResult struct {
 //     type-check. When non-nil, must be parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
 //     non-project fallback Program with synthesized CompilerOptions).
+//   - Timing=nil                          → per-rule timing collection is off
+//     and the lint hot path pays no instrumentation cost. When non-nil, every
+//     rule Run call and listener invocation is timed and accumulated into the
+//     collector, keyed by rule name. Callers may share one collector across
+//     multiple RunLinter invocations (e.g. --fix re-lint passes) to aggregate.
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
@@ -122,6 +127,8 @@ type RunLinterOptions struct {
 
 	TypeCheck             bool
 	SkipTypeCheckPrograms []bool
+
+	Timing *TimingCollector
 
 	OnDiagnostic DiagnosticHandler
 }

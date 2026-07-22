@@ -60,7 +60,7 @@ func TestDispatchPluginLintAsync_DispatchErrorSurfacesDiagnostic(t *testing.T) {
 	failing := func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		return nil, errors.New("WorkerPool: closed")
 	}
-	diags := <-dispatchPluginLintAsync(context.Background(), failing, pluginInput(), false, "off")
+	diags := <-dispatchPluginLintAsync(context.Background(), failing, pluginInput(), false, "off", nil)
 	if len(diags) != 1 {
 		t.Fatalf("dispatch failure should surface 1 diagnostic, got %d", len(diags))
 	}
@@ -82,7 +82,7 @@ func TestDispatchPluginLintAsync_CanceledNoDiagnostic(t *testing.T) {
 	canceled := func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		return nil, context.Canceled
 	}
-	if diags := <-dispatchPluginLintAsync(context.Background(), canceled, pluginInput(), false, "off"); len(diags) != 0 {
+	if diags := <-dispatchPluginLintAsync(context.Background(), canceled, pluginInput(), false, "off", nil); len(diags) != 0 {
 		t.Errorf("context.Canceled should yield 0 diagnostics, got %d", len(diags))
 	}
 }
@@ -94,7 +94,7 @@ func TestDispatchPluginLintAsync_NoInputsNoDiagnostic(t *testing.T) {
 		t.Fatal("dispatch must not be called with no inputs")
 		return nil, errors.New("unreachable")
 	}
-	if diags := <-dispatchPluginLintAsync(context.Background(), dispatch, nil, false, "off"); len(diags) != 0 {
+	if diags := <-dispatchPluginLintAsync(context.Background(), dispatch, nil, false, "off", nil); len(diags) != 0 {
 		t.Errorf("no inputs should yield 0 diagnostics, got %d", len(diags))
 	}
 }

@@ -44,6 +44,10 @@ type EslintPluginLintRequest struct {
 	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
 	Fix             bool                              `json:"fix"`
 	SuggestionsMode string                            `json:"suggestionsMode"`
+	// CollectTiming asks the worker to measure per-rule execution time
+	// (create + listener invocations) and report it in each file result's
+	// ruleTimes. Off by default so the worker hot path pays nothing.
+	CollectTiming bool `json:"collectTiming,omitempty"`
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
@@ -87,6 +91,10 @@ type EslintPluginFileResult struct {
 	ParseError  string                   `json:"parseError,omitempty"`
 	Cancelled   bool                     `json:"cancelled"`
 	RuleErrors  []EslintPluginRuleError  `json:"ruleErrors,omitempty"`
+	// RuleTimes maps rule name → execution time in MILLISECONDS for this
+	// file (worker-side wall time: create + listener invocations). Present
+	// only when the request set CollectTiming.
+	RuleTimes map[string]float64 `json:"ruleTimes,omitempty"`
 }
 
 type EslintPluginLintResult struct {
@@ -185,6 +193,7 @@ func DispatchEslintPluginRules(
 	files []EslintPluginFileInput,
 	fix bool,
 	suggestionsMode string,
+	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) error {
 	if len(files) == 0 || dispatch == nil {
@@ -200,8 +209,9 @@ func DispatchEslintPluginRules(
 	for i, batch := range batches {
 		g.Go(func() error {
 			// Each batch writes only its own slot, so concurrent batches share
-			// no state; diagnostics are emitted serially after Wait.
-			batchErrs[i] = dispatchOneBatch(ctx, dispatch, batch, fix, suggestionsMode,
+			// no state; diagnostics are emitted serially after Wait. The timing
+			// collector is the one mutex-guarded exception, merged per file.
+			batchErrs[i] = dispatchOneBatch(ctx, dispatch, batch, fix, suggestionsMode, timing,
 				func(d rule.RuleDiagnostic) { batchDiags[i] = append(batchDiags[i], d) })
 			return nil
 		})
@@ -242,6 +252,7 @@ func dispatchOneBatch(
 	batch []EslintPluginFileInput,
 	fix bool,
 	suggestionsMode string,
+	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) (err error) {
 	defer func() {
@@ -249,7 +260,7 @@ func dispatchOneBatch(
 			err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
 		}
 	}()
-	req := buildEslintPluginRequest(batch, fix, suggestionsMode)
+	req := buildEslintPluginRequest(batch, fix, suggestionsMode, timing != nil)
 	res, dispatchErr := dispatch(ctx, req)
 	if dispatchErr != nil {
 		return dispatchErr
@@ -257,7 +268,7 @@ func dispatchOneBatch(
 	if res == nil {
 		return nil
 	}
-	return applyEslintPluginResults(batch, res, onDiagnostic)
+	return applyEslintPluginResults(batch, res, timing, onDiagnostic)
 }
 
 // dispatchConcurrency bounds how many plugin-lint batches are dispatched
@@ -326,7 +337,7 @@ func eslintPluginBatchKey(f EslintPluginFileInput) string {
 	return string(b)
 }
 
-func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestionsMode string) EslintPluginLintRequest {
+func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestionsMode string, collectTiming bool) EslintPluginLintRequest {
 	rules := map[string]EslintPluginRuleConfig{}
 	for _, r := range batch[0].Rules {
 		rules[r.Name] = EslintPluginRuleConfig{Options: r.Options}
@@ -346,10 +357,11 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestio
 		Rules:           rules,
 		Fix:             fix,
 		SuggestionsMode: suggestionsMode,
+		CollectTiming:   collectTiming,
 	}
 }
 
-func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLintResult, onDiagnostic DiagnosticHandler) error {
+func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLintResult, timing *TimingCollector, onDiagnostic DiagnosticHandler) error {
 	byPath := map[string]*EslintPluginFileResult{}
 	for i := range res.Results {
 		byPath[res.Results[i].FilePath] = &res.Results[i]
@@ -362,6 +374,9 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 		}
 		if fr.Cancelled {
 			return context.Canceled
+		}
+		if timing != nil && len(fr.RuleTimes) > 0 {
+			timing.addFileRuleTimesMS(fr.RuleTimes)
 		}
 
 		sevByRule := map[string]rule.DiagnosticSeverity{}

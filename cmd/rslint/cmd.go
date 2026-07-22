@@ -54,6 +54,7 @@ type lintArgs struct {
 	// unavailable (for example in the wasm build).
 	StdoutIsTTY bool
 	Quiet       bool
+	Timing      bool
 	MaxWarnings int
 	StartTimeMs int64
 	RuleFlags   []string
@@ -91,6 +92,7 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
+  --timing              Print a per-rule timing table (also enabled by TIMING=1)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -469,6 +471,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	fs.BoolVar(&args.Timing, "timing", false, "print a per-rule timing table")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
@@ -547,6 +550,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	ruleFlags := args.RuleFlags
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
+	// --timing (or the ESLint-style TIMING env var) enables per-rule timing.
+	// One collector is shared across the initial lint and every --fix re-lint
+	// pass, so the table reflects total rule cost for the whole run.
+	var timingCollector *linter.TimingCollector
+	if (args.Timing || timingEnvEnabled(os.Getenv("TIMING"))) && !typeCheckOnly {
+		timingCollector = linter.NewTimingCollector()
+	}
 	format := output.FormatDefault
 	if !init {
 		var formatErr error
@@ -919,6 +929,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		SyntaxErrorFiles:      syntaxErrorFiles,
 		TypeCheck:             typeCheck,
 		SkipTypeCheckPrograms: skipTypeCheck,
+		Timing:                timingCollector,
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -936,7 +947,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
 		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
-		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix))
+		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
 	}
 
 	lintResult, err := linter.RunLinter(runOpts)
@@ -1056,6 +1067,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				SyntaxErrorFiles:      fixSyntaxErrorFiles,
 				TypeCheck:             typeCheck,
 				SkipTypeCheckPrograms: fixSkipMask,
+				Timing:                timingCollector,
 				OnDiagnostic: func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)
@@ -1070,7 +1082,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
 					lintResolver: fixConfigResolver,
 				})
-				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
+				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
 			}
 			passResult, passErr := linter.RunLinter(fixRunOpts)
 			var fixPluginDiags []rule.RuleDiagnostic
@@ -1180,6 +1192,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
 		return 1
+	}
+	// The timing table goes to stderr so machine-readable stdout formats
+	// (jsonline/github/gitlab) stay parseable with --timing enabled.
+	if timingCollector != nil {
+		fmt.Fprint(os.Stderr, formatRuleTimingTable(timingCollector.Timings()))
 	}
 	counts := report.Counts()
 

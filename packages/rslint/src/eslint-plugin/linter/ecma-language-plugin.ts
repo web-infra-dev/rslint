@@ -151,6 +151,12 @@ export interface LintFileRequest {
    */
   collectFixes: boolean;
   suggestionsMode: SuggestionsMode;
+  /**
+   * Measure per-rule execution time (create + listener invocations) and
+   * report it in the result's `ruleTimes`. Driven by Go's `--timing` /
+   * `TIMING=1`; off by default so the per-node hot path pays nothing.
+   */
+  collectTiming?: boolean;
   /** Optional Int32Array(SharedArrayBuffer) cancel flag, length-1, for per-node Atomics polling. */
   cancelFlag?: Int32Array;
   /**
@@ -181,6 +187,11 @@ export interface LintFileResult {
   parseError?: string;
   /** Per-rule errors caught during create() / listener execution. */
   ruleErrors?: Array<{ rule: string; message: string }>;
+  /**
+   * Per-rule execution time in milliseconds (create + listener
+   * invocations). Present only when the request set `collectTiming`.
+   */
+  ruleTimes?: Record<string, number>;
 }
 
 /**
@@ -387,6 +398,12 @@ export function lintFile(
     listeners: Record<string, ListenerFn | ListenerFn[]>;
   }> = [];
   const ruleErrors: Array<{ rule: string; message: string }> = [];
+  // Per-rule execution time (ms). Allocated only when the wire request
+  // asked for timing; listeners are wrapped at registration below, so
+  // the disabled path pays nothing per visited node.
+  const ruleTimes: Record<string, number> | undefined = req.collectTiming
+    ? {}
+    : undefined;
 
   for (const [ruleName, cfg] of Object.entries(req.rules)) {
     const ruleDef = resolveRule(ruleName, loadedPlugins);
@@ -428,6 +445,7 @@ export function lintFile(
     });
 
     let returnedListeners: Record<string, ListenerFn | ListenerFn[]> = {};
+    const createStart = ruleTimes ? performance.now() : 0;
     try {
       // ruleAny is `any` so the RHS is `any` and assigns to the typed
       // target without a cast.
@@ -438,6 +456,18 @@ export function lintFile(
         message: `create: ${(err as Error)?.message ?? String(err)}`,
       });
       continue;
+    } finally {
+      if (ruleTimes) {
+        ruleTimes[ruleName] =
+          (ruleTimes[ruleName] ?? 0) + (performance.now() - createStart);
+      }
+    }
+    if (ruleTimes) {
+      returnedListeners = wrapListenersWithTiming(
+        returnedListeners,
+        ruleName,
+        ruleTimes,
+      );
     }
 
     // Standard ESLint plugin API: `rule.create(ctx)` returns the listener
@@ -627,7 +657,42 @@ export function lintFile(
   }
 
   if (ruleErrors.length > 0) result.ruleErrors = ruleErrors;
+  if (ruleTimes) result.ruleTimes = ruleTimes;
   return result;
+}
+
+/**
+ * Wrap every listener of one rule so its execution time accrues to
+ * `ruleTimes[ruleName]`. A throwing listener still gets its time recorded
+ * (the visit loop catches and reports the error via `onListenerError`).
+ */
+function wrapListenersWithTiming(
+  listeners: Record<string, ListenerFn | ListenerFn[]>,
+  ruleName: string,
+  ruleTimes: Record<string, number>,
+): Record<string, ListenerFn | ListenerFn[]> {
+  const wrapFn = (fn: ListenerFn): ListenerFn => {
+    return (node) => {
+      const start = performance.now();
+      try {
+        fn(node);
+      } finally {
+        ruleTimes[ruleName] =
+          (ruleTimes[ruleName] ?? 0) + (performance.now() - start);
+      }
+    };
+  };
+  const wrapped: Record<string, ListenerFn | ListenerFn[]> = {};
+  for (const [selector, value] of Object.entries(listeners)) {
+    if (Array.isArray(value)) {
+      wrapped[selector] = value.map((fn) =>
+        typeof fn === 'function' ? wrapFn(fn) : fn,
+      );
+    } else {
+      wrapped[selector] = typeof value === 'function' ? wrapFn(value) : value;
+    }
+  }
+  return wrapped;
 }
 
 // Per-Worker dedup: prevents the same (selector, errorMessage) from

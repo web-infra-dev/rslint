@@ -64,6 +64,8 @@ export interface EslintPluginLintRequest {
   /** Collect autofixes (driven by Go's `--fix`). */
   fix?: boolean;
   suggestionsMode?: 'off' | 'eager';
+  /** Collect per-rule execution times (driven by Go's `--timing` / `TIMING=1`). */
+  collectTiming?: boolean;
 }
 
 export interface BuildPluginLintTasksOptions {
@@ -110,6 +112,7 @@ export function buildPluginLintTasks(
   // the worker's per-task field stays `collectFixes`.
   const collectFixes = input.fix ?? false;
   const suggestionsMode: 'off' | 'eager' = input.suggestionsMode ?? 'off';
+  const collectTiming = input.collectTiming ?? false;
 
   return input.files.map((f) => {
     const configKey = f.configKey ?? '';
@@ -124,6 +127,7 @@ export function buildPluginLintTasks(
       rules: sharedRules,
       collectFixes,
       suggestionsMode,
+      collectTiming,
       configKey,
     };
   });
@@ -146,6 +150,7 @@ export interface EslintPluginLintResult {
     parseError?: string;
     cancelled?: boolean;
     ruleErrors?: Array<{ rule: string; message: string }>;
+    ruleTimes?: Record<string, number>;
   }>;
 }
 
@@ -164,6 +169,7 @@ export function buildPluginLintResult(
       parseError: r.parseError,
       cancelled: r.cancelled,
       ruleErrors: r.ruleErrors,
+      ruleTimes: r.ruleTimes,
     })),
   };
 }

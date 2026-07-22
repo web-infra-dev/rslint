@@ -690,7 +690,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 					return nil, errors.New("bidirectional pluginLint transport is unavailable")
 				}
 			}
-			pluginCh = dispatchPluginLintAsync(pluginCtx, dispatch, pluginInputs, req.Fix, pluginSuggestionsMode(req.Fix))
+			pluginCh = dispatchPluginLintAsync(pluginCtx, dispatch, pluginInputs, req.Fix, pluginSuggestionsMode(req.Fix), nil)
 		}
 	}
 	if cancelPlugin != nil {
