@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +53,7 @@ func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
 			name,
 			t.Kind,
 			fmt.Sprintf("%.1f", float64(t.Time.Microseconds())/1000),
-			fmt.Sprintf("%d", t.Files),
+			strconv.Itoa(t.Files),
 			fmt.Sprintf("%.1f%%", relative),
 		})
 	}
