@@ -52,6 +52,35 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// cannot be statically folded must not match ----
 			{Code: `const { [key]: a } = Object; a({}, foo)`},
 
+			// ---- Modified-global tracking: any bare write to the global
+			// `Object` in the file disables tracking entirely, even for calls
+			// textually before the write (ESLint ReferenceTracker's
+			// isModifiedGlobal) ----
+			{Code: `Object = {}; Object.assign({}, foo);`},
+			{Code: `Object ||= {}; Object.assign({}, foo);`},
+			{Code: `Object.assign({}, before); Object = {}; Object.assign({}, after);`},
+
+			// ---- Modified-global tracking: same for a written global-object
+			// entry name ----
+			{Code: `window = {}; window.Object.assign({}, foo);`},
+
+			// ---- Modified-global tracking: an alias that resolves to a
+			// modified global must not match either ----
+			{Code: `const o = Object; Object = {}; o.assign({}, foo);`},
+
+			// ---- Modified-global tracking: for-of assignment targets and
+			// destructuring-assignment targets count as writes too ----
+			{Code: `for (Object of xs); Object.assign({}, foo)`},
+			{Code: `({ Object } = x); Object.assign({}, foo)`},
+
+			// ---- Global-object tracking: an alias of something that is not a
+			// global object must not match ----
+			{Code: `const g = foo; g.Object.assign({}, x)`},
+
+			// ---- Global-object tracking: destructuring `Object` off a
+			// non-global source must not match ----
+			{Code: `const { Object: O } = foo; O.assign({}, x)`},
+
 			// ---- Branch lock-in: nested Object.assign whose own "Object" is
 			// shadowed by an inner function parameter — the outer call still
 			// matches, the inner one must not (scope boundary correctness) ----
@@ -331,6 +360,37 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 				Code:   `global.Object.assign({}, foo)`,
 				Output: []string{`({ ...foo})`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Modified-global tracking: a write to a local binding that
+			// shadows `Object` must NOT disable tracking of the real global ----
+			{
+				Code:   "function f(Object) { Object = {}; }\nObject.assign({}, foo)",
+				Output: []string{"function f(Object) { Object = {}; }\n({ ...foo})"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 2, Column: 1}},
+			},
+
+			// ---- Global-object tracking: the global object itself reached
+			// through a stable local alias ----
+			{
+				Code:   `const g = globalThis; g.Object.assign({}, foo)`,
+				Output: []string{`const g = globalThis; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 23}},
+			},
+
+			// ---- Global-object tracking: `Object` destructured off a global
+			// object, renamed and shorthand (the shorthand also shadows the
+			// global `Object` name, so it must be tracked via the destructure
+			// path, not isGlobalIdentifier) ----
+			{
+				Code:   `const { Object: O } = globalThis; O.assign({}, foo)`,
+				Output: []string{`const { Object: O } = globalThis; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 35}},
+			},
+			{
+				Code:   `const { Object } = globalThis; Object.assign({}, foo)`,
+				Output: []string{`const { Object } = globalThis; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 32}},
 			},
 		},
 	)

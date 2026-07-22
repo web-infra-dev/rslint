@@ -22,12 +22,65 @@ func buildUseLiteralMessage() rule.RuleMessage {
 	}
 }
 
+// trackedGlobalNames lists the globals this rule ever uses as a tracking
+// entry point: `Object` itself plus the global-object aliases.
+var trackedGlobalNames = map[string]bool{
+	"Object":     true,
+	"globalThis": true,
+	"window":     true,
+	"self":       true,
+	"global":     true,
+}
+
+// globalWrites lazily records which tracked global names have a write
+// reference somewhere in the file (`Object = {}`, `window ||= foo`, ...).
+// ESLint's ReferenceTracker treats such a global as modified and stops
+// tracking it entirely — no call in the file is reported, even ones textually
+// before the write (isModifiedGlobal). Writes to a local binding that shadows
+// the name do not count.
+type globalWrites struct {
+	sourceFile *ast.SourceFile
+	computed   bool
+	written    map[string]bool
+}
+
+func (w *globalWrites) has(name string) bool {
+	if !w.computed {
+		w.compute()
+	}
+	return w.written[name]
+}
+
+func (w *globalWrites) compute() {
+	w.computed = true
+	w.written = map[string]bool{}
+	var visit func(node *ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == ast.KindIdentifier {
+			name := node.AsIdentifier().Text
+			if trackedGlobalNames[name] && !w.written[name] &&
+				utils.IsWriteReference(node) && !utils.IsShadowed(node, name) {
+				w.written[name] = true
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(&w.sourceFile.Node)
+}
+
 // isGlobalIdentifier reports whether node, after unwrapping parentheses and TS
 // assertion wrappers, is an unshadowed reference to the global `name` — i.e.
-// no local declaration shadows it and no `/* global name: off */` /
-// languageOptions.globals entry un-declares it. Mirrors the "is this the
-// global variable, not a local rebinding" half of ESLint's ReferenceTracker.
-func isGlobalIdentifier(node *ast.Node, name string, globals map[string]bool) bool {
+// no local declaration shadows it, no `/* global name: off */` /
+// languageOptions.globals entry un-declares it, and the global is never
+// written in the file. Mirrors the "is this the global variable, not a local
+// rebinding, and is it unmodified" half of ESLint's ReferenceTracker.
+func isGlobalIdentifier(node *ast.Node, name string, globals map[string]bool, writes *globalWrites) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil || !ast.IsIdentifier(node) || node.AsIdentifier().Text != name {
 		return false
@@ -38,7 +91,7 @@ func isGlobalIdentifier(node *ast.Node, name string, globals map[string]bool) bo
 	if declared, ok := globals[name]; ok && !declared {
 		return false
 	}
-	return true
+	return !writes.has(name)
 }
 
 // unwrapValue strips parentheses, TS assertions, and — for a trailing
@@ -81,29 +134,42 @@ func isMemberAccessWithName(node *ast.Node, name string, evaluator *utils.Static
 	return false
 }
 
-// isKnownGlobalObjectRef reports whether node is an unshadowed reference to
-// one of the global-object aliases ESLint's ReferenceTracker walks through:
-// `globalThis`, `window`, `self`, `global`.
-func isKnownGlobalObjectRef(node *ast.Node, ctx rule.RuleContext) bool {
-	node = utils.SkipAssertionsAndParens(node)
+// isGlobalObjectValue reports whether node, once resolved, denotes one of the
+// global-object aliases ESLint's ReferenceTracker walks through — an
+// unshadowed, unmodified `globalThis`, `window`, `self`, or `global` — either
+// directly or through a chain of stable local aliases
+// (`const g = globalThis; g.Object.assign(...)`).
+func isGlobalObjectValue(node *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, writes *globalWrites, depth int) bool {
+	if depth > maxAliasDepth {
+		return false
+	}
+	node = unwrapValue(node)
 	if node == nil || !ast.IsIdentifier(node) {
 		return false
 	}
-	name := node.AsIdentifier().Text
-	switch name {
+	switch name := node.AsIdentifier().Text; name {
 	case "globalThis", "window", "self", "global":
-		return isGlobalIdentifier(node, name, ctx.Globals)
+		if isGlobalIdentifier(node, name, ctx.Globals, writes) {
+			return true
+		}
 	}
-	return false
+	initializer, ok := evaluator.ResolveIdentifierInitializer(node)
+	if !ok {
+		return false
+	}
+	return isGlobalObjectValue(initializer, ctx, evaluator, writes, depth+1)
 }
 
 // isObjectValue reports whether node, once resolved, denotes the global
 // `Object` — directly, through a global-object entry (`window.Object`,
-// `globalThis.Object`, ...), or through a chain of stable local aliases
-// (e.g. `const o = Object; const p = o; p.assign(...)`). Aliasing is resolved
-// via evaluator.ResolveIdentifierInitializer, which only follows `const`
-// bindings, or `let`/`var` bindings that are never reassigned in the file.
-func isObjectValue(node *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, depth int) bool {
+// `globalThis.Object`, ..., itself possibly reached through an alias), by
+// destructuring `Object` off a global object
+// (`const {Object: O} = globalThis`), or through a chain of stable local
+// aliases (e.g. `const o = Object; const p = o; p.assign(...)`). Aliasing is
+// resolved via evaluator.ResolveIdentifierInitializer, which only follows
+// `const` bindings, or `let`/`var` bindings that are never reassigned in the
+// file.
+func isObjectValue(node *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, writes *globalWrites, depth int) bool {
 	if depth > maxAliasDepth {
 		return false
 	}
@@ -111,20 +177,23 @@ func isObjectValue(node *ast.Node, ctx rule.RuleContext, evaluator *utils.Static
 	if node == nil {
 		return false
 	}
-	if isGlobalIdentifier(node, "Object", ctx.Globals) {
+	if isGlobalIdentifier(node, "Object", ctx.Globals, writes) {
 		return true
 	}
 	if isMemberAccessWithName(node, "Object", evaluator) {
-		return isKnownGlobalObjectRef(utils.AccessExpressionObject(node), ctx)
+		return isGlobalObjectValue(utils.AccessExpressionObject(node), ctx, evaluator, writes, depth)
 	}
 	if node.Kind != ast.KindIdentifier {
 		return false
+	}
+	if source, ok := destructuredBindingSource(node, "Object", ctx, evaluator); ok {
+		return isGlobalObjectValue(source, ctx, evaluator, writes, depth+1)
 	}
 	initializer, ok := evaluator.ResolveIdentifierInitializer(node)
 	if !ok {
 		return false
 	}
-	return isObjectValue(initializer, ctx, evaluator, depth+1)
+	return isObjectValue(initializer, ctx, evaluator, writes, depth+1)
 }
 
 // bindingPropertyNameIs reports whether a BindingElement's property name
@@ -148,72 +217,116 @@ func bindingPropertyNameIs(propertyName *ast.Node, name string, evaluator *utils
 	return false
 }
 
-// isAssignDestructuredFromObject reports whether node is an identifier bound
-// by destructuring the `assign` property off the global `Object`, e.g.
-// `const {assign} = Object` or `const {assign: a} = Object` — regardless of
-// the declaration's var/let/const kind. Unlike isObjectValue's alias
-// resolution, this does not check for later reassignment of the bound
-// identifier (there is no cheap write-tracking available for a
-// BindingElement's symbol here); this mirrors ESLint's own ReferenceTracker,
-// which likewise treats every read of a traced binding as the traced value
-// regardless of intervening writes.
-func isAssignDestructuredFromObject(node *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator) bool {
-	if node == nil || node.Kind != ast.KindIdentifier || ctx.TypeChecker == nil {
-		return false
-	}
+// referenceBindingElement returns the single BindingElement that declares the
+// variable referenced by node, or nil. The checker's symbol is consulted
+// first; in a script (non-module) file, a top-level binding whose name
+// collides with a lib global (`const {Object} = globalThis`) makes
+// GetSymbolAtLocation resolve to the merged global symbol instead of the
+// local binding, so the binder's Locals tables are walked as a fallback —
+// nearest scope that binds the name wins, mirroring lexical lookup.
+func referenceBindingElement(node *ast.Node, ctx rule.RuleContext) *ast.Node {
 	symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
-	if symbol == nil || len(symbol.Declarations) != 1 {
-		return false
+	if symbol != nil && len(symbol.Declarations) == 1 &&
+		symbol.Declarations[0] != nil && symbol.Declarations[0].Kind == ast.KindBindingElement {
+		return symbol.Declarations[0]
 	}
-	decl := symbol.Declarations[0]
-	if decl == nil || decl.Kind != ast.KindBindingElement {
-		return false
+
+	name := node.AsIdentifier().Text
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindFunctionExpression || current.Kind == ast.KindClassExpression {
+			if exprName := current.Name(); exprName != nil && ast.IsIdentifier(exprName) &&
+				exprName.AsIdentifier().Text == name {
+				// Named function/class expressions bind their name only inside
+				// the expression, outside the ordinary Locals table.
+				return nil
+			}
+		}
+		if !ast.IsLocalsContainer(current) {
+			continue
+		}
+		if local := ast.GetLocals(current)[name]; local != nil {
+			if len(local.Declarations) == 1 && local.Declarations[0] != nil &&
+				local.Declarations[0].Kind == ast.KindBindingElement {
+				return local.Declarations[0]
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+// destructuredBindingSource returns the initializer of the variable
+// declaration that binds node by destructuring the property `name` off it —
+// the `Object` in `const {assign: node} = Object` — regardless of the
+// declaration's var/let/const kind. Property names may be identifiers, string
+// literals, or statically-evaluable computed names. Unlike
+// evaluator.ResolveIdentifierInitializer, this does not check for later
+// reassignment of the bound identifier (there is no cheap write-tracking
+// available for a BindingElement's symbol here); this mirrors ESLint's own
+// ReferenceTracker, which likewise treats every read of a traced binding as
+// the traced value regardless of intervening writes.
+func destructuredBindingSource(node *ast.Node, name string, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator) (*ast.Node, bool) {
+	if node == nil || node.Kind != ast.KindIdentifier || ctx.TypeChecker == nil {
+		return nil, false
+	}
+	decl := referenceBindingElement(node, ctx)
+	if decl == nil {
+		return nil, false
 	}
 	be := decl.AsBindingElement()
 	if be == nil || be.DotDotDotToken != nil {
-		return false
+		return nil, false
 	}
 	propertyName := be.PropertyName
 	if propertyName == nil {
 		propertyName = be.Name()
 	}
-	if !bindingPropertyNameIs(propertyName, "assign", evaluator) {
-		return false
+	if !bindingPropertyNameIs(propertyName, name, evaluator) {
+		return nil, false
 	}
 
 	pattern := decl.Parent
 	if pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
-		return false
+		return nil, false
 	}
 	declarationNode := pattern.Parent
 	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
-		return false
+		return nil, false
 	}
 	declarationList := declarationNode.Parent
 	if declarationList == nil || declarationList.Kind != ast.KindVariableDeclarationList {
-		return false
+		return nil, false
 	}
-	initializer := declarationNode.AsVariableDeclaration().Initializer
-	return isObjectValue(initializer, ctx, evaluator, 0)
+	return declarationNode.AsVariableDeclaration().Initializer, true
+}
+
+// isAssignDestructuredFromObject reports whether node is an identifier bound
+// by destructuring the `assign` property off the global `Object`, e.g.
+// `const {assign} = Object` or `const {assign: a} = window.Object`.
+func isAssignDestructuredFromObject(node *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, writes *globalWrites) bool {
+	source, ok := destructuredBindingSource(node, "assign", ctx, evaluator)
+	return ok && isObjectValue(source, ctx, evaluator, writes, 0)
 }
 
 // isObjectAssignCallee reports whether callee, once resolved, denotes the
 // `assign` method of the global `Object` — reached directly
 // (`Object.assign`), through a global-object entry
-// (`globalThis.Object.assign`, `window.Object.assign`, ...), through a chain
-// of stable local aliases of the `Object` receiver
+// (`globalThis.Object.assign`, `window.Object.assign`, ..., where the global
+// object itself may be aliased: `const g = globalThis; g.Object.assign`),
+// through a chain of stable local aliases of the `Object` receiver
 // (`const o = Object; const p = o; p.assign(...)`), a stable local alias of
 // `Object.assign` itself (`const assign = Object.assign; assign(...)`), a
 // destructure of `assign` off `Object` (`const {assign} = Object;
-// assign(...)`, including string-literal and computed property-name forms),
-// or a trailing comma-operator sequence around any of the above
-// (`(0, Object.assign)(...)`, `(0, Object).assign(...)`). Dot and
-// computed-statically-evaluable member access forms are both accepted
-// (`Object["as" + "sign"]`), and parentheses / TS assertions are transparent
-// throughout. Mirrors ESLint's ReferenceTracker tracking of the global
-// `Object.assign` API through simple aliasing.
-func isObjectAssignCallee(callee *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator) bool {
-	return isObjectAssignCalleeDepth(callee, ctx, evaluator, 0)
+// assign(...)`) or of `Object` off a global object
+// (`const {Object: O} = globalThis; O.assign(...)`), including string-literal
+// and computed property-name forms, or a trailing comma-operator sequence
+// around any of the above (`(0, Object.assign)(...)`,
+// `(0, Object).assign(...)`). Dot and computed-statically-evaluable member
+// access forms are both accepted (`Object["as" + "sign"]`), and parentheses /
+// TS assertions are transparent throughout. Mirrors ESLint's ReferenceTracker
+// tracking of the global `Object.assign` API through simple aliasing.
+func isObjectAssignCallee(callee *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, writes *globalWrites) bool {
+	return isObjectAssignCalleeDepth(callee, ctx, evaluator, writes, 0)
 }
 
 // maxAliasDepth bounds how many identifier-alias hops isObjectAssignCallee
@@ -223,7 +336,7 @@ func isObjectAssignCallee(callee *ast.Node, ctx rule.RuleContext, evaluator *uti
 // targets a distinct declaration) from recursing unboundedly.
 const maxAliasDepth = 8
 
-func isObjectAssignCalleeDepth(callee *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, depth int) bool {
+func isObjectAssignCalleeDepth(callee *ast.Node, ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, writes *globalWrites, depth int) bool {
 	if depth > maxAliasDepth {
 		return false
 	}
@@ -233,20 +346,20 @@ func isObjectAssignCalleeDepth(callee *ast.Node, ctx rule.RuleContext, evaluator
 	}
 
 	if callee.Kind == ast.KindIdentifier {
-		if isAssignDestructuredFromObject(callee, ctx, evaluator) {
+		if isAssignDestructuredFromObject(callee, ctx, evaluator, writes) {
 			return true
 		}
 		initializer, ok := evaluator.ResolveIdentifierInitializer(callee)
 		if !ok {
 			return false
 		}
-		return isObjectAssignCalleeDepth(initializer, ctx, evaluator, depth+1)
+		return isObjectAssignCalleeDepth(initializer, ctx, evaluator, writes, depth+1)
 	}
 
 	if !isMemberAccessWithName(callee, "assign", evaluator) {
 		return false
 	}
-	return isObjectValue(utils.AccessExpressionObject(callee), ctx, evaluator, depth)
+	return isObjectValue(utils.AccessExpressionObject(callee), ctx, evaluator, writes, depth)
 }
 
 // hasArraySpread reports whether any of the call's own arguments is a spread
@@ -534,13 +647,14 @@ var PreferObjectSpreadRule = rule.Rule{
 	Name: "prefer-object-spread",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		evaluator := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		writes := &globalWrites{sourceFile: ctx.SourceFile}
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
 				if call.Arguments == nil || len(call.Arguments.Nodes) < 1 {
 					return
 				}
-				if !isObjectAssignCallee(call.Expression, ctx, evaluator) {
+				if !isObjectAssignCallee(call.Expression, ctx, evaluator, writes) {
 					return
 				}
 
