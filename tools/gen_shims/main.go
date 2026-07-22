@@ -47,6 +47,7 @@ func canBeExported(t types.Signature) bool {
 func main() {
 	packagesToShim := []string{
 		"ast",
+		"binder",
 		"bundled",
 		"checker",
 		"compiler",
