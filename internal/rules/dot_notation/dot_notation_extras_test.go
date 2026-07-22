@@ -204,3 +204,23 @@ func TestDotNotationExtras(t *testing.T) {
 		},
 	})
 }
+
+// TestDotNotationAllowPatternSchema locks in the fail-fast behavior for an
+// invalid allowPattern. Upstream constructs `new RegExp(allowPattern, "u")`
+// while loading the rule, so an invalid pattern like `"("` throws before any
+// linting happens. rslint's equivalent surface is config validation: the
+// schema marks allowPattern with `format: "regex"`, so ValidateRuleOptions
+// rejects the config up front instead of silently linting as if no pattern
+// were configured.
+func TestDotNotationAllowPatternSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allowPattern": "("}}
+	if err := DotNotationRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allowPattern regex to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{map[string]any{"allowPattern": "(?<=a)b"}}
+	if err := DotNotationRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allowPattern regex to pass schema validation, got: %v", err)
+	}
+}

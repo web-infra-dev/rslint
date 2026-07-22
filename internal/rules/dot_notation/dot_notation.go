@@ -179,9 +179,11 @@ var DotNotationRule = rule.Rule{
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does
-		// not support those). Invalid regex patterns are silently ignored, as
-		// upstream would throw at rule-construction time in that case, which
-		// is out of scope here.
+		// not support those). Upstream throws at rule-load time on an invalid
+		// pattern; rslint's equivalent fail-fast surface is config validation,
+		// where the schema's `format: "regex"` on allowPattern rejects the
+		// config before linting starts - so the compile-error branch here is
+		// only defensive.
 		var allowRE *regexp2.Regexp
 		if opts.AllowPattern != "" {
 			if re, err := regexp2.Compile(opts.AllowPattern, regexp2.ECMAScript|regexp2.Unicode); err == nil {
