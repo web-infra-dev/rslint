@@ -496,6 +496,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-conditional-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/no-conditional-in-test.test.ts',
     './tests/eslint-plugin-jest/rules/no-confusing-set-timeout.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
