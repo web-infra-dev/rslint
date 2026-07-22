@@ -5,8 +5,17 @@ import (
 	"time"
 )
 
+// Rule implementation kinds reported in the timing table.
+const (
+	RuleKindNative = "native" // built-in Go rule
+	RuleKindJS     = "js"     // rule run by the Node.js ESLint plugin worker
+)
+
 // RuleTiming aggregates one rule's execution cost across all linted files.
 type RuleTiming struct {
+	// Kind is RuleKindNative or RuleKindJS, depending on which side
+	// executed the rule.
+	Kind string
 	// Time is the total time spent in the rule: building its listeners
 	// (Run) plus every listener invocation during AST traversal, including
 	// any diagnostics/fix construction those listeners perform. Files are
@@ -36,6 +45,7 @@ func (c *TimingCollector) addFile(rules []ConfiguredRule, durations []time.Durat
 	defer c.mu.Unlock()
 	for i, configuredRule := range rules {
 		t := c.timings[configuredRule.Name]
+		t.Kind = RuleKindNative
 		t.Time += durations[i]
 		t.Files++
 		c.timings[configuredRule.Name] = t
@@ -49,6 +59,7 @@ func (c *TimingCollector) addFileRuleTimesMS(times map[string]float64) {
 	defer c.mu.Unlock()
 	for name, ms := range times {
 		t := c.timings[name]
+		t.Kind = RuleKindJS
 		t.Time += time.Duration(ms * float64(time.Millisecond))
 		t.Files++
 		c.timings[name] = t

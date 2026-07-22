@@ -36,8 +36,8 @@ func TestFormatRuleTimingTableEmpty(t *testing.T) {
 
 func TestFormatRuleTimingTable(t *testing.T) {
 	table := formatRuleTimingTable(map[string]linter.RuleTiming{
-		"no-console":                {Time: 500 * time.Microsecond, Files: 3},
-		"@typescript-eslint/no-var": {Time: 1500 * time.Microsecond, Files: 2},
+		"no-console":                {Kind: linter.RuleKindNative, Time: 500 * time.Microsecond, Files: 3},
+		"@typescript-eslint/no-var": {Kind: linter.RuleKindJS, Time: 1500 * time.Microsecond, Files: 2},
 	})
 
 	lines := strings.Split(strings.TrimSuffix(table, "\n"), "\n")
@@ -46,6 +46,7 @@ func TestFormatRuleTimingTable(t *testing.T) {
 		t.Fatalf("expected 6 lines, got %d:\n%s", len(lines), table)
 	}
 	if !strings.Contains(lines[1], "Rule") ||
+		!strings.Contains(lines[1], "Source") ||
 		!strings.Contains(lines[1], "Time (ms)") ||
 		!strings.Contains(lines[1], "Files") ||
 		!strings.Contains(lines[1], "Relative") {
@@ -55,14 +56,15 @@ func TestFormatRuleTimingTable(t *testing.T) {
 	if !strings.HasPrefix(lines[3], "@typescript-eslint/no-var") {
 		t.Errorf("expected slowest rule first, got %q", lines[3])
 	}
-	if !strings.Contains(lines[3], "1.5") || !strings.Contains(lines[3], "75.0%") {
+	if !strings.Contains(lines[3], "js") || !strings.Contains(lines[3], "1.5") ||
+		!strings.Contains(lines[3], "75.0%") {
 		t.Errorf("unexpected slowest-rule row: %q", lines[3])
 	}
 	if !strings.HasPrefix(lines[4], "no-console") {
 		t.Errorf("expected no-console second, got %q", lines[4])
 	}
-	if !strings.Contains(lines[4], "0.5") || !strings.Contains(lines[4], "25.0%") ||
-		!strings.Contains(lines[4], "3") {
+	if !strings.Contains(lines[4], "native") || !strings.Contains(lines[4], "0.5") ||
+		!strings.Contains(lines[4], "25.0%") || !strings.Contains(lines[4], "3") {
 		t.Errorf("unexpected no-console row: %q", lines[4])
 	}
 }

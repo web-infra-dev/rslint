@@ -114,13 +114,15 @@ TIMING=1 rslint src/
 ```
 
 ```
-Rule                                    | Time (ms) | Files | Relative
-----------------------------------------|-----------|-------|---------
-@typescript-eslint/no-misused-promises  |    1203.5 |   842 |    31.2%
-@typescript-eslint/no-floating-promises |     801.2 |   842 |    20.8%
-no-control-regex                        |     102.9 |   842 |     2.7%
+Rule                                    | Source | Time (ms) | Files | Relative
+----------------------------------------|--------|-----------|-------|---------
+@typescript-eslint/no-misused-promises  | native |    1203.5 |   842 |    31.2%
+@typescript-eslint/no-floating-promises | native |     801.2 |   842 |    20.8%
+jsdoc/no-types                          | js     |     311.4 |   842 |     8.1%
+no-control-regex                        | native |     102.9 |   842 |     2.7%
 ```
 
+- **Source** — `native` for built-in Go rules, `js` for rules run through the ESLint plugin compatibility layer.
 - **Time (ms)** — total time spent in the rule across all files: building its listeners plus running them during AST traversal, including diagnostic and fix construction.
 - **Files** — number of files the rule executed on.
 - **Relative** — the rule's share of the summed rule time.

@@ -40,7 +40,7 @@ func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
 		return names[i] < names[j]
 	})
 
-	header := []string{"Rule", "Time (ms)", "Files", "Relative"}
+	header := []string{"Rule", "Source", "Time (ms)", "Files", "Relative"}
 	rows := make([][]string, 0, len(names))
 	for _, name := range names {
 		t := timings[name]
@@ -50,6 +50,7 @@ func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
 		}
 		rows = append(rows, []string{
 			name,
+			t.Kind,
 			fmt.Sprintf("%.1f", float64(t.Time.Microseconds())/1000),
 			fmt.Sprintf("%d", t.Files),
 			fmt.Sprintf("%.1f%%", relative),
@@ -75,7 +76,7 @@ func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
 			if i > 0 {
 				b.WriteString(" | ")
 			}
-			if i == 0 {
+			if i <= 1 { // Rule and Source are left-aligned, numbers right-aligned.
 				b.WriteString(cell)
 				b.WriteString(strings.Repeat(" ", widths[i]-len(cell)))
 			} else {
