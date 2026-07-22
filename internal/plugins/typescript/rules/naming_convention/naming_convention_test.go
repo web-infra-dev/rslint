@@ -297,6 +297,25 @@ func TestNamingConventionRule(t *testing.T) {
 			},
 		},
 
+		// Unused modifier never applies to members: a type property read via
+		// property access must keep the base format, and even an unreferenced
+		// member stays on the base format (typescript-eslint only computes
+		// `unused` for scope-participating declarations).
+		{
+			Code: "type foo_type = {\n  used_prop: string;\n  extra_prop: number;\n};\nexport declare const foo_var: foo_type;\nexport const prop_value = foo_var.used_prop;",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":   []interface{}{"snake_case"},
+					"selector": "default",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"PascalCase"},
+					"modifiers": []interface{}{"unused"},
+					"selector":  "default",
+				},
+			},
+		},
+
 		// A `filter` on an earlier, less-specific selector (memberLike) must
 		// not defeat a later, more specific selector (property) that has no
 		// filter at all — the more specific selector should still win.
@@ -318,6 +337,27 @@ func TestNamingConventionRule(t *testing.T) {
 			},
 		},
 	}, []rule_tester.InvalidTestCase{
+		// Members never get the `unused` modifier: an unreferenced type
+		// property is still checked against the base format, not the
+		// unused override.
+		{
+			Code: "export type foo_type = {\n  ExtraProp: string;\n};",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":   []interface{}{"snake_case"},
+					"selector": "default",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"PascalCase"},
+					"modifiers": []interface{}{"unused"},
+					"selector":  "default",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "doesNotMatchFormat", Line: 2, Column: 3},
+			},
+		},
+
 		// Variable violating camelCase
 		{
 			Code: `const my_variable = 1;`,

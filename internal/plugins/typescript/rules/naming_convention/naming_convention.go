@@ -114,11 +114,12 @@ const (
 	selectorMemberLike   = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty |
 		selectorParameterProperty | selectorEnumMember | selectorClassMethod | selectorObjectLiteralMethod |
 		selectorTypeMethod | selectorClassicAccessor | selectorAutoAccessor
-	selectorTypeLike = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
-	selectorMethod   = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
-	selectorProperty = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
-	selectorAccessor = selectorClassicAccessor | selectorAutoAccessor
-	selectorDefault  = selectorVariableLike | selectorMemberLike | selectorTypeLike | selectorImport
+	selectorTypeLike        = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
+	selectorMethod          = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
+	selectorProperty        = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
+	selectorAccessor        = selectorClassicAccessor | selectorAutoAccessor
+	selectorDefault         = selectorVariableLike | selectorMemberLike | selectorTypeLike | selectorImport
+	selectorUnusedSupported = selectorVariableLike | selectorTypeLike
 )
 
 func parseSelectorKind(s string) (selectorKind, bool) {
@@ -1236,10 +1237,11 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 		mods |= modifierDestructured
 	}
 
-	// Unused check - exported symbols are never considered unused.
+	// Unused check - exported symbols are never considered unused, and only
+	// scope-participating declarations (not members or imports) can be unused.
 	// Use nameNode (the specific identifier) for symbol lookup, not the declaration node,
 	// so that individual destructured bindings are correctly detected as unused.
-	if mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
+	if sel&selectorUnusedSupported != 0 && mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
 		mods |= modifierUnused
 	}
 
@@ -1359,12 +1361,49 @@ type referencedInfo struct {
 	shorthandNames map[string]bool // names used in shorthand property assignments
 }
 
+// needsUnusedInfo reports whether any selector checks the "unused" modifier.
+// Only then is the referenced-symbols collection needed — isUnusedByNameNode
+// treats a nil referencedInfo as "not unused", and the unused bit in the
+// computed modifiers is only ever consumed by selectors that require it.
+func needsUnusedInfo(selectors []normalizedSelector) bool {
+	for _, sel := range selectors {
+		if sel.modifiers&modifierUnused != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // collectReferencedSymbols walks the source file and collects all symbols that are referenced
 // (i.e., used in a non-declaration context). This is used to detect the "unused" modifier.
+//
+// The symbol set is only ever queried for symbols of declaration names in this file,
+// and any reference resolving to such a symbol is an identifier with the same text as
+// the declared name. So the walk first gathers all declaration-name texts in one
+// pure-syntax pass, then consults the checker only for identifiers matching one of
+// them — GetSymbolAtLocation is expensive (property accesses trigger lazy type
+// checking; failed resolutions trigger spelling suggestions).
 func collectReferencedSymbols(ctx rule.RuleContext) *referencedInfo {
 	if ctx.TypeChecker == nil {
 		return nil
 	}
+
+	declNames := make(map[string]bool)
+	var collectDeclNames func(node *ast.Node)
+	collectDeclNames = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == ast.KindIdentifier && node.Parent != nil &&
+			ast.GetNameOfDeclaration(node.Parent) == node {
+			declNames[node.AsIdentifier().Text] = true
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			collectDeclNames(child)
+			return false
+		})
+	}
+	collectDeclNames(&ctx.SourceFile.Node)
 
 	info := &referencedInfo{
 		symbols:        make(map[*ast.Symbol]bool),
@@ -1379,7 +1418,7 @@ func collectReferencedSymbols(ctx rule.RuleContext) *referencedInfo {
 		if node.Kind == ast.KindIdentifier {
 			parent := node.Parent
 			isDeclarationName := parent != nil && ast.GetNameOfDeclaration(parent) == node
-			if !isDeclarationName {
+			if !isDeclarationName && declNames[node.AsIdentifier().Text] {
 				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
 				if sym != nil {
 					info.symbols[sym] = true
@@ -2116,7 +2155,10 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 	}
 
 	reExportedNames := collectReExportedNames(ctx)
-	refInfo := collectReferencedSymbols(ctx)
+	var refInfo *referencedInfo
+	if needsUnusedInfo(selectors) {
+		refInfo = collectReferencedSymbols(ctx)
+	}
 
 	handleNode := func(node *ast.Node) {
 		identifiers := getIdentifierFromNode(ctx, node)
