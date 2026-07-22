@@ -114,11 +114,12 @@ const (
 	selectorMemberLike   = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty |
 		selectorParameterProperty | selectorEnumMember | selectorClassMethod | selectorObjectLiteralMethod |
 		selectorTypeMethod | selectorClassicAccessor | selectorAutoAccessor
-	selectorTypeLike = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
-	selectorMethod   = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
-	selectorProperty = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
-	selectorAccessor = selectorClassicAccessor | selectorAutoAccessor
-	selectorDefault  = selectorVariableLike | selectorMemberLike | selectorTypeLike | selectorImport
+	selectorTypeLike        = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
+	selectorMethod          = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
+	selectorProperty        = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
+	selectorAccessor        = selectorClassicAccessor | selectorAutoAccessor
+	selectorDefault         = selectorVariableLike | selectorMemberLike | selectorTypeLike | selectorImport
+	selectorUnusedSupported = selectorVariableLike | selectorTypeLike
 )
 
 func parseSelectorKind(s string) (selectorKind, bool) {
@@ -1236,10 +1237,11 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 		mods |= modifierDestructured
 	}
 
-	// Unused check - exported symbols are never considered unused.
+	// Unused check - exported symbols are never considered unused, and only
+	// scope-participating declarations (not members or imports) can be unused.
 	// Use nameNode (the specific identifier) for symbol lookup, not the declaration node,
 	// so that individual destructured bindings are correctly detected as unused.
-	if mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
+	if sel&selectorUnusedSupported != 0 && mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
 		mods |= modifierUnused
 	}
 
