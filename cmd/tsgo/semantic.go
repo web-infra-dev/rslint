@@ -267,8 +267,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					semantic.Node2sym[key] = sym_id
 					semantic.Node2type[key] = typeID
 
-					// Resolve alias symbol if this is an alias
-					if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+					// A merged symbol can contain both a local value and an imported type.
+					// Value references must keep the local symbol instead of resolving the alias.
+					if symbol.Flags&ast.SymbolFlagsAlias != 0 && symbol.Flags&ast.SymbolFlagsValue == 0 {
 						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
 							aliased_id := ast.GetSymbolId(aliasedSymbol)
 							if aliased_id != sym_id {

@@ -228,6 +228,45 @@ func TestSemanticSnapshot_NonBMPCharPositions(t *testing.T) {
 	}
 }
 
+func TestSemanticAliasDoesNotReplaceMergedLocalValue(t *testing.T) {
+	tmpDir := t.TempDir()
+	tsconfigPath := filepath.Join(tmpDir, "tsconfig.json")
+	modulePath := filepath.Join(tmpDir, "module.ts")
+	indexPath := filepath.Join(tmpDir, "index.ts")
+
+	if err := os.WriteFile(tsconfigPath, []byte(`{"include":["./*.ts"]}`), 0o644); err != nil {
+		t.Fatalf("Failed to write tsconfig: %v", err)
+	}
+	if err := os.WriteFile(modulePath, []byte("export interface SymbolLinks {}"), 0o644); err != nil {
+		t.Fatalf("Failed to write module: %v", err)
+	}
+	source := "import { SymbolLinks } from './module';\nconst SymbolLinks = class implements SymbolLinks {};\nnew SymbolLinks();"
+	if err := os.WriteFile(indexPath, []byte(source), 0o644); err != nil {
+		t.Fatalf("Failed to write index: %v", err)
+	}
+
+	t.Chdir(tmpDir)
+	program, err := CreateProgram("tsconfig.json")
+	if err != nil {
+		t.Fatalf("Failed to create program: %v", err)
+	}
+
+	semantic := CollectSemantic(program)
+	var localValueID ast.SymbolId
+	for symbolID, symbol := range semantic.Symtab {
+		if string(symbol.Name) == "SymbolLinks" && symbol.Flags&int(ast.SymbolFlagsValue) != 0 {
+			localValueID = symbolID
+			break
+		}
+	}
+	if localValueID == 0 {
+		t.Fatal("local SymbolLinks value symbol not found")
+	}
+	if target, exists := semantic.AliasSymbols[localValueID]; exists {
+		t.Fatalf("local value symbol %d was incorrectly aliased to %d", localValueID, target)
+	}
+}
+
 func TestSemanticSnapshot_InternalSymbolNameSanitized(t *testing.T) {
 	// Arrow functions produce an internal symbol with name "\xFEfunction".
 	// Verify that the \xFE prefix is sanitized to "__" in the output.

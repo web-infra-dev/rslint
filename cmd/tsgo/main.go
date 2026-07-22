@@ -23,6 +23,7 @@ type CheckResult = struct {
 	ModuleList      []string            `json:"module_list"`
 	SourceFiles     []EncodedSourceFile `json:"source_files"`
 	RootFiles       []string            `json:"root_files"`
+	ModuleExports   [][]ast.SymbolId    `json:"module_exports"`
 	Semantic        Semantic            `json:"semantic"`
 	Diagnostics     []Diagnostics       `json:"diagnostics"`
 	SourceFileExtra []SourceFileExtra   `json:"source_file_extra"`
@@ -206,6 +207,24 @@ func runMain() int {
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
 
 		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId, sourceFileIds)
+		exports := []ast.SymbolId{}
+		if sourceFile.Symbol != nil {
+			for _, symbol := range tc.GetExportsOfModule(sourceFile.Symbol) {
+				if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+					if tc.GetTypeOnlyAliasDeclaration(symbol) != nil {
+						continue
+					}
+					if target, ok := tc.ResolveAlias(symbol); ok {
+						symbol = target
+					}
+				}
+				if symbol.Flags&ast.SymbolFlagsValue == 0 {
+					continue
+				}
+				exports = append(exports, ast.GetSymbolId(symbol))
+			}
+		}
+		checkResult.ModuleExports = append(checkResult.ModuleExports, exports)
 	}
 	checkResult.Diagnostics = getDiagnostics(diagnostics, &fileMap)
 
