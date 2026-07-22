@@ -41,19 +41,6 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 			{Code: `const { x, nested: [y] } = source;`, Options: map[string]interface{}{"vars": "local"}},
 			{Code: `{ var blockVar = 1; } for (var loopVar of source) { consume(); }`, Options: map[string]interface{}{"vars": "local"}},
 
-			// Exported directives mark declaration bindings only in the script-global
-			// scope. Explicit `/* global */` names remain global even in a module.
-			// Cover lexical declarations as well as var, which upstream exercises.
-			{Code: `/*exported globalLet, GlobalClass, globalFn*/ let globalLet=1; class GlobalClass{} function globalFn(){}`},
-			{Code: `/*exported blockVar*/ { var blockVar=1; }`},
-			{
-				Code: `/*global _declared*/ /*exported _declared*/ export {};`,
-				Options: map[string]interface{}{
-					"varsIgnorePattern":       "^_",
-					"reportUsedIgnorePattern": true,
-				},
-			},
-
 			// Locks in upstream array-pattern precedence: only an identifier that
 			// is a direct ArrayPattern child matches this option.
 			{Code: `const [_direct] = source;`, Options: map[string]interface{}{"destructuredArrayIgnorePattern": "^_"}},
@@ -221,39 +208,11 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 				},
 			},
 
-			// ---- Dimension 4: exported directives mark exact script-global names ----
+			// ---- Intentional difference: exported comments do not mark globals as used ----
 			{
-				Code: `/*exported x*/ var x=1; function f(){let x=2} f();`,
+				Code: `/* exported publicValue */ var publicValue = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					extraUnusedErrorWithSuggestion("x", true, 1, 42, 43, `/*exported x*/ var x=1; function f(){} f();`),
-				},
-			},
-			{
-				Code: `/*exported x:false*/ var x=1;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					extraUnusedErrorWithSuggestion("x", true, 1, 26, 27, `/*exported x:false*/ `),
-				},
-			},
-			{
-				Code: `/* exported _x */ var _x=1;`,
-				Options: map[string]interface{}{
-					"varsIgnorePattern":       "^_",
-					"reportUsedIgnorePattern": true,
-				},
-				Errors: []rule_tester.InvalidTestCaseError{
-					extraUsedIgnoredError("_x", ". Used vars must not match /^_/u", 1, 23, 25),
-				},
-			},
-			{
-				Code: `/*exported f*/ { function f(){} }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					extraUnusedErrorWithSuggestion("f", false, 1, 27, 28, `/*exported f*/ {  }`),
-				},
-			},
-			{
-				Code: `/*exported x*/ for(let x of xs){}`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					extraUnusedError("x", true, 1, 24, 25, ""),
+					extraUnusedErrorWithSuggestion("publicValue", true, 1, 32, 43, `/* exported publicValue */ `),
 				},
 			},
 

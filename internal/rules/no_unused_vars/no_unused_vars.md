@@ -91,11 +91,10 @@ For example, this configuration allows underscore-prefixed parameters:
 }
 ```
 
-## Exported Globals
+## Differences from ESLint
 
-In script files, an `/* exported name */` block comment marks the named global
-binding as used. Multiple names are comma-separated. The directive has no
-effect on nested bindings or in ES modules.
+- With an `/* exported publicValue */` comment, rslint still reports an
+  otherwise unused top-level `publicValue`; ESLint treats it as used.
 
 ```javascript
 /* exported publicValue */

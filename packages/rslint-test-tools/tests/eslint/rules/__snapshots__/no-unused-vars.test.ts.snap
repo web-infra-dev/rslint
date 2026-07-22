@@ -931,58 +931,6 @@ exports[`no-unused-vars > invalid 32`] = `
 
 exports[`no-unused-vars > invalid 33`] = `
 {
-  "code": "/*exported max*/ var max = 1, min = {min: 1}",
-  "diagnostics": [
-    {
-      "message": "'min' is assigned a value but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 34,
-          "line": 1,
-        },
-        "start": {
-          "column": 31,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 34`] = `
-{
-  "code": "/*exported x*/ var { x, y } = z",
-  "diagnostics": [
-    {
-      "message": "'y' is assigned a value but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 26,
-          "line": 1,
-        },
-        "start": {
-          "column": 25,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 35`] = `
-{
   "code": "var _a; var b;",
   "diagnostics": [
     {
@@ -1007,7 +955,7 @@ exports[`no-unused-vars > invalid 35`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 36`] = `
+exports[`no-unused-vars > invalid 34`] = `
 {
   "code": "var a; function foo() { var _b; var c_; } foo();",
   "diagnostics": [
@@ -1033,7 +981,7 @@ exports[`no-unused-vars > invalid 36`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 37`] = `
+exports[`no-unused-vars > invalid 35`] = `
 {
   "code": "function foo(a, _b) { } foo();",
   "diagnostics": [
@@ -1059,7 +1007,7 @@ exports[`no-unused-vars > invalid 37`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 38`] = `
+exports[`no-unused-vars > invalid 36`] = `
 {
   "code": "function foo(a, _b, c) { return a; } foo();",
   "diagnostics": [
@@ -1085,7 +1033,7 @@ exports[`no-unused-vars > invalid 38`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 39`] = `
+exports[`no-unused-vars > invalid 37`] = `
 {
   "code": "function foo(_a) { } foo();",
   "diagnostics": [
@@ -1111,7 +1059,7 @@ exports[`no-unused-vars > invalid 39`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 40`] = `
+exports[`no-unused-vars > invalid 38`] = `
 {
   "code": "var [ firstItemIgnored, secondItem ] = items;",
   "diagnostics": [
@@ -1137,7 +1085,7 @@ exports[`no-unused-vars > invalid 40`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 41`] = `
+exports[`no-unused-vars > invalid 39`] = `
 {
   "code": "const array = ['a', 'b', 'c']; const [a, _b, c] = array; const newArray = [a, c];",
   "diagnostics": [
@@ -1163,7 +1111,7 @@ exports[`no-unused-vars > invalid 41`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 42`] = `
+exports[`no-unused-vars > invalid 40`] = `
 {
   "code": "const array = ['a', 'b', 'c', 'd', 'e']; const [a, _b, c] = array;",
   "diagnostics": [
@@ -1204,7 +1152,7 @@ exports[`no-unused-vars > invalid 42`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 43`] = `
+exports[`no-unused-vars > invalid 41`] = `
 {
   "code": "const array = ['a', 'b', 'c'];
 const [a, _b, c] = array;
@@ -1279,7 +1227,7 @@ const ignoreArray = ['ignore'];",
 }
 `;
 
-exports[`no-unused-vars > invalid 44`] = `
+exports[`no-unused-vars > invalid 42`] = `
 {
   "code": "const array = [obj]; const [{_a, foo}] = array; console.log(foo);",
   "diagnostics": [
@@ -1305,7 +1253,7 @@ exports[`no-unused-vars > invalid 44`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 45`] = `
+exports[`no-unused-vars > invalid 43`] = `
 {
   "code": "function foo([{_a, bar}]) {bar;}foo();",
   "diagnostics": [
@@ -1331,7 +1279,7 @@ exports[`no-unused-vars > invalid 45`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 46`] = `
+exports[`no-unused-vars > invalid 44`] = `
 {
   "code": "let _a, b; foo.forEach(item => { [a, b] = item; });",
   "diagnostics": [
@@ -1372,7 +1320,7 @@ exports[`no-unused-vars > invalid 46`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 47`] = `
+exports[`no-unused-vars > invalid 45`] = `
 {
   "code": "(function(obj) { var name; for ( name in obj ) { i(); return; } })({});",
   "diagnostics": [
@@ -1398,7 +1346,7 @@ exports[`no-unused-vars > invalid 47`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 48`] = `
+exports[`no-unused-vars > invalid 46`] = `
 {
   "code": "(function(obj) { var name; for ( name in obj ) { } })({});",
   "diagnostics": [
@@ -1424,7 +1372,7 @@ exports[`no-unused-vars > invalid 48`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 49`] = `
+exports[`no-unused-vars > invalid 47`] = `
 {
   "code": "(function(obj) { for ( var name in obj ) { } })({});",
   "diagnostics": [
@@ -1450,7 +1398,7 @@ exports[`no-unused-vars > invalid 49`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 50`] = `
+exports[`no-unused-vars > invalid 48`] = `
 {
   "code": "for ( var { foo } in bar ) { }",
   "diagnostics": [
@@ -1476,7 +1424,7 @@ exports[`no-unused-vars > invalid 50`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 51`] = `
+exports[`no-unused-vars > invalid 49`] = `
 {
   "code": "for ( var [ foo ] in bar ) { }",
   "diagnostics": [
@@ -1502,7 +1450,7 @@ exports[`no-unused-vars > invalid 51`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 52`] = `
+exports[`no-unused-vars > invalid 50`] = `
 {
   "code": "(function(iter) { var name; for ( name of iter ) { i(); return; } })({});",
   "diagnostics": [
@@ -1528,7 +1476,7 @@ exports[`no-unused-vars > invalid 52`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 53`] = `
+exports[`no-unused-vars > invalid 51`] = `
 {
   "code": "(function(iter) { var name; for ( name of iter ) { } })({});",
   "diagnostics": [
@@ -1554,7 +1502,7 @@ exports[`no-unused-vars > invalid 53`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 54`] = `
+exports[`no-unused-vars > invalid 52`] = `
 {
   "code": "(function(iter) { for ( var name of iter ) { } })({});",
   "diagnostics": [
@@ -1580,7 +1528,7 @@ exports[`no-unused-vars > invalid 54`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 55`] = `
+exports[`no-unused-vars > invalid 53`] = `
 {
   "code": "for ( var { foo } of bar ) { }",
   "diagnostics": [
@@ -1606,7 +1554,7 @@ exports[`no-unused-vars > invalid 55`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 56`] = `
+exports[`no-unused-vars > invalid 54`] = `
 {
   "code": "for ( var [ foo ] of bar ) { }",
   "diagnostics": [
@@ -1632,7 +1580,7 @@ exports[`no-unused-vars > invalid 56`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 57`] = `
+exports[`no-unused-vars > invalid 55`] = `
 {
   "code": "
 /* global foobar, foo, bar */
@@ -1675,7 +1623,7 @@ foobar;",
 }
 `;
 
-exports[`no-unused-vars > invalid 58`] = `
+exports[`no-unused-vars > invalid 56`] = `
 {
   "code": "
 /* global foobar,
@@ -1721,7 +1669,7 @@ foobar;",
 }
 `;
 
-exports[`no-unused-vars > invalid 59`] = `
+exports[`no-unused-vars > invalid 57`] = `
 {
   "code": "const data = { type: 'coords', x: 1, y: 2 };
 const { type, ...coords } = data;
@@ -1749,7 +1697,7 @@ const { type, ...coords } = data;
 }
 `;
 
-exports[`no-unused-vars > invalid 60`] = `
+exports[`no-unused-vars > invalid 58`] = `
 {
   "code": "const data = { type: 'coords', x: 2, y: 2 };
 const { type, ...coords } = data;
@@ -1777,7 +1725,7 @@ const { type, ...coords } = data;
 }
 `;
 
-exports[`no-unused-vars > invalid 61`] = `
+exports[`no-unused-vars > invalid 59`] = `
 {
   "code": "let type, coords;
 ({ type, ...coords } = data);
@@ -1805,7 +1753,7 @@ exports[`no-unused-vars > invalid 61`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 62`] = `
+exports[`no-unused-vars > invalid 60`] = `
 {
   "code": "const data = { type: 'coords', x: 3, y: 2 };
 const { type, ...coords } = data;
@@ -1833,7 +1781,7 @@ const { type, ...coords } = data;
 }
 `;
 
-exports[`no-unused-vars > invalid 63`] = `
+exports[`no-unused-vars > invalid 61`] = `
 {
   "code": "const data = { vars: ['x','y'], x: 1, y: 2 };
 const { vars: [x], ...coords } = data;
@@ -1861,7 +1809,7 @@ const { vars: [x], ...coords } = data;
 }
 `;
 
-exports[`no-unused-vars > invalid 64`] = `
+exports[`no-unused-vars > invalid 62`] = `
 {
   "code": "const data = { defaults: { x: 0 }, x: 1, y: 2 };
 const { defaults: { x }, ...coords } = data;
@@ -1889,7 +1837,7 @@ const { defaults: { x }, ...coords } = data;
 }
 `;
 
-exports[`no-unused-vars > invalid 65`] = `
+exports[`no-unused-vars > invalid 63`] = `
 {
   "code": "(({a, ...rest}) => {})",
   "diagnostics": [
@@ -1915,7 +1863,7 @@ exports[`no-unused-vars > invalid 65`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 66`] = `
+exports[`no-unused-vars > invalid 64`] = `
 {
   "code": "/* global a$fooz,$foo */
 a$fooz;",
@@ -1942,7 +1890,7 @@ a$fooz;",
 }
 `;
 
-exports[`no-unused-vars > invalid 67`] = `
+exports[`no-unused-vars > invalid 65`] = `
 {
   "code": "/* globals a$fooz, $ */
 a$fooz;",
@@ -1969,7 +1917,7 @@ a$fooz;",
 }
 `;
 
-exports[`no-unused-vars > invalid 68`] = `
+exports[`no-unused-vars > invalid 66`] = `
 {
   "code": "/*globals $foo*/",
   "diagnostics": [
@@ -1995,7 +1943,7 @@ exports[`no-unused-vars > invalid 68`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 69`] = `
+exports[`no-unused-vars > invalid 67`] = `
 {
   "code": "/* global global*/",
   "diagnostics": [
@@ -2021,7 +1969,7 @@ exports[`no-unused-vars > invalid 69`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 70`] = `
+exports[`no-unused-vars > invalid 68`] = `
 {
   "code": "/*global foo:true*/",
   "diagnostics": [
@@ -2047,7 +1995,7 @@ exports[`no-unused-vars > invalid 70`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 71`] = `
+exports[`no-unused-vars > invalid 69`] = `
 {
   "code": "/*global 変数, 数*/
 変数;",
@@ -2074,7 +2022,7 @@ exports[`no-unused-vars > invalid 71`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 72`] = `
+exports[`no-unused-vars > invalid 70`] = `
 {
   "code": "/*global 𠮷𩸽, 𠮷*/
 \\u{20BB7}\\u{29E3D};",
@@ -2101,7 +2049,7 @@ exports[`no-unused-vars > invalid 72`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 73`] = `
+exports[`no-unused-vars > invalid 71`] = `
 {
   "code": "export default function(a) {}",
   "diagnostics": [
@@ -2127,7 +2075,7 @@ exports[`no-unused-vars > invalid 73`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 74`] = `
+exports[`no-unused-vars > invalid 72`] = `
 {
   "code": "export default function(a, b) { console.log(a); }",
   "diagnostics": [
@@ -2153,7 +2101,7 @@ exports[`no-unused-vars > invalid 74`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 75`] = `
+exports[`no-unused-vars > invalid 73`] = `
 {
   "code": "export default (function(a) {});",
   "diagnostics": [
@@ -2179,7 +2127,7 @@ exports[`no-unused-vars > invalid 75`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 76`] = `
+exports[`no-unused-vars > invalid 74`] = `
 {
   "code": "export default (function(a, b) { console.log(a); });",
   "diagnostics": [
@@ -2205,7 +2153,7 @@ exports[`no-unused-vars > invalid 76`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 77`] = `
+exports[`no-unused-vars > invalid 75`] = `
 {
   "code": "export default (a) => {};",
   "diagnostics": [
@@ -2231,7 +2179,7 @@ exports[`no-unused-vars > invalid 77`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 78`] = `
+exports[`no-unused-vars > invalid 76`] = `
 {
   "code": "export default (a, b) => { console.log(a); };",
   "diagnostics": [
@@ -2257,12 +2205,64 @@ exports[`no-unused-vars > invalid 78`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 79`] = `
+exports[`no-unused-vars > invalid 77`] = `
 {
   "code": "try{}catch(err){};",
   "diagnostics": [
     {
       "message": "'err' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 78`] = `
+{
+  "code": "try{}catch(err){};",
+  "diagnostics": [
+    {
+      "message": "'err' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 79`] = `
+{
+  "code": "try{}catch(err){};",
+  "diagnostics": [
+    {
+      "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -2314,7 +2314,7 @@ exports[`no-unused-vars > invalid 81`] = `
   "code": "try{}catch(err){};",
   "diagnostics": [
     {
-      "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
+      "message": "'err' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -2336,58 +2336,6 @@ exports[`no-unused-vars > invalid 81`] = `
 `;
 
 exports[`no-unused-vars > invalid 82`] = `
-{
-  "code": "try{}catch(err){};",
-  "diagnostics": [
-    {
-      "message": "'err' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 83`] = `
-{
-  "code": "try{}catch(err){};",
-  "diagnostics": [
-    {
-      "message": "'err' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 84`] = `
 {
   "code": "try{}catch(ignoreErr){}try{}catch(err){};",
   "diagnostics": [
@@ -2413,7 +2361,7 @@ exports[`no-unused-vars > invalid 84`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 85`] = `
+exports[`no-unused-vars > invalid 83`] = `
 {
   "code": "try{}catch(error){}try{}catch(err){};",
   "diagnostics": [
@@ -2454,59 +2402,59 @@ exports[`no-unused-vars > invalid 85`] = `
 }
 `;
 
+exports[`no-unused-vars > invalid 84`] = `
+{
+  "code": "try{}catch(err){};",
+  "diagnostics": [
+    {
+      "message": "'err' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 85`] = `
+{
+  "code": "try{}catch(err){};",
+  "diagnostics": [
+    {
+      "message": "'err' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
 exports[`no-unused-vars > invalid 86`] = `
-{
-  "code": "try{}catch(err){};",
-  "diagnostics": [
-    {
-      "message": "'err' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 87`] = `
-{
-  "code": "try{}catch(err){};",
-  "diagnostics": [
-    {
-      "message": "'err' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 88`] = `
 {
   "code": "var a = 0; a = a + 1;",
   "diagnostics": [
@@ -2532,7 +2480,7 @@ exports[`no-unused-vars > invalid 88`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 89`] = `
+exports[`no-unused-vars > invalid 87`] = `
 {
   "code": "var a = 0; a = a + a;",
   "diagnostics": [
@@ -2558,7 +2506,7 @@ exports[`no-unused-vars > invalid 89`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 90`] = `
+exports[`no-unused-vars > invalid 88`] = `
 {
   "code": "var a = 0; a += a + 1;",
   "diagnostics": [
@@ -2584,7 +2532,7 @@ exports[`no-unused-vars > invalid 90`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 91`] = `
+exports[`no-unused-vars > invalid 89`] = `
 {
   "code": "var a = 0; a++;",
   "diagnostics": [
@@ -2610,7 +2558,7 @@ exports[`no-unused-vars > invalid 91`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 92`] = `
+exports[`no-unused-vars > invalid 90`] = `
 {
   "code": "function foo(a) { a = a + 1 } foo();",
   "diagnostics": [
@@ -2636,7 +2584,7 @@ exports[`no-unused-vars > invalid 92`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 93`] = `
+exports[`no-unused-vars > invalid 91`] = `
 {
   "code": "function foo(a) { a += a + 1 } foo();",
   "diagnostics": [
@@ -2662,7 +2610,7 @@ exports[`no-unused-vars > invalid 93`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 94`] = `
+exports[`no-unused-vars > invalid 92`] = `
 {
   "code": "function foo(a) { a++ } foo();",
   "diagnostics": [
@@ -2688,7 +2636,7 @@ exports[`no-unused-vars > invalid 94`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 95`] = `
+exports[`no-unused-vars > invalid 93`] = `
 {
   "code": "var a = 3; a = a * 5 + 6;",
   "diagnostics": [
@@ -2714,7 +2662,7 @@ exports[`no-unused-vars > invalid 95`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 96`] = `
+exports[`no-unused-vars > invalid 94`] = `
 {
   "code": "var a = 2, b = 4; a = a * 2 + b;",
   "diagnostics": [
@@ -2740,7 +2688,7 @@ exports[`no-unused-vars > invalid 96`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 97`] = `
+exports[`no-unused-vars > invalid 95`] = `
 {
   "code": "function foo(cb) { cb = function(a) { cb(1 + a); }; bar(not_cb); } foo();",
   "diagnostics": [
@@ -2766,7 +2714,7 @@ exports[`no-unused-vars > invalid 97`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 98`] = `
+exports[`no-unused-vars > invalid 96`] = `
 {
   "code": "function foo(cb) { cb = function(a) { return cb(1 + a); }(); } foo();",
   "diagnostics": [
@@ -2792,7 +2740,7 @@ exports[`no-unused-vars > invalid 98`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 99`] = `
+exports[`no-unused-vars > invalid 97`] = `
 {
   "code": "function foo(cb) { cb = (function(a) { cb(1 + a); }, cb); } foo();",
   "diagnostics": [
@@ -2818,7 +2766,7 @@ exports[`no-unused-vars > invalid 99`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 100`] = `
+exports[`no-unused-vars > invalid 98`] = `
 {
   "code": "function foo(cb) { cb = (0, function(a) { cb(1 + a); }); } foo();",
   "diagnostics": [
@@ -2844,7 +2792,7 @@ exports[`no-unused-vars > invalid 100`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 101`] = `
+exports[`no-unused-vars > invalid 99`] = `
 {
   "code": "while (a) {
     function foo(b) {
@@ -2875,7 +2823,7 @@ exports[`no-unused-vars > invalid 101`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 102`] = `
+exports[`no-unused-vars > invalid 100`] = `
 {
   "code": "(function(a, b, c) {})",
   "diagnostics": [
@@ -2916,7 +2864,7 @@ exports[`no-unused-vars > invalid 102`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 103`] = `
+exports[`no-unused-vars > invalid 101`] = `
 {
   "code": "(function(a, b, {c, d}) {})",
   "diagnostics": [
@@ -2957,7 +2905,7 @@ exports[`no-unused-vars > invalid 103`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 104`] = `
+exports[`no-unused-vars > invalid 102`] = `
 {
   "code": "(function(a, b, {c, d}) {})",
   "diagnostics": [
@@ -3013,7 +2961,7 @@ exports[`no-unused-vars > invalid 104`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 105`] = `
+exports[`no-unused-vars > invalid 103`] = `
 {
   "code": "(function(a, b, {c, d}) {})",
   "diagnostics": [
@@ -3069,7 +3017,7 @@ exports[`no-unused-vars > invalid 105`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 106`] = `
+exports[`no-unused-vars > invalid 104`] = `
 {
   "code": "/*global
 foo*/",
@@ -3096,7 +3044,7 @@ foo*/",
 }
 `;
 
-exports[`no-unused-vars > invalid 107`] = `
+exports[`no-unused-vars > invalid 105`] = `
 {
   "code": "(function ({ a }, b ) { return b; })();",
   "diagnostics": [
@@ -3122,7 +3070,7 @@ exports[`no-unused-vars > invalid 107`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 108`] = `
+exports[`no-unused-vars > invalid 106`] = `
 {
   "code": "(function ({ a }, { b, c } ) { return b; })();",
   "diagnostics": [
@@ -3163,7 +3111,7 @@ exports[`no-unused-vars > invalid 108`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 109`] = `
+exports[`no-unused-vars > invalid 107`] = `
 {
   "code": "let x = 0;
 x++, x = 0;",
@@ -3190,7 +3138,7 @@ x++, x = 0;",
 }
 `;
 
-exports[`no-unused-vars > invalid 110`] = `
+exports[`no-unused-vars > invalid 108`] = `
 {
   "code": "let x = 0;
 x++, x = 0;
@@ -3218,7 +3166,7 @@ x=3;",
 }
 `;
 
-exports[`no-unused-vars > invalid 111`] = `
+exports[`no-unused-vars > invalid 109`] = `
 {
   "code": "let x = 0; x++, 0;",
   "diagnostics": [
@@ -3244,7 +3192,7 @@ exports[`no-unused-vars > invalid 111`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 112`] = `
+exports[`no-unused-vars > invalid 110`] = `
 {
   "code": "let x = 0; 0, x++;",
   "diagnostics": [
@@ -3270,7 +3218,7 @@ exports[`no-unused-vars > invalid 112`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 113`] = `
+exports[`no-unused-vars > invalid 111`] = `
 {
   "code": "let x = 0; 0, (1, x++);",
   "diagnostics": [
@@ -3296,7 +3244,7 @@ exports[`no-unused-vars > invalid 113`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 114`] = `
+exports[`no-unused-vars > invalid 112`] = `
 {
   "code": "let x = 0; foo = (x++, 0);",
   "diagnostics": [
@@ -3322,7 +3270,7 @@ exports[`no-unused-vars > invalid 114`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 115`] = `
+exports[`no-unused-vars > invalid 113`] = `
 {
   "code": "let x = 0; foo = ((0, x++), 0);",
   "diagnostics": [
@@ -3348,7 +3296,7 @@ exports[`no-unused-vars > invalid 115`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 116`] = `
+exports[`no-unused-vars > invalid 114`] = `
 {
   "code": "let x = 0; x += 1, 0;",
   "diagnostics": [
@@ -3374,7 +3322,7 @@ exports[`no-unused-vars > invalid 116`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 117`] = `
+exports[`no-unused-vars > invalid 115`] = `
 {
   "code": "let x = 0; 0, x += 1;",
   "diagnostics": [
@@ -3400,7 +3348,7 @@ exports[`no-unused-vars > invalid 117`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 118`] = `
+exports[`no-unused-vars > invalid 116`] = `
 {
   "code": "let x = 0; 0, (1, x += 1);",
   "diagnostics": [
@@ -3426,7 +3374,7 @@ exports[`no-unused-vars > invalid 118`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 119`] = `
+exports[`no-unused-vars > invalid 117`] = `
 {
   "code": "let x = 0; foo = (x += 1, 0);",
   "diagnostics": [
@@ -3452,7 +3400,7 @@ exports[`no-unused-vars > invalid 119`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 120`] = `
+exports[`no-unused-vars > invalid 118`] = `
 {
   "code": "let x = 0; foo = ((0, x += 1), 0);",
   "diagnostics": [
@@ -3478,7 +3426,7 @@ exports[`no-unused-vars > invalid 120`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 121`] = `
+exports[`no-unused-vars > invalid 119`] = `
 {
   "code": "let z = 0;
 z = z + 1, z = 2;",
@@ -3505,7 +3453,7 @@ z = z + 1, z = 2;",
 }
 `;
 
-exports[`no-unused-vars > invalid 122`] = `
+exports[`no-unused-vars > invalid 120`] = `
 {
   "code": "let z = 0;
 z = z+1, z = 2;
@@ -3533,7 +3481,7 @@ z = 3;",
 }
 `;
 
-exports[`no-unused-vars > invalid 123`] = `
+exports[`no-unused-vars > invalid 121`] = `
 {
   "code": "let z = 0;
 z = z+1, z = 2;
@@ -3561,7 +3509,7 @@ z = z+3;",
 }
 `;
 
-exports[`no-unused-vars > invalid 124`] = `
+exports[`no-unused-vars > invalid 122`] = `
 {
   "code": "let x = 0; 0, x = x+1;",
   "diagnostics": [
@@ -3587,7 +3535,7 @@ exports[`no-unused-vars > invalid 124`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 125`] = `
+exports[`no-unused-vars > invalid 123`] = `
 {
   "code": "let x = 0; x = x+1, 0;",
   "diagnostics": [
@@ -3613,7 +3561,7 @@ exports[`no-unused-vars > invalid 125`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 126`] = `
+exports[`no-unused-vars > invalid 124`] = `
 {
   "code": "let x = 0; foo = ((0, x = x + 1), 0);",
   "diagnostics": [
@@ -3639,7 +3587,7 @@ exports[`no-unused-vars > invalid 126`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 127`] = `
+exports[`no-unused-vars > invalid 125`] = `
 {
   "code": "let x = 0; foo = (x = x+1, 0);",
   "diagnostics": [
@@ -3665,7 +3613,7 @@ exports[`no-unused-vars > invalid 127`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 128`] = `
+exports[`no-unused-vars > invalid 126`] = `
 {
   "code": "let x = 0; 0, (1, x=x+1);",
   "diagnostics": [
@@ -3691,7 +3639,7 @@ exports[`no-unused-vars > invalid 128`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 129`] = `
+exports[`no-unused-vars > invalid 127`] = `
 {
   "code": "(function ({ a, b }, { c } ) { return b; })();",
   "diagnostics": [
@@ -3732,7 +3680,7 @@ exports[`no-unused-vars > invalid 129`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 130`] = `
+exports[`no-unused-vars > invalid 128`] = `
 {
   "code": "(function ([ a ], b ) { return b; })();",
   "diagnostics": [
@@ -3758,7 +3706,7 @@ exports[`no-unused-vars > invalid 130`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 131`] = `
+exports[`no-unused-vars > invalid 129`] = `
 {
   "code": "(function ([ a ], [ b, c ] ) { return b; })();",
   "diagnostics": [
@@ -3799,7 +3747,7 @@ exports[`no-unused-vars > invalid 131`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 132`] = `
+exports[`no-unused-vars > invalid 130`] = `
 {
   "code": "(function ([ a, b ], [ c ] ) { return b; })();",
   "diagnostics": [
@@ -3840,59 +3788,59 @@ exports[`no-unused-vars > invalid 132`] = `
 }
 `;
 
+exports[`no-unused-vars > invalid 131`] = `
+{
+  "code": "(function(_a) {})();",
+  "diagnostics": [
+    {
+      "message": "'_a' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 132`] = `
+{
+  "code": "(function(_a) {})();",
+  "diagnostics": [
+    {
+      "message": "'_a' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
 exports[`no-unused-vars > invalid 133`] = `
-{
-  "code": "(function(_a) {})();",
-  "diagnostics": [
-    {
-      "message": "'_a' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 13,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 134`] = `
-{
-  "code": "(function(_a) {})();",
-  "diagnostics": [
-    {
-      "message": "'_a' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 13,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 135`] = `
 {
   "code": "var a = function() { a(); };",
   "diagnostics": [
@@ -3918,7 +3866,7 @@ exports[`no-unused-vars > invalid 135`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 136`] = `
+exports[`no-unused-vars > invalid 134`] = `
 {
   "code": "var a = function(){ return function() { a(); } };",
   "diagnostics": [
@@ -3944,7 +3892,7 @@ exports[`no-unused-vars > invalid 136`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 137`] = `
+exports[`no-unused-vars > invalid 135`] = `
 {
   "code": "const a = () => () => { a(); };",
   "diagnostics": [
@@ -3970,7 +3918,7 @@ exports[`no-unused-vars > invalid 137`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 138`] = `
+exports[`no-unused-vars > invalid 136`] = `
 {
   "code": "let myArray = [1,2,3,4].filter((x) => x == 0);
 myArray = myArray.filter((x) => x == 1);",
@@ -3997,7 +3945,7 @@ myArray = myArray.filter((x) => x == 1);",
 }
 `;
 
-exports[`no-unused-vars > invalid 139`] = `
+exports[`no-unused-vars > invalid 137`] = `
 {
   "code": "const a = 1; a += 1;",
   "diagnostics": [
@@ -4023,7 +3971,7 @@ exports[`no-unused-vars > invalid 139`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 140`] = `
+exports[`no-unused-vars > invalid 138`] = `
 {
   "code": "const a = () => { a(); };",
   "diagnostics": [
@@ -4049,7 +3997,7 @@ exports[`no-unused-vars > invalid 140`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 141`] = `
+exports[`no-unused-vars > invalid 139`] = `
 {
   "code": "let x = [];
 x = x.concat(x);",
@@ -4076,7 +4024,7 @@ x = x.concat(x);",
 }
 `;
 
-exports[`no-unused-vars > invalid 142`] = `
+exports[`no-unused-vars > invalid 140`] = `
 {
   "code": "let a = 'a';
 a = 10;
@@ -4119,7 +4067,7 @@ function foo(){a = 11;a = () => {a = 13}}",
 }
 `;
 
-exports[`no-unused-vars > invalid 143`] = `
+exports[`no-unused-vars > invalid 141`] = `
 {
   "code": "let foo;
 init();
@@ -4148,7 +4096,7 @@ function init() {foo = 1;}",
 }
 `;
 
-exports[`no-unused-vars > invalid 144`] = `
+exports[`no-unused-vars > invalid 142`] = `
 {
   "code": "function foo(n) {
 if (n < 2) return 1;
@@ -4176,7 +4124,7 @@ return n * foo(n - 1);}",
 }
 `;
 
-exports[`no-unused-vars > invalid 145`] = `
+exports[`no-unused-vars > invalid 143`] = `
 {
   "code": "let c = 'c';
 c = 10;
@@ -4204,59 +4152,59 @@ function foo1() {c = 11; c = () => { c = 13 }} c = foo1",
 }
 `;
 
+exports[`no-unused-vars > invalid 144`] = `
+{
+  "code": "class Foo { static {} }",
+  "diagnostics": [
+    {
+      "message": "'Foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 145`] = `
+{
+  "code": "class Foo { static {} }",
+  "diagnostics": [
+    {
+      "message": "'Foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
 exports[`no-unused-vars > invalid 146`] = `
-{
-  "code": "class Foo { static {} }",
-  "diagnostics": [
-    {
-      "message": "'Foo' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 10,
-          "line": 1,
-        },
-        "start": {
-          "column": 7,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 147`] = `
-{
-  "code": "class Foo { static {} }",
-  "diagnostics": [
-    {
-      "message": "'Foo' is defined but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 10,
-          "line": 1,
-        },
-        "start": {
-          "column": 7,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-unused-vars",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unused-vars > invalid 148`] = `
 {
   "code": "class Foo { static { var bar; } }",
   "diagnostics": [
@@ -4282,7 +4230,7 @@ exports[`no-unused-vars > invalid 148`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 149`] = `
+exports[`no-unused-vars > invalid 147`] = `
 {
   "code": "class Foo {}",
   "diagnostics": [
@@ -4308,7 +4256,7 @@ exports[`no-unused-vars > invalid 149`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 150`] = `
+exports[`no-unused-vars > invalid 148`] = `
 {
   "code": "class Foo { static bar; }",
   "diagnostics": [
@@ -4334,7 +4282,7 @@ exports[`no-unused-vars > invalid 150`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 151`] = `
+exports[`no-unused-vars > invalid 149`] = `
 {
   "code": "class Foo { static bar() {} }",
   "diagnostics": [
@@ -4360,7 +4308,7 @@ exports[`no-unused-vars > invalid 151`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 152`] = `
+exports[`no-unused-vars > invalid 150`] = `
 {
   "code": "const _a = 5;const _b = _a + 5",
   "diagnostics": [
@@ -4386,7 +4334,7 @@ exports[`no-unused-vars > invalid 152`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 153`] = `
+exports[`no-unused-vars > invalid 151`] = `
 {
   "code": "const _a = 42; foo(() => _a);",
   "diagnostics": [
@@ -4412,7 +4360,7 @@ exports[`no-unused-vars > invalid 153`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 154`] = `
+exports[`no-unused-vars > invalid 152`] = `
 {
   "code": " (function foo(_a) { return _a + 5 })(5)",
   "diagnostics": [
@@ -4438,7 +4386,7 @@ exports[`no-unused-vars > invalid 154`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 155`] = `
+exports[`no-unused-vars > invalid 153`] = `
 {
   "code": "const [ a, _b ] = items;
 console.log(a+_b);",
@@ -4465,7 +4413,7 @@ console.log(a+_b);",
 }
 `;
 
-exports[`no-unused-vars > invalid 156`] = `
+exports[`no-unused-vars > invalid 154`] = `
 {
   "code": "let _x;
 [_x] = arr;
@@ -4493,7 +4441,7 @@ foo(_x);",
 }
 `;
 
-exports[`no-unused-vars > invalid 157`] = `
+exports[`no-unused-vars > invalid 155`] = `
 {
   "code": "const [ignored] = arr;
 foo(ignored);",
@@ -4520,7 +4468,7 @@ foo(ignored);",
 }
 `;
 
-exports[`no-unused-vars > invalid 158`] = `
+exports[`no-unused-vars > invalid 156`] = `
 {
   "code": "try{}catch(_err){console.error(_err)}",
   "diagnostics": [
@@ -4546,7 +4494,7 @@ exports[`no-unused-vars > invalid 158`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 159`] = `
+exports[`no-unused-vars > invalid 157`] = `
 {
   "code": "try {} catch ({ message }) { console.error(message); }",
   "diagnostics": [
@@ -4572,7 +4520,7 @@ exports[`no-unused-vars > invalid 159`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 160`] = `
+exports[`no-unused-vars > invalid 158`] = `
 {
   "code": "try {} catch ([_a, _b]) { doSomething(_a, _b); }",
   "diagnostics": [
@@ -4613,7 +4561,7 @@ exports[`no-unused-vars > invalid 160`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 161`] = `
+exports[`no-unused-vars > invalid 159`] = `
 {
   "code": "try {} catch ([_a, _b]) { doSomething(_a, _b); }",
   "diagnostics": [
@@ -4654,7 +4602,7 @@ exports[`no-unused-vars > invalid 161`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 162`] = `
+exports[`no-unused-vars > invalid 160`] = `
 {
   "code": "
 try {
@@ -4685,7 +4633,7 @@ try {
 }
 `;
 
-exports[`no-unused-vars > invalid 163`] = `
+exports[`no-unused-vars > invalid 161`] = `
 {
   "code": "
 try {
@@ -4716,7 +4664,7 @@ try {
 }
 `;
 
-exports[`no-unused-vars > invalid 164`] = `
+exports[`no-unused-vars > invalid 162`] = `
 {
   "code": "try {} catch ({ message, errors: [firstError] }) {}",
   "diagnostics": [
@@ -4757,7 +4705,7 @@ exports[`no-unused-vars > invalid 164`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 165`] = `
+exports[`no-unused-vars > invalid 163`] = `
 {
   "code": "try {} catch ({ stack: $ }) { $ = 'Something broke: ' + $; }",
   "diagnostics": [
@@ -4783,7 +4731,7 @@ exports[`no-unused-vars > invalid 165`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 166`] = `
+exports[`no-unused-vars > invalid 164`] = `
 {
   "code": "_ => { _ = _ + 1 };",
   "diagnostics": [
@@ -4809,7 +4757,7 @@ exports[`no-unused-vars > invalid 166`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 167`] = `
+exports[`no-unused-vars > invalid 165`] = `
 {
   "code": "const [a, b, c] = foo; alert(a + c);",
   "diagnostics": [
@@ -4835,7 +4783,7 @@ exports[`no-unused-vars > invalid 167`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 168`] = `
+exports[`no-unused-vars > invalid 166`] = `
 {
   "code": "const [a = aDefault] = foo;",
   "diagnostics": [
@@ -4861,7 +4809,7 @@ exports[`no-unused-vars > invalid 168`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 169`] = `
+exports[`no-unused-vars > invalid 167`] = `
 {
   "code": "const [[a = aDefault]]= foo;",
   "diagnostics": [
@@ -4887,7 +4835,7 @@ exports[`no-unused-vars > invalid 169`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 170`] = `
+exports[`no-unused-vars > invalid 168`] = `
 {
   "code": "const [[a = aDefault], b]= foo;",
   "diagnostics": [
@@ -4928,7 +4876,7 @@ exports[`no-unused-vars > invalid 170`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 171`] = `
+exports[`no-unused-vars > invalid 169`] = `
 {
   "code": "const [a = aDefault, b] = foo; alert(b);",
   "diagnostics": [
@@ -4954,7 +4902,7 @@ exports[`no-unused-vars > invalid 171`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 172`] = `
+exports[`no-unused-vars > invalid 170`] = `
 {
   "code": "function a([a = aDefault]) { } a();",
   "diagnostics": [
@@ -4980,7 +4928,7 @@ exports[`no-unused-vars > invalid 172`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 173`] = `
+exports[`no-unused-vars > invalid 171`] = `
 {
   "code": "function a([[a = aDefault]]) { } a();",
   "diagnostics": [
@@ -5006,7 +4954,7 @@ exports[`no-unused-vars > invalid 173`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 174`] = `
+exports[`no-unused-vars > invalid 172`] = `
 {
   "code": "function a([a = aDefault, b]) { alert(b); } a();",
   "diagnostics": [
@@ -5032,7 +4980,7 @@ exports[`no-unused-vars > invalid 174`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 175`] = `
+exports[`no-unused-vars > invalid 173`] = `
 {
   "code": "function a([[a = aDefault, b]]) { alert(b); } a();",
   "diagnostics": [
@@ -5058,7 +5006,7 @@ exports[`no-unused-vars > invalid 175`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 176`] = `
+exports[`no-unused-vars > invalid 174`] = `
 {
   "code": "const { a: a1 } = foo",
   "diagnostics": [
@@ -5084,7 +5032,7 @@ exports[`no-unused-vars > invalid 176`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 177`] = `
+exports[`no-unused-vars > invalid 175`] = `
 {
   "code": "const { a: a1, b: b1 } = foo; alert(b1);",
   "diagnostics": [
@@ -5110,7 +5058,7 @@ exports[`no-unused-vars > invalid 177`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 178`] = `
+exports[`no-unused-vars > invalid 176`] = `
 {
   "code": "const { a: a1, b: b1 } = foo; alert(a1);",
   "diagnostics": [
@@ -5136,7 +5084,7 @@ exports[`no-unused-vars > invalid 178`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 179`] = `
+exports[`no-unused-vars > invalid 177`] = `
 {
   "code": "function a({ a: a1 }) {} a();",
   "diagnostics": [
@@ -5162,7 +5110,7 @@ exports[`no-unused-vars > invalid 179`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 180`] = `
+exports[`no-unused-vars > invalid 178`] = `
 {
   "code": "const { a: a1 = aDefault } = foo;",
   "diagnostics": [
@@ -5188,7 +5136,7 @@ exports[`no-unused-vars > invalid 180`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 181`] = `
+exports[`no-unused-vars > invalid 179`] = `
 {
   "code": "const [{ a: a1 = aDefault }] = foo;",
   "diagnostics": [
@@ -5214,7 +5162,7 @@ exports[`no-unused-vars > invalid 181`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 182`] = `
+exports[`no-unused-vars > invalid 180`] = `
 {
   "code": "const { a = aDefault } = foo;",
   "diagnostics": [
@@ -5240,7 +5188,7 @@ exports[`no-unused-vars > invalid 182`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 183`] = `
+exports[`no-unused-vars > invalid 181`] = `
 {
   "code": "const { a = aDefault, b } = foo; alert(b);",
   "diagnostics": [
@@ -5266,7 +5214,7 @@ exports[`no-unused-vars > invalid 183`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 184`] = `
+exports[`no-unused-vars > invalid 182`] = `
 {
   "code": "const { a, b = bDefault } = foo; alert(a);",
   "diagnostics": [
@@ -5292,7 +5240,7 @@ exports[`no-unused-vars > invalid 184`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 185`] = `
+exports[`no-unused-vars > invalid 183`] = `
 {
   "code": "const { a, b = bDefault, c } = foo; alert(a + c);",
   "diagnostics": [
@@ -5318,7 +5266,7 @@ exports[`no-unused-vars > invalid 185`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 186`] = `
+exports[`no-unused-vars > invalid 184`] = `
 {
   "code": "const { [key]: a } = foo;",
   "diagnostics": [
@@ -5344,7 +5292,7 @@ exports[`no-unused-vars > invalid 186`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 187`] = `
+exports[`no-unused-vars > invalid 185`] = `
 {
   "code": "const [...{ a, b }] = array; alert(a);",
   "diagnostics": [
@@ -5370,7 +5318,7 @@ exports[`no-unused-vars > invalid 187`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 188`] = `
+exports[`no-unused-vars > invalid 186`] = `
 {
   "code": "function foo (...rest) {} foo();",
   "diagnostics": [
@@ -5396,7 +5344,7 @@ exports[`no-unused-vars > invalid 188`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 189`] = `
+exports[`no-unused-vars > invalid 187`] = `
 {
   "code": "function foo (a, ...rest) { alert(a); } foo();",
   "diagnostics": [
@@ -5422,7 +5370,7 @@ exports[`no-unused-vars > invalid 189`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 190`] = `
+exports[`no-unused-vars > invalid 188`] = `
 {
   "code": "const {...rest} = foo;",
   "diagnostics": [
@@ -5448,7 +5396,7 @@ exports[`no-unused-vars > invalid 190`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 191`] = `
+exports[`no-unused-vars > invalid 189`] = `
 {
   "code": "const {a, ...rest} = foo; alert(a);",
   "diagnostics": [
@@ -5474,7 +5422,7 @@ exports[`no-unused-vars > invalid 191`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 192`] = `
+exports[`no-unused-vars > invalid 190`] = `
 {
   "code": "const {...rest} = foo, a = bar; alert(a);",
   "diagnostics": [
@@ -5500,7 +5448,7 @@ exports[`no-unused-vars > invalid 192`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 193`] = `
+exports[`no-unused-vars > invalid 191`] = `
 {
   "code": "const a = bar, {...rest} = foo; alert(a);",
   "diagnostics": [
@@ -5526,7 +5474,7 @@ exports[`no-unused-vars > invalid 193`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 194`] = `
+exports[`no-unused-vars > invalid 192`] = `
 {
   "code": "function foo ({...rest}) { } foo();",
   "diagnostics": [
@@ -5552,7 +5500,7 @@ exports[`no-unused-vars > invalid 194`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 195`] = `
+exports[`no-unused-vars > invalid 193`] = `
 {
   "code": "function foo (a, {...rest}) { alert(a); } foo();",
   "diagnostics": [
@@ -5578,7 +5526,7 @@ exports[`no-unused-vars > invalid 195`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 196`] = `
+exports[`no-unused-vars > invalid 194`] = `
 {
   "code": "function foo ({...rest}, a) { alert(a); } foo();",
   "diagnostics": [
@@ -5604,7 +5552,7 @@ exports[`no-unused-vars > invalid 196`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 197`] = `
+exports[`no-unused-vars > invalid 195`] = `
 {
   "code": "const [...rest] = foo;",
   "diagnostics": [
@@ -5630,7 +5578,7 @@ exports[`no-unused-vars > invalid 197`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 198`] = `
+exports[`no-unused-vars > invalid 196`] = `
 {
   "code": "const [[...rest]] = foo;",
   "diagnostics": [
@@ -5656,7 +5604,7 @@ exports[`no-unused-vars > invalid 198`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 199`] = `
+exports[`no-unused-vars > invalid 197`] = `
 {
   "code": "const [a, ...rest] = foo; alert(a);",
   "diagnostics": [
@@ -5682,7 +5630,7 @@ exports[`no-unused-vars > invalid 199`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 200`] = `
+exports[`no-unused-vars > invalid 198`] = `
 {
   "code": "function foo ([...rest]) { } foo();",
   "diagnostics": [
@@ -5708,7 +5656,7 @@ exports[`no-unused-vars > invalid 200`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 201`] = `
+exports[`no-unused-vars > invalid 199`] = `
 {
   "code": "const [a, ...{ b }] = array; alert(a);",
   "diagnostics": [
@@ -5734,7 +5682,7 @@ exports[`no-unused-vars > invalid 201`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 202`] = `
+exports[`no-unused-vars > invalid 200`] = `
 {
   "code": "const [[a, ...{ b }]] = array; alert(a);",
   "diagnostics": [
@@ -5760,7 +5708,7 @@ exports[`no-unused-vars > invalid 202`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 203`] = `
+exports[`no-unused-vars > invalid 201`] = `
 {
   "code": "const [...[a]] = array;",
   "diagnostics": [
@@ -5786,7 +5734,7 @@ exports[`no-unused-vars > invalid 203`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 204`] = `
+exports[`no-unused-vars > invalid 202`] = `
 {
   "code": "const [[...[a]]] = array;",
   "diagnostics": [
@@ -5812,7 +5760,7 @@ exports[`no-unused-vars > invalid 204`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 205`] = `
+exports[`no-unused-vars > invalid 203`] = `
 {
   "code": "const [...[a, b]] = array; alert(a);",
   "diagnostics": [
@@ -5838,7 +5786,7 @@ exports[`no-unused-vars > invalid 205`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 206`] = `
+exports[`no-unused-vars > invalid 204`] = `
 {
   "code": "const [a, ...[b]] = array; alert(a);",
   "diagnostics": [
@@ -5864,7 +5812,7 @@ exports[`no-unused-vars > invalid 206`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 207`] = `
+exports[`no-unused-vars > invalid 205`] = `
 {
   "code": "const [[a, ...[b]]] = array; alert(a);",
   "diagnostics": [
@@ -5890,7 +5838,7 @@ exports[`no-unused-vars > invalid 207`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 208`] = `
+exports[`no-unused-vars > invalid 206`] = `
 {
   "code": "const [a, ...[b]] = array; alert(b);",
   "diagnostics": [
@@ -5916,7 +5864,7 @@ exports[`no-unused-vars > invalid 208`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 209`] = `
+exports[`no-unused-vars > invalid 207`] = `
 {
   "code": "const [a, ...[[ b ]]] = array; alert(a);",
   "diagnostics": [
@@ -5942,7 +5890,7 @@ exports[`no-unused-vars > invalid 209`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 210`] = `
+exports[`no-unused-vars > invalid 208`] = `
 {
   "code": "const [a, ...[{ b }]] = array; alert(a);",
   "diagnostics": [
@@ -5968,7 +5916,7 @@ exports[`no-unused-vars > invalid 210`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 211`] = `
+exports[`no-unused-vars > invalid 209`] = `
 {
   "code": "function foo([a, ...[[ b ]]]) {} foo();",
   "diagnostics": [
@@ -6009,7 +5957,7 @@ exports[`no-unused-vars > invalid 211`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 212`] = `
+exports[`no-unused-vars > invalid 210`] = `
 {
   "code": "function foo([a, ...[{ b }]]) {} foo();",
   "diagnostics": [
@@ -6050,7 +5998,7 @@ exports[`no-unused-vars > invalid 212`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 213`] = `
+exports[`no-unused-vars > invalid 211`] = `
 {
   "code": "function foo(...[[ a ]]) {} foo();",
   "diagnostics": [
@@ -6076,7 +6024,7 @@ exports[`no-unused-vars > invalid 213`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 214`] = `
+exports[`no-unused-vars > invalid 212`] = `
 {
   "code": "function foo(...[{ a }]) {} foo();",
   "diagnostics": [
@@ -6102,7 +6050,7 @@ exports[`no-unused-vars > invalid 214`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 215`] = `
+exports[`no-unused-vars > invalid 213`] = `
 {
   "code": "function foo(a, ...[b]) { alert(a); } foo();",
   "diagnostics": [
@@ -6128,7 +6076,7 @@ exports[`no-unused-vars > invalid 215`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 216`] = `
+exports[`no-unused-vars > invalid 214`] = `
 {
   "code": "const [a, [b]] = array; alert(a);",
   "diagnostics": [
@@ -6154,7 +6102,7 @@ exports[`no-unused-vars > invalid 216`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 217`] = `
+exports[`no-unused-vars > invalid 215`] = `
 {
   "code": "const [[a, [b]]] = array; alert(a);",
   "diagnostics": [
@@ -6180,7 +6128,7 @@ exports[`no-unused-vars > invalid 217`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 218`] = `
+exports[`no-unused-vars > invalid 216`] = `
 {
   "code": "const [a, [[b]]] = array; alert(a);",
   "diagnostics": [
@@ -6206,7 +6154,7 @@ exports[`no-unused-vars > invalid 218`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 219`] = `
+exports[`no-unused-vars > invalid 217`] = `
 {
   "code": "function a([[b]]) {} a();",
   "diagnostics": [
@@ -6232,7 +6180,7 @@ exports[`no-unused-vars > invalid 219`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 220`] = `
+exports[`no-unused-vars > invalid 218`] = `
 {
   "code": "function a([[b], c]) { alert(c); } a();",
   "diagnostics": [
@@ -6258,7 +6206,7 @@ exports[`no-unused-vars > invalid 220`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 221`] = `
+exports[`no-unused-vars > invalid 219`] = `
 {
   "code": "const [{b}, a] = array; alert(a);",
   "diagnostics": [
@@ -6284,7 +6232,7 @@ exports[`no-unused-vars > invalid 221`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 222`] = `
+exports[`no-unused-vars > invalid 220`] = `
 {
   "code": "const [[{b}, a]] = array; alert(a);",
   "diagnostics": [
@@ -6310,7 +6258,7 @@ exports[`no-unused-vars > invalid 222`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 223`] = `
+exports[`no-unused-vars > invalid 221`] = `
 {
   "code": "const [[[{b}], a]] = array; alert(a);",
   "diagnostics": [
@@ -6336,7 +6284,7 @@ exports[`no-unused-vars > invalid 223`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 224`] = `
+exports[`no-unused-vars > invalid 222`] = `
 {
   "code": "function a([{b}]) {} a();",
   "diagnostics": [
@@ -6362,7 +6310,7 @@ exports[`no-unused-vars > invalid 224`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 225`] = `
+exports[`no-unused-vars > invalid 223`] = `
 {
   "code": "function a([{b}, c]) { alert(c); } a();",
   "diagnostics": [
@@ -6388,7 +6336,7 @@ exports[`no-unused-vars > invalid 225`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 226`] = `
+exports[`no-unused-vars > invalid 224`] = `
 {
   "code": "const { a: { b }, c } = foo; alert(c);",
   "diagnostics": [
@@ -6414,7 +6362,7 @@ exports[`no-unused-vars > invalid 226`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 227`] = `
+exports[`no-unused-vars > invalid 225`] = `
 {
   "code": "const { c, a: { b } } = foo; alert(c);",
   "diagnostics": [
@@ -6440,7 +6388,7 @@ exports[`no-unused-vars > invalid 227`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 228`] = `
+exports[`no-unused-vars > invalid 226`] = `
 {
   "code": "const { a: { b: { c }, d } } = foo; alert(d);",
   "diagnostics": [
@@ -6466,7 +6414,7 @@ exports[`no-unused-vars > invalid 228`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 229`] = `
+exports[`no-unused-vars > invalid 227`] = `
 {
   "code": "const { a: { b: { c: { e } }, d } } = foo; alert(d);",
   "diagnostics": [
@@ -6492,7 +6440,7 @@ exports[`no-unused-vars > invalid 229`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 230`] = `
+exports[`no-unused-vars > invalid 228`] = `
 {
   "code": "const [{ a: { b }, c }] = foo; alert(c);",
   "diagnostics": [
@@ -6518,7 +6466,7 @@ exports[`no-unused-vars > invalid 230`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 231`] = `
+exports[`no-unused-vars > invalid 229`] = `
 {
   "code": "const { a: [{ b }]} = foo;",
   "diagnostics": [
@@ -6544,7 +6492,7 @@ exports[`no-unused-vars > invalid 231`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 232`] = `
+exports[`no-unused-vars > invalid 230`] = `
 {
   "code": "const { a: [[ b ]]} = foo;",
   "diagnostics": [
@@ -6570,7 +6518,7 @@ exports[`no-unused-vars > invalid 232`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 233`] = `
+exports[`no-unused-vars > invalid 231`] = `
 {
   "code": "const [{ a: [{ b }]}] = foo;",
   "diagnostics": [
@@ -6596,7 +6544,7 @@ exports[`no-unused-vars > invalid 233`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 234`] = `
+exports[`no-unused-vars > invalid 232`] = `
 {
   "code": "const { a: [{ b }], c} = foo; alert(c);",
   "diagnostics": [
@@ -6622,7 +6570,7 @@ exports[`no-unused-vars > invalid 234`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 235`] = `
+exports[`no-unused-vars > invalid 233`] = `
 {
   "code": "function foo({ a: [{ b }]}) {} foo();",
   "diagnostics": [
@@ -6648,7 +6596,7 @@ exports[`no-unused-vars > invalid 235`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 236`] = `
+exports[`no-unused-vars > invalid 234`] = `
 {
   "code": "function foo({ a: [[ b ]]}) {} foo();",
   "diagnostics": [
@@ -6674,7 +6622,7 @@ exports[`no-unused-vars > invalid 236`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 237`] = `
+exports[`no-unused-vars > invalid 235`] = `
 {
   "code": "let a = foo, b = 'bar'; alert(b);",
   "diagnostics": [
@@ -6700,7 +6648,7 @@ exports[`no-unused-vars > invalid 237`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 238`] = `
+exports[`no-unused-vars > invalid 236`] = `
 {
   "code": "let a = foo, b = 'bar'; alert(a);",
   "diagnostics": [
@@ -6726,7 +6674,7 @@ exports[`no-unused-vars > invalid 238`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 239`] = `
+exports[`no-unused-vars > invalid 237`] = `
 {
   "code": "let { a } = foo, bar = 'hello'; alert(bar);",
   "diagnostics": [
@@ -6752,7 +6700,7 @@ exports[`no-unused-vars > invalid 239`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 240`] = `
+exports[`no-unused-vars > invalid 238`] = `
 {
   "code": "let bar = 'hello', { a } = foo; alert(bar);",
   "diagnostics": [
@@ -6778,7 +6726,7 @@ exports[`no-unused-vars > invalid 240`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 241`] = `
+exports[`no-unused-vars > invalid 239`] = `
 {
   "code": "import a from 'module';",
   "diagnostics": [
@@ -6804,7 +6752,7 @@ exports[`no-unused-vars > invalid 241`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 242`] = `
+exports[`no-unused-vars > invalid 240`] = `
 {
   "code": "import * as foo from 'module';",
   "diagnostics": [
@@ -6830,7 +6778,7 @@ exports[`no-unused-vars > invalid 242`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 243`] = `
+exports[`no-unused-vars > invalid 241`] = `
 {
   "code": "import a, * as foo from 'module'; a();",
   "diagnostics": [
@@ -6856,7 +6804,7 @@ exports[`no-unused-vars > invalid 243`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 244`] = `
+exports[`no-unused-vars > invalid 242`] = `
 {
   "code": "import a, * as foo from 'module'; foo.hello;",
   "diagnostics": [
@@ -6882,7 +6830,7 @@ exports[`no-unused-vars > invalid 244`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 245`] = `
+exports[`no-unused-vars > invalid 243`] = `
 {
   "code": "import { a } from 'module';",
   "diagnostics": [
@@ -6908,7 +6856,7 @@ exports[`no-unused-vars > invalid 245`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 246`] = `
+exports[`no-unused-vars > invalid 244`] = `
 {
   "code": "import { a, b } from 'module'; alert(b);",
   "diagnostics": [
@@ -6934,7 +6882,7 @@ exports[`no-unused-vars > invalid 246`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 247`] = `
+exports[`no-unused-vars > invalid 245`] = `
 {
   "code": "import { a, b } from 'module'; alert(a);",
   "diagnostics": [
@@ -6960,7 +6908,7 @@ exports[`no-unused-vars > invalid 247`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 248`] = `
+exports[`no-unused-vars > invalid 246`] = `
 {
   "code": "import { a as foo } from 'module';",
   "diagnostics": [
@@ -6986,7 +6934,7 @@ exports[`no-unused-vars > invalid 248`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 249`] = `
+exports[`no-unused-vars > invalid 247`] = `
 {
   "code": "import { a as foo, b } from 'module'; alert(b);",
   "diagnostics": [
@@ -7012,7 +6960,7 @@ exports[`no-unused-vars > invalid 249`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 250`] = `
+exports[`no-unused-vars > invalid 248`] = `
 {
   "code": "import { a, b as foo } from 'module'; alert(a);",
   "diagnostics": [
@@ -7038,7 +6986,7 @@ exports[`no-unused-vars > invalid 250`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 251`] = `
+exports[`no-unused-vars > invalid 249`] = `
 {
   "code": "import { default as foo, a } from 'module'; alert(a);",
   "diagnostics": [
@@ -7064,7 +7012,7 @@ exports[`no-unused-vars > invalid 251`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 252`] = `
+exports[`no-unused-vars > invalid 250`] = `
 {
   "code": "import foo, { a } from 'module'; alert(a);",
   "diagnostics": [
@@ -7090,7 +7038,7 @@ exports[`no-unused-vars > invalid 252`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 253`] = `
+exports[`no-unused-vars > invalid 251`] = `
 {
   "code": "import foo, { a } from 'module'; foo();",
   "diagnostics": [
@@ -7116,7 +7064,7 @@ exports[`no-unused-vars > invalid 253`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 254`] = `
+exports[`no-unused-vars > invalid 252`] = `
 {
   "code": "let a; a = foo;",
   "diagnostics": [
@@ -7142,7 +7090,7 @@ exports[`no-unused-vars > invalid 254`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 255`] = `
+exports[`no-unused-vars > invalid 253`] = `
 {
   "code": "array.forEach(a => {})",
   "diagnostics": [
@@ -7168,7 +7116,7 @@ exports[`no-unused-vars > invalid 255`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 256`] = `
+exports[`no-unused-vars > invalid 254`] = `
 {
   "code": "if (foo()) var bar;",
   "diagnostics": [
@@ -7194,7 +7142,7 @@ exports[`no-unused-vars > invalid 256`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 257`] = `
+exports[`no-unused-vars > invalid 255`] = `
 {
   "code": "for (;;) var foo;",
   "diagnostics": [
@@ -7220,7 +7168,7 @@ exports[`no-unused-vars > invalid 257`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 258`] = `
+exports[`no-unused-vars > invalid 256`] = `
 {
   "code": "for (a in b) var foo;",
   "diagnostics": [
@@ -7246,7 +7194,7 @@ exports[`no-unused-vars > invalid 258`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 259`] = `
+exports[`no-unused-vars > invalid 257`] = `
 {
   "code": "for (a of b) var foo;",
   "diagnostics": [
@@ -7272,7 +7220,7 @@ exports[`no-unused-vars > invalid 259`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 260`] = `
+exports[`no-unused-vars > invalid 258`] = `
 {
   "code": "while (a) var foo;",
   "diagnostics": [
@@ -7298,7 +7246,7 @@ exports[`no-unused-vars > invalid 260`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 261`] = `
+exports[`no-unused-vars > invalid 259`] = `
 {
   "code": "do var foo; while (b);",
   "diagnostics": [
@@ -7324,7 +7272,7 @@ exports[`no-unused-vars > invalid 261`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 262`] = `
+exports[`no-unused-vars > invalid 260`] = `
 {
   "code": "with (a) var foo;",
   "diagnostics": [
@@ -7350,7 +7298,7 @@ exports[`no-unused-vars > invalid 262`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 263`] = `
+exports[`no-unused-vars > invalid 261`] = `
 {
   "code": "console.log('foo')
 var a
@@ -7378,7 +7326,7 @@ var a
 }
 `;
 
-exports[`no-unused-vars > invalid 264`] = `
+exports[`no-unused-vars > invalid 262`] = `
 {
   "code": "console.log('foo')
 var [a] = foo;
@@ -7406,7 +7354,7 @@ var [a] = foo;
 }
 `;
 
-exports[`no-unused-vars > invalid 265`] = `
+exports[`no-unused-vars > invalid 263`] = `
 {
   "code": "console.log('foo')
 var {a} = foo;
@@ -7434,7 +7382,7 @@ var {a} = foo;
 }
 `;
 
-exports[`no-unused-vars > invalid 266`] = `
+exports[`no-unused-vars > invalid 264`] = `
 {
   "code": "let x;
 () => x = 1;",
@@ -7461,7 +7409,7 @@ exports[`no-unused-vars > invalid 266`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 267`] = `
+exports[`no-unused-vars > invalid 265`] = `
 {
   "code": "let [a = 1] = arr;
 a = 2;",
@@ -7488,7 +7436,7 @@ a = 2;",
 }
 `;
 
-exports[`no-unused-vars > invalid 268`] = `
+exports[`no-unused-vars > invalid 266`] = `
 {
   "code": "function foo(a = 1, b){alert(b);} foo();",
   "diagnostics": [
@@ -7514,7 +7462,7 @@ exports[`no-unused-vars > invalid 268`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 269`] = `
+exports[`no-unused-vars > invalid 267`] = `
 {
   "code": "function foo(a = 1) {a = 2;} foo();",
   "diagnostics": [
@@ -7540,7 +7488,7 @@ exports[`no-unused-vars > invalid 269`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 270`] = `
+exports[`no-unused-vars > invalid 268`] = `
 {
   "code": "function foo(a = 1, b) {a = 2;} foo();",
   "diagnostics": [
@@ -7581,7 +7529,7 @@ exports[`no-unused-vars > invalid 270`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 271`] = `
+exports[`no-unused-vars > invalid 269`] = `
 {
   "code": "using resource = getResource();",
   "diagnostics": [
@@ -7607,7 +7555,7 @@ exports[`no-unused-vars > invalid 271`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 272`] = `
+exports[`no-unused-vars > invalid 270`] = `
 {
   "code": "await using resource = getResource();",
   "diagnostics": [
@@ -7633,7 +7581,7 @@ exports[`no-unused-vars > invalid 272`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 273`] = `
+exports[`no-unused-vars > invalid 271`] = `
 {
   "code": "const UnusedComponent = () => <div />;",
   "diagnostics": [
@@ -7659,7 +7607,7 @@ exports[`no-unused-vars > invalid 273`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 274`] = `
+exports[`no-unused-vars > invalid 272`] = `
 {
   "code": "import { Card } from './card.jsx'; <MyCard />;",
   "diagnostics": [
@@ -7685,7 +7633,7 @@ exports[`no-unused-vars > invalid 274`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 275`] = `
+exports[`no-unused-vars > invalid 273`] = `
 {
   "code": "import { Card, Button } from './components.jsx'; <Card />;",
   "diagnostics": [
@@ -7711,7 +7659,7 @@ exports[`no-unused-vars > invalid 275`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 276`] = `
+exports[`no-unused-vars > invalid 274`] = `
 {
   "code": "import Card from './Card'; const Button = () => <button />;",
   "diagnostics": [
@@ -7752,7 +7700,7 @@ exports[`no-unused-vars > invalid 276`] = `
 }
 `;
 
-exports[`no-unused-vars > invalid 277`] = `
+exports[`no-unused-vars > invalid 275`] = `
 {
   "code": "import { Card as MyCard } from './card.jsx'; <Card />;",
   "diagnostics": [

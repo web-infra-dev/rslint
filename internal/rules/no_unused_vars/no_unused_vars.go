@@ -49,7 +49,6 @@ type analysisContext struct {
 	writeRefs          map[*ast.Symbol][]*ast.Node
 	localExportTargets map[*ast.Symbol]bool
 	globalRefsByName   map[string][]*ast.Node
-	exportedNames      map[string]bool
 	refIndex           *utils.ReferenceIndex
 	seenMergedSymbols  map[*ast.Symbol]bool
 	reporter           *diagnosticReporter
@@ -1815,9 +1814,9 @@ func coreTypeDeclarationSelfReferenceCounts(definition *ast.Node) bool {
 		(definition.Kind == ast.KindInterfaceDeclaration || definition.Kind == ast.KindTypeAliasDeclaration)
 }
 
-// isScriptGlobalDefinition models ESLint's global scope for vars:"local" and
-// `/* exported */`. `var` uses its enclosing variable scope even when nested
-// in a block or loop; lexical declarations use tsgo's block-scope container.
+// isScriptGlobalDefinition models ESLint's global scope for vars:"local".
+// `var` uses its enclosing variable scope even when nested in a block or loop;
+// lexical declarations use tsgo's block-scope container.
 func isScriptGlobalDefinition(sourceFile *ast.SourceFile, definition *ast.Node) bool {
 	if sourceFile == nil || definition == nil || ast.IsExternalModule(sourceFile) {
 		return false
@@ -1931,14 +1930,6 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	}
 
 	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, definition)
-	if scriptGlobal && ac.exportedNames[name] {
-		// ESLint marks exported-directive globals as used before this rule runs.
-		// Preserve that ordering so reportUsedIgnorePattern can still diagnose a
-		// marked name that matches an ignore pattern.
-		varInfo.Used = true
-		varInfo.OnlyUsedAsType = false
-	}
-
 	// vars: "local" skips only the script global scope. ES module top-level
 	// bindings live in a module scope and must still be checked.
 	if opts.Vars == "local" && scriptGlobal {
@@ -2029,6 +2020,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	}
 }
 
+// NOTE: Unlike ESLint, `/* exported name */` comments do not mark bindings as
+// used. This legacy script-only directive is intentionally outside the initial
+// port scope.
 func newRule() rule.Rule {
 	return rule.Rule{
 		Name:   "no-unused-vars",
@@ -2049,7 +2043,6 @@ func newRule() rule.Rule {
 				writeRefs:          make(map[*ast.Symbol][]*ast.Node),
 				localExportTargets: make(map[*ast.Symbol]bool),
 				globalRefsByName:   make(map[string][]*ast.Node),
-				exportedNames:      rule.ParseExportedNames(ctx.SourceFile, ctx.Comments),
 				// ESLint core uses lexical scopes, so the binder-backed name index
 				// deliberately has no checker dependency. Project and gap files follow
 				// the same path.
@@ -2386,9 +2379,6 @@ func newRule() rule.Rule {
 			if opts.Vars != "local" {
 				for _, inlineGlobal := range ctx.InlineGlobals {
 					if !inlineGlobal.Declared || len(inlineGlobal.NameRanges) == 0 {
-						continue
-					}
-					if ac.exportedNames[inlineGlobal.Name] {
 						continue
 					}
 					if hasInlineGlobalUse(ctx.SourceFile, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
