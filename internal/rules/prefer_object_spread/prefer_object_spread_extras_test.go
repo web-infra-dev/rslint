@@ -38,6 +38,20 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// ---- Branch lock-in: "globalThis" declared off via languageOptions.globals ----
 			{Code: `globalThis.Object.assign({}, foo)`, Globals: map[string]bool{"globalThis": false}},
 
+			// ---- Branch lock-in: "window" declared off via languageOptions.globals ----
+			{Code: `window.Object.assign({}, foo)`, Globals: map[string]bool{"window": false}},
+
+			// ---- Branch lock-in: "window" shadowed by a function parameter ----
+			{Code: `function f(window) { return window.Object.assign({}, a); }`},
+
+			// ---- Member-name evaluation: a computed member name that cannot
+			// be statically folded must not match ----
+			{Code: `Object["as" + sign]({}, foo)`},
+
+			// ---- Alias tracking: a computed destructured property name that
+			// cannot be statically folded must not match ----
+			{Code: `const { [key]: a } = Object; a({}, foo)`},
+
 			// ---- Branch lock-in: nested Object.assign whose own "Object" is
 			// shadowed by an inner function parameter — the outer call still
 			// matches, the inner one must not (scope boundary correctness) ----
@@ -267,6 +281,54 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			},
 			{
 				Code:   `(0, Object).assign({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Member-name evaluation: computed member name folded by the
+			// static string evaluator (`"as" + "sign"`), like ESLint's
+			// getStaticValue-based ReferenceTracker ----
+			{
+				Code:   `Object["as" + "sign"]({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Alias tracking: `Object` receiver reached through a
+			// multi-hop alias chain (P -> O -> Object) ----
+			{
+				Code:   `const O = Object; const P = O; P.assign({}, foo)`,
+				Output: []string{`const O = Object; const P = O; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 32}},
+			},
+
+			// ---- Alias tracking: `assign` destructured off `Object` via a
+			// string-literal and a statically-folded computed property name ----
+			{
+				Code:   `const { "assign": a } = Object; a({}, foo)`,
+				Output: []string{`const { "assign": a } = Object; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 33}},
+			},
+			{
+				Code:   `const { ["as" + "sign"]: b } = Object; b({}, foo)`,
+				Output: []string{`const { ["as" + "sign"]: b } = Object; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 40}},
+			},
+
+			// ---- Global-object entries: window / self / global alongside the
+			// globalThis case already covered above ----
+			{
+				Code:   `window.Object.assign({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `self.Object.assign({}, foo)`,
+				Output: []string{`({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `global.Object.assign({}, foo)`,
 				Output: []string{`({ ...foo})`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
 			},
