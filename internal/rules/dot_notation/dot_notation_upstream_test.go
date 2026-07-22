@@ -118,21 +118,14 @@ func TestDotNotationUpstream(t *testing.T) {
 					"    .then(function(){})\n" +
 					"    .catch(function(){})\n" +
 					"    .then(function(){})\n" +
-					"    [\"catch\"](function(){});",
-				"getResource()\n" +
-					"    .then(function(){})\n" +
-					"    .catch(function(){})\n" +
-					"    .then(function(){})\n" +
 					"    .catch(function(){});",
 			},
 			// Diagnostics are reported in AST-traversal order (outer node
 			// before the nested one it contains), not sorted by source
 			// position - the line-5 access is the outer node of the chain,
 			// so it's visited (and reported) before the line-3 access nested
-			// inside it. The fix-application order is unaffected: fixes are
-			// applied by range (line 3's shorter, nested range first), which
-			// is why the fixed-output stages below still land in source
-			// order.
+			// inside it. Each fix replaces only its own bracket part, so the
+			// two ranges don't overlap and both apply in a single pass.
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "useDot", Line: 5, Column: 6},
 				{MessageId: "useDot", Line: 3, Column: 6},

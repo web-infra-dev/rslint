@@ -145,6 +145,48 @@ func TestDotNotationExtras(t *testing.T) {
 			Options: map[string]interface{}{"allowKeywords": false},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useBrackets", Line: 1, Column: 14}},
 		},
+		// ---- Regression: a comment nested inside parens around the key
+		// must suppress the autofix - it can't survive a `.bar` rewrite. The
+		// diagnostic is still reported, but --fix leaves the code unchanged. ----
+		{
+			Code:   "foo[(/* keep */ 'bar')];",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 17}},
+		},
+		// ---- Regression: nested bracket accesses. Each fix replaces
+		// only its own `['key']` bracket part (never the whole
+		// ElementAccessExpression), so the two ranges don't overlap and both
+		// convert in a single fix pass, preserving inter-access whitespace. ----
+		{
+			Code:   "a['b']  ['c'];",
+			Output: []string{"a.b  .c;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useDot", Line: 1, Column: 10},
+				{MessageId: "useDot", Line: 1, Column: 3},
+			},
+		},
+		// ---- Regression: same single-pass requirement for a chain of
+		// optional bracket accesses - `?.['b']` becomes `?.b` by replacing
+		// only the `['b']` part (the untouched `?.` supplies the dot). ----
+		{
+			Code:   "a?.['b']?.['c'];",
+			Output: []string{"a?.b?.c;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useDot", Line: 1, Column: 12},
+				{MessageId: "useDot", Line: 1, Column: 5},
+			},
+		},
+		// ---- Regression: same single-pass requirement in the
+		// dot->bracket direction - each fix replaces only its own `.keyword`
+		// operator + name part, never the whole PropertyAccessExpression. ----
+		{
+			Code:    "a.if.while;",
+			Output:  []string{`a["if"]["while"];`},
+			Options: map[string]interface{}{"allowKeywords": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useBrackets", Line: 1, Column: 6},
+				{MessageId: "useBrackets", Line: 1, Column: 3},
+			},
+		},
 		// ---- Regression: whitespace between an optional-chain `?.` and the
 		// following `[` must be preserved verbatim, not collapsed into a
 		// second (invalid) copy of the operator. ----
