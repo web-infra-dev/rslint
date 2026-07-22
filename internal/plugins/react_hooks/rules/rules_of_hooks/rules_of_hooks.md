@@ -86,14 +86,19 @@ function App() {
 
 ## Options
 
-> **Warning**: options passed to this rule are ignored. The rule's schema
-> accepts `{ "additionalHooks": "..." }` — exactly as upstream
-> `eslint-plugin-react-hooks` declares it — but, also exactly as upstream, the
-> implementation never reads it: upstream added the schema entry and the
-> settings-based implementation in the same commit
-> ([facebook/react#34497](https://github.com/facebook/react/pull/34497)) and
-> only ever wired up the latter. Configure extra effect hooks through the
-> `additionalEffectHooks` **setting** below instead.
+`additionalHooks` is a regex of extra hook names to treat as effect hooks
+(functions created with `useEffectEvent` may be called inside them):
+
+```json
+{
+  "rules": {
+    "react-hooks/rules-of-hooks": ["error", { "additionalHooks": "(useMyEffect|useServerEffect)" }]
+  }
+}
+```
+
+When set, the rule-level option takes precedence over the
+`additionalEffectHooks` setting below.
 
 ## Settings
 

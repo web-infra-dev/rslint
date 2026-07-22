@@ -15,9 +15,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// The schema declares `additionalHooks` exactly as upstream does, but — also
-// exactly as upstream — the implementation never reads it: upstream's create()
-// only consults `settings['react-hooks'].additionalEffectHooks`.
+// The schema declares `additionalHooks` exactly as upstream does. Since
+// facebook/react#37085 upstream's create() reads it: the rule-level option
+// takes precedence, `settings['react-hooks'].additionalEffectHooks` is the
+// fallback.
 //
 //go:embed rules_of_hooks.schema.json
 var schemaJSON []byte
@@ -556,6 +557,28 @@ func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
 	return react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks")
 }
 
+// parseAdditionalHooks resolves the additional-effect-hooks regex: the
+// rule-level `additionalHooks` option takes precedence, with
+// `settings['react-hooks'].additionalEffectHooks` as the fallback —
+// mirroring upstream's create() since facebook/react#37085.
+func parseAdditionalHooks(options []any, settings map[string]interface{}) *regexp.Regexp {
+	re := getAdditionalEffectHooks(settings)
+	if len(options) == 0 {
+		return re
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	// Mirrors upstream's `rawOptions.additionalHooks` truthiness check: a
+	// non-empty rule-level pattern replaces the settings fallback even when
+	// it fails to compile; absent or empty keeps the settings-derived value.
+	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
+		re = nil
+		if compiled, err := regexp.Compile(raw); err == nil {
+			re = compiled
+		}
+	}
+	return re
+}
+
 // eeRegistry tracks `const X = useEffectEvent(...)` declarations per enclosing
 // function-like, used as the fallback when TypeChecker symbol resolution is
 // unavailable. The TypeChecker path takes precedence whenever
@@ -821,7 +844,7 @@ var RulesOfHooksRule = rule.Rule{
 	Name:   "react-hooks/rules-of-hooks",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		additionalRe := getAdditionalEffectHooks(ctx.Settings)
+		additionalRe := parseAdditionalHooks(options, ctx.Settings)
 		sf := ctx.SourceFile
 		registry := collectEffectEventBindings(sf)
 		tc := ctx.TypeChecker
