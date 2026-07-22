@@ -75,6 +75,7 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('rstest');
     expect(rec.rules).toEqual({
+      'rstest/no-commented-out-tests': 'warn',
       'rstest/no-mocks-import': 'error',
     });
   });

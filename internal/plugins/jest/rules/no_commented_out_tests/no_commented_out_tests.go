@@ -8,10 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// Port of eslint-plugin-jest no-commented-out-tests:
-// /^\s*[xf]?(test|it|describe)(\.\w+|\[['"]\w+['"]\])?\s*\(/mu
-var commentedTestRegexp = regexp.MustCompile(`(?m)^\s*[xf]?(test|it|describe)(\.\w+|\[['"]\w+['"]\])?\s*\(`)
-
 func buildCommentedTestsMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "commentedTests",
@@ -42,23 +38,44 @@ func commentInnerText(sourceText string, comment *ast.CommentRange) string {
 	}
 }
 
-var NoCommentedOutTestsRule = rule.Rule{
-	Name: "jest/no-commented-out-tests",
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		text := ctx.SourceFile.Text()
-		for _, comment := range ctx.Comments.All() {
-			if comment == nil {
-				continue
-			}
-			inner := commentInnerText(text, comment)
-			if inner == "" || !commentedTestRegexp.MatchString(inner) {
-				continue
-			}
-			ctx.ReportRange(
-				core.NewTextRange(comment.Pos(), comment.End()),
-				buildCommentedTestsMessage(),
-			)
-		}
-		return rule.RuleListeners{}
-	},
+type Options struct {
+	Name              string
+	AllowTestPrefixes bool
 }
+
+// NewRule creates a no-commented-out-tests rule for a test framework.
+func NewRule(options Options) rule.Rule {
+	prefixPattern := ""
+	if options.AllowTestPrefixes {
+		prefixPattern = "[xf]?"
+	}
+	// Port of eslint-plugin-jest no-commented-out-tests:
+	// /^\s*[xf]?(test|it|describe)(\.\w+|\[['"]\w+['"]\])?\s*\(/mu
+	commentedTestRegexp := regexp.MustCompile(`(?m)^\s*` + prefixPattern + `(test|it|describe)(\.\w+|\[['"]\w+['"]\])?\s*\(`)
+
+	return rule.Rule{
+		Name: options.Name,
+		Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
+			text := ctx.SourceFile.Text()
+			for _, comment := range ctx.Comments.All() {
+				if comment == nil {
+					continue
+				}
+				inner := commentInnerText(text, comment)
+				if inner == "" || !commentedTestRegexp.MatchString(inner) {
+					continue
+				}
+				ctx.ReportRange(
+					core.NewTextRange(comment.Pos(), comment.End()),
+					buildCommentedTestsMessage(),
+				)
+			}
+			return rule.RuleListeners{}
+		},
+	}
+}
+
+var NoCommentedOutTestsRule = NewRule(Options{
+	Name:              "jest/no-commented-out-tests",
+	AllowTestPrefixes: true,
+})
