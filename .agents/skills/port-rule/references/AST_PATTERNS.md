@@ -372,6 +372,64 @@ See `typescript-go/_packages/api/src/api.ts` for full API:
 
 ---
 
+## Collecting Variable References (ctx.Refs)
+
+Reference: `internal/rule/ref_store.go`, consumer example: `internal/rules/no_var/no_var.go`
+
+For rules that need **"every identifier that references this declared symbol"** (ESLint's `variable.references` from the scope manager), use `ctx.Refs` — a lazily built per-file reference index:
+
+```go
+refs := ctx.Refs.References(sym) // []*ast.Node, in source order
+```
+
+Do **NOT** hand-roll this by walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` on every identifier. That pattern is a known performance killer: `GetSymbolAtLocation` can trigger lazy type-checking of whole expressions, and for a top-level declaration the walk covers the entire file. `ctx.Refs` resolves identifiers with the binder's scope walk instead — it never touches the TypeChecker and never triggers type computation.
+
+### Semantics
+
+- **Query key is a binder symbol.** Get it from the declaration node: `decl.Symbol()` (the binder attaches symbols to `VariableDeclaration` / `BindingElement` / etc., not to the name identifier). Do NOT query with `checker.GetSymbolAtLocation` results — the checker may return merged symbols that compare unequal to binder symbols, and the lookup will miss.
+- **Declaration names are not references**: the `a` of `var a = 1` is excluded; the `a` of a later `a = 2` is included. Reads and writes are both references — distinguish them positionally in your rule if needed.
+- **Non-reference positions are pre-filtered**: property names (`x.a`), object-literal/destructuring keys, import/export binding names, labels, and lowercase JSX tag names never appear.
+- **Scope- and meaning-aware**: shadowing identifiers in other scopes don't leak in, and type-position vs value-position identifiers resolve to the right symbol (mirrors the checker's meaning selection).
+- **Single-file only**: it answers "who references this symbol _in this file_". Cross-file references (an `export` imported elsewhere) still require the checker.
+- Returned slice is **read-only**. `References(nil)` returns nil; a nil `*RefStore` receiver is also safe.
+
+### Availability
+
+`ctx.Refs` is nil when no program is available. Core ESLint rules must guard:
+
+```go
+if ctx.Refs == nil {
+    return false // degrade gracefully, same as a ctx.TypeChecker nil check
+}
+```
+
+For `RequiresTypeInfo: true` rules, a program always exists, so `ctx.Refs` is guaranteed non-nil.
+
+### Example (from no-var)
+
+```go
+// Declaration side: collect binder symbols from the declaration nodes.
+utils.CollectBindingNames(varDecl.Name(), func(ident *ast.Node, _ string) {
+    if decl := ident.Parent; decl != nil && decl.Name() == ident {
+        if sym := decl.Symbol(); sym != nil {
+            vars = append(vars, varInfo{nameNode: ident, sym: sym})
+        }
+    }
+})
+
+// Reference side: one map lookup per symbol, no AST walking.
+refs := make(map[*ast.Symbol][]*ast.Node, len(vars))
+for _, v := range vars {
+    refs[v.sym] = ctx.Refs.References(v.sym)
+}
+```
+
+### Cost model
+
+The index is lazy twice over: the single AST walk that buckets candidate identifiers runs on the first `References` call in the file, and name resolution runs once per **queried name** — asking about `foo` never pays for resolving unrelated identifiers like `console` or `Promise`. Files where no rule queries the index pay nothing.
+
+---
+
 ## Complex Rule Patterns
 
 ### Control Flow Analysis
