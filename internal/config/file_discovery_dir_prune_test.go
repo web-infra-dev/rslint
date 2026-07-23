@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"gotest.tools/v3/assert"
 )
 
@@ -144,18 +145,16 @@ func TestDiscoverGapFiles_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *t
 		"scripts/debug/keep.ts",
 		"scripts/other/drop.ts",
 	})
-	config := RslintConfig{
-		{
-			Ignores: []string{
-				"**/target/**/*",
-				"**/scripts/**/*",
-				"!Scripts/**/Debug/**/*",
-			},
-			gitignoreSemantics:       true,
-			gitignoreCaseInsensitive: true,
-		},
+	config := ConfigWithCollectedGitignore(RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
-	}
+	}, []gitignore.Pattern{
+		{Glob: "**/target/**/*", NodeGlob: "**/target", DirectoryOnly: true},
+		// scripts/* ignores each immediate child node without excluding the
+		// scripts parent, so Git permits the later Debug negation to reopen the
+		// matching child.
+		{Glob: "scripts/*", NodeGlob: "scripts/*"},
+		{Glob: "!Scripts/**/Debug/**/*", NodeGlob: "Scripts/**/Debug", Negated: true, DirectoryOnly: true},
+	}, true)
 
 	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
 	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, true)

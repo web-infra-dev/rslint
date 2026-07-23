@@ -43,6 +43,14 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			gitignores: map[string]string{".gitignore": "ignored.ts\n"},
 		},
 		{
+			name:     "directory negation preserves nested directory ignore",
+			relative: "dist-path/dist/output.ts",
+			gitignores: map[string]string{
+				".gitignore":                "dist/\ndist-*/\n!dist-path/\n",
+				"dist-path/dist/.gitignore": "!output.ts\n",
+			},
+		},
+		{
 			name:          "config negation restores gitignored explicit target",
 			relative:      "dist/important.ts",
 			globalIgnores: []string{"!dist/important.ts"},
@@ -77,13 +85,12 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:     "pruned nested source does not override root negation",
+			name:     "excluded parent blocks child negation and nested source",
 			relative: "dist/types/private.ts",
 			gitignores: map[string]string{
 				".gitignore":            "dist/\n!dist/types/\n",
 				"dist/types/.gitignore": "private.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:       "directory symlink remains lintable without ignore",
