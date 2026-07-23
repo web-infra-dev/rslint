@@ -37,14 +37,17 @@
 package aria_role
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed aria_role.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's exact string. Reproduced verbatim so a
 // future audit can diff against `src/rules/aria-role.js` byte-for-byte.
@@ -55,12 +58,12 @@ type options struct {
 	allowedInvalidRoles map[string]struct{}
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if v, ok := m["ignoreNonDOM"].(bool); ok {
 		opts.ignoreNonDOM = v
 	}
@@ -98,9 +101,9 @@ func reportIfInvalid(ctx rule.RuleContext, attr *ast.Node, str string, allowed m
 }
 
 var AriaRoleRule = rule.Rule{
-	Name: "jsx-a11y/aria-role",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/aria-role",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

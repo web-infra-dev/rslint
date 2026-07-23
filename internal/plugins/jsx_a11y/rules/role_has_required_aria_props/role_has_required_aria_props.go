@@ -172,7 +172,8 @@ func isSemanticRoleElement(elementType string, attrs []*ast.Node, roleAttrValue 
 }
 
 var RoleHasRequiredAriaPropsRule = rule.Rule{
-	Name: "jsx-a11y/role-has-required-aria-props",
+	Name:   "jsx-a11y/role-has-required-aria-props",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

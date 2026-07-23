@@ -1,14 +1,17 @@
 package img_redundant_alt
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed img_redundant_alt.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` constant verbatim — including
 // the curly-quote in `don’t` and the trailing comma after `photo,` inside
@@ -23,12 +26,12 @@ type options struct {
 	words      []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if rawComponents, ok := m["components"]; ok {
 		if arr, ok := rawComponents.([]interface{}); ok {
 			for _, v := range arr {
@@ -51,9 +54,9 @@ func parseOptions(raw any) options {
 }
 
 var ImgRedundantAltRule = rule.Rule{
-	Name: "jsx-a11y/img-redundant-alt",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/img-redundant-alt",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Upstream: `typesToValidate = ['img'].concat(componentOptions)`.

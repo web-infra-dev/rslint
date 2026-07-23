@@ -1,12 +1,16 @@
 package alt_text
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed alt_text.schema.json
+var schemaJSON []byte
 
 // Default DOM elements alt-text validates. Mirrors upstream's `DEFAULT_ELEMENTS`.
 // The order is preserved because option-driven custom-component lookup falls
@@ -53,12 +57,12 @@ type options struct {
 	customComponents map[string][]string // keyed by DOM element name (e.g. "img" / `input[type="image"]`)
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{elements: defaultElements}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 
 	if rawElements, ok := m["elements"]; ok {
 		// Upstream falls through to DEFAULT_ELEMENTS via `||` only when
@@ -82,9 +86,9 @@ func parseOptions(raw any) options {
 }
 
 var AltTextRule = rule.Rule{
-	Name: "jsx-a11y/alt-text",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/alt-text",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Precompute the set of nodeType strings that should trigger a check.

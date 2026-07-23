@@ -14,7 +14,8 @@ import (
 const errorMessage = "<iframe> elements must have a unique title property."
 
 var IframeHasTitleRule = rule.Rule{
-	Name: "jsx-a11y/iframe-has-title",
+	Name:   "jsx-a11y/iframe-has-title",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		elementType := func(node *ast.Node) string {
 			return jsxa11yutil.GetElementType(node, ctx.Settings)

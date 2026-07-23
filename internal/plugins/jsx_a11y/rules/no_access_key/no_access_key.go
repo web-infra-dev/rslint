@@ -22,7 +22,8 @@ import (
 const errorMessage = "No access key attribute allowed. Inconsistencies between keyboard shortcuts and keyboard commands used by screen readers and keyboard-only users create a11y complications."
 
 var NoAccessKeyRule = rule.Rule{
-	Name: "jsx-a11y/no-access-key",
+	Name:   "jsx-a11y/no-access-key",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)

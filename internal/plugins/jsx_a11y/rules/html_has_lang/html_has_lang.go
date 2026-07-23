@@ -13,7 +13,8 @@ import (
 const errorMessage = "<html> elements must have the lang prop."
 
 var HtmlHasLangRule = rule.Rule{
-	Name: "jsx-a11y/html-has-lang",
+	Name:   "jsx-a11y/html-has-lang",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		elementType := func(node *ast.Node) string {
 			return jsxa11yutil.GetElementType(node, ctx.Settings)

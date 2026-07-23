@@ -40,14 +40,17 @@
 package label_has_associated_control
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed label_has_associated_control.schema.json
+var schemaJSON []byte
 
 // Message strings mirror upstream's `errorMessages` constant verbatim.
 const (
@@ -98,15 +101,15 @@ type options struct {
 	depth             int
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{
 		assert: defaultAssert,
 		depth:  defaultDepth,
 	}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.labelComponents = jsxa11yutil.StringSliceOption(m["labelComponents"])
 	opts.labelAttributes = jsxa11yutil.StringSliceOption(m["labelAttributes"])
 	opts.controlComponents = jsxa11yutil.StringSliceOption(m["controlComponents"])
@@ -156,9 +159,9 @@ func parseOptions(raw any) options {
 // plugin registry. The Name matches the rslint convention — the
 // `jsx-a11y/` prefix is part of the registered key.
 var LabelHasAssociatedControlRule = rule.Rule{
-	Name: "jsx-a11y/label-has-associated-control",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/label-has-associated-control",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// `labelComponentNames = ['label'].concat(labelComponents)` upstream.

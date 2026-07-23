@@ -44,7 +44,8 @@ import (
 const errorMessage = `aria-hidden="true" must not be set on focusable elements.`
 
 var NoAriaHiddenOnFocusableRule = rule.Rule{
-	Name: "jsx-a11y/no-aria-hidden-on-focusable",
+	Name:   "jsx-a11y/no-aria-hidden-on-focusable",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 

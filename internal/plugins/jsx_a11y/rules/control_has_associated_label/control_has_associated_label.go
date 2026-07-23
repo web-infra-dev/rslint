@@ -26,13 +26,16 @@
 package control_has_associated_label
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed control_has_associated_label.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` constant verbatim.
 const errorMessage = "A control must be associated with a text label."
@@ -52,12 +55,12 @@ type options struct {
 	depth             int
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{depth: defaultDepth}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.labelAttributes = jsxa11yutil.StringSliceOption(m["labelAttributes"])
 	opts.controlComponents = jsxa11yutil.StringSliceOption(m["controlComponents"])
 	opts.ignoreElements = jsxa11yutil.StringSliceOption(m["ignoreElements"])
@@ -78,9 +81,9 @@ func parseOptions(raw any) options {
 }
 
 var ControlHasAssociatedLabelRule = rule.Rule{
-	Name: "jsx-a11y/control-has-associated-label",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/control-has-associated-label",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		// Upstream `newIgnoreElements = new Set([].concat(ignoreElements,
 		// ignoreList))` where `ignoreList = ['link']`. The `link` entry is
