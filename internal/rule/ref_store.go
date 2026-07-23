@@ -117,7 +117,7 @@ func isReferencePosition(n *ast.Node) bool {
 		// Lowercase tag names are JSX intrinsics (`<div>`), not identifier
 		// references; uppercase ones reference a component value.
 		text := n.Text()
-		return len(text) > 0 && !(text[0] >= 'a' && text[0] <= 'z')
+		return len(text) > 0 && (text[0] < 'a' || text[0] > 'z')
 	}
 	return true
 }
