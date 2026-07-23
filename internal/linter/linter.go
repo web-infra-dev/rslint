@@ -77,7 +77,7 @@ type runProgramOptions struct {
 	// leaves this disabled because it does not consume that result.
 	CollectExecutedRules bool
 	// SingleThreaded, when true, lints this program's file shards
-	// sequentially on the calling goroutine instead of in parallel workers.
+	// sequentially on the calling goroutine instead of in parallel tasks.
 	SingleThreaded bool
 	// TypeInfoFiles is the set of files with reliable project type information.
 	// Rules that require type information are filtered for every other file,
@@ -91,12 +91,48 @@ type programLintResult struct {
 	executedRules   map[string]struct{}
 }
 
+type listenerRegistry struct {
+	byKind      map[ast.Kind][]func(node *ast.Node)
+	activeKinds []ast.Kind
+}
+
+func newListenerRegistry() listenerRegistry {
+	return listenerRegistry{
+		byKind:      make(map[ast.Kind][]func(node *ast.Node), 20),
+		activeKinds: make([]ast.Kind, 0, 20),
+	}
+}
+
+func (r *listenerRegistry) add(kind ast.Kind, listener func(node *ast.Node)) {
+	listeners := r.byKind[kind]
+	if len(listeners) == 0 {
+		r.activeKinds = append(r.activeKinds, kind)
+	}
+	r.byKind[kind] = append(listeners, listener)
+}
+
+func (r *listenerRegistry) listeners(kind ast.Kind) []func(node *ast.Node) {
+	return r.byKind[kind]
+}
+
+// reset releases every listener closure from the completed file while
+// retaining the sparse registry's backing storage for the next file in the
+// same checker-shard task.
+func (r *listenerRegistry) reset() {
+	for _, kind := range r.activeKinds {
+		listeners := r.byKind[kind]
+		clear(listeners)
+		r.byKind[kind] = listeners[:0]
+	}
+	r.activeKinds = r.activeKinds[:0]
+}
+
 // runLintRulesInProgram lints files in a single Program. Files are filtered
 // through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
 // execution. Pass FileFilter=nil to disable that layer.
 //
 // Unless SingleThreaded is set, files are linted in parallel shards — one
-// worker per pool checker, each worker owning its checker exclusively and
+// task per pool checker, each task owning its checker exclusively and
 // processing the files associated to it (see the sharding comment in the
 // function body for the invariants this preserves).
 //
@@ -126,13 +162,11 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		return result
 	}
 
-	// lintFile lints one file with its already-resolved rules and checker. All per-file state
-	// (listener map, comments, DisableManager, rule contexts) lives inside
-	// this function, so concurrent calls for different files are independent;
-	// the checker is the only shared resource and is owned exclusively by the
-	// calling worker (see the sharding below).
-	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker) {
-		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
+	// lintFile lints one file with its already-resolved rules and checker. Its
+	// comments, DisableManager, and rule contexts are per-file. The listener
+	// registry belongs to the calling checker-shard task and is empty on entry;
+	// reset clears all captured per-file state before the next serial file.
+	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
 
 		// One lazy store is shared by directives, inline globals, and every
 		// comment-aware rule in this file. Most files never materialize it.
@@ -170,138 +204,16 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				Refs:           refs,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
-				ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
-					if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:   r.Name,
-						Range:      textRange,
-						Message:    msg,
-						SourceFile: file,
-						FilePath:   file.FileName(),
-						Severity:   r.Severity,
-					})
-				},
-				ReportRangeWithFixes: func(textRange core.TextRange, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-					if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:   r.Name,
-						Range:      textRange,
-						Message:    msg,
-						FixesPtr:   &fixes,
-						SourceFile: file,
-						FilePath:   file.FileName(),
-						Severity:   r.Severity,
-					})
-				},
-				ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-					if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:    r.Name,
-						Range:       textRange,
-						Message:     msg,
-						Suggestions: &suggestions,
-						SourceFile:  file,
-						FilePath:    file.FileName(),
-						Severity:    r.Severity,
-					})
-				},
-				ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-					trimmedRange := utils.TrimNodeTextRange(file, node)
-					if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:   r.Name,
-						Range:      trimmedRange,
-						Message:    msg,
-						SourceFile: file,
-						FilePath:   file.FileName(),
-						Severity:   r.Severity,
-					})
-				},
-				ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-					trimmedRange := utils.TrimNodeTextRange(file, node)
-					if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:   r.Name,
-						Range:      trimmedRange,
-						Message:    msg,
-						FixesPtr:   &fixes,
-						SourceFile: file,
-						FilePath:   file.FileName(),
-						Severity:   r.Severity,
-					})
-				},
-				ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-					trimmedRange := utils.TrimNodeTextRange(file, node)
-					if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:    r.Name,
-						Range:       trimmedRange,
-						Message:     msg,
-						Suggestions: &suggestions,
-						SourceFile:  file,
-						FilePath:    file.FileName(),
-						Severity:    r.Severity,
-					})
-				},
-				ReportNodeWithFixesAndSuggestions: func(node *ast.Node, msg rule.RuleMessage, fixes []rule.RuleFix, suggestions []rule.RuleSuggestion) {
-					trimmedRange := utils.TrimNodeTextRange(file, node)
-					if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:    r.Name,
-						Range:       trimmedRange,
-						Message:     msg,
-						FixesPtr:    &fixes,
-						Suggestions: &suggestions,
-						SourceFile:  file,
-						FilePath:    file.FileName(),
-						Severity:    r.Severity,
-					})
-				},
-				ReportRangeWithFixesAndSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, fixes []rule.RuleFix, suggestions []rule.RuleSuggestion) {
-					if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
-						return
-					}
-					opts.OnDiagnostic(rule.RuleDiagnostic{
-						RuleName:    r.Name,
-						Range:       textRange,
-						Message:     msg,
-						FixesPtr:    &fixes,
-						Suggestions: &suggestions,
-						SourceFile:  file,
-						FilePath:    file.FileName(),
-						Severity:    r.Severity,
-					})
-				},
-			}
+			}.WithReporter(r.Name, r.Severity, opts.OnDiagnostic)
 
 			for kind, listener := range r.Run(ctx) {
-				listeners, ok := registeredListeners[kind]
-				if !ok {
-					listeners = make([](func(node *ast.Node)), 0, len(rules))
-				}
-				registeredListeners[kind] = append(listeners, listener)
+				registeredListeners.add(kind, listener)
 			}
 		}
 
 		runListeners := func(kind ast.Kind, node *ast.Node) {
-			if listeners, ok := registeredListeners[kind]; ok {
-				for _, listener := range listeners {
-					listener(node)
-				}
+			for _, listener := range registeredListeners.listeners(kind) {
+				listener(node)
 			}
 		}
 
@@ -371,17 +283,18 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 			return false
 		}
 		file.Node.ForEachChild(childVisitor)
-		clear(registeredListeners)
+		registeredListeners.reset()
 	}
 
 	// Phase 1 parallelism is per-file within the program: files are grouped
 	// by the checker the pool associated to them (for the compiler pool this
 	// is the stable index%N mapping built in checkerpool.go), and each group
-	// is linted serially by ONE worker holding that checker exclusively.
+	// is linted serially by one checker-shard task holding that checker
+	// exclusively.
 	// This keeps three invariants:
 	//   - a checker is never used by two goroutines at once (pool contract:
 	//     checkers must not be accessed concurrently);
-	//   - every file's diagnostics are emitted by a single worker, so the
+	//   - every file's diagnostics are emitted by a single task, so the
 	//     file-internal diagnostic order stays deterministic — the fixer's
 	//     tie-breaking and reporters rely on this;
 	//   - Phase 2 type-check visits files through the same association,
@@ -392,7 +305,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	// to the first checker, so the grouping collapses to a single group
 	// (no intra-program parallelism on that path; today it is only reached
 	// via LintSingleFile, where one file means one group anyway).
-	// Correctness never depends on the grouping: each worker only uses the
+	// Correctness never depends on the grouping: each task only uses the
 	// checker it acquired exclusively for its own shard.
 	ctx := context.Background()
 	rulesByFile := make(map[*ast.SourceFile][]ConfiguredRule, len(filesToLint))
@@ -433,13 +346,14 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	wg := core.NewWorkGroup(opts.SingleThreaded)
 	for chk, files := range checkerGroups {
 		wg.Queue(func() {
+			registeredListeners := newListenerRegistry()
 			if chk != nil {
 				var done func()
 				chk, done = opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
 				defer done()
 			}
 			for _, file := range files {
-				lintFile(file, rulesByFile[file], chk)
+				lintFile(file, rulesByFile[file], chk, &registeredListeners)
 			}
 		})
 	}
@@ -802,7 +716,7 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		GetRulesForFile:  getRulesForFile,
 		SyntaxErrorFiles: map[string]struct{}{},
 		// A single file is a single shard — run it on the calling goroutine
-		// instead of spawning a worker.
+		// instead of scheduling a background task.
 		SingleThreaded: true,
 		OnDiagnostic:   opts.OnDiagnostic,
 	})

@@ -202,7 +202,7 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 		`,
 		Tsx:      true,
 		Options:  map[string]interface{}{"additionalHooks": ""},
-		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalHooks": "(useTracked)"}},
+		Settings: map[string]interface{}{"react-hooks": map[string]interface{}{"additionalEffectHooks": "(useTracked)"}},
 		Errors: []rule_tester.InvalidTestCaseError{
 			{
 				Message: "React Hook useTracked has a missing dependency: 'id'. Either include it or remove the dependency array.",
