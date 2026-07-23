@@ -53,8 +53,8 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			{Code: `const { [key]: a } = Object; a({}, foo)`},
 
 			// ---- Modified-global tracking: a bare write to the global
-			// `Object` untracks every reference positioned after it (calls
-			// before the write still match — see the invalid section) ----
+			// `Object` stops tracking every reference positioned after it
+			// (calls before the write still match — see the invalid section) ----
 			{Code: `Object = {}; Object.assign({}, foo);`},
 			{Code: `Object ||= {}; Object.assign({}, foo);`},
 
@@ -107,8 +107,8 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			{Code: `var a = b; var b = a; b.assign({}, x)`},
 			{Code: `var a = a; a.assign({}, x)`},
 
-			// ---- Nested destructuring: a default value makes the bound value
-			// untrackable ----
+			// ---- Nested destructuring: a default value means the bound value
+			// cannot be tracked ----
 			{Code: `const { Object: { assign } = {} } = globalThis; assign({}, x)`},
 
 			// ---- Nested destructuring: a non-global root must not match ----
