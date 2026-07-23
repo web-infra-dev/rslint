@@ -114,14 +114,20 @@ const (
 //   - Kind: the directory role (see dirKind), classified once here instead of
 //     by suffix inspection at each call site.
 //
-// Glob is the normalized, `!`-stripped matcher fed to doublestar — byte-for-byte
-// the same string the old []string pipeline matched against, so file-level
-// matching (isFileIgnored) is unchanged.
+// Glob is the normalized, `!`-stripped matcher fed to doublestar. For collected
+// Git rules, its prefix ending at GitNodeGlobEnd is the original path-node
+// matcher and the complete Glob is its conservative subtree projection. Keeping
+// both views in one string avoids doubling the hot IgnorePattern's string
+// headers. GitDirectoryOnly and GitContentsOnly retain the two Git-only roles.
 type IgnorePattern struct {
-	Glob            string
-	Negated         bool
-	Kind            dirKind
-	CaseInsensitive bool
+	Glob             string
+	GitNodeGlobEnd   int
+	Negated          bool
+	Kind             dirKind
+	CaseInsensitive  bool
+	GitPattern       bool
+	GitDirectoryOnly bool
+	GitContentsOnly  bool
 }
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
@@ -197,18 +203,31 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 	}
 	normalizedPath := normalizePath(filePath, cwd)
 	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
+	if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+		// On Windows and case-insensitive macOS volumes, callers may supply a
+		// canonical path whose drive/share or directory casing differs from
+		// cwd. A case-sensitive relative conversion then manufactures ../ even
+		// though both paths name the same tree. Re-resolve only on that uncommon
+		// fallback so the normal hot path pays no extra pattern scan.
+		normalizedPath = normalizePathWithCaseSensitivity(filePath, cwd, false)
+		unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
+	}
+	return isFileIgnoredNormalized(normalizedPath, unixPath, patterns)
+}
 
-	ignored := false
-	for _, p := range patterns {
-		matched := ignorePatternMatches(p, normalizedPath)
-		if !matched && unixPath != normalizedPath {
-			matched = ignorePatternMatches(p, unixPath)
-		}
-		if matched {
-			ignored = !p.Negated
+func pathEscapesCwd(path string) bool {
+	return path == ".." ||
+		strings.HasPrefix(path, "../") ||
+		tspath.PathIsAbsolute(path)
+}
+
+func hasCaseInsensitivePattern(patterns []IgnorePattern) bool {
+	for _, pattern := range patterns {
+		if pattern.CaseInsensitive {
+			return true
 		}
 	}
-	return ignored
+	return false
 }
 
 // ignorePatternMatches reports whether path matches pattern.Glob, applying the
@@ -224,13 +243,270 @@ func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 
 // isFileIgnoredSimple is the cwd-unavailable fallback (matches the raw path).
 func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
+	return isFileIgnoredNormalized(filePath, strings.ReplaceAll(filePath, "\\", "/"), patterns)
+}
+
+func isFileIgnoredNormalized(path string, unixPath string, patterns []IgnorePattern) bool {
 	ignored := false
-	for _, p := range patterns {
-		if ignorePatternMatches(p, filePath) {
+	for index := 0; index < len(patterns); {
+		p := patterns[index]
+		if p.GitPattern {
+			end := index + 1
+			for end < len(patterns) && patterns[end].GitPattern {
+				end++
+			}
+			gitState := newGitIgnorePathState(unixPath)
+			groupIgnored := gitState.evaluate(patterns[index:end])
+			if gitState.matched {
+				ignored = groupIgnored
+			}
+			index = end
+			continue
+		}
+		matched := ignorePatternMatches(p, path)
+		if !matched && unixPath != path {
+			matched = ignorePatternMatches(p, unixPath)
+		}
+		if matched {
 			ignored = !p.Negated
 		}
+		index++
 	}
 	return ignored
+}
+
+// gitIgnorePathState evaluates a contiguous group of collected Git rules
+// against every concrete node on one target path. Rules are visited in reverse:
+// the first match for a node is its final Git decision. A negation resolves only
+// the node it actually matches; an unresolved parent can therefore still be
+// ignored by an earlier positive rule. This is the Git distinction erased by
+// the historical !dir/**/* projection.
+//
+// Authored config patterns are evaluated after the complete Git group and may
+// still intentionally override its final decision as a separate config layer.
+type gitIgnorePathState struct {
+	path                   string
+	lowerPath              string
+	fileDepth              int
+	unresolved             int
+	resolvedDepths         uint64
+	resolvedDepthsOverflow []bool
+	matched                bool
+}
+
+func newGitIgnorePathState(path string) gitIgnorePathState {
+	path = strings.Trim(path, "/")
+	if path == "." {
+		path = ""
+	} else if strings.HasPrefix(path, "./") ||
+		strings.Contains(path, "//") ||
+		strings.Contains(path, "/./") ||
+		strings.HasSuffix(path, "/.") {
+		// The normal path enters through normalizePath and never needs this
+		// branch. Keep the cwd-less fallback equivalent to the former
+		// component builder for redundant separators and "." components.
+		parts := strings.Split(path, "/")
+		filtered := parts[:0]
+		for _, part := range parts {
+			if part != "" && part != "." {
+				filtered = append(filtered, part)
+			}
+		}
+		path = strings.Join(filtered, "/")
+	}
+	depth := -1
+	if path != "" {
+		depth = strings.Count(path, "/")
+	}
+	return gitIgnorePathState{
+		path:       path,
+		fileDepth:  depth,
+		unresolved: depth + 1,
+	}
+}
+
+func (state *gitIgnorePathState) evaluate(patterns []IgnorePattern) bool {
+	for index := len(patterns) - 1; index >= 0 && state.unresolved > 0; index-- {
+		if state.apply(patterns[index]) {
+			return true
+		}
+	}
+	return false
+}
+
+// apply reports whether pattern is the final positive decision for any still
+// unresolved path node. That is enough to ignore the target immediately:
+// reverse traversal guarantees no earlier rule can override that node.
+func (state *gitIgnorePathState) apply(pattern IgnorePattern) bool {
+	if state.fileDepth < 0 {
+		return false
+	}
+	path := state.path
+	if pattern.CaseInsensitive {
+		if state.lowerPath == "" {
+			state.lowerPath = strings.ToLower(path)
+		}
+		path = state.lowerPath
+	}
+
+	if basenameGlob, ok := gitIgnoreRootBasenameGlob(pattern); ok {
+		return state.applyRootBasename(pattern, path, basenameGlob)
+	}
+
+	// A non-directory-only rule may name the target file itself. Its subtree
+	// projection separately tells us whether any ancestor can match.
+	if !pattern.GitDirectoryOnly &&
+		!state.depthResolved(state.fileDepth) &&
+		gitIgnorePatternMatchesNode(pattern, path) {
+		if state.applyDepth(state.fileDepth, pattern.Negated) {
+			return true
+		}
+		if state.unresolved == 0 {
+			return false
+		}
+	}
+
+	// Glob is the node pattern's conservative subtree projection. One match
+	// against the complete target cheaply rejects the overwhelmingly common
+	// case where this rule cannot name any ancestor.
+	if !utils.MatchGlob(pattern.Glob, path) {
+		return false
+	}
+
+	end := strings.LastIndexByte(path, '/')
+	for depth := state.fileDepth - 1; depth >= 0 && end >= 0; depth-- {
+		node := path[:end]
+		if !state.depthResolved(depth) &&
+			gitIgnorePatternMatchesNode(pattern, node) {
+			if state.applyDepth(depth, pattern.Negated) {
+				return true
+			}
+			if state.unresolved == 0 {
+				return false
+			}
+		}
+		end = strings.LastIndexByte(node, '/')
+	}
+	return false
+}
+
+// gitIgnoreRootBasenameGlob recognizes the dominant .gitignore shape:
+// an unrooted, single-component rule from the config root. Matching its small
+// basename glob against path components avoids repeatedly running a **/ glob
+// over growing full-path prefixes. A rooted "/**/name" rule has the same
+// config-root semantics and is safe to take through this path too.
+func gitIgnoreRootBasenameGlob(pattern IgnorePattern) (string, bool) {
+	const prefix = "**/"
+	nodeGlob := gitIgnoreNodeGlob(pattern)
+	if !strings.HasPrefix(nodeGlob, prefix) ||
+		strings.HasSuffix(nodeGlob, "/**") {
+		return "", false
+	}
+	glob := strings.TrimPrefix(nodeGlob, prefix)
+	return glob, glob != "" && !strings.Contains(glob, "/")
+}
+
+func (state *gitIgnorePathState) applyRootBasename(pattern IgnorePattern, path string, glob string) bool {
+	var end int
+	depth := state.fileDepth
+	if pattern.GitDirectoryOnly {
+		end = strings.LastIndexByte(path, '/')
+		depth--
+	} else {
+		start := strings.LastIndexByte(path, '/') + 1
+		if !state.depthResolved(depth) &&
+			utils.MatchGlob(glob, path[start:]) {
+			if state.applyDepth(depth, pattern.Negated) {
+				return true
+			}
+			if state.unresolved == 0 {
+				return false
+			}
+		}
+		end = start - 1
+		depth--
+	}
+	if end < 0 {
+		return false
+	}
+
+	// A literal component is common enough to avoid both doublestar and glob
+	// matching entirely. Wildcard components first use the subtree projection
+	// to reject non-matches, then inspect only the candidate's ancestors.
+	literal := !strings.ContainsAny(glob, "*?[{")
+	if !literal && !utils.MatchGlob(pattern.Glob, path) {
+		return false
+	}
+	for depth >= 0 && state.unresolved > 0 {
+		start := strings.LastIndexByte(path[:end], '/') + 1
+		component := path[start:end]
+		if !state.depthResolved(depth) &&
+			((literal && component == glob) || (!literal && utils.MatchGlob(glob, component))) {
+			if state.applyDepth(depth, pattern.Negated) {
+				return true
+			}
+		}
+		if start == 0 {
+			break
+		}
+		end = start - 1
+		depth--
+	}
+	return false
+}
+
+func (state *gitIgnorePathState) applyDepth(depth int, negated bool) bool {
+	state.matched = true
+	if !negated {
+		return true
+	}
+	state.resolveDepth(depth)
+	return false
+}
+
+func (state *gitIgnorePathState) depthResolved(depth int) bool {
+	if depth < 64 {
+		return state.resolvedDepths&(uint64(1)<<uint(depth)) != 0
+	}
+	index := depth - 64
+	return index < len(state.resolvedDepthsOverflow) &&
+		state.resolvedDepthsOverflow[index]
+}
+
+func (state *gitIgnorePathState) resolveDepth(depth int) {
+	if state.depthResolved(depth) {
+		return
+	}
+	state.unresolved--
+	if depth < 64 {
+		state.resolvedDepths |= uint64(1) << uint(depth)
+		return
+	}
+	index := depth - 64
+	if index >= len(state.resolvedDepthsOverflow) {
+		state.resolvedDepthsOverflow = append(
+			state.resolvedDepthsOverflow,
+			make([]bool, index-len(state.resolvedDepthsOverflow)+1)...,
+		)
+	}
+	state.resolvedDepthsOverflow[index] = true
+}
+
+func gitIgnorePatternMatchesNode(pattern IgnorePattern, path string) bool {
+	if pattern.GitContentsOnly {
+		// Glob is NodeGlob with a required final component (/**/*), which
+		// expresses Git's true trailing-/** semantics without ambiguity when
+		// an earlier doublestar can match the same complete path.
+		return utils.MatchGlob(pattern.Glob, path)
+	}
+	return utils.MatchGlob(gitIgnoreNodeGlob(pattern), path)
+}
+
+func gitIgnoreNodeGlob(pattern IgnorePattern) string {
+	if pattern.GitNodeGlobEnd <= 0 || pattern.GitNodeGlobEnd > len(pattern.Glob) {
+		return ""
+	}
+	return pattern.Glob[:pattern.GitNodeGlobEnd]
 }
 
 // isDirAbsolutelyBlocked reports whether dirPath (or an ancestor segment) is

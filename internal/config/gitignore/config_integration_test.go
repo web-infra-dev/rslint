@@ -16,10 +16,8 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-// For representative reachable patterns, ConfigWithGitignore should make the
-// same final file decision as Git. Excluded-parent re-inclusion is covered by
-// the product-level ordered-global-ignore tests below instead: once a rule is
-// collected, rslint intentionally lets later negations re-include it.
+// For representative patterns, ConfigWithGitignore should make the same final
+// file decision as Git, including excluded-parent and directory-node ordering.
 func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 	git, err := exec.LookPath("git")
 	if err != nil {
@@ -51,9 +49,42 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 			files:      []string{"cache/deep/file.ts", "build/keep.ts", "build/drop.ts", "build/drop/child.ts"},
 		},
 		{
+			name:       "excluded parent cannot be re-included by child negation",
+			gitignores: map[string]string{".gitignore": "blocked/\n!blocked/keep.ts\n"},
+			files:      []string{"blocked/keep.ts", "blocked/drop.ts"},
+		},
+		{
 			name:       "trailing doublestar remains reversible",
 			gitignores: map[string]string{".gitignore": "build/**\n!build/keep.ts\n"},
 			files:      []string{"build/keep.ts", "build/drop.ts", "build/deep/drop.ts"},
+		},
+		{
+			name:       "bare doublestar",
+			gitignores: map[string]string{".gitignore": "**\n"},
+			files:      []string{"source.ts", "nested/deep/source.ts"},
+		},
+		{
+			name:       "ambiguous trailing doublestar",
+			gitignores: map[string]string{".gitignore": "**/cache/**\n"},
+			files:      []string{"cache.ts", "cache/cache", "cache/deep/cache", "other/cache/cache", "other/source.ts"},
+		},
+		{
+			name: "directory negation does not reinclude nested ignored directory",
+			gitignores: map[string]string{
+				".gitignore":                "dist/\ndist-*/\n!dist-path/\n",
+				"dist-path/dist/.gitignore": "!output.ts\n",
+			},
+			files: []string{"dist-path/src/source.ts", "dist-path/dist/output.ts"},
+		},
+		{
+			name:       "directory negation preserves independent descendant matches",
+			gitignores: map[string]string{".gitignore": "cache-*/\n*.generated.ts\ncache/\n!cache-path/\n"},
+			files:      []string{"cache-path/src/source.ts", "cache-path/src/types.generated.ts", "cache-path/cache/output.ts"},
+		},
+		{
+			name:       "later ancestor ignore overrides earlier descendant negation",
+			gitignores: map[string]string{".gitignore": "!build/keep/\nbuild/\n"},
+			files:      []string{"build/keep/source.ts"},
 		},
 		{
 			name: "reachable nested source overrides ancestor",
@@ -77,6 +108,17 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 			},
 		},
 		{
+			name: "nested source directory is literal glob text",
+			gitignores: map[string]string{
+				"!pkg[1]{x}/.gitignore": "ignored.ts\n",
+			},
+			files: []string{
+				"!pkg[1]{x}/ignored.ts",
+				"!pkg[1]{x}/source.ts",
+				"!pkg1x/ignored.ts",
+			},
+		},
+		{
 			name: "ignored nested source is unreachable",
 			gitignores: map[string]string{
 				".gitignore":         "blocked/\n",
@@ -94,12 +136,12 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 				t.Fatalf("git init: %v: %s", err, output)
 			}
 			for _, relative := range test.files {
-				// Windows cannot materialize a file whose name contains `*`.
-				// The platform-independent collector unit test still pins the
-				// escaped pattern conversion to `literal[*].ts`; this Git parity
-				// integration case can only exercise the literal filename where
-				// the host filesystem supports it.
-				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+				// Windows cannot materialize `*` or a trailing space in a file
+				// name. Platform-independent collector tests still pin those
+				// conversions; this filesystem parity case skips only the
+				// impossible host paths.
+				if runtime.GOOS == "windows" &&
+					(relative == "literal*.ts" || strings.HasSuffix(relative, " ")) {
 					continue
 				}
 				path := filepath.Join(root, filepath.FromSlash(relative))
@@ -114,7 +156,8 @@ func TestConfigWithGitignore_MatchesGitCheckIgnore(t *testing.T) {
 			base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 			full := config.ConfigWithGitignore(base, root, osvfs.FS(), nil)
 			for _, relative := range test.files {
-				if runtime.GOOS == "windows" && relative == "literal*.ts" {
+				if runtime.GOOS == "windows" &&
+					(relative == "literal*.ts" || strings.HasSuffix(relative, " ")) {
 					continue
 				}
 				path := filepath.Join(root, filepath.FromSlash(relative))
@@ -277,7 +320,7 @@ func TestConfigWithGitignore_ExplicitMatchesDefaultPruning(t *testing.T) {
 	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
 	explicit := config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target})
 	assert.Equal(t, explicit.IsFileIgnored(target, dir), full.IsFileIgnored(target, dir))
-	assert.Assert(t, !explicit.IsFileIgnored(target, dir))
+	assert.Assert(t, explicit.IsFileIgnored(target, dir))
 }
 
 func TestConfigWithGitignore_FullWalkHonorsOrderedDirectoryReinclude(t *testing.T) {

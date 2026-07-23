@@ -107,6 +107,44 @@ func TestConvertGitignoreToGlobs_Negation(t *testing.T) {
 	assert.Equal(t, globs[0], "!**/dist/**/*")
 }
 
+func TestConvertGitignoreToPatterns_PreservesDirectoryNode(t *testing.T) {
+	patterns := convertGitignoreToPatterns("!dist-path/\n!dist-path/**/*\n", "")
+	assert.DeepEqual(t, patterns, []Pattern{
+		{
+			Glob:          "!**/dist-path/**/*",
+			NodeGlob:      "**/dist-path",
+			Negated:       true,
+			DirectoryOnly: true,
+		},
+		{
+			Glob:     "!dist-path/**/*",
+			NodeGlob: "dist-path/**/*",
+			Negated:  true,
+		},
+	})
+}
+
+func TestConvertGitignoreToPatterns_DistinguishesBareAndTrailingDoublestar(t *testing.T) {
+	patterns := convertGitignoreToPatterns("**\nfoo/**\nfoo/**/\n", "")
+	assert.DeepEqual(t, patterns, []Pattern{
+		{
+			Glob:     "**/**",
+			NodeGlob: "**/**",
+		},
+		{
+			Glob:         "foo/**",
+			NodeGlob:     "foo/**",
+			ContentsOnly: true,
+		},
+		{
+			Glob:          "foo/**/*",
+			NodeGlob:      "foo/**",
+			DirectoryOnly: true,
+			ContentsOnly:  true,
+		},
+	})
+}
+
 func TestConvertGitignoreToGlobs_CommentsAndBlanks(t *testing.T) {
 	globs := convertGitignoreToGlobs("# comment\n\ndist/\n\n# another\n*.log\n", "")
 	assert.Equal(t, len(globs), 2)
@@ -196,6 +234,14 @@ func TestConvertGitignoreToGlobs_NestedWildcard(t *testing.T) {
 	globs := convertGitignoreToGlobs("*.generated.ts\n", "packages/app")
 	assert.Equal(t, len(globs), 1)
 	assert.Equal(t, globs[0], "packages/app/**/*.generated.ts")
+}
+
+func TestConvertGitignoreToPatterns_QuotesNestedFilesystemDirectory(t *testing.T) {
+	patterns := convertGitignoreToPatterns("ignored.ts\n", "!pkg[1]{x}*")
+	assert.DeepEqual(t, patterns, []Pattern{{
+		Glob:     "./!pkg[[]1][{]x[}][*]/**/ignored.ts",
+		NodeGlob: "!pkg[[]1][{]x[}][*]/**/ignored.ts",
+	}})
 }
 
 // --- Collector integration tests ---
@@ -603,6 +649,16 @@ func TestCursorDirectoryReachability(t *testing.T) {
 			assert.Equal(t, blocked, test.wantBlocked)
 		})
 	}
+}
+
+func TestCursorTrailingDoublestarMatchesNestedRepeatedName(t *testing.T) {
+	cursor := NewCursor("/repo", true)
+	cursor, _ = cursor.AppendSource("/repo", "**/cache/**\n")
+
+	cache, blocked := cursor.Enter("/repo/cache")
+	assert.Assert(t, !blocked, "trailing /** must not match the directory before it")
+	_, blocked = cache.Enter("/repo/cache/cache")
+	assert.Assert(t, blocked, "a repeated name below the matched directory is still its content")
 }
 
 func TestCursorBlockSourceTraversalPreservesInheritedRules(t *testing.T) {

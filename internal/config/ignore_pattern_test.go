@@ -1,8 +1,10 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"gotest.tools/v3/assert"
 )
 
@@ -105,6 +107,74 @@ func TestParseIgnorePattern_DotStarDoesNotOverBlock(t *testing.T) {
 	}
 	if cfg.GetConfigForFile("/repo/src/app/main.ts", "/repo") == nil {
 		t.Error(`nested file src/app/main.ts must still be linted under ignores ["./*"]`)
+	}
+}
+
+func TestCollectedGitignoreDirectoryNegationIsNodeScoped(t *testing.T) {
+	patterns := parseCollectedGitignorePatterns([]gitignore.Pattern{
+		{Glob: "**/dist/**/*", NodeGlob: "**/dist", DirectoryOnly: true},
+		{Glob: "**/dist-*/**/*", NodeGlob: "**/dist-*", DirectoryOnly: true},
+		{Glob: "!**/dist-path/**/*", NodeGlob: "**/dist-path", Negated: true, DirectoryOnly: true},
+	}, false)
+
+	assert.Assert(t, !isFileIgnored("dist-path/src/source.ts", patterns, ""))
+	assert.Assert(t, isFileIgnored("dist-path/dist/output.ts", patterns, ""))
+}
+
+func TestCollectedGitignoreDirectoryNegationBeyondBitsetDepth(t *testing.T) {
+	path := "dist-path/" + strings.Repeat("level/", 64) + "dist/output.ts"
+	patterns := parseCollectedGitignorePatterns([]gitignore.Pattern{
+		{Glob: "**/dist/**/*", NodeGlob: "**/dist", DirectoryOnly: true},
+		{Glob: "**/dist-*/**/*", NodeGlob: "**/dist-*", DirectoryOnly: true},
+		{Glob: "!**/dist-path/**/*", NodeGlob: "**/dist-path", Negated: true, DirectoryOnly: true},
+	}, false)
+
+	assert.Assert(t, isFileIgnored(path, patterns, ""), "the descendant match above depth 64 must survive the ancestor negation")
+}
+
+func TestCollectedGitignoreNegationResolvesNodeBeyondBitsetDepth(t *testing.T) {
+	path := strings.Repeat("level/", 65) + "keep.ts"
+	patterns := parseCollectedGitignorePatterns([]gitignore.Pattern{
+		{Glob: path, NodeGlob: path},
+		{Glob: "!" + path, NodeGlob: path, Negated: true},
+	}, false)
+
+	assert.Assert(t, !isFileIgnored(path, patterns, ""), "the final negation must resolve a file node above depth 64")
+}
+
+func TestCollectedGitignoreNegationCannotReincludeBelowIgnoredParent(t *testing.T) {
+	patterns := parseCollectedGitignorePatterns([]gitignore.Pattern{
+		{Glob: "**/blocked/**/*", NodeGlob: "**/blocked", DirectoryOnly: true},
+		{Glob: "!blocked/keep.ts", NodeGlob: "blocked/keep.ts", Negated: true},
+	}, false)
+
+	assert.Assert(t, isFileIgnored("blocked/keep.ts", patterns, ""))
+}
+
+func TestCollectedGitignoreCaseInsensitiveWindowsPathSpace(t *testing.T) {
+	patterns := parseCollectedGitignorePatterns([]gitignore.Pattern{{
+		Glob:     "src/ignored.ts",
+		NodeGlob: "src/ignored.ts",
+	}}, true)
+	for _, test := range []struct {
+		name string
+		file string
+		cwd  string
+	}{
+		{
+			name: "drive letter separators and directory case",
+			file: `c:\REPO\SRC\IGNORED.TS`,
+			cwd:  "C:/repo",
+		},
+		{
+			name: "UNC server share and directory case",
+			file: `//SERVER/Share/REPO/SRC/IGNORED.TS`,
+			cwd:  "//server/share/repo",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Assert(t, isFileIgnored(test.file, patterns, test.cwd))
+		})
 	}
 }
 
