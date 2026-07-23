@@ -104,7 +104,7 @@ The rule accepts a single options object:
   bare-identifier callees — `Foo.useBar` and `React.useBar` are NOT
   matched even if the identifier suffix is in the regex (mirrors
   upstream's `node === calleeNode` gate). Falls back to
-  `settings['react-hooks'].additionalHooks` when omitted or empty.
+  `settings['react-hooks'].additionalEffectHooks` when omitted or empty.
   ```json
   { "react-hooks/exhaustive-deps": ["error", { "additionalHooks": "(useMyEffect|useAsync)" }] }
   ```

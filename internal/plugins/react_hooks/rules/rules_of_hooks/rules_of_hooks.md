@@ -84,6 +84,22 @@ function App() {
 }
 ```
 
+## Options
+
+`additionalHooks` is a regex of extra hook names to treat as effect hooks
+(functions created with `useEffectEvent` may be called inside them):
+
+```json
+{
+  "rules": {
+    "react-hooks/rules-of-hooks": ["error", { "additionalHooks": "(useMyEffect|useServerEffect)" }]
+  }
+}
+```
+
+When set, the rule-level option takes precedence over the
+`additionalEffectHooks` setting below.
+
 ## Settings
 
 ```json
