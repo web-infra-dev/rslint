@@ -93,7 +93,7 @@ type directorySeedResolution struct {
 type gitignoreObservation struct {
 	ownerDirectory  string
 	sourceDirectory string
-	globs           []string
+	patterns        []gitignore.Pattern
 }
 
 type gitignoreReadResult struct {
@@ -1248,14 +1248,14 @@ func (builder *configCatalogBuilder) readGitignoreSource(
 	if !content.exists {
 		return cursor, nil
 	}
-	next, globs := cursor.AppendSource(matchDirectory, content.content)
-	if len(globs) == 0 {
+	next, patterns := cursor.AppendSourcePatterns(matchDirectory, content.content)
+	if len(patterns) == 0 {
 		return next, nil
 	}
 	return next, &gitignoreObservation{
 		ownerDirectory:  ownerDirectory,
 		sourceDirectory: matchDirectory,
-		globs:           globs,
+		patterns:        patterns,
 	}
 }
 
@@ -1330,7 +1330,7 @@ func (builder *configCatalogBuilder) observeGitignoreSource(
 }
 
 func (builder *configCatalogBuilder) recordGitignoreObservation(observation gitignoreObservation) {
-	if observation.ownerDirectory == "" || observation.sourceDirectory == "" || len(observation.globs) == 0 {
+	if observation.ownerDirectory == "" || observation.sourceDirectory == "" || len(observation.patterns) == 0 {
 		return
 	}
 	if builder.gitignoreSources == nil {
@@ -1349,7 +1349,7 @@ func (builder *configCatalogBuilder) recordGitignoreObservation(observation giti
 	if _, exists := sources[identity]; exists {
 		return
 	}
-	observation.globs = append([]string(nil), observation.globs...)
+	observation.patterns = append([]gitignore.Pattern(nil), observation.patterns...)
 	sources[identity] = observation
 }
 
@@ -1635,13 +1635,13 @@ func (builder *configCatalogBuilder) materializeGitignoreConfigs() {
 			}
 			return left < right
 		})
-		var globs []string
+		var patterns []gitignore.Pattern
 		for _, observation := range observations {
-			globs = append(globs, observation.globs...)
+			patterns = append(patterns, observation.patterns...)
 		}
 		builder.configs[ownerDirectory] = rslintconfig.ConfigWithCollectedGitignore(
 			entries,
-			globs,
+			patterns,
 			caseInsensitive,
 		)
 	}

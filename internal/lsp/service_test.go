@@ -2353,14 +2353,13 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			wantLinted: true,
 		},
 		{
-			name:     "pruned nested source does not override root negation",
+			name:     "excluded parent keeps nested source unreachable",
 			relative: "dist/types/private.ts",
 			config:   config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
 			gitignores: map[string]string{
 				".gitignore":            "dist/\n!dist/types/\n",
 				"dist/types/.gitignore": "private.ts\n",
 			},
-			wantLinted: true,
 		},
 		{
 			name:       "directory symlink remains lintable without ignore",

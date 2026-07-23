@@ -1206,6 +1206,7 @@ func TestHandleLint_SuggestionsConverted(t *testing.T) {
 	}
 	if anyDiag == nil {
 		t.Fatalf("expected a no-explicit-any diagnostic, got %+v", resp.Diagnostics)
+		return
 	}
 	if anyDiag.MessageId != "unexpectedAny" {
 		t.Fatalf("expected messageId unexpectedAny, got %q", anyDiag.MessageId)
@@ -1263,6 +1264,7 @@ func TestHandleLint_SuggestionDataConverted(t *testing.T) {
 	}
 	if diag == nil {
 		t.Fatalf("expected a no-restricted-types diagnostic, got %+v", resp.Diagnostics)
+		return
 	}
 	if len(diag.Suggestions) != 1 {
 		t.Fatalf("expected 1 suggestion, got %d: %+v", len(diag.Suggestions), diag.Suggestions)

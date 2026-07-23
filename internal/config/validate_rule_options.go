@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"runtime"
+	"slices"
 	"sort"
 	"sync"
 
@@ -22,9 +24,12 @@ func (e RuleOptionsError) Error() string {
 	return fmt.Sprintf("invalid options for rule %q: %v", e.RuleName, e.Err)
 }
 
-// ValidateRuleOptions validates every enabled rule's options in config
-// against the rule's declared schema, in parallel, and returns every failure
-// (not just the first) sorted by rule name for deterministic output.
+// ValidateRuleOptions validates every enabled rule's options in config against
+// the rule's declared schema and returns a normalized config plus every failure
+// (not just the first) sorted by rule name for deterministic output. The input
+// config is never mutated. The returned config owns each entry's Rules map and
+// its JSON-shaped rule values; successful options contain schema defaults,
+// while failed options remain an unmodified copy of their input value.
 //
 // It is meant to run as a separate step right after configuration is
 // resolved and before linting starts, so a bad config fails fast instead of
@@ -37,45 +42,71 @@ func (e RuleOptionsError) Error() string {
 //
 // Each entry's options are validated independently, mirroring ESLint, which
 // validates every config array element's options rather than only the final
-// merged value. The parallel loop leans on [rule.Schema]'s internal
-// sync.Once: racing first uses compile each schema at most once, and a
-// schema shared by many rules (EmptyArraySchema) compiles a single time.
+// merged value. Unique schemas are compiled first with bounded parallelism;
+// options are then normalized and validated by a second bounded worker pool.
+// Separating the phases keeps repeated entries from occupying every worker
+// while they wait on the same [rule.Schema] compile.
 //
 // Validation is also where schema-declared `default` values are filled in,
-// exactly like ajv's `useDefaults` in ESLint: [rule.Schema.Validate] mutates
-// the options' own maps and slices in place, and because each work item's
-// options slice aliases the raw config entry value it was parsed from
-// (parseRuleConfigValue sub-slices, it never copies), the defaults land in
-// the very options the per-file config merge later hands to rules — no
-// write-back needed. The parallel loop stays race-free because every entry's
-// rule value is its own decoded JSON value, never shared with another
-// entry's.
-func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOptionsError {
+// exactly like ajv's `useDefaults` in ESLint. [rule.Schema.Validate] mutates
+// maps and slices in place, so every options-bearing work item receives a deep
+// copy of its complete raw rule value first. This makes arbitrary aliases
+// between entries safe without serializing independent schema validation.
+func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) (RslintConfig, []RuleOptionsError) {
 	type workItem struct {
-		entryIndex int
-		ruleName   string
-		schema     *rule.Schema
-		options    []any
+		entryIndex  int
+		ruleName    string
+		schema      *rule.Schema
+		schemaIndex int
+		ruleValue   any
+		hasOptions  bool
+	}
+	type workResult struct {
+		ruleValue any
+		err       error
 	}
 
+	normalized := slices.Clone(config)
+	schemaIndexes := make(map[*rule.Schema]int)
+	var schemas []*rule.Schema
+	var schemaNeedsEmptyOptionsValidation []bool
 	var items []workItem
 	for entryIndex, entry := range config {
+		if entry.Rules == nil {
+			continue
+		}
+		normalizedRules := make(Rules, len(entry.Rules))
+		normalized[entryIndex].Rules = normalizedRules
 		for ruleName, ruleValue := range entry.Rules {
-			ruleConfig, _, err := parseRuleConfigValue(ruleValue)
+			ruleConfig, hasOptions, err := parseRuleConfigValue(ruleValue)
 			// Malformed rule values (bad severity etc.) are rejected at config
 			// ingress by ValidateConfig; they are not this step's concern.
 			if err != nil || !ruleConfig.IsEnabled() {
+				normalizedRules[ruleName] = cloneConfigValue(ruleValue)
 				continue
 			}
 			ruleImpl, exists := registry.GetRule(ruleName)
 			if !exists || ruleImpl.Schema == nil {
+				normalizedRules[ruleName] = cloneConfigValue(ruleValue)
 				continue
 			}
+			schemaIndex, exists := schemaIndexes[ruleImpl.Schema]
+			if !exists {
+				schemaIndex = len(schemas)
+				schemaIndexes[ruleImpl.Schema] = schemaIndex
+				schemas = append(schemas, ruleImpl.Schema)
+				schemaNeedsEmptyOptionsValidation = append(schemaNeedsEmptyOptionsValidation, false)
+			}
+			if !hasOptions {
+				schemaNeedsEmptyOptionsValidation[schemaIndex] = true
+			}
 			items = append(items, workItem{
-				entryIndex: entryIndex,
-				ruleName:   ruleName,
-				schema:     ruleImpl.Schema,
-				options:    ruleConfig.Options,
+				entryIndex:  entryIndex,
+				ruleName:    ruleName,
+				schema:      ruleImpl.Schema,
+				schemaIndex: schemaIndex,
+				ruleValue:   ruleValue,
+				hasOptions:  hasOptions,
 			})
 		}
 	}
@@ -89,20 +120,56 @@ func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOpti
 		return items[i].entryIndex < items[j].entryIndex
 	})
 
-	results := make([]error, len(items))
-	var wg sync.WaitGroup
-	for i, item := range items {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			results[i] = item.schema.Validate(item.options)
-		}()
+	compileErrors := make([]error, len(schemas))
+	emptyOptionsErrors := make([]error, len(schemas))
+	parallelRuleOptionsWork(len(schemas), func(index int) {
+		_, compileErrors[index] = schemas[index].Compile()
+		if compileErrors[index] == nil && schemaNeedsEmptyOptionsValidation[index] {
+			emptyOptionsErrors[index] = schemas[index].Validate(nil)
+		}
+	})
+
+	results := make([]workResult, len(items))
+	var optionItemIndexes []int
+	for index, item := range items {
+		if err := compileErrors[item.schemaIndex]; err != nil {
+			results[index].err = err
+			continue
+		}
+		if !item.hasOptions {
+			results[index].err = emptyOptionsErrors[item.schemaIndex]
+			continue
+		}
+		optionItemIndexes = append(optionItemIndexes, index)
 	}
-	wg.Wait()
+	parallelRuleOptionsWork(len(optionItemIndexes), func(workIndex int) {
+		index := optionItemIndexes[workIndex]
+		item := items[index]
+		// hasOptions is only true for array-form rule values with at least one
+		// element after the severity, so the cloned options start at index 1.
+		clonedValue, ok := cloneConfigValue(item.ruleValue).([]any)
+		if !ok {
+			results[index].err = fmt.Errorf("internal error: cloned rule value has unexpected type %T", item.ruleValue)
+			return
+		}
+		results[index].err = item.schema.Validate(clonedValue[1:])
+		if results[index].err == nil {
+			results[index].ruleValue = clonedValue
+		}
+	})
+
+	for index, item := range items {
+		ruleValue := results[index].ruleValue
+		if results[index].err != nil || !item.hasOptions {
+			ruleValue = cloneConfigValue(item.ruleValue)
+		}
+		normalized[item.entryIndex].Rules[item.ruleName] = ruleValue
+	}
 
 	var errs []RuleOptionsError
 	seen := map[string]bool{}
-	for i, err := range results {
+	for i, result := range results {
+		err := result.err
 		if err == nil {
 			continue
 		}
@@ -115,5 +182,35 @@ func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) []RuleOpti
 		seen[key] = true
 		errs = append(errs, RuleOptionsError{RuleName: items[i].ruleName, Err: err})
 	}
-	return errs
+	return normalized, errs
+}
+
+func parallelRuleOptionsWork(taskCount int, work func(int)) {
+	if taskCount == 0 {
+		return
+	}
+	workerCount := min(runtime.GOMAXPROCS(0), taskCount)
+	if workerCount == 1 {
+		for index := range taskCount {
+			work(index)
+		}
+		return
+	}
+
+	jobs := make(chan int, workerCount)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				work(index)
+			}
+		}()
+	}
+	for index := range taskCount {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
 }

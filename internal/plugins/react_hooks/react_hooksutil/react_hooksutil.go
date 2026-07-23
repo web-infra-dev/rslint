@@ -841,10 +841,10 @@ func IsInsideComponentOrHook(node *ast.Node) bool {
 	return false
 }
 
-// AdditionalHooksFromSettings reads
-// `settings['react-hooks'].<key>` (typically `additionalHooks` for
-// exhaustive-deps, or `additionalEffectHooks` for rules-of-hooks)
-// and compiles it as a regex. Returns nil when the setting is absent
+// AdditionalHooksFromSettings reads `settings['react-hooks'].<key>`
+// (`additionalEffectHooks`, the key upstream's shared
+// getAdditionalEffectHooksFromSettings uses for both rules) and
+// compiles it as a regex. Returns nil when the setting is absent
 // or the pattern fails to compile — mirroring upstream's lenient
 // behavior of silently ignoring malformed regex strings.
 func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *regexp.Regexp {

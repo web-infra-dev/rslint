@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
+	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
@@ -116,6 +117,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_expressions"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_private_class_members"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
@@ -133,6 +135,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_regex_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
@@ -158,6 +161,7 @@ func GetAllRules() []rule.Rule {
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
+		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
@@ -250,6 +254,7 @@ func GetAllRules() []rule.Rule {
 		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
+		prefer_object_spread.PreferObjectSpreadRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_regex_literals.PreferRegexLiteralsRule,
 		prefer_template.PreferTemplateRule,
@@ -279,6 +284,7 @@ func GetAllRules() []rule.Rule {
 		no_unused_expressions.NoUnusedExpressionsRule,
 		no_unused_labels.NoUnusedLabelsRule,
 		no_unused_private_class_members.NoUnusedPrivateClassMembersRule,
+		no_unused_vars.NoUnusedVarsRule,
 		one_var.OneVarRule,
 		prefer_arrow_callback.PreferArrowCallbackRule,
 		no_dupe_else_if.NoDupeElseIfRule,

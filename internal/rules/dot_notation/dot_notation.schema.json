@@ -1,0 +1,20 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowKeywords": {
+          "type": "boolean"
+        },
+        "allowPattern": {
+          "type": "string",
+          "format": "regex"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

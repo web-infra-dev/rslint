@@ -37,23 +37,27 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 			collectionFiles[i] = ResolveGitignoreCollectionPath(file, "", configDir, fsys)
 		}
 	}
-	globs := gitignore.CollectWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
+	patterns := gitignore.CollectPatternsWithBoundaries(configDir, fsys, collectionFiles, isDirectoryBlocked, stopDirs)
 	caseInsensitive := fsys != nil && !fsys.UseCaseSensitiveFileNames()
-	return ConfigWithCollectedGitignore(config, globs, caseInsensitive)
+	return ConfigWithCollectedGitignore(config, patterns, caseInsensitive)
 }
 
 // ConfigWithCollectedGitignore prepends one already-collected Git projection
 // without retaining a filesystem. Both the standalone collector path and
 // staged config discovery use this constructor so private Git matching metadata
 // cannot diverge between them.
-func ConfigWithCollectedGitignore(config RslintConfig, globs []string, caseInsensitive bool) RslintConfig {
-	if len(globs) == 0 {
+func ConfigWithCollectedGitignore(config RslintConfig, patterns []gitignore.Pattern, caseInsensitive bool) RslintConfig {
+	if len(patterns) == 0 {
 		return config
 	}
 	gitignoreEntry := ConfigEntry{
-		Ignores:                  append([]string(nil), globs...),
-		gitignoreSemantics:       true,
-		gitignoreCaseInsensitive: caseInsensitive,
+		Ignores: make([]string, len(patterns)),
+		collectedGitignore: &collectedGitignoreMetadata{
+			ignores: parseCollectedGitignorePatterns(patterns, caseInsensitive),
+		},
+	}
+	for index, pattern := range patterns {
+		gitignoreEntry.Ignores[index] = pattern.Glob
 	}
 	effective := make(RslintConfig, 0, len(config)+1)
 	effective = append(effective, gitignoreEntry)
@@ -65,37 +69,55 @@ func ConfigWithCollectedGitignore(config RslintConfig, globs []string, caseInsen
 // flat-config matcher without turning them into irreversible ESLint directory
 // blocks. The synthetic patterns still participate in the same ordered list as
 // authored config ignores, so a later config negation can re-include a target.
-func parseCollectedGitignorePatterns(globs []string, caseInsensitive bool) []IgnorePattern {
-	patterns := make([]IgnorePattern, 0, len(globs)*2)
+func parseCollectedGitignorePatterns(collected []gitignore.Pattern, caseInsensitive bool) []IgnorePattern {
+	patterns := make([]IgnorePattern, 0, len(collected))
 	parse := func(raw string) IgnorePattern {
 		pattern := ParseIgnorePattern(raw)
 		pattern.CaseInsensitive = caseInsensitive
 		return pattern
 	}
-	for _, raw := range globs {
-		negated := strings.HasPrefix(raw, "!")
-		body := strings.TrimPrefix(raw, "!")
-		if body == "" {
+	for _, source := range collected {
+		body := source.Glob
+		if source.Negated {
+			body = strings.TrimPrefix(body, "!")
+		}
+		nodeGlob := normalizePattern(source.NodeGlob)
+		if body == "" || nodeGlob == "" {
 			continue
 		}
 
-		prefix := ""
-		if negated {
-			prefix = "!"
+		// Every Git rule can match a directory node, including a rule without a
+		// trailing slash (for example "build"). Keep a subtree projection for
+		// sound walk pruning. The original node matcher remains a prefix of that
+		// projection and GitNodeGlobEnd records its boundary.
+		projection := body
+		if strings.HasSuffix(projection, "/**") && !strings.HasSuffix(projection, "/**/*") {
+			projection += "/*"
+		} else if !strings.HasSuffix(projection, "/**/*") {
+			projection += "/**/*"
 		}
-		if strings.HasSuffix(body, "/**") && !strings.HasSuffix(body, "/**/*") {
-			patterns = append(patterns, parse(prefix+body+"/*"))
+		if source.Negated {
+			projection = "!" + projection
+		}
+		pattern := parse(projection)
+		pattern.GitPattern = true
+		pattern.GitDirectoryOnly = source.DirectoryOnly
+		pattern.GitContentsOnly = source.ContentsOnly
+		if caseInsensitive {
+			// Git patterns are immutable after parsing. Fold them once here;
+			// the per-file matcher then only needs to fold the target path once,
+			// rather than allocating lower-case copies for every pattern/node.
+			pattern.Glob = strings.ToLower(pattern.Glob)
+			nodeGlob = strings.ToLower(nodeGlob)
+		}
+		if !strings.HasPrefix(pattern.Glob, nodeGlob) {
+			// Collected patterns always satisfy this compact-representation
+			// invariant. Reject an inconsistent manually constructed value
+			// instead of slicing an unrelated projection at match time.
 			continue
 		}
-		if strings.HasSuffix(body, "/**/*") {
-			patterns = append(patterns, parse(raw))
-			continue
-		}
-
-		direct := parse(raw)
-		direct.Kind = dirNone
-		patterns = append(patterns, direct)
-		patterns = append(patterns, parse(prefix+body+"/**/*"))
+		pattern.GitNodeGlobEnd = len(nodeGlob)
+		patterns = append(patterns, pattern)
 	}
 	return patterns
 }

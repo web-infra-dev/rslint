@@ -1439,14 +1439,24 @@ func isPropertyNameLikePosition(node *ast.Node) bool {
 //   - unresolvedRefs: maps identifier text to nodes where GetSymbolAtLocation returns nil
 //
 // After the walk, it calls markJsxFactoryUsed to handle JSX factory implicit usage.
+//
+// The maps are only ever queried for symbols (and, for unresolvedRefs, names) of
+// declarations the rule's listeners process, and any reference resolving to such a
+// symbol is an identifier with the same text as the declared name. So identifiers
+// whose text matches no candidate declaration name are skipped without consulting
+// the checker — GetSymbolAtLocation is expensive (property accesses trigger lazy
+// type checking of the whole expression; failed resolutions trigger spelling
+// suggestions), and most identifiers in a file don't refer to checked declarations.
 func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, unresolvedRefs map[string][]*ast.Node) {
+	candidateNames := collectCandidateNames(sourceFile)
+
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
 			return
 		}
 
-		if ast.IsIdentifier(node) && !isDeclarationName(node) {
+		if ast.IsIdentifier(node) && !isDeclarationName(node) && candidateNames[node.AsIdentifier().Text] {
 			// Track write-only references separately for report position.
 			// Simple assignments (=) are write-only and don't count as usage.
 			if isPartOfAssignment(node) {
@@ -1460,16 +1470,13 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 				})
 				return
 			}
+			sym := ctx.TypeChecker.GetSymbolAtLocation(node)
 			// Compound assignments (+=, -=, etc.) and update expressions (++, --)
 			// are both read and write. Track as writeRef for report position,
-			// but don't return early — the node is still recorded as a usage below.
-			if isCompoundAssignmentTarget(node) || isUpdateTarget(node) {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if sym != nil {
-					writeRefs[sym] = append(writeRefs[sym], node)
-				}
+			// and still record the node as a usage below.
+			if sym != nil && (isCompoundAssignmentTarget(node) || isUpdateTarget(node)) {
+				writeRefs[sym] = append(writeRefs[sym], node)
 			}
-			sym := ctx.TypeChecker.GetSymbolAtLocation(node)
 			if sym != nil {
 				// Store usage under both the original symbol and the resolved alias.
 				// This ensures import specifiers match correctly: the declaration site
@@ -1526,6 +1533,46 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 	// matching @typescript-eslint/parser's `jsxPragma` behavior (the factory
 	// is considered used whenever the file contains JSX, in any runtime).
 	markJsxFactoryUsed(ctx, sourceFile, usages)
+}
+
+// collectCandidateNames walks the source file and gathers the name texts of every
+// declaration kind the rule's listeners process (variables, parameters, functions,
+// classes, interfaces, type aliases, enums, namespaces, type parameters, and all
+// import forms). Only identifiers matching one of these names can ever resolve to
+// a symbol the rule queries, so collectSymbolUsages uses this set to pre-filter
+// before calling into the checker.
+func collectCandidateNames(sourceFile *ast.Node) map[string]bool {
+	names := make(map[string]bool)
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		switch node.Kind {
+		case ast.KindVariableDeclaration:
+			// Covers catch clause variables and destructuring patterns.
+			utils.CollectBindingNames(node.AsVariableDeclaration().Name(), func(_ *ast.Node, name string) {
+				names[name] = true
+			})
+		case ast.KindParameter:
+			utils.CollectBindingNames(node.AsParameterDeclaration().Name(), func(_ *ast.Node, name string) {
+				names[name] = true
+			})
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
+			ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+			ast.KindTypeParameter, ast.KindImportSpecifier, ast.KindImportClause,
+			ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
+			if name := node.Name(); name != nil && ast.IsIdentifier(name) {
+				names[name.AsIdentifier().Text] = true
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(sourceFile)
+	return names
 }
 
 // markJsxFactoryUsed checks if the source file contains JSX and, if so, marks

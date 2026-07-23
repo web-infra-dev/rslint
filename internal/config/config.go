@@ -44,12 +44,15 @@ type ConfigEntry struct {
 	Plugins  []string `json:"plugins,omitempty"`
 	Settings Settings `json:"settings,omitempty"`
 
-	// gitignoreSemantics marks the process-local synthetic entry prepended by
-	// ConfigWithGitignore. Git patterns need slightly different directory
-	// classification from authored flat-config ignores, while remaining in the
-	// same ordered ignore sequence so later config negations can re-include.
-	gitignoreSemantics       bool
-	gitignoreCaseInsensitive bool
+	// collectedGitignore marks the process-local synthetic entry prepended by
+	// ConfigWithGitignore and retains its once-compiled directory-node
+	// matchers. Keeping the uncommon metadata behind one pointer preserves the
+	// original ConfigEntry footprint for every ordinary authored config entry.
+	collectedGitignore *collectedGitignoreMetadata
+}
+
+type collectedGitignoreMetadata struct {
+	ignores []IgnorePattern
 }
 
 func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
@@ -688,8 +691,12 @@ func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string
 
 // normalizePath converts file path to be relative to cwd for consistent matching
 func normalizePath(filePath, cwd string) string {
+	return normalizePathWithCaseSensitivity(filePath, cwd, true)
+}
+
+func normalizePathWithCaseSensitivity(filePath, cwd string, useCaseSensitive bool) string {
 	return tspath.NormalizePath(tspath.ConvertToRelativePath(filePath, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: true,
+		UseCaseSensitiveFileNames: useCaseSensitive,
 		CurrentDirectory:          cwd,
 	}))
 }
@@ -708,10 +715,21 @@ func extractConfigIgnores(config RslintConfig) []IgnorePattern {
 		if !isGlobalIgnoreEntry(entry) {
 			continue
 		}
-		if entry.gitignoreSemantics {
-			ignores = append(ignores, parseCollectedGitignorePatterns(entry.Ignores, entry.gitignoreCaseInsensitive)...)
+		var entryIgnores []IgnorePattern
+		if entry.collectedGitignore != nil {
+			entryIgnores = entry.collectedGitignore.ignores
 		} else {
-			ignores = append(ignores, ParseIgnorePatterns(entry.Ignores)...)
+			entryIgnores = ParseIgnorePatterns(entry.Ignores)
+		}
+		if len(entryIgnores) == 0 {
+			continue
+		}
+		if len(ignores) == 0 {
+			// Reuse the first immutable group. Limiting capacity guarantees a
+			// later append cannot mutate its config-owned backing array.
+			ignores = entryIgnores[:len(entryIgnores):len(entryIgnores)]
+		} else {
+			ignores = append(ignores, entryIgnores...)
 		}
 	}
 	return ignores

@@ -266,22 +266,25 @@ type RuleListeners map[ast.Kind]func(node *ast.Node)
 
 ```go
 type RuleContext struct {
-    SourceFile                 *ast.SourceFile
-    Settings                   map[string]interface{}
-    ConfigGlobals              map[string]bool
-    InlineGlobals              []InlineGlobal
-    Globals                    map[string]bool
-    Comments                   *CommentStore
-    Program                    *compiler.Program
-    TypeChecker                *checker.Checker
-    DisableManager             *DisableManager
-    ReportRange                func(textRange core.TextRange, msg RuleMessage)
-    ReportRangeWithFixes       func(textRange core.TextRange, msg RuleMessage, fixes ...RuleFix)
-    ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
-    ReportNode                 func(node *ast.Node, msg RuleMessage)
-    ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
-    ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
+    SourceFile     *ast.SourceFile
+    Settings       map[string]interface{}
+    ConfigGlobals  map[string]bool
+    InlineGlobals  []InlineGlobal
+    Globals        map[string]bool
+    Comments       *CommentStore
+    Program        *compiler.Program
+    TypeChecker    *checker.Checker
+    DisableManager *DisableManager
 }
+
+func (*RuleContext) ReportRange(...)
+func (*RuleContext) ReportRangeWithFixes(...)
+func (*RuleContext) ReportRangeWithSuggestions(...)
+func (*RuleContext) ReportNode(...)
+func (*RuleContext) ReportNodeWithFixes(...)
+func (*RuleContext) ReportNodeWithSuggestions(...)
+func (*RuleContext) ReportNodeWithFixesAndSuggestions(...)
+func (*RuleContext) ReportRangeWithFixesAndSuggestions(...)
 ```
 
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
@@ -297,6 +300,9 @@ context data instead of scanning comments independently. Configured access
 aliases are normalized consistently: writable and read-only aliases declare a
 name, `null` is read-only, and only `"off"` disables it. The Node plugin scope separately
 preserves writable versus read-only access for ESLint-compatible scope APIs.
+The linter binds immutable rule name, severity, and diagnostic-sink metadata to
+each context once. The reporting methods use that state directly rather than
+allocating bound callback closures for every reporting variant.
 
 ### Listener Registration
 
@@ -306,7 +312,10 @@ Rules do not walk the AST themselves. Instead:
 2. config merge selects enabled rules for a file
 3. each enabled rule runs `Run(ctx)`
 4. `Run(ctx)` returns listeners keyed by `ast.Kind`
-5. the linter aggregates them into a per-file dispatch table
+5. the linter appends them, in rule order, to the checker-shard task's sparse
+   dispatch registry
+6. after traversing a file, the task clears every listener slot and reuses the
+   registry's map and per-kind backing slices for its next serial file
 
 This allows one AST traversal to serve many rules.
 
@@ -927,9 +936,11 @@ goroutines remain outside that guarantee.
 - **Checker Phase Separation**: the checker is released before TypeScript semantic diagnostics run, so `GetSemanticDiagnostics` can reacquire its own checker cleanly
 - **File Filtering**: Skip node_modules and bundled files automatically
 - **Gap-File Degradation**: fallback gap-file Programs skip type-aware rules and semantic diagnostics instead of paying unreliable semantic costs
-- **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint workers and output handling
+- **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint tasks and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
 - **Lazy Shared Comments**: each file owns one `CommentStore`; directive consumers and comment-aware rules materialize its canonical comment list only when needed and reuse the result. Rule-specific text checks avoid scanner work when their comment syntax cannot occur
+- **Task-Local Listener Reuse**: each checker-shard task owns one sparse listener registry and reuses its map and per-kind slice capacity across that task's serial files. Registries are never shared across tasks or requests
+- **Direct Rule Reporting Methods**: each rule context stores one compact immutable reporter state; its reporting methods replace the former family of per-rule bound closures
 
 ### Caching Strategy
 
@@ -945,7 +956,8 @@ goroutines remain outside that guarantee.
 ### Memory Management
 
 - **ts-go Owns the Heavy Graphs**: AST nodes, checker state, `Program` graphs, and session state are primarily owned by ts-go; rslint adds listener maps, diagnostics, and config-derived rule lists on top
-- **Short-Lived Per-File Structures**: comment stores, disable managers, and registered listener maps are allocated per file and dropped after traversal. A comment slice is allocated only if requested; `clear(registeredListeners)` helps release references promptly
+- **Short-Lived Per-File Structures**: comment stores, disable managers, and rule contexts are allocated per file and dropped after traversal. A comment slice is allocated only if requested
+- **Bounded Listener Retention**: a listener registry lives only for one checker-shard task. After each file it clears every function slot before shortening the slices, so backing capacity can be reused without retaining closures, source files, checker state, or rule contexts. The registry is dropped when that task completes and is never pooled across runs or LSP requests
 - **Source Snapshot Ownership**: snapshot entries hold an immutable source string plus its 128-bit hash without explicitly copying source bytes; on an AST miss, that string is passed directly to the parser. After generation replacement, a retained unchanged AST may still hold the prior equal string while the fresh snapshot owns the new read. Replaced generations are reclaimed after any in-flight lookup releases them. AST retention and source-generation retention remain deliberately separate lifecycles.
 - **Fix Application Uses Linear Rebuilds**: `ApplyRuleFixes` sorts fixes, skips overlapping edits, and rebuilds the output with `strings.Builder` rather than mutating source buffers in place
 - **Bounded Queues**: CLI diagnostics use a buffered channel of 4096 items; LSP request/outgoing queues are buffered to 100, and debounce/refresh signals are single-slot channels

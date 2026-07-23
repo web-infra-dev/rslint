@@ -241,6 +241,7 @@ func TestGetConfigForFile_SplitEntry_ProjectFromNativeEntrySurvives(t *testing.T
 	merged := cfg.GetConfigForFile("/proj/a.ts", "/proj")
 	if merged == nil {
 		t.Fatal("merged config should not be nil")
+		return
 	}
 	if merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
 		t.Fatal("merged languageOptions/parserOptions must survive from the native entry")

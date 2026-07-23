@@ -368,6 +368,40 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				"additionalEffectHooks": "(useMyEffect|useServerEffect)",
 			},
 		}},
+		// Valid: useEffectEvent can be called in custom effect hooks
+		// configured via rule options (facebook/react#37085).
+		{Code: `
+			function MyComponent({ theme }) {
+				const onClick = useEffectEvent(() => {
+					showNotification(theme);
+				});
+				useMyEffect(() => {
+					onClick();
+				});
+				useServerEffect(() => {
+					onClick();
+				});
+			}
+		`, Tsx: true, Options: map[string]interface{}{
+			"additionalHooks": "(useMyEffect|useServerEffect)",
+		}},
+		// Valid: rule-level additionalHooks takes precedence over settings.
+		{Code: `
+			function MyComponent({ theme }) {
+				const onClick = useEffectEvent(() => {
+					showNotification(theme);
+				});
+				useMyEffect(() => {
+					onClick();
+				});
+			}
+		`, Tsx: true, Options: map[string]interface{}{
+			"additionalHooks": "useMyEffect",
+		}, Settings: map[string]interface{}{
+			"react-hooks": map[string]interface{}{
+				"additionalEffectHooks": "useServerEffect",
+			},
+		}},
 		// SKIP: rslint does not parse Flow `component` syntax.
 		{Skip: true, Code: `
 			component MyComponent(theme: any) {
@@ -1459,6 +1493,49 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 			Settings: map[string]interface{}{
 				"react-hooks": map[string]interface{}{
 					"additionalEffectHooks": "useMyEffect",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
+			},
+		},
+		// Invalid: useEffectEvent should not be callable in hooks not
+		// matching the options regex (facebook/react#37085).
+		{
+			Code: `
+				function MyComponent({ theme }) {
+					const onClick = useEffectEvent(() => {
+						showNotification(theme);
+					});
+					useWrongHook(() => {
+						onClick();
+					});
+				}
+			`,
+			Tsx:     true,
+			Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
+			},
+		},
+		// Invalid: rule-level additionalHooks takes precedence over settings,
+		// so a hook matched only by the settings regex is not an effect hook.
+		{
+			Code: `
+				function MyComponent({ theme }) {
+					const onClick = useEffectEvent(() => {
+						showNotification(theme);
+					});
+					useWrongHook(() => {
+						onClick();
+					});
+				}
+			`,
+			Tsx:     true,
+			Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
+			Settings: map[string]interface{}{
+				"react-hooks": map[string]interface{}{
+					"additionalEffectHooks": "useWrongHook",
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{

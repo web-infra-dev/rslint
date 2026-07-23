@@ -491,9 +491,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		if err := config.ValidateConfig(entries); err != nil {
 			return nil, fmt.Errorf("invalid discovered config for %q: %w", configDir, err)
 		}
-		if err := validateRuleOptionsForConfig(entries, configDir); err != nil {
+		normalizedEntries, err := validateRuleOptionsForConfig(entries, configDir)
+		if err != nil {
 			return nil, err
 		}
+		entries = normalizedEntries
 		configID := lspFilesystemPathID(configDir, fsys)
 		if previous, exists := seenConfigDirs[configID]; exists {
 			return nil, fmt.Errorf(

@@ -1,0 +1,798 @@
+// Rstest Snapshot v1
+
+exports[`prefer-object-spread > invalid 1`] = `
+{
+  "code": "Object.assign({}, foo)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 2`] = `
+{
+  "code": "Object.assign  ({}, foo)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 3`] = `
+{
+  "code": "Object.assign({}, { foo: 'bar' })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 4`] = `
+{
+  "code": "Object.assign({}, baz, { foo: 'bar' })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 5`] = `
+{
+  "code": "Object.assign({}, { foo: 'bar', baz: 'foo' })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 6`] = `
+{
+  "code": "Object.assign({ foo: 'bar' }, baz)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 7`] = `
+{
+  "code": "Object.assign({ foo: 'bar' }, cats, dogs, trees, birds)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 8`] = `
+{
+  "code": "Object.assign({ foo: 'bar' }, Object.assign({ bar: 'foo' }, baz))",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 9`] = `
+{
+  "code": "Object.assign({foo: 'bar', ...bar}, baz)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 10`] = `
+{
+  "code": "Object.assign({}, { foo, bar, baz })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 11`] = `
+{
+  "code": "Object.assign({}, { [bar]: 'foo' })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 12`] = `
+{
+  "code": "Object.assign({ ...bar }, { ...baz })",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 13`] = `
+{
+  "code": "Object.assign({})",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 14`] = `
+{
+  "code": "Object.assign({ foo: bar })",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 15`] = `
+{
+  "code": "let a = Object.assign({})",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 16`] = `
+{
+  "code": "let a = Object.assign({}, a)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 17`] = `
+{
+  "code": "let a = Object.assign({ a: 1 }, b)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 18`] = `
+{
+  "code": "Object.assign({}, a ? b : {}, b => c, a = 2)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 19`] = `
+{
+  "code": "[1, 2, Object.assign({}, a)]",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 20`] = `
+{
+  "code": "const foo = Object.assign({}, a)",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 21`] = `
+{
+  "code": "function foo() { return Object.assign({}, a) }",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 22`] = `
+{
+  "code": "foo(Object.assign({}, a));",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 23`] = `
+{
+  "code": "const x = { foo: 'bar', baz: Object.assign({}, a) }",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 24`] = `
+{
+  "code": "Object.assign({ });",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 25`] = `
+{
+  "code": "Object.assign({
+});",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 26`] = `
+{
+  "code": "globalThis.Object.assign({ });",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 27`] = `
+{
+  "code": "globalThis.Object.assign({
+});",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 28`] = `
+{
+  "code": "Object.assign({ get a() {}, set b(val) {} })",
+  "diagnostics": [
+    {
+      "message": "Use an object literal instead of \`Object.assign\`. eg: \`{ foo: bar }\`.",
+      "messageId": "useLiteralMessage",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 29`] = `
+{
+  "code": "const obj = Object.assign<{}, Record<string, string[]>>({}, getObject());",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-spread > invalid 30`] = `
+{
+  "code": "Object.assign<{}, A>({}, foo);",
+  "diagnostics": [
+    {
+      "message": "Use an object spread instead of \`Object.assign\` eg: \`{ ...foo }\`.",
+      "messageId": "useSpreadMessage",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

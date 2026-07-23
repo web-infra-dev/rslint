@@ -9,6 +9,27 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+// Pattern preserves both views of one collected .gitignore rule:
+//
+//   - Glob is the compatibility projection exposed through the synthetic
+//     config entry and used to derive conservative directory pruning.
+//   - NodeGlob matches the path node named by the Git rule before a trailing
+//     directory slash is expanded to /**/*. Keeping this view is essential for
+//     ordered negations: !dist-path/ re-includes the dist-path node, not every
+//     independently ignored node below it.
+//
+// DirectoryOnly retains Git's trailing-slash restriction. Negated is stored
+// separately because an escaped leading exclamation mark is literal pattern
+// text, not a negation. ContentsOnly distinguishes a genuine trailing "/**"
+// from an unrooted bare "**" whose generated NodeGlob also ends in "/**".
+type Pattern struct {
+	Glob          string
+	NodeGlob      string
+	Negated       bool
+	DirectoryOnly bool
+	ContentsOnly  bool
+}
+
 func normalizeGlobPath(path string) string {
 	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
@@ -17,10 +38,6 @@ func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool
 	if !useCaseSensitive {
 		pattern = strings.ToLower(pattern)
 		path = strings.ToLower(path)
-	}
-	// Git's trailing /** matches contents, not the directory itself.
-	if strings.HasSuffix(pattern, "/**") && utils.MatchGlob(strings.TrimSuffix(pattern, "/**"), path) {
-		return false
 	}
 	return utils.MatchGlob(pattern, path)
 }
@@ -48,10 +65,34 @@ func Collect(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlo
 // boundaries. A boundary directory and everything below it belongs to another
 // config, so none of its .gitignore files participate in this collection.
 func CollectWithBoundaries(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool, stopDirs []string) []string {
+	return patternGlobs(CollectPatternsWithBoundaries(configDir, fsys, targetFiles, isDirectoryBlocked, stopDirs))
+}
+
+// CollectPatterns is the structured form of Collect. Callers that feed the
+// final ignore matcher must use this form so Git directory-node semantics are
+// not lost in the compatibility glob projection.
+func CollectPatterns(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool) []Pattern {
+	return CollectPatternsWithBoundaries(configDir, fsys, targetFiles, isDirectoryBlocked, nil)
+}
+
+// CollectPatternsWithBoundaries is the structured form of
+// CollectWithBoundaries.
+func CollectPatternsWithBoundaries(configDir string, fsys vfs.FS, targetFiles []string, isDirectoryBlocked func(string) bool, stopDirs []string) []Pattern {
 	if targetFiles == nil {
-		return readGitignoreAsGlobsWithBoundaries(configDir, fsys, isDirectoryBlocked, stopDirs)
+		return readGitignoreAsPatternsWithBoundaries(configDir, fsys, isDirectoryBlocked, stopDirs)
 	}
-	return readGitignoreAsGlobsForFilesWithBoundaries(configDir, fsys, targetFiles, stopDirs)
+	return readGitignoreAsPatternsForFilesWithBoundaries(configDir, fsys, targetFiles, stopDirs)
+}
+
+func patternGlobs(patterns []Pattern) []string {
+	if len(patterns) == 0 {
+		return nil
+	}
+	globs := make([]string, len(patterns))
+	for index, pattern := range patterns {
+		globs[index] = pattern.Glob
+	}
+	return globs
 }
 
 // readGitignoreAsGlobs reads .gitignore files relevant to configDir and
@@ -72,26 +113,30 @@ func readGitignoreAsGlobs(configDir string, fsys vfs.FS, isDirectoryBlocked func
 }
 
 func readGitignoreAsGlobsWithBoundaries(configDir string, fsys vfs.FS, isDirectoryBlocked func(string) bool, stopDirs []string) []string {
+	return patternGlobs(readGitignoreAsPatternsWithBoundaries(configDir, fsys, isDirectoryBlocked, stopDirs))
+}
+
+func readGitignoreAsPatternsWithBoundaries(configDir string, fsys vfs.FS, isDirectoryBlocked func(string) bool, stopDirs []string) []Pattern {
 	if fsys == nil {
 		return nil
 	}
 	normalizedRoot := normalizeGlobPath(configDir)
 	boundaries := normalizeCollectionBoundaries(normalizedRoot, stopDirs, fsys.UseCaseSensitiveFileNames())
-	var allGlobs []string
+	var allPatterns []Pattern
 
-	collectGitignoreGlobs(normalizedRoot, "", fsys, &allGlobs, isDirectoryBlocked, nil, boundaries)
+	collectGitignorePatterns(normalizedRoot, "", fsys, &allPatterns, isDirectoryBlocked, nil, boundaries)
 
-	if len(allGlobs) == 0 {
+	if len(allPatterns) == 0 {
 		return nil
 	}
-	return allGlobs
+	return allPatterns
 }
 
-// readGitignoreAsGlobsForFilesWithBoundaries reads only .gitignore files on
+// readGitignoreAsPatternsForFilesWithBoundaries reads only .gitignore files on
 // each directory chain from configDir to an explicit target. This is used by
 // API-style calls where the target set is already known; unlike the full
 // collector, it does not scan every descendant of configDir.
-func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []string {
+func readGitignoreAsPatternsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []Pattern {
 	if fsys == nil || len(files) == 0 {
 		return nil
 	}
@@ -124,7 +169,7 @@ func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, f
 	}
 	sortByPathDepth(dirs)
 
-	var allGlobs []string
+	var allPatterns []Pattern
 	var pruneRules []gitignorePruneRule
 	var prunedDirs []string
 	for _, dir := range dirs {
@@ -135,7 +180,8 @@ func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, f
 			prunedDirs = append(prunedDirs, dir)
 			continue
 		}
-		if isDirIgnoredByPruneRules(dir, pruneRules, useCaseSensitive) {
+		rel, _ := relativeDir(normalizedConfigDir, dir, useCaseSensitive)
+		if isDirIgnoredByPruneRules(rel, pruneRules, useCaseSensitive) {
 			prunedDirs = append(prunedDirs, dir)
 			continue
 		}
@@ -144,16 +190,16 @@ func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, f
 		if !ok {
 			continue
 		}
-		rel, _ := relativeDir(normalizedConfigDir, dir, useCaseSensitive)
-		allGlobs = append(allGlobs, convertGitignoreToGlobs(content, rel)...)
-		if rule, ok := newGitignorePruneRule(dir, content); ok {
-			pruneRules = append(pruneRules, rule)
+		localPatterns := convertGitignoreToPatterns(content, rel)
+		allPatterns = append(allPatterns, localPatterns...)
+		if len(localPatterns) > 0 {
+			pruneRules = append(pruneRules, gitignorePruneRule{patterns: localPatterns})
 		}
 	}
-	if len(allGlobs) == 0 {
+	if len(allPatterns) == 0 {
 		return nil
 	}
-	return allGlobs
+	return allPatterns
 }
 
 func normalizeCollectionBoundaries(configDir string, stopDirs []string, useCaseSensitive bool) []string {
@@ -219,14 +265,7 @@ func isDescendantSymlinkDir(configDir string, dir string, fsys vfs.FS) bool {
 }
 
 type gitignorePruneRule struct {
-	baseDir  string
-	patterns []gitignorePrunePattern
-}
-
-type gitignorePrunePattern struct {
-	negated bool
-	rooted  bool
-	pattern string
+	patterns []Pattern
 }
 
 // Cursor is an immutable, filesystem-independent view of the .gitignore
@@ -298,6 +337,15 @@ func (cursor Cursor) Enter(directory string) (Cursor, bool) {
 // source IO path separate and pass the matching-space directory explicitly so
 // lexical and canonical discovery routes cannot be mixed accidentally.
 func (cursor Cursor) AppendSource(directory string, content string) (Cursor, []string) {
+	next, patterns := cursor.AppendSourcePatterns(directory, content)
+	return next, patternGlobs(patterns)
+}
+
+// AppendSourcePatterns is the structured form of AppendSource. It keeps the
+// directory-node matcher needed by final file decisions while AppendSource
+// remains available to compatibility callers that only inspect projected
+// globs.
+func (cursor Cursor) AppendSourcePatterns(directory string, content string) (Cursor, []Pattern) {
 	if !cursor.sourceReachable {
 		return cursor, nil
 	}
@@ -310,26 +358,29 @@ func (cursor Cursor) AppendSource(directory string, content string) (Cursor, []s
 	}
 
 	next := cursor
-	if rule, ok := newGitignorePruneRule(directory, content); ok {
-		next.rules = append(append([]gitignorePruneRule(nil), cursor.rules...), rule)
+	patterns := convertGitignoreToPatterns(content, relative)
+	if len(patterns) > 0 {
+		next.rules = append(
+			append([]gitignorePruneRule(nil), cursor.rules...),
+			gitignorePruneRule{patterns: patterns},
+		)
 	}
-	globs := convertGitignoreToGlobs(content, relative)
-	return next, globs
+	return next, patterns
 }
 
 func (cursor Cursor) blocksDirectoryNode(directory string) bool {
 	if cursor.rootDir == "" || directory == "" {
 		return false
 	}
+	relative, ok := relativeDir(cursor.rootDir, directory, cursor.useCaseSensitive)
+	if !ok || relative == "" {
+		return false
+	}
 	ignored := false
 	for _, rule := range cursor.rules {
-		relative, ok := relativeDir(rule.baseDir, directory, cursor.useCaseSensitive)
-		if !ok || relative == "" {
-			continue
-		}
 		for _, pattern := range rule.patterns {
 			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, cursor.useCaseSensitive) {
-				ignored = !pattern.negated
+				ignored = !pattern.Negated
 			}
 		}
 	}
@@ -337,100 +388,33 @@ func (cursor Cursor) blocksDirectoryNode(directory string) bool {
 }
 
 // gitignorePrunePatternMatchesDirectoryNode matches only the current directory
-// node. The existing collector predicate additionally checks ancestors because
-// a raw Git walk can never enter an ignored parent; config discovery cannot use
-// that shortcut because a later authored `!dir/` may reopen the parent node
-// while raw nested-source reachability remains blocked.
-func gitignorePrunePatternMatchesDirectoryNode(pattern gitignorePrunePattern, relative string, useCaseSensitive bool) bool {
-	if pattern.rooted {
-		return matchGitignoreGlob(pattern.pattern, relative, useCaseSensitive)
+// node. Parent reachability is already enforced by the recursive walk, the
+// explicit-chain prunedDirs set, or Cursor.sourceReachable. Re-evaluating an
+// ancestor here would incorrectly let !parent/ re-include an independently
+// ignored child directory.
+func gitignorePrunePatternMatchesDirectoryNode(pattern Pattern, relative string, useCaseSensitive bool) bool {
+	glob := pattern.NodeGlob
+	if pattern.ContentsOnly {
+		// Git's trailing /** matches only contents. Requiring one final
+		// component keeps the prefix directory itself reachable.
+		glob += "/*"
 	}
-	parts := splitPathComponents(relative)
-	if len(parts) == 0 {
+	return matchGitignoreGlob(glob, relative, useCaseSensitive)
+}
+
+func isDirIgnoredByPruneRules(relative string, rules []gitignorePruneRule, useCaseSensitive bool) bool {
+	if relative == "" {
 		return false
 	}
-	return matchGitignoreGlob(pattern.pattern, parts[len(parts)-1], useCaseSensitive)
-}
-
-func newGitignorePruneRule(baseDir string, content string) (gitignorePruneRule, bool) {
-	patterns := parseGitignorePrunePatterns(content)
-	if len(patterns) == 0 {
-		return gitignorePruneRule{}, false
-	}
-	return gitignorePruneRule{baseDir: baseDir, patterns: patterns}, true
-}
-
-func parseGitignorePrunePatterns(content string) []gitignorePrunePattern {
-	var patterns []gitignorePrunePattern
-	for _, line := range strings.Split(content, "\n") {
-		line, ok := normalizeGitignoreLine(line)
-		if !ok {
-			continue
-		}
-		negated := false
-		if strings.HasPrefix(line, "!") {
-			negated = true
-			line = line[1:]
-		}
-		if containsParentPathComponent(line) {
-			continue
-		}
-		line = strings.TrimSuffix(line, "/")
-		rooted := false
-		if strings.HasPrefix(line, "/") {
-			rooted = true
-			line = strings.TrimPrefix(line, "/")
-		} else if strings.Contains(line, "/") {
-			rooted = true
-		}
-		if line == "" {
-			continue
-		}
-		line = gitignorePatternForConfigGlob(line)
-		patterns = append(patterns, gitignorePrunePattern{
-			negated: negated,
-			rooted:  rooted,
-			pattern: line,
-		})
-	}
-	return patterns
-}
-
-func isDirIgnoredByPruneRules(dir string, rules []gitignorePruneRule, useCaseSensitive bool) bool {
 	ignored := false
 	for _, rule := range rules {
-		rel, ok := relativeDir(rule.baseDir, dir, useCaseSensitive)
-		if !ok || rel == "" {
-			continue
-		}
 		for _, pattern := range rule.patterns {
-			if gitignorePrunePatternCoversDir(pattern, rel, useCaseSensitive) {
-				ignored = !pattern.negated
+			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, useCaseSensitive) {
+				ignored = !pattern.Negated
 			}
 		}
 	}
 	return ignored
-}
-
-func gitignorePrunePatternCoversDir(pattern gitignorePrunePattern, relDir string, useCaseSensitive bool) bool {
-	for current := relDir; current != ""; current = parentDir(current) {
-		if gitignorePrunePatternMatchesPath(pattern, current, useCaseSensitive) {
-			return true
-		}
-	}
-	return false
-}
-
-func gitignorePrunePatternMatchesPath(pattern gitignorePrunePattern, relPath string, useCaseSensitive bool) bool {
-	if pattern.rooted {
-		return matchGitignoreGlob(pattern.pattern, relPath, useCaseSensitive)
-	}
-	for _, part := range splitPathComponents(relPath) {
-		if matchGitignoreGlob(pattern.pattern, part, useCaseSensitive) {
-			return true
-		}
-	}
-	return false
 }
 
 type filesystemPath struct {
@@ -579,15 +563,15 @@ func filesystemPathDepth(path string) int {
 	return strings.Count(rest, "/") + 1
 }
 
-// collectGitignoreGlobs recursively scans for .gitignore files and converts
-// their patterns to globs. Raw patterns from parent .gitignore files are used
-// to prune directories during scanning.
+// collectGitignorePatterns recursively scans for .gitignore files and converts
+// their rules to structured patterns. Raw patterns from parent .gitignore
+// files are used to prune directories during scanning.
 //
 // isDirectoryBlocked provides directory-level pruning from the caller's
 // config policy. If it returns true, files below that directory cannot be
 // linted, so nested .gitignore sources there are irrelevant.
-func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string) {
-	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, boundaries, &gitignoreWalkState{
+func collectGitignorePatterns(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string) {
+	collectGitignorePatternsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, boundaries, &gitignoreWalkState{
 		resolvedPaths: make(map[string]string),
 		visited:       make(map[string]struct{}),
 	})
@@ -607,13 +591,13 @@ func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
 	return realpath
 }
 
-func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, state *gitignoreWalkState) {
+func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, state *gitignoreWalkState) {
 	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
-		localGlobs := convertGitignoreToGlobs(content, relDir)
-		*result = append(*result, localGlobs...)
-		if rule, ok := newGitignorePruneRule(absDir, content); ok {
-			pruneRules = append(pruneRules, rule)
+		localPatterns := convertGitignoreToPatterns(content, relDir)
+		*result = append(*result, localPatterns...)
+		if len(localPatterns) > 0 {
+			pruneRules = append(pruneRules, gitignorePruneRule{patterns: localPatterns})
 		}
 	}
 
@@ -657,7 +641,7 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 		}
 
 		// Prune directories already ignored by collected .gitignore patterns.
-		if isDirIgnoredByPruneRules(childAbs, pruneRules, fsys.UseCaseSensitiveFileNames()) {
+		if isDirIgnoredByPruneRules(childRel, pruneRules, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
 
@@ -668,7 +652,7 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			state.visited[childRealPath] = struct{}{}
 		}
 
-		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, boundaries, state)
+		collectGitignorePatternsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, boundaries, state)
 	}
 }
 
@@ -688,18 +672,22 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 //
 //	baseDir="pkg/app", "tmp/" → "pkg/app/**/tmp/**/*"
 func convertGitignoreToGlobs(content string, baseDir string) []string {
-	var globs []string
+	return patternGlobs(convertGitignoreToPatterns(content, baseDir))
+}
+
+func convertGitignoreToPatterns(content string, baseDir string) []Pattern {
+	var patterns []Pattern
 	for _, line := range strings.Split(content, "\n") {
 		line, ok := normalizeGitignoreLine(line)
 		if !ok {
 			continue
 		}
-		glob := convertSinglePattern(line, baseDir)
-		if glob != "" {
-			globs = append(globs, glob)
+		pattern, ok := convertSinglePatternToPattern(line, baseDir)
+		if ok {
+			patterns = append(patterns, pattern)
 		}
 	}
-	return globs
+	return patterns
 }
 
 func normalizeGitignoreLine(line string) (string, bool) {
@@ -732,6 +720,7 @@ func trimUnescapedTrailingGitignoreWhitespace(line string) string {
 	}
 	return line
 }
+
 func splitPathComponents(p string) []string {
 	var parts []string
 	for _, part := range strings.Split(p, "/") {
@@ -745,13 +734,21 @@ func splitPathComponents(p string) []string {
 
 // convertSinglePattern converts one gitignore pattern line to a glob.
 func convertSinglePattern(line string, baseDir string) string {
+	pattern, ok := convertSinglePatternToPattern(line, baseDir)
+	if !ok {
+		return ""
+	}
+	return pattern.Glob
+}
+
+func convertSinglePatternToPattern(line string, baseDir string) (Pattern, bool) {
 	negated := false
 	if strings.HasPrefix(line, "!") {
 		negated = true
 		line = line[1:]
 	}
 	if containsParentPathComponent(line) {
-		return ""
+		return Pattern{}, false
 	}
 
 	// Trailing / means directory-only; for glob purposes, we match dir/**
@@ -772,33 +769,43 @@ func convertSinglePattern(line string, baseDir string) string {
 	}
 
 	if line == "" {
-		return ""
+		return Pattern{}, false
 	}
+	contentsOnly := strings.HasSuffix(line, "/**")
 	line = gitignorePatternForConfigGlob(line)
+	baseGlob := gitignoreBaseDirForConfigGlob(baseDir)
 
 	// Build the glob pattern
 	var glob string
 	if rooted {
-		if baseDir != "" {
-			glob = baseDir + "/" + line
+		if baseGlob != "" {
+			glob = baseGlob + "/" + line
 		} else {
 			glob = line
 		}
 	} else {
 		// Unrooted: matches at any depth
-		if baseDir != "" {
-			glob = baseDir + "/**/" + line
+		if baseGlob != "" {
+			glob = baseGlob + "/**/" + line
 		} else {
 			glob = "**/" + line
 		}
 	}
+
+	nodeGlob := glob
 
 	// Append /**/* for directory patterns to match all contents.
 	// Use /**/* (file-level) instead of /** (directory-level) because collected
 	// rules participate in one ordered global-ignore sequence and later
 	// negations must be able to re-include descendants.
 	if dirOnly && !strings.HasSuffix(glob, "/**/*") {
-		glob += "/**/*"
+		if contentsOnly {
+			// A genuine trailing /** already supplies the recursive part; add
+			// one required component so the directory before it is not matched.
+			glob += "/*"
+		} else {
+			glob += "/**/*"
+		}
 	}
 
 	if negated {
@@ -809,7 +816,34 @@ func convertSinglePattern(line string, baseDir string) string {
 		// without changing the matcher.
 		glob = "./" + glob
 	}
-	return glob
+	return Pattern{
+		Glob:          glob,
+		NodeGlob:      nodeGlob,
+		Negated:       negated,
+		DirectoryOnly: dirOnly,
+		ContentsOnly:  contentsOnly,
+	}, true
+}
+
+// gitignoreBaseDirForConfigGlob quotes the real directory names contributed by
+// the filesystem. Unlike the .gitignore rule itself, this prefix is never glob
+// syntax: a repository directory literally named pkg[1] or pkg{a} must remain
+// literal on Unix, Windows, and case-insensitive macOS volumes.
+func gitignoreBaseDirForConfigGlob(baseDir string) string {
+	if !strings.ContainsAny(baseDir, "*?[{}") {
+		return baseDir
+	}
+	var result strings.Builder
+	result.Grow(len(baseDir))
+	for index := range len(baseDir) {
+		character := baseDir[index]
+		if character == '/' {
+			result.WriteByte(character)
+		} else {
+			appendConfigGlobLiteral(&result, character)
+		}
+	}
+	return result.String()
 }
 
 // gitignorePatternForConfigGlob removes Git's backslash quoting before a

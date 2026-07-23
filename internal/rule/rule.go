@@ -271,28 +271,112 @@ type RuleContext struct {
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every
 	// later consumer for this file reuses it.
-	Comments                   *CommentStore
-	Program                    *compiler.Program
-	TypeChecker                *checker.Checker
-	DisableManager             *DisableManager
-	ReportRange                func(textRange core.TextRange, msg RuleMessage)
-	ReportRangeWithFixes       func(textRange core.TextRange, msg RuleMessage, fixes ...RuleFix)
-	ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
-	ReportNode                 func(node *ast.Node, msg RuleMessage)
-	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
-	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
-	// ReportNodeWithFixesAndSuggestions emits a single diagnostic carrying
-	// BOTH an autofix and one or more suggestions. Used by rules that follow
-	// upstream's "promote first suggestion to fix while keeping the
-	// suggestion" pattern (e.g., ESLint's
-	// `enableDangerousAutofixThisMayCauseInfiniteLoops` in
-	// react-hooks/exhaustive-deps).
-	ReportNodeWithFixesAndSuggestions func(node *ast.Node, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
-	// ReportRangeWithFixesAndSuggestions is the range-keyed twin of
-	// ReportNodeWithFixesAndSuggestions. Same semantics, anchors the
-	// diagnostic at an explicit TextRange instead of a node's trimmed
-	// range.
-	ReportRangeWithFixesAndSuggestions func(textRange core.TextRange, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
+	Comments       *CommentStore
+	Program        *compiler.Program
+	TypeChecker    *checker.Checker
+	DisableManager *DisableManager
+	reporter       ruleContextReporter
+}
+
+// ruleContextReporter is immutable after Rule.Run starts. Keeping only the
+// rule-specific metadata here avoids allocating a family of bound reporting
+// closures for every rule context.
+type ruleContextReporter struct {
+	ruleName     string
+	severity     DiagnosticSeverity
+	onDiagnostic func(RuleDiagnostic)
+}
+
+// WithReporter returns a context configured to report diagnostics for one
+// rule. The linter calls it once for each context before invoking Rule.Run.
+func (ctx RuleContext) WithReporter(
+	ruleName string,
+	severity DiagnosticSeverity,
+	onDiagnostic func(RuleDiagnostic),
+) RuleContext {
+	if ctx.SourceFile == nil {
+		panic("rule: reporter requires a source file")
+	}
+	if onDiagnostic == nil {
+		panic("rule: reporter requires a diagnostic handler")
+	}
+	ctx.reporter = ruleContextReporter{
+		ruleName:     ruleName,
+		severity:     severity,
+		onDiagnostic: onDiagnostic,
+	}
+	return ctx
+}
+
+func (ctx *RuleContext) requireReporter() {
+	if ctx.reporter.onDiagnostic == nil {
+		panic("rule: uninitialized RuleContext reporter")
+	}
+}
+
+// reportRange assumes requireReporter has already run. Keeping validation in
+// the public methods makes node reports fail consistently before touching a
+// nil SourceFile while paying only one reporter check per diagnostic.
+func (ctx *RuleContext) reportRange(textRange core.TextRange, msg RuleMessage, fixes *[]RuleFix, suggestions *[]RuleSuggestion) {
+	reporter := &ctx.reporter
+	if ctx.DisableManager.IsRuleDisabled(reporter.ruleName, textRange.Pos()) {
+		return
+	}
+	reporter.onDiagnostic(RuleDiagnostic{
+		RuleName:    reporter.ruleName,
+		Range:       textRange,
+		Message:     msg,
+		FixesPtr:    fixes,
+		Suggestions: suggestions,
+		SourceFile:  ctx.SourceFile,
+		FilePath:    ctx.SourceFile.FileName(),
+		Severity:    reporter.severity,
+	})
+}
+
+func (ctx *RuleContext) ReportRange(textRange core.TextRange, msg RuleMessage) {
+	ctx.requireReporter()
+	ctx.reportRange(textRange, msg, nil, nil)
+}
+
+func (ctx *RuleContext) ReportRangeWithFixes(textRange core.TextRange, msg RuleMessage, fixes ...RuleFix) {
+	ctx.requireReporter()
+	ctx.reportRange(textRange, msg, &fixes, nil)
+}
+
+func (ctx *RuleContext) ReportRangeWithSuggestions(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion) {
+	ctx.requireReporter()
+	ctx.reportRange(textRange, msg, nil, &suggestions)
+}
+
+func (ctx *RuleContext) ReportNode(node *ast.Node, msg RuleMessage) {
+	ctx.requireReporter()
+	ctx.reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, nil, nil)
+}
+
+func (ctx *RuleContext) ReportNodeWithFixes(node *ast.Node, msg RuleMessage, fixes ...RuleFix) {
+	ctx.requireReporter()
+	ctx.reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, &fixes, nil)
+}
+
+func (ctx *RuleContext) ReportNodeWithSuggestions(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion) {
+	ctx.requireReporter()
+	ctx.reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, nil, &suggestions)
+}
+
+// ReportNodeWithFixesAndSuggestions emits a single diagnostic carrying both
+// an autofix and one or more suggestions. It is used by rules that promote a
+// suggestion to an autofix while keeping the suggestion available.
+func (ctx *RuleContext) ReportNodeWithFixesAndSuggestions(node *ast.Node, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion) {
+	ctx.requireReporter()
+	ctx.reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, &fixes, &suggestions)
+}
+
+// ReportRangeWithFixesAndSuggestions is the range-keyed twin of
+// ReportNodeWithFixesAndSuggestions.
+func (ctx *RuleContext) ReportRangeWithFixesAndSuggestions(textRange core.TextRange, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion) {
+	ctx.requireReporter()
+	ctx.reportRange(textRange, msg, &fixes, &suggestions)
 }
 
 func ReportNodeWithFixesOrSuggestions(ctx RuleContext, node *ast.Node, fix bool, msg RuleMessage, suggestionMsg RuleMessage, fixes ...RuleFix) {

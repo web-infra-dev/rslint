@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "additionalHooks": {
+          "type": "string",
+          "format": "regex"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
