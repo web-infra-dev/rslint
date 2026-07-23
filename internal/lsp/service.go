@@ -258,16 +258,19 @@ func (s *Server) reloadConfig() error {
 	return nil
 }
 
-func validateRuleOptionsForConfig(entries config.RslintConfig, configDirectory string) error {
-	optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
+func validateRuleOptionsForConfig(
+	entries config.RslintConfig,
+	configDirectory string,
+) (config.RslintConfig, error) {
+	normalized, optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
 	if len(optionsErrs) == 0 {
-		return nil
+		return normalized, nil
 	}
 	msgs := make([]string, len(optionsErrs))
 	for i, optionsErr := range optionsErrs {
 		msgs[i] = optionsErr.Error()
 	}
-	return fmt.Errorf("invalid rule options for %q:\n%s", configDirectory, strings.Join(msgs, "\n"))
+	return nil, fmt.Errorf("invalid rule options for %q:\n%s", configDirectory, strings.Join(msgs, "\n"))
 }
 
 // handleDidChangeWatchedFiles handles file change notifications from the client.

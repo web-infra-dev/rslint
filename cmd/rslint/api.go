@@ -373,8 +373,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if configMap == nil && !configGitignoreFrozen {
 		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
 	}
-	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
-		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
+	var optionsMessages []string
+	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig)
+	if len(optionsMessages) > 0 {
+		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(optionsMessages, "\n"))
 	}
 
 	// The plugin registry is process-global, but execution is request-gated by
