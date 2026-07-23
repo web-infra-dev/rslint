@@ -313,20 +313,13 @@ func resolveHtmlForAttributes(settings map[string]interface{}) []string {
 		return defaultHtmlForAttributes
 	}
 	raw, ok := attrs["for"]
-	if !ok || raw == nil {
-		return defaultHtmlForAttributes
-	}
-	arr, ok := raw.([]interface{})
 	if !ok {
 		return defaultHtmlForAttributes
 	}
-	out := make([]string, 0, len(arr))
-	for _, item := range arr {
-		if s, ok := item.(string); ok {
-			out = append(out, s)
-		}
+	if out := jsxa11yutil.StringSliceOption(raw); out != nil {
+		return out
 	}
-	return out
+	return defaultHtmlForAttributes
 }
 
 // validateHtmlFor mirrors upstream's `validateHtmlFor`:

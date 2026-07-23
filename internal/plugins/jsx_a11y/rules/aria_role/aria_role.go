@@ -67,12 +67,10 @@ func parseOptions(raw []any) options {
 	if v, ok := m["ignoreNonDOM"].(bool); ok {
 		opts.ignoreNonDOM = v
 	}
-	if arr, ok := m["allowedInvalidRoles"].([]interface{}); ok && len(arr) > 0 {
-		opts.allowedInvalidRoles = make(map[string]struct{}, len(arr))
-		for _, v := range arr {
-			if s, ok := v.(string); ok {
-				opts.allowedInvalidRoles[s] = struct{}{}
-			}
+	if roles := jsxa11yutil.StringSliceOption(m["allowedInvalidRoles"]); len(roles) > 0 {
+		opts.allowedInvalidRoles = make(map[string]struct{}, len(roles))
+		for _, s := range roles {
+			opts.allowedInvalidRoles[s] = struct{}{}
 		}
 	}
 	return opts

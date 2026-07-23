@@ -32,24 +32,8 @@ func parseOptions(raw []any) options {
 		return opts
 	}
 	m, _ := raw[0].(map[string]interface{})
-	if rawComponents, ok := m["components"]; ok {
-		if arr, ok := rawComponents.([]interface{}); ok {
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					opts.components = append(opts.components, s)
-				}
-			}
-		}
-	}
-	if rawWords, ok := m["words"]; ok {
-		if arr, ok := rawWords.([]interface{}); ok {
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					opts.words = append(opts.words, s)
-				}
-			}
-		}
-	}
+	opts.components = jsxa11yutil.StringSliceOption(m["components"])
+	opts.words = jsxa11yutil.StringSliceOption(m["words"])
 	return opts
 }
 
