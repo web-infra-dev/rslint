@@ -267,9 +267,11 @@ func countWriteReferences(sym *ast.Symbol, declName string, declNode *ast.Node, 
 			return
 		}
 
-		if n.Kind == ast.KindIdentifier && !isPartOfDeclaration(n, declNode) {
-			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if refSym == sym && utils.IsWriteReference(n) {
+		// Cheap syntax checks (name match, write position) come first so the
+		// expensive checker lookup only runs for genuine write candidates.
+		if n.Kind == ast.KindIdentifier && n.Text() == declName &&
+			utils.IsWriteReference(n) && !isPartOfDeclaration(n, declNode) {
+			if ctx.TypeChecker.GetSymbolAtLocation(n) == sym {
 				count++
 			}
 		}
@@ -340,8 +342,10 @@ func isReadBeforeFirstAssign(sym *ast.Symbol, declName string, declNode *ast.Nod
 			return done
 		}
 
-		// After declaration, check for reads and writes
-		if n.Kind == ast.KindIdentifier {
+		// After declaration, check for reads and writes. Only identifiers with
+		// the declared name can resolve to the target symbol — skip the rest
+		// without consulting the checker.
+		if n.Kind == ast.KindIdentifier && n.Text() == declName {
 			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
 			if refSym == sym {
 				if utils.IsWriteReference(n) {
@@ -475,9 +479,9 @@ func findWriteInSameBlock(sym *ast.Symbol, declName string, declNode *ast.Node, 
 			return
 		}
 
-		if n.Kind == ast.KindIdentifier && !isPartOfDeclaration(n, declNode) {
-			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if refSym == sym && utils.IsWriteReference(n) {
+		if n.Kind == ast.KindIdentifier && n.Text() == declName &&
+			utils.IsWriteReference(n) && !isPartOfDeclaration(n, declNode) {
+			if ctx.TypeChecker.GetSymbolAtLocation(n) == sym {
 				writeNode = n
 				return
 			}
