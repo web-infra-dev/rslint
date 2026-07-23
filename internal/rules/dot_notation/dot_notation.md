@@ -57,10 +57,6 @@ Examples of **correct** code for this rule with `{ "allowPattern": "^[a-z]+(_[a-
 const x = foo["snake_case"];
 ```
 
-## Differences from ESLint
-
-- An invalid `allowPattern` regular expression is silently ignored (treated as if no pattern were configured) rather than throwing when the rule is configured — this rule doesn't validate the pattern's syntax.
-
 ## Original Documentation
 
 - [ESLint dot-notation](https://eslint.org/docs/latest/rules/dot-notation)
