@@ -107,27 +107,6 @@ func buildUseBracketsMessage(key string) rule.RuleMessage {
 	}
 }
 
-// hasCommentBetween reports whether any comment appears anywhere in the
-// source range [start, end), walking the token stream gap by gap.
-// HasCommentsInRange alone can't do this: it only sees trivia contiguous from
-// its start position and stops at the first real token, so it misses comments
-// hidden past nested tokens, e.g. the parens in `foo[(/* keep */ 'bar')]`.
-// This mirrors upstream's `sourceCode.commentsExistBetween(leftBracket,
-// rightBracket)` check over the whole bracket interior.
-func hasCommentBetween(sourceFile *ast.SourceFile, start, end int) bool {
-	for pos := start; pos < end; {
-		if utils.HasCommentsInRange(sourceFile, core.NewTextRange(pos, end)) {
-			return true
-		}
-		tok, ok := utils.TokenAtOrAfter(sourceFile, pos)
-		if !ok || tok.Start >= end || tok.End <= pos {
-			return false
-		}
-		pos = tok.End
-	}
-	return false
-}
-
 // jsonQuote mirrors JS's JSON.stringify(str) for the message-data formatting
 // of a string literal key (e.g. "b" -> `"b"`).
 func jsonQuote(s string) string {
@@ -237,7 +216,7 @@ var DotNotationRule = rule.Rule{
 				bracketEnd--
 			}
 
-			if hasCommentBetween(sourceFile, bracketStart+1, bracketEnd) {
+			if utils.HasCommentInSpan(ctx.Comments.All(), bracketStart+1, bracketEnd) {
 				// Report but don't fix: a comment lives inside the brackets
 				// (anywhere, including inside nested parens around the key).
 				ctx.ReportNode(keyNode, buildUseDotMessage(formattedKey))
@@ -343,7 +322,7 @@ var DotNotationRule = rule.Rule{
 			if gapStart > nameRange.Pos() {
 				gapStart = nameRange.Pos()
 			}
-			if utils.HasCommentsInRange(sourceFile, core.NewTextRange(gapStart, nameRange.Pos())) {
+			if utils.HasCommentInSpan(ctx.Comments.All(), gapStart, nameRange.Pos()) {
 				// Report but don't fix: a comment lives between the operator
 				// and the property name.
 				ctx.ReportNode(pae.Name(), buildUseBracketsMessage(name))

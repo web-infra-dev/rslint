@@ -152,6 +152,18 @@ func TestDotNotationExtras(t *testing.T) {
 			Code:   "foo[(/* keep */ 'bar')];",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 17}},
 		},
+		{
+			Code:   "foo[( 'bar' /* keep */ )];",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 7}},
+		},
+		{
+			Code:   "foo[ ( /* keep */ 'bar' ) ];",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 19}},
+		},
+		{
+			Code:   "foo[(( /* keep */ 'bar' ))];",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 19}},
+		},
 		// ---- Regression: nested bracket accesses. Each fix replaces
 		// only its own `['key']` bracket part (never the whole
 		// ElementAccessExpression), so the two ranges don't overlap and both
