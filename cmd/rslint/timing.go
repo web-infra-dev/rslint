@@ -10,9 +10,42 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
+// timingFlag parses --timing. IsBoolFlag makes the value optional: a bare
+// --timing enables the full table, --timing=N keeps only the top N rules
+// (the value must use the = form, or N would swallow a positional path).
+type timingFlag struct {
+	enabled *bool
+	limit   *int
+}
+
+func (f *timingFlag) IsBoolFlag() bool { return true }
+
+func (f *timingFlag) String() string { return "" }
+
+func (f *timingFlag) Set(value string) error {
+	switch strings.ToLower(value) {
+	case "true", "all":
+		*f.enabled = true
+		*f.limit = 0
+		return nil
+	case "false":
+		*f.enabled = false
+		*f.limit = 0
+		return nil
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return fmt.Errorf("expected \"all\" or a positive rule count, got %q", value)
+	}
+	*f.enabled = true
+	*f.limit = n
+	return nil
+}
+
 // formatRuleTimingTable renders the per-rule timing table, sorted by total
-// time descending. Relative is each rule's share of the summed rule time.
-func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
+// time descending. Relative is each rule's share of the summed rule time
+// across ALL rules, even when limit > 0 truncates the table to the top N.
+func formatRuleTimingTable(timings map[string]linter.RuleTiming, limit int) string {
 	if len(timings) == 0 {
 		return ""
 	}
@@ -30,6 +63,9 @@ func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {
 		}
 		return names[i] < names[j]
 	})
+	if limit > 0 && limit < len(names) {
+		names = names[:limit]
+	}
 
 	header := []string{"Rule", "Source", "Time (ms)", "Files", "Relative"}
 	rows := make([][]string, 0, len(names))

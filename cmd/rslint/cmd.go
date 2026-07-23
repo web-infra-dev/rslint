@@ -55,6 +55,8 @@ type lintArgs struct {
 	StdoutIsTTY bool
 	Quiet       bool
 	Timing      bool
+	// TimingLimit caps the timing table to the top N rules; 0 means all.
+	TimingLimit int
 	MaxWarnings int
 	StartTimeMs int64
 	RuleFlags   []string
@@ -92,7 +94,7 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
-  --timing              Print a per-rule timing table
+  --timing[=all|N]      Print a per-rule timing table (top N rules with =N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -471,7 +473,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
-	fs.BoolVar(&args.Timing, "timing", false, "print a per-rule timing table")
+	fs.Var(&timingFlag{enabled: &args.Timing, limit: &args.TimingLimit}, "timing", "print a per-rule timing table")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
@@ -554,6 +556,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// initial lint and every --fix re-lint pass, so the table reflects total
 	// rule cost for the whole run.
 	var timingCollector *linter.TimingCollector
+	timingLimit := args.TimingLimit
 	if args.Timing && !typeCheckOnly {
 		timingCollector = linter.NewTimingCollector()
 	}
@@ -1196,7 +1199,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// The timing table goes to stderr so machine-readable stdout formats
 	// (jsonline/github/gitlab) stay parseable with --timing enabled.
 	if timingCollector != nil {
-		fmt.Fprint(os.Stderr, formatRuleTimingTable(timingCollector.Timings()))
+		fmt.Fprint(os.Stderr, formatRuleTimingTable(timingCollector.Timings(), timingLimit))
 	}
 	counts := report.Counts()
 
