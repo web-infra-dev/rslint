@@ -463,7 +463,7 @@ func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T
 	}
 }
 
-func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.T) {
+func TestHandleConfigRefreshInvalidRuleOptionsDisablesRuleAndCommits(t *testing.T) {
 	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
@@ -471,9 +471,11 @@ func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.
 
 	result := startConfigRefreshForTest(s, "config-change")
 	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	loadRequest, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
+	_, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
 		Rules: config.Rules{
-			"no-console": []any{"error", map[string]any{"allow": "warn"}},
+			"no-console":   []any{"error", map[string]any{"allow": "warn"}},
+			"no-such-rule": "error",
+			"no-debugger":  "error",
 		},
 	}})
 	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
@@ -482,19 +484,25 @@ func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.
 	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
 	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
 
-	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
-	abortControl := abortMessage.Params.(configTransactionControlRequest)
-	if abortControl.TransactionID != loadRequest.TransactionID {
-		t.Fatalf("abort transaction = %q, want %q", abortControl.TransactionID, loadRequest.TransactionID)
-	}
-	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
 
+	// Invalid options and unknown rule names must not fail the transaction:
+	// the offending rules are disabled with a logged warning and every other
+	// rule keeps running.
 	completed := awaitConfigRefreshResult(t, result)
-	if completed.err == nil || !strings.Contains(completed.err.Error(), `invalid options for rule "no-console"`) {
-		t.Fatalf("configRefresh error = %v, want invalid rule options", completed.err)
+	if completed.err != nil {
+		t.Fatalf("configRefresh with invalid rules should commit, got: %v", completed.err)
 	}
-	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
-		t.Fatalf("invalid options replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
+	committed := s.jsConfigs[root][0].Rules
+	if committed["no-console"] != "off" {
+		t.Fatalf("expected the invalid-options rule to be disabled, got %v", committed["no-console"])
+	}
+	if committed["no-such-rule"] != "off" {
+		t.Fatalf("expected the unknown rule to be disabled, got %v", committed["no-such-rule"])
+	}
+	if committed["no-debugger"] != "error" {
+		t.Fatalf("expected the valid rule to stay enabled, got %v", committed["no-debugger"])
 	}
 }
 
@@ -776,14 +784,14 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	writeConfigCandidate(t, root)
 	writeConfigCandidate(t, nested)
 	installLastGoodConfig(s, root)
-	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
+	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"prefer-const": "error"}}}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
 	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
 	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	_, rootResponse := loadedConfigResponse(t, rootLoad, config.RslintConfig{{
-		Rules: config.Rules{"new-root": "error"},
+		Rules: config.Rules{"no-var": "error"},
 	}})
 	respondToConfigReverseRequest(t, s, rootLoad, rootResponse, nil)
 
@@ -807,7 +815,7 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	}
 	if s.eslintPluginConfigGeneration != "last-good" ||
 		s.jsConfigs[root][0].Rules["no-console"] != "error" ||
-		s.jsConfigs[nested][0].Rules["old-nested"] != "error" {
+		s.jsConfigs[nested][0].Rules["prefer-const"] != "error" {
 		t.Fatalf("partial boundary failure replaced last-good state: %+v", s.jsConfigs)
 	}
 }
@@ -826,7 +834,7 @@ func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
 	result := startConfigRefreshForTest(s, "config-change")
 	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
 	_, rootResponse := loadedConfigResponse(t, rootLoad, config.RslintConfig{{
-		Rules: config.Rules{"new-root": "error"},
+		Rules: config.Rules{"no-var": "error"},
 	}})
 	respondToConfigReverseRequest(t, s, rootLoad, rootResponse, nil)
 	nestedLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
@@ -842,7 +850,7 @@ func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
 	if completed.err != nil {
 		t.Fatalf("new failed child should use core parent fallback: %v", completed.err)
 	}
-	if len(s.jsConfigs) != 1 || s.jsConfigs[root][0].Rules["new-root"] != "error" {
+	if len(s.jsConfigs) != 1 || s.jsConfigs[root][0].Rules["no-var"] != "error" {
 		t.Fatalf("parent fallback catalog = %+v", s.jsConfigs)
 	}
 	owner, ok := s.nearestJSConfigKey(documentURIFromPath(filepath.Join(nested, "src", "index.ts")))

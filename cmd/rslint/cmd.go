@@ -407,16 +407,17 @@ func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]r
 	return cloned
 }
 
-// validateResolvedRuleOptions runs rule-options schema validation over the
-// resolved configuration: every configMap config in multi-config mode (each
-// message suffixed with the owning config directory, since the same rule can
-// be misconfigured differently per config), or the single rslintConfig
-// otherwise. Returns one formatted message per failure.
-func validateResolvedRuleOptions(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig) []string {
+// validateResolvedRules runs config-time rule validation — unknown rule
+// names and rule-options schema failures — over the resolved configuration:
+// every configMap config in multi-config mode (each message suffixed with
+// the owning config directory, since the same rule can be misconfigured
+// differently per config), or the single rslintConfig otherwise. Returns one
+// formatted message per failure.
+func validateResolvedRules(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig, eslintPlugins []rslintconfig.EslintPluginEntry) []string {
 	var messages []string
 	if configMap == nil {
-		for _, optionsError := range rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry) {
-			messages = append(messages, optionsError.Error())
+		for _, ruleError := range rslintconfig.ValidateRules(rslintConfig, rslintconfig.GlobalRuleRegistry, eslintPlugins) {
+			messages = append(messages, ruleError.Error())
 		}
 		return messages
 	}
@@ -426,8 +427,8 @@ func validateResolvedRuleOptions(configMap map[string]rslintconfig.RslintConfig,
 	}
 	slices.Sort(configDirs)
 	for _, dir := range configDirs {
-		for _, optionsError := range rslintconfig.ValidateRuleOptions(configMap[dir], rslintconfig.GlobalRuleRegistry) {
-			messages = append(messages, fmt.Sprintf("%s (config at %s)", optionsError.Error(), dir))
+		for _, ruleError := range rslintconfig.ValidateRules(configMap[dir], rslintconfig.GlobalRuleRegistry, eslintPlugins) {
+			messages = append(messages, fmt.Sprintf("%s (config at %s)", ruleError.Error(), dir))
 		}
 	}
 	return messages
@@ -743,11 +744,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}
 
-	// Validate every configured rule's options against its declared schema —
-	// a separate step after configuration is fully resolved (including --rule
-	// overrides) and before any linting starts, so a bad config fails fast
-	// with every failure reported at once instead of surfacing mid-lint.
-	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
+	// Validate every configured rule — the name must resolve to a known rule
+	// and the options must satisfy the rule's declared schema — as a separate
+	// step after configuration is fully resolved (including --rule overrides)
+	// and before any linting starts, so a bad config fails fast with every
+	// failure reported at once instead of being silently ignored (unknown
+	// names) or surfacing mid-lint (bad options).
+	if messages := validateResolvedRules(configMap, rslintConfig, eslintPlugins); len(messages) > 0 {
 		for _, message := range messages {
 			fmt.Fprintf(os.Stderr, "error: %s\n", message)
 		}

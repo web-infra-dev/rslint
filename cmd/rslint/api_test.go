@@ -2294,14 +2294,15 @@ func TestHandleLint_NoEslintPluginMetadataDoesNotDispatchStalePlaceholder(t *tes
 		t.Fatalf("expected initial plugin dispatch, got %d", calls.Load())
 	}
 
-	response, err := handler.HandleLintWithContext(context.Background(), baseRequest, requester)
-	if err != nil {
-		t.Fatalf("lint without metadata: %v", err)
+	// A request that enables the plugin rule but carries no plugin metadata is
+	// rejected by rule-name validation — the stale placeholder registered by
+	// the earlier request must not make the name resolvable, let alone
+	// dispatch to the plugin host.
+	_, err := handler.HandleLintWithContext(context.Background(), baseRequest, requester)
+	if err == nil || !strings.Contains(err.Error(), `unknown rule "request-plugin/rule"`) {
+		t.Fatalf("metadata-free request should fail rule-name validation, got: %v", err)
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("request without metadata unexpectedly dispatched pluginLint; calls=%d", calls.Load())
-	}
-	if response.RuleCount != 0 || len(response.Diagnostics) != 0 {
-		t.Fatalf("stale placeholder leaked into metadata-free request: rules=%d diagnostics=%+v", response.RuleCount, response.Diagnostics)
 	}
 }

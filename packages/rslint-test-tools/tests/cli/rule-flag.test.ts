@@ -794,10 +794,10 @@ console.error("error");
   });
 
   // -----------------------------------------------------------------------
-  // --rule for non-existent rule (should silently skip)
+  // --rule for non-existent rule (should fail, matching ESLint's --rule)
   // -----------------------------------------------------------------------
 
-  test('--rule with non-existent rule name is silently ignored', async () => {
+  test('--rule with non-existent rule name fails with exit code 1', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': mjsConfig({}),
       'tsconfig.json': TS_CONFIG,
@@ -809,8 +809,30 @@ console.error("error");
         ['--rule', 'this-rule-does-not-exist: error'],
         tempDir,
       );
-      // Should not crash — the non-existent rule is silently skipped
-      expect(result.stdout).not.toContain('this-rule-does-not-exist');
+      // Matches ESLint's behavior: `eslint --rule 'this-rule-does-not-exist:
+      // error'` fails the run rather than skipping silently.
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain(
+        'unknown rule "this-rule-does-not-exist"',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('--rule with non-existent rule name set to "off" does not fail', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': mjsConfig({}),
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'export const x = 1;\n',
+    });
+
+    try {
+      const result = await runRslint(
+        ['--rule', 'this-rule-does-not-exist: off'],
+        tempDir,
+      );
+      expect(result.exitCode).toBe(0);
     } finally {
       await cleanupTempDir(tempDir);
     }
