@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 // The rule-options validation step runs after configuration is fully
@@ -82,5 +84,59 @@ func TestCLIValidRuleOptionsLintNormally(t *testing.T) {
 	}
 	if code != 1 || !strings.Contains(stdout, "no-debugger") {
 		t.Fatalf("expected the lint itself to run and flag no-debugger, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestValidateResolvedRuleOptionsReturnsNormalizedSingleConfig(t *testing.T) {
+	inputOptions := map[string]any{"values": []any{"original"}}
+	input := rslintconfig.RslintConfig{{
+		Rules: rslintconfig.Rules{
+			"unknown-rule": []any{"error", inputOptions},
+		},
+	}}
+
+	normalizedMap, normalized, messages := validateResolvedRuleOptions(nil, input)
+	if normalizedMap != nil {
+		t.Fatalf("single-config mode returned a non-nil config map: %#v", normalizedMap)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("unexpected validation messages: %v", messages)
+	}
+
+	normalizedOptions := normalized[0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("helper returned the input config instead of its normalized copy: %#v", got)
+	}
+}
+
+func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
+	normalizedMap, _, messages := validateResolvedRuleOptions(
+		map[string]rslintconfig.RslintConfig{},
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"unused": "error"}}},
+	)
+	if normalizedMap == nil || len(normalizedMap) != 0 {
+		t.Fatalf("non-nil empty config map changed mode: %#v", normalizedMap)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("unexpected validation messages: %v", messages)
+	}
+
+	inputOptions := map[string]any{"values": []any{"original"}}
+	inputMap := map[string]rslintconfig.RslintConfig{
+		"/workspace/a": {{
+			Rules: rslintconfig.Rules{
+				"unknown-rule": []any{"error", inputOptions},
+			},
+		}},
+	}
+	normalizedMap, _, messages = validateResolvedRuleOptions(inputMap, nil)
+	if len(messages) != 0 {
+		t.Fatalf("unexpected validation messages: %v", messages)
+	}
+	normalizedOptions := normalizedMap["/workspace/a"][0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("multi-config helper returned an aliased input value: %#v", got)
 	}
 }

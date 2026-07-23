@@ -411,26 +411,34 @@ func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]r
 // resolved configuration: every configMap config in multi-config mode (each
 // message suffixed with the owning config directory, since the same rule can
 // be misconfigured differently per config), or the single rslintConfig
-// otherwise. Returns one formatted message per failure.
-func validateResolvedRuleOptions(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig) []string {
+// otherwise. It returns normalized copies plus one formatted message per
+// failure, leaving the input configs untouched.
+func validateResolvedRuleOptions(
+	configMap map[string]rslintconfig.RslintConfig,
+	rslintConfig rslintconfig.RslintConfig,
+) (map[string]rslintconfig.RslintConfig, rslintconfig.RslintConfig, []string) {
 	var messages []string
 	if configMap == nil {
-		for _, optionsError := range rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry) {
+		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry)
+		for _, optionsError := range optionsErrors {
 			messages = append(messages, optionsError.Error())
 		}
-		return messages
+		return nil, normalized, messages
 	}
 	configDirs := make([]string, 0, len(configMap))
 	for dir := range configMap {
 		configDirs = append(configDirs, dir)
 	}
 	slices.Sort(configDirs)
+	normalizedMap := make(map[string]rslintconfig.RslintConfig, len(configMap))
 	for _, dir := range configDirs {
-		for _, optionsError := range rslintconfig.ValidateRuleOptions(configMap[dir], rslintconfig.GlobalRuleRegistry) {
+		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(configMap[dir], rslintconfig.GlobalRuleRegistry)
+		normalizedMap[dir] = normalized
+		for _, optionsError := range optionsErrors {
 			messages = append(messages, fmt.Sprintf("%s (config at %s)", optionsError.Error(), dir))
 		}
 	}
-	return messages
+	return normalizedMap, rslintConfig, messages
 }
 
 // resolveStartTime returns the start time for timing output.
@@ -747,8 +755,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// a separate step after configuration is fully resolved (including --rule
 	// overrides) and before any linting starts, so a bad config fails fast
 	// with every failure reported at once instead of surfacing mid-lint.
-	if messages := validateResolvedRuleOptions(configMap, rslintConfig); len(messages) > 0 {
-		for _, message := range messages {
+	var optionsMessages []string
+	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig)
+	if len(optionsMessages) > 0 {
+		for _, message := range optionsMessages {
 			fmt.Fprintf(os.Stderr, "error: %s\n", message)
 		}
 		return 1
