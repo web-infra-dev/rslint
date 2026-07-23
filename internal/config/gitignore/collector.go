@@ -132,14 +132,10 @@ func readGitignoreAsPatternsWithBoundaries(configDir string, fsys vfs.FS, isDire
 	return allPatterns
 }
 
-// readGitignoreAsGlobsForFilesWithBoundaries reads only .gitignore files on
+// readGitignoreAsPatternsForFilesWithBoundaries reads only .gitignore files on
 // each directory chain from configDir to an explicit target. This is used by
 // API-style calls where the target set is already known; unlike the full
 // collector, it does not scan every descendant of configDir.
-func readGitignoreAsGlobsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []string {
-	return patternGlobs(readGitignoreAsPatternsForFilesWithBoundaries(configDir, fsys, files, stopDirs))
-}
-
 func readGitignoreAsPatternsForFilesWithBoundaries(configDir string, fsys vfs.FS, files []string, stopDirs []string) []Pattern {
 	if fsys == nil || len(files) == 0 {
 		return nil
