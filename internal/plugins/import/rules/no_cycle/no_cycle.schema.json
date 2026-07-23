@@ -1,0 +1,43 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "commonjs": {
+          "type": "boolean"
+        },
+        "amd": {
+          "type": "boolean"
+        },
+        "esmodule": {
+          "type": "boolean"
+        },
+        "maxDepth": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "enum": ["∞"]
+            }
+          ]
+        },
+        "ignoreExternal": {
+          "type": "boolean"
+        },
+        "allowUnsafeDynamicCyclicDependency": {
+          "type": "boolean"
+        },
+        "disableScc": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

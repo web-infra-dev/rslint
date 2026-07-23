@@ -10,7 +10,8 @@ import (
 
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/no-mutable-exports.js
 var NoMutableExportsRule = rule.Rule{
-	Name: "import/no-mutable-exports",
+	Name:   "import/no-mutable-exports",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// checkDeclarationList reports if the VariableDeclarationList uses `let` or `var`.
 		checkDeclarationList := func(declList *ast.Node) {
