@@ -1,6 +1,6 @@
 /**
  * Per-rule timing collection (`collectTiming` → `result.ruleTimes`),
- * driven by Go's `--timing` / `TIMING=1`. Assertions stay
+ * driven by Go's `--timing`. Assertions stay
  * magnitude-free (presence / shape / non-negativity only) so the suite
  * can't flake on scheduler noise.
  */

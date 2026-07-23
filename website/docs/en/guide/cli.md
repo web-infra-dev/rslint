@@ -106,11 +106,10 @@ rslint src/ --rule 'no-console: off' --format github
 
 ## Rule Timing
 
-Use `--timing` (or the ESLint-style `TIMING=1` environment variable) to print a per-rule timing table after the run, sorted by total time:
+Use `--timing` to print a per-rule timing table after the run, sorted by total time:
 
 ```bash
 rslint --timing src/
-TIMING=1 rslint src/
 ```
 
 ```

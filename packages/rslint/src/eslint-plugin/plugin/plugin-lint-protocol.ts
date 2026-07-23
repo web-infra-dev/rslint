@@ -64,7 +64,7 @@ export interface EslintPluginLintRequest {
   /** Collect autofixes (driven by Go's `--fix`). */
   fix?: boolean;
   suggestionsMode?: 'off' | 'eager';
-  /** Collect per-rule execution times (driven by Go's `--timing` / `TIMING=1`). */
+  /** Collect per-rule execution times (driven by Go's `--timing`). */
   collectTiming?: boolean;
 }
 

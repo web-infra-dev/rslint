@@ -10,16 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
-// timingEnvEnabled reports whether the ESLint-style TIMING environment
-// variable requests the per-rule timing table.
-func timingEnvEnabled(value string) bool {
-	switch strings.ToLower(value) {
-	case "", "0", "false":
-		return false
-	}
-	return true
-}
-
 // formatRuleTimingTable renders the per-rule timing table, sorted by total
 // time descending. Relative is each rule's share of the summed rule time.
 func formatRuleTimingTable(timings map[string]linter.RuleTiming) string {

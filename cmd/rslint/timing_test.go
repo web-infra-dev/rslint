@@ -8,26 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
-func TestTimingEnvEnabled(t *testing.T) {
-	cases := []struct {
-		value string
-		want  bool
-	}{
-		{"", false},
-		{"0", false},
-		{"false", false},
-		{"FALSE", false},
-		{"1", true},
-		{"all", true},
-		{"true", true},
-	}
-	for _, c := range cases {
-		if got := timingEnvEnabled(c.value); got != c.want {
-			t.Errorf("timingEnvEnabled(%q) = %v, want %v", c.value, got, c.want)
-		}
-	}
-}
-
 func TestFormatRuleTimingTableEmpty(t *testing.T) {
 	if got := formatRuleTimingTable(nil); got != "" {
 		t.Errorf("expected empty output for no timings, got %q", got)

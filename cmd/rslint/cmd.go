@@ -92,7 +92,7 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
-  --timing              Print a per-rule timing table (also enabled by TIMING=1)
+  --timing              Print a per-rule timing table
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -550,11 +550,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	ruleFlags := args.RuleFlags
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
-	// --timing (or the ESLint-style TIMING env var) enables per-rule timing.
-	// One collector is shared across the initial lint and every --fix re-lint
-	// pass, so the table reflects total rule cost for the whole run.
+	// --timing enables per-rule timing. One collector is shared across the
+	// initial lint and every --fix re-lint pass, so the table reflects total
+	// rule cost for the whole run.
 	var timingCollector *linter.TimingCollector
-	if (args.Timing || timingEnvEnabled(os.Getenv("TIMING"))) && !typeCheckOnly {
+	if args.Timing && !typeCheckOnly {
 		timingCollector = linter.NewTimingCollector()
 	}
 	format := output.FormatDefault

@@ -153,8 +153,8 @@ export interface LintFileRequest {
   suggestionsMode: SuggestionsMode;
   /**
    * Measure per-rule execution time (create + listener invocations) and
-   * report it in the result's `ruleTimes`. Driven by Go's `--timing` /
-   * `TIMING=1`; off by default so the per-node hot path pays nothing.
+   * report it in the result's `ruleTimes`. Driven by Go's `--timing`;
+   * off by default so the per-node hot path pays nothing.
    */
   collectTiming?: boolean;
   /** Optional Int32Array(SharedArrayBuffer) cancel flag, length-1, for per-node Atomics polling. */
