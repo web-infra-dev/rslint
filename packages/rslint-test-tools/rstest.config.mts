@@ -120,6 +120,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-destructuring.test.ts',
     './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
     './tests/eslint/rules/prefer-numeric-literals.test.ts',
+    './tests/eslint/rules/prefer-object-spread.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/prefer-spread.test.ts',
