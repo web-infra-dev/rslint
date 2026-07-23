@@ -22,6 +22,9 @@
             {
               "type": "string",
               "enum": ["∞"]
+            },
+            {
+              "type": "null"
             }
           ]
         },
