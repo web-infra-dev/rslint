@@ -126,6 +126,14 @@ describe('parseArgs positionals', () => {
     expect(result.positionals).toEqual(['--not-a-flag']);
   });
 
+  test('--timing=N inline value stays a single argument', () => {
+    // --timing is a bool-style Go flag: `--timing 20` would treat 20 as a
+    // file path, so the inline form must survive the rebuild untouched.
+    const result = parseArgs(['--timing=20', 'src/a.ts']);
+    expect(result.rest).toEqual(['--timing=20', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
   test('--singleThreaded is detected and still forwarded to Go', () => {
     const result = parseArgs(['--singleThreaded', 'src/a.ts']);
     expect(result.singleThreaded).toBe(true);
@@ -276,7 +284,7 @@ describe('parseArgs --rule flag', () => {
   });
 
   test('--rule=value syntax is reordered correctly', () => {
-    // node:util parseArgs splits --rule=value into rawName='--rule' + value
+    // Inline `=` values are forwarded as a single argument.
     const result = parseArgs([
       'src/a.ts',
       '--rule=no-console: error',
@@ -284,8 +292,7 @@ describe('parseArgs --rule flag', () => {
       'github',
     ]);
     expect(result.rest).toEqual([
-      '--rule',
-      'no-console: error',
+      '--rule=no-console: error',
       '--format',
       'github',
       'src/a.ts',

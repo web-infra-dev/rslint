@@ -64,8 +64,15 @@ export function parseArgs(argv: string[]) {
         token.name === 'start-time'
       )
         continue;
-      flags.push(token.rawName);
-      if (token.value != null) flags.push(token.value);
+      // Keep `--flag=value` as a single argument: Go bool-style flags
+      // (e.g. --timing[=N]) only accept a value in the `=` form, so
+      // splitting would turn the value into a bogus positional.
+      if (token.value != null && token.inlineValue) {
+        flags.push(`${token.rawName}=${token.value}`);
+      } else {
+        flags.push(token.rawName);
+        if (token.value != null) flags.push(token.value);
+      }
     } else if (token.kind === 'option-terminator') {
       seenTerminator = true;
     } else if (token.kind === 'positional') {
