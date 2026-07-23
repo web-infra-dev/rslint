@@ -52,21 +52,20 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// cannot be statically folded must not match ----
 			{Code: `const { [key]: a } = Object; a({}, foo)`},
 
-			// ---- Modified-global tracking: any bare write to the global
-			// `Object` in the file disables tracking entirely, even for calls
-			// textually before the write (ESLint ReferenceTracker's
-			// isModifiedGlobal) ----
+			// ---- Modified-global tracking: a bare write to the global
+			// `Object` untracks every reference positioned after it (calls
+			// before the write still match — see the invalid section) ----
 			{Code: `Object = {}; Object.assign({}, foo);`},
 			{Code: `Object ||= {}; Object.assign({}, foo);`},
-			{Code: `Object.assign({}, before); Object = {}; Object.assign({}, after);`},
 
 			// ---- Modified-global tracking: same for a written global-object
 			// entry name ----
 			{Code: `window = {}; window.Object.assign({}, foo);`},
 
-			// ---- Modified-global tracking: an alias that resolves to a
-			// modified global must not match either ----
-			{Code: `const o = Object; Object = {}; o.assign({}, foo);`},
+			// ---- Modified-global tracking: an alias whose initializer reads
+			// the global after it was modified must not match (capture-position
+			// semantics; contrast with the capture-before-write invalid case) ----
+			{Code: `Object = {}; const o = Object; o.assign({}, foo);`},
 
 			// ---- Modified-global tracking: for-of assignment targets and
 			// destructuring-assignment targets count as writes too ----
@@ -86,15 +85,34 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// matches, the inner one must not (scope boundary correctness) ----
 			{Code: `(function (Object) { return Object.assign({}, x); })()`},
 
-			// ---- Alias tracking: a `let`-aliased Object receiver that is
-			// later reassigned must NOT be treated as a stable alias
-			// (isObjectReference relies on ResolveIdentifierInitializer's
-			// hasWrites check) ----
+			// ---- Alias tracking: the last write before the call assigns a
+			// non-Object value, so the alias no longer matches at that point ----
 			{Code: `let o = Object; o = foo; o.assign({}, bar)`},
 
-			// ---- Alias tracking: a `let`-aliased Object.assign callee that
-			// is later reassigned must NOT be treated as a stable alias ----
+			// ---- Alias tracking: same for a reassigned Object.assign alias ----
 			{Code: `let assign = Object.assign; assign = foo; assign({}, bar)`},
+
+			// ---- Flow tracking: a local write positioned after the call does
+			// not make the alias match at the call site ----
+			{Code: `let o; o.assign({}, x); o = Object;`},
+
+			// ---- Flow tracking: compound assignment is an opaque write ----
+			{Code: `let o = foo; o = Object; o ||= bar; o.assign({}, x)`},
+
+			// ---- Flow tracking: destructuring-assignment writes are opaque ----
+			{Code: `let assign; ({ assign } = Object); assign({}, x)`},
+
+			// ---- Cycle safety: mutually- and self-referential alias chains
+			// must resolve to unknown instead of recursing forever ----
+			{Code: `var a = b; var b = a; b.assign({}, x)`},
+			{Code: `var a = a; a.assign({}, x)`},
+
+			// ---- Nested destructuring: a default value makes the bound value
+			// untrackable ----
+			{Code: `const { Object: { assign } = {} } = globalThis; assign({}, x)`},
+
+			// ---- Nested destructuring: a non-global root must not match ----
+			{Code: `const { Object: { assign } } = foo; assign({}, x)`},
 
 			// ---- Alias tracking: destructuring a property other than
 			// "assign" off Object must not match ----
@@ -391,6 +409,110 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 				Code:   `const { Object } = globalThis; Object.assign({}, foo)`,
 				Output: []string{`const { Object } = globalThis; ({ ...foo})`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 32}},
+			},
+
+			// ---- __proto__ preservation: a source object literal with a
+			// prototype-setting `__proto__:` property must be kept whole
+			// behind a spread — unwrapping it into the merged literal would
+			// set the result's prototype, which Object.assign never does for
+			// a source (its `__proto__:` creates no own properties, so the
+			// call copies nothing) ----
+			{
+				Code:   `Object.assign({}, { __proto__: proto })`,
+				Output: []string{`({ ...{ __proto__: proto }})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `Object.assign({}, { "__proto__": proto })`,
+				Output: []string{`({ ...{ "__proto__": proto }})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `Object.assign({}, { __proto__: a }, { b: 1 })`,
+				Output: []string{`({ ...{ __proto__: a }, b: 1})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- __proto__ preservation: the FIRST argument keeps
+			// unwrapping — its `__proto__:` sets the target's prototype in
+			// the original call too, so the merged literal is equivalent ----
+			{
+				Code:   `Object.assign({ __proto__: base }, foo)`,
+				Output: []string{`({__proto__: base, ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- __proto__ preservation: a computed `["__proto__"]` creates
+			// an ordinary own property, not a prototype, so the literal still
+			// unwraps ----
+			{
+				Code:   `Object.assign({}, { ["__proto__"]: proto })`,
+				Output: []string{`({ ["__proto__"]: proto})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- needsWrappingParens: as the callee of an outer call the
+			// fixed literal must be parenthesized (`{ ...foo }()` does not
+			// parse), unlike the argument position covered above ----
+			{
+				Code:   `Object.assign({}, foo)()`,
+				Output: []string{`({ ...foo})()`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Modified-global tracking is flow-sensitive: a call before
+			// the bare write still matches; the call after it does not ----
+			{
+				Code:   `Object.assign({}, before); Object = {}; Object.assign({}, after);`,
+				Output: []string{`({ ...before}); Object = {}; Object.assign({}, after);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+			},
+
+			// ---- Modified-global tracking: an alias whose initializer read
+			// the global BEFORE the write captured the pristine Object, so
+			// the call still matches at runtime ----
+			{
+				Code:   `const o = Object; Object = {}; o.assign({}, foo);`,
+				Output: []string{`const o = Object; Object = {}; ({ ...foo});`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 32}},
+			},
+
+			// ---- Flow tracking: a reassigned alias reports the calls made
+			// while it held Object and only those ----
+			{
+				Code:   `let o = Object; o.assign({}, a); o = foo; o.assign({}, b);`,
+				Output: []string{`let o = Object; ({ ...a}); o = foo; o.assign({}, b);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 17}},
+			},
+
+			// ---- Flow tracking: aliases established by a plain assignment
+			// (not a declaration initializer) match too, for both the Object
+			// receiver and Object.assign itself ----
+			{
+				Code:   `let o; o = Object; o.assign({}, x)`,
+				Output: []string{`let o; o = Object; ({ ...x})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 20}},
+			},
+			{
+				Code:   `let assign; assign = Object.assign; assign({}, x)`,
+				Output: []string{`let assign; assign = Object.assign; ({ ...x})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 37}},
+			},
+
+			// ---- Nested destructuring: `assign` bound through a nested
+			// pattern off a global object ----
+			{
+				Code:   `const { Object: { assign } } = globalThis; assign({}, x)`,
+				Output: []string{`const { Object: { assign } } = globalThis; ({ ...x})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 44}},
+			},
+
+			// ---- Alias chains longer than the old 8-hop cap still resolve
+			// (cycle detection replaced the fixed depth limit) ----
+			{
+				Code:   `const a = Object; const b = a; const c = b; const d = c; const e = d; const f = e; const g = f; const h = g; const i = h; const j = i; j.assign({}, foo)`,
+				Output: []string{`const a = Object; const b = a; const c = b; const d = c; const e = d; const f = e; const g = f; const h = g; const i = h; const j = i; ({ ...foo})`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 136}},
 			},
 		},
 	)

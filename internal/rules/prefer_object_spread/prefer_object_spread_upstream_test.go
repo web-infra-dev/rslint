@@ -28,14 +28,9 @@ func TestPreferObjectSpreadUpstream(t *testing.T) {
 			{Code: `Object.assign({}, ...objects)`},
 			{Code: `foo({ foo: 'bar' })`},
 			{Code: "\n        const Object = {};\n        Object.assign({}, foo);\n        "},
-			// SKIP: relies on ESLint's ReferenceTracker refusing to track a
-			// global variable that is ever the target of a bare (declaration-less)
-			// assignment anywhere in the file. rslint's shadow check only detects
-			// shadowing via a new declaration — see "Differences from ESLint".
-			{Code: "\n        Object = {};\n        Object.assign({}, foo);\n        ", Skip: true},
+			{Code: "\n        Object = {};\n        Object.assign({}, foo);\n        "},
 			{Code: "\n        const Object = {};\n        Object.assign({ foo: 'bar' });\n        "},
-			// SKIP: see the bare-reassignment note above.
-			{Code: "\n        Object = {};\n        Object.assign({ foo: 'bar' });\n        ", Skip: true},
+			{Code: "\n        Object = {};\n        Object.assign({ foo: 'bar' });\n        "},
 			{Code: "\n        const Object = require('foo');\n        Object.assign({ foo: 'bar' });\n        "},
 			{Code: "\n        import Object from 'foo';\n        Object.assign({ foo: 'bar' });\n        "},
 			{Code: "\n        import { Something as Object } from 'foo';\n        Object.assign({ foo: 'bar' });\n        "},
