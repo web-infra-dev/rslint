@@ -38,6 +38,12 @@ jobs:
         with:
           submodules: true
           fetch-depth: 1
+
+      - name: Disable CPU hogs (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        uses: ./.github/actions/windows-disable-cpu-hogs
+
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -364,7 +370,7 @@ jobs:
       - test-wasm
       - test-rust
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-mini
     name: CI Done
     steps:
       - run: exit 1
