@@ -1199,7 +1199,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// The timing table goes to stderr so machine-readable stdout formats
 	// (jsonline/github/gitlab) stay parseable with --timing enabled.
 	if timingCollector != nil {
-		fmt.Fprint(os.Stderr, formatRuleTimingTable(timingCollector.Timings(), timingLimit))
+		fmt.Fprint(os.Stderr, output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit))
 	}
 	counts := report.Counts()
 
