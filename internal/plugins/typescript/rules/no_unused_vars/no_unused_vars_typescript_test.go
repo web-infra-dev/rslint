@@ -115,6 +115,18 @@ export type Handler = (event: string, data: unknown) => void;
 `},
 		// index signature param
 		{Code: `export interface Dict { [key: string]: unknown; }`},
+		// computed property names are value references, even inside type declarations
+		{Code: `
+declare const registeredServiceBrand: unique symbol;
+
+export interface RegisteredService {
+  [registeredServiceBrand]: string;
+}
+`},
+		{Code: `
+declare const brand: unique symbol;
+export type Branded = { [brand]: string };
+`},
 		// declare global (global scope augmentation, never reported)
 		{Code: `declare global { const BUILD_HASH: string; }`},
 		// declare global with nested namespace and interface
@@ -133,6 +145,14 @@ declare global {
 		{Code: `
 export class Foo {
   constructor(private readonly name: string) {}
+}
+`},
+		// A used parameter property establishes the last used parameter.
+		{Code: `
+export class Foo {
+  constructor(value: string, private readonly name: string) {
+    console.log(this.name);
+  }
 }
 `},
 
@@ -239,6 +259,11 @@ type FuncType = typeof typedFunc;
 export type { FuncType };
 `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 2, Column: 18}},
+		},
+		// Type predicate parameter references are type-only, matching typescript-eslint.
+		{
+			Code:   `export function isString(value: unknown): value is string { return true; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 26}},
 		},
 		// unused declare namespace (with members)
 		{
@@ -492,4 +517,3 @@ export interface Constructable {
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
-

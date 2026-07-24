@@ -1932,6 +1932,13 @@ export type T = {
 };
     `,
     `
+declare const registeredServiceBrand: unique symbol;
+
+export interface RegisteredService {
+  [registeredServiceBrand]: string;
+}
+    `,
+    `
 type Foo = string;
 export class Bar {
   [x: Foo]: any;

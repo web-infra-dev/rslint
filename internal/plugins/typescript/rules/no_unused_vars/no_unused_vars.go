@@ -37,11 +37,12 @@ type Config struct {
 }
 
 type analysisContext struct {
-	allUsages         map[*ast.Symbol][]*ast.Node
-	writeRefs         map[*ast.Symbol][]*ast.Node
-	unresolvedRefs    map[string][]*ast.Node
-	seenMergedSymbols map[*ast.Symbol]bool
-	reportedUnused    map[*ast.Node]bool
+	allUsages          map[*ast.Symbol][]*ast.Node
+	writeRefs          map[*ast.Symbol][]*ast.Node
+	unresolvedRefs     map[string][]*ast.Node
+	localExportTargets map[*ast.Symbol]bool
+	seenMergedSymbols  map[*ast.Symbol]bool
+	reportedUnused     map[*ast.Node]bool
 }
 
 type VariableInfo struct {
@@ -123,40 +124,22 @@ func compilePatterns(config Config) Config {
 	return config
 }
 
-// isInTypeContext checks if an identifier is inside a type-only position
-// (type reference, type alias body, interface body, etc.). Used to detect
-// variables that are "only used as a type" — runtime values referenced solely
-// in type annotations should be reported with a specific message.
-func isInTypeContext(node *ast.Node) bool {
-	parent := node.Parent
-	for parent != nil {
-		switch parent.Kind {
-		case ast.KindTypeReference,
-			ast.KindTypeAliasDeclaration,
-			ast.KindInterfaceDeclaration,
-			ast.KindTypeParameter,
-			ast.KindTypeQuery,
-			ast.KindTypeOperator,
-			ast.KindIndexedAccessType,
-			ast.KindConditionalType,
-			ast.KindInferType,
-			ast.KindTypeLiteral,
-			ast.KindMappedType:
-			return true
-			// Note: KindAsExpression, KindTypeAssertionExpression, KindSatisfiesExpression
-			// are NOT included here. Their expression operand is a value context;
-			// only the type annotation part is a type context. Since we walk up
-			// from the identifier, a value operand will pass through these nodes
-			// and continue upward without being misclassified as type-only.
-		}
-		parent = parent.Parent
+// isTypeOnlyReference mirrors typescript-eslint's narrow type-only reference
+// semantics. A value binding is ignored only when its identifier chain is the
+// operand of `typeof` in a type query or names a parameter in a type predicate.
+// Other expressions embedded in type declarations (notably computed property
+// names) are runtime value references.
+func isTypeOnlyReference(node *ast.Node) bool {
+	if node == nil {
+		return false
 	}
-	return false
-}
-
-// isDeclarationName delegates to utils.IsDeclarationIdentifier.
-func isDeclarationName(node *ast.Node) bool {
-	return utils.IsDeclarationIdentifier(node)
+	if ast.IsPartOfTypeQuery(node) {
+		return true
+	}
+	for node != nil && (node.Kind == ast.KindIdentifier || node.Kind == ast.KindQualifiedName) {
+		node = node.Parent
+	}
+	return node != nil && node.Kind == ast.KindTypePredicate
 }
 
 // isPartOfAssignment checks if an identifier is a write-only target in an
@@ -987,7 +970,7 @@ func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, allUsages 
 // export modifier on any merged declaration (declaration merging), parent
 // VariableStatement export, re-export via `export { name }`, and ancestor
 // ExportDeclaration nodes on the variable or its references.
-func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
+func isExported(varInfo *VariableInfo, sym *ast.Symbol, localExportTargets map[*ast.Symbol]bool) bool {
 	if varInfo.Variable == nil {
 		return false
 	}
@@ -1000,7 +983,6 @@ func isExported(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 
 		// Declaration merging: if ANY declaration of the symbol is exported,
 		// the variable is considered exported (e.g., `interface Foo {} export const Foo = ...`)
-		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
 		if sym != nil && len(sym.Declarations) > 1 {
 			for _, decl := range sym.Declarations {
 				if ast.GetCombinedModifierFlags(decl)&ast.ModifierFlagsExport != 0 {
@@ -1058,76 +1040,14 @@ doneParentWalk:
 		}
 	}
 
-	// Check if the symbol is re-exported via `export { name }`.
-	// The export specifier creates a different symbol chain, so we resolve
-	// both sides through SkipAlias and compare.
-	if varInfo.Definition != nil {
-		sym := ctx.TypeChecker.GetSymbolAtLocation(varInfo.Variable)
-		if sym != nil {
-			sf := ast.GetSourceFileOfNode(varInfo.Variable)
-			if isReExportedSymbol(ctx, sym, sf.AsNode()) {
-				return true
-			}
-		}
+	// Named local exports are resolved once during the source-file collection
+	// pass. This is both scope-accurate and avoids scanning all top-level
+	// statements again for every declaration.
+	if sym != nil && localExportTargets[sym] {
+		return true
 	}
 
 	return false
-}
-
-// isReExportedSymbol checks if a symbol is re-exported via `export { name }` or
-// `export { name as alias }`. Resolves both the export specifier's symbol and the
-// original symbol through SkipAlias to handle re-exports of imported bindings.
-func isReExportedSymbol(ctx rule.RuleContext, sym *ast.Symbol, sourceFile *ast.Node) bool {
-	found := false
-	sourceFile.ForEachChild(func(child *ast.Node) bool {
-		if child.Kind != ast.KindExportDeclaration {
-			return false
-		}
-		exportDecl := child.AsExportDeclaration()
-		if exportDecl == nil || exportDecl.ExportClause == nil {
-			return false
-		}
-		// `export { ... } from 'mod'` only re-exports module bindings, never
-		// in-scope locals — skip these declarations entirely so a local that
-		// happens to share a name with a module export is not falsely treated
-		// as re-exported.
-		if exportDecl.ModuleSpecifier != nil {
-			return false
-		}
-		if !ast.IsNamedExports(exportDecl.ExportClause) {
-			return false
-		}
-		namedExports := exportDecl.ExportClause.AsNamedExports()
-		if namedExports == nil || namedExports.Elements == nil {
-			return false
-		}
-		for _, spec := range namedExports.Elements.Nodes {
-			exportSpec := spec.AsExportSpecifier()
-			if exportSpec == nil {
-				continue
-			}
-			// When renamed (`export { join as myJoin }`), PropertyName references the local binding.
-			// When not renamed (`export { join }`), Name's symbol differs from the import binding,
-			// so we use GetSymbolAtLocation on PropertyName which resolves to the local symbol.
-			refNode := exportSpec.PropertyName
-			if refNode != nil {
-				exportSym := ctx.TypeChecker.GetSymbolAtLocation(refNode)
-				if exportSym == sym {
-					found = true
-					return true
-				}
-			} else {
-				// No rename: compare by name text since the export specifier creates a different symbol
-				exportName := exportSpec.Name()
-				if exportName != nil && ast.IsIdentifier(exportName) && sym.Name == exportName.AsIdentifier().Text {
-					found = true
-					return true
-				}
-			}
-		}
-		return false
-	})
-	return found
 }
 
 func buildUnusedVarMessage(varName string, hasAssignment bool) rule.RuleMessage {
@@ -1433,146 +1353,159 @@ func isPropertyNameLikePosition(node *ast.Node) bool {
 	return false
 }
 
-// collectSymbolUsages walks the entire source file AST and collects:
-//   - usages: maps each symbol to its usage reference nodes (read references)
-//   - writeRefs: maps each symbol to its write-only reference nodes (assignments)
-//   - unresolvedRefs: maps identifier text to nodes where GetSymbolAtLocation returns nil
-//
-// After the walk, it calls markJsxFactoryUsed to handle JSX factory implicit usage.
-//
-// The maps are only ever queried for symbols (and, for unresolvedRefs, names) of
-// declarations the rule's listeners process, and any reference resolving to such a
-// symbol is an identifier with the same text as the declared name. So identifiers
-// whose text matches no candidate declaration name are skipped without consulting
-// the checker — GetSymbolAtLocation is expensive (property accesses trigger lazy
-// type checking of the whole expression; failed resolutions trigger spelling
-// suggestions), and most identifiers in a file don't refer to checked declarations.
-func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, unresolvedRefs map[string][]*ast.Node) {
-	candidateNames := collectCandidateNames(sourceFile)
-
-	var walk func(*ast.Node)
-	walk = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
-		if ast.IsIdentifier(node) && !isDeclarationName(node) && candidateNames[node.AsIdentifier().Text] {
-			// Track write-only references separately for report position.
-			// Simple assignments (=) are write-only and don't count as usage.
-			if isPartOfAssignment(node) {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if sym != nil {
-					writeRefs[sym] = append(writeRefs[sym], node)
-				}
-				node.ForEachChild(func(child *ast.Node) bool {
-					walk(child)
-					return false
-				})
-				return
-			}
-			sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-			// Compound assignments (+=, -=, etc.) and update expressions (++, --)
-			// are both read and write. Track as writeRef for report position,
-			// and still record the node as a usage below.
-			if sym != nil && (isCompoundAssignmentTarget(node) || isUpdateTarget(node)) {
-				writeRefs[sym] = append(writeRefs[sym], node)
-			}
-			if sym != nil {
-				// Store usage under both the original symbol and the resolved alias.
-				// This ensures import specifiers match correctly: the declaration site
-				// uses the original (pre-alias) symbol, while re-exports or other
-				// alias chains still work via the resolved symbol.
-				usages[sym] = append(usages[sym], node)
-				resolved := ctx.TypeChecker.SkipAlias(sym)
-				if resolved != sym {
-					usages[resolved] = append(usages[resolved], node)
-				}
-			} else if !isPropertyNameLikePosition(node) {
-				// TypeChecker is the source of truth; this branch is only a
-				// narrow fallback for residual cases where GetSymbolAtLocation
-				// returns nil but the identifier IS a value/type reference
-				// (e.g., empty namespaces — see TestNoUnusedVarsPatterns'
-				// `namespace _Foo {} export const x = _Foo;` invalid case,
-				// which still depends on the name-based lookup).
-				//
-				// Identifiers in pure property/label/attribute positions can
-				// never refer to a top-level declared symbol, so excluding
-				// them here prevents `obj.name` (any-typed) from polluting
-				// the lookup of an unused local `name`.
-				idText := node.AsIdentifier().Text
-				unresolvedRefs[idText] = append(unresolvedRefs[idText], node)
-			}
-			// For shorthand properties like { stats }, the identifier serves
-			// as both the property name and the value reference. GetSymbolAtLocation
-			// returns the property symbol, but we also need the value symbol to
-			// track usage of the referenced variable (especially for imports).
-			if node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-				if valSym != nil {
-					usages[valSym] = append(usages[valSym], node)
-					resolved := ctx.TypeChecker.SkipAlias(valSym)
-					if resolved != valSym {
-						usages[resolved] = append(usages[resolved], node)
-					}
-				}
-			}
-		}
-
-		node.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
+// collectCandidateName records declarations processed by this rule. References
+// whose text does not match one of these names never need a checker lookup.
+func collectCandidateName(node *ast.Node, names map[string]struct{}) {
+	switch node.Kind {
+	case ast.KindVariableDeclaration:
+		// Covers catch clause variables and destructuring patterns.
+		utils.CollectBindingNames(node.AsVariableDeclaration().Name(), func(_ *ast.Node, name string) {
+			names[name] = struct{}{}
 		})
+	case ast.KindParameter:
+		utils.CollectBindingNames(node.AsParameterDeclaration().Name(), func(_ *ast.Node, name string) {
+			names[name] = struct{}{}
+		})
+	case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+		ast.KindTypeParameter, ast.KindImportSpecifier, ast.KindImportClause,
+		ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
+		if name := node.Name(); name != nil && ast.IsIdentifier(name) {
+			names[name.AsIdentifier().Text] = struct{}{}
+		}
 	}
-	walk(sourceFile)
-
-	// TypeScript only creates a reference from JSX to the factory function in
-	// the classic `jsx: "react"` runtime, and even then via an implicit
-	// `React.createElement` call that has no identifier node for the AST walk
-	// above to find. For every other mode (preserve, react-native, react-jsx)
-	// the factory import has no textual reference at all. Mark it as used,
-	// matching @typescript-eslint/parser's `jsxPragma` behavior (the factory
-	// is considered used whenever the file contains JSX, in any runtime).
-	markJsxFactoryUsed(ctx, sourceFile, usages)
 }
 
-// collectCandidateNames walks the source file and gathers the name texts of every
-// declaration kind the rule's listeners process (variables, parameters, functions,
-// classes, interfaces, type aliases, enums, namespaces, type parameters, and all
-// import forms). Only identifiers matching one of these names can ever resolve to
-// a symbol the rule queries, so collectSymbolUsages uses this set to pre-filter
-// before calling into the checker.
-func collectCandidateNames(sourceFile *ast.Node) map[string]bool {
-	names := make(map[string]bool)
+// collectLocalExportTargets resolves the exact in-scope symbols consumed by a
+// named local export. Source-bearing re-exports never refer to local bindings.
+func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, targets map[*ast.Symbol]bool) {
+	if node.Kind != ast.KindExportDeclaration {
+		return
+	}
+	exportDecl := node.AsExportDeclaration()
+	if exportDecl == nil || exportDecl.ModuleSpecifier != nil || exportDecl.ExportClause == nil ||
+		!ast.IsNamedExports(exportDecl.ExportClause) {
+		return
+	}
+	namedExports := exportDecl.ExportClause.AsNamedExports()
+	if namedExports == nil || namedExports.Elements == nil {
+		return
+	}
+	for _, spec := range namedExports.Elements.Nodes {
+		if spec.AsExportSpecifier() == nil {
+			continue
+		}
+		target := ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(spec)
+		if target == nil {
+			continue
+		}
+		targets[target] = true
+		if resolved := ctx.TypeChecker.SkipAlias(target); resolved != target {
+			targets[resolved] = true
+		}
+	}
+}
+
+func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, ac *analysisContext) {
+	// Keep TypeScript's ordinary location symbol for write-only shorthand
+	// destructuring targets. In `({ a } = value)`, that node is the property
+	// symbol; ESLint reports an unused `a` at its declaration rather than at
+	// this property-shaped write.
+	if isPartOfAssignment(node) {
+		if sym := ctx.TypeChecker.GetSymbolAtLocation(node); sym != nil {
+			ac.writeRefs[sym] = append(ac.writeRefs[sym], node)
+		}
+		return
+	}
+
+	// GetReferenceSymbol reuses rslint's checker-aware handling for shorthand
+	// properties and local export specifiers, whose ordinary location symbol is
+	// a property/export symbol rather than the referenced local binding.
+	sym := utils.GetReferenceSymbol(node, ctx.TypeChecker)
+
+	// Compound assignments (+=, -=, etc.) and update expressions (++, --)
+	// are both read and write.
+	if sym != nil && (isCompoundAssignmentTarget(node) || isUpdateTarget(node)) {
+		ac.writeRefs[sym] = append(ac.writeRefs[sym], node)
+	}
+	if sym != nil {
+		ac.allUsages[sym] = append(ac.allUsages[sym], node)
+		if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != sym {
+			ac.allUsages[resolved] = append(ac.allUsages[resolved], node)
+		}
+		return
+	}
+
+	// TypeChecker is the source of truth; this is a narrow fallback for
+	// residual cases such as empty namespaces where symbol lookup returns nil.
+	// Property-like names must not enter the name-based fallback, but they are
+	// still sent through the checker above because parameter properties can be
+	// referenced through `this.property`.
+	if isPropertyNameLikePosition(node) {
+		return
+	}
+	name := node.AsIdentifier().Text
+	ac.unresolvedRefs[name] = append(ac.unresolvedRefs[name], node)
+}
+
+// collectSymbolUsages gathers candidate declarations, reference identifiers,
+// JSX markers, and local export targets in one AST traversal. Checker work is
+// deferred until all candidate names are known, so unrelated identifiers are
+// discarded without a symbol lookup.
+func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, ac *analysisContext) {
+	candidateNames := make(map[string]struct{})
+	referenceCapacity := 0
+	if sf := sourceFile.AsSourceFile(); sf != nil {
+		// Use the parser's exact upper bound so the one-pass collector never
+		// has to grow this temporary slice.
+		referenceCapacity = sf.IdentifierCount
+	}
+	referenceNodes := make([]*ast.Node, 0, referenceCapacity)
+	var firstJsx *ast.Node
+	var firstFragment *ast.Node
+
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
 			return
 		}
+
+		collectCandidateName(node, candidateNames)
+		collectLocalExportTargets(ctx, node, ac.localExportTargets)
+
 		switch node.Kind {
-		case ast.KindVariableDeclaration:
-			// Covers catch clause variables and destructuring patterns.
-			utils.CollectBindingNames(node.AsVariableDeclaration().Name(), func(_ *ast.Node, name string) {
-				names[name] = true
-			})
-		case ast.KindParameter:
-			utils.CollectBindingNames(node.AsParameterDeclaration().Name(), func(_ *ast.Node, name string) {
-				names[name] = true
-			})
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
-			ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
-			ast.KindTypeParameter, ast.KindImportSpecifier, ast.KindImportClause,
-			ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
-			if name := node.Name(); name != nil && ast.IsIdentifier(name) {
-				names[name.AsIdentifier().Text] = true
+		case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
+			if firstJsx == nil {
+				firstJsx = node
+			}
+		case ast.KindJsxFragment:
+			if firstJsx == nil {
+				firstJsx = node
+			}
+			if firstFragment == nil {
+				firstFragment = node
 			}
 		}
+
+		if ast.IsIdentifier(node) && !utils.IsDeclarationIdentifier(node) {
+			referenceNodes = append(referenceNodes, node)
+		}
+
 		node.ForEachChild(func(child *ast.Node) bool {
 			walk(child)
 			return false
 		})
 	}
 	walk(sourceFile)
-	return names
+
+	for _, node := range referenceNodes {
+		if _, ok := candidateNames[node.AsIdentifier().Text]; ok {
+			collectIdentifierUsage(ctx, node, ac)
+		}
+	}
+
+	// JSX factory references are implicit and have no identifier node.
+	markJsxFactoryUsed(ctx, sourceFile, firstJsx, firstFragment, ac.allUsages)
 }
 
 // markJsxFactoryUsed checks if the source file contains JSX and, if so, marks
@@ -1581,7 +1514,7 @@ func collectCandidateNames(sourceFile *ast.Node) map[string]bool {
 // without this an `import React` whose only "use" is JSX would be falsely
 // reported. Mirrors @typescript-eslint/parser, which treats the jsxPragma
 // (default "React") as used whenever JSX is present, regardless of runtime.
-func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
+func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, firstJsx *ast.Node, firstFragment *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
 	if ctx.Program == nil {
 		return
 	}
@@ -1589,7 +1522,6 @@ func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*
 	if opts == nil {
 		return
 	}
-	firstJsx, firstFragment := findJsxNodes(sourceFile)
 	if firstJsx == nil && firstFragment == nil {
 		return
 	}
@@ -1682,38 +1614,6 @@ func markImportByNameAsUsed(ctx rule.RuleContext, sourceFile *ast.Node, name str
 	})
 }
 
-// findJsxNodes returns the first JSX element/self-closing node and the first
-// JSX fragment node found in the AST. Either may be nil if not present.
-func findJsxNodes(node *ast.Node) (firstJsx *ast.Node, firstFragment *ast.Node) {
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || (firstJsx != nil && firstFragment != nil) {
-			return
-		}
-		switch n.Kind {
-		case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
-			if firstJsx == nil {
-				firstJsx = n
-			}
-		case ast.KindJsxFragment:
-			// Fragments also require the JSX factory (e.g., React.createElement),
-			// so they count as a JSX element for factory-marking purposes.
-			if firstJsx == nil {
-				firstJsx = n
-			}
-			if firstFragment == nil {
-				firstFragment = n
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return firstJsx != nil && firstFragment != nil
-		})
-	}
-	walk(node)
-	return
-}
-
 // processVariable determines whether a single declared variable/parameter/import
 // is unused and, if so, reports it. The decision pipeline:
 //  1. Resolve the symbol and look up usages (original sym → SkipAlias → unresolved fallback)
@@ -1790,7 +1690,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			if len(filteredUsages) > 0 {
 				onlyUsedAsType := true
 				for _, usage := range filteredUsages {
-					if !isInTypeContext(usage) {
+					if !isTypeOnlyReference(usage) {
 						onlyUsedAsType = false
 						break
 					}
@@ -1839,7 +1739,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		return
 	}
 
-	if isExported(ctx, varInfo) {
+	if isExported(varInfo, sym, ac.localExportTargets) {
 		// Even exported variables should be reported if they match an ignore pattern
 		// and reportUsedIgnorePattern is true (e.g., `export const x = _Foo`).
 		if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
@@ -1908,11 +1808,12 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 
 		ac := &analysisContext{
-			allUsages:         make(map[*ast.Symbol][]*ast.Node),
-			writeRefs:         make(map[*ast.Symbol][]*ast.Node),
-			unresolvedRefs:    make(map[string][]*ast.Node),
-			seenMergedSymbols: make(map[*ast.Symbol]bool),
-			reportedUnused:    make(map[*ast.Node]bool),
+			allUsages:          make(map[*ast.Symbol][]*ast.Node),
+			writeRefs:          make(map[*ast.Symbol][]*ast.Node),
+			unresolvedRefs:     make(map[string][]*ast.Node),
+			localExportTargets: make(map[*ast.Symbol]bool),
+			seenMergedSymbols:  make(map[*ast.Symbol]bool),
+			reportedUnused:     make(map[*ast.Node]bool),
 		}
 		collected := false
 
@@ -1921,7 +1822,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		ensureCollected := func(node *ast.Node) {
 			if !collected {
 				sourceFile := ast.GetSourceFileOfNode(node)
-				collectSymbolUsages(ctx, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.unresolvedRefs)
+				collectSymbolUsages(ctx, sourceFile.AsNode(), ac)
 				collected = true
 			}
 		}
