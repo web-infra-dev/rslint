@@ -76,6 +76,126 @@ function isActivateConfigsRequest(
   );
 }
 
+function asError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+/**
+ * Tracks completion callbacks, rather than `write()` return values: a false
+ * return means the chunk was accepted under backpressure, not that it was
+ * flushed. The tracker retains no report text or Promise array; under sustained
+ * backpressure the Writable owns one small completion callback per roughly
+ * 8 KiB IPC output chunk alongside the chunks it already buffers.
+ */
+class StdoutWriteBarrier {
+  private accepting = true;
+  private closed = false;
+  private pendingWrites = 0;
+  private failure: Error | null = null;
+  private readonly waiters = new Set<() => void>();
+
+  constructor(private readonly stream: NodeJS.WritableStream) {
+    // Writable failures also emit `error`; handling the event prevents EPIPE
+    // from becoming an uncaught exception and covers streams that omit a write
+    // callback after failing.
+    stream.on('error', this.onError);
+    stream.on('close', this.onClose);
+    stream.on('finish', this.onClose);
+  }
+
+  write(text: string): void {
+    if (!this.accepting || this.closed) {
+      this.recordFailure(
+        new Error(
+          `engine: stdout write after ${
+            this.closed ? 'stream close' : 'flush began'
+          }`,
+        ),
+      );
+      return;
+    }
+
+    this.pendingWrites++;
+    let completed = false;
+    const complete = (error?: Error | null): void => {
+      if (completed) return;
+      completed = true;
+      this.pendingWrites--;
+      if (error) {
+        this.recordFailure(asError(error));
+      } else {
+        this.wakeWaiters();
+      }
+    };
+
+    try {
+      this.stream.write(text, complete);
+    } catch (error) {
+      if (completed) {
+        this.recordFailure(asError(error));
+      } else {
+        complete(asError(error));
+      }
+    }
+  }
+
+  async sealAndFlush(): Promise<void> {
+    this.accepting = false;
+
+    // IpcClient dispatches all complete frames in one input chunk
+    // synchronously. Yield once so an illegal output notification following
+    // shutdown in that same chunk is observed before shutdown is acknowledged.
+    await Promise.resolve();
+
+    while (!this.failure && this.pendingWrites > 0) {
+      await new Promise<void>((resolve) => {
+        this.waiters.add(resolve);
+      });
+    }
+    if (this.failure) {
+      throw new Error(
+        `engine: stdout forwarding failed: ${this.failure.message}`,
+      );
+    }
+  }
+
+  dispose(): void {
+    this.stream.off('error', this.onError);
+    this.stream.off('close', this.onClose);
+    this.stream.off('finish', this.onClose);
+    if (this.pendingWrites > 0 && !this.failure) {
+      this.recordFailure(
+        new Error(`engine stopped with ${this.pendingWrites} pending write(s)`),
+      );
+    }
+  }
+
+  private readonly onError = (error: Error): void => {
+    this.recordFailure(asError(error));
+  };
+
+  private readonly onClose = (): void => {
+    this.closed = true;
+    if (this.pendingWrites > 0) {
+      this.recordFailure(
+        new Error(
+          `engine: stdout stream closed with ${this.pendingWrites} pending write(s)`,
+        ),
+      );
+    }
+  };
+
+  private recordFailure(error: Error): void {
+    if (!this.failure) this.failure = error;
+    this.wakeWaiters();
+  }
+
+  private wakeWaiters(): void {
+    for (const resolve of this.waiters) resolve();
+    this.waiters.clear();
+  }
+}
+
 // POSIX: a process killed by signal N exits 128+N. Node reports the signal
 // NAME, so map the ones we can receive; collapsing all to 130 would mislabel
 // a SIGTERM/SIGKILL teardown as a Ctrl-C.
@@ -272,6 +392,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     process.off('SIGTERM', onSignal);
     process.off('SIGHUP', onSignal);
   };
+  const forwardedStdout = new StdoutWriteBarrier(stdout);
 
   // try/finally so the worker pool is always drained — every exit path
   // (init failure as well as normal completion) runs the `finally`, which
@@ -327,9 +448,15 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             throw error;
           }
         }
-        case 'shutdown':
-          // Go signals it's done; teardown happens via the 'exit' event below.
+        case 'shutdown': {
+          // Go sends shutdown only after its last output notification. Seal
+          // forwarding and wait for the actual destination callbacks. The
+          // response is Go's barrier: only after receiving it may Go write
+          // deferred stderr (the timing table).
+          await forwardedStdout.sealAndFlush();
+          // Teardown happens via the child 'exit' event below.
           return { ok: true };
+        }
         case 'pluginLint':
           // Go dispatched a plugin-lint batch in parallel with native linting.
           // Go only dispatches after activation returned plugin metadata, so a
@@ -349,7 +476,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       'output',
       (msg: IpcMessage<{ stream?: string; text?: string }>) => {
         const text = msg.data?.text;
-        if (text != null) stdout.write(text);
+        if (text != null) forwardedStdout.write(text);
       },
     );
     ipc.start();
@@ -421,6 +548,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     for (const transactionId of configTransactions) {
       configModuleHost.deleteSession(transactionId);
     }
+    forwardedStdout.dispose();
   }
 }
 
