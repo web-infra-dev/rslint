@@ -37,6 +37,94 @@ type runCaches struct {
 	usedOutside   map[*ast.Node]bool
 }
 
+type suggestionBuilder func() []rule.RuleSuggestion
+
+type suggestionReporter struct {
+	ctx              *rule.RuleContext
+	dangerousAutofix bool
+}
+
+// newSuggestionReporter is the rule-local adapter between upstream's
+// suggestion-first reporting model and rslint's independently demanded edit
+// categories. Dangerous autofix mode promotes exactly the first suggestion's
+// first fix while memoizing the shared suggestion build for EditDemandAll.
+func newSuggestionReporter(ctx *rule.RuleContext, dangerousAutofix bool) *suggestionReporter {
+	return &suggestionReporter{
+		ctx:              ctx,
+		dangerousAutofix: dangerousAutofix,
+	}
+}
+
+func (reporter *suggestionReporter) report(
+	node *ast.Node,
+	description string,
+	buildSuggestions suggestionBuilder,
+) {
+	message := rule.RuleMessage{Description: description}
+	if buildSuggestions == nil {
+		reporter.ctx.ReportNode(node, message)
+		return
+	}
+	if !reporter.dangerousAutofix {
+		reporter.ctx.ReportNodeWithDeferredSuggestions(node, message, buildSuggestions)
+		return
+	}
+	reporter.reportDangerous(node, message, buildSuggestions)
+}
+
+func (reporter *suggestionReporter) reportDangerous(
+	node *ast.Node,
+	message rule.RuleMessage,
+	buildSuggestions suggestionBuilder,
+) {
+	var suggestions []rule.RuleSuggestion
+	suggestionsBuilt := false
+	getSuggestions := func() []rule.RuleSuggestion {
+		if !suggestionsBuilt {
+			suggestions = buildSuggestions()
+			suggestionsBuilt = true
+		}
+		return suggestions
+	}
+	reporter.ctx.ReportNodeWithDeferredFixesAndSuggestions(
+		node,
+		message,
+		func() []rule.RuleFix {
+			built := getSuggestions()
+			if len(built) == 0 || len(built[0].FixesArr) == 0 {
+				return nil
+			}
+			// Mirrors upstream's `problem.fix =
+			// problem.suggest[0].fix`: promote the first
+			// suggestion's first fix only (singular `.fix`).
+			return []rule.RuleFix{built[0].FixesArr[0]}
+		},
+		getSuggestions,
+	)
+}
+
+func buildDependencyArraySuggestion(
+	sf *ast.SourceFile,
+	depsNode *ast.Node,
+	suggestedDeps []string,
+	alphabetized bool,
+	optionalChains map[string]bool,
+) []rule.RuleSuggestion {
+	if alphabetized {
+		sort.Strings(suggestedDeps)
+	}
+
+	formatted := make([]string, len(suggestedDeps))
+	for i, key := range suggestedDeps {
+		formatted[i] = formatDependency(key, optionalChains)
+	}
+	suggestionText := "[" + strings.Join(formatted, ", ") + "]"
+	return []rule.RuleSuggestion{{
+		Message:  rule.RuleMessage{Description: "Update the dependencies array to be: " + suggestionText},
+		FixesArr: []rule.RuleFix{rule.RuleFixReplace(sf, depsNode, suggestionText)},
+	}}
+}
+
 // ExhaustiveDepsRule is the rslint port of upstream `react-hooks/exhaustive-deps`.
 //
 // Architectural difference from upstream: instead of relying on ESLint's
@@ -72,26 +160,14 @@ var ExhaustiveDepsRule = rule.Rule{
 		report := func(node *ast.Node, msg string) {
 			ctx.ReportNode(node, rule.RuleMessage{Description: msg})
 		}
-		reportWithSuggestions := func(node *ast.Node, msg string, sugs ...rule.RuleSuggestion) {
-			if opts.EnableDangerousAutofixThisMayCauseInfiniteLoops && len(sugs) > 0 && len(sugs[0].FixesArr) > 0 {
-				// Mirrors upstream's
-				// `problem.fix = problem.suggest[0].fix`: promote the
-				// first suggestion's first fix only (singular `.fix`,
-				// not the entire FixesArr), AND keep the suggestions.
-				firstFix := []rule.RuleFix{sugs[0].FixesArr[0]}
-				ctx.ReportNodeWithFixesAndSuggestions(node, rule.RuleMessage{Description: msg}, firstFix, sugs)
-				return
-			}
-			if len(sugs) == 0 {
-				ctx.ReportNode(node, rule.RuleMessage{Description: msg})
-				return
-			}
-			ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{Description: msg}, sugs...)
-		}
+		suggestionReports := newSuggestionReporter(
+			&ctx,
+			opts.EnableDangerousAutofixThisMayCauseInfiniteLoops,
+		)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				visitCall(ctx, sf, tc, opts, caches, node, report, reportWithSuggestions)
+				visitCall(ctx, sf, tc, opts, caches, node, report, suggestionReports)
 			},
 		}
 	},
@@ -109,7 +185,7 @@ func visitCall(
 	caches *runCaches,
 	node *ast.Node,
 	report func(*ast.Node, string),
-	reportWithSuggestions func(*ast.Node, string, ...rule.RuleSuggestion),
+	suggestionReports *suggestionReporter,
 ) {
 	call := node.AsCallExpression()
 	callee := call.Expression
@@ -182,7 +258,7 @@ func visitCall(
 	cb := stripAsExpression(callback)
 	switch cb.Kind {
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		visitFunctionWithDependencies(ctx, sf, tc, opts, caches, cb, depsNode, callee, hookName, isEffect, node, reportWithSuggestions)
+		visitFunctionWithDependencies(ctx, sf, tc, opts, caches, cb, depsNode, callee, hookName, isEffect, node, suggestionReports)
 	case ast.KindIdentifier:
 		// useEffect(myFn, deps): try to follow the symbol.
 		// Without a deps array we can't fault anything (effect always runs).
@@ -223,14 +299,14 @@ func visitCall(
 				}
 				switch decl.Kind {
 				case ast.KindFunctionDeclaration:
-					visitFunctionWithDependencies(ctx, sf, tc, opts, caches, decl, depsNode, callee, hookName, isEffect, node, reportWithSuggestions)
+					visitFunctionWithDependencies(ctx, sf, tc, opts, caches, decl, depsNode, callee, hookName, isEffect, node, suggestionReports)
 					return
 				case ast.KindVariableDeclaration:
 					vd := decl.AsVariableDeclaration()
 					if vd.Initializer != nil {
 						init := stripAsExpression(vd.Initializer)
 						if init != nil && (init.Kind == ast.KindArrowFunction || init.Kind == ast.KindFunctionExpression) {
-							visitFunctionWithDependencies(ctx, sf, tc, opts, caches, init, depsNode, callee, hookName, isEffect, node, reportWithSuggestions)
+							visitFunctionWithDependencies(ctx, sf, tc, opts, caches, init, depsNode, callee, hookName, isEffect, node, suggestionReports)
 							return
 						}
 					}
@@ -238,15 +314,18 @@ func visitCall(
 			}
 		}
 		// Fallback: suggest adding the identifier to the deps array.
-		fix := rule.RuleFixReplace(sf, depsNode, "["+cb.AsIdentifier().Text+"]")
-		reportWithSuggestions(callee,
+		callbackName := cb.AsIdentifier().Text
+		suggestionReports.report(callee,
 			fmt.Sprintf(
 				"React Hook %s has a missing dependency: '%s'. Either include it or remove the dependency array.",
-				hookName, cb.AsIdentifier().Text,
+				hookName, callbackName,
 			),
-			rule.RuleSuggestion{
-				Message:  rule.RuleMessage{Description: "Update the dependencies array to be: [" + cb.AsIdentifier().Text + "]"},
-				FixesArr: []rule.RuleFix{fix},
+			func() []rule.RuleSuggestion {
+				suggestionText := "[" + callbackName + "]"
+				return []rule.RuleSuggestion{{
+					Message:  rule.RuleMessage{Description: "Update the dependencies array to be: " + suggestionText},
+					FixesArr: []rule.RuleFix{rule.RuleFixReplace(sf, depsNode, suggestionText)},
+				}}
 			},
 		)
 	default:
@@ -294,7 +373,7 @@ func visitFunctionWithDependencies(
 	hookName string,
 	isEffect bool,
 	hookCall *ast.Node,
-	reportWithSuggestions func(*ast.Node, string, ...rule.RuleSuggestion),
+	suggestionReports *suggestionReporter,
 ) {
 	if isEffect && hasAsyncModifier(callback) {
 		ctx.ReportNode(callback, rule.RuleMessage{Description: "Effect callbacks are synchronous to prevent race conditions. " +
@@ -403,7 +482,7 @@ func visitFunctionWithDependencies(
 	// No deps array case: only emit the setState-without-deps diagnostic.
 	if depsNode == nil {
 		emitSetStateInsideEffectWarning(ctx, sf, tc, hookCall, reactiveHook, hookName, callback,
-			dependencies, setStateCallSites, stableDeps, optionalChains, reportWithSuggestions)
+			dependencies, setStateCallSites, stableDeps, optionalChains, suggestionReports)
 		return
 	}
 
@@ -423,24 +502,12 @@ func visitFunctionWithDependencies(
 
 	rec := collectRecommendations(dependencies, declared, stableDeps, externalDeps, isEffect)
 
-	suggestedDeps := rec.Suggested
 	problemCount := len(rec.Duplicate) + len(rec.Missing) + len(rec.Unnecessary)
 	if problemCount == 0 {
 		// No deps issues: check for constructions that change every render.
-		emitConstructionWarnings(ctx, sf, tc, callback, depsNode, declared, hookName, opts, reportWithSuggestions)
-		flushDeferredDiagnostics(ctx, deferredElementDiags, opts.EnableDangerousAutofixThisMayCauseInfiniteLoops)
+		emitConstructionWarnings(ctx, sf, tc, callback, depsNode, declared, hookName, opts, suggestionReports)
+		flushDeferredDiagnostics(deferredElementDiags, suggestionReports)
 		return
-	}
-
-	// For non-effect hooks with missing deps, recompute suggestions from scratch.
-	if !isEffect && len(rec.Missing) > 0 {
-		rec2 := collectRecommendations(dependencies, []declaredDependency{}, stableDeps, externalDeps, isEffect)
-		suggestedDeps = rec2.Suggested
-	}
-
-	// Alphabetize suggestions iff the originals were alphabetized.
-	if areDeclaredDepsAlphabetized(declared) {
-		sort.Strings(suggestedDeps)
 	}
 
 	// Build the warning message.
@@ -448,22 +515,36 @@ func visitFunctionWithDependencies(
 	msg := buildDepDiagnostic(hookCalleeText, rec, externalDeps, dependencies,
 		hookName, optionalChains, setStateCallSites, stateVariableSymbols, componentFn, tc, callback)
 
-	// Build suggestion text.
-	formatted := make([]string, len(suggestedDeps))
-	for i, k := range suggestedDeps {
-		formatted[i] = formatDependency(k, optionalChains)
+	suggestedDeps := rec.Suggested
+	var buildSuggestions suggestionBuilder
+	if !isEffect && len(rec.Missing) > 0 {
+		// Non-effect hooks intentionally recompute from scratch to mirror
+		// upstream. Keep that less-common edit-only work deferred.
+		buildSuggestions = func() []rule.RuleSuggestion {
+			rec2 := collectRecommendations(dependencies, []declaredDependency{}, stableDeps, externalDeps, isEffect)
+			return buildDependencyArraySuggestion(
+				sf,
+				depsNode,
+				rec2.Suggested,
+				areDeclaredDepsAlphabetized(declared),
+				optionalChains,
+			)
+		}
+	} else {
+		buildSuggestions = func() []rule.RuleSuggestion {
+			return buildDependencyArraySuggestion(
+				sf,
+				depsNode,
+				suggestedDeps,
+				areDeclaredDepsAlphabetized(declared),
+				optionalChains,
+			)
+		}
 	}
-	suggestionText := "[" + strings.Join(formatted, ", ") + "]"
-	fix := rule.RuleFixReplace(sf, depsNode, suggestionText)
-	reportWithSuggestions(depsNode, msg,
-		rule.RuleSuggestion{
-			Message:  rule.RuleMessage{Description: "Update the dependencies array to be: " + suggestionText},
-			FixesArr: []rule.RuleFix{fix},
-		},
-	)
+	suggestionReports.report(depsNode, msg, buildSuggestions)
 	// Flush per-element diagnostics AFTER the main report — upstream's
 	// observable order is missing-dep first, element errors after.
-	flushDeferredDiagnostics(ctx, deferredElementDiags, opts.EnableDangerousAutofixThisMayCauseInfiniteLoops)
+	flushDeferredDiagnostics(deferredElementDiags, suggestionReports)
 }
 
 // buildDepDiagnostic constructs the "React Hook X has a/an missing/unnecessary
@@ -874,7 +955,7 @@ func emitSetStateInsideEffectWarning(
 	setStateCallSites map[*ast.Symbol]*ast.Node,
 	stableDeps map[string]bool,
 	optionalChains map[string]bool,
-	reportWithSuggestions func(*ast.Node, string, ...rule.RuleSuggestion),
+	suggestionReports *suggestionReporter,
 ) {
 	var found string
 	// Iterate dep keys in source order so the "first setState in callback"
@@ -914,24 +995,27 @@ func emitSetStateInsideEffectWarning(
 		formatted[i] = formatDependency(k, optionalChains)
 	}
 	suggestionText := "[" + strings.Join(formatted, ", ") + "]"
-	// Insert AFTER the callback (not after the whole call expression),
-	// matching upstream's `fixer.insertTextAfter(node, ...)`. Using
-	// hookCall.End() would put the deps array INSIDE the closing `)`.
-	fix := rule.RuleFix{
-		Text:  ", " + suggestionText,
-		Range: callback.Loc.WithPos(callback.End()),
-	}
 	_ = sf
 	_ = tc
 	_ = reactiveHook
-	reportWithSuggestions(hookCall,
+	suggestionReports.report(hookCall,
 		fmt.Sprintf(
 			"React Hook %s contains a call to '%s'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass %s as a second argument to the %s Hook.",
 			hookName, found, suggestionText, hookName,
 		),
-		rule.RuleSuggestion{
-			Message:  rule.RuleMessage{Description: "Add dependencies array: " + suggestionText},
-			FixesArr: []rule.RuleFix{fix},
+		func() []rule.RuleSuggestion {
+			return []rule.RuleSuggestion{{
+				Message: rule.RuleMessage{Description: "Add dependencies array: " + suggestionText},
+				FixesArr: []rule.RuleFix{{
+					// Insert AFTER the callback (not after the whole call
+					// expression), matching upstream's
+					// `fixer.insertTextAfter(node, ...)`. Using
+					// hookCall.End() would put the deps array inside the
+					// closing `)`.
+					Text:  ", " + suggestionText,
+					Range: callback.Loc.WithPos(callback.End()),
+				}},
+			}}
 		},
 	)
 }
@@ -949,7 +1033,7 @@ func emitConstructionWarnings(
 	declared []declaredDependency,
 	hookName string,
 	opts Options,
-	reportWithSuggestions func(*ast.Node, string, ...rule.RuleSuggestion),
+	suggestionReports *suggestionReporter,
 ) {
 	componentFn := findEnclosingFunction(callback)
 	if componentFn == nil {
@@ -989,26 +1073,29 @@ func emitConstructionWarnings(
 			"The '%s' %s %s the dependencies of %s Hook (at line %d) change on every render. %s",
 			nameText, c.DepType, causation, hookName, depsLine, advice,
 		)
-		var sugs []rule.RuleSuggestion
+		var buildSuggestions suggestionBuilder
 		if c.IsUsedOutsideHook && c.Decl != nil && c.Decl.Kind == ast.KindVariableDeclaration && c.DepType == "function" {
-			before := "useCallback("
-			after := ")"
-			if wrapper == "useMemo" {
-				before = "useMemo(() => { return "
-				after = "; })"
+			initNode := c.InitNode
+			buildSuggestions = func() []rule.RuleSuggestion {
+				before := "useCallback("
+				after := ")"
+				if wrapper == "useMemo" {
+					before = "useMemo(() => { return "
+					after = "; })"
+				}
+				return []rule.RuleSuggestion{{
+					Message: rule.RuleMessage{Description: fmt.Sprintf(
+						"Wrap the %s of '%s' in its own %s() Hook.",
+						ctype, nameText, wrapper,
+					)},
+					FixesArr: []rule.RuleFix{
+						rule.RuleFixInsertBefore(sf, initNode, before),
+						rule.RuleFixInsertAfter(initNode, after),
+					},
+				}}
 			}
-			sugs = []rule.RuleSuggestion{{
-				Message: rule.RuleMessage{Description: fmt.Sprintf(
-					"Wrap the %s of '%s' in its own %s() Hook.",
-					ctype, nameText, wrapper,
-				)},
-				FixesArr: []rule.RuleFix{
-					rule.RuleFixInsertBefore(sf, c.InitNode, before),
-					rule.RuleFixInsertAfter(c.InitNode, after),
-				},
-			}}
 		}
-		reportWithSuggestions(c.Decl, msg, sugs...)
+		suggestionReports.report(c.Decl, msg, buildSuggestions)
 	}
 	_ = opts
 }
@@ -1029,9 +1116,10 @@ func lineOf(sf *ast.SourceFile, node *ast.Node) (int, error) {
 type elementDiagnostic struct {
 	node    *ast.Node
 	message string
-	// suggestion is non-nil only for the useEffectEvent variant — every
-	// other element diagnostic upstream is suggestion-less.
-	suggestion *rule.RuleSuggestion
+	// suggestionMessage is non-empty only for the useEffectEvent variant.
+	// Its range and edit remain deferred until the runtime requests suggestions
+	// or dangerous autofixes.
+	suggestionMessage string
 }
 
 // parseDeclaredDeps mirrors upstream's loop over the array literal: for
@@ -1089,17 +1177,14 @@ func parseDeclaredDeps(
 		if tc != nil && el.Kind == ast.KindIdentifier {
 			sym := tc.GetSymbolAtLocation(el)
 			if sym != nil && useEffectEventSymbols[sym] {
-				removeRange := utils.TrimNodeTextRange(sf, el)
+				dependencyText := getCalleeText(sf, el)
 				deferred = append(deferred, elementDiagnostic{
 					node: el,
 					message: fmt.Sprintf(
 						"Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `%s` from the list.",
-						getCalleeText(sf, el),
+						dependencyText,
 					),
-					suggestion: &rule.RuleSuggestion{
-						Message:  rule.RuleMessage{Description: fmt.Sprintf("Remove the dependency `%s`", getCalleeText(sf, el))},
-						FixesArr: []rule.RuleFix{rule.RuleFixRemoveRange(removeRange)},
-					},
+					suggestionMessage: fmt.Sprintf("Remove the dependency `%s`", dependencyText),
 				})
 			}
 		}
@@ -1166,29 +1251,29 @@ func parseDeclaredDeps(
 // parseDeclaredDeps. Called by the caller AFTER the main missing-dep
 // diagnostic, so the output order matches upstream.
 //
-// `enableDangerous` mirrors upstream's `reportProblem` promotion gate:
-// when `enableDangerousAutofixThisMayCauseInfiniteLoops` is on and the
-// diagnostic carries a suggestion, the first suggestion's first fix is
-// promoted to a top-level autofix while keeping the suggestion array.
-// This applies to every `reportProblem` call in upstream — including
-// the per-element useEffectEvent rejection — so we plumb the flag here.
-func flushDeferredDiagnostics(ctx rule.RuleContext, deferred []elementDiagnostic, enableDangerous bool) {
+// Suggestion construction is routed through the same reporter as the
+// top-level dependency diagnostic. This keeps demand gating and dangerous
+// autofix promotion identical for every upstream `reportProblem` call.
+func flushDeferredDiagnostics(
+	deferred []elementDiagnostic,
+	suggestionReports *suggestionReporter,
+) {
 	for _, d := range deferred {
-		if d.suggestion != nil {
-			if enableDangerous && len(d.suggestion.FixesArr) > 0 {
-				firstFix := []rule.RuleFix{d.suggestion.FixesArr[0]}
-				ctx.ReportNodeWithFixesAndSuggestions(
-					d.node,
-					rule.RuleMessage{Description: d.message},
-					firstFix,
-					[]rule.RuleSuggestion{*d.suggestion},
-				)
-				continue
-			}
-			ctx.ReportNodeWithSuggestions(d.node, rule.RuleMessage{Description: d.message}, *d.suggestion)
-		} else {
-			ctx.ReportNode(d.node, rule.RuleMessage{Description: d.message})
+		node := d.node
+		if d.suggestionMessage == "" {
+			suggestionReports.report(node, d.message, nil)
+			continue
 		}
+
+		suggestionMessage := d.suggestionMessage
+		suggestionReports.report(node, d.message, func() []rule.RuleSuggestion {
+			return []rule.RuleSuggestion{{
+				Message: rule.RuleMessage{Description: suggestionMessage},
+				FixesArr: []rule.RuleFix{
+					rule.RuleFixRemoveRange(utils.TrimNodeTextRange(suggestionReports.ctx.SourceFile, node)),
+				},
+			}}
+		})
 	}
 }
 
