@@ -128,5 +128,38 @@ ruleTester.run('no-focused-tests', {} as never, {
         },
       ],
     },
+    {
+      // `.only` before a conditional factory: the runIf(...) factory layer
+      // must be skipped so `.only` is reported exactly once.
+      code: 'test.only.runIf(true)()',
+      errors: [
+        {
+          line: 1,
+          column: 6,
+          endColumn: 10,
+          messageId: 'focusedTest',
+          suggestions: [
+            { messageId: 'suggestRemoveFocus', output: 'test.runIf(true)()' },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'describe.only.skipIf(false)()',
+      errors: [
+        {
+          line: 1,
+          column: 10,
+          endColumn: 14,
+          messageId: 'focusedTest',
+          suggestions: [
+            {
+              messageId: 'suggestRemoveFocus',
+              output: 'describe.skipIf(false)()',
+            },
+          ],
+        },
+      ],
+    },
   ],
 });

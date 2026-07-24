@@ -203,6 +203,44 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
+				// `.only` before a conditional factory: the runIf(...) factory
+				// layer must be skipped so `.only` is reported exactly once.
+				Code: "test.only.runIf(true)()",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Line:      1,
+						Column:    6,
+						EndLine:   1,
+						EndColumn: 10,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "test.runIf(true)()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: "describe.only.skipIf(false)()",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Line:      1,
+						Column:    10,
+						EndLine:   1,
+						EndColumn: 14,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe.skipIf(false)()",
+							},
+						},
+					},
+				},
+			},
+			{
 				Code: "import { describe as describeThis } from '@rstest/core';\n\ndescribeThis.only()",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{

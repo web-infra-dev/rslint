@@ -19,8 +19,10 @@ var rstestSharedModifiers = map[string]bool{
 }
 
 // Conditional and parameterized members available on both `test` and
-// `describe` (test.runIf/skipIf/each/for, describe.runIf/skipIf/each/for).
-var rstestSharedMembers = map[string]bool{
+// `describe`. Each of these is installed as a factory that returns a new test
+// API which is then invoked again (test.runIf(cond)(...), test.each(cases)(...)),
+// so they all form a "factory call + actual call" shape.
+var rstestParameterizedMembers = map[string]bool{
 	"runIf":  true,
 	"skipIf": true,
 	"each":   true,
@@ -30,7 +32,7 @@ var rstestSharedMembers = map[string]bool{
 // isValidRstestMember reports whether a chained member is legal for the given
 // Rstest root. `fails` is only available on `test`/`it`, not `describe`.
 func isValidRstestMember(root string, member string) bool {
-	if rstestSharedModifiers[member] || rstestSharedMembers[member] {
+	if rstestSharedModifiers[member] || rstestParameterizedMembers[member] {
 		return true
 	}
 	if member == "fails" && root != "describe" {
@@ -62,11 +64,8 @@ func isValidRstestCall(name string, members []string) bool {
 // Rstest.
 func RstestFnCallParseConfig() jestUtils.FnCallParseConfig {
 	return jestUtils.FnCallParseConfig{
-		ImportModule: RstestImportModule,
-		IsValidChain: isValidRstestCall,
-		ParameterizedModifiers: map[string]bool{
-			"each": true,
-			"for":  true,
-		},
+		ImportModule:           RstestImportModule,
+		IsValidChain:           isValidRstestCall,
+		ParameterizedModifiers: rstestParameterizedMembers,
 	}
 }
