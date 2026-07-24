@@ -121,6 +121,10 @@ func isReferencePosition(n *ast.Node) bool {
 		return p.AsPropertyAssignment().Name() != n
 	case ast.KindBindingElement:
 		return p.AsBindingElement().PropertyName != n
+	case ast.KindImportAttribute:
+		// Import attribute keys (`type` in `with { type: "json" }`) are
+		// syntactic names, not references to same-named variables.
+		return p.AsImportAttribute().Name() != n
 	case ast.KindImportSpecifier, ast.KindExportSpecifier, ast.KindNamespaceImport,
 		ast.KindImportClause, ast.KindNamespaceExport:
 		// Import/export bindings resolve through module/alias machinery the
