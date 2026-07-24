@@ -187,15 +187,12 @@ func checkFirst(ctx rule.RuleContext, options []any) {
 
 	absoluteFirst := utils.GetOptionsString(options) == "absolute-first"
 	body := statements.Nodes
-	sourceText := ctx.SourceFile.Text()
 
 	nonImportCount := 0
 	anyExpressions := false
 	anyRelative := false
 	var lastLegalImp *ast.Node
 	var errorInfos []errorInfo
-	shouldSort := true
-	lastSortNodesIndex := 0
 
 	for i, node := range body {
 		// Skip directives ('use strict', etc.) that precede any real expression.
@@ -223,19 +220,6 @@ func checkFirst(ctx rule.RuleContext, options []any) {
 			}
 
 			if nonImportCount > 0 {
-				// This import appears after non-import code.
-				// Check if any of its declared names are referenced before it;
-				// if so, moving the import could change evaluation order, so
-				// disable autofix from this point on.
-				if shouldSort {
-					if hasReferenceBeforeImport(ctx, body, i, node) {
-						shouldSort = false
-					}
-				}
-				if shouldSort {
-					lastSortNodesIndex = len(errorInfos)
-				}
-
 				rangeFrom := 0
 				if i > 0 {
 					rangeFrom = body[i-1].End()
@@ -258,23 +242,73 @@ func checkFirst(ctx rule.RuleContext, options []any) {
 		return
 	}
 
-	for i, ei := range errorInfos {
-		if i == lastSortNodesIndex {
-			// The last sortable error carries the combined fix that moves all
-			// sortable imports to the top.
-			sortNodes := errorInfos[:lastSortNodesIndex+1]
-			fixes := buildFix(sourceText, body, lastLegalImp, sortNodes)
-			ctx.ReportNodeWithFixes(ei.node, messageFirst(), fixes...)
-		} else if i < lastSortNodesIndex {
-			// Earlier sortable errors get a no-op fix so the fixer treats them
-			// as already handled (avoids overlapping fix conflicts).
-			ctx.ReportNodeWithFixes(ei.node, messageFirst(), rule.RuleFix{
-				Range: core.NewTextRange(ei.node.End(), ei.node.End()),
-				Text:  "",
-			})
-		} else {
-			ctx.ReportNode(ei.node, messageFirst())
+	var fixPlan firstFixPlan
+	fixPlanBuilt := false
+	getFixes := func(errorIndex int, node *ast.Node) []rule.RuleFix {
+		if !fixPlanBuilt {
+			fixPlan = buildFixPlan(ctx, body, lastLegalImp, errorInfos)
+			fixPlanBuilt = true
 		}
+		return fixPlan.fixesFor(errorIndex, node)
+	}
+
+	for i, ei := range errorInfos {
+		errorIndex := i
+		node := ei.node
+		ctx.ReportNodeWithDeferredFixes(node, messageFirst(), func() []rule.RuleFix {
+			return getFixes(errorIndex, node)
+		})
+	}
+}
+
+type firstFixPlan struct {
+	lastSortNodesIndex int
+	combinedFixes      []rule.RuleFix
+}
+
+func (p firstFixPlan) fixesFor(errorIndex int, node *ast.Node) []rule.RuleFix {
+	switch {
+	case errorIndex == p.lastSortNodesIndex:
+		return p.combinedFixes
+	case errorIndex < p.lastSortNodesIndex:
+		return []rule.RuleFix{{
+			Range: core.NewTextRange(node.End(), node.End()),
+			Text:  "",
+		}}
+	default:
+		return nil
+	}
+}
+
+// buildFixPlan determines which misplaced imports may be safely moved together
+// and builds the per-diagnostic fixes. This work is only needed by consumers
+// that request autofixes.
+func buildFixPlan(ctx rule.RuleContext, body []*ast.Node, lastLegalImp *ast.Node, errorInfos []errorInfo) firstFixPlan {
+	shouldSort := true
+	lastSortNodesIndex := 0
+	bodyIndex := 0
+	for i, ei := range errorInfos {
+		for bodyIndex < len(body) && body[bodyIndex] != ei.node {
+			bodyIndex++
+		}
+		if bodyIndex == len(body) {
+			panic("import/first: misplaced import is not part of the source-file body")
+		}
+		// The first misplaced import remains individually fixable. A reference
+		// only prevents later imports from joining the same batch.
+		if shouldSort && hasReferenceBeforeImport(ctx, body, bodyIndex, ei.node) {
+			shouldSort = false
+		}
+		if shouldSort {
+			lastSortNodesIndex = i
+		}
+	}
+
+	return firstFixPlan{
+		lastSortNodesIndex: lastSortNodesIndex,
+		// The last sortable error carries the combined fix that moves all
+		// sortable imports to the top.
+		combinedFixes: buildFix(ctx.SourceFile.Text(), body, lastLegalImp, errorInfos[:lastSortNodesIndex+1]),
 	}
 }
 
