@@ -387,8 +387,10 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 				configuredListenerRule(ast.KindNumericLiteral, "b-second", rule.SeverityWarning),
 			}
 		},
-		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
-			diagnostics = append(diagnostics, diagnostic)
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
 		},
 	})
 	if err != nil {
@@ -469,8 +471,11 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 				},
 			}}
 		},
-		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
-			diagnostics = append(diagnostics, diagnostic)
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
 		},
 	})
 	if err != nil {

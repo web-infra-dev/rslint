@@ -38,13 +38,13 @@ var NoVarRule = rule.Rule{
 					Description: "Unexpected var, use let or const instead.",
 				}
 
-				if canFix(node, &ctx) {
+				ctx.ReportNodeWithDeferredFixes(reportNode, msg, func() []rule.RuleFix {
+					if !canFix(node, &ctx) {
+						return nil
+					}
 					varRange := utils.GetVarKeywordRange(node, ctx.SourceFile)
-					ctx.ReportNodeWithFixes(reportNode, msg,
-						rule.RuleFixReplaceRange(varRange, "let"))
-				} else {
-					ctx.ReportNode(reportNode, msg)
-				}
+					return []rule.RuleFix{rule.RuleFixReplaceRange(varRange, "let")}
+				})
 			},
 		}
 	},

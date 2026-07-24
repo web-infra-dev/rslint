@@ -954,6 +954,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		rulesForFile = getRulesForFile
 	}
 
+	nativeEditDemand := rule.EditDemandNone
+	if fix {
+		nativeEditDemand = rule.EditDemandAutofix
+	}
 	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
@@ -965,8 +969,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		TypeCheck:             typeCheck,
 		SkipTypeCheckPrograms: skipTypeCheck,
 		Timing:                timingCollector,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			diagnosticsChan <- d
+		Consumer: rule.DiagnosticConsumer{
+			Demand: nativeEditDemand,
+			Report: func(d rule.RuleDiagnostic) {
+				diagnosticsChan <- d
+			},
 		},
 	}
 	// Dispatch eslint-plugin rules to the Node worker in parallel with the
@@ -1083,6 +1090,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			if !typeCheckOnly {
 				fixRulesForFile = fixGetRulesForFile
 			}
+			passEditDemand := rule.EditDemandAutofix
+			if pass == maxFixPasses {
+				// This pass only verifies the bytes written by the final
+				// allowed write pass; no further fixes can be applied.
+				passEditDemand = rule.EditDemandNone
+			}
 			var passDiags []rule.RuleDiagnostic
 			fixSyntaxDiagnostics, fixSyntaxErrorFiles := collectTargetSyntacticDiagnostics(
 				newPrograms,
@@ -1103,10 +1116,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				TypeCheck:             typeCheck,
 				SkipTypeCheckPrograms: fixSkipMask,
 				Timing:                timingCollector,
-				OnDiagnostic: func(d rule.RuleDiagnostic) {
-					diagsMu.Lock()
-					passDiags = append(passDiags, d)
-					diagsMu.Unlock()
+				Consumer: rule.DiagnosticConsumer{
+					Demand: passEditDemand,
+					Report: func(d rule.RuleDiagnostic) {
+						diagsMu.Lock()
+						passDiags = append(passDiags, d)
+						diagsMu.Unlock()
+					},
 				},
 			}
 			// Re-dispatch plugin rules each pass (only when configured): the

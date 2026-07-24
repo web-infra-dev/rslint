@@ -38,7 +38,10 @@ func runLinterPositional(
 		GetRulesForFile:  getRulesForFile,
 		TypeInfoFiles:    typeInfoFiles,
 		TypeCheck:        typeCheck,
-		OnDiagnostic:     onDiagnostic,
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: onDiagnostic,
+		},
 	})
 }
 
@@ -88,7 +91,10 @@ func RunLinterInProgram(
 			TypeInfoFiles:    typeInfoFiles,
 			SyntaxErrorFiles: syntaxErrorFiles,
 			TypeCheck:        true,
-			OnDiagnostic:     onDiagnostic,
+			Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAll,
+				Report: onDiagnostic,
+			},
 			PerProgramFilter: func() []FileFilter {
 				if ff == nil {
 					return nil
@@ -109,6 +115,8 @@ func RunLinterInProgram(
 		GetRulesForFile:  getRulesForFile,
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
-		OnDiagnostic:     onDiagnostic,
+	}, rule.DiagnosticConsumer{
+		Demand: rule.EditDemandAll,
+		Report: onDiagnostic,
 	}).lintedFileCount
 }

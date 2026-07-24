@@ -973,7 +973,16 @@ func runLintWithProgramLoader(
 	if err != nil {
 		return lintPassResult{}, err
 	}
-	return lintSingleFile(program, filename, configFilePath, hasTypeInfo, fileConfigResolver, ctx, fs), nil
+	return lintSingleFile(
+		program,
+		filename,
+		configFilePath,
+		hasTypeInfo,
+		fileConfigResolver,
+		rule.EditDemandAll,
+		ctx,
+		fs,
+	), nil
 }
 
 func lintSingleFile(
@@ -982,6 +991,7 @@ func lintSingleFile(
 	configFilePath string,
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
+	editDemand rule.EditDemand,
 	ctx context.Context,
 	fs vfs.FS,
 ) lintPassResult {
@@ -1024,7 +1034,10 @@ func lintSingleFile(
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
 		},
-		OnDiagnostic: diagnosticCollector,
+		Consumer: rule.DiagnosticConsumer{
+			Demand: editDemand,
+			Report: diagnosticCollector,
+		},
 	})
 
 	if diagnostics == nil {
@@ -1205,7 +1218,16 @@ func (s *Server) runConfiguredLintForContent(
 			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
 		}
 		if programContainsFile(program, filename, overlayFS) {
-			return lintSingleFile(program, filename, configFilePath, true, resolver, ctx, overlayFS), nil
+			return lintSingleFile(
+				program,
+				filename,
+				configFilePath,
+				true,
+				resolver,
+				rule.EditDemandAutofix,
+				ctx,
+				overlayFS,
+			), nil
 		}
 	}
 
@@ -1213,7 +1235,16 @@ func (s *Server) runConfiguredLintForContent(
 	if err != nil {
 		return lintPassResult{}, fmt.Errorf("create fallback lint program: %w", err)
 	}
-	return lintSingleFile(program, filename, configFilePath, false, resolver, ctx, overlayFS), nil
+	return lintSingleFile(
+		program,
+		filename,
+		configFilePath,
+		false,
+		resolver,
+		rule.EditDemandAutofix,
+		ctx,
+		overlayFS,
+	), nil
 }
 
 func lspFilesystemPathID(filePath string, fs vfs.FS) string {

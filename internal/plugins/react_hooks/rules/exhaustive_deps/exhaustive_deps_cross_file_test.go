@@ -226,10 +226,13 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 				},
 			}}
 		},
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			mu.Lock()
-			defer mu.Unlock()
-			diagnostics = append(diagnostics, d)
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(d rule.RuleDiagnostic) {
+				mu.Lock()
+				defer mu.Unlock()
+				diagnostics = append(diagnostics, d)
+			},
 		},
 	}); err != nil {
 		t.Fatalf("RunLinter: %v", err)

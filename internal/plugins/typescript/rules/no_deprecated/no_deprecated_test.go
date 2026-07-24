@@ -203,10 +203,12 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 				},
 			}
 		},
-		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
-			diagnosticsMu.Lock()
-			diagnostics = append(diagnostics, diagnostic)
-			diagnosticsMu.Unlock()
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnosticsMu.Lock()
+				diagnostics = append(diagnostics, diagnostic)
+				diagnosticsMu.Unlock()
+			},
 		},
 	})
 	if err != nil {

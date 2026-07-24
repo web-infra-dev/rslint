@@ -1498,8 +1498,11 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)
 			},
-			OnDiagnostic: func(d rule.RuleDiagnostic) {
-				diags = append(diags, d)
+			Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAll,
+				Report: func(d rule.RuleDiagnostic) {
+					diags = append(diags, d)
+				},
 			},
 		})
 		return diags

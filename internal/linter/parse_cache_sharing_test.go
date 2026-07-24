@@ -73,16 +73,18 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 		Programs:       programs,
 		SingleThreaded: singleThreaded,
 		TypeCheck:      typeCheck,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			mu.Lock()
-			defer mu.Unlock()
-			got = append(got, diagKey{
-				File: tspath.NormalizePath(d.FilePath),
-				Pos:  d.Range.Pos(),
-				End:  d.Range.End(),
-				Rule: d.RuleName,
-				Msg:  d.Message.Description,
-			})
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				mu.Lock()
+				defer mu.Unlock()
+				got = append(got, diagKey{
+					File: tspath.NormalizePath(d.FilePath),
+					Pos:  d.Range.Pos(),
+					End:  d.Range.End(),
+					Rule: d.RuleName,
+					Msg:  d.Message.Description,
+				})
+			},
 		},
 	}
 	if withRules {

@@ -134,6 +134,31 @@ func TestRefStoreMetaPropertyExcluded(t *testing.T) {
 	}
 }
 
+func TestRefStoreImportAttributeNameExcluded(t *testing.T) {
+	// `type` in an import attribute is a syntactic key, not a reference to a
+	// same-named variable.
+	sourceFile, refs := newBoundRefStore(t, "/import-attribute.ts", core.ScriptKindTS,
+		`import data from "pkg" with { type: "json" }; var type = 1; type++;`)
+
+	occurrences := identifiers(sourceFile.AsNode(), "type")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of type, got %d", len(occurrences))
+	}
+	attributeIdent, declIdent, useIdent := occurrences[0], occurrences[1], occurrences[2]
+	if attributeIdent.Parent == nil || attributeIdent.Parent.Kind != ast.KindImportAttribute {
+		t.Fatalf("expected the first `type` to be an ImportAttribute name, got parent kind %v", attributeIdent.Parent.Kind)
+	}
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != useIdent {
+		t.Fatalf("References = %v, want [%v] (the import attribute key must be excluded)", got, useIdent)
+	}
+}
+
 func TestRefStoreJsxNamespacedNameExcluded(t *testing.T) {
 	// `bar` in the namespaced JSX tag name `<bar:qux />` is syntactic, not a
 	// reference to a same-named variable.
