@@ -49,51 +49,19 @@ func isForInOrOfLoopVariable(varDecl *ast.Node) bool {
 	return stmt != nil && stmt.Initializer == list
 }
 
-// collectWrittenUndefinedSymbols walks the source file and collects symbols of
-// every identifier named "undefined" that is written to (assignment target).
-// Symbol-level declaration analysis (init, parameter/class/function/catch/import
-// defs, for-in/of loop) is handled separately via `symbol.Declarations`.
-func collectWrittenUndefinedSymbols(ctx rule.RuleContext) map[*ast.Symbol]bool {
-	written := map[*ast.Symbol]bool{}
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil {
-		return written
-	}
-	tc := ctx.TypeChecker
-
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		if ast.IsIdentifier(n) && n.AsIdentifier().Text == "undefined" && utils.IsWriteReference(n) {
-			// GetReferenceSymbol resolves the value-binding symbol for
-			// shorthand destructuring assignments, instead of the property
-			// symbol that GetSymbolAtLocation would otherwise return.
-			if sym := utils.GetReferenceSymbol(n, tc); sym != nil {
-				written[sym] = true
-			}
-		}
-		n.ForEachChild(func(c *ast.Node) bool {
-			walk(c)
-			return false
-		})
-	}
-
-	walk(ctx.SourceFile.AsNode())
-	return written
-}
-
 // isSymbolSafelyShadowingUndefined matches ESLint's safelyShadowsUndefined:
 // every def of the symbol must be a plain VariableDeclaration without an
 // initializer and not a for-in/of loop variable, AND the symbol must have no
 // write references.
-func isSymbolSafelyShadowingUndefined(sym *ast.Symbol, writtenSymbols map[*ast.Symbol]bool) bool {
+func isSymbolSafelyShadowingUndefined(sym *ast.Symbol, refs *rule.RefStore) bool {
 	if sym == nil {
-		// No type info — be permissive, same as when TypeChecker is nil.
+		// No symbol info — be permissive, same as when refs is nil.
 		return true
 	}
-	if writtenSymbols[sym] {
-		return false
+	for _, ref := range refs.References(sym) {
+		if utils.IsWriteReference(ref) {
+			return false
+		}
 	}
 	if len(sym.Declarations) == 0 {
 		return true
@@ -171,16 +139,6 @@ var NoShadowRestrictedNamesRule = rule.Rule{
 			restricted["globalThis"] = true
 		}
 
-		var writtenUndefinedSymbols map[*ast.Symbol]bool
-		undefinedComputed := false
-		ensureUndefinedAnalysis := func() {
-			if undefinedComputed {
-				return
-			}
-			undefinedComputed = true
-			writtenUndefinedSymbols = collectWrittenUndefinedSymbols(ctx)
-		}
-
 		reported := map[*ast.Node]bool{}
 		report := func(ident *ast.Node, name string) {
 			if ident == nil || reported[ident] {
@@ -198,14 +156,16 @@ var NoShadowRestrictedNamesRule = rule.Rule{
 				return
 			}
 			if name == "undefined" && allowSafeUndefined {
-				if ctx.TypeChecker == nil {
-					// No type information: be permissive, matching ESLint's
+				if ctx.Refs == nil {
+					// No reference info: be permissive, matching ESLint's
 					// safelyShadowsUndefined when the declaration has no initializer.
 					return
 				}
-				ensureUndefinedAnalysis()
-				sym := ctx.TypeChecker.GetSymbolAtLocation(ident)
-				if isSymbolSafelyShadowingUndefined(sym, writtenUndefinedSymbols) &&
+				var sym *ast.Symbol
+				if decl := ident.Parent; decl != nil && decl.Name() == ident {
+					sym = decl.Symbol()
+				}
+				if isSymbolSafelyShadowingUndefined(sym, ctx.Refs) &&
 					!hasSameScopeNonVarUndefinedDeclaration(ident) {
 					return
 				}

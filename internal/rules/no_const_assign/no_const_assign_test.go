@@ -109,13 +109,12 @@ func TestNoConstAssignRule(t *testing.T) {
 			},
 
 			// Assignment via destructuring
-			// TODO: This test case is not working yet - needs investigation of AST structure
-			// {
-			// 	Code: `const x = 0; ({x} = {x: 1});`,
-			// 	Errors: []rule_tester.InvalidTestCaseError{
-			// 		{MessageId: "const", Line: 1, Column: 16},
-			// 	},
-			// },
+			{
+				Code: `const x = 0; ({x} = {x: 1});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 16},
+				},
+			},
 
 			// Compound assignment +=
 			{

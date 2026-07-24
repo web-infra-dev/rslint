@@ -177,19 +177,27 @@ var PreferConstRule = rule.Rule{
 
 // shouldReport determines whether a candidate should be reported as "use const".
 func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, opts preferConstOptions) bool {
-	sym := ctx.TypeChecker.GetSymbolAtLocation(c.nameNode)
+	// The binder attaches the symbol to the enclosing declaration
+	// (VariableDeclaration or BindingElement). ctx.Refs is keyed by that
+	// binder symbol, not by checker.GetSymbolAtLocation results.
+	decl := c.nameNode.Parent
+	if decl == nil || decl.Name() != c.nameNode {
+		return false
+	}
+	sym := decl.Symbol()
 	if sym == nil {
 		return false
 	}
+	refs := ctx.Refs.References(sym)
 
 	if c.hasInitializer {
 		// For initialized candidates: report if 0 writes after declaration (never reassigned)
-		return !isReassigned(sym, c.nameNode.Text(), declNode, ctx)
+		return countWriteReferences(refs) == 0
 	}
 
 	// For uninitialized candidates (let x;):
 	// Count write references (excluding declaration)
-	writeCount := countWriteReferences(sym, c.nameNode.Text(), declNode, ctx)
+	writeCount := countWriteReferences(refs)
 	if writeCount != 1 {
 		// 0 writes: never assigned, "let x;" alone is fine - don't report
 		// 2+ writes: truly reassigned - don't report
@@ -200,13 +208,13 @@ func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, o
 	// But only if the write is at the same block level as the declaration.
 	// If the write is inside a nested block (if, for, try, function, etc.),
 	// we can't safely convert to "const x = ..." because it would change semantics.
-	writeNode := findWriteInSameBlock(sym, c.nameNode.Text(), declNode, ctx)
+	writeNode := findWriteInSameBlock(refs, declNode, ctx)
 	if writeNode == nil {
 		return false
 	}
 	// ESLint reports uninitialized variables at the write location when there's no read
 	// between declaration and write. If there IS a read before write, report at the declaration.
-	readBeforeAssign := isReadBeforeFirstAssign(sym, c.nameNode.Text(), declNode, ctx)
+	readBeforeAssign := isReadBeforeFirstAssign(refs, declNode.Pos())
 	if !readBeforeAssign {
 		c.reportNode = writeNode
 	}
@@ -247,176 +255,39 @@ func isInForInOrOf(node *ast.Node) bool {
 	return node.Parent.Kind == ast.KindForInStatement || node.Parent.Kind == ast.KindForOfStatement
 }
 
-// isReassigned checks if a symbol is ever assigned to after its declaration.
-func isReassigned(sym *ast.Symbol, declName string, declNode *ast.Node, ctx *rule.RuleContext) bool {
-	return countWriteReferences(sym, declName, declNode, ctx) > 0
-}
-
-// countWriteReferences counts the number of write references to a symbol after its declaration.
-func countWriteReferences(sym *ast.Symbol, declName string, declNode *ast.Node, ctx *rule.RuleContext) int {
-	// Find enclosing scope to limit the walk
-	scope := findEnclosingScope(declNode)
-	if scope == nil {
-		scope = ctx.SourceFile.AsNode()
-	}
-
+// countWriteReferences counts the number of write references among refs (as
+// returned by ctx.Refs.References(sym)). Declaration names are never included
+// in refs, so this naturally excludes the declaration itself; a write inside
+// the same declaration's initializer (e.g. `let x = (x = 1)`) is still a
+// descendant of the initializer rather than of the binding name, so it is
+// still counted.
+func countWriteReferences(refs []*ast.Node) int {
 	count := 0
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
+	for _, ref := range refs {
+		if utils.IsWriteReference(ref) {
+			count++
 		}
-
-		// Cheap syntax checks (name match, write position) come first so the
-		// expensive checker lookup only runs for genuine write candidates.
-		if n.Kind == ast.KindIdentifier && n.Text() == declName &&
-			utils.IsWriteReference(n) && !isPartOfDeclaration(n, declNode) {
-			if ctx.TypeChecker.GetSymbolAtLocation(n) == sym {
-				count++
-			}
-		}
-
-		// Also check ShorthandPropertyAssignment - in ({x} = {x: 2}), the TypeChecker
-		// resolves the shorthand name to the property symbol, not the variable symbol.
-		// Use name-based matching combined with scope check for this case.
-		// To avoid false-matching shadowed variables, verify that the shorthand's
-		// value symbol (obtained via the generated identifier) matches the target.
-		if n.Kind == ast.KindShorthandPropertyAssignment && !isPartOfDeclaration(n, declNode) {
-			shorthand := n.AsShorthandPropertyAssignment()
-			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
-				name := shorthand.Name().Text()
-				if name == declName && isInSameScope(n, declNode) {
-					// Guard against shadowed variables: if the TypeChecker can resolve
-					// the shorthand's value to a different symbol, skip it.
-					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
-					if valSym == nil || valSym == sym {
-						count++
-						return // Skip children to avoid double-counting the name identifier via Path 1
-					}
-				}
-			}
-		}
-
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
 	}
-	walk(scope)
 	return count
 }
 
-// isReadBeforeFirstAssign checks if a variable is read between its declaration and first assignment.
-// This is used for uninitialized variables (let x;) when ignoreReadBeforeAssign is true.
-func isReadBeforeFirstAssign(sym *ast.Symbol, declName string, declNode *ast.Node, ctx *rule.RuleContext) bool {
-	scope := findEnclosingScope(declNode)
-	if scope == nil {
-		scope = ctx.SourceFile.AsNode()
-	}
-
-	// Walk the scope in source order; track whether we passed the declaration and found the first write
-	pastDecl := false
+// isReadBeforeFirstAssign checks if a variable is read (among refs occurring
+// at or after declPos) before its first write. This is used for uninitialized
+// variables (let x;) when ignoreReadBeforeAssign is true. refs must be in
+// source order, as returned by ctx.Refs.References(sym).
+func isReadBeforeFirstAssign(refs []*ast.Node, declPos int) bool {
 	foundRead := false
-
-	var walk func(*ast.Node) bool
-	walk = func(n *ast.Node) bool {
-		if n == nil {
-			return false
+	for _, ref := range refs {
+		if ref.Pos() < declPos {
+			continue
 		}
-
-		// Check if we reached the declaration
-		if n == declNode {
-			pastDecl = true
-			return false
+		if utils.IsWriteReference(ref) {
+			// Found the first write at or after the declaration - stop looking.
+			return foundRead
 		}
-
-		if !pastDecl {
-			done := false
-			n.ForEachChild(func(child *ast.Node) bool {
-				if walk(child) {
-					done = true
-					return true
-				}
-				return false
-			})
-			return done
-		}
-
-		// After declaration, check for reads and writes. Only identifiers with
-		// the declared name can resolve to the target symbol — skip the rest
-		// without consulting the checker.
-		if n.Kind == ast.KindIdentifier && n.Text() == declName {
-			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if refSym == sym {
-				if utils.IsWriteReference(n) {
-					// Found the first write - stop walking
-					return true
-				}
-				// It is a read reference before the first write
-				foundRead = true
-			}
-		}
-
-		// Also detect writes through ShorthandPropertyAssignment in destructuring.
-		// The TypeChecker may resolve shorthand names to property symbols instead of
-		// variable symbols, so we use name-based matching (same as countWriteReferences).
-		if n.Kind == ast.KindShorthandPropertyAssignment && !isPartOfDeclaration(n, declNode) {
-			shorthand := n.AsShorthandPropertyAssignment()
-			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
-				if shorthand.Name().Text() == declName && isInSameScope(n, declNode) {
-					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
-					if valSym == nil || valSym == sym {
-						// Found the first write via shorthand destructuring - stop walking
-						return true
-					}
-				}
-			}
-		}
-
-		done := false
-		n.ForEachChild(func(child *ast.Node) bool {
-			if walk(child) {
-				done = true
-				return true
-			}
-			return false
-		})
-		return done
+		foundRead = true
 	}
-	walk(scope)
 	return foundRead
-}
-
-// findEnclosingScope delegates to the public utils.FindEnclosingScope.
-func findEnclosingScope(node *ast.Node) *ast.Node {
-	return utils.FindEnclosingScope(node)
-}
-
-// isPartOfDeclaration checks if an identifier node is part of the variable declaration's
-// binding name (not its initializer). This ensures that writes inside the initializer
-// (e.g. `let x = (x = 1)`) are still counted as reassignments.
-func isPartOfDeclaration(identNode *ast.Node, declNode *ast.Node) bool {
-	varDecl := declNode.AsVariableDeclaration()
-	if varDecl == nil || varDecl.Name() == nil {
-		return false
-	}
-	// Check if the identifier is a descendant of the binding name node
-	nameNode := varDecl.Name()
-	return ast.FindAncestorOrQuit(identNode, func(n *ast.Node) ast.FindAncestorResult {
-		if n == nameNode {
-			return ast.FindAncestorTrue
-		}
-		// Stop if we've left the declaration entirely
-		if n == declNode {
-			return ast.FindAncestorQuit
-		}
-		return ast.FindAncestorFalse
-	}) != nil
-}
-
-// isInSameScope checks if two nodes share the same enclosing function/module/source scope.
-func isInSameScope(a *ast.Node, b *ast.Node) bool {
-	return findEnclosingScope(a) == findEnclosingScope(b)
 }
 
 // findContainingBlock finds the nearest Block, SourceFile, ModuleBlock, CaseClause, or DefaultClause ancestor.
@@ -461,52 +332,19 @@ func isDirectChildOfBlock(writeNode *ast.Node, declBlock *ast.Node) bool {
 // ESLint only suggests const for uninitialized variables when the write can be merged
 // into the declaration (i.e., same block level). Writes inside nested blocks (if, for,
 // try, function bodies, etc.) cannot be safely merged.
-func findWriteInSameBlock(sym *ast.Symbol, declName string, declNode *ast.Node, ctx *rule.RuleContext) *ast.Node {
+func findWriteInSameBlock(refs []*ast.Node, declNode *ast.Node, ctx *rule.RuleContext) *ast.Node {
 	declBlock := findContainingBlock(declNode)
 	if declBlock == nil {
 		return nil
 	}
 
-	scope := findEnclosingScope(declNode)
-	if scope == nil {
-		scope = ctx.SourceFile.AsNode()
-	}
-
 	var writeNode *ast.Node
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || writeNode != nil {
-			return
+	for _, ref := range refs {
+		if utils.IsWriteReference(ref) {
+			writeNode = ref
+			break
 		}
-
-		if n.Kind == ast.KindIdentifier && n.Text() == declName &&
-			utils.IsWriteReference(n) && !isPartOfDeclaration(n, declNode) {
-			if ctx.TypeChecker.GetSymbolAtLocation(n) == sym {
-				writeNode = n
-				return
-			}
-		}
-
-		if n.Kind == ast.KindShorthandPropertyAssignment && !isPartOfDeclaration(n, declNode) {
-			shorthand := n.AsShorthandPropertyAssignment()
-			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
-				name := shorthand.Name().Text()
-				if name == declName && isInSameScope(n, declNode) {
-					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
-					if valSym == nil || valSym == sym {
-						writeNode = shorthand.Name()
-						return
-					}
-				}
-			}
-		}
-
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
 	}
-	walk(scope)
 
 	if writeNode == nil {
 		return nil
@@ -540,19 +378,12 @@ func findWriteInSameBlock(sym *ast.Symbol, declName string, declNode *ast.Node, 
 // destructuring assignment containing writeNode have at most 1 write reference.
 // Used with destructuring: "all" to suppress reporting when not all variables in
 // the destructuring write group can be const.
-// Uses name-based matching because GetSymbolAtLocation on shorthand property names
-// in destructuring assignments resolves to the property symbol, not the variable.
 func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContext) bool {
 	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
 		return ast.IsDestructuringAssignment(n)
 	})
 	if assignExpr == nil {
 		return true // not in a destructuring, no group constraint
-	}
-
-	scope := findEnclosingScope(writeNode)
-	if scope == nil {
-		scope = ctx.SourceFile.AsNode()
 	}
 
 	left := assignExpr.AsBinaryExpression().Left
@@ -574,47 +405,11 @@ func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContex
 		if sym == nil {
 			return
 		}
-		if countWritesBySym(sym, ident.Text(), scope, ctx) > 1 {
+		if countWriteReferences(ctx.Refs.References(sym)) > 1 {
 			allConst = false
 		}
 	})
 	return allConst
-}
-
-// countWritesBySym counts write references to a specific symbol within a scope.
-// Uses symbol comparison for identifiers and GetShorthandAssignmentValueSymbol
-// for shorthand property assignments.
-func countWritesBySym(sym *ast.Symbol, name string, scope *ast.Node, ctx *rule.RuleContext) int {
-	count := 0
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind == ast.KindIdentifier && n.Text() == name && utils.IsWriteReference(n) {
-			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if refSym == sym {
-				count++
-			}
-		}
-		if n.Kind == ast.KindShorthandPropertyAssignment {
-			shorthand := n.AsShorthandPropertyAssignment()
-			if shorthand != nil && shorthand.Name() != nil &&
-				shorthand.Name().Text() == name && utils.IsInDestructuringAssignment(n) {
-				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
-				if valSym == nil || valSym == sym {
-					count++
-					return // avoid double-counting
-				}
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(scope)
-	return count
 }
 
 // hasNonReportableDestructuringTarget checks if a write node is inside a destructuring
