@@ -50,6 +50,12 @@ func TestNoCommentedOutTests(t *testing.T) {
 			{Code: "// test`not a parameterized Rstest API`"},
 			{Code: `// test.only`},
 			{Code: `// describe.concurrent`},
+
+			// Type arguments are only recognized after each/for, so prose
+			// containing angle brackets is not mistaken for a test call.
+			{Code: `// test <input> (see docs)`},
+			{Code: `// it <-> (x)`},
+			{Code: `// describe <T> (generic explanation)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Direct test and suite calls.
@@ -122,10 +128,19 @@ func TestNoCommentedOutTests(t *testing.T) {
 			invalid(`// describe['only'].each(rows)("foo", ({ value }) => {})`),
 			invalid("// test[\"for\"]`value | expected`(\"foo\", ({ value }) => {})"),
 
+			// extend is treated as an ordinary member; any commented-out
+			// test.extend call is reported.
+			invalid(`// test.extend({})`),
+			invalid(`// test.extend<{ value: string }>({ value: ")" })`),
+			invalid(`// it['extend']({ fixture: async ({}, use) => use(")") })`),
+			invalid(`// test.extend({})("foo", () => {})`),
+			invalid(`// it['extend']<Fixtures>({})("foo", () => {})`),
+			invalid(`// test.extend({}).for<Row>(rows)("foo", ({ value }) => {})`),
 			// Block comments may contain multiline calls and chains.
 			invalid("/*\n  describe(\"foo\", () => {})\n*/"),
 			invalid("/*\n  describe\n    .only\n    .concurrent(\"foo\", () => {})\n*/"),
 			invalid("/*\n  test.for<Row>`\n    value\n    ${1}\n  `(\"$value\", ({ value }) => {})\n*/"),
+			invalid("/*\n  test.extend({\n    value: async ({}, use) => use(\"fixture\"),\n  })(\"foo\", () => {})\n*/"),
 		},
 	)
 }

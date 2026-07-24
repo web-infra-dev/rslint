@@ -12,12 +12,18 @@ const (
 	testRootPattern            = `(test|it|describe)`
 	testMemberPattern          = `(\s*(\.\s*\w+|\[\s*['"]\w+['"]\s*\]))`
 	parameterizedMemberPattern = `(\.\s*(each|for)|\[\s*['"](each|for)['"]\s*\])`
-	typeArgumentsPattern       = `(\s*<[^\x60\n]*>)?`
+	// Type arguments must be attached directly (no leading space), so prose
+	// such as `test <input> (see docs)` is not mistaken for a generic call.
+	typeArgumentsPattern = `(<[^\x60\n]*>)?`
 )
 
 var commentedTestRegexps = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^\s*` + testRootPattern + testMemberPattern + `*` + typeArgumentsPattern + `\s*\(`),
-	regexp.MustCompile(`(?m)^\s*` + testRootPattern + testMemberPattern + `*` + `\s*` + parameterizedMemberPattern + typeArgumentsPattern + `\s*\x60`),
+	regexp.MustCompile(
+		`(?m)^\s*` + testRootPattern + testMemberPattern + `*` + typeArgumentsPattern + `\s*\(`,
+	),
+	regexp.MustCompile(
+		`(?m)^\s*` + testRootPattern + testMemberPattern + `*` + `\s*` + parameterizedMemberPattern + typeArgumentsPattern + `\s*\x60`,
+	),
 }
 
 func buildCommentedTestsMessage() rule.RuleMessage {
