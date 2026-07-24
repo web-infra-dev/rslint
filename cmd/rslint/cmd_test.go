@@ -1649,3 +1649,31 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 		t.Fatalf("write error must identify the target path, got %v", err)
 	}
 }
+
+func TestParseLintFlagsTiming(t *testing.T) {
+	cases := []struct {
+		name         string
+		argv         []string
+		wantExitCode int
+		wantEnabled  bool
+		wantLimit    int
+	}{
+		{name: "absent", argv: []string{}},
+		{name: "bare --timing", argv: []string{"--timing"}, wantEnabled: true},
+		{name: "--timing-top implies --timing", argv: []string{"--timing-top", "10"}, wantEnabled: true, wantLimit: 10},
+		{name: "--timing-top zero is a no-op", argv: []string{"--timing-top", "0"}},
+		{name: "negative --timing-top is rejected", argv: []string{"--timing-top", "-3"}, wantExitCode: 2},
+		{name: "non-numeric --timing-top is rejected", argv: []string{"--timing-top", "ten"}, wantExitCode: 2},
+	}
+	for _, c := range cases {
+		args, _, exitCode := parseLintFlags(c.argv)
+		if exitCode != c.wantExitCode {
+			t.Errorf("%s: parseLintFlags(%v) exit code = %d, want %d", c.name, c.argv, exitCode, c.wantExitCode)
+			continue
+		}
+		if exitCode == 0 && (args.Timing != c.wantEnabled || args.TimingLimit != c.wantLimit) {
+			t.Errorf("%s: parseLintFlags(%v) = timing %v limit %d, want timing %v limit %d",
+				c.name, c.argv, args.Timing, args.TimingLimit, c.wantEnabled, c.wantLimit)
+		}
+	}
+}

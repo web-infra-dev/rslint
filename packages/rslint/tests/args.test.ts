@@ -126,11 +126,15 @@ describe('parseArgs positionals', () => {
     expect(result.positionals).toEqual(['--not-a-flag']);
   });
 
-  test('--timing=N inline value stays a single argument', () => {
-    // --timing is a bool-style Go flag: `--timing 20` would treat 20 as a
-    // file path, so the inline form must survive the rebuild untouched.
-    const result = parseArgs(['--timing=20', 'src/a.ts']);
-    expect(result.rest).toEqual(['--timing=20', 'src/a.ts']);
+  test('--timing-top value not in positionals', () => {
+    const result = parseArgs(['--timing-top', '20', 'src/a.ts']);
+    expect(result.rest).toEqual(['--timing-top', '20', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('--timing-top after a positional is reordered before it', () => {
+    const result = parseArgs(['src/a.ts', '--timing-top', '20']);
+    expect(result.rest).toEqual(['--timing-top', '20', 'src/a.ts']);
     expect(result.positionals).toEqual(['src/a.ts']);
   });
 
@@ -284,7 +288,7 @@ describe('parseArgs --rule flag', () => {
   });
 
   test('--rule=value syntax is reordered correctly', () => {
-    // Inline `=` values are forwarded as a single argument.
+    // node:util parseArgs splits --rule=value into rawName='--rule' + value
     const result = parseArgs([
       'src/a.ts',
       '--rule=no-console: error',
@@ -292,7 +296,8 @@ describe('parseArgs --rule flag', () => {
       'github',
     ]);
     expect(result.rest).toEqual([
-      '--rule=no-console: error',
+      '--rule',
+      'no-console: error',
       '--format',
       'github',
       'src/a.ts',

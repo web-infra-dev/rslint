@@ -44,10 +44,7 @@ type EslintPluginLintRequest struct {
 	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
 	Fix             bool                              `json:"fix"`
 	SuggestionsMode string                            `json:"suggestionsMode"`
-	// CollectTiming asks the worker to measure per-rule execution time
-	// (create + listener invocations) and report it in each file result's
-	// ruleTimes. Off by default so the worker hot path pays nothing.
-	CollectTiming bool `json:"collectTiming,omitempty"`
+	CollectTiming   bool                              `json:"collectTiming,omitempty"`
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
@@ -91,10 +88,7 @@ type EslintPluginFileResult struct {
 	ParseError  string                   `json:"parseError,omitempty"`
 	Cancelled   bool                     `json:"cancelled"`
 	RuleErrors  []EslintPluginRuleError  `json:"ruleErrors,omitempty"`
-	// RuleTimes maps rule name → execution time in MILLISECONDS for this
-	// file (worker-side wall time: create + listener invocations). Present
-	// only when the request set CollectTiming.
-	RuleTimes map[string]float64 `json:"ruleTimes,omitempty"`
+	RuleTimes   map[string]float64       `json:"ruleTimes,omitempty"`
 }
 
 type EslintPluginLintResult struct {

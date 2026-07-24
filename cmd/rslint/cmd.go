@@ -55,7 +55,6 @@ type lintArgs struct {
 	StdoutIsTTY bool
 	Quiet       bool
 	Timing      bool
-	// TimingLimit caps the timing table to the top N rules; 0 means all.
 	TimingLimit int
 	MaxWarnings int
 	StartTimeMs int64
@@ -94,7 +93,8 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
-  --timing[=all|N]      Print a per-rule timing table (top N rules with =N)
+  --timing              Print a per-rule timing table
+  --timing-top N        Print only the top N rules in the timing table
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -481,7 +481,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
-	fs.Var(&timingFlag{enabled: &args.Timing, limit: &args.TimingLimit}, "timing", "print a per-rule timing table")
+	fs.BoolVar(&args.Timing, "timing", false, "print a per-rule timing table")
+	fs.IntVar(&args.TimingLimit, "timing-top", 0, "print only the top N rules in the timing table (implies --timing)")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
@@ -495,6 +496,14 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
+
+	if args.TimingLimit < 0 {
+		fmt.Fprintf(os.Stderr, "invalid value %d for flag -timing-top: expected a positive rule count\n", args.TimingLimit)
+		return args, help, 2
+	}
+	if args.TimingLimit > 0 {
+		args.Timing = true
+	}
 
 	// --type-check-only implies --type-check and skips all lint rules.
 	// Reject incompatible flag combinations before doing any work.
