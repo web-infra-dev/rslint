@@ -1,6 +1,7 @@
 package newline_after_import
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed newline_after_import.schema.json
+var schemaJSON []byte
 
 type ruleOptions struct {
 	count            int
@@ -17,26 +20,17 @@ type ruleOptions struct {
 	considerComments bool
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{count: 1}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["count"]; ok {
-			if f, ok := v.(float64); ok && f >= 1 {
-				opts.count = int(f)
-			}
-		}
-		if v, ok := optsMap["exactCount"]; ok {
-			if b, ok := v.(bool); ok {
-				opts.exactCount = b
-			}
-		}
-		if v, ok := optsMap["considerComments"]; ok {
-			if b, ok := v.(bool); ok {
-				opts.considerComments = b
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if f, ok := optsMap["count"].(float64); ok && f >= 1 {
+		opts.count = int(f)
+	}
+	opts.exactCount, _ = optsMap["exactCount"].(bool)
+	opts.considerComments, _ = optsMap["considerComments"].(bool)
 	return opts
 }
 
@@ -58,9 +52,9 @@ func makeMessage(typ string, count int) rule.RuleMessage {
 // NewlineAfterImportRule enforces a newline after import/require statements.
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/newline-after-import.md
 var NewlineAfterImportRule = rule.Rule{
-	Name: "import/newline-after-import",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "import/newline-after-import",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		// The linter visits SourceFile's children (not the SourceFile node itself),

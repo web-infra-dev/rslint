@@ -8,7 +8,8 @@ import (
 
 // See: https://github.com/import-js/eslint-plugin-import/blob/01c9eb04331d2efa8d63f2d7f4bfec3bc44c94f3/src/rules/no-self-import.js
 var NoSelfImportRule = rule.Rule{
-	Name: "import/no-self-import",
+	Name:   "import/no-self-import",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return utils.VisitModules(func(source, node *ast.Node) {
 			isImportingSelf(ctx, source, node)

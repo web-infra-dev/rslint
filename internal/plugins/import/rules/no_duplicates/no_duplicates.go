@@ -1,6 +1,7 @@
 package no_duplicates
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,34 +14,30 @@ import (
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_duplicates.schema.json
+var schemaJSON []byte
+
 type ruleOptions struct {
 	considerQueryString bool
 	preferInline        bool
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	optsMap := rslintUtils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["considerQueryString"]; ok {
-			if b, ok := v.(bool); ok {
-				opts.considerQueryString = b
-			}
-		}
-		if v, ok := optsMap["prefer-inline"]; ok {
-			if b, ok := v.(bool); ok {
-				opts.preferInline = b
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
+	opts.considerQueryString, _ = optsMap["considerQueryString"].(bool)
+	opts.preferInline, _ = optsMap["prefer-inline"].(bool)
 	return opts
 }
 
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-duplicates.md
 var NoDuplicatesRule = rule.Rule{
-	Name: "import/no-duplicates",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "import/no-duplicates",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		sourceFile := ctx.SourceFile

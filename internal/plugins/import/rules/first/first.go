@@ -1,6 +1,7 @@
 package first
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -11,11 +12,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed first.schema.json
+var schemaJSON []byte
+
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/first.js
 var FirstRule = rule.Rule{
-	Name: "import/first",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "import/first",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// The linter visits SourceFile's children but never fires a KindSourceFile
 		// listener, so run the check eagerly before returning listeners.
 		checkFirst(ctx, options)
@@ -175,7 +179,7 @@ type errorInfo struct {
 	rangeTo   int
 }
 
-func checkFirst(ctx rule.RuleContext, options any) {
+func checkFirst(ctx rule.RuleContext, options []any) {
 	statements := ctx.SourceFile.Statements
 	if statements == nil || len(statements.Nodes) == 0 {
 		return

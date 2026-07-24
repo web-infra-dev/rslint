@@ -1,6 +1,7 @@
 package namespace
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,9 @@ import (
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed namespace.schema.json
+var schemaJSON []byte
+
 type ruleOptions struct {
 	allowComputed bool
 }
@@ -18,9 +22,9 @@ type ruleOptions struct {
 //
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/namespace.js
 var NamespaceRule = rule.Rule{
-	Name: "import/namespace",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "import/namespace",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		namespaces := collectNamespaces(ctx)
 
@@ -41,13 +45,13 @@ var NamespaceRule = rule.Rule{
 	},
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	if optsMap := rslint_utils.GetOptionsMap(options); optsMap != nil {
-		if allowComputed, ok := optsMap["allowComputed"].(bool); ok {
-			opts.allowComputed = allowComputed
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
+	opts.allowComputed, _ = optsMap["allowComputed"].(bool)
 	return opts
 }
 
