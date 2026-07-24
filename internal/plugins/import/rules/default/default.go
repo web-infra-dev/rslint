@@ -13,7 +13,8 @@ import (
 //
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/default.js
 var DefaultRule = rule.Rule{
-	Name: "import/default",
+	Name:   "import/default",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkDefault := func(node *ast.Node) {
 			importDecl := node.AsImportDeclaration()

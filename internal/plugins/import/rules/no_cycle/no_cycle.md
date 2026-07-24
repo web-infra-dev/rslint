@@ -81,6 +81,22 @@ dynamic `import()`.
 }
 ```
 
+### `esmodule`
+
+Checks ES module `import`/`export` sources. Defaults to `true`; set to
+`false` to disable them.
+
+```json
+{ "import/no-cycle": ["error", { "esmodule": false }] }
+```
+
+### `disableScc`
+
+Accepted for compatibility with upstream configs. Upstream uses this to skip
+building a strongly-connected-components graph, an internal traversal
+optimization; this rule does not build one either way, so the option has no
+observable effect here.
+
 ## Original Documentation
 
 - [eslint-plugin-import/no-cycle](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-cycle.md)

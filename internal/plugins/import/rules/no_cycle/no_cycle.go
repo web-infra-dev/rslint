@@ -1,6 +1,7 @@
 package no_cycle
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -10,8 +11,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_cycle.schema.json
+var schemaJSON []byte
 
 const unlimitedDepth = int(^uint(0) >> 1)
 
@@ -36,42 +39,34 @@ type queuedModule struct {
 //
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/no-cycle.js
 var NoCycleRule = rule.Rule{
-	Name: "import/no-cycle",
-	Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
-		opts := parseOptions(rule.LegacyUnwrapOptions(newOptions))
+	Name:   "import/no-cycle",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		checkSourceFile(ctx, opts)
 		return rule.RuleListeners{}
 	},
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
 		maxDepth: unlimitedDepth,
 		moduleReferences: import_utils.ModuleReferenceOptions{
 			ESModule: true,
 		},
 	}
-
-	optsMap := rslint_utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
 	if maxDepth, ok := parseMaxDepth(optsMap["maxDepth"]); ok {
 		opts.maxDepth = maxDepth
 	}
-	if ignoreExternal, ok := optsMap["ignoreExternal"].(bool); ok {
-		opts.ignoreExternal = ignoreExternal
-	}
-	if allow, ok := optsMap["allowUnsafeDynamicCyclicDependency"].(bool); ok {
-		opts.allowUnsafeDynamicCyclicDependency = allow
-	}
-	if commonJS, ok := optsMap["commonjs"].(bool); ok {
-		opts.moduleReferences.CommonJS = commonJS
-	}
-	if amd, ok := optsMap["amd"].(bool); ok {
-		opts.moduleReferences.AMD = amd
-	}
+	opts.ignoreExternal, _ = optsMap["ignoreExternal"].(bool)
+	opts.allowUnsafeDynamicCyclicDependency, _ = optsMap["allowUnsafeDynamicCyclicDependency"].(bool)
+	opts.moduleReferences.CommonJS, _ = optsMap["commonjs"].(bool)
+	opts.moduleReferences.AMD, _ = optsMap["amd"].(bool)
 	if esmodule, ok := optsMap["esmodule"].(bool); ok {
 		opts.moduleReferences.ESModule = esmodule
 	}

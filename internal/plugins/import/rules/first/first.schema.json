@@ -1,0 +1,11 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "string",
+      "enum": ["absolute-first", "disable-absolute-first"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
