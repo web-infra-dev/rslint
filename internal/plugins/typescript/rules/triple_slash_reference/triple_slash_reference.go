@@ -2,130 +2,173 @@ package triple_slash_reference
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type TripleSlashReferenceOptions struct {
 	Lib   string `json:"lib"`   // "always" | "never"
-	Path  string `json:"path"`  // "always" | "never" | "prefer-import"
+	Path  string `json:"path"`  // "always" | "never"
 	Types string `json:"types"` // "always" | "never" | "prefer-import"
 }
 
-var tripleSlashRegex = regexp.MustCompile(`^///\s*<reference\s+(path|types|lib)\s*=`)
+type pendingReference struct {
+	textRange core.TextRange
+	module    string
+}
 
-// TripleSlashReferenceRule implements the triple-slash-reference rule
-// Disallow certain triple slash directives
+// ECMAScript's \s includes WhiteSpace and LineTerminator code points. Keep the
+// set explicit: Go regexp's \s is ASCII-only and would not match the upstream
+// rule for comments containing non-ASCII whitespace.
+const ecmascriptWhitespace = `[\t\n\v\f\r \x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]`
+
+// This is the upstream regexp applied to ESLint's Comment.value. Comment.value
+// omits the leading "//", so a real triple-slash comment starts with "/".
+// Preserve its deliberately permissive details: no required whitespace before
+// the reference kind, "|" is accepted as a quote, and the module capture is
+// greedy and does not require a closing tag.
+var tripleSlashReferencePattern = regexp.MustCompile(
+	`^/` + ecmascriptWhitespace + `*<reference` +
+		ecmascriptWhitespace + `*(types|path|lib)` +
+		ecmascriptWhitespace + `*=` +
+		ecmascriptWhitespace + `*["|'](.*)["|']`,
+)
+
+// GetLeadingCommentRanges only calls NodeFactory.NewCommentRange, which is a
+// pure value constructor. Reuse one hook-free factory instead of allocating
+// the comparatively large NodeFactory once per linted file.
+var tripleSlashReferenceCommentFactory = ast.NewNodeFactory(ast.NodeFactoryHooks{})
+
+// TripleSlashReferenceRule implements the triple-slash-reference rule.
+// Disallow certain triple slash directives in favor of import declarations.
 var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
 	Name: "triple-slash-reference",
 	Run:  run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opts := TripleSlashReferenceOptions{
-		Lib:   "always",
-		Path:  "always",
-		Types: "prefer-import",
-	}
-
-	// Parse options
-	if options != nil {
-		var optsMap map[string]interface{}
-		var ok bool
-
-		// Handle array format: [{ option: value }]
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			optsMap, ok = optArray[0].(map[string]interface{})
-		} else {
-			// Handle direct object format: { option: value }
-			optsMap, ok = options.(map[string]interface{})
-		}
-
-		if ok {
-			if lib, ok := optsMap["lib"].(string); ok {
-				opts.Lib = lib
-			}
-			if path, ok := optsMap["path"].(string); ok {
-				opts.Path = path
-			}
-			if types, ok := optsMap["types"].(string); ok {
-				opts.Types = types
-			}
-		}
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
+	if opts.Lib == "always" && opts.Path == "always" && opts.Types == "always" {
+		return rule.RuleListeners{}
 	}
 
 	text := ctx.SourceFile.Text()
+	references := make([]pendingReference, 0)
 
-	// Check if file has imports
-	hasImport := hasImportStatements(ctx.SourceFile)
-
-	// Only real single-line comment tokens can be triple-slash directives, so
-	// this walks the linter's precomputed comment list instead of scanning
-	// raw source text/lines. That avoids matching text that merely looks like
-	// a reference comment inside a string, template literal, or block comment.
-	for _, comment := range ctx.Comments.All() {
-		if comment.Kind != ast.KindSingleLineCommentTrivia {
-			continue
-		}
-		if comment.Pos() < 0 || comment.End() > len(text) {
+	// sourceCode.getCommentsBefore(Program) only exposes the comments in the
+	// file's leading trivia. Scanning that prefix also avoids materializing the
+	// linter's full-file token/comment cache for this rule.
+	for comment := range scanner.GetLeadingCommentRanges(tripleSlashReferenceCommentFactory, text, 0) {
+		if comment.Kind != ast.KindSingleLineCommentTrivia ||
+			comment.Pos() < 0 ||
+			comment.Pos()+2 > comment.End() ||
+			comment.End() > len(text) {
 			continue
 		}
 
-		commentText := text[comment.Pos():comment.End()]
-		if !tripleSlashRegex.MatchString(commentText) {
+		commentValue := text[comment.Pos()+2 : comment.End()]
+		match := tripleSlashReferencePattern.FindStringSubmatchIndex(commentValue)
+		if match == nil {
 			continue
 		}
 
-		// Determine the type of reference
-		var refType string
-		if strings.Contains(commentText, `path=`) {
-			refType = "path"
-		} else if strings.Contains(commentText, `types=`) {
-			refType = "types"
-		} else if strings.Contains(commentText, `lib=`) {
-			refType = "lib"
-		}
+		referenceKind := commentValue[match[2]:match[3]]
+		module := commentValue[match[4]:match[5]]
+		textRange := core.NewTextRange(comment.Pos(), comment.End())
 
-		// Check if this reference should be reported
-		shouldReport := false
-		switch refType {
-		case "path":
-			shouldReport = opts.Path == "never"
-		case "types":
-			shouldReport = opts.Types == "never" || (opts.Types == "prefer-import" && hasImport)
+		switch referenceKind {
 		case "lib":
-			shouldReport = opts.Lib == "never"
-		}
-
-		if shouldReport {
-			ctx.ReportRange(
-				core.NewTextRange(comment.Pos(), comment.End()),
-				rule.RuleMessage{
-					Id:          "tripleSlashReference",
-					Description: "Do not use a triple slash reference for " + refType + ", use `import` style instead.",
-				},
-			)
+			if opts.Lib == "never" {
+				reportReference(&ctx, textRange, module)
+			}
+		case "path":
+			if opts.Path == "never" {
+				reportReference(&ctx, textRange, module)
+			}
+		case "types":
+			switch opts.Types {
+			case "never":
+				reportReference(&ctx, textRange, module)
+			case "prefer-import":
+				references = append(references, pendingReference{
+					textRange: textRange,
+					module:    module,
+				})
+			}
 		}
 	}
 
-	return rule.RuleListeners{}
+	if len(references) == 0 {
+		return rule.RuleListeners{}
+	}
+
+	reportMatchingReferences := func(module string) {
+		for _, reference := range references {
+			if reference.module == module {
+				reportReference(&ctx, reference.textRange, reference.module)
+			}
+		}
+	}
+
+	return rule.RuleListeners{
+		ast.KindImportDeclaration: func(node *ast.Node) {
+			declaration := node.AsImportDeclaration()
+			module, ok := utils.GetStaticStringLiteralValue(declaration.ModuleSpecifier)
+			if ok {
+				reportMatchingReferences(module)
+			}
+		},
+		ast.KindImportEqualsDeclaration: func(node *ast.Node) {
+			declaration := node.AsImportEqualsDeclaration()
+			if declaration.ModuleReference == nil ||
+				declaration.ModuleReference.Kind != ast.KindExternalModuleReference {
+				return
+			}
+
+			externalReference := declaration.ModuleReference.AsExternalModuleReference()
+			module, ok := utils.GetStaticStringLiteralValue(externalReference.Expression)
+			if ok {
+				reportMatchingReferences(module)
+			}
+		},
+	}
 }
 
-// hasImportStatements checks if the source file contains any import statements
-func hasImportStatements(sourceFile *ast.SourceFile) bool {
-	if sourceFile.Statements == nil {
-		return false
+func parseOptions(options []any) TripleSlashReferenceOptions {
+	opts := TripleSlashReferenceOptions{
+		Lib:   "always",
+		Path:  "never",
+		Types: "prefer-import",
 	}
 
-	for _, stmt := range sourceFile.Statements.Nodes {
-		switch stmt.Kind {
-		case ast.KindImportDeclaration, ast.KindImportEqualsDeclaration:
-			return true
+	if optionsMap := utils.GetOptionsMap(options); optionsMap != nil {
+		if lib, ok := optionsMap["lib"].(string); ok {
+			opts.Lib = lib
+		}
+		if path, ok := optionsMap["path"].(string); ok {
+			opts.Path = path
+		}
+		if types, ok := optionsMap["types"].(string); ok {
+			opts.Types = types
 		}
 	}
-	return false
+
+	return opts
+}
+
+func reportReference(ctx *rule.RuleContext, textRange core.TextRange, module string) {
+	ctx.ReportRange(
+		textRange,
+		rule.RuleMessage{
+			Id:          "tripleSlashReference",
+			Description: "Do not use a triple slash reference for " + module + ", use `import` style instead.",
+			Data: map[string]string{
+				"module": module,
+			},
+		},
+	)
 }
