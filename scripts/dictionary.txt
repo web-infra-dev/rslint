@@ -243,6 +243,7 @@ isatty
 isnan
 Isnt
 jakebailey
+jiti
 Jpan
 jsnum
 jsonc
@@ -283,12 +284,14 @@ lookback
 LSP
 lsproto
 lsquo
+lucide
 macrolanguage
 marginx
 marginy
 materialise
 materialised
 McCabe
+memfs
 menuitemcheckbox
 menuitemradio
 metacharacter
@@ -374,6 +377,7 @@ optionable
 Orya
 osvfs
 outputfixes
+ovsx
 oxendict
 packagejson
 pagebreak
@@ -386,11 +390,13 @@ pendings
 perr
 phonebk
 phonebook
+picomatch
 Pipeable
 pollable
 posinset
 Prag
 preact
+prebundle
 predeclare
 preresolved
 Prettier
@@ -445,6 +451,7 @@ respawning
 respawns
 rethrowing
 rewalks
+rimraf
 rivo
 roledescription
 roletype
@@ -533,6 +540,7 @@ Thaa
 thenables
 throughs
 Tibt
+tinybench
 tinyglobby
 tmdb
 tmpl

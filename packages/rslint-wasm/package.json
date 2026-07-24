@@ -26,15 +26,15 @@
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@microsoft/api-extractor": "7.58.7",
-    "@wasmer/wasmfs": "0.12.0",
-    "esbuild": "^0.28.0",
-    "buffer": "^6.0.3",
-    "cross-env": "^10.1.0",
-    "esbuild-plugin-polyfill-node": "0.3.0",
-    "memfs": "^4.64.0",
-    "prebundle": "1.6.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@microsoft/api-extractor": "catalog:build",
+    "@wasmer/wasmfs": "catalog:wasm",
+    "esbuild": "catalog:build",
+    "buffer": "catalog:wasm",
+    "cross-env": "catalog:wasm",
+    "esbuild-plugin-polyfill-node": "catalog:wasm",
+    "memfs": "catalog:wasm",
+    "prebundle": "catalog:wasm",
+    "@typescript/native-preview": "catalog:types"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"

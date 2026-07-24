@@ -37,14 +37,15 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "^0.11.3",
-    "ajv": "6.15.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "prettier": "3.9.4",
-    "typescript": "5.9.3",
-    "zx": "8.8.5",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@rstest/core": "catalog:test",
+    "@types/react": "catalog:types",
+    "ajv": "catalog:tools",
+    "husky": "catalog:tools",
+    "lint-staged": "catalog:tools",
+    "prettier": "catalog:tools",
+    "typescript": "catalog:types",
+    "@typescript/native-preview": "catalog:types",
+    "zx": "catalog:tools"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -58,8 +59,5 @@
   "engines": {
     "pnpm": ">=10.34.4"
   },
-  "files": [],
-  "dependencies": {
-    "@types/react": "^19.2.14"
-  }
+  "files": []
 }
