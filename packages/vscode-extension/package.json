@@ -96,6 +96,7 @@
     "ovsx": "catalog:vscode",
     "rimraf": "catalog:build",
     "typescript": "catalog:types",
+    "@typescript/native-preview": "catalog:types",
     "vscode-languageclient": "catalog:vscode",
     "vscode-languageserver": "catalog:vscode",
     "vscode-languageserver-textdocument": "catalog:vscode"

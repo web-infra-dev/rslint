@@ -66,6 +66,7 @@
     "@types/picomatch": "catalog:build",
     "@typescript-eslint/scope-manager": "catalog:lint",
     "@typescript-eslint/visitor-keys": "catalog:lint",
+    "@typescript/native-preview": "catalog:types",
     "eslint-scope": "catalog:lint",
     "eslint-visitor-keys": "catalog:lint",
     "espree": "catalog:lint",

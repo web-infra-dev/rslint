@@ -77,8 +77,8 @@ catalogs:
       specifier: ^13.0.0
       version: 13.0.0
     eslint-plugin-sonarjs:
-      specifier: ^4.2.0
-      version: 4.2.0
+      specifier: 4.0.3
+      version: 4.0.3
     eslint-plugin-unicorn:
       specifier: ^64.0.0
       version: 64.0.0
@@ -136,9 +136,12 @@ catalogs:
     '@types/vscode':
       specifier: ^1.125.0
       version: 1.125.0
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20250904.1
+      version: 7.0.0-dev.20250904.1
     typescript:
-      specifier: ^6.0.3
-      version: 6.0.3
+      specifier: 5.9.3
+      version: 5.9.3
   vscode:
     '@vscode/test-cli':
       specifier: ^0.0.15
@@ -282,6 +285,9 @@ importers:
       '@types/react':
         specifier: catalog:types
         version: 19.2.17
+      '@typescript/native-preview':
+        specifier: catalog:types
+        version: 7.0.0-dev.20250904.1
       ajv:
         specifier: catalog:tools
         version: 6.15.0
@@ -296,7 +302,7 @@ importers:
         version: 3.9.6
       typescript:
         specifier: catalog:types
-        version: 6.0.3
+        version: 5.9.3
       zx:
         specifier: catalog:tools
         version: 8.8.5
@@ -349,7 +355,7 @@ importers:
         version: 0.7.2
       '@rslib/core':
         specifier: catalog:build
-        version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20260707.2)(core-js@3.47.0)(typescript@6.0.3)
+        version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@5.9.3)
       '@rslint/api':
         specifier: workspace:*
         version: link:../rslint-api
@@ -365,6 +371,9 @@ importers:
       '@typescript-eslint/visitor-keys':
         specifier: catalog:lint
         version: 8.65.0
+      '@typescript/native-preview':
+        specifier: catalog:types
+        version: 7.0.0-dev.20250904.1
       eslint-scope:
         specifier: catalog:lint
         version: 9.1.2
@@ -385,7 +394,7 @@ importers:
         version: 0.2.17
       typescript:
         specifier: catalog:types
-        version: 6.0.3
+        version: 5.9.3
     optionalDependencies:
       '@rslint/native-darwin-arm64':
         specifier: workspace:*
@@ -416,13 +425,13 @@ importers:
     devDependencies:
       '@rslib/core':
         specifier: catalog:build
-        version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20260707.2)(core-js@3.47.0)(typescript@6.0.3)
+        version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@6.0.3)
       '@types/node':
         specifier: catalog:types
         version: 26.1.1
-      typescript:
+      '@typescript/native-preview':
         specifier: catalog:types
-        version: 6.0.3
+        version: 7.0.0-dev.20250904.1
 
   packages/rslint-test-tools:
     devDependencies:
@@ -473,7 +482,7 @@ importers:
         version: 13.0.0(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-sonarjs:
         specifier: catalog:lint
-        version: 4.2.0(eslint@10.7.0(jiti@2.7.0))
+        version: 4.0.3(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-unicorn:
         specifier: catalog:lint
         version: 64.0.0(eslint@10.7.0(jiti@2.7.0))
@@ -487,6 +496,9 @@ importers:
       '@microsoft/api-extractor':
         specifier: catalog:build
         version: 7.58.12(@types/node@26.1.1)
+      '@typescript/native-preview':
+        specifier: catalog:types
+        version: 7.0.0-dev.20250904.1
       '@wasmer/wasmfs':
         specifier: catalog:wasm
         version: 0.12.0
@@ -508,9 +520,6 @@ importers:
       prebundle:
         specifier: catalog:wasm
         version: 1.6.5(typescript@6.0.3)
-      typescript:
-        specifier: catalog:types
-        version: 6.0.3
 
   packages/rule-tester:
     dependencies:
@@ -521,9 +530,12 @@ importers:
       '@types/node':
         specifier: catalog:types
         version: 26.1.1
+      '@typescript/native-preview':
+        specifier: catalog:types
+        version: 7.0.0-dev.20250904.1
       typescript:
         specifier: catalog:types
-        version: 6.0.3
+        version: 5.9.3
 
   packages/tsgo:
     optionalDependencies:
@@ -562,6 +574,9 @@ importers:
       '@types/vscode':
         specifier: catalog:types
         version: 1.125.0
+      '@typescript/native-preview':
+        specifier: catalog:types
+        version: 7.0.0-dev.20250904.1
       '@vscode/test-cli':
         specifier: catalog:vscode
         version: 0.0.15
@@ -588,7 +603,7 @@ importers:
         version: 6.1.3
       typescript:
         specifier: catalog:types
-        version: 6.0.3
+        version: 5.9.3
       vscode-languageclient:
         specifier: catalog:vscode
         version: 9.0.1
@@ -718,7 +733,7 @@ importers:
         version: 4.3.3
       typescript:
         specifier: catalog:types
-        version: 6.0.3
+        version: 5.9.3
 
 packages:
 
@@ -2976,51 +2991,51 @@ packages:
     resolution: {integrity: sha512-8C71BQkGjiMmXtop7pHVJu1l2NNShFdkCyD6a2ezzs5vU/L3LRtb69EtcteFwz0mYMPzIgOw0n6OV4VBUWZd7A==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-wny2pgKjGbiZtnOIHVa3tXC1UfDqxNEFzyPGmiqybedG8hipG2Nfp0l5UxbaKCjkLacUpH/W5bP2hBOMVhCOzg==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-1rt4DhERW1VM4OwWYVIrCp1k1S4kpZAxzbCnprNinVJInhHexY2K0FFD9IGXKWSRANHg/OmJRQYTEoDKM6pqNw==}
+    engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-Afc7M5zOwo+GpfcYwz5Z8HMB2tPVsui7nNIqEuuFB73MPdVqNn/Wmpe4tP4MRri0AtJnJknoHBaTJ/VDAp/Jhw==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-d2DMQnsXAkZDDk9bU/FhY/D74tbMAkboIGb+hq7kIIgOVcxOswhwLFZ/ajW/9NTesktz8Z14t40Ber+/Pny25A==}
+    engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-iITBa2WjjTI5N9t5l7Z4KoOSI+2zBlhbvFzsD/f8qX8QoKjz/Y4DPyBDgezYi8nkqjjksbgSOJ3/ykzhwrB9cg==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-+fv13RDSk+7wFYY846q5ig7X6G07JT7wbajk6p4rELXTIfS1c6gRHGhODETCfFVaPziP4IlvqyinNP8F8wc9uQ==}
+    engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-hJm/UOqZTr9FHmR7uNm8VGX4oKtfWk0Jem0zPeJFNC8ckGUfSBueyiEYMZB+XmRc1aG4x1E46y3CplP4CLHvGQ==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-YyfTK1SGmfeDJv6G3vSmVxjM914Xio7O57NzRKOyEQnmBT5tdXTzeWgkjrUh1jE8wCUu0f0ZZ+xDTwgys+E2ug==}
+    engines: {node: '>=20.6.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-du0dzi6y97Po5vDNdPJTyyijHCpaS22JLRnKZEJXBDaO9gCIymOv/5QQokFRuOlQm0bWl3i9PF4OVdGP6uAOQA==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-BjWJI42cUUilIyQHZpQQeSjC/Ifj/UaIf4oj6lRHDcg5qgLHWe5bAUxuNjE6i7wi+TTN9YxUvBDkMAcm/hI8wg==}
+    engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-SsAwfhyHJ1akgBc+99z4+hwdbHsdWaKB8EwCNIMA6JfSLMeUjffrYvxu+vfMyxVtOVOz7RrRXRoiDiu4a2sCtg==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-rPv/mVaneZTuFESk/zDg3dFiZjpdipVMcLaF10Ns1fIyWdZ0ja79Ufm1eCFbk8KFNEX2dEx+vFEvD9n4bhEneg==}
+    engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-DL4u27stv0fo71sVhOzHSwE+YMZsbBijVI+kg5dLDLilSH79WFTJ8RSQ46vJrCMt+Gjlv/JOZP1PuLJDfioYeQ==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-+twwqKYEv5UdZX5FRaBo0bDQgw/uPQjU3hqaqaO0Dhp1Ou8Ce4oi5hgwauB1j29JwBbvOi9/yoEcjsjT2Wsaxw==}
+    engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260707.2':
-    resolution: {integrity: sha512-oUGp+Rep/hqMhPunyinsALUwSlzHINSxitifPiSaeqoKOKD2OlR9NE3TaPqwsl4NlGslsOSUXI1JotWQzpYCPg==}
-    engines: {node: '>=16.20.0'}
+  '@typescript/native-preview@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-IzPzhumNsWsIg4Kmt0y+0b2BBtsvD17rDmKj78yNeU3AsuA6xignQ5eDkFtRmLdGPVZwa8Yg5zPcJRFln98Ocw==}
+    engines: {node: '>=20.6.0'}
     hasBin: true
 
   '@typespec/ts-http-runtime@0.3.7':
@@ -3858,8 +3873,8 @@ packages:
     peerDependencies:
       eslint: '>=5.0.0'
 
-  eslint-plugin-sonarjs@4.2.0:
-    resolution: {integrity: sha512-bqADfuNtTL7VK6RU29eoiFTtaaBKIpVPuX3bOl+rBpWSBa0zIBVZlqZNZQjfP6s4iXkAJokv5IsD8OsACkwApg==}
+  eslint-plugin-sonarjs@4.0.3:
+    resolution: {integrity: sha512-5drkJKLC9qQddIiaATV0e8+ygbUc7b0Ti6VB7M2d3jmKNh3X0RaiIJYTs3dr9xnlhlrxo+/s1FoO3Jgv6O/c7g==}
     peerDependencies:
       eslint: ^8.0.0 || ^9.0.0 || ^10.0.0
 
@@ -7993,10 +8008,22 @@ snapshots:
     optionalDependencies:
       '@rsbuild/core': 2.1.7(core-js@3.47.0)
 
-  '@rslib/core@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20260707.2)(core-js@3.47.0)(typescript@6.0.3)':
+  '@rslib/core@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@5.9.3)':
     dependencies:
       '@rsbuild/core': 2.1.7(core-js@3.47.0)
-      rsbuild-plugin-dts: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20260707.2)(typescript@6.0.3)
+      rsbuild-plugin-dts: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
+    optionalDependencies:
+      '@microsoft/api-extractor': 7.58.12(@types/node@26.1.1)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - '@module-federation/runtime-tools'
+      - '@typescript/native-preview'
+      - core-js
+
+  '@rslib/core@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@6.0.3)':
+    dependencies:
+      '@rsbuild/core': 2.1.7(core-js@3.47.0)
+      rsbuild-plugin-dts: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@6.0.3)
     optionalDependencies:
       '@microsoft/api-extractor': 7.58.12(@types/node@26.1.1)
       typescript: 6.0.3
@@ -8548,37 +8575,36 @@ snapshots:
       '@typescript-eslint/types': 8.65.0
       eslint-visitor-keys: 5.0.1
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260707.2':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250904.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260707.2':
+  '@typescript/native-preview@7.0.0-dev.20250904.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260707.2
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260707.2
-    optional: true
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20250904.1
 
   '@typespec/ts-http-runtime@0.3.7':
     dependencies:
@@ -9498,7 +9524,7 @@ snapshots:
     dependencies:
       eslint: 10.7.0(jiti@2.7.0)
 
-  eslint-plugin-sonarjs@4.2.0(eslint@10.7.0(jiti@2.7.0)):
+  eslint-plugin-sonarjs@4.0.3(eslint@10.7.0(jiti@2.7.0)):
     dependencies:
       '@eslint-community/regexpp': 4.12.2
       builtin-modules: 3.3.0
@@ -9513,7 +9539,6 @@ snapshots:
       semver: 7.8.5
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
-      yaml: 2.9.0
 
   eslint-plugin-unicorn@64.0.0(eslint@10.7.0(jiti@2.7.0)):
     dependencies:
@@ -11766,13 +11791,22 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.62.2
       fsevents: 2.3.3
 
-  rsbuild-plugin-dts@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20260707.2)(typescript@6.0.3):
+  rsbuild-plugin-dts@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3):
     dependencies:
       '@ast-grep/napi': 0.37.0
       '@rsbuild/core': 2.1.7(core-js@3.47.0)
     optionalDependencies:
       '@microsoft/api-extractor': 7.58.12(@types/node@26.1.1)
-      '@typescript/native-preview': 7.0.0-dev.20260707.2
+      '@typescript/native-preview': 7.0.0-dev.20250904.1
+      typescript: 5.9.3
+
+  rsbuild-plugin-dts@0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@rsbuild/core@2.1.7(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@6.0.3):
+    dependencies:
+      '@ast-grep/napi': 0.37.0
+      '@rsbuild/core': 2.1.7(core-js@3.47.0)
+    optionalDependencies:
+      '@microsoft/api-extractor': 7.58.12(@types/node@26.1.1)
+      '@typescript/native-preview': 7.0.0-dev.20250904.1
       typescript: 6.0.3
 
   rsbuild-plugin-google-analytics@1.0.6(@rsbuild/core@2.1.7(core-js@3.47.0)):

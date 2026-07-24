@@ -34,7 +34,7 @@
     "esbuild-plugin-polyfill-node": "catalog:wasm",
     "memfs": "catalog:wasm",
     "prebundle": "catalog:wasm",
-    "typescript": "catalog:types"
+    "@typescript/native-preview": "catalog:types"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"
