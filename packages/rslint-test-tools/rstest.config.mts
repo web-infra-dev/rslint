@@ -541,6 +541,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
 
