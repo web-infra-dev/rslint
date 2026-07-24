@@ -23,6 +23,8 @@ minimumReleaseAgeExclude:
   - '@rstest/*'
   - '@rsdoctor/*'
   - '@rslint/*'
+  - '@rstackjs/*'
+  - '@rstack-dev/*'
 
 # Prevent un-reviewed build scripts
 strictDepBuilds: true
