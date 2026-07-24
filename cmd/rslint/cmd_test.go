@@ -1659,11 +1659,13 @@ func TestParseLintFlagsTiming(t *testing.T) {
 		wantLimit    int
 	}{
 		{name: "absent", argv: []string{}},
-		{name: "bare --timing", argv: []string{"--timing"}, wantEnabled: true},
-		{name: "--timing-top implies --timing", argv: []string{"--timing-top", "10"}, wantEnabled: true, wantLimit: 10},
-		{name: "--timing-top zero is a no-op", argv: []string{"--timing-top", "0"}},
-		{name: "negative --timing-top is rejected", argv: []string{"--timing-top", "-3"}, wantExitCode: 2},
-		{name: "non-numeric --timing-top is rejected", argv: []string{"--timing-top", "ten"}, wantExitCode: 2},
+		{name: "--timing all", argv: []string{"--timing", "all"}, wantEnabled: true},
+		{name: "--timing ALL", argv: []string{"--timing", "ALL"}, wantEnabled: true},
+		{name: "--timing N", argv: []string{"--timing", "10"}, wantEnabled: true, wantLimit: 10},
+		{name: "zero is rejected", argv: []string{"--timing", "0"}, wantExitCode: 2},
+		{name: "negative is rejected", argv: []string{"--timing", "-3"}, wantExitCode: 2},
+		{name: "non-numeric is rejected", argv: []string{"--timing", "ten"}, wantExitCode: 2},
+		{name: "missing value is rejected", argv: []string{"--timing"}, wantExitCode: 2},
 	}
 	for _, c := range cases {
 		args, _, exitCode := parseLintFlags(c.argv)

@@ -17,8 +17,7 @@ rslint [options] [files/directories...]
 | `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
 | `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
 | `--quiet`             | Report errors only, suppress warnings                                                          |
-| `--timing`            | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
-| `--timing-top <n>`    | Print only the top N rules in the timing table (implies `--timing`)                            |
+| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
 | `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
 | `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
 | `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
@@ -107,11 +106,11 @@ rslint src/ --rule 'no-console: off' --format github
 
 ## Rule Timing
 
-Use `--timing` to print a per-rule timing table after the run, sorted by total time. Use `--timing-top` to keep only the top N rules (it implies `--timing`):
+Use `--timing` to print a per-rule timing table after the run, sorted by total time. Pass a number to keep only the top N rules (`all`, the default, prints every rule):
 
 ```bash
 rslint --timing src/
-rslint --timing-top 10 src/
+rslint --timing 10 src/
 ```
 
 ```

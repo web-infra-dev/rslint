@@ -35,7 +35,6 @@ export function parseArgs(argv: string[]) {
       // mistaken for positional file/dir arguments.
       format: { type: 'string' },
       'max-warnings': { type: 'string' },
-      'timing-top': { type: 'string' },
       rule: { type: 'string', multiple: true },
       trace: { type: 'string' },
       cpuprof: { type: 'string' },
@@ -57,7 +56,8 @@ export function parseArgs(argv: string[]) {
   const positionalsBefore: string[] = [];
   const positionalsAfter: string[] = [];
   let seenTerminator = false;
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
     if (token.kind === 'option') {
       if (
         token.name === 'config' ||
@@ -65,6 +65,19 @@ export function parseArgs(argv: string[]) {
         token.name === 'start-time'
       )
         continue;
+      // Go's --timing requires a value ("all" or a top rule count) but the
+      // value is optional on the Node CLI: consume the next argument only
+      // when it matches, otherwise fill in the default "all".
+      if (token.name === 'timing' && token.value == null) {
+        const next = tokens[i + 1];
+        if (next?.kind === 'positional' && /^(all|\d+)$/i.test(next.value)) {
+          flags.push(token.rawName, next.value);
+          i++;
+        } else {
+          flags.push(token.rawName, 'all');
+        }
+        continue;
+      }
       flags.push(token.rawName);
       if (token.value != null) flags.push(token.value);
     } else if (token.kind === 'option-terminator') {

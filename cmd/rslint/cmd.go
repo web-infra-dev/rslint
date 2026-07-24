@@ -13,6 +13,7 @@ import (
 	"runtime/trace"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -93,8 +94,7 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
-  --timing              Print a per-rule timing table
-  --timing-top N        Print only the top N rules in the timing table
+  --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -481,8 +481,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
-	fs.BoolVar(&args.Timing, "timing", false, "print a per-rule timing table")
-	fs.IntVar(&args.TimingLimit, "timing-top", 0, "print only the top N rules in the timing table (implies --timing)")
+	var timingValue string
+	fs.StringVar(&timingValue, "timing", "", "print a per-rule timing table: 'all' or a top rule count")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
@@ -497,12 +497,20 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	}
 	args.RuleFlags = []string(ruleFlags)
 
-	if args.TimingLimit < 0 {
-		fmt.Fprintf(os.Stderr, "invalid value %d for flag -timing-top: expected a positive rule count\n", args.TimingLimit)
-		return args, help, 2
-	}
-	if args.TimingLimit > 0 {
+	// The Node.js entry point fills in the default "all" when the user
+	// passes a bare --timing, so the value is always present here.
+	switch {
+	case timingValue == "":
+	case strings.EqualFold(timingValue, "all"):
 		args.Timing = true
+	default:
+		n, err := strconv.Atoi(timingValue)
+		if err != nil || n <= 0 {
+			fmt.Fprintf(os.Stderr, "invalid value %q for flag -timing: expected \"all\" or a positive rule count\n", timingValue)
+			return args, help, 2
+		}
+		args.Timing = true
+		args.TimingLimit = n
 	}
 
 	// --type-check-only implies --type-check and skips all lint rules.
