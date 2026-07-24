@@ -191,6 +191,11 @@ jobs:
           submodules: true
           fetch-depth: 1
 
+      - name: Disable CPU hogs (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        uses: ./.github/actions/windows-disable-cpu-hogs
+
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
