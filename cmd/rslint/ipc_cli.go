@@ -341,8 +341,9 @@ func runCLI(args []string) int {
 	// The peer holds the real stdout for IPC frames, so any plain-text write
 	// (usage banner, "Created rslint.config.*", lint output) would corrupt the
 	// frame stream if it shared the fd. Redirect through `output`
-	// notifications, which the peer concatenates into its real stdout. stderr
-	// is untouched (inherited end-to-end).
+	// notifications, which the peer concatenates into its real stdout. Ordinary
+	// stderr stays inherited; deferred final stderr waits for Node's shutdown
+	// acknowledgement before using that inherited stream.
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
 		_ = ch.Close()
@@ -386,19 +387,19 @@ func runCLI(args []string) int {
 		return &res, nil
 	}
 
-	// Hold the --timing table back until finalizeStdout has drained the
-	// async stdout forwarding: stderr is inherited and would otherwise
-	// surface the table before (or inside) the still-in-flight lint report.
+	// Hold the --timing table until Node confirms that its real stdout sink has
+	// completed every forwarded write. Draining the Go pipe alone is not a
+	// sufficient ordering edge because Node's Writable writes are asynchronous.
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 
 	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
-	if timingTable != "" {
+	stdoutFlushed := shutdownPeer(ch, state)
+	if stdoutFlushed && !state.signalled.Load() && timingTable != "" {
 		fmt.Fprint(os.Stderr, timingTable)
 	}
-	shutdownPeer(ch, state)
 	_ = ch.Close()
 
 	if state.signalled.Load() {
@@ -418,17 +419,19 @@ func markCLIInterrupted(ctx context.Context, state *runCLIState) bool {
 	return interrupted
 }
 
-// shutdownPeer best-effort tells the peer we're done so it drains its worker
-// pool and exits cleanly. Skipped if a signal already fired: the peer sees its
-// own stdin disconnect anyway, and pushing another frame races the closing
-// pipe.
-func shutdownPeer(ch *ipc.Channel, state *runCLIState) {
+// shutdownPeer tells the peer we're done and waits for its acknowledgement.
+// The Node peer sends that acknowledgement only after forwarded stdout has
+// flushed, so a true result is the ordering barrier for deferred stderr.
+// Skipped if a signal already fired: the peer sees its own stdin disconnect
+// anyway, and pushing another frame races the closing pipe.
+func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 	if state != nil && state.signalled.Load() {
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, _ = ch.SendRequest(ctx, kindShutdown, struct{}{})
+	_, err := ch.SendRequest(ctx, kindShutdown, struct{}{})
+	return err == nil
 }
 
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,

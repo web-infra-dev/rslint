@@ -1,7 +1,7 @@
 import { describe, test, expect } from '@rstest/core';
 import fs from 'node:fs';
 import os from 'node:os';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Writable } from 'node:stream';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runEngine } from '../src/cli/engine.js';
@@ -52,6 +52,97 @@ describe('runEngine init payload TTY fact', () => {
     const { exitCode, payload } = await runWithSink(new PassThrough());
     expect(exitCode).toBe(0);
     expect(payload.runtime?.stdoutIsTTY).toBe(false);
+  });
+});
+
+describe('runEngine output shutdown barrier', () => {
+  test('waits for stdout under backpressure before acknowledging shutdown', async () => {
+    const events: string[] = [];
+    let releaseFirstWrite!: () => void;
+    let markFirstWriteStarted!: () => void;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    const firstWriteGate = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let stdoutWrites = 0;
+    const stdout = new Writable({
+      highWaterMark: 1,
+      write(_chunk, _encoding, callback) {
+        stdoutWrites++;
+        const write = stdoutWrites;
+        events.push(`stdout:${write}:start`);
+        if (write === 1) {
+          markFirstWriteStarted();
+          void firstWriteGate.then(() => {
+            events.push(`stdout:${write}:done`);
+            callback();
+          });
+          return;
+        }
+        events.push(`stdout:${write}:done`);
+        callback();
+      },
+    });
+    let settled = false;
+    const run = runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    }).then((code) => {
+      settled = true;
+      return code;
+    });
+
+    try {
+      await firstWriteStarted;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(settled).toBe(false);
+    } finally {
+      releaseFirstWrite();
+    }
+
+    expect(await run).toBe(0);
+    expect(events).toEqual([
+      'stdout:1:start',
+      'stdout:1:done',
+      'stdout:2:start',
+      'stdout:2:done',
+    ]);
+  });
+
+  test('rejects shutdown when stdout forwarding fails', async () => {
+    const stdout = new Writable({
+      write(_chunk, _encoding, callback) {
+        callback(new Error('injected stdout failure'));
+      },
+    });
+    const exitCode = await runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    });
+
+    expect(exitCode).toBe(2);
+  });
+
+  test('rejects shutdown without hanging when stdout closes mid-write', async () => {
+    const stdout = new Writable({
+      write() {
+        stdout.destroy();
+      },
+    });
+    const exitCode = await runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    });
+
+    expect(exitCode).toBe(2);
   });
 });
 

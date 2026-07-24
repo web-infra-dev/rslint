@@ -803,7 +803,8 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
 11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
 12. **Output Formatting**: the CLI-private output subsystem renders `default`, JSON line, GitHub workflow command, or GitLab Code Quality formats. Only `default` emits a summary; machine-readable formats never emit ANSI styling or a summary.
-13. **Exit Code**: depends on the report counts, `--max-warnings`, and fix outcomes
+13. **Output Synchronization**: in the default IPC CLI, Go drains all report text into ordered `output` notifications and then sends its terminal `shutdown` request. Node seals forwarding and waits for every real-stdout write callback before acknowledging; only after Go receives that acknowledgement does it emit deferred stderr (currently the `--timing` table), so merged `2>&1` output cannot place the table before or inside the report.
+14. **Exit Code**: depends on the report counts, `--max-warnings`, and fix outcomes
 
 ### Concurrency Model
 
