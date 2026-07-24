@@ -46,10 +46,12 @@ func runProgramTypeCheck(t *testing.T, program *compiler.Program) []rule.RuleDia
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				out = append(out, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					out = append(out, d)
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -289,10 +291,12 @@ export type T = typeof M;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				diags = append(diags, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					diags = append(diags, d)
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -330,10 +334,12 @@ export type T = typeof M;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				diags = append(diags, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					diags = append(diags, d)
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -455,10 +461,12 @@ func TestMatrix_TypeInfoFilesDoesNotRestrictTypeCheck(t *testing.T) {
 			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 			TypeCheck:       true,
 			TypeInfoFiles:   infoFiles,
-			OnDiagnostic: func(d rule.RuleDiagnostic) {
-				if strings.HasPrefix(d.RuleName, "TypeScript(") {
-					out = append(out, d)
-				}
+			Consumer: rule.DiagnosticConsumer{
+				Report: func(d rule.RuleDiagnostic) {
+					if strings.HasPrefix(d.RuleName, "TypeScript(") {
+						out = append(out, d)
+					}
+				},
 			},
 		})
 		if err != nil {
@@ -513,10 +521,12 @@ func TestMatrix_StrictOnlyDiagAcrossPrograms_KeptExactlyOnce(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				got = append(got, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					got = append(got, d)
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -555,10 +565,12 @@ func TestMatrix_TypeCheckFalse_NoPhaseTwo(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       false,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				got = append(got, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					got = append(got, d)
+				}
+			},
 		},
 	})
 	if err != nil {

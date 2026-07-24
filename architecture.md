@@ -260,6 +260,13 @@ type RuleListeners map[ast.Kind]func(node *ast.Node)
 
 `RequiresTypeInfo` is important because gap-file fallback Programs intentionally do not run type-aware rules.
 
+Within `internal/rule`, ownership is split by concern without introducing a
+new package boundary: `rule.go` owns rule metadata and listeners,
+`diagnostic.go` owns diagnostic/edit value types, and `context.go` owns the
+runtime context and reporting pipeline. `DiagnosticConsumer` and `EditDemand`
+are canonical rule-framework types; `internal/linter` consumes them directly
+instead of re-exporting aliases.
+
 ### Rule Context
 
 `RuleContext` is the runtime environment passed to each rule. It includes:
@@ -272,6 +279,7 @@ type RuleContext struct {
     InlineGlobals  []InlineGlobal
     Globals        map[string]bool
     Comments       *CommentStore
+    Refs           *RefStore
     Program        *compiler.Program
     TypeChecker    *checker.Checker
     DisableManager *DisableManager
@@ -285,6 +293,10 @@ func (*RuleContext) ReportNodeWithFixes(...)
 func (*RuleContext) ReportNodeWithSuggestions(...)
 func (*RuleContext) ReportNodeWithFixesAndSuggestions(...)
 func (*RuleContext) ReportRangeWithFixesAndSuggestions(...)
+func (*RuleContext) ReportNodeWithDeferredFixes(..., func() []RuleFix)
+func (*RuleContext) ReportRangeWithDeferredFixes(..., func() []RuleFix)
+func (*RuleContext) ReportNodeWithDeferredSuggestions(..., func() []RuleSuggestion)
+func (*RuleContext) ReportRangeWithDeferredSuggestions(..., func() []RuleSuggestion)
 ```
 
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
@@ -293,6 +305,12 @@ for the first consumer; later consumers share that list. A source without `//`
 or `/*` takes a cheap byte-scan fast path. Inline-global parsing first checks
 for an exact raw-text directive candidate, so ordinary files do not force
 comment collection.
+The linter also creates one shared `RefStore` handle per file. Its candidate
+identifier walk is deferred until the first reference query, and binder name
+resolution is then performed once per queried symbol name. Rules query it with
+binder declaration symbols instead of repeating AST walks or TypeChecker
+lookups; files whose rules never request references do not materialize the
+index.
 `ConfigGlobals` preserves the effective `languageOptions.globals` source,
 `InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
 resolved map after inline settings override configuration. Rules consume this
@@ -303,6 +321,32 @@ preserves writable versus read-only access for ESLint-compatible scope APIs.
 The linter binds immutable rule name, severity, and diagnostic-sink metadata to
 each context once. The reporting methods use that state directly rather than
 allocating bound callback closures for every reporting variant.
+
+Native lint entry points provide one `DiagnosticConsumer` containing both the
+report callback and an `EditDemand` bit mask. Autofixes and suggestions are
+independent demand bits; zero requests diagnostics without optional edits.
+This is a reporting-pass capability, not a `Program` property:
+`RunLinter` normalizes it once and passes the same immutable consumer separately
+to every per-Program lint task and then into each rule reporter.
+
+The category-specific deferred reporting methods apply inline-disable
+suppression first, inspect the matching demand bit, and only then invoke the
+builder synchronously. Builders are never retained and must contain only work
+needed to construct their optional artifact; diagnostic detection, message,
+range, and severity are decided before the builder. Keeping the rule API
+category-specific avoids exposing a general callback protocol or a demand
+query that rules could accidentally use to change diagnostic semantics.
+Adding another native optional artifact is additive: define one demand bit and
+one category-specific deferred reporting path. The pass/Program scheduling
+boundary and existing rule APIs do not need to change.
+
+Existing eager `Report*WithFixes` and `Report*WithSuggestions` methods remain
+available for gradual rule migration. Their already-built artifacts are
+filtered by the same consumer demand, but only the deferred methods can avoid
+the construction cost. Direct `RuleContext.WithReporter` compatibility callers
+request all edits; production lint entry points bind `DiagnosticConsumer`
+explicitly. The demand neither changes TypeChecker acquisition nor the
+independent serialized eslint-plugin reverse-dispatch protocol.
 
 ### Listener Registration
 
@@ -336,13 +380,16 @@ The actual diagnostic model is text-range based and fix-aware:
 
 ```go
 type RuleDiagnostic struct {
-    Range       core.TextRange
-    RuleName    string
-    Message     RuleMessage
-    FixesPtr    *[]RuleFix
-    Suggestions *[]RuleSuggestion
-    SourceFile  *ast.SourceFile
-    Severity    DiagnosticSeverity
+    Range        core.TextRange
+    RuleName     string
+    Message      RuleMessage
+    FixesPtr     *[]RuleFix
+    Suggestions  *[]RuleSuggestion
+    SourceFile   ast.SourceFileLike
+    FilePath     string
+    Severity     DiagnosticSeverity
+    Origin       DiagnosticOrigin
+    PreFormatted bool
 }
 
 type RuleFix struct {
@@ -365,7 +412,13 @@ Autofix is implemented as text edits:
 - replace = replace a non-empty range with text
 - remove = replace a range with the empty string
 
-Rules attach fixes through `ReportRangeWithFixes(...)` or `ReportNodeWithFixes(...)`.
+Rules with cheap, unconditional edits can attach fixes through
+`ReportRangeWithFixes(...)` or `ReportNodeWithFixes(...)`. Rules whose edit-only
+analysis is expensive should use `ReportRangeWithDeferredFixes(...)` or
+`ReportNodeWithDeferredFixes(...)`, allowing the framework to skip that
+analysis when the current native consumer does not need autofixes. The
+suggestion counterparts provide the same migration path for expensive
+suggestion construction.
 
 Fix application happens in `internal/linter/source_code_fixer.go`:
 
@@ -376,9 +429,16 @@ Fix application happens in `internal/linter/source_code_fixer.go`:
 
 Important behavior differences by integration:
 
-- **CLI**: can rerun lint and fix for multiple passes
+- **CLI lint-only**: requests diagnostics only, so migrated native rules do not
+  construct autofixes or suggestions
+- **CLI `--fix`**: requests native autofixes, can rerun lint and fix for multiple
+  passes, and uses diagnostics-only mode for the final no-more-writes
+  verification pass
 - **LSP quick fix**: returns direct text edits for one diagnostic
 - **LSP fix-all**: runs repeated lint-fix cycles, then returns one whole-document replacement edit
+- **LSP normal diagnostics and API**: request all native edits because fixes and
+  suggestions are response metadata even when they are not immediately applied
+- **LSP speculative fix-all passes**: request native autofixes only
 - **API**: `lint({ fix: true })` applies fixes in a single pass and returns the fixed source per file in `output` (the JS side persists it via `Rslint.outputFixes`). There is no separate `applyFixes`, and—unlike the CLI—it does not re-lint across passes.
 
 ## 8. Configuration & Directives
@@ -798,7 +858,7 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order.
 6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
 7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
-8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
+8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
 11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
@@ -940,8 +1000,14 @@ goroutines remain outside that guarantee.
 - **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint tasks and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
 - **Lazy Shared Comments**: each file owns one `CommentStore`; directive consumers and comment-aware rules materialize its canonical comment list only when needed and reuse the result. Rule-specific text checks avoid scanner work when their comment syntax cannot occur
+- **Lazy Shared References**: each file exposes one `RefStore`; its candidate identifier walk is deferred until first use, and each queried symbol name is binder-resolved once for reuse across native rules
 - **Task-Local Listener Reuse**: each checker-shard task owns one sparse listener registry and reuses its map and per-kind slice capacity across that task's serial files. Registries are never shared across tasks or requests
 - **Direct Rule Reporting Methods**: each rule context stores one compact immutable reporter state; its reporting methods replace the former family of per-rule bound closures
+- **Demand-Driven Native Edits**: native consumers explicitly request optional
+  edit kinds. Deferred edit builders run only after suppression and only when
+  their matching kind is requested, so lint-only runs preserve diagnostics while
+  avoiding edit-only analysis. Eager reporting methods remain compatible while
+  rules migrate incrementally.
 
 ### Caching Strategy
 
@@ -1131,7 +1197,10 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  Single DFS AST Traversal -> Listener Dispatch                               │
 │            │                                                                 │
 │            ▼                                                                 │
-│  RuleDiagnostic / Fix / Suggestion Collection                                │
+│  Native Edit Demand -> Report / Suppress -> Deferred Edit Materialization    │
+│            │                                                                 │
+│            ▼                                                                 │
+│  RuleDiagnostic / Requested Fix / Requested Suggestion Collection            │
 │            │                                                                 │
 │            ├───────────────► CLI --type-check: Program-wide Type Check       │
 │            │                    (real tsconfigs)                              │

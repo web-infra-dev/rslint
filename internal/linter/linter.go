@@ -2,6 +2,7 @@ package linter
 
 import (
 	"context"
+	"errors"
 	"os"
 	"runtime"
 	"strings"
@@ -86,8 +87,7 @@ type runProgramOptions struct {
 	TypeInfoFiles map[string]struct{}
 	// Timing, when non-nil, receives per-rule execution timings. nil disables
 	// instrumentation entirely (listeners are registered unwrapped).
-	Timing       *TimingCollector
-	OnDiagnostic DiagnosticHandler
+	Timing *TimingCollector
 }
 
 type programLintResult struct {
@@ -142,11 +142,10 @@ func (r *listenerRegistry) reset() {
 //
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
-// concern handled by RunLinter directly.
-func runLintRulesInProgram(opts runProgramOptions) programLintResult {
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
-	}
+// concern handled by RunLinter directly. consumer is passed separately because
+// edit demand belongs to the reporting pass, not to runProgramOptions or the
+// Program itself.
+func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsumer) programLintResult {
 	getRulesForFile := opts.GetRulesForFile
 	if getRulesForFile == nil {
 		return programLintResult{}
@@ -218,7 +217,11 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				Refs:           refs,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
-			}.WithReporter(r.Name, r.Severity, opts.OnDiagnostic)
+			}.WithDiagnosticConsumer(
+				r.Name,
+				r.Severity,
+				consumer,
+			)
 
 			var runStart time.Time
 			if ruleDurations != nil {
@@ -469,9 +472,10 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
+	if !opts.Consumer.Demand.IsValid() {
+		return nil, errors.New("linter: invalid native edit demand")
 	}
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
@@ -509,12 +513,11 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				SingleThreaded:       opts.SingleThreaded,
 				TypeInfoFiles:        opts.TypeInfoFiles,
 				Timing:               opts.Timing,
-				OnDiagnostic:         opts.OnDiagnostic,
 			}
 			programIndex := i
 			programOptions := programOpts
 			wg.Queue(func() {
-				programResults[programIndex] = runLintRulesInProgram(programOptions)
+				programResults[programIndex] = runLintRulesInProgram(programOptions, consumer)
 			})
 		}
 		wg.RunAndWait()
@@ -532,7 +535,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			Programs:       opts.Programs,
 			Skip:           opts.SkipTypeCheckPrograms,
 			SingleThreaded: opts.SingleThreaded,
-			OnDiagnostic:   opts.OnDiagnostic,
+			OnDiagnostic:   consumer.Report,
 		})
 	}
 
@@ -733,9 +736,10 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
+	if !opts.Consumer.Demand.IsValid() {
+		panic("linter: invalid native edit demand")
 	}
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
 	getRulesForFile := opts.GetRulesForFile
 	if !opts.HasTypeInfo && getRulesForFile != nil {
 		base := getRulesForFile
@@ -753,9 +757,18 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.
 		SingleThreaded: true,
-		OnDiagnostic:   opts.OnDiagnostic,
-	})
+	}, consumer)
 }
+
+func normalizeDiagnosticConsumer(consumer rule.DiagnosticConsumer) rule.DiagnosticConsumer {
+	if consumer.Report == nil {
+		consumer.Demand = rule.EditDemandNone
+		consumer.Report = discardDiagnostic
+	}
+	return consumer
+}
+
+func discardDiagnostic(rule.RuleDiagnostic) {}
 
 // composeOwnedFilter combines a caller-supplied filter with the program's
 // owned-file restriction. Either component may be nil.

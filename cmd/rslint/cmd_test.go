@@ -1248,8 +1248,11 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
 			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(activeConfig, sf.FileName(), dir, false, typeInfoFiles)
 		},
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			diagnostics = append(diagnostics, d)
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
+			},
 		},
 	})
 	if err != nil {
