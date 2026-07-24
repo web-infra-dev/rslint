@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -134,6 +136,124 @@ func requestContext(t *testing.T) context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)
 	return ctx
+}
+
+type gatedAPIWriter struct {
+	mu          sync.Mutex
+	buf         bytes.Buffer
+	calls       int
+	bodyEntered chan struct{}
+	releaseBody chan struct{}
+	releaseOnce sync.Once
+}
+
+func newGatedAPIWriter() *gatedAPIWriter {
+	return &gatedAPIWriter{
+		bodyEntered: make(chan struct{}),
+		releaseBody: make(chan struct{}),
+	}
+}
+
+func (w *gatedAPIWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	w.calls++
+	call := w.calls
+	w.mu.Unlock()
+	if call == 2 {
+		close(w.bodyEntered)
+		<-w.releaseBody
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *gatedAPIWriter) release() {
+	w.releaseOnce.Do(func() { close(w.releaseBody) })
+}
+
+func (w *gatedAPIWriter) bytes() []byte {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return bytes.Clone(w.buf.Bytes())
+}
+
+func TestService_ExitWaitsForCompleteAcknowledgement(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	writer := newGatedAPIWriter()
+	t.Cleanup(writer.release)
+	service := NewService(inR, writer, &serviceTestHandler{})
+
+	serviceDone := make(chan error, 1)
+	go func() { serviceDone <- service.Start() }()
+
+	request, err := ipc.NewMessage(ipc.KindExit, 17, struct{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ipc.WriteFrame(inW, request); err != nil {
+		t.Fatalf("write exit request: %v", err)
+	}
+	select {
+	case <-writer.bodyEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("exit acknowledgement did not reach the body-write gate")
+	}
+	select {
+	case err := <-serviceDone:
+		t.Fatalf("service returned before the complete exit acknowledgement: %v", err)
+	default:
+	}
+
+	writer.release()
+	select {
+	case err := <-serviceDone:
+		if err != nil {
+			t.Fatalf("service exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("service did not return after the complete exit acknowledgement")
+	}
+
+	response, err := ipc.ReadFrame(bufio.NewReader(bytes.NewReader(writer.bytes())))
+	if err != nil {
+		t.Fatalf("read exit acknowledgement: %v", err)
+	}
+	if response.Kind != ipc.KindResponse || response.ID != 17 {
+		t.Fatalf("exit acknowledgement = kind %q id %d", response.Kind, response.ID)
+	}
+}
+
+type failingAPIWriter struct{}
+
+func (failingAPIWriter) Write([]byte) (int, error) {
+	return 0, errors.New("api writer boom")
+}
+
+func TestService_ExitWriteFailureIsNotSuccess(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	service := NewService(inR, failingAPIWriter{}, &serviceTestHandler{})
+
+	serviceDone := make(chan error, 1)
+	go func() { serviceDone <- service.Start() }()
+	request, err := ipc.NewMessage(ipc.KindExit, 23, struct{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ipc.WriteFrame(inW, request); err != nil {
+		t.Fatalf("write exit request: %v", err)
+	}
+
+	select {
+	case err := <-serviceDone:
+		if err == nil {
+			t.Fatal("exit acknowledgement write failure returned success")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("service hung after the exit acknowledgement write failed")
+	}
 }
 
 func TestService_BidirectionalLintKeepsReadLoopRunning(t *testing.T) {

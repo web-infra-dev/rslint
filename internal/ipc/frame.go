@@ -165,11 +165,28 @@ func WriteFrame(w io.Writer, msg *Message) error {
 	if len(body) > maxFrameSize {
 		return fmt.Errorf("ipc: frame body %d exceeds cap %d", len(body), maxFrameSize)
 	}
-	if err := binary.Write(w, binary.LittleEndian, uint32(len(body))); err != nil {
+	var header [4]byte
+	binary.LittleEndian.PutUint32(header[:], uint32(len(body)))
+	if err := writeExact(w, header[:]); err != nil {
 		return fmt.Errorf("ipc: write frame length: %w", err)
 	}
-	if _, err := w.Write(body); err != nil {
+	if err := writeExact(w, body); err != nil {
 		return fmt.Errorf("ipc: write frame body: %w", err)
+	}
+	return nil
+}
+
+// writeExact treats any short write as terminal, even when a broken Writer
+// returns a nil error. Retrying would be unsafe for framing: the peer has
+// already received a prefix, and a Writer returning (0, nil) could otherwise
+// spin forever.
+func writeExact(w io.Writer, p []byte) error {
+	n, err := w.Write(p)
+	if err != nil {
+		return err
+	}
+	if n != len(p) {
+		return io.ErrShortWrite
 	}
 	return nil
 }
