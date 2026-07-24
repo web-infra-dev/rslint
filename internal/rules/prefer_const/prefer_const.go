@@ -392,16 +392,11 @@ func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContex
 		if !allConst {
 			return
 		}
-		// Resolve the symbol directly from the identifier node provided by
-		// VisitDestructuringIdentifiers. For shorthand properties, the parent
-		// is a ShorthandPropertyAssignment and GetSymbolAtLocation returns the
-		// property symbol, so use GetShorthandAssignmentValueSymbol instead.
-		var sym *ast.Symbol
-		if ident.Parent != nil && ident.Parent.Kind == ast.KindShorthandPropertyAssignment {
-			sym = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(ident.Parent)
-		} else {
-			sym = ctx.TypeChecker.GetSymbolAtLocation(ident)
-		}
+		// ctx.Refs.Resolve handles shorthand property names the same as
+		// plain identifiers (unlike checker.GetSymbolAtLocation, which
+		// resolves a shorthand name to the property symbol rather than the
+		// variable it reads/writes).
+		sym := ctx.Refs.Resolve(ident)
 		if sym == nil {
 			return
 		}
@@ -417,7 +412,7 @@ func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContex
 // 1. Member expressions (obj.prop, arr[i]) — can never be const declarations
 // 2. Identifiers whose declaration is in a different block scope — can't safely merge
 // Same-scope identifiers (var, const, import, param, etc.) do NOT suppress reporting.
-// Uses TypeChecker symbol resolution instead of name-set collection to correctly
+// Uses ctx.Refs symbol resolution instead of name-set collection to correctly
 // handle all declaration types (imports, function/class declarations, parameters, etc.).
 func hasNonReportableDestructuringTarget(writeNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) bool {
 	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
@@ -437,12 +432,12 @@ func hasNonReportableDestructuringTarget(writeNode *ast.Node, declNode *ast.Node
 
 // hasNonReportableTarget checks if a destructuring pattern contains targets that
 // should suppress reporting: member expressions, or identifiers declared in a
-// different block scope. Uses TypeChecker to resolve each identifier's declaration
+// different block scope. Uses ctx.Refs to resolve each identifier's declaration
 // rather than pre-collecting names, so it correctly handles imports, parameters,
 // function declarations, class declarations, etc.
 func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleContext) bool {
 	if node.Kind == ast.KindIdentifier {
-		sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+		sym := ctx.Refs.Resolve(node)
 		if sym == nil || len(sym.Declarations) == 0 {
 			// Can't resolve — treat as non-reportable (conservative)
 			return true
@@ -461,7 +456,7 @@ func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleC
 			found = true
 			return true
 		case ast.KindIdentifier:
-			sym := ctx.TypeChecker.GetSymbolAtLocation(child)
+			sym := ctx.Refs.Resolve(child)
 			if sym == nil || len(sym.Declarations) == 0 {
 				found = true
 				return true
@@ -473,7 +468,7 @@ func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleC
 		case ast.KindShorthandPropertyAssignment:
 			shorthand := child.AsShorthandPropertyAssignment()
 			if shorthand != nil && shorthand.Name() != nil {
-				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(child)
+				valSym := ctx.Refs.Resolve(shorthand.Name())
 				if valSym == nil || len(valSym.Declarations) == 0 {
 					found = true
 					return true

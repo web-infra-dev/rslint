@@ -75,6 +75,23 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 	return s.refs[sym]
 }
 
+// Resolve returns the symbol that a reference-position identifier resolves
+// to — the forward counterpart to References, for rules that need "what
+// declaration does this identifier refer to" rather than "what identifiers
+// refer to this declaration." It uses the same binder scope walk as
+// References, so it never touches the TypeChecker.
+//
+// Returns nil for identifiers that aren't reference positions (declaration
+// names, property keys, import/export bindings, labels, intrinsic JSX tags —
+// see isReferencePosition) and for names that don't resolve to a symbol
+// bound in this file.
+func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/)
+}
+
 // collectCandidates walks the file once and buckets by name every identifier
 // that occupies a reference position.
 func (s *RefStore) collectCandidates() {
