@@ -36,9 +36,18 @@ type RefStore struct {
 // be the file's program options (the resolver consults script target and
 // module settings during scope walks).
 func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions) *RefStore {
+	resolver := binder.NameResolver{CompilerOptions: options}
+	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
+		// A script file's own top-level locals are never consulted by the
+		// scope walk (they're conceptually merged into the global symbol
+		// table), so the resolver must be handed this file's locals as its
+		// globals table or a top-level `var`/function declaration never
+		// resolves.
+		resolver.Globals = sourceFile.Locals
+	}
 	return &RefStore{
 		sourceFile: sourceFile,
-		resolver:   binder.NameResolver{CompilerOptions: options},
+		resolver:   resolver,
 	}
 }
 
@@ -88,10 +97,18 @@ func (s *RefStore) collectCandidates() {
 // something non-local (property names, import/export bindings, labels,
 // intrinsic JSX tags).
 func isReferencePosition(n *ast.Node) bool {
+	p := n.Parent
+	if p != nil && p.Kind == ast.KindShorthandPropertyAssignment && p.AsShorthandPropertyAssignment().Name() == n {
+		// `{x}` reads x as an expression, and `({x} = obj)` writes to x once
+		// the object literal is reinterpreted as an assignment pattern;
+		// IsDeclarationName treats this name as a declaration (it also
+		// declares the object's property), which would otherwise discard
+		// both real uses.
+		return true
+	}
 	if ast.IsDeclarationName(n) {
 		return false
 	}
-	p := n.Parent
 	if p == nil {
 		return false
 	}
@@ -111,6 +128,17 @@ func isReferencePosition(n *ast.Node) bool {
 		return false
 	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
 		// Labels live in their own namespace and never reference variables.
+		return false
+	case ast.KindMetaProperty:
+		// `target`/`meta`/`defer` in `new.target`, `import.meta`, and
+		// `import.defer` are syntactic, not identifiers that can reference a
+		// variable.
+		return false
+	case ast.KindJsxNamespacedName:
+		// The namespace and name pieces of a namespaced JSX tag or attribute
+		// (`<foo:bar attr:name="v" />`) are syntactic, never variable
+		// references; the plain identifier tag name case is still handled
+		// by IsJsxTagName below.
 		return false
 	}
 	if ast.IsJsxTagName(n) {
