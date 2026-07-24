@@ -95,14 +95,15 @@ type LintResult struct {
 //     type-check. When non-nil, must be parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
 //     non-project fallback Program with synthesized CompilerOptions).
+//   - Consumer=zero                        → diagnostics are dropped and no
+//     optional native edit artifacts are materialized
 //   - Timing=nil                          → per-rule timing collection is off
 //     and the lint hot path pays no instrumentation cost. When non-nil, every
 //     rule Run call and listener invocation is timed and accumulated into the
 //     collector, keyed by rule name. Callers may share one collector across
 //     multiple RunLinter invocations (e.g. --fix re-lint passes) to aggregate.
-//   - OnDiagnostic=nil                    → diagnostics are dropped
 //
-// Thread-safety: OnDiagnostic is invoked from multiple goroutines
+// Thread-safety: Consumer.Report is invoked from multiple goroutines
 // concurrently — Phase 1 fans out per program AND per file shard within
 // each program (one worker per pool checker), Phase 2 (type-check) fans
 // out per program. Callers MUST make their handler safe for concurrent
@@ -124,13 +125,15 @@ type RunLinterOptions struct {
 	GetRulesForFile  RuleHandler
 	TypeInfoFiles    map[string]struct{}
 	SyntaxErrorFiles map[string]struct{}
+	// Consumer owns diagnostic delivery and the optional edit artifacts needed
+	// by native Go consumers. It does not alter the separate eslint-plugin
+	// reverse-dispatch request.
+	Consumer rule.DiagnosticConsumer
 
 	TypeCheck             bool
 	SkipTypeCheckPrograms []bool
 
 	Timing *TimingCollector
-
-	OnDiagnostic DiagnosticHandler
 }
 
 // LintSingleFileOptions configures a single-file, single-program rule pass.
@@ -144,5 +147,6 @@ type LintSingleFileOptions struct {
 	HasTypeInfo     bool
 	GetRulesForFile RuleHandler
 	ExcludePaths    []string
-	OnDiagnostic    DiagnosticHandler
+	// Consumer has the same native-only semantics as RunLinterOptions.Consumer.
+	Consumer rule.DiagnosticConsumer
 }

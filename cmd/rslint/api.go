@@ -653,7 +653,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			}
 			return activeRules
 		},
-		OnDiagnostic: diagnosticCollector,
+		// The API returns concrete fixes, suggestions, and fixable counts
+		// independently of whether req.Fix later applies autofixes.
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: diagnosticCollector,
+		},
 	}
 
 	// Metadata is the feature gate: without it there is no plugin target walk,

@@ -53,7 +53,9 @@ func TestGate_LinterFiltersTypeAwareRuleOnGapFile(t *testing.T) {
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return rules
 		},
-		OnDiagnostic: func(rule.RuleDiagnostic) {},
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(rule.RuleDiagnostic) {},
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
