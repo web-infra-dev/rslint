@@ -190,6 +190,34 @@ func (ctx *RuleContext) reportRangeWithDeferredSuggestions(textRange core.TextRa
 	ctx.emitRange(textRange, msg, nil, suggestions)
 }
 
+func (ctx *RuleContext) reportRangeWithDeferredFixesAndSuggestions(
+	textRange core.TextRange,
+	msg RuleMessage,
+	buildFixes func() []RuleFix,
+	buildSuggestions func() []RuleSuggestion,
+) {
+	if !ctx.shouldReportRange(textRange) {
+		return
+	}
+
+	var fixes *[]RuleFix
+	if ctx.reporter.consumer.Demand&EditDemandAutofix != 0 {
+		built := buildFixes()
+		if len(built) > 0 {
+			fixes = &built
+		}
+	}
+
+	var suggestions *[]RuleSuggestion
+	if ctx.reporter.consumer.Demand&EditDemandSuggestion != 0 {
+		built := buildSuggestions()
+		if len(built) > 0 {
+			suggestions = &built
+		}
+	}
+	ctx.emitRange(textRange, msg, fixes, suggestions)
+}
+
 func (ctx *RuleContext) ReportRange(textRange core.TextRange, msg RuleMessage) {
 	ctx.requireReporter()
 	ctx.reportRange(textRange, msg, nil, nil)
@@ -227,6 +255,26 @@ func (ctx *RuleContext) ReportRangeWithDeferredSuggestions(textRange core.TextRa
 	ctx.reportRangeWithDeferredSuggestions(textRange, msg, build)
 }
 
+// ReportRangeWithDeferredFixesAndSuggestions reports one diagnostic whose
+// autofixes and suggestions are constructed independently when their matching
+// artifact categories are requested. Each requested builder runs synchronously
+// after suppression and is never retained; empty results attach no artifact.
+func (ctx *RuleContext) ReportRangeWithDeferredFixesAndSuggestions(
+	textRange core.TextRange,
+	msg RuleMessage,
+	buildFixes func() []RuleFix,
+	buildSuggestions func() []RuleSuggestion,
+) {
+	ctx.requireReporter()
+	if buildFixes == nil {
+		panic("rule: deferred fixes require a builder")
+	}
+	if buildSuggestions == nil {
+		panic("rule: deferred suggestions require a builder")
+	}
+	ctx.reportRangeWithDeferredFixesAndSuggestions(textRange, msg, buildFixes, buildSuggestions)
+}
+
 func (ctx *RuleContext) ReportNode(node *ast.Node, msg RuleMessage) {
 	ctx.requireReporter()
 	ctx.reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, nil, nil)
@@ -260,6 +308,29 @@ func (ctx *RuleContext) ReportNodeWithDeferredSuggestions(node *ast.Node, msg Ru
 		panic("rule: deferred suggestions require a builder")
 	}
 	ctx.reportRangeWithDeferredSuggestions(utils.TrimNodeTextRange(ctx.SourceFile, node), msg, build)
+}
+
+// ReportNodeWithDeferredFixesAndSuggestions is the node-keyed twin of
+// ReportRangeWithDeferredFixesAndSuggestions.
+func (ctx *RuleContext) ReportNodeWithDeferredFixesAndSuggestions(
+	node *ast.Node,
+	msg RuleMessage,
+	buildFixes func() []RuleFix,
+	buildSuggestions func() []RuleSuggestion,
+) {
+	ctx.requireReporter()
+	if buildFixes == nil {
+		panic("rule: deferred fixes require a builder")
+	}
+	if buildSuggestions == nil {
+		panic("rule: deferred suggestions require a builder")
+	}
+	ctx.reportRangeWithDeferredFixesAndSuggestions(
+		utils.TrimNodeTextRange(ctx.SourceFile, node),
+		msg,
+		buildFixes,
+		buildSuggestions,
+	)
 }
 
 // ReportNodeWithFixesAndSuggestions emits a single diagnostic carrying both
