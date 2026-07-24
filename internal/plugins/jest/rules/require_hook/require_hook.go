@@ -92,16 +92,25 @@ func shouldBeInHook(node *ast.Node, ctx rule.RuleContext, allowedFunctionCalls [
 
 	switch node.Kind {
 	case ast.KindExpressionStatement:
-		return shouldBeInHook(node.AsExpressionStatement().Expression, ctx, allowedFunctionCalls)
+		return shouldBeInHook(ast.SkipParentheses(node.AsExpressionStatement().Expression), ctx, allowedFunctionCalls)
 	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if call.Expression.Kind == ast.KindImportKeyword ||
+			call.QuestionDotToken != nil ||
+			ast.IsOptionalChain(node) {
+			return false
+		}
 		if isJestFnCall(node, ctx) {
 			return false
 		}
 		name := utils.CalleeChainName(node)
 		return !containsString(allowedFunctionCalls, name)
 	case ast.KindVariableStatement:
+		if ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
+			return false
+		}
 		declList := node.AsVariableStatement().DeclarationList
-		if declList == nil || declList.Flags&ast.NodeFlagsConst != 0 {
+		if declList == nil || declList.Flags&ast.NodeFlagsBlockScoped == ast.NodeFlagsConst {
 			return false
 		}
 		decls := declList.AsVariableDeclarationList().Declarations
@@ -138,9 +147,21 @@ func getFunctionBodyBlock(fn *ast.Node) *ast.Node {
 	return nil
 }
 
+func hasCallExpressionParent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	parent := node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	return parent != nil && parent.Kind == ast.KindCallExpression
+}
+
 func describeCallbackBody(call *ast.Node, ctx rule.RuleContext) *ast.Node {
 	if call == nil ||
 		call.Kind != ast.KindCallExpression ||
+		hasCallExpressionParent(call) ||
 		!utils.IsTypeOfJestFnCall(call, ctx, utils.JestFnTypeDescribe) {
 		return nil
 	}

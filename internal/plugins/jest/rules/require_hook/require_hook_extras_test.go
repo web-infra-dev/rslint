@@ -15,7 +15,10 @@ func TestRequireHookExtras(t *testing.T) {
 		t,
 		&require_hook.RequireHookRule,
 		[]rule_tester.ValidTestCase{
-			{Code: `(setup());`},
+			{Code: `setup?.();`},
+			{Code: `foo?.bar();`},
+			{Code: `import('x');`},
+			{Code: `export let value = setup();`},
 			{Code: `jest['mock']('../api');`},
 			{Code: `describe('a test', () => setup());`},
 			{Code: `describe.only('suite', () => {
@@ -47,7 +50,6 @@ func TestRequireHookExtras(t *testing.T) {
 }));`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useHook", Line: 1, Column: 1},
-					{MessageId: "useHook", Line: 2, Column: 3},
 				},
 			},
 			{
@@ -69,7 +71,19 @@ func TestRequireHookExtras(t *testing.T) {
 				},
 			},
 			{
-				Code: `setup?.();`,
+				Code: `(setup());`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHook", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `await using value = setup();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHook", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `(foo?.bar)();`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useHook", Line: 1, Column: 1},
 				},
