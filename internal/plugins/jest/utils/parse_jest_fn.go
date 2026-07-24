@@ -49,7 +49,48 @@ func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnTyp
 	return slices.Contains(kinds, parsed.Kind)
 }
 
+// FnCallParseConfig describes the framework-specific inputs the shared test
+// function-call parser needs. Jest uses the default config; other frameworks
+// (e.g. Rstest) supply their own import module and valid call-chain predicate.
+type FnCallParseConfig struct {
+	// ImportModule is the module test globals are imported/required from.
+	ImportModule string
+	// IsValidChain reports whether a resolved root name plus member chain is a
+	// legal call for the framework (e.g. "test" + ["only"]).
+	IsValidChain func(name string, members []string) bool
+	// ParameterizedModifiers are the members whose "factory call + actual call"
+	// shape must be skipped so the actual call keeps its modifiers (Jest: each;
+	// Rstest: each, for). nil means only "each".
+	ParameterizedModifiers map[string]bool
+}
+
+// isParameterizedModifier reports whether member is a parameterized factory
+// modifier for the given config, defaulting to "each" when unset.
+func (c FnCallParseConfig) isParameterizedModifier(member string) bool {
+	if c.ParameterizedModifiers == nil {
+		return member == "each"
+	}
+	return c.ParameterizedModifiers[member]
+}
+
+var jestFnCallParseConfig = FnCallParseConfig{
+	ImportModule: jestGlobalsModule,
+	IsValidChain: isValidJestCall,
+}
+
+// JestFnCallParseConfig returns the parser config for Jest, so rules that expose
+// a framework-parameterized factory can pass Jest's defaults explicitly.
+func JestFnCallParseConfig() FnCallParseConfig {
+	return jestFnCallParseConfig
+}
+
 func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
+	return ParseFnCall(node, ctx, jestFnCallParseConfig)
+}
+
+// ParseFnCall parses a test framework function call using the supplied config,
+// so frameworks other than Jest can reuse the same parser.
+func ParseFnCall(node *ast.Node, ctx rule.RuleContext, config FnCallParseConfig) *ParsedJestFnCall {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
 	}
@@ -66,12 +107,12 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	callExpr := node.AsCallExpression()
-	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) || isInnerExpectCall(node, localName, members, ctx.Settings) {
+	if isEachFactoryCall(callExpr, members, config) || isInvalidTaggedTemplateCall(callExpr, members, config) || isInnerExpectCall(node, localName, members, ctx.Settings) {
 		return nil
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
+	name, originalNode, headType := ResolveFunctionReferenceForModule(node, localName, localNode, ctx, config.ImportModule)
 	if name == "" {
 		return nil
 	}
@@ -84,7 +125,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	if kind == JestFnTypeUnknown {
 		return nil
 	}
-	if kind != JestFnTypeExpect && kind != JestFnTypeJest && !isValidJestCall(name, members) {
+	if kind != JestFnTypeExpect && kind != JestFnTypeJest && !config.IsValidChain(name, members) {
 		return nil
 	}
 
@@ -229,6 +270,12 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 }
 
 func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
+	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, jestGlobalsModule)
+}
+
+// ResolveFunctionReferenceForModule resolves a test-global reference against a
+// specific import module, so frameworks other than Jest can share the resolver.
+func ResolveFunctionReferenceForModule(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext, importModule string) (string, *ast.Node, JestImportMode) {
 	if ctx.TypeChecker == nil {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -255,11 +302,11 @@ func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *a
 			continue
 		}
 
-		if name, originalNode, ok := resolveJestGlobalsImportSpecifier(decl); ok {
+		if name, originalNode, ok := resolveModuleImportSpecifier(decl, importModule); ok {
 			return name, originalNode, JEST_IMPORT_MODE
 		}
 
-		if name, originalNode, ok := resolveJestGlobalsRequireBinding(decl); ok {
+		if name, originalNode, ok := resolveModuleRequireBinding(decl, importModule); ok {
 			return name, originalNode, JEST_IMPORT_MODE
 		}
 
@@ -275,13 +322,13 @@ func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *a
 	return localName, localNode, JEST_GLOBAL_MODE
 }
 
-func resolveJestGlobalsImportSpecifier(decl *ast.Node) (string, *ast.Node, bool) {
+func resolveModuleImportSpecifier(decl *ast.Node, importModule string) (string, *ast.Node, bool) {
 	if decl == nil || decl.Kind != ast.KindImportSpecifier {
 		return "", nil, false
 	}
 
 	importDecl := FindImportDeclaration(decl)
-	if importDecl == nil || importDecl.ModuleSpecifier == nil || importDecl.ModuleSpecifier.Text() != jestGlobalsModule {
+	if importDecl == nil || importDecl.ModuleSpecifier == nil || importDecl.ModuleSpecifier.Text() != importModule {
 		return "", nil, false
 	}
 
@@ -302,13 +349,13 @@ func resolveJestGlobalsImportSpecifier(decl *ast.Node) (string, *ast.Node, bool)
 	return name.Text(), name, true
 }
 
-func resolveJestGlobalsRequireBinding(decl *ast.Node) (string, *ast.Node, bool) {
+func resolveModuleRequireBinding(decl *ast.Node, importModule string) (string, *ast.Node, bool) {
 	if decl == nil || decl.Kind != ast.KindBindingElement {
 		return "", nil, false
 	}
 
 	varDecl := internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
-	if varDecl == nil || !isJestGlobalsRequireCall(varDecl.AsVariableDeclaration().Initializer) {
+	if varDecl == nil || !isModuleRequireCall(varDecl.AsVariableDeclaration().Initializer, importModule) {
 		return "", nil, false
 	}
 
@@ -333,7 +380,7 @@ func resolveJestGlobalsRequireBinding(decl *ast.Node) (string, *ast.Node, bool) 
 	return "", nil, false
 }
 
-func isJestGlobalsRequireCall(node *ast.Node) bool {
+func isModuleRequireCall(node *ast.Node, importModule string) bool {
 	node = ast.SkipParentheses(node)
 	if node == nil || !ast.IsRequireCall(node, true /*requireStringLiteralLikeArgument*/) {
 		return false
@@ -351,9 +398,9 @@ func isJestGlobalsRequireCall(node *ast.Node) bool {
 
 	switch specifier.Kind {
 	case ast.KindStringLiteral:
-		return specifier.AsStringLiteral().Text == jestGlobalsModule
+		return specifier.AsStringLiteral().Text == importModule
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return specifier.AsNoSubstitutionTemplateLiteral().Text == jestGlobalsModule
+		return specifier.AsNoSubstitutionTemplateLiteral().Text == importModule
 	default:
 		return false
 	}
@@ -394,12 +441,12 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
-	if callExpr == nil || len(members) == 0 || members[len(members)-1] != "each" {
+func isEachFactoryCall(callExpr *ast.CallExpression, members []string, config FnCallParseConfig) bool {
+	if callExpr == nil || len(members) == 0 || !config.isParameterizedModifier(members[len(members)-1]) {
 		return false
 	}
 
-	// Only skip the factory layer so members (e.g. each/only/skip) are preserved on the actual call.
+	// Only skip the factory layer so members (e.g. each/for/only/skip) are preserved on the actual call.
 	// .each has a "factory call + actual call" shape:
 	// - factory:  describe.each(...)
 	// - actual:
@@ -418,7 +465,7 @@ func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
 	}
 }
 
-func isInvalidTaggedTemplateCall(callExpr *ast.CallExpression, members []string) bool {
+func isInvalidTaggedTemplateCall(callExpr *ast.CallExpression, members []string, config FnCallParseConfig) bool {
 	if callExpr == nil || callExpr.Expression == nil {
 		return false
 	}
@@ -427,7 +474,7 @@ func isInvalidTaggedTemplateCall(callExpr *ast.CallExpression, members []string)
 		return false
 	}
 
-	return len(members) == 0 || members[len(members)-1] != "each"
+	return len(members) == 0 || !config.isParameterizedModifier(members[len(members)-1])
 }
 
 func isValidJestCall(name string, members []string) bool {
