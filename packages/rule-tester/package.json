@@ -33,8 +33,7 @@
   "description": "Rule testing utilities for rslint",
   "devDependencies": {
     "@types/node": "catalog:types",
-    "typescript": "catalog:types",
-    "@typescript/native-preview": "catalog:types"
+    "typescript": "catalog:types"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"

@@ -84,9 +84,9 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@types/mocha": "catalog:vscode",
+    "@types/mocha": "catalog:types",
     "@types/node": "catalog:types",
-    "@types/vscode": "catalog:vscode",
+    "@types/vscode": "catalog:types",
     "@vscode/test-cli": "catalog:vscode",
     "@vscode/test-electron": "catalog:vscode",
     "@vscode/vsce": "catalog:vscode",
@@ -96,7 +96,6 @@
     "ovsx": "catalog:vscode",
     "rimraf": "catalog:build",
     "typescript": "catalog:types",
-    "@typescript/native-preview": "catalog:types",
     "vscode-languageclient": "catalog:vscode",
     "vscode-languageserver": "catalog:vscode",
     "vscode-languageserver-textdocument": "catalog:vscode"

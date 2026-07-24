@@ -19,7 +19,7 @@
   "devDependencies": {
     "@rslib/core": "catalog:build",
     "@types/node": "catalog:types",
-    "@typescript/native-preview": "catalog:types"
+    "typescript": "catalog:types"
   },
   "publishConfig": {
     "access": "public"

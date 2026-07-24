@@ -44,8 +44,7 @@
     "lint-staged": "catalog:tools",
     "prettier": "catalog:tools",
     "typescript": "catalog:types",
-    "zx": "catalog:tools",
-    "@typescript/native-preview": "catalog:types"
+    "zx": "catalog:tools"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
