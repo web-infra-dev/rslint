@@ -38,7 +38,7 @@ var NoVarRule = rule.Rule{
 					Description: "Unexpected var, use let or const instead.",
 				}
 
-				if ctx.TypeChecker != nil && canFix(node, &ctx) {
+				if canFix(node, &ctx) {
 					varRange := utils.GetVarKeywordRange(node, ctx.SourceFile)
 					ctx.ReportNodeWithFixes(reportNode, msg,
 						rule.RuleFixReplaceRange(varRange, "let"))
@@ -61,6 +61,9 @@ func isInDeclareGlobal(node *ast.Node) bool {
 
 // canFix checks all 10 ESLint conditions to determine if var→let is safe.
 func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
+	if ctx.Refs == nil {
+		return false
+	}
 	declList := node.AsVariableDeclarationList()
 	if declList == nil || declList.Declarations == nil {
 		return false
@@ -89,9 +92,13 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 			continue
 		}
 		utils.CollectBindingNames(varDecl.Name(), func(ident *ast.Node, _ string) {
-			sym := ctx.TypeChecker.GetSymbolAtLocation(ident)
-			if sym != nil {
-				vars = append(vars, varInfo{nameNode: ident, sym: sym})
+			// The binder attaches the symbol to the enclosing declaration
+			// (VariableDeclaration or BindingElement). Binder symbols are the
+			// currency of ctx.Refs, so use them on the declaration side too.
+			if decl := ident.Parent; decl != nil && decl.Name() == ident {
+				if sym := decl.Symbol(); sym != nil {
+					vars = append(vars, varInfo{nameNode: ident, sym: sym})
+				}
 			}
 		})
 	}
@@ -100,12 +107,13 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 		return false
 	}
 
-	// Collect all references in the enclosing scope
-	scope := findEnclosingScope(node)
-	if scope == nil {
-		scope = ctx.SourceFile.AsNode()
+	// Collect all references from the shared per-file index. A reference can
+	// only resolve to these symbols from within their scope, so the file-wide
+	// lists are identical to what a bounded scope walk would find.
+	refs := make(map[*ast.Symbol][]*ast.Node, len(vars))
+	for _, v := range vars {
+		refs[v.sym] = ctx.Refs.References(v.sym)
 	}
-	refs := collectReferences(scope, vars, ctx)
 
 	// Condition 2: self-reference or forward-reference in TDZ
 	// Uses positional range checks (matching ESLint's approach).
@@ -380,64 +388,6 @@ func findBlockScope(node *ast.Node) *ast.Node {
 		}
 		return false
 	})
-}
-
-// collectReferences walks the enclosing scope and collects all identifier references
-// to any of the given variables, grouped by symbol. Identifiers are pre-filtered by
-// name and by position before consulting the checker: GetSymbolAtLocation is expensive
-// (it can trigger lazy type checking of whole expressions), and for a top-level var the
-// scope is the entire file.
-func collectReferences(scope *ast.Node, vars []varInfo, ctx *rule.RuleContext) map[*ast.Symbol][]*ast.Node {
-	symSet := make(map[*ast.Symbol]bool, len(vars))
-	nameSet := make(map[string]bool, len(vars))
-	for _, v := range vars {
-		symSet[v.sym] = true
-		nameSet[v.nameNode.Text()] = true
-	}
-
-	result := make(map[*ast.Symbol][]*ast.Node)
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		// Skip declaration names (never counted as references) and positions that
-		// can never be a variable reference, e.g. the `b` in `a.b` or `{b: x}`.
-		if n.Kind == ast.KindIdentifier && nameSet[n.Text()] &&
-			!ast.IsDeclarationName(n) && !isNonReferencePosition(n) {
-			sym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if sym != nil && symSet[sym] {
-				result[sym] = append(result[sym], n)
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(scope)
-	return result
-}
-
-// isNonReferencePosition reports whether an identifier occupies a position that can
-// never reference a variable: the name of a property access / qualified name, or a
-// property name in an object literal / destructuring pattern.
-func isNonReferencePosition(n *ast.Node) bool {
-	p := n.Parent
-	if p == nil {
-		return false
-	}
-	switch p.Kind {
-	case ast.KindPropertyAccessExpression:
-		return p.AsPropertyAccessExpression().Name() == n
-	case ast.KindQualifiedName:
-		return p.AsQualifiedName().Right == n
-	case ast.KindPropertyAssignment:
-		return p.AsPropertyAssignment().Name() == n
-	case ast.KindBindingElement:
-		return p.AsBindingElement().PropertyName == n
-	}
-	return false
 }
 
 type varInfo struct {

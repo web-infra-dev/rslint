@@ -16,6 +16,8 @@ Your job is porting the **rule's semantics** — given equivalent input, produce
 
 Note: `languageOptions.globals` and `/*global ...*/` comments are automatically parsed by rslint and exposed through `ctx.Globals`. When porting rules that reference global variables, do not skip these test cases; instead, check `ctx.Globals` (e.g., `ctx.Globals[name]`).
 
+Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). Use it instead of walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier, which is a known performance killer. See [AST_PATTERNS.md — Collecting Variable References](./AST_PATTERNS.md#collecting-variable-references-ctxrefs) for semantics and the nil guard.
+
 Note: every comment in the file is already collected once by the linter and exposed through `ctx.Comments` (`[]*ast.CommentRange`, sorted, deduplicated). If your rule needs to scan all of a file's comments (directive comments, "is this line comment-only", etc.), iterate `ctx.Comments` directly — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
 
 When an upstream test case depends on other unsupported concepts (like `env` or `/*eslint*/` configurations):
@@ -318,7 +320,7 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
-- `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries
+- `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())` — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Collecting Variable References](AST_PATTERNS.md#collecting-variable-references-ctxrefs))
 - `GetOptionsMap` — options parsing (handles both array and map inputs)
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 

@@ -398,6 +398,30 @@ enumTypes := utils.GetEnumTypes(typeChecker, t)
 
 ---
 
+## `internal/rule/ref_store.go` - Reference Index (ctx.Refs)
+
+The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`.
+
+```go
+// Guard first: ctx.Refs is nil when no program is available (JS-only runs).
+if ctx.Refs == nil {
+    return
+}
+
+// Query with the BINDER symbol from the declaration node —
+// decl.Symbol(), never checker.GetSymbolAtLocation (merged symbols miss).
+refs := ctx.Refs.References(decl.Symbol()) // []*ast.Node, source order, read-only
+```
+
+- Declaration names are excluded; reads and writes are both included.
+- Property names, import/export bindings, labels, and lowercase JSX tags are pre-filtered out; shadowing and type-vs-value positions resolve correctly.
+- Single-file only — cross-file references still need the checker.
+- Never hand-roll this with an AST walk + `GetSymbolAtLocation` per identifier; that pattern triggers lazy type-checking and is a known performance killer.
+
+See [AST_PATTERNS.md — Collecting Variable References](./AST_PATTERNS.md#collecting-variable-references-ctxrefs) for the full semantics and a worked example (no-var).
+
+---
+
 ## `internal/utils/builtin_symbol_likes.go` - Builtin Symbol Checking
 
 ### Builtin Type Checking

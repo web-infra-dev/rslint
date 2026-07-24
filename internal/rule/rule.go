@@ -271,7 +271,13 @@ type RuleContext struct {
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every
 	// later consumer for this file reuses it.
-	Comments       *CommentStore
+	Comments *CommentStore
+	// Refs lazily provides the per-file identifier-reference index. Rules
+	// that need "all references to this declared symbol" should query this
+	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
+	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
+	// Nil when no program is available.
+	Refs           *RefStore
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager

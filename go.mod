@@ -6,6 +6,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/api => ./shim/api
 	github.com/microsoft/typescript-go/shim/api/encoder => ./shim/api/encoder
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
+	github.com/microsoft/typescript-go/shim/binder => ./shim/binder
 	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
 	github.com/microsoft/typescript-go/shim/collections => ./shim/collections
@@ -33,6 +34,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
+	github.com/microsoft/typescript-go/shim/binder v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
 	github.com/microsoft/typescript-go/shim/collections v0.0.0

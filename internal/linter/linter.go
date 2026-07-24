@@ -192,6 +192,13 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		// A cheap source-text check inside ParseInlineGlobals avoids asking
 		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
+
+		// One lazy reference index shared by every rule in this file; most
+		// files never materialize it.
+		var refs *rule.RefStore
+		if opts.Program != nil {
+			refs = rule.NewRefStore(file, opts.Program.Options())
+		}
 		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
@@ -208,6 +215,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				Comments:       comments,
+				Refs:           refs,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 			}.WithReporter(r.Name, r.Severity, opts.OnDiagnostic)
