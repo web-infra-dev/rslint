@@ -17,6 +17,61 @@ import (
 // channel closes.
 type InboundHandler func(ctx context.Context, msg *Message) (any, error)
 
+// ResponseReceipt is completed by Channel after an inbound response reaches a
+// terminal write outcome. A nil Err means the complete intended response frame
+// was accepted by the underlying writer. Call Err only after Done is closed.
+//
+// The receipt is framework-owned: completing it never calls application code,
+// so Channel may safely publish the successful write commit point while holding
+// its write lock.
+type ResponseReceipt struct {
+	done chan struct{}
+	once sync.Once
+	err  error
+}
+
+// Done closes exactly once when the response write succeeds or cannot succeed.
+func (r *ResponseReceipt) Done() <-chan struct{} { return r.done }
+
+// Err returns the response write outcome. It must be called after Done closes.
+func (r *ResponseReceipt) Err() error { return r.err }
+
+func (r *ResponseReceipt) complete(err error) {
+	r.once.Do(func() {
+		r.err = err
+		close(r.done)
+	})
+}
+
+type trackedResponse struct {
+	payload  any
+	receipt  *ResponseReceipt
+	terminal bool
+}
+
+// TrackResponse wraps an inbound handler result and returns a receipt for its
+// response write. The wire payload is unchanged; only Channel sees the wrapper.
+func TrackResponse(payload any) (any, *ResponseReceipt) {
+	return newTrackedResponse(payload, false)
+}
+
+// TrackTerminalResponse is TrackResponse plus a write-side seal: after the
+// complete response frame is accepted, Channel rejects every later frame. This
+// is used by terminal protocol requests whose acknowledgement must be the last
+// outbound frame.
+func TrackTerminalResponse(payload any) (any, *ResponseReceipt) {
+	return newTrackedResponse(payload, true)
+}
+
+func newTrackedResponse(payload any, terminal bool) (any, *ResponseReceipt) {
+	receipt := &ResponseReceipt{done: make(chan struct{})}
+	return &trackedResponse{
+		payload:  payload,
+		receipt:  receipt,
+		terminal: terminal,
+	}, receipt
+}
+
 // NotificationHandler handles an inbound notification (id == 0). No reply.
 type NotificationHandler func(msg *Message)
 
@@ -53,7 +108,12 @@ type Channel struct {
 	nextID   int
 	closed   bool
 	closeErr error
-	started  bool
+	// writeSealed rejects frames that have not yet passed write admission.
+	// It is published while writeMu is held on a terminal response or write
+	// fault, closing the unlock-before-close race for queued writers.
+	writeSealed  bool
+	writeSealErr error
+	started      bool
 
 	notifyHandlers map[MessageKind]NotificationHandler
 	inbound        InboundHandler
@@ -67,6 +127,11 @@ type Channel struct {
 // non-draining) peer can't block a write forever. Re-armed per write in
 // writeFrame; only applies to writers that support SetWriteDeadline.
 const defaultWriteTimeout = 30 * time.Second
+
+var (
+	errTerminalResponse = errors.New("ipc: writes sealed after terminal response")
+	errWriteNotAdmitted = errors.New("ipc: write not admitted")
+)
 
 // NewChannel creates a channel over r (inbound frames) and w (outbound
 // frames). Call SetInboundHandler/RegisterNotification before Start.
@@ -214,18 +279,88 @@ type deadlineWriter interface{ SetWriteDeadline(t time.Time) error }
 // SendRequest wakes via c.done instead of hanging forever. The deadline is
 // re-armed on each write (a stale past-deadline can't linger to a later call).
 func (c *Channel) writeFrame(msg *Message) error {
+	return c.writeFrameTracked(msg, nil, false)
+}
+
+// writeFrameTracked writes one frame and optionally publishes its completion
+// through receipt. Write admission and terminal/failure sealing are serialized
+// by writeMu:
+//
+//   - queued writers check closed/sealed only after acquiring writeMu;
+//   - a write fault seals admission before releasing writeMu, so a partially
+//     written frame can never be followed by another frame;
+//   - a terminal response seals admission before its successful receipt is
+//     completed, so the waiter does not need to win a scheduling race to Close.
+func (c *Channel) writeFrameTracked(msg *Message, receipt *ResponseReceipt, terminal bool) error {
 	c.writeMu.Lock()
+
+	if err := c.writeAdmissionError(); err != nil {
+		c.writeMu.Unlock()
+		if receipt != nil {
+			receipt.complete(err)
+		}
+		return err
+	}
+
+	err := c.writeFrameBytes(msg)
+	if err != nil {
+		c.sealWrites(err)
+	} else if terminal {
+		c.sealWrites(errTerminalResponse)
+	}
+	if err == nil && receipt != nil {
+		// Framework-owned and non-blocking; safe while writeMu establishes the
+		// response-before-application commit point.
+		receipt.complete(nil)
+	}
+	c.writeMu.Unlock()
+
+	if err != nil {
+		c.closeWith(err)
+		if receipt != nil {
+			receipt.complete(err)
+		}
+	}
+	return err
+}
+
+func (c *Channel) writeFrameBytes(msg *Message) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("ipc: writer panicked: %v", recovered)
+		}
+	}()
 	if c.writeTimeout > 0 {
 		if dw, ok := c.writer.(deadlineWriter); ok {
 			_ = dw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		}
 	}
-	err := WriteFrame(c.writer, msg)
-	c.writeMu.Unlock()
-	if err != nil {
-		c.closeWith(err)
+	return WriteFrame(c.writer, msg)
+}
+
+// writeAdmissionError is called only while writeMu is held.
+func (c *Channel) writeAdmissionError() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.writeSealed {
+		return fmt.Errorf("%w: %w", errWriteNotAdmitted, c.writeSealErr)
 	}
-	return err
+	if c.closed {
+		return fmt.Errorf("%w: %w", errWriteNotAdmitted, c.closeErr)
+	}
+	return nil
+}
+
+// sealWrites is called only while writeMu is held. The first seal reason wins,
+// giving every queued writer a stable terminal error.
+func (c *Channel) sealWrites(err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.writeSealed {
+		return
+	}
+	c.writeSealed = true
+	c.writeSealErr = err
 }
 
 func (c *Channel) readLoop() {
@@ -302,52 +437,110 @@ func (c *Channel) dispatch(msg *Message) {
 		c.sendError(msg.ID, fmt.Sprintf("no inbound handler registered (kind=%s)", msg.Kind))
 		return
 	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				c.sendError(msg.ID, fmt.Sprintf("inbound handler panicked: %v", r))
+	go c.handleInboundRequest(h, msg)
+}
+
+func (c *Channel) handleInboundRequest(h InboundHandler, msg *Message) {
+	result, err := callInboundHandler(h, c.inCtx, msg)
+	if err != nil {
+		err = stableInboundError(err)
+		if _, receipt, _, tracked := unwrapTrackedResponse(result); tracked {
+			writeErr := c.sendErrorFrame(msg.ID, err.Error(), true)
+			if writeErr != nil {
+				err = errors.Join(err, writeErr)
+				if !errors.Is(writeErr, errWriteNotAdmitted) {
+					fmt.Fprintf(os.Stderr, "rslint: write error (id=%d): %v\n", msg.ID, writeErr)
+				}
 			}
-		}()
-		result, err := h(c.inCtx, msg)
-		if err != nil {
-			c.sendError(msg.ID, err.Error())
+			receipt.complete(err)
 			return
 		}
-		c.sendResponse(msg.ID, result)
+		c.sendError(msg.ID, err.Error())
+		return
+	}
+	c.sendResponse(msg.ID, result)
+}
+
+// callInboundHandler scopes panic recovery to application code. Response
+// writing happens afterward, so a post-handler transport failure can never be
+// mistaken for a handler panic and produce a second response for the same ID.
+func callInboundHandler(h InboundHandler, ctx context.Context, msg *Message) (result any, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = nil
+			err = fmt.Errorf("inbound handler panicked: %v", recovered)
+		}
 	}()
+	return h(ctx, msg)
+}
+
+func stableInboundError(err error) (stable error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			stable = fmt.Errorf("inbound handler error panicked: %v", recovered)
+		}
+	}()
+	return errors.New(err.Error())
 }
 
 func (c *Channel) sendResponse(id int, payload any) {
-	if c.isClosed() {
-		return
-	}
-	msg, err := NewMessage(KindResponse, id, payload)
+	payload, receipt, terminal, _ := unwrapTrackedResponse(payload)
+
+	msg, err := newResponseMessage(id, payload)
 	if err != nil {
-		c.sendError(id, fmt.Sprintf("marshal response failed: %v", err))
+		// The intended response was not written. A tracked lifecycle response
+		// seals after its fallback error frame so its waiter can abort without
+		// another writer overtaking the eventual Close.
+		writeErr := c.sendErrorFrame(
+			id,
+			fmt.Sprintf("marshal response failed: %v", err),
+			receipt != nil || terminal,
+		)
+		if receipt != nil {
+			if writeErr != nil {
+				err = errors.Join(err, writeErr)
+			}
+			receipt.complete(err)
+		}
 		return
 	}
-	if err := c.writeFrame(msg); err != nil {
+	if err := c.writeFrameTracked(msg, receipt, terminal); err != nil &&
+		!errors.Is(err, errWriteNotAdmitted) {
 		fmt.Fprintf(os.Stderr, "rslint: write response (id=%d): %v\n", id, err)
 	}
 }
 
+func unwrapTrackedResponse(payload any) (any, *ResponseReceipt, bool, bool) {
+	tracked, ok := payload.(*trackedResponse)
+	if !ok {
+		return payload, nil, false, false
+	}
+	return tracked.payload, tracked.receipt, tracked.terminal, true
+}
+
 func (c *Channel) sendError(id int, message string) {
-	if c.isClosed() {
-		return
-	}
-	msg := &Message{Kind: KindError, ID: id}
-	if raw, err := marshalJSON(ErrorResponseData{Message: message}); err == nil {
-		msg.Data = raw
-	}
-	if err := c.writeFrame(msg); err != nil {
+	if err := c.sendErrorFrame(id, message, false); err != nil &&
+		!errors.Is(err, errWriteNotAdmitted) {
 		fmt.Fprintf(os.Stderr, "rslint: write error (id=%d): %v\n", id, err)
 	}
 }
 
-func (c *Channel) isClosed() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.closed
+func (c *Channel) sendErrorFrame(id int, message string, terminal bool) error {
+	msg := &Message{Kind: KindError, ID: id}
+	if raw, err := marshalJSON(ErrorResponseData{Message: message}); err == nil {
+		msg.Data = raw
+	}
+	return c.writeFrameTracked(msg, nil, terminal)
+}
+
+func newResponseMessage(id int, payload any) (msg *Message, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			msg = nil
+			err = fmt.Errorf("ipc: marshal response payload panicked: %v", recovered)
+		}
+	}()
+	return NewMessage(KindResponse, id, payload)
 }
 
 // closeWith shuts the channel down: marks closed, records the cause, cancels
@@ -382,6 +575,10 @@ func (c *Channel) closeWith(cause error) {
 		c.closeErr = errors.New("ipc: channel closed (peer EOF)")
 	} else {
 		c.closeErr = fmt.Errorf("ipc: channel closed: %w", cause)
+	}
+	if !c.writeSealed {
+		c.writeSealed = true
+		c.writeSealErr = c.closeErr
 	}
 	c.pending = make(map[int]chan *Message) // drop refs; waiters wake via c.done
 	c.mu.Unlock()

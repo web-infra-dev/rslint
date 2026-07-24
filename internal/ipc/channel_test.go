@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -193,6 +194,55 @@ func TestFrame_RoundTrip(t *testing.T) {
 	}
 }
 
+type shortWriteWriter struct {
+	failCall int
+	failN    func(int) int
+	failErr  error
+	calls    int
+}
+
+func (w *shortWriteWriter) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls == w.failCall {
+		return w.failN(len(p)), w.failErr
+	}
+	return len(p), nil
+}
+
+func TestWriteFrame_RejectsShortWrites(t *testing.T) {
+	msg, err := NewMessage("hello", 7, map[string]int{"x": 42})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeBoom := errors.New("write boom")
+	tests := []struct {
+		name     string
+		failCall int
+		failN    func(int) int
+		failErr  error
+		want     error
+	}{
+		{"header partial nil", 1, func(n int) int { return n - 1 }, nil, io.ErrShortWrite},
+		{"header zero nil", 1, func(int) int { return 0 }, nil, io.ErrShortWrite},
+		{"body partial nil", 2, func(n int) int { return n - 1 }, nil, io.ErrShortWrite},
+		{"body zero nil", 2, func(int) int { return 0 }, nil, io.ErrShortWrite},
+		{"body full with error", 2, func(n int) int { return n }, writeBoom, writeBoom},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			writer := &shortWriteWriter{
+				failCall: test.failCall,
+				failN:    test.failN,
+				failErr:  test.failErr,
+			}
+			err := WriteFrame(writer, msg)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("WriteFrame error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
 // TestNewMessage_NilContainerPayloadOmitted pins the wire-parity fix: a nil
 // map/slice/pointer (and untyped nil) is "no payload" → the data field is
 // omitted, matching Node where `undefined` is dropped by JSON.stringify. An
@@ -263,6 +313,375 @@ func TestChannel_RegisterAfterStartPanics(t *testing.T) {
 type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("write boom") }
+
+type gatedFrameWriter struct {
+	mu          sync.Mutex
+	buf         bytes.Buffer
+	calls       int
+	bodyEntered chan struct{}
+	releaseBody chan struct{}
+	releaseOnce sync.Once
+}
+
+func newGatedFrameWriter() *gatedFrameWriter {
+	return &gatedFrameWriter{
+		bodyEntered: make(chan struct{}),
+		releaseBody: make(chan struct{}),
+	}
+}
+
+func (w *gatedFrameWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	w.calls++
+	call := w.calls
+	w.mu.Unlock()
+	if call == 2 {
+		close(w.bodyEntered)
+		<-w.releaseBody
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *gatedFrameWriter) release() {
+	w.releaseOnce.Do(func() { close(w.releaseBody) })
+}
+
+func (w *gatedFrameWriter) bytes() []byte {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return bytes.Clone(w.buf.Bytes())
+}
+
+func writeInboundRequest(t *testing.T, w io.Writer, kind MessageKind, id int) {
+	t.Helper()
+	msg, err := NewMessage(kind, id, struct{}{})
+	if err != nil {
+		t.Fatalf("NewMessage: %v", err)
+	}
+	if err := WriteFrame(w, msg); err != nil {
+		t.Fatalf("WriteFrame: %v", err)
+	}
+}
+
+func TestChannel_ResponseReceiptWaitsForCompleteFrame(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	writer := newGatedFrameWriter()
+	t.Cleanup(writer.release)
+
+	receiptCh := make(chan *ResponseReceipt, 1)
+	c := NewChannel(inR, writer)
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackResponse(map[string]any{"ok": true})
+		receiptCh <- receipt
+		return response, nil
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, "init", 1)
+	receipt := <-receiptCh
+	select {
+	case <-writer.bodyEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("response body write did not reach the gate")
+	}
+	select {
+	case <-receipt.Done():
+		t.Fatal("receipt completed before the response body write returned")
+	default:
+	}
+
+	writer.release()
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err != nil {
+			t.Fatalf("response receipt: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("receipt did not complete after the full response write")
+	}
+
+	msg, err := ReadFrame(bufio.NewReader(bytes.NewReader(writer.bytes())))
+	if err != nil {
+		t.Fatalf("read committed response: %v", err)
+	}
+	if msg.Kind != KindResponse || msg.ID != 1 {
+		t.Fatalf("committed frame = kind %q id %d, want response id 1", msg.Kind, msg.ID)
+	}
+}
+
+func TestChannel_ResponseReceiptReportsMarshalFailure(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	var output bytes.Buffer
+
+	receiptCh := make(chan *ResponseReceipt, 1)
+	c := NewChannel(inR, &output)
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackResponse(func() {})
+		receiptCh <- receipt
+		return response, nil
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, "init", 1)
+	receipt := <-receiptCh
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err == nil || !strings.Contains(err.Error(), "unsupported type") {
+			t.Fatalf("receipt error = %v, want marshal failure", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("marshal failure did not complete the response receipt")
+	}
+
+	msg, err := ReadFrame(bufio.NewReader(bytes.NewReader(output.Bytes())))
+	if err != nil {
+		t.Fatalf("read fallback error response: %v", err)
+	}
+	if msg.Kind != KindError || msg.ID != 1 {
+		t.Fatalf("fallback frame = kind %q id %d, want error id 1", msg.Kind, msg.ID)
+	}
+	if err := c.SendNotification("late", nil); err == nil {
+		t.Fatal("tracked marshal failure did not seal later writes")
+	}
+}
+
+func TestChannel_TrackedHandlerErrorCompletesReceipt(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	var output bytes.Buffer
+	receiptCh := make(chan *ResponseReceipt, 1)
+
+	c := NewChannel(inR, &output)
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackResponse(map[string]any{"ignored": true})
+		receiptCh <- receipt
+		return response, errors.New("handler failed")
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, "init", 1)
+	receipt := <-receiptCh
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err == nil || !strings.Contains(err.Error(), "handler failed") {
+			t.Fatalf("receipt error = %v, want handler failure", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("tracked handler error did not complete the response receipt")
+	}
+
+	msg, err := ReadFrame(bufio.NewReader(bytes.NewReader(output.Bytes())))
+	if err != nil {
+		t.Fatalf("read handler error response: %v", err)
+	}
+	if msg.Kind != KindError || msg.ID != 1 {
+		t.Fatalf("handler error frame = kind %q id %d, want error id 1", msg.Kind, msg.ID)
+	}
+	var responseErr ErrorResponseData
+	if err := msg.Decode(&responseErr); err != nil {
+		t.Fatalf("decode handler error: %v", err)
+	}
+	if responseErr.Message != "handler failed" {
+		t.Fatalf("handler error message = %q, want %q", responseErr.Message, "handler failed")
+	}
+	if err := c.SendNotification("late", nil); !errors.Is(err, errTerminalResponse) {
+		t.Fatalf("late write error = %v, want %v", err, errTerminalResponse)
+	}
+}
+
+func TestChannel_ResponseReceiptReportsCloseBeforeWrite(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	var output bytes.Buffer
+	handlerRelease := make(chan struct{})
+
+	receiptCh := make(chan *ResponseReceipt, 1)
+	c := NewChannel(inR, &output)
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackResponse(map[string]any{"ok": true})
+		receiptCh <- receipt
+		<-handlerRelease
+		return response, nil
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, "init", 1)
+	receipt := <-receiptCh
+	_ = c.Close()
+	close(handlerRelease)
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err == nil {
+			t.Fatal("receipt reported success after the channel closed")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("closed channel did not complete the response receipt")
+	}
+	if output.Len() != 0 {
+		t.Fatalf("closed channel wrote %d unexpected bytes", output.Len())
+	}
+}
+
+type panicWriter struct{}
+
+func (panicWriter) Write([]byte) (int, error) { panic("writer boom") }
+
+func TestChannel_ResponseReceiptReportsWriterPanic(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	receiptCh := make(chan *ResponseReceipt, 1)
+
+	c := NewChannel(inR, panicWriter{})
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackResponse(map[string]any{"ok": true})
+		receiptCh <- receipt
+		return response, nil
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, "init", 1)
+	receipt := <-receiptCh
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err == nil || !strings.Contains(err.Error(), "writer panicked") {
+			t.Fatalf("receipt error = %v, want writer panic", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("writer panic did not complete the response receipt")
+	}
+	select {
+	case <-c.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("writer panic did not close the channel")
+	}
+}
+
+func TestChannel_TerminalResponseSealsLaterWrites(t *testing.T) {
+	inR, inW := io.Pipe()
+	t.Cleanup(func() { _ = inW.Close() })
+	writer := newGatedFrameWriter()
+	t.Cleanup(writer.release)
+	receiptCh := make(chan *ResponseReceipt, 1)
+
+	c := NewChannel(inR, writer)
+	c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		response, receipt := TrackTerminalResponse(struct{}{})
+		receiptCh <- receipt
+		return response, nil
+	})
+	c.Start()
+	t.Cleanup(func() { _ = c.Close() })
+
+	writeInboundRequest(t, inW, KindExit, 1)
+	receipt := <-receiptCh
+	select {
+	case <-writer.bodyEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("terminal response body write did not reach the gate")
+	}
+
+	lateResult := make(chan error, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	go func() {
+		_, err := c.SendRequest(ctx, "late", nil)
+		lateResult <- err
+	}()
+
+	pendingDeadline := time.After(2 * time.Second)
+	for {
+		c.mu.Lock()
+		pending := len(c.pending)
+		c.mu.Unlock()
+		if pending == 1 {
+			break
+		}
+		select {
+		case <-pendingDeadline:
+			t.Fatal("late writer did not queue behind the terminal response")
+		default:
+			runtime.Gosched()
+		}
+	}
+	select {
+	case err := <-lateResult:
+		t.Fatalf("queued writer returned before terminal response was released: %v", err)
+	default:
+	}
+
+	writer.release()
+	select {
+	case <-receipt.Done():
+		if err := receipt.Err(); err != nil {
+			t.Fatalf("terminal response receipt: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("terminal response receipt did not complete")
+	}
+
+	select {
+	case err := <-lateResult:
+		if !errors.Is(err, errTerminalResponse) {
+			t.Fatalf("queued write error = %v, want %v", err, errTerminalResponse)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queued writer did not observe the terminal write seal")
+	}
+	reader := bufio.NewReader(bytes.NewReader(writer.bytes()))
+	if _, err := ReadFrame(reader); err != nil {
+		t.Fatalf("read terminal response: %v", err)
+	}
+	if _, err := ReadFrame(reader); !errors.Is(err, io.EOF) {
+		t.Fatalf("unexpected frame after terminal response: %v", err)
+	}
+
+	_ = c.Close()
+	c.writeMu.Lock()
+	admissionErr := c.writeAdmissionError()
+	c.writeMu.Unlock()
+	if !errors.Is(admissionErr, errTerminalResponse) {
+		t.Fatalf("post-close admission error = %v, want first seal reason %v", admissionErr, errTerminalResponse)
+	}
+}
+
+type panickingError struct{}
+
+func (panickingError) Error() string { panic("error boom") }
+
+func TestChannel_HandlerErrorPanicRecovered(t *testing.T) {
+	a, b := newChannelPair(t)
+	b.SetInboundHandler(func(context.Context, *Message) (any, error) {
+		return nil, panickingError{}
+	})
+	a.Start()
+	b.Start()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	for range 2 {
+		_, err := a.SendRequest(ctx, "x", nil)
+		if err == nil {
+			t.Fatal("expected peer error")
+		}
+		if !strings.Contains(err.Error(), "inbound handler error panicked: error boom") {
+			t.Fatalf("unexpected peer error: %v", err)
+		}
+		select {
+		case <-b.Done():
+			t.Fatal("panicking error stringer closed the channel")
+		default:
+		}
+	}
+}
 
 func TestChannel_WriteErrorCascades(t *testing.T) {
 	pr, pw := io.Pipe()

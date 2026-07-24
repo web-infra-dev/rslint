@@ -133,8 +133,13 @@ type runtimePayload struct {
 // runCLIState carries the init-handshake outcome from the inbound handler
 // (which runs on the channel's read-loop goroutine) to the runCLI main
 // goroutine, and tracks whether a termination signal fired.
+type initDelivery struct {
+	payload *initPayload
+	reply   *ipc.ResponseReceipt
+}
+
 type runCLIState struct {
-	payloadCh chan *initPayload // 1-buffered; receives at most one payload
+	payloadCh chan initDelivery // 1-buffered; receives at most one result
 	once      sync.Once
 	signalled atomic.Bool // set on SIGINT/SIGTERM/SIGHUP
 }
@@ -165,7 +170,7 @@ func runCLI(args []string) int {
 	origStdout := os.Stdout
 	ch := ipc.NewChannel(os.Stdin, origStdout)
 
-	state := &runCLIState{payloadCh: make(chan *initPayload, 1)}
+	state := &runCLIState{payloadCh: make(chan initDelivery, 1)}
 
 	// Mirror lintCtx cancellation onto state.signalled so the final exit-code
 	// mapping (130 when set) works even when the signal arrives after the
@@ -188,9 +193,12 @@ func runCLI(args []string) int {
 			if err := msg.Decode(&p); err != nil {
 				return nil, fmt.Errorf("decode init: %w", err)
 			}
+			response, receipt := ipc.TrackResponse(map[string]any{"ok": true})
 			// Exactly-once: engine.ts sends one init; defensive vs a buggy peer.
-			state.once.Do(func() { state.payloadCh <- &p })
-			return map[string]any{"ok": true}, nil
+			state.once.Do(func() {
+				state.payloadCh <- initDelivery{payload: &p, reply: receipt}
+			})
+			return response, nil
 		default:
 			return nil, fmt.Errorf("rslint: unsupported inbound kind %q", msg.Kind)
 		}
@@ -205,7 +213,7 @@ func runCLI(args []string) int {
 		<-ch.Done()
 		state.once.Do(func() {
 			select {
-			case state.payloadCh <- nil:
+			case state.payloadCh <- initDelivery{}:
 			default:
 			}
 		})
@@ -218,9 +226,9 @@ func runCLI(args []string) int {
 	initTimer := time.NewTimer(initTimeout)
 	defer initTimer.Stop()
 
-	var payload *initPayload
+	var delivery initDelivery
 	select {
-	case payload = <-state.payloadCh:
+	case delivery = <-state.payloadCh:
 	case <-sigChInit:
 		state.signalled.Store(true)
 		_ = ch.Close()
@@ -230,10 +238,43 @@ func runCLI(args []string) int {
 		_ = ch.Close()
 		return 2
 	}
-	if payload == nil {
+	if delivery.payload == nil {
 		_ = ch.Close() // peer disconnected before init
 		return 2
 	}
+
+	// The handler has decoded and reserved this init, but the application may
+	// not observe it until the complete response frame has reached stdout.
+	// Keep the original signal/timeout progress guarantees while waiting.
+	select {
+	case <-delivery.reply.Done():
+		if delivery.reply.Err() != nil {
+			_ = ch.Close()
+			return 2
+		}
+	case <-sigChInit:
+		state.signalled.Store(true)
+		_ = ch.Close()
+		return 130
+	case <-initTimer.C:
+		fmt.Fprintf(os.Stderr, "rslint: timed out waiting for init after %s\n", initTimeout)
+		_ = ch.Close()
+		return 2
+	case <-ch.Done():
+		// A successful receipt may race a peer EOF. Prefer the committed reply
+		// when both are ready; otherwise the transport ended before the ACK.
+		select {
+		case <-delivery.reply.Done():
+		default:
+			_ = ch.Close()
+			return 2
+		}
+		if delivery.reply.Err() != nil {
+			_ = ch.Close()
+			return 2
+		}
+	}
+	payload := delivery.payload
 
 	// Apply the payload. Working directory and the positional file set are
 	// payload-authoritative; the rest supplement flag values.

@@ -16,7 +16,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -269,27 +268,18 @@ type Service struct {
 	handshakeOK      bool
 	peerCapabilities map[string]struct{}
 
-	exitMu        sync.Mutex
-	exitRequestID int
 	exitRequested bool
-	exitAck       chan struct{}
-	exitAckOnce   sync.Once
+	exitReply     chan *ipc.ResponseReceipt
 }
 
 // NewService creates a new IPC service
 func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 	s := &Service{
-		handler: handler,
-		reader:  &observedReader{reader: reader},
-		exitAck: make(chan struct{}),
+		handler:   handler,
+		reader:    &observedReader{reader: reader},
+		exitReply: make(chan *ipc.ResponseReceipt, 1),
 	}
-	observedWriter := &frameObserverWriter{
-		writer:        writer,
-		remaining:     -1,
-		shouldCapture: s.exitHasBeenRequested,
-		onFrame:       s.observeOutboundFrame,
-	}
-	s.channel = ipc.NewChannel(s.reader, observedWriter)
+	s.channel = ipc.NewChannel(s.reader, writer)
 	s.channel.SetInboundHandler(s.handleInbound)
 	return s
 }
@@ -298,22 +288,34 @@ func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 func (s *Service) Start() error {
 	s.channel.Start()
 	select {
-	case <-s.exitAck:
-		// The complete exit response frame has reached the underlying writer.
-		// Closing earlier can race Channel's asynchronous inbound handler and
-		// suppress the ack that legacy Node/browser clients await.
+	case receipt := <-s.exitReply:
+		select {
+		case <-receipt.Done():
+			if err := receipt.Err(); err != nil {
+				_ = s.channel.Close()
+				return fmt.Errorf("api: write exit acknowledgement: %w", err)
+			}
+		case <-s.channel.Done():
+			return s.channelResult()
+		}
+		// A terminal response seals later writes before completing its receipt;
+		// Close now publishes channel shutdown without racing a queued writer.
 		_ = s.channel.Close()
 		return nil
 	case <-s.channel.Done():
-		err := s.reader.Err()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		return errors.New("api: IPC transport closed unexpectedly")
+		return s.channelResult()
 	}
+}
+
+func (s *Service) channelResult() error {
+	err := s.reader.Err()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return errors.New("api: IPC transport closed unexpectedly")
 }
 
 func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, error) {
@@ -388,35 +390,17 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 		return s.handler.HandleGetAstInfo(req)
 
 	case ipc.KindExit:
-		s.exitMu.Lock()
-		if !s.exitRequested {
-			s.exitRequested = true
-			s.exitRequestID = msg.ID
+		if s.exitRequested {
+			return struct{}{}, nil
 		}
-		s.exitMu.Unlock()
-		return struct{}{}, nil
+		s.exitRequested = true
+		response, receipt := ipc.TrackTerminalResponse(struct{}{})
+		s.exitReply <- receipt
+		return response, nil
 
 	default:
 		return nil, fmt.Errorf("unknown message kind: %s", msg.Kind)
 	}
-}
-
-func (s *Service) observeOutboundFrame(msg *ipc.Message) {
-	if msg.Kind != ipc.KindResponse && msg.Kind != ipc.KindError {
-		return
-	}
-	s.exitMu.Lock()
-	isExitAck := s.exitRequested && msg.ID == s.exitRequestID
-	s.exitMu.Unlock()
-	if isExitAck {
-		s.exitAckOnce.Do(func() { close(s.exitAck) })
-	}
-}
-
-func (s *Service) exitHasBeenRequested() bool {
-	s.exitMu.Lock()
-	defer s.exitMu.Unlock()
-	return s.exitRequested
 }
 
 // observedReader records the terminal read error so Service.Start can retain
@@ -482,90 +466,6 @@ func (r *observedReader) Err() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.err
-}
-
-// frameObserverWriter observes complete outbound frames after their bytes have
-// been accepted by the real writer. It normally tracks lengths only; after an
-// exit request arrives it captures response bodies until the matching ack is
-// seen. Channel serializes all calls into it.
-type frameObserverWriter struct {
-	writer        io.Writer
-	shouldCapture func() bool
-	onFrame       func(*ipc.Message)
-	mu            sync.Mutex
-	header        [4]byte
-	headerLen     int
-	remaining     int
-	capture       bool
-	body          []byte
-}
-
-func (w *frameObserverWriter) Write(p []byte) (int, error) {
-	n, err := w.writer.Write(p)
-	if n != len(p) && err == nil {
-		err = io.ErrShortWrite
-	}
-	if n <= 0 {
-		return n, err
-	}
-
-	w.mu.Lock()
-	var completed []*ipc.Message
-	data := p[:n]
-	for len(data) > 0 {
-		if w.remaining < 0 {
-			headerBytes := min(4-w.headerLen, len(data))
-			copy(w.header[w.headerLen:], data[:headerBytes])
-			w.headerLen += headerBytes
-			data = data[headerBytes:]
-			if w.headerLen < 4 {
-				continue
-			}
-			w.remaining = int(binary.LittleEndian.Uint32(w.header[:]))
-			w.headerLen = 0
-			w.capture = w.shouldCapture()
-			if w.capture {
-				w.body = make([]byte, 0, w.remaining)
-			}
-		}
-
-		bodyBytes := min(w.remaining, len(data))
-		if w.capture {
-			w.body = append(w.body, data[:bodyBytes]...)
-		}
-		w.remaining -= bodyBytes
-		data = data[bodyBytes:]
-		if w.remaining == 0 {
-			if w.capture {
-				var msg ipc.Message
-				if json.Unmarshal(w.body, &msg) == nil {
-					completed = append(completed, &msg)
-				}
-			}
-			w.remaining = -1
-			w.capture = false
-			w.body = nil
-		}
-	}
-	w.mu.Unlock()
-
-	if err == nil {
-		for _, msg := range completed {
-			w.onFrame(msg)
-		}
-	}
-	return n, err
-}
-
-// Preserve Channel's write-deadline support when the underlying writer is an
-// *os.File or net.Conn. Channel intentionally ignores unsupported deadlines.
-func (w *frameObserverWriter) SetWriteDeadline(deadline time.Time) error {
-	if writer, ok := w.writer.(interface {
-		SetWriteDeadline(deadline time.Time) error
-	}); ok {
-		return writer.SetWriteDeadline(deadline)
-	}
-	return nil
 }
 
 // IsIPCMode returns true if the process is in IPC mode
