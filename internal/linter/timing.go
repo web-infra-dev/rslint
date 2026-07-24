@@ -22,7 +22,8 @@ type RuleTiming struct {
 	// linted by parallel workers, so the sum over all rules can exceed the
 	// run's wall-clock time.
 	Time time.Duration
-	// Files is the number of files the rule executed on.
+	// Files is the number of distinct files the rule executed on. A file
+	// re-linted by --fix passes counts once, while its time keeps accruing.
 	Files int
 }
 
@@ -30,38 +31,61 @@ type RuleTiming struct {
 // workers. Workers merge once per linted file (not per node/listener), so
 // lock contention stays negligible.
 type TimingCollector struct {
-	mu      sync.Mutex
-	timings map[string]RuleTiming
+	mu        sync.Mutex
+	timings   map[string]RuleTiming
+	ruleFiles map[string]map[string]struct{}
 }
 
 func NewTimingCollector() *TimingCollector {
-	return &TimingCollector{timings: make(map[string]RuleTiming)}
+	return &TimingCollector{
+		timings:   make(map[string]RuleTiming),
+		ruleFiles: make(map[string]map[string]struct{}),
+	}
+}
+
+// countFile records filePath under the rule name and reports whether it had
+// not been counted before. Callers must hold c.mu.
+func (c *TimingCollector) countFile(name string, filePath string) bool {
+	set := c.ruleFiles[name]
+	if set == nil {
+		set = make(map[string]struct{})
+		c.ruleFiles[name] = set
+	}
+	if _, seen := set[filePath]; seen {
+		return false
+	}
+	set[filePath] = struct{}{}
+	return true
 }
 
 // addFile folds one file's per-rule durations (parallel to rules) into the
 // aggregate.
-func (c *TimingCollector) addFile(rules []ConfiguredRule, durations []time.Duration) {
+func (c *TimingCollector) addFile(filePath string, rules []ConfiguredRule, durations []time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, configuredRule := range rules {
 		t := c.timings[configuredRule.Name]
 		t.Kind = RuleKindNative
 		t.Time += durations[i]
-		t.Files++
+		if c.countFile(configuredRule.Name, filePath) {
+			t.Files++
+		}
 		c.timings[configuredRule.Name] = t
 	}
 }
 
 // addFileRuleTimesMS folds one file's per-rule times — in MILLISECONDS, as
 // the Node plugin worker reports them on the wire — into the aggregate.
-func (c *TimingCollector) addFileRuleTimesMS(times map[string]float64) {
+func (c *TimingCollector) addFileRuleTimesMS(filePath string, times map[string]float64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for name, ms := range times {
 		t := c.timings[name]
 		t.Kind = RuleKindJS
 		t.Time += time.Duration(ms * float64(time.Millisecond))
-		t.Files++
+		if c.countFile(name, filePath) {
+			t.Files++
+		}
 		c.timings[name] = t
 	}
 }

@@ -307,7 +307,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		}
 		file.Node.ForEachChild(childVisitor)
 		if opts.Timing != nil {
-			opts.Timing.addFile(rules, ruleDurations)
+			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
 		}
 		registeredListeners.reset()
 	}

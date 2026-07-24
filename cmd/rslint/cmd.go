@@ -67,6 +67,11 @@ type lintArgs struct {
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.
 	FS vfs.FS
+	// DeferTimingTable, when non-nil, receives the rendered --timing table
+	// instead of it being printed to stderr by the pipeline. The IPC entry
+	// uses it to emit the table only after the async stdout forwarding has
+	// drained, so the table cannot interleave with the lint report.
+	DeferTimingTable func(table string)
 	// ConfigCatalog is the immutable result of Go-owned JS/TS config discovery.
 	// A nil or empty automatic catalog selects the native JSON/JSONC loader;
 	// explicit catalogs remain authoritative even when their config is empty.
@@ -1226,7 +1231,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// The timing table goes to stderr so machine-readable stdout formats
 	// (jsonline/github/gitlab) stay parseable with --timing enabled.
 	if timingCollector != nil {
-		fmt.Fprint(os.Stderr, output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit))
+		table := output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit)
+		if args.DeferTimingTable != nil {
+			args.DeferTimingTable(table)
+		} else {
+			fmt.Fprint(os.Stderr, table)
+		}
 	}
 	counts := report.Counts()
 

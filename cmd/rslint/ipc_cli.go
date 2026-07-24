@@ -345,9 +345,18 @@ func runCLI(args []string) int {
 		return &res, nil
 	}
 
+	// Hold the --timing table back until finalizeStdout has drained the
+	// async stdout forwarding: stderr is inherited and would otherwise
+	// surface the table before (or inside) the still-in-flight lint report.
+	var timingTable string
+	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
+
 	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
+	if timingTable != "" {
+		fmt.Fprint(os.Stderr, timingTable)
+	}
 	shutdownPeer(ch, state)
 	_ = ch.Close()
 

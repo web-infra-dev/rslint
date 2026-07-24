@@ -124,7 +124,7 @@ no-control-regex                        | native |     102.9 |   842 |     2.7%
 
 - **Source** — `native` for built-in Go rules, `js` for rules run through the ESLint plugin compatibility layer.
 - **Time (ms)** — total time spent in the rule across all files: building its listeners plus running them during AST traversal, including diagnostic and fix construction.
-- **Files** — number of files the rule executed on.
+- **Files** — number of distinct files the rule executed on.
 - **Relative** — the rule's share of the summed rule time.
 
 The table is written to stderr, so machine-readable output formats such as `jsonline` stay parseable. Files are linted by parallel workers, so summed rule time can exceed the run's wall-clock time. With `--fix`, times accumulate across all re-lint passes. Rules executed through the ESLint plugin compatibility layer are included: their time is measured inside the Node.js worker (rule `create` plus listener invocations), excluding parse and IPC overhead.

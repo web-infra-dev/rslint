@@ -370,7 +370,7 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 			return context.Canceled
 		}
 		if timing != nil && len(fr.RuleTimes) > 0 {
-			timing.addFileRuleTimesMS(fr.RuleTimes)
+			timing.addFileRuleTimesMS(fr.FilePath, fr.RuleTimes)
 		}
 
 		sevByRule := map[string]rule.DiagnosticSeverity{}
