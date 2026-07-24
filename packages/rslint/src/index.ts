@@ -12,6 +12,7 @@ export {
   importPlugin,
   promisePlugin,
   jestPlugin,
+  rstestPlugin,
   unicornPlugin,
   jsxA11yPlugin,
 } from './config/presets/index.js';

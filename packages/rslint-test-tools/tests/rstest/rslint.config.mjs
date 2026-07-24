@@ -1,0 +1,12 @@
+export default [
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['./tsconfig.files.json', './tsconfig.virtual.json'],
+      },
+    },
+    rules: {},
+    plugins: ['rstest'],
+  },
+];
