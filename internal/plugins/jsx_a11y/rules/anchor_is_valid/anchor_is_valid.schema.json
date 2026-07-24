@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "specialLink": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "aspects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["noHref", "invalidHref", "preferButton"]
+          },
+          "uniqueItems": true,
+          "additionalItems": false,
+          "minItems": 1
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

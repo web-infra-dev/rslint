@@ -65,11 +65,6 @@ new RuleTester().run('no-distracting-elements', null as never, {
     { code: '<this.Foo />' },
     { code: '<UI.marquee />' }, // type "UI.marquee" ≠ "marquee"
 
-    // ---- options: null elements falls back to default ----
-    { code: '<div />', options: [{ elements: null }] },
-    // rslint extension: array-of-non-strings silences the rule.
-    { code: '<marquee />', options: [{ elements: [123, true] }] },
-
     // ---- Components map: map-to-non-distracting / non-string value ----
     {
       code: '<Foo />',
@@ -198,11 +193,6 @@ new RuleTester().run('no-distracting-elements', null as never, {
     },
 
     // ---- Custom `elements` list ----
-    {
-      code: '<custom />',
-      options: [{ elements: ['custom'] }],
-      errors: [expectedError('custom')],
-    },
     {
       code: '<blink />',
       options: [{ elements: ['blink'] }],
@@ -378,23 +368,6 @@ new RuleTester().run('no-distracting-elements', null as never, {
           polymorphicAllowList: [123 as unknown as string, 'Foo'],
         },
       },
-      errors: [expectedError('marquee')],
-    },
-
-    // ---- rslint-specific options (no schema validation) ----
-    {
-      code: '<marquee />',
-      options: [{ elements: ['marquee', 123] }],
-      errors: [expectedError('marquee')],
-    },
-    {
-      code: '<marquee />',
-      options: [{ elements: ['', 'marquee'] }],
-      errors: [expectedError('marquee')],
-    },
-    {
-      code: '<marquee />',
-      options: [{ elements: ['marquee', 'marquee'] }],
       errors: [expectedError('marquee')],
     },
   ],

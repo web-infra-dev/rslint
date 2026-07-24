@@ -51,14 +51,17 @@
 package no_interactive_element_to_noninteractive_role
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_interactive_element_to_noninteractive_role.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
 const errorMessage = "Interactive elements should not be assigned non-interactive roles."
@@ -72,12 +75,12 @@ type options struct {
 	allowedRoles map[string][]string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	for key, v := range m {
 		if parsed := jsxa11yutil.StringSliceOption(v); parsed != nil {
 			if opts.allowedRoles == nil {
@@ -90,9 +93,9 @@ func parseOptions(raw any) options {
 }
 
 var NoInteractiveElementToNoninteractiveRoleRule = rule.Rule{
-	Name: "jsx-a11y/no-interactive-element-to-noninteractive-role",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-interactive-element-to-noninteractive-role",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

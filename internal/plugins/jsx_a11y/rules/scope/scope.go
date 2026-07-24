@@ -44,7 +44,8 @@ import (
 const errorMessage = "The scope prop can only be used on <th> elements."
 
 var ScopeRule = rule.Rule{
-	Name: "jsx-a11y/scope",
+	Name:   "jsx-a11y/scope",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

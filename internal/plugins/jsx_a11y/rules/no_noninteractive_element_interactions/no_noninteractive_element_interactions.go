@@ -44,14 +44,17 @@
 package no_noninteractive_element_interactions
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_noninteractive_element_interactions.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
 const errorMessage = "Non-interactive elements should not be assigned mouse or keyboard event listeners."
@@ -92,12 +95,12 @@ var defaultInteractiveProps = func() []string {
 	return out
 }()
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if rawHandlers, ok := m["handlers"]; ok {
 		// Upstream `config.handlers || defaultInteractiveProps`. JS arrays
 		// (including empty) are truthy, so we treat any present `[]string`
@@ -123,9 +126,9 @@ func parseOptions(raw any) options {
 }
 
 var NoNoninteractiveElementInteractionsRule = rule.Rule{
-	Name: "jsx-a11y/no-noninteractive-element-interactions",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-noninteractive-element-interactions",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		interactiveProps := defaultInteractiveProps
 		if opts.Handlers != nil {

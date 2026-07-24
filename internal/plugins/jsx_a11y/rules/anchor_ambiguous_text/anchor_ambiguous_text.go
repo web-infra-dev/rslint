@@ -13,6 +13,7 @@
 package anchor_ambiguous_text
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
@@ -22,8 +23,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed anchor_ambiguous_text.schema.json
+var schemaJSON []byte
 
 // defaultAmbiguousWords mirrors upstream's `DEFAULT_AMBIGUOUS_WORDS`. Order
 // matters because it surfaces in the user-facing diagnostic via
@@ -242,12 +245,12 @@ type options struct {
 	words []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{words: defaultAmbiguousWords}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	// Upstream: `const { words = DEFAULT_AMBIGUOUS_WORDS } = options;`. The
 	// destructuring default only kicks in when `words` is `undefined`. An
 	// explicit `[]` REPLACES the defaults and disables the rule for that run
@@ -263,9 +266,9 @@ func parseOptions(raw any) options {
 }
 
 var AnchorAmbiguousTextRule = rule.Rule{
-	Name: "jsx-a11y/anchor-ambiguous-text",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/anchor-ambiguous-text",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Pre-build the lookup set so each check is O(1) on the wordlist.

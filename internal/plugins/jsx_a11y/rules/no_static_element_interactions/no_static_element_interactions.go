@@ -40,14 +40,17 @@
 package no_static_element_interactions
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_static_element_interactions.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
 const errorMessage = "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element."
@@ -64,12 +67,12 @@ type options struct {
 	AllowExpressionValues bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if v, ok := m["handlers"]; ok {
 		opts.HandlersProvided = true
 		opts.Handlers = jsxa11yutil.StringSliceOption(v)
@@ -127,9 +130,9 @@ func hasNonNullInteractiveHandler(attrs []*ast.Node, handlers []string) bool {
 }
 
 var NoStaticElementInteractionsRule = rule.Rule{
-	Name: "jsx-a11y/no-static-element-interactions",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-static-element-interactions",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		handlers := opts.Handlers
 		if !opts.HandlersProvided {
