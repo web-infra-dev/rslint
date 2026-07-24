@@ -17,6 +17,7 @@ rslint [options] [files/directories...]
 | `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
 | `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
 | `--quiet`             | Report errors only, suppress warnings                                                          |
+| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
 | `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
 | `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
 | `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
@@ -102,6 +103,31 @@ rslint src/ --rule 'no-console: off' --format github
 - CLI rules have the **highest precedence** and override all config file entries, including per-file overrides.
 - When the same rule is specified multiple times, the **last one wins**.
 - Rules that don't exist in the registry are silently ignored.
+
+## Rule Timing
+
+Use `--timing` to print a per-rule timing table after the run, sorted by total time. Pass a number to keep only the top N rules (`all`, the default, prints every rule):
+
+```bash
+rslint --timing src/
+rslint --timing 10 src/
+```
+
+```
+Rule                                    | Source | Time (ms) | Files | Relative
+----------------------------------------|--------|-----------|-------|---------
+@typescript-eslint/no-misused-promises  | native |    1203.5 |   842 |    31.2%
+@typescript-eslint/no-floating-promises | native |     801.2 |   842 |    20.8%
+jsdoc/no-types                          | js     |     311.4 |   842 |     8.1%
+no-control-regex                        | native |     102.9 |   842 |     2.7%
+```
+
+- **Source** — `native` for built-in Go rules, `js` for rules run through the ESLint plugin compatibility layer.
+- **Time (ms)** — total time spent in the rule across all files: building its listeners plus running them during AST traversal, including diagnostic and fix construction.
+- **Files** — number of distinct files the rule executed on.
+- **Relative** — the rule's share of the summed rule time.
+
+The table is written to stderr, so machine-readable output formats such as `jsonline` stay parseable. Files are linted by parallel workers, so summed rule time can exceed the run's wall-clock time. With `--fix`, times accumulate across all re-lint passes. Rules executed through the ESLint plugin compatibility layer are included: their time is measured inside the Node.js worker (rule `create` plus listener invocations), excluding parse and IPC overhead.
 
 ## Exit Codes
 

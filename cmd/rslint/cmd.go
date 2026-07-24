@@ -13,6 +13,7 @@ import (
 	"runtime/trace"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,8 @@ type lintArgs struct {
 	// unavailable (for example in the wasm build).
 	StdoutIsTTY bool
 	Quiet       bool
+	Timing      bool
+	TimingLimit int
 	MaxWarnings int
 	StartTimeMs int64
 	RuleFlags   []string
@@ -64,6 +67,11 @@ type lintArgs struct {
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.
 	FS vfs.FS
+	// DeferTimingTable, when non-nil, receives the rendered --timing table
+	// instead of it being printed to stderr by the pipeline. The IPC entry
+	// uses it to emit the table only after the async stdout forwarding has
+	// drained, so the table cannot interleave with the lint report.
+	DeferTimingTable func(table string)
 	// ConfigCatalog is the immutable result of Go-owned JS/TS config discovery.
 	// A nil or empty automatic catalog selects the native JSON/JSONC loader;
 	// explicit catalogs remain authoritative even when their config is empty.
@@ -91,6 +99,7 @@ Options:
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
+  --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
@@ -477,6 +486,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	var timingValue string
+	fs.StringVar(&timingValue, "timing", "", "print a per-rule timing table: 'all' or a top rule count")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
@@ -490,6 +501,22 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
+
+	// The Node.js entry point fills in the default "all" when the user
+	// passes a bare --timing, so the value is always present here.
+	switch {
+	case timingValue == "":
+	case strings.EqualFold(timingValue, "all"):
+		args.Timing = true
+	default:
+		n, err := strconv.Atoi(timingValue)
+		if err != nil || n <= 0 {
+			fmt.Fprintf(os.Stderr, "invalid value %q for flag -timing: expected \"all\" or a positive rule count\n", timingValue)
+			return args, help, 2
+		}
+		args.Timing = true
+		args.TimingLimit = n
+	}
 
 	// --type-check-only implies --type-check and skips all lint rules.
 	// Reject incompatible flag combinations before doing any work.
@@ -555,6 +582,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	ruleFlags := args.RuleFlags
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
+	// --timing enables per-rule timing. One collector is shared across the
+	// initial lint and every --fix re-lint pass, so the table reflects total
+	// rule cost for the whole run.
+	var timingCollector *linter.TimingCollector
+	timingLimit := args.TimingLimit
+	if args.Timing && !typeCheckOnly {
+		timingCollector = linter.NewTimingCollector()
+	}
 	format := output.FormatDefault
 	if !init {
 		var formatErr error
@@ -929,6 +964,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		SyntaxErrorFiles:      syntaxErrorFiles,
 		TypeCheck:             typeCheck,
 		SkipTypeCheckPrograms: skipTypeCheck,
+		Timing:                timingCollector,
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -946,7 +982,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
 		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
-		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix))
+		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
 	}
 
 	lintResult, err := linter.RunLinter(runOpts)
@@ -1066,6 +1102,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				SyntaxErrorFiles:      fixSyntaxErrorFiles,
 				TypeCheck:             typeCheck,
 				SkipTypeCheckPrograms: fixSkipMask,
+				Timing:                timingCollector,
 				OnDiagnostic: func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)
@@ -1080,7 +1117,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
 					lintResolver: fixConfigResolver,
 				})
-				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
+				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
 			}
 			passResult, passErr := linter.RunLinter(fixRunOpts)
 			var fixPluginDiags []rule.RuleDiagnostic
@@ -1190,6 +1227,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
 		return 1
+	}
+	// The timing table goes to stderr so machine-readable stdout formats
+	// (jsonline/github/gitlab) stay parseable with --timing enabled.
+	if timingCollector != nil {
+		table := output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit)
+		if args.DeferTimingTable != nil {
+			args.DeferTimingTable(table)
+		} else {
+			fmt.Fprint(os.Stderr, table)
+		}
 	}
 	counts := report.Counts()
 

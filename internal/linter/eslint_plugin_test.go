@@ -25,7 +25,7 @@ func TestDispatchEslintPlugin_EmptyShortCircuit(t *testing.T) {
 		called++
 		return &EslintPluginLintResult{}, nil
 	}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, nil, false, "off", func(rule.RuleDiagnostic) {}); err != nil {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, nil, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if called != 0 {
@@ -58,7 +58,7 @@ func TestDispatchEslintPlugin_GroupsBySignature(t *testing.T) {
 		}
 		return &EslintPluginLintResult{Results: results}, nil
 	}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(rule.RuleDiagnostic) {}); err != nil {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(batches) != 3 {
@@ -105,7 +105,7 @@ func TestDispatchEslintPlugin_SeverityDoesNotFragmentBatches(t *testing.T) {
 		return &EslintPluginLintResult{Results: results}, nil
 	}
 	sevByPath := map[string]rule.DiagnosticSeverity{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		sevByPath[d.FilePath] = d.Severity
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -157,7 +157,7 @@ func TestDispatchEslintPlugin_ConcurrentBatchesAllEmitted(t *testing.T) {
 		return &EslintPluginLintResult{Results: results}, nil
 	}
 	seen := map[string]int{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		seen[d.FilePath]++
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -203,7 +203,7 @@ func TestDispatchEslintPlugin_BatchFailureDoesNotAbortOthers(t *testing.T) {
 		}}}, nil
 	}
 	seen := map[string]int{}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		seen[d.FilePath]++
 	})
 	if !errors.Is(err, wantErr) {
@@ -245,7 +245,7 @@ func TestDispatchEslintPlugin_FirstBatchErrorWins(t *testing.T) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path}}}, nil
 		}
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(rule.RuleDiagnostic) {})
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
 	if !errors.Is(err, errEarly) {
 		t.Fatalf("expected the first-in-batch-order error (f2's), got %v", err)
 	}
@@ -267,7 +267,7 @@ func TestDispatchEslintPlugin_SeverityReattachAndClamp(t *testing.T) {
 		}}}, nil
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -307,7 +307,7 @@ func TestDispatchEslintPlugin_ParseErrorClasses(t *testing.T) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{fr}}, nil
 		}
 		var diags []rule.RuleDiagnostic
-		if err := DispatchEslintPluginRules(context.Background(), dispatch, mkFiles(), false, "off", func(d rule.RuleDiagnostic) {
+		if err := DispatchEslintPluginRules(context.Background(), dispatch, mkFiles(), false, "off", nil, func(d rule.RuleDiagnostic) {
 			diags = append(diags, d)
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -378,7 +378,7 @@ func TestDispatchEslintPlugin_Cancelled(t *testing.T) {
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: "/a.ts", Cancelled: true}}}, nil
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(rule.RuleDiagnostic) {})
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(rule.RuleDiagnostic) {})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
@@ -391,7 +391,7 @@ func TestDispatchEslintPlugin_MissingResultNoPanic(t *testing.T) {
 		return &EslintPluginLintResult{Results: nil}, nil // no result for /a.ts
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -466,7 +466,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags = append(diags, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -500,7 +500,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags2 []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch2, files2, true, "eager", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch2, files2, true, "eager", nil, func(d rule.RuleDiagnostic) {
 		diags2 = append(diags2, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -535,7 +535,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		}}}, nil
 	}
 	var diags3 []rule.RuleDiagnostic
-	if err := DispatchEslintPluginRules(context.Background(), dispatch3, files3, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch3, files3, false, "off", nil, func(d rule.RuleDiagnostic) {
 		diags3 = append(diags3, d)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -652,7 +652,7 @@ func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
 		}}}, nil
 	}
 	sevByRule := map[string]rule.DiagnosticSeverity{}
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		sevByRule[d.RuleName] = d.Severity
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -705,7 +705,7 @@ func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
 		}}}, nil
 	}
 	emitted := map[string]bool{}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		emitted[d.FilePath] = true
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -742,7 +742,7 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	}
 	var got rule.RuleDiagnostic
 	gotN := 0
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, true, "eager", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, true, "eager", nil, func(d rule.RuleDiagnostic) {
 		got = d
 		gotN++
 	}); err != nil {
@@ -797,7 +797,7 @@ func TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion(t *te
 		}}}, nil
 	}
 	var order []string
-	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
 		order = append(order, d.FilePath)
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -830,7 +830,7 @@ func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
 		}
 		return nil, boom // later batch: a real transport failure
 	}
-	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {})
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {})
 	if !errors.Is(err, boom) {
 		t.Fatalf("expected the real transport error to surface, got %v", err)
 	}

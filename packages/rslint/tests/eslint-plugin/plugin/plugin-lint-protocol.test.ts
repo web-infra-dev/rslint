@@ -143,7 +143,7 @@ describe('buildPluginLintTasks', () => {
 });
 
 describe('buildPluginLintResult', () => {
-  test('projects to the 5-field wire shape, drops aggregate convenience fields', () => {
+  test('projects to the 6-field wire shape, drops aggregate convenience fields', () => {
     const results: LintFileResult[] = [
       {
         filePath: '/a.ts',
@@ -167,7 +167,7 @@ describe('buildPluginLintResult', () => {
     const projected = buildPluginLintResult(results);
     expect(projected.results).toHaveLength(1);
     const r = projected.results[0];
-    // Exactly the 5 Go-visible fields, no more.
+    // Exactly the 6 Go-visible fields, no more.
     expect(Object.keys(r).sort()).toEqual(
       [
         'cancelled',
@@ -175,6 +175,7 @@ describe('buildPluginLintResult', () => {
         'filePath',
         'parseError',
         'ruleErrors',
+        'ruleTimes',
       ].sort(),
     );
     expect(r.filePath).toBe('/a.ts');

@@ -93,6 +93,7 @@ func dispatchPluginLintAsync(
 	inputs []linter.EslintPluginFileInput,
 	fix bool,
 	suggestionsMode string,
+	timing *linter.TimingCollector,
 ) <-chan []rule.RuleDiagnostic {
 	ch := make(chan []rule.RuleDiagnostic, 1)
 	go func() {
@@ -101,7 +102,7 @@ func dispatchPluginLintAsync(
 		// the local slice needs no lock.
 		var diags []rule.RuleDiagnostic
 		if dispatch != nil && len(inputs) > 0 {
-			err := linter.DispatchEslintPluginRules(ctx, dispatch, inputs, fix, suggestionsMode,
+			err := linter.DispatchEslintPluginRules(ctx, dispatch, inputs, fix, suggestionsMode, timing,
 				func(d rule.RuleDiagnostic) { diags = append(diags, d) })
 			if err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(os.Stderr, "rslint: eslint-plugin lint error: %v\n", err)
