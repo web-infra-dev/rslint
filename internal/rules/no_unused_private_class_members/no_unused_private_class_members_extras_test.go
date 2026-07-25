@@ -20,9 +20,14 @@
 package no_unused_private_class_members
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -418,4 +423,92 @@ class C {
 			),
 		},
 	)
+}
+
+func TestNoUnusedPrivateClassMembersEditDemand(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `class C {
+	value = () => 1
+	#unused;
+	[key]() {}
+}`, core.ScriptKindTS)
+	classNode := sourceFile.Statements.Nodes[0]
+	classInfo := collectPrivateMembers(classNode)
+
+	run := func(demand rule.EditDemand) (rule.RuleDiagnostic, int) {
+		t.Helper()
+
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(NoUnusedPrivateClassMembersRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+		itemBuilds := 0
+		reportUnusedMembers(ctx, classInfo, func() []sourceItem {
+			itemBuilds++
+			return collectSourceItems(sourceFile, comments.All())
+		})
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0], itemBuilds
+	}
+
+	diagnosticsOnly, diagnosticsOnlyBuilds := run(rule.EditDemandNone)
+	autofixOnly, autofixOnlyBuilds := run(rule.EditDemandAutofix)
+	suggestionOnly, suggestionOnlyBuilds := run(rule.EditDemandSuggestion)
+	allEdits, allEditsBuilds := run(rule.EditDemandAll)
+
+	if diagnosticsOnlyBuilds != 0 || autofixOnlyBuilds != 0 ||
+		suggestionOnlyBuilds != 1 || allEditsBuilds != 1 {
+		t.Fatalf(
+			"source item builds = none:%d autofix:%d suggestion:%d all:%d",
+			diagnosticsOnlyBuilds,
+			autofixOnlyBuilds,
+			suggestionOnlyBuilds,
+			allEditsBuilds,
+		)
+	}
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.Suggestions != nil || autofixOnly.Suggestions != nil {
+		t.Fatal("non-suggestion demand materialized suggestions")
+	}
+	if suggestionOnly.Suggestions == nil ||
+		!reflect.DeepEqual(suggestionOnly.Suggestions, allEdits.Suggestions) {
+		t.Fatal("suggestion and all-edits demands produced different suggestions")
+	}
+	if suggestions := *allEdits.Suggestions; len(suggestions) != 1 ||
+		suggestions[0].Message.Id != "removeUnusedPrivateClassMember" ||
+		len(suggestions[0].Fixes()) != 2 {
+		t.Fatalf("unexpected suggestions: %#v", suggestions)
+	}
+	for _, diagnostic := range []rule.RuleDiagnostic{diagnosticsOnly, autofixOnly, suggestionOnly, allEdits} {
+		if diagnostic.FixesPtr != nil {
+			t.Fatal("suggestion-only rule materialized autofixes")
+		}
+	}
 }
