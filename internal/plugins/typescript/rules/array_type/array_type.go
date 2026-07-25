@@ -143,6 +143,119 @@ func buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className str
 	}
 }
 
+func nodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	return sourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+}
+
+func messageType(sourceFile *ast.SourceFile, node *ast.Node) string {
+	if isSimpleType(node) {
+		return nodeText(sourceFile, node)
+	}
+	return "T"
+}
+
+func buildGenericFixes(
+	sourceFile *ast.SourceFile,
+	errorNode *ast.Node,
+	elementType *ast.Node,
+	className string,
+) []rule.RuleFix {
+	elementTypeText := nodeText(sourceFile, elementType)
+
+	// When converting T[] -> Array<T>, remove unnecessary parentheses.
+	if ast.IsParenthesizedTypeNode(elementType) {
+		parenType := elementType.AsParenthesizedTypeNode()
+		if parenType != nil && parenType.Type != nil {
+			elementTypeText = nodeText(sourceFile, parenType.Type)
+		}
+	}
+
+	return []rule.RuleFix{
+		rule.RuleFixReplace(sourceFile, errorNode, className+"<"+elementTypeText+">"),
+	}
+}
+
+func buildAnyArrayFixes(
+	sourceFile *ast.SourceFile,
+	node *ast.Node,
+	readonlyPrefix string,
+) []rule.RuleFix {
+	return []rule.RuleFix{
+		rule.RuleFixReplace(sourceFile, node, readonlyPrefix+"any[]"),
+	}
+}
+
+func buildArrayReplacement(
+	typeParamText string,
+	readonlyPrefix string,
+	typeParens bool,
+	parentParens bool,
+	appendArrayBrackets bool,
+) string {
+	switch {
+	case parentParens && typeParens && appendArrayBrackets:
+		return "(" + readonlyPrefix + "(" + typeParamText + ")[])"
+	case parentParens && typeParens:
+		return "(" + readonlyPrefix + "(" + typeParamText + "))"
+	case parentParens && appendArrayBrackets:
+		return "(" + readonlyPrefix + typeParamText + "[])"
+	case parentParens:
+		return "(" + readonlyPrefix + typeParamText + ")"
+	case typeParens && appendArrayBrackets:
+		return readonlyPrefix + "(" + typeParamText + ")[]"
+	case typeParens:
+		return readonlyPrefix + "(" + typeParamText + ")"
+	case appendArrayBrackets:
+		return readonlyPrefix + typeParamText + "[]"
+	default:
+		return readonlyPrefix + typeParamText
+	}
+}
+
+func buildArrayFixes(
+	sourceFile *ast.SourceFile,
+	node *ast.Node,
+	typeParam *ast.Node,
+	currentOption string,
+	readonlyPrefix string,
+	isReadonlyWithGenericArrayType bool,
+) []rule.RuleFix {
+	// Converting Array<T> -> T[] may require parentheses around T or
+	// around the whole readonly form when it is nested in another array.
+	var typeParens bool
+	var parentParens bool
+	if currentOption == "array" || currentOption == "array-simple" {
+		typeParens = typeNeedsParentheses(typeParam)
+		parentParens = readonlyPrefix != "" &&
+			node.Parent != nil &&
+			node.Parent.Kind == ast.KindArrayType &&
+			!isParenthesized(node.Parent.AsArrayTypeNode().ElementType)
+	}
+
+	typeParamText := nodeText(sourceFile, typeParam)
+	if currentOption == "array-simple" && ast.IsParenthesizedTypeNode(typeParam) {
+		parenType := typeParam.AsParenthesizedTypeNode()
+		if parenType != nil && parenType.Type != nil {
+			typeParamText = nodeText(sourceFile, parenType.Type)
+		}
+	}
+
+	return []rule.RuleFix{
+		rule.RuleFixReplace(
+			sourceFile,
+			node,
+			buildArrayReplacement(
+				typeParamText,
+				readonlyPrefix,
+				typeParens,
+				parentParens,
+				!isReadonlyWithGenericArrayType,
+			),
+		),
+	}
+}
+
 var ArrayTypeRule = rule.CreateRule(rule.Rule{
 	Name: "array-type",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
@@ -177,14 +290,6 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 		readonlyOption := opts.Readonly
 		if readonlyOption == "" {
 			readonlyOption = defaultOption
-		}
-
-		getMessageType := func(node *ast.Node) string {
-			if isSimpleType(node) {
-				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-				return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
-			}
-			return "T"
 		}
 
 		return rule.RuleListeners{
@@ -224,7 +329,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					errorNode = node.Parent
 				}
 
-				typeStr := getMessageType(arrayType.ElementType)
+				typeStr := messageType(ctx.SourceFile, arrayType.ElementType)
 				className := "Array"
 				readonlyPrefix := ""
 				if isReadonly {
@@ -239,23 +344,9 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					message = buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className)
 				}
 
-				// Get the exact text of the element type to preserve formatting
-				elementTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, arrayType.ElementType)
-				elementTypeText := ctx.SourceFile.Text()[elementTypeRange.Pos():elementTypeRange.End()]
-
-				// When converting T[] -> Array<T>, remove unnecessary parentheses
-				if ast.IsParenthesizedTypeNode(arrayType.ElementType) {
-					// For parenthesized types, get the inner type to avoid double parentheses
-					parenType := arrayType.ElementType.AsParenthesizedTypeNode()
-					if parenType != nil && parenType.Type != nil {
-						innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, parenType.Type)
-						elementTypeText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
-					}
-				}
-
-				newText := fmt.Sprintf("%s<%s>", className, elementTypeText)
-				ctx.ReportNodeWithFixes(errorNode, message,
-					rule.RuleFixReplace(ctx.SourceFile, errorNode, newText))
+				ctx.ReportNodeWithDeferredFixes(errorNode, message, func() []rule.RuleFix {
+					return buildGenericFixes(ctx.SourceFile, errorNode, arrayType.ElementType, className)
+				})
 			},
 
 			ast.KindTypeReference: func(node *ast.Node) {
@@ -355,8 +446,9 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 						message = buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, "any")
 					}
 
-					ctx.ReportNodeWithFixes(node, message,
-						rule.RuleFixReplace(ctx.SourceFile, node, readonlyPrefix+"any[]"))
+					ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+						return buildAnyArrayFixes(ctx.SourceFile, node, readonlyPrefix)
+					})
 					return
 				}
 
@@ -366,42 +458,7 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 
 				typeParam := typeParams.Nodes[0]
 
-				// Only add parentheses when converting Array<T> -> T[] if T needs them
-				// Never add parentheses when converting T[] -> Array<T>
-				var typeParens bool
-				var parentParens bool
-
-				if currentOption == "array" || currentOption == "array-simple" {
-					// Converting Array<T> -> T[] - may need parentheses
-					typeParens = typeNeedsParentheses(typeParam)
-					parentParens = readonlyPrefix != "" &&
-						node.Parent != nil &&
-						node.Parent.Kind == ast.KindArrayType &&
-						!isParenthesized(node.Parent.AsArrayTypeNode().ElementType)
-				}
-				// If converting T[] -> Array<T>, don't add parentheses
-
-				start := ""
-				if parentParens {
-					start += "("
-				}
-				start += readonlyPrefix
-				if typeParens {
-					start += "("
-				}
-
-				end := ""
-				if typeParens {
-					end += ")"
-				}
-				if !isReadonlyWithGenericArrayType {
-					end += "[]"
-				}
-				if parentParens {
-					end += ")"
-				}
-
-				typeStr := getMessageType(typeParam)
+				typeStr := messageType(ctx.SourceFile, typeParam)
 				className := typeName
 				if !isReadonlyArrayType {
 					className = "Array"
@@ -419,23 +476,16 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 					message = buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, typeStr)
 				}
 
-				// Get the exact text of the type parameter to preserve formatting
-				typeParamRange := utils.TrimNodeTextRange(ctx.SourceFile, typeParam)
-				typeParamText := ctx.SourceFile.Text()[typeParamRange.Pos():typeParamRange.End()]
-
-				// When converting from array-simple mode, we're converting T[] -> Array<T>
-				// In this case, if T is a parenthesized type, we should remove the parentheses
-				if (currentOption == "array-simple") && ast.IsParenthesizedTypeNode(typeParam) {
-					// For parenthesized types, get the inner type to avoid double parentheses
-					parenType := typeParam.AsParenthesizedTypeNode()
-					if parenType != nil && parenType.Type != nil {
-						innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, parenType.Type)
-						typeParamText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
-					}
-				}
-
-				ctx.ReportNodeWithFixes(node, message,
-					rule.RuleFixReplace(ctx.SourceFile, node, start+typeParamText+end))
+				ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+					return buildArrayFixes(
+						ctx.SourceFile,
+						node,
+						typeParam,
+						currentOption,
+						readonlyPrefix,
+						isReadonlyWithGenericArrayType,
+					)
+				})
 			},
 		}
 	},
