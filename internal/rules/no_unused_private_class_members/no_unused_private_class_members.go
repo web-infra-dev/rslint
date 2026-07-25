@@ -226,17 +226,19 @@ func reportUnusedMembers(ctx rule.RuleContext, classInfo *classMembers, getItems
 			continue
 		}
 
-		items := getItems()
-		fixes := []rule.RuleFix{
-			rule.RuleFixReplaceRange(memberRemovalRange(ctx.SourceFile, member.declNode, items), ""),
-		}
-		if token, ok := semicolonInsertionToken(ctx.SourceFile, classInfo.classNode, member.declNode, items); ok {
-			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(token.end, token.end), ";"))
-		}
+		ctx.ReportNodeWithDeferredSuggestions(member.nameNode, message, func() []rule.RuleSuggestion {
+			items := getItems()
+			fixes := []rule.RuleFix{
+				rule.RuleFixReplaceRange(memberRemovalRange(ctx.SourceFile, member.declNode, items), ""),
+			}
+			if token, ok := semicolonInsertionToken(ctx.SourceFile, classInfo.classNode, member.declNode, items); ok {
+				fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(token.end, token.end), ";"))
+			}
 
-		ctx.ReportNodeWithSuggestions(member.nameNode, message, rule.RuleSuggestion{
-			Message:  removeUnusedPrivateClassMemberMessage(member.name),
-			FixesArr: fixes,
+			return []rule.RuleSuggestion{{
+				Message:  removeUnusedPrivateClassMemberMessage(member.name),
+				FixesArr: fixes,
+			}}
 		})
 	}
 }
