@@ -1,9 +1,14 @@
 package dot_notation
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -79,9 +84,9 @@ func TestDotNotationRule(t *testing.T) {
 		{Code: "a['with-dash'];"},
 		{Code: "a['has space'];"},
 		{Code: "a[''];"},
-		{Code: "a['12valid'];"},       // starts with digit
-		{Code: "a['\\n'];"},            // contains newline
-		{Code: "a['it\\'s'];"},         // contains quote
+		{Code: "a['12valid'];"}, // starts with digit
+		{Code: "a['\\n'];"},     // contains newline
+		{Code: "a['it\\'s'];"},  // contains quote
 		{Code: "a['$ok'];", Options: map[string]interface{}{"allowPattern": "^\\$"}}, // starts with $ but allowPattern matches
 
 		// --- #2 non-ASCII identifier-looking strings (ESLint ASCII-only regex skips them) ---
@@ -316,4 +321,102 @@ func TestDotNotationRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
 		},
 	})
+}
+
+func TestDotNotationEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		"declare const object: { property: string; commented: string; while: string };\n"+
+			"object['property'];\n"+
+			"object[/* keep */ 'commented'];\n"+
+			"object?.while;\n"+
+			"object./* keep */ while;\n"+
+			"let.if();",
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := []any{map[string]interface{}{"allowKeywords": false}}
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:             DotNotationRule.Name,
+					Severity:         rule.SeverityError,
+					RequiresTypeInfo: DotNotationRule.RequiresTypeInfo,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return DotNotationRule.Run(ctx, options)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 5 {
+			t.Fatalf("demand %d: diagnostics = %d, want 5", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnostics := map[rule.EditDemand][]rule.RuleDiagnostic{
+		rule.EditDemandNone:       run(rule.EditDemandNone),
+		rule.EditDemandAutofix:    run(rule.EditDemandAutofix),
+		rule.EditDemandSuggestion: run(rule.EditDemandSuggestion),
+		rule.EditDemandAll:        run(rule.EditDemandAll),
+	}
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+
+	for index := range diagnostics[rule.EditDemandAll] {
+		want := withoutEdits(diagnostics[rule.EditDemandAll][index])
+		for demand, demandDiagnostics := range diagnostics {
+			if got := withoutEdits(demandDiagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("diagnostic %d changed for demand %d:\ngot:  %#v\nwant: %#v", index, demand, got, want)
+			}
+			if demandDiagnostics[index].Suggestions != nil {
+				t.Errorf("diagnostic %d demand %d unexpectedly has suggestions", index, demand)
+			}
+		}
+	}
+
+	wantFix := []bool{true, false, true, false, false}
+	wantText := []string{"object.property", "", "object?.[\"while\"]", "", ""}
+	for index, shouldFix := range wantFix {
+		autofix := diagnostics[rule.EditDemandAutofix][index].FixesPtr
+		allEdits := diagnostics[rule.EditDemandAll][index].FixesPtr
+		if (autofix != nil) != shouldFix {
+			t.Errorf("diagnostic %d fix presence = %v, want %v", index, autofix != nil, shouldFix)
+		}
+		if !reflect.DeepEqual(autofix, allEdits) {
+			t.Errorf("diagnostic %d fixes differ between autofix and all-edits demand", index)
+		}
+		if shouldFix {
+			if len(*autofix) != 1 || (*autofix)[0].Text != wantText[index] {
+				t.Errorf("diagnostic %d fixes = %#v, want replacement %q", index, *autofix, wantText[index])
+			}
+		}
+		if diagnostics[rule.EditDemandNone][index].FixesPtr != nil ||
+			diagnostics[rule.EditDemandSuggestion][index].FixesPtr != nil {
+			t.Errorf("diagnostic %d attached fixes without autofix demand", index)
+		}
+	}
 }
