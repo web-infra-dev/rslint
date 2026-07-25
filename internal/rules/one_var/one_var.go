@@ -730,11 +730,17 @@ var OneVarRule = rule.Rule{
 								prevInitCount, prevUninitCount := countDeclarations(prevDecls)
 								switch {
 								case typeOpts.initialized == modeConsecutive && typeOpts.uninitialized == modeConsecutive:
-									reportRangeWithFixes(ctx, reportRange, msg("combine", kind), fixCombine(view, node, kind, ctx.SourceFile))
+									ctx.ReportRangeWithDeferredFixes(reportRange, msg("combine", kind), func() []rule.RuleFix {
+										return fixCombine(view, node, kind, ctx.SourceFile)
+									})
 								case typeOpts.initialized == modeConsecutive && initCount > 0 && prevInitCount > 0:
-									reportRangeWithFixes(ctx, reportRange, msg("combineInitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+									ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineInitialized", kind), func() []rule.RuleFix {
+										return fixCombine(view, node, kind, ctx.SourceFile)
+									})
 								case typeOpts.uninitialized == modeConsecutive && uninitCount > 0 && prevUninitCount > 0:
-									reportRangeWithFixes(ctx, reportRange, msg("combineUninitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+									ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineUninitialized", kind), func() []rule.RuleFix {
+										return fixCombine(view, node, kind, ctx.SourceFile)
+									})
 								}
 							}
 						}
@@ -746,16 +752,22 @@ var OneVarRule = rule.Rule{
 			currentScope := getCurrentScope(key)
 			if currentScope != nil && !hasOnlyOneStatement(currentScope, typeOpts, declarations, opts.separateRequires) {
 				if typeOpts.initialized == modeAlways && typeOpts.uninitialized == modeAlways {
-					reportRangeWithFixes(ctx, reportRange, msg("combine", kind), fixCombine(view, node, kind, ctx.SourceFile))
+					ctx.ReportRangeWithDeferredFixes(reportRange, msg("combine", kind), func() []rule.RuleFix {
+						return fixCombine(view, node, kind, ctx.SourceFile)
+					})
 				} else {
 					if typeOpts.initialized == modeAlways && initCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("combineInitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineInitialized", kind), func() []rule.RuleFix {
+							return fixCombine(view, node, kind, ctx.SourceFile)
+						})
 					}
 					if typeOpts.uninitialized == modeAlways && uninitCount > 0 {
 						// for-in/for-of left side: skip combineUninitialized
 						// (mirrors ESLint's `parent.left === node` early return).
 						if !isForInOfInit {
-							reportRangeWithFixes(ctx, reportRange, msg("combineUninitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+							ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineUninitialized", kind), func() []rule.RuleFix {
+								return fixCombine(view, node, kind, ctx.SourceFile)
+							})
 						}
 					}
 				}
@@ -766,11 +778,17 @@ var OneVarRule = rule.Rule{
 				totalDecls := initCount + uninitCount
 				if totalDecls > 1 {
 					if typeOpts.initialized == modeNever && typeOpts.uninitialized == modeNever {
-						reportRangeWithFixes(ctx, reportRange, msg("split", kind), fixSplit(view, node, kind, ctx.SourceFile))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("split", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
 					} else if typeOpts.initialized == modeNever && initCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("splitInitialized", kind), fixSplit(view, node, kind, ctx.SourceFile))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("splitInitialized", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
 					} else if typeOpts.uninitialized == modeNever && uninitCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("splitUninitialized", kind), fixSplit(view, node, kind, ctx.SourceFile))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("splitUninitialized", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
 					}
 				}
 			}
@@ -814,12 +832,4 @@ var OneVarRule = rule.Rule{
 			ast.KindVariableDeclarationList: checkDeclList,
 		}
 	},
-}
-
-func reportRangeWithFixes(ctx rule.RuleContext, r core.TextRange, m rule.RuleMessage, fixes []rule.RuleFix) {
-	if len(fixes) > 0 {
-		ctx.ReportRangeWithFixes(r, m, fixes...)
-	} else {
-		ctx.ReportRange(r, m)
-	}
 }
