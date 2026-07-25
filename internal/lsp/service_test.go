@@ -766,15 +766,14 @@ func TestDebounce_CloseRace(t *testing.T) {
 		t.Fatal("URI should be removed from pendingLintURIs after close")
 	}
 
-	// Step 3: wait for the timer to fire
-	time.Sleep(300 * time.Millisecond)
-
-	// debounceCh should have a signal (timer still fires)
+	// Step 3: wait for the timer to fire. Waiting on the signal synchronizes
+	// with the timer callback without assuming it will be scheduled within a
+	// fixed amount of time.
 	select {
 	case <-s.debounceCh:
 		// good — signal received
-	default:
-		t.Fatal("timer should still fire even after close")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timer did not fire after close")
 	}
 
 	// Step 4: simulate what the dispatch loop does — iterate pending URIs
