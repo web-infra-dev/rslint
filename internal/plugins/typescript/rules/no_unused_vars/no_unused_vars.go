@@ -1160,6 +1160,37 @@ func getImportRemoveFix(ctx rule.RuleContext, definition *ast.Node, reportedUnus
 	return nil, rule.RuleMessage{}
 }
 
+func reportUnusedImport(
+	ctx rule.RuleContext,
+	reportNode *ast.Node,
+	definition *ast.Node,
+	message rule.RuleMessage,
+	autofix bool,
+	reportedUnused map[*ast.Node]bool,
+) {
+	// Deferred builders execute synchronously when their artifact category is
+	// requested, so they observe the same incremental reportedUnused state as
+	// the former eager path.
+	if autofix {
+		ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
+			fixes, _ := getImportRemoveFix(ctx, definition, reportedUnused)
+			return fixes
+		})
+		return
+	}
+
+	ctx.ReportNodeWithDeferredSuggestions(reportNode, message, func() []rule.RuleSuggestion {
+		fixes, suggestionMessage := getImportRemoveFix(ctx, definition, reportedUnused)
+		if len(fixes) == 0 {
+			return nil
+		}
+		return []rule.RuleSuggestion{{
+			Message:  suggestionMessage,
+			FixesArr: fixes,
+		}}
+	})
+}
+
 func getImportDeclaration(node *ast.Node) *ast.Node {
 	current := node
 	for current != nil {
@@ -1786,15 +1817,15 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// Track unused imports for allImportSpecifiersUnused check
 		if isImport {
 			ac.reportedUnused[definition] = true
-		}
-
-		// Generate import removal fix/suggestion
-		if isImport {
-			fixes, suggestionMsg := getImportRemoveFix(ctx, definition, ac.reportedUnused)
-			if len(fixes) > 0 {
-				rule.ReportNodeWithFixesOrSuggestions(ctx, reportNode, opts.EnableAutofixRemoval.Imports, buildUnusedVarMessage(name, assigned), suggestionMsg, fixes...)
-				return
-			}
+			reportUnusedImport(
+				ctx,
+				reportNode,
+				definition,
+				buildUnusedVarMessage(name, assigned),
+				opts.EnableAutofixRemoval.Imports,
+				ac.reportedUnused,
+			)
+			return
 		}
 		ctx.ReportNode(reportNode, buildUnusedVarMessage(name, assigned))
 	}
