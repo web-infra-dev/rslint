@@ -143,11 +143,9 @@ func checkIfWithElse(ctx rule.RuleContext, node *ast.Node) {
 }
 
 func displayReport(ctx rule.RuleContext, elseNode *ast.Node) {
-	if fixes := buildFixes(ctx, elseNode); len(fixes) > 0 {
-		ctx.ReportNodeWithFixes(elseNode, unexpectedMessage, fixes...)
-		return
-	}
-	ctx.ReportNode(elseNode, unexpectedMessage)
+	ctx.ReportNodeWithDeferredFixes(elseNode, unexpectedMessage, func() []rule.RuleFix {
+		return buildFixes(ctx, elseNode)
+	})
 }
 
 func isStatementListParent(node *ast.Node) bool {
