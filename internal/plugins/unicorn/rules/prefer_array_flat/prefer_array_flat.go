@@ -396,11 +396,12 @@ var PreferArrayFlatRule = rule.Rule{
 
 				for _, match := range matches {
 					ruleMessage := message(match.description)
-					if canFix(node, match.array, ctx) {
-						ctx.ReportNodeWithFixes(node, ruleMessage, buildFixes(node, match, ctx)...)
-					} else {
-						ctx.ReportNode(node, ruleMessage)
-					}
+					ctx.ReportNodeWithDeferredFixes(node, ruleMessage, func() []rule.RuleFix {
+						if !canFix(node, match.array, ctx) {
+							return nil
+						}
+						return buildFixes(node, match, ctx)
+					})
 				}
 			},
 		}
