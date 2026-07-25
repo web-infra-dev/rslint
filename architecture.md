@@ -297,6 +297,12 @@ func (*RuleContext) ReportNodeWithDeferredFixes(..., func() []RuleFix)
 func (*RuleContext) ReportRangeWithDeferredFixes(..., func() []RuleFix)
 func (*RuleContext) ReportNodeWithDeferredSuggestions(..., func() []RuleSuggestion)
 func (*RuleContext) ReportRangeWithDeferredSuggestions(..., func() []RuleSuggestion)
+func (*RuleContext) ReportNodeWithDeferredFixesAndSuggestions(
+    ..., func() []RuleFix, func() []RuleSuggestion,
+)
+func (*RuleContext) ReportRangeWithDeferredFixesAndSuggestions(
+    ..., func() []RuleFix, func() []RuleSuggestion,
+)
 ```
 
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
@@ -329,16 +335,18 @@ This is a reporting-pass capability, not a `Program` property:
 `RunLinter` normalizes it once and passes the same immutable consumer separately
 to every per-Program lint task and then into each rule reporter.
 
-The category-specific deferred reporting methods apply inline-disable
-suppression first, inspect the matching demand bit, and only then invoke the
-builder synchronously. Builders are never retained and must contain only work
-needed to construct their optional artifact; diagnostic detection, message,
-range, and severity are decided before the builder. Keeping the rule API
+The deferred reporting methods apply inline-disable suppression first, inspect
+the matching demand bit, and only then invoke each category-specific builder
+synchronously. Builders are never retained and must contain only work needed
+to construct their optional artifact; diagnostic detection, message, range,
+and severity are decided before the builder. A diagnostic that can carry both
+autofixes and suggestions supplies two independent builders, so a consumer
+requesting one category does not materialize the other. Keeping builders
 category-specific avoids exposing a general callback protocol or a demand
-query that rules could accidentally use to change diagnostic semantics.
-Adding another native optional artifact is additive: define one demand bit and
-one category-specific deferred reporting path. The pass/Program scheduling
-boundary and existing rule APIs do not need to change.
+query that rules could accidentally use to change diagnostic semantics. Adding
+another native optional artifact is additive: define one demand bit and one
+category-specific builder path. The pass/Program scheduling boundary and
+existing rule APIs do not need to change.
 
 Existing eager `Report*WithFixes` and `Report*WithSuggestions` methods remain
 available for gradual rule migration. Their already-built artifacts are
@@ -418,7 +426,10 @@ analysis is expensive should use `ReportRangeWithDeferredFixes(...)` or
 `ReportNodeWithDeferredFixes(...)`, allowing the framework to skip that
 analysis when the current native consumer does not need autofixes. The
 suggestion counterparts provide the same migration path for expensive
-suggestion construction.
+suggestion construction. A single diagnostic with independently expensive
+autofixes and suggestions should use
+`Report*WithDeferredFixesAndSuggestions(...)`; its two builders are gated
+separately while suppression and diagnostic emission still happen once.
 
 Fix application happens in `internal/linter/source_code_fixer.go`:
 
