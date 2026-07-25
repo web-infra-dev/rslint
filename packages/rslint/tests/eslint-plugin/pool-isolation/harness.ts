@@ -23,6 +23,8 @@ const DIST_ESLINT_PLUGIN = path.resolve(
 );
 
 export const JOURNAL_VERSION = 1;
+export const POOL_ISOLATION_AUDIT_PREFIX = '[pool-isolation-audit] ';
+const AUDIT_VERSION = 1;
 const STDERR_LIMIT_BYTES = 256 * 1024;
 const JOURNAL_LIMIT_BYTES = 1024 * 1024;
 
@@ -255,7 +257,7 @@ export async function runPoolScenario(
       const processError = reportedError ?? spawnError ?? cleanupError;
       const stderr = Buffer.concat(stderrChunks).toString('utf8');
 
-      resolve({
+      const result: ScenarioResult = {
         scenario,
         verdict: classifyScenario({
           scenario,
@@ -275,7 +277,14 @@ export async function runPoolScenario(
         timedOut,
         stderr,
         stderrTruncated,
-      });
+      };
+
+      // Emit exactly one parent-authored, machine-readable record per isolated
+      // scenario. Child stdout is discarded, so it cannot forge this success
+      // evidence. In particular, CI logs now distinguish a clean PASS from the
+      // narrowly tolerated Windows EXPECTED-NATIVE-ABORT verdict.
+      process.stdout.write(`${formatScenarioAudit(result)}\n`);
+      resolve(result);
     });
   });
 }
@@ -516,6 +525,29 @@ function containsOrdered(
     if (value === required[requiredIndex]) requiredIndex++;
   }
   return requiredIndex === required.length;
+}
+
+/**
+ * Stable, single-line evidence for auditing green CI runs.
+ */
+export function formatScenarioAudit(r: ScenarioResult): string {
+  return `${POOL_ISOLATION_AUDIT_PREFIX}${JSON.stringify({
+    version: AUDIT_VERSION,
+    scenario: r.scenario,
+    verdict: r.verdict,
+    exitCode: r.exitCode,
+    signal: r.signal,
+    timedOut: r.timedOut,
+    lastMilestone: r.milestones.at(-1) ?? null,
+    milestoneCount: r.milestones.length,
+    assertionCount: r.asserts.length,
+    failedAssertionCount: r.asserts.filter((assertion) => !assertion.pass)
+      .length,
+    journalValid: r.journalError === undefined,
+    harnessError: r.error !== undefined,
+    stderrBytes: Buffer.byteLength(r.stderr),
+    stderrTruncated: r.stderrTruncated,
+  })}`;
 }
 
 /**

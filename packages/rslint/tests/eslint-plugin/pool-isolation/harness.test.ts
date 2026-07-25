@@ -2,7 +2,9 @@ import { describe, expect, test } from '@rstest/core';
 
 import {
   JOURNAL_VERSION,
+  POOL_ISOLATION_AUDIT_PREFIX,
   classifyScenario,
+  formatScenarioAudit,
   parseJournalForTests,
   type ClassificationInput,
   type JournalRecord,
@@ -160,6 +162,46 @@ describe('pool-isolation verdict is fail-closed', () => {
     ).toBe('FAIL');
     expect(classify({ processError: 'orderly failure' })).toBe('FAIL');
     expect(classify({ journalError: 'torn record' })).toBe('FAIL');
+  });
+});
+
+describe('pool-isolation CI audit record', () => {
+  test('is one machine-readable line that exposes clean versus tolerated exit', () => {
+    const line = formatScenarioAudit({
+      scenario: SCENARIO,
+      verdict: 'EXPECTED-NATIVE-ABORT',
+      milestones: [
+        'started',
+        'init-done',
+        'refed-plugin-loaded',
+        'terminate-invoked',
+      ],
+      asserts: [],
+      exitCode: null,
+      signal: 'SIGABRT',
+      timedOut: false,
+      stderr: '',
+      stderrTruncated: false,
+    });
+
+    expect(line.startsWith(POOL_ISOLATION_AUDIT_PREFIX)).toBe(true);
+    expect(line).not.toContain('\n');
+    expect(JSON.parse(line.slice(POOL_ISOLATION_AUDIT_PREFIX.length))).toEqual({
+      version: 1,
+      scenario: SCENARIO,
+      verdict: 'EXPECTED-NATIVE-ABORT',
+      exitCode: null,
+      signal: 'SIGABRT',
+      timedOut: false,
+      lastMilestone: 'terminate-invoked',
+      milestoneCount: 4,
+      assertionCount: 0,
+      failedAssertionCount: 0,
+      journalValid: true,
+      harnessError: false,
+      stderrBytes: 0,
+      stderrTruncated: false,
+    });
   });
 });
 
