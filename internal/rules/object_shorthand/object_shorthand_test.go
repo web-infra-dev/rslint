@@ -1,9 +1,13 @@
 package object_shorthand
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -223,4 +227,97 @@ func TestObjectShorthandRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestObjectShorthandEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		`const first = {method: function() { return 1; }};
+const second = {arrow: () => { return 2; }};`,
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := []any{"always", map[string]any{"avoidExplicitReturnArrows": true}}
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     ObjectShorthandRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return ObjectShorthandRule.Run(ctx, options)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 2 {
+			t.Fatalf("demand %d: diagnostics = %d, want 2", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index := range allEdits {
+		want := withoutEdits(allEdits[index])
+		for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+			rule.EditDemandNone:       diagnosticsOnly,
+			rule.EditDemandAutofix:    autofixOnly,
+			rule.EditDemandSuggestion: suggestionOnly,
+		} {
+			if got := withoutEdits(diagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("demand %d diagnostic %d changed:\ngot  %#v\nwant %#v", demand, index, got, want)
+			}
+		}
+	}
+
+	wantFixes := []bool{true, true}
+	for index, wantFix := range wantFixes {
+		if got := autofixOnly[index].FixesPtr != nil; got != wantFix {
+			t.Errorf("autofix diagnostic %d fix presence = %t, want %t", index, got, wantFix)
+		}
+		if !reflect.DeepEqual(autofixOnly[index].FixesPtr, allEdits[index].FixesPtr) {
+			t.Errorf("autofix and all-edits diagnostic %d produced different fixes", index)
+		}
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{diagnosticsOnly, suggestionOnly} {
+		for index, diagnostic := range diagnostics {
+			if diagnostic.FixesPtr != nil {
+				t.Errorf("non-autofix diagnostic %d materialized fixes", index)
+			}
+		}
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{diagnosticsOnly, autofixOnly, suggestionOnly, allEdits} {
+		for index, diagnostic := range diagnostics {
+			if diagnostic.Suggestions != nil {
+				t.Errorf("autofix-only diagnostic %d materialized suggestions", index)
+			}
+		}
+	}
 }
