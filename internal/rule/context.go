@@ -144,6 +144,27 @@ func (ctx *RuleContext) emitRange(textRange core.TextRange, msg RuleMessage, fix
 	})
 }
 
+// These category-specific emitters take slices by value so their slice-header
+// pointers escape only when a non-empty artifact is actually attached.
+// Keeping the address-taking out of the deferred builders' empty-result path
+// avoids one allocation for every requested-but-unavailable artifact.
+func (ctx *RuleContext) emitRangeWithFixes(textRange core.TextRange, msg RuleMessage, fixes []RuleFix) {
+	ctx.emitRange(textRange, msg, &fixes, nil)
+}
+
+func (ctx *RuleContext) emitRangeWithSuggestions(textRange core.TextRange, msg RuleMessage, suggestions []RuleSuggestion) {
+	ctx.emitRange(textRange, msg, nil, &suggestions)
+}
+
+func (ctx *RuleContext) emitRangeWithFixesAndSuggestions(
+	textRange core.TextRange,
+	msg RuleMessage,
+	fixes []RuleFix,
+	suggestions []RuleSuggestion,
+) {
+	ctx.emitRange(textRange, msg, &fixes, &suggestions)
+}
+
 // reportRange assumes requireReporter has already run. Keeping validation in
 // the public methods makes node reports fail consistently before touching a
 // nil SourceFile while paying only one reporter check per diagnostic.
@@ -165,14 +186,14 @@ func (ctx *RuleContext) reportRangeWithDeferredFixes(textRange core.TextRange, m
 		return
 	}
 
-	var fixes *[]RuleFix
 	if ctx.reporter.consumer.Demand&EditDemandAutofix != 0 {
 		built := build()
 		if len(built) > 0 {
-			fixes = &built
+			ctx.emitRangeWithFixes(textRange, msg, built)
+			return
 		}
 	}
-	ctx.emitRange(textRange, msg, fixes, nil)
+	ctx.emitRange(textRange, msg, nil, nil)
 }
 
 func (ctx *RuleContext) reportRangeWithDeferredSuggestions(textRange core.TextRange, msg RuleMessage, build func() []RuleSuggestion) {
@@ -180,14 +201,14 @@ func (ctx *RuleContext) reportRangeWithDeferredSuggestions(textRange core.TextRa
 		return
 	}
 
-	var suggestions *[]RuleSuggestion
 	if ctx.reporter.consumer.Demand&EditDemandSuggestion != 0 {
 		built := build()
 		if len(built) > 0 {
-			suggestions = &built
+			ctx.emitRangeWithSuggestions(textRange, msg, built)
+			return
 		}
 	}
-	ctx.emitRange(textRange, msg, nil, suggestions)
+	ctx.emitRange(textRange, msg, nil, nil)
 }
 
 func (ctx *RuleContext) reportRangeWithDeferredFixesAndSuggestions(
@@ -200,22 +221,26 @@ func (ctx *RuleContext) reportRangeWithDeferredFixesAndSuggestions(
 		return
 	}
 
-	var fixes *[]RuleFix
+	var fixes []RuleFix
 	if ctx.reporter.consumer.Demand&EditDemandAutofix != 0 {
-		built := buildFixes()
-		if len(built) > 0 {
-			fixes = &built
-		}
+		fixes = buildFixes()
 	}
 
-	var suggestions *[]RuleSuggestion
+	var suggestions []RuleSuggestion
 	if ctx.reporter.consumer.Demand&EditDemandSuggestion != 0 {
-		built := buildSuggestions()
-		if len(built) > 0 {
-			suggestions = &built
-		}
+		suggestions = buildSuggestions()
 	}
-	ctx.emitRange(textRange, msg, fixes, suggestions)
+
+	switch {
+	case len(fixes) > 0 && len(suggestions) > 0:
+		ctx.emitRangeWithFixesAndSuggestions(textRange, msg, fixes, suggestions)
+	case len(fixes) > 0:
+		ctx.emitRangeWithFixes(textRange, msg, fixes)
+	case len(suggestions) > 0:
+		ctx.emitRangeWithSuggestions(textRange, msg, suggestions)
+	default:
+		ctx.emitRange(textRange, msg, nil, nil)
+	}
 }
 
 func (ctx *RuleContext) ReportRange(textRange core.TextRange, msg RuleMessage) {
