@@ -149,6 +149,103 @@ func findClosingParenRange(objNode *ast.Node, sf *ast.SourceFile) (int, int, boo
 	return parenEnd - 1, parenEnd, true
 }
 
+func insertFix(pos int, text string) rule.RuleFix {
+	return rule.RuleFixReplaceRange(core.NewTextRange(pos, pos), text)
+}
+
+func removeFix(start int, end int) rule.RuleFix {
+	return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
+}
+
+func positionsOnSameLine(sourceFile *ast.SourceFile, left int, right int) bool {
+	lineStarts := scanner.GetECMALineStarts(sourceFile)
+	return scanner.ComputeLineOfPosition(lineStarts, left) == scanner.ComputeLineOfPosition(lineStarts, right)
+}
+
+func buildBlockBodyFixes(
+	sourceFile *ast.SourceFile,
+	text string,
+	arrowNode *ast.Node,
+	body *ast.Node,
+	blockRange core.TextRange,
+	statementCount int,
+	firstStatement *ast.Node,
+	returnExpression *ast.Node,
+) []rule.RuleFix {
+	if statementCount != 1 ||
+		firstStatement == nil ||
+		firstStatement.Kind != ast.KindReturnStatement ||
+		returnExpression == nil ||
+		hasASIProblemAfter(text, body.End()) {
+		return nil
+	}
+
+	argument := ast.SkipParentheses(returnExpression)
+	braceOpenStart := blockRange.Pos()
+	braceCloseEnd := blockRange.End()
+	braceCloseStart := braceCloseEnd - 1
+	firstValueStart := scanner.SkipTrivia(text, returnExpression.Pos())
+	valueEnd := utils.TrimNodeTextRange(sourceFile, returnExpression).End()
+
+	semicolonStart, semicolonEnd := -1, -1
+	if pos := scanner.SkipTrivia(text, valueEnd); pos < braceCloseStart && pos < len(text) && text[pos] == ';' {
+		semicolonStart, semicolonEnd = pos, pos+1
+	}
+	lastValueEnd := valueEnd
+	if semicolonStart >= 0 {
+		lastValueEnd = semicolonEnd
+	}
+
+	// commentsExistBetween(openingBrace, firstValueToken) ||
+	// commentsExistBetween(lastValueToken, closingBrace). ForEachComment
+	// walks every token's trivia, so it catches a comment sitting after
+	// the `return` keyword too (which a position-anchored scan misses).
+	commentsExist := false
+	utils.ForEachComment(body, func(comment *ast.CommentRange) {
+		if commentsExist {
+			return
+		}
+		if (comment.Pos() >= braceOpenStart+1 && comment.End() <= firstValueStart) ||
+			(comment.Pos() >= lastValueEnd && comment.End() <= braceCloseStart) {
+			commentsExist = true
+		}
+	}, sourceFile)
+
+	var fixes []rule.RuleFix
+	if commentsExist {
+		returnKeywordStart := scanner.SkipTrivia(text, braceOpenStart+1)
+		fixes = append(fixes,
+			removeFix(braceOpenStart, braceOpenStart+1),
+			removeFix(braceCloseStart, braceCloseEnd),
+			removeFix(returnKeywordStart, returnKeywordStart+len("return")),
+		)
+	} else {
+		fixes = append(fixes,
+			removeFix(braceOpenStart, firstValueStart),
+			removeFix(lastValueEnd, braceCloseEnd),
+		)
+	}
+
+	isSequence := argument.Kind == ast.KindBinaryExpression &&
+		argument.AsBinaryExpression() != nil &&
+		argument.AsBinaryExpression().OperatorToken != nil &&
+		argument.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken
+	startsWithBrace := firstValueStart < len(text) && text[firstValueStart] == '{'
+	needsParentheses := startsWithBrace || isSequence ||
+		(isInsideForLoopInitializer(arrowNode) && subtreeHasInOperator(arrowNode))
+	if needsParentheses && returnExpression.Kind != ast.KindParenthesizedExpression {
+		fixes = append(fixes,
+			insertFix(firstValueStart, "("),
+			insertFix(lastValueEnd, ")"),
+		)
+	}
+
+	if semicolonStart >= 0 {
+		fixes = append(fixes, removeFix(semicolonStart, semicolonEnd))
+	}
+	return fixes
+}
+
 var ArrowBodyStyleRule = rule.Rule{
 	Name: "arrow-body-style",
 	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
@@ -159,17 +256,6 @@ var ArrowBodyStyleRule = rule.Rule{
 		never := o.style == styleNever
 		sf := ctx.SourceFile
 		text := sf.Text()
-
-		sameLine := func(a, b int) bool {
-			lineStarts := scanner.GetECMALineStarts(sf)
-			return scanner.ComputeLineOfPosition(lineStarts, a) == scanner.ComputeLineOfPosition(lineStarts, b)
-		}
-		insertAt := func(pos int, s string) rule.RuleFix {
-			return rule.RuleFixReplaceRange(core.NewTextRange(pos, pos), s)
-		}
-		removeR := func(start, end int) rule.RuleFix {
-			return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
-		}
 
 		validate := func(node *ast.Node) {
 			arrow := node.AsArrowFunction()
@@ -232,81 +318,9 @@ var ArrowBodyStyleRule = rule.Rule{
 					}
 				}
 
-				// Build the autofix. It stays empty when upstream would emit no
-				// fix (more than one statement, no/empty return argument, or an
-				// ASI hazard on the token after the block).
-				var fixes []rule.RuleFix
-				if len(stmts) == 1 && firstStmt.Kind == ast.KindReturnStatement && retExpr != nil && !hasASIProblemAfter(text, body.End()) {
-					argument := ast.SkipParentheses(retExpr)
-
-					braceOpenStart := blockRange.Pos()
-					braceCloseEnd := blockRange.End()
-					braceCloseStart := braceCloseEnd - 1
-					firstValueStart := scanner.SkipTrivia(text, retExpr.Pos())
-					valueEnd := utils.TrimNodeTextRange(sf, retExpr).End()
-
-					semiStart, semiEnd := -1, -1
-					if p := scanner.SkipTrivia(text, valueEnd); p < braceCloseStart && p < len(text) && text[p] == ';' {
-						semiStart, semiEnd = p, p+1
-					}
-					lastValueEnd := valueEnd
-					if semiStart >= 0 {
-						lastValueEnd = semiEnd
-					}
-
-					// commentsExistBetween(openingBrace, firstValueToken) ||
-					// commentsExistBetween(lastValueToken, closingBrace). ForEachComment
-					// walks every token's trivia, so it catches a comment sitting after
-					// the `return` keyword too (which a position-anchored scan misses).
-					commentsExist := false
-					utils.ForEachComment(body, func(c *ast.CommentRange) {
-						if commentsExist {
-							return
-						}
-						if (c.Pos() >= braceOpenStart+1 && c.End() <= firstValueStart) ||
-							(c.Pos() >= lastValueEnd && c.End() <= braceCloseStart) {
-							commentsExist = true
-						}
-					}, sf)
-
-					if commentsExist {
-						returnKwStart := scanner.SkipTrivia(text, braceOpenStart+1)
-						fixes = append(fixes,
-							removeR(braceOpenStart, braceOpenStart+1),
-							removeR(braceCloseStart, braceCloseEnd),
-							removeR(returnKwStart, returnKwStart+len("return")),
-						)
-					} else {
-						fixes = append(fixes,
-							removeR(braceOpenStart, firstValueStart),
-							removeR(lastValueEnd, braceCloseEnd),
-						)
-					}
-
-					isSeq := argument.Kind == ast.KindBinaryExpression &&
-						argument.AsBinaryExpression() != nil &&
-						argument.AsBinaryExpression().OperatorToken != nil &&
-						argument.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken
-					startsWithBrace := firstValueStart < len(text) && text[firstValueStart] == '{'
-					needsParens := startsWithBrace || isSeq ||
-						(isInsideForLoopInitializer(node) && subtreeHasInOperator(node))
-					if needsParens && retExpr.Kind != ast.KindParenthesizedExpression {
-						fixes = append(fixes,
-							insertAt(firstValueStart, "("),
-							insertAt(lastValueEnd, ")"),
-						)
-					}
-
-					if semiStart >= 0 {
-						fixes = append(fixes, removeR(semiStart, semiEnd))
-					}
-				}
-
-				if len(fixes) > 0 {
-					ctx.ReportRangeWithFixes(blockRange, msg, fixes...)
-				} else {
-					ctx.ReportRange(blockRange, msg)
-				}
+				ctx.ReportRangeWithDeferredFixes(blockRange, msg, func() []rule.RuleFix {
+					return buildBlockBodyFixes(sf, text, node, body, blockRange, len(stmts), firstStmt, retExpr)
+				})
 				return
 			}
 
@@ -323,47 +337,47 @@ var ArrowBodyStyleRule = rule.Rule{
 				ctx.ReportRange(reportRange, msgExpectedBlock())
 				return
 			}
-			firstTokenStart := scanner.SkipTrivia(text, arrowToken.End())
-			nodeEnd := utils.TrimNodeTextRange(sf, node).End()
-
-			var fixes []rule.RuleFix
-			handled := false
-			if firstTokenStart < len(text) && text[firstTokenStart] == '(' {
-				braceStart := scanner.SkipTrivia(text, firstTokenStart+1)
-				if braceStart < len(text) && text[braceStart] == '{' {
-					objNode := ast.GetNodeAtPosition(sf, braceStart, false)
-					// A `({a} = b)`-style destructuring target parses as an
-					// ObjectLiteralExpression in tsgo but is an ObjectPattern in
-					// ESTree, so exclude assignment targets to match ESLint (which
-					// keeps the forced parens via its else branch).
-					if objNode != nil && objNode.Kind == ast.KindObjectLiteralExpression && !ast.IsAssignmentTarget(objNode) {
-						if cpStart, cpEnd, ok := findClosingParenRange(objNode, sf); ok {
-							openParenStart := firstTokenStart
-							openParenEnd := firstTokenStart + 1
-							if sameLine(openParenStart, braceStart) {
-								fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(openParenStart, openParenEnd), "{return "))
-							} else {
-								// Different lines: keep the `return ` next to the
-								// object so ASI does not split the statement.
-								fixes = append(fixes,
-									rule.RuleFixReplaceRange(core.NewTextRange(openParenStart, openParenEnd), "{"),
-									insertAt(braceStart, "return "),
-								)
+			ctx.ReportRangeWithDeferredFixes(reportRange, msgExpectedBlock(), func() []rule.RuleFix {
+				firstTokenStart := scanner.SkipTrivia(text, arrowToken.End())
+				nodeEnd := utils.TrimNodeTextRange(sf, node).End()
+				var fixes []rule.RuleFix
+				handled := false
+				if firstTokenStart < len(text) && text[firstTokenStart] == '(' {
+					braceStart := scanner.SkipTrivia(text, firstTokenStart+1)
+					if braceStart < len(text) && text[braceStart] == '{' {
+						objectNode := ast.GetNodeAtPosition(sf, braceStart, false)
+						// A `({a} = b)`-style destructuring target parses as an
+						// ObjectLiteralExpression in tsgo but is an ObjectPattern in
+						// ESTree, so exclude assignment targets to match ESLint (which
+						// keeps the forced parens via its else branch).
+						if objectNode != nil && objectNode.Kind == ast.KindObjectLiteralExpression && !ast.IsAssignmentTarget(objectNode) {
+							if closeParenStart, closeParenEnd, ok := findClosingParenRange(objectNode, sf); ok {
+								openParenStart := firstTokenStart
+								openParenEnd := firstTokenStart + 1
+								if positionsOnSameLine(sf, openParenStart, braceStart) {
+									fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(openParenStart, openParenEnd), "{return "))
+								} else {
+									// Different lines: keep the `return ` next to the
+									// object so ASI does not split the statement.
+									fixes = append(fixes,
+										rule.RuleFixReplaceRange(core.NewTextRange(openParenStart, openParenEnd), "{"),
+										insertFix(braceStart, "return "),
+									)
+								}
+								fixes = append(fixes, removeFix(closeParenStart, closeParenEnd), insertFix(nodeEnd, "}"))
+								handled = true
 							}
-							fixes = append(fixes, removeR(cpStart, cpEnd), insertAt(nodeEnd, "}"))
-							handled = true
 						}
 					}
 				}
-			}
-			if !handled {
-				fixes = append(fixes,
-					insertAt(firstTokenStart, "{return "),
-					insertAt(nodeEnd, "}"),
-				)
-			}
-
-			ctx.ReportRangeWithFixes(reportRange, msgExpectedBlock(), fixes...)
+				if !handled {
+					fixes = append(fixes,
+						insertFix(firstTokenStart, "{return "),
+						insertFix(nodeEnd, "}"),
+					)
+				}
+				return fixes
+			})
 		}
 
 		return rule.RuleListeners{
