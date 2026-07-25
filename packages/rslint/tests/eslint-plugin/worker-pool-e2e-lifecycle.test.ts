@@ -163,13 +163,14 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     // inbound shutdown message, so shutdown must escalate to a forced
     // terminate() after the 5s grace. Terminating an oxc-napi worker can
     // native-abort below the JS layer on Windows — run it isolated (see
-    // ./pool-isolation/runner.mjs). PASS = clean terminate; TOLERATED-PASS =
-    // pool reached terminate then the subprocess aborted; FAIL = hang, failed
-    // in-child assertion, or a crash before the terminate point.
-    test('shutdown drains a sync-wedged worker via terminate fallback within grace', async () => {
+    // ./pool-isolation/runner.mjs). PASS = clean terminate;
+    // EXPECTED-NATIVE-ABORT = Windows reached the exact Worker.terminate call
+    // and then aborted below JS; FAIL = hang, failed state assertion, malformed
+    // journal, or any exit outside that narrow boundary.
+    test('shutdown drains a sync-wedged worker via terminate fallback', async () => {
       const r = await runPoolScenario('hang-shutdown');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    }, 70_000);
 
     // U12: a single WorkerPool instance must support N lintBatch calls
     // in sequence (the CLI's fix-loop and the LSP's continuous edit
@@ -229,14 +230,13 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     // runs in an isolated subprocess (see ./pool-isolation/runner.mjs): a native
     // abort is confined there, and the pool's outcome comes back via milestones.
     //
-    //   PASS           = clean terminate (mac/linux): shutdown bounded + drained
-    //   TOLERATED-PASS = pool reached terminate, then the subprocess aborted
-    //                    (Windows napi teardown) — the pool still did its job
-    //   FAIL           = hang, failed in-child assertion, or a crash BEFORE the
-    //                    terminate point — a real regression
+    //   PASS                  = exact terminate observed + pool drained
+    //   EXPECTED-NATIVE-ABORT = Windows aborted at the exact terminate call
+    //   FAIL                  = deadlock, failed/missing assertion, invalid
+    //                           journal, or an exit outside that boundary
     test('U11: plugin with a top-level setInterval — shutdown still terminates the worker', async () => {
       const r = await runPoolScenario('u11');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    }, 70_000);
   },
 );

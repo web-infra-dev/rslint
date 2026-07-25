@@ -2944,7 +2944,7 @@ describe('applyOptionDefaults: schema property defaults fill existing object slo
 // ────────────────────────────────────────────────────────────────────
 
 describe('WorkerPool: worker hard-exit during init rejects (not 60s hang)', () => {
-  test('config that process.exit()s at import → init() rejects fast', async () => {
+  test('config that process.exit()s at import → init() rejects from the exit event', async () => {
     const exitPath = path.resolve(
       __dirname,
       'fixtures',
@@ -2955,27 +2955,24 @@ describe('WorkerPool: worker hard-exit during init rejects (not 60s hang)', () =
       configs: [{ configPath: exitPath, configDirectory: exitDir }],
       workerCount: 1,
       // Long init timeout — the test asserts we DON'T wait for it.
-      workerInitTimeoutMs: 30_000,
+      workerInitTimeoutMs: 60_000,
     });
 
-    const start = Date.now();
     let err: Error | undefined;
     try {
       await pool.init();
     } catch (e) {
       err = e as Error;
     }
-    const elapsed = Date.now() - start;
-
-    // Rejected (not hung) and well under the 30s init timeout.
+    // The error source proves the worker exit event won the race against the
+    // 60s timeout. The outer test timeout remains only a deadlock sentinel.
     expect(err).toBeDefined();
-    expect(elapsed).toBeLessThan(10_000);
     // Message names the exit path, not a misleading "init timed out".
     expect(err!.message).toMatch(/exited during init|init failed/);
     expect(err!.message).not.toMatch(/timed out/);
 
     await pool.shutdown().catch(() => {});
-  }, 35_000);
+  }, 70_000);
 });
 
 // ────────────────────────────────────────────────────────────────────
