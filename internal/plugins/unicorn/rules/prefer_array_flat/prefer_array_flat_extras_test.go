@@ -1,8 +1,14 @@
 package prefer_array_flat_test
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -501,4 +507,83 @@ Array.prototype.concat.call([], item)`,
 	// candidate call by themselves and are ignored by the CallExpression listener.
 
 	suite.run(t)
+}
+
+func TestPreferArrayFlatEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		`array.flatMap(value => value);`,
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     prefer_array_flat.PreferArrayFlatRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return prefer_array_flat.PreferArrayFlatRule.Run(ctx, nil)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.FixesPtr != nil || suggestionOnly.FixesPtr != nil {
+		t.Fatal("non-autofix demand materialized fixes")
+	}
+	if autofixOnly.FixesPtr == nil || !reflect.DeepEqual(autofixOnly.FixesPtr, allEdits.FixesPtr) {
+		t.Fatal("autofix and all-edits demands produced different fixes")
+	}
+	if fixes := *allEdits.FixesPtr; len(fixes) == 0 {
+		t.Fatal("all-edits demand produced no fixes")
+	}
+	for _, diagnostic := range []rule.RuleDiagnostic{diagnosticsOnly, autofixOnly, suggestionOnly, allEdits} {
+		if diagnostic.Suggestions != nil {
+			t.Fatal("autofix-only rule materialized suggestions")
+		}
+	}
 }
