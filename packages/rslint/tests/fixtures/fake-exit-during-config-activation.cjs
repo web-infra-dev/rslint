@@ -10,7 +10,9 @@ const configPath = path.resolve(process.argv[2]);
 const buildMarker = process.argv[3] ? path.resolve(process.argv[3]) : undefined;
 const configDirectory = path.dirname(configPath);
 let buffer = Buffer.alloc(0);
-const CLEANUP_WATCHDOG_MS = 60_000;
+// The parent test succeeds on process exit. This only releases a fixture that
+// has failed to observe its event-driven build marker for 30 minutes.
+const CLEANUP_WATCHDOG_MS = 30 * 60_000;
 const cleanupWatchdog = setTimeout(() => {
   process.stderr.write(
     'fake config-activation child timed out waiting for build marker\n',

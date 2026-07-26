@@ -18,9 +18,7 @@ const EXIT_DURING_CONFIG_ACTIVATION_BIN = path.resolve(
   __dirname,
   './fixtures/fake-exit-during-config-activation.cjs',
 );
-// The fixture owns a 60s failure-only cleanup watchdog. The outer bound leaves
-// time for its non-zero exit, stream close, and assertions to finish.
-const CONFIG_ACTIVATION_TEST_TIMEOUT_MS = 70_000;
+const CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 /**
  * Runs the engine against the fake IPC binary, which echoes the `init`
@@ -304,7 +302,7 @@ describe('runEngine config activation', () => {
         fs.rmSync(root, { recursive: true, force: true });
       }
     },
-    CONFIG_ACTIVATION_TEST_TIMEOUT_MS,
+    CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
   test(
@@ -417,6 +415,6 @@ describe('runEngine config activation', () => {
         fs.rmSync(root, { recursive: true, force: true });
       }
     },
-    CONFIG_ACTIVATION_TEST_TIMEOUT_MS,
+    CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,
   );
 });

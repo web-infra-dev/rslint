@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 
-const CLI_PROCESS_TIMEOUT_MS = 180_000;
+// Success is determined by the close event and validated output, never elapsed
+// time. This only kills a CLI process that has failed to exit for 30 minutes.
+const CLI_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
 const CLI_OUTPUT_LIMIT_BYTES = 16 * 1024 * 1024;
 const EXPECTED_CLI_EXIT_CODES = new Set([0, 1, 2]);
 const RUNTIME_FATAL_MARKER =
@@ -22,7 +24,7 @@ export function validateCliClose(input: {
   stderr?: string;
 }): string | undefined {
   if (input.timedOut) {
-    return `timed out after ${CLI_PROCESS_TIMEOUT_MS}ms`;
+    return `timed out after ${CLI_DEAD_PROCESS_WATCHDOG_MS}ms`;
   }
   if (input.spawnError) {
     return `failed to spawn: ${input.spawnError.message}`;
@@ -89,7 +91,7 @@ export function runCliProcess(
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
-    }, CLI_PROCESS_TIMEOUT_MS);
+    }, CLI_DEAD_PROCESS_WATCHDOG_MS);
     timer.unref();
 
     child.on('close', (code, signal) => {

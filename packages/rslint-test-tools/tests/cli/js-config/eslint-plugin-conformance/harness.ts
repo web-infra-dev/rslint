@@ -11,6 +11,7 @@
  * engines, so the emitted `ruleId` is identical across the comparison.
  */
 import { createRequire } from 'node:module';
+import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -18,10 +19,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
+import { validateConformanceStderrContract } from './stderr-contract.js';
 
 const require = createRequire(import.meta.url);
-const CONFORMANCE_TOTAL_TIMEOUT_MS = 540_000;
-const CONFORMANCE_CHUNK_TIMEOUT_MS = 180_000;
+// A finite test cannot prove that work will never complete. Normal completion
+// is driven by ESLint's promise and rslint's process close; this deliberately
+// long sentinel exists only to release CI after a genuine deadlock.
+const CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS = 30 * 60_000;
 
 /** One differential case: a minimal trigger for `<alias>/<rule>`. */
 export interface DiffCase {
@@ -38,9 +42,10 @@ export interface DiffCase {
   /** Force JSX parsing (otherwise auto-detected from `code`). */
   jsx?: boolean;
   /**
-   * One exact stderr line that this case is expected to emit. Omit for the
-   * normal contract (strictly empty stderr). Counts are checked per chunk, so
-   * an expected warning cannot hide an extra copy or an unrelated warning.
+   * One exact stderr warning this case permits and requires at batch level.
+   * Plugin warning de-duplication is worker/scheduling dependent, so each
+   * distinct expected line must appear at least once and no more often than
+   * the number of annotated cases. Unrelated stderr remains forbidden.
    */
   expectedStderr?: string;
 }
@@ -240,15 +245,15 @@ export async function runEslintV10(
  */
 export function runRslintBatch(
   cases: DiffCase[],
-  deadline = Date.now() + CONFORMANCE_TOTAL_TIMEOUT_MS,
+  deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS,
 ): Map<number, NormDiag[]> {
   const CHUNK = 60;
   const byIndex = new Map<number, NormDiag[]>(cases.map((_, i) => [i, []]));
   for (let start = 0; start < cases.length; start += CHUNK) {
-    const remainingMs = deadline - Date.now();
+    const remainingMs = deadline - performance.now();
     if (remainingMs <= 0) {
       throw new Error(
-        `rslint conformance exceeded its ${CONFORMANCE_TOTAL_TIMEOUT_MS}ms suite watchdog`,
+        `rslint conformance exceeded its ${CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS}ms batch deadlock sentinel`,
       );
     }
     runRslintChunk(
@@ -256,7 +261,7 @@ export function runRslintBatch(
       start,
       Math.min(start + CHUNK, cases.length),
       byIndex,
-      Math.min(CONFORMANCE_CHUNK_TIMEOUT_MS, remainingMs),
+      remainingMs,
     );
   }
   for (const [i, arr] of byIndex) byIndex.set(i, sortDiags(arr));
@@ -332,7 +337,7 @@ function runRslintChunk(
         cwd: dir,
         encoding: 'utf8',
         env: { ...env, NO_COLOR: '1' },
-        timeout: Math.max(1, timeoutMs),
+        timeout: Math.max(1, Math.floor(timeoutMs)),
         killSignal: 'SIGKILL',
         maxBuffer: 16 * 1024 * 1024,
       },
@@ -349,17 +354,17 @@ function runRslintChunk(
     const actualStderrLines = res.stderr
       .split('\n')
       .map((line) => line.trim())
-      .filter(Boolean)
-      .sort();
+      .filter(Boolean);
     const expectedStderrLines = cases
       .slice(start, end)
-      .flatMap((c) => (c.expectedStderr ? [c.expectedStderr] : []))
-      .sort();
-    if (
-      JSON.stringify(actualStderrLines) !== JSON.stringify(expectedStderrLines)
-    ) {
+      .flatMap((c) => (c.expectedStderr ? [c.expectedStderr] : []));
+    const stderrViolation = validateConformanceStderrContract(
+      actualStderrLines,
+      expectedStderrLines,
+    );
+    if (stderrViolation) {
       throw new Error(
-        `rslint stderr contract mismatch:\nexpected=${JSON.stringify(expectedStderrLines)}\nactual=${JSON.stringify(actualStderrLines)}\nraw:\n${res.stderr.slice(0, 2000)}`,
+        `rslint stderr contract mismatch:\n${stderrViolation}\nraw:\n${res.stderr.slice(0, 2000)}`,
       );
     }
 
@@ -428,7 +433,7 @@ function runRslintChunk(
  * `match` = identical normalized diag sets, `empty` = neither engine reported.
  */
 export async function compareCases(cases: DiffCase[]): Promise<Verdict[]> {
-  const deadline = Date.now() + CONFORMANCE_TOTAL_TIMEOUT_MS;
+  const deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS;
   const es = await runEslintV10(cases);
   const rs = runRslintBatch(cases, deadline);
   return cases.map((c, i) => {

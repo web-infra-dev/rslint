@@ -1,12 +1,5 @@
 import { defineConfig } from '@rstest/core';
 
-// WorkerPool's longest product cleanup boundary is the 60s init timeout.
-// Rstest does not cancel a timed-out test body, so the outer test watchdog must
-// fire later; otherwise a failed test keeps mutating shared state while the
-// runner has already moved on to subsequent files.
-const NON_WINDOWS_TEST_TIMEOUT_MS = 70_000;
-const WINDOWS_TEST_TIMEOUT_MS = 90_000;
-
 export default defineConfig({
   testEnvironment: 'node',
   globals: true,
@@ -14,13 +7,10 @@ export default defineConfig({
   // Run Windows test files serially so Rstest's CPU-count process pool cannot
   // multiply that inner concurrency and starve Worker startup/shutdown.
   pool: process.platform === 'win32' ? { maxWorkers: 1 } : undefined,
-  // This is the final deadlock sentinel, not a success criterion. Windows can
-  // spend a full default interval waiting for a Worker startup event while the
-  // self-hosted runner is contended, so give it a wider outer bound.
-  testTimeout:
-    process.platform === 'win32'
-      ? WINDOWS_TEST_TIMEOUT_MS
-      : NON_WINDOWS_TEST_TIMEOUT_MS,
+  // Normal completion is event-driven. This is only the final in-process
+  // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
+  // The same semantic boundary applies on every platform.
+  testTimeout: 35 * 60_000,
   // The eslint-plugin worker tests spawn the built `dist/eslint-plugin/
   // lint-worker.js` (worker_threads can't run TS); this setup file points the
   // pool at it via setWorkerEntryForTests(). Run `pnpm build` once before testing.

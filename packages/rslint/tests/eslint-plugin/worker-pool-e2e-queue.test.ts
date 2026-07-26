@@ -9,7 +9,7 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
-  POOL_SCENARIO_OUTER_TIMEOUT_MS,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
 } from './pool-isolation/harness.js';
 
 class QueueFakeWorker extends EventEmitter {
@@ -119,7 +119,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const r = await runPoolScenario('all-degraded');
         expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
       },
-      POOL_SCENARIO_OUTER_TIMEOUT_MS,
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
     // Queue-model regression suite — five tests pinning the design
@@ -336,7 +336,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const r = await runPoolScenario('lint-batch-after-degraded');
         expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
       },
-      POOL_SCENARIO_OUTER_TIMEOUT_MS,
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
     );
   },
 );

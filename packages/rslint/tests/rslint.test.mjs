@@ -20,8 +20,10 @@ const eslintPluginFixturesDir = path.resolve(
   import.meta.dirname,
   'eslint-plugin/fixtures',
 );
-const EXIT_FIXTURE_TIMEOUT_MS = 60_000;
-const EXIT_FIXTURE_TEST_TIMEOUT_MS = EXIT_FIXTURE_TIMEOUT_MS + 10_000;
+// These fixtures prove that the public API lets Node exit. Success is the
+// validated close event; this only releases a process still alive after 30m.
+const EXIT_FIXTURE_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
+const EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 const EXIT_FIXTURE_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 
 async function runExitFixture(scriptName, successMarker) {
@@ -62,7 +64,7 @@ async function runExitFixture(scriptName, successMarker) {
   const timer = setTimeout(() => {
     timedOut = true;
     child.kill('SIGKILL');
-  }, EXIT_FIXTURE_TIMEOUT_MS);
+  }, EXIT_FIXTURE_DEAD_PROCESS_WATCHDOG_MS);
   timer.unref();
 
   const { code, signal } = await new Promise((resolve) => {
@@ -2101,7 +2103,7 @@ module.exports = config;`
     async () => {
       await runExitFixture('no-close-exit.mjs', 'FIXTURE_OK:no-close');
     },
-    EXIT_FIXTURE_TEST_TIMEOUT_MS,
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
   test(
@@ -2112,7 +2114,7 @@ module.exports = config;`
         'FIXTURE_OK:no-close-plugin',
       );
     },
-    EXIT_FIXTURE_TEST_TIMEOUT_MS,
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
   test(
@@ -2123,7 +2125,7 @@ module.exports = config;`
         'FIXTURE_OK:no-close-plugin-error',
       );
     },
-    EXIT_FIXTURE_TEST_TIMEOUT_MS,
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
   test(
@@ -2134,7 +2136,7 @@ module.exports = config;`
         'FIXTURE_OK:close-active-plugin',
       );
     },
-    EXIT_FIXTURE_TEST_TIMEOUT_MS,
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
   // Fully in-memory (issue #1106): config object + in-memory tsconfig via

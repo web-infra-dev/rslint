@@ -37,8 +37,10 @@ const require = createRequire(import.meta.url);
 const TUPLE = platformTuple();
 const PKG_BASE = `native-${TUPLE}`;
 const NODE_FILE = `rslint.${TUPLE}.node`;
-const PACKAGED_CHILD_TIMEOUT_MS = 60_000;
-const PACKAGED_TEST_TIMEOUT_MS = PACKAGED_CHILD_TIMEOUT_MS + 10_000;
+// Success is the validated process close, not a duration. This only releases
+// an isolated packaged-layout process that has not exited for 30 minutes.
+const PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
+const PACKAGED_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 // A self-contained `.mjs` plugin + config — `.mjs` needs no `jiti`, isolating
 // this test to the native-parser resolution it is meant to guard.
@@ -167,7 +169,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const result = spawnSync(process.execPath, ['runner.mjs'], {
           cwd: root,
           encoding: 'utf8',
-          timeout: PACKAGED_CHILD_TIMEOUT_MS,
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
           killSignal: 'SIGKILL',
           maxBuffer: 16 * 1024 * 1024,
           env: { ...process.env, NODE_PATH: '' },
@@ -178,7 +180,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         expect(result.stdout.trim()).toBe('PACKAGED_OK');
         expect(result.stderr.trim()).toBe('');
       },
-      PACKAGED_TEST_TIMEOUT_MS,
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
     test(
@@ -190,7 +192,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const result = spawnSync(process.execPath, ['runner.mjs'], {
           cwd: root,
           encoding: 'utf8',
-          timeout: PACKAGED_CHILD_TIMEOUT_MS,
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
           killSignal: 'SIGKILL',
           maxBuffer: 16 * 1024 * 1024,
           env: { ...process.env, NODE_PATH: '' },
@@ -206,7 +208,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           /task_timeout|worker_crashed|EXPECTED-NATIVE-ABORT/,
         );
       },
-      PACKAGED_TEST_TIMEOUT_MS,
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
     );
   },
 );

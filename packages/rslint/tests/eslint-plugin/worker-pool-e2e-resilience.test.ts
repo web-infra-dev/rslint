@@ -12,7 +12,7 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
-  POOL_SCENARIO_OUTER_TIMEOUT_MS,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
 } from './pool-isolation/harness.js';
 
 /**
@@ -130,7 +130,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const r = await runPoolScenario('worker-exit-race');
         expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
       },
-      POOL_SCENARIO_OUTER_TIMEOUT_MS,
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
     );
 
     // A hung listener trips the per-task timeout, which terminates the worker
@@ -143,7 +143,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const r = await runPoolScenario('task-timeout');
         expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
       },
-      POOL_SCENARIO_OUTER_TIMEOUT_MS,
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
     );
   },
 );

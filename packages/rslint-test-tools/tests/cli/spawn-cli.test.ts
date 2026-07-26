@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@rstest/core';
 
+import { validateConformanceStderrContract } from './js-config/eslint-plugin-conformance/stderr-contract.js';
 import { validateCliClose } from './spawn-cli.js';
 
 /** Windows NTSTATUS 0xC0000005, in unsigned and signed representations. */
@@ -81,5 +82,56 @@ describe('CLI child close validation', () => {
         stderr: 'fatal error handling config: expected fixture diagnostic',
       }),
     ).toBeUndefined();
+  });
+});
+
+describe('CLI conformance stderr validation', () => {
+  test('accepts an empty contract and an exact match', () => {
+    expect(validateConformanceStderrContract([], [])).toBeUndefined();
+    expect(
+      validateConformanceStderrContract(['warning-a'], ['warning-a']),
+    ).toBeUndefined();
+    expect(
+      validateConformanceStderrContract(
+        ['warning-b', 'warning-a'],
+        ['warning-a', 'warning-b'],
+      ),
+    ).toBeUndefined();
+  });
+
+  test('accepts scheduling-dependent warning de-duplication', () => {
+    expect(
+      validateConformanceStderrContract(
+        ['warning-a', 'warning-a'],
+        ['warning-a', 'warning-a', 'warning-a'],
+      ),
+    ).toBeUndefined();
+  });
+
+  test('requires every distinct expected warning', () => {
+    expect(
+      validateConformanceStderrContract(
+        ['warning-a'],
+        ['warning-a', 'warning-b'],
+      ),
+    ).toContain('missing required stderr line "warning-b"');
+  });
+
+  test('rejects every unrelated stderr line', () => {
+    expect(
+      validateConformanceStderrContract(
+        ['warning-a', 'unexpected'],
+        ['warning-a', 'warning-a'],
+      ),
+    ).toContain('unexpected stderr line "unexpected" (1 occurrence)');
+  });
+
+  test('rejects warning amplification beyond annotated cases', () => {
+    expect(
+      validateConformanceStderrContract(
+        ['warning-a', 'warning-a', 'warning-a'],
+        ['warning-a', 'warning-a'],
+      ),
+    ).toContain('stderr line "warning-a" occurred 3 times; expected at most 2');
   });
 });

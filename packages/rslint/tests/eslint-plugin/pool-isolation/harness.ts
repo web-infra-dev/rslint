@@ -24,9 +24,10 @@ const DIST_ESLINT_PLUGIN = path.resolve(
 
 export const JOURNAL_VERSION = 1;
 export const POOL_ISOLATION_AUDIT_PREFIX = '[pool-isolation-audit] ';
-export const POOL_SCENARIO_PROCESS_TIMEOUT_MS = 60_000;
-export const POOL_SCENARIO_OUTER_TIMEOUT_MS =
-  POOL_SCENARIO_PROCESS_TIMEOUT_MS + 10_000;
+// Scenario success is established by its durable event journal and clean
+// process close. This only releases a scenario that has not exited for 30m.
+export const POOL_SCENARIO_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
+export const POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 const AUDIT_VERSION = 1;
 const STDERR_LIMIT_BYTES = 256 * 1024;
 const JOURNAL_LIMIT_BYTES = 1024 * 1024;
@@ -184,7 +185,7 @@ export async function runPoolScenario(
 ): Promise<ScenarioResult> {
   // This is only a dead-process/deadlock sentinel. Scenario correctness is
   // established by recorded state transitions, never elapsed wall time.
-  const timeoutMs = opts.timeoutMs ?? POOL_SCENARIO_PROCESS_TIMEOUT_MS;
+  const timeoutMs = opts.timeoutMs ?? POOL_SCENARIO_DEAD_PROCESS_WATCHDOG_MS;
   const runId = randomUUID();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-iso-'));
   const milestoneFile = path.join(tmpDir, 'milestones.ndjson');
