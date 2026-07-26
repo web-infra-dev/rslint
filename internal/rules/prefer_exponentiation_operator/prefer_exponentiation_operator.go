@@ -381,7 +381,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	return text[pos:end], true
 }
 
-func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
+func buildFixes(sf *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 	call := node.AsCallExpression()
 	if call == nil || call.Arguments == nil {
 		return nil
@@ -441,26 +441,29 @@ func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
 		prefix = ";"
 	}
 
-	fix := rule.RuleFixReplaceRange(core.NewTextRange(nodeRange.Pos(), nodeRange.End()), prefix+replacement+suffix)
-	return &fix
+	return []rule.RuleFix{
+		rule.RuleFixReplaceRange(
+			core.NewTextRange(nodeRange.Pos(), nodeRange.End()),
+			prefix+replacement+suffix,
+		),
+	}
 }
 
 // https://eslint.org/docs/latest/rules/prefer-exponentiation-operator
 var PreferExponentiationOperatorRule = rule.Rule{
 	Name: "prefer-exponentiation-operator",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		sourceFile := ctx.SourceFile
+		message := buildUseExponentiationMessage()
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !isMathPowCall(node, ctx.Globals) {
 					return
 				}
 
-				if fix := buildFix(ctx.SourceFile, node); fix != nil {
-					ctx.ReportNodeWithFixes(node, buildUseExponentiationMessage(), *fix)
-					return
-				}
-
-				ctx.ReportNode(node, buildUseExponentiationMessage())
+				ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+					return buildFixes(sourceFile, node)
+				})
 			},
 		}
 	},
