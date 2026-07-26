@@ -3,8 +3,8 @@ package no_unused_vars
 import (
 	"fmt"
 	"regexp"
-
 	"strings"
+	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -37,12 +37,16 @@ type Config struct {
 }
 
 type analysisContext struct {
-	allUsages          map[*ast.Symbol][]*ast.Node
-	writeRefs          map[*ast.Symbol][]*ast.Node
-	unresolvedRefs     map[string][]*ast.Node
 	localExportTargets map[*ast.Symbol]bool
 	seenMergedSymbols  map[*ast.Symbol]bool
 	reportedUnused     map[*ast.Node]bool
+	explicitExports    map[*ast.Node]explicitExportResult
+	parameterBounds    map[*ast.Node]parameterBoundary
+	fallbackInfos      map[*ast.Symbol]referenceInfo
+	fallbackCandidates map[string][]*ast.Node
+	jsxScanned         bool
+	firstJsx           *ast.Node
+	firstFragment      *ast.Node
 }
 
 type VariableInfo struct {
@@ -51,6 +55,39 @@ type VariableInfo struct {
 	OnlyUsedAsType bool
 	References     []*ast.Node
 	Definition     *ast.Node
+}
+
+type explicitExportResult struct {
+	hasExplicitExports bool
+}
+
+type parameterBoundary struct {
+	lastUsed *ast.Node
+}
+
+type referenceInfo struct {
+	usages    []*ast.Node
+	writeRefs []*ast.Node
+}
+
+type checkerReferenceCollector struct {
+	allUsages      map[*ast.Symbol][]*ast.Node
+	writeRefs      map[*ast.Symbol][]*ast.Node
+	unresolvedRefs map[string][]*ast.Node
+}
+
+// Config is rebuilt for every linted file. Reuse compiled patterns across
+// files, but cap the cache for long-lived LSP processes and evict in FIFO
+// order so a burst of one-off configurations cannot disable future caching.
+const maxCachedPatterns = 64
+
+var patternCache = struct {
+	sync.RWMutex
+	entries map[string]*regexp.Regexp
+	order   []string
+}{
+	entries: make(map[string]*regexp.Regexp),
+	order:   make([]string, 0, maxCachedPatterns),
 }
 
 func parseOptions(options interface{}) Config {
@@ -109,19 +146,39 @@ func parseOptionsFromMap(optsMap map[string]interface{}, config *Config) {
 }
 
 func compilePatterns(config Config) Config {
-	if config.VarsIgnorePattern != "" {
-		config.varsIgnoreRe, _ = regexp.Compile(config.VarsIgnorePattern)
-	}
-	if config.ArgsIgnorePattern != "" {
-		config.argsIgnoreRe, _ = regexp.Compile(config.ArgsIgnorePattern)
-	}
-	if config.CaughtErrorsIgnorePattern != "" {
-		config.caughtErrorsIgnoreRe, _ = regexp.Compile(config.CaughtErrorsIgnorePattern)
-	}
-	if config.DestructuredArrayIgnorePattern != "" {
-		config.destructuredArrayIgnoreRe, _ = regexp.Compile(config.DestructuredArrayIgnorePattern)
-	}
+	config.varsIgnoreRe = cachedPattern(config.VarsIgnorePattern)
+	config.argsIgnoreRe = cachedPattern(config.ArgsIgnorePattern)
+	config.caughtErrorsIgnoreRe = cachedPattern(config.CaughtErrorsIgnorePattern)
+	config.destructuredArrayIgnoreRe = cachedPattern(config.DestructuredArrayIgnorePattern)
 	return config
+}
+
+func cachedPattern(pattern string) *regexp.Regexp {
+	if pattern == "" {
+		return nil
+	}
+	patternCache.RLock()
+	cached, ok := patternCache.entries[pattern]
+	patternCache.RUnlock()
+	if ok {
+		return cached
+	}
+	re, _ := regexp.Compile(pattern)
+	patternCache.Lock()
+	if cached, ok := patternCache.entries[pattern]; ok {
+		patternCache.Unlock()
+		return cached
+	}
+	if len(patternCache.order) == maxCachedPatterns {
+		delete(patternCache.entries, patternCache.order[0])
+		copy(patternCache.order, patternCache.order[1:])
+		patternCache.order[len(patternCache.order)-1] = pattern
+	} else {
+		patternCache.order = append(patternCache.order, pattern)
+	}
+	patternCache.entries[pattern] = re
+	patternCache.Unlock()
+	return re
 }
 
 // isTypeOnlyReference mirrors typescript-eslint's narrow type-only reference
@@ -209,7 +266,7 @@ func isCompoundAssignmentTarget(node *ast.Node) bool {
 // hasAssignment checks if a variable declaration has an initializer or any
 // write references. Used to distinguish "assigned a value but never used"
 // from "defined but never used" in error messages.
-func hasAssignment(definition *ast.Node, sym *ast.Symbol, writeRefs map[*ast.Symbol][]*ast.Node) bool {
+func hasAssignment(definition *ast.Node, writeRefs []*ast.Node) bool {
 	if definition != nil {
 		switch definition.Kind {
 		case ast.KindVariableDeclaration:
@@ -229,12 +286,7 @@ func hasAssignment(definition *ast.Node, sym *ast.Symbol, writeRefs map[*ast.Sym
 			}
 		}
 	}
-	if sym != nil {
-		if refs, exists := writeRefs[sym]; exists && len(refs) > 0 {
-			return true
-		}
-	}
-	return false
+	return len(writeRefs) > 0
 }
 
 // isInsideLoop checks whether node is lexically inside a loop construct (for,
@@ -421,14 +473,6 @@ func isUnusedExpression(node *ast.Node) bool {
 	return false
 }
 
-// isInsideOwnDeclaration checks if a usage reference is inside the body of its
-// own declaration. This covers:
-//   - namespace self-reference: `namespace Foo { Foo.Bar }` — Foo used only inside itself
-//   - recursive function: `function foo() { return foo(); }` — foo calls only itself
-func isInsideOwnDeclaration(usage *ast.Node, definition *ast.Node) bool {
-	return isInsideAnyOwnDeclaration(usage, []*ast.Node{definition})
-}
-
 // isInsideAnyOwnDeclaration checks if a usage reference is inside the body of
 // any of the given declarations. Used for declaration merging (e.g., multiple
 // interface declarations for the same symbol).
@@ -566,29 +610,17 @@ func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *ch
 
 // isParamUsed checks if a parameter name (Identifier or binding pattern) has any usage.
 // Recursively checks destructured binding elements.
-func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
+func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, ac *analysisContext) bool {
 	if nameNode == nil {
 		return false
 	}
 	if ast.IsIdentifier(nameNode) {
+		definition := nameNode.Parent
 		sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
-		if sym == nil {
-			return false
-		}
-		resolved := ctx.TypeChecker.SkipAlias(sym)
-		if usageNodes, exists := allUsages[resolved]; exists {
-			for _, usage := range usageNodes {
-				if usage.Pos() != nameNode.Pos() {
-					return true
-				}
-			}
-		}
-		// Also check original sym for import specifiers
-		if usageNodes, exists := allUsages[sym]; exists {
-			for _, usage := range usageNodes {
-				if usage.Pos() != nameNode.Pos() {
-					return true
-				}
+		info := getReferenceInfo(ctx, nameNode, nameNode.AsIdentifier().Text, definition, sym, ac)
+		for _, usage := range info.usages {
+			if usage.Pos() != nameNode.Pos() {
+				return true
 			}
 		}
 		return false
@@ -599,7 +631,7 @@ func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, allUsages map[*ast.Sy
 		nameNode.ForEachChild(func(child *ast.Node) bool {
 			if child.Kind == ast.KindBindingElement {
 				elem := child.AsBindingElement()
-				if elem != nil && isParamUsed(ctx, elem.Name(), allUsages) {
+				if elem != nil && isParamUsed(ctx, elem.Name(), ac) {
 					found = true
 					return true
 				}
@@ -656,12 +688,8 @@ func isForInOfDeclaration(node *ast.Node) *ast.Node {
 
 // hasArrayDestructuringWrite checks if the variable has any write reference
 // via array destructuring assignment (e.g., `[_x] = arr`).
-func hasArrayDestructuringWrite(writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) bool {
-	refs, exists := writeRefs[sym]
-	if !exists {
-		return false
-	}
-	for _, ref := range refs {
+func hasArrayDestructuringWrite(writeRefs []*ast.Node) bool {
+	for _, ref := range writeRefs {
 		parent := ref.Parent
 		for parent != nil {
 			if parent.Kind == ast.KindArrayLiteralExpression {
@@ -713,7 +741,7 @@ func isParameterInWithoutBodyDeclaration(node *ast.Node) bool {
 // Special case: if the immediate parent module block has explicit exports
 // (export =, export default, or export { ... }), non-exported declarations are
 // private and should be checked — return false for them.
-func isInsideAmbientModuleBlock(node *ast.Node) bool {
+func isInsideAmbientModuleBlock(node *ast.Node, ac *analysisContext) bool {
 	moduleBlock := ast.FindAncestorKind(node, ast.KindModuleBlock)
 	if moduleBlock == nil {
 		return false
@@ -758,18 +786,23 @@ func isInsideAmbientModuleBlock(node *ast.Node) bool {
 	}
 	// If the module block has explicit exports, non-exported declarations
 	// should be checked (return false).
-	if moduleBlockHasExplicitExports(moduleBlock) {
+	if containerHasExplicitExports(moduleBlock, ac) {
 		return false
 	}
 	return true
 }
 
-// moduleBlockHasExplicitExports checks if a ModuleBlock contains any explicit export
-// statements (export =, export default, export { ... }, export * from '...').
-// Note: export modifier on declarations (export const, export namespace, etc.) does NOT count.
-func moduleBlockHasExplicitExports(moduleBlock *ast.Node) bool {
+// containerHasExplicitExports checks whether a SourceFile or ModuleBlock
+// contains an explicit export statement. The result is cached per rule run
+// because ambient checks ask the same question once per declaration.
+// Export modifiers on declarations (export const, export namespace, etc.) do
+// not count.
+func containerHasExplicitExports(container *ast.Node, ac *analysisContext) bool {
+	if result, ok := ac.explicitExports[container]; ok {
+		return result.hasExplicitExports
+	}
 	found := false
-	moduleBlock.ForEachChild(func(child *ast.Node) bool {
+	container.ForEachChild(func(child *ast.Node) bool {
 		switch child.Kind {
 		case ast.KindExportAssignment:
 			// export = x or export default x
@@ -782,6 +815,10 @@ func moduleBlockHasExplicitExports(moduleBlock *ast.Node) bool {
 		}
 		return false
 	})
+	if ac.explicitExports == nil {
+		ac.explicitExports = make(map[*ast.Node]explicitExportResult)
+	}
+	ac.explicitExports[container] = explicitExportResult{hasExplicitExports: found}
 	return found
 }
 
@@ -790,7 +827,7 @@ func moduleBlockHasExplicitExports(moduleBlock *ast.Node) bool {
 // - Top-level declarations without explicit exports are globally visible → skip
 // - Top-level declarations with explicit exports are module-scoped → check
 // - Declarations inside namespaces are handled by isInsideAmbientModuleBlock
-func isInDtsWithoutExplicitExports(node *ast.Node) bool {
+func isInDtsWithoutExplicitExports(node *ast.Node, ac *analysisContext) bool {
 	sf := ast.GetSourceFileOfNode(node)
 	if sf == nil || !sf.IsDeclarationFile {
 		return false
@@ -803,20 +840,7 @@ func isInDtsWithoutExplicitExports(node *ast.Node) bool {
 	}
 	// We're at the top level of a .d.ts file.
 	// Check if the source file has explicit exports.
-	sourceNode := sf.AsNode()
-	hasExplicit := false
-	sourceNode.ForEachChild(func(child *ast.Node) bool {
-		switch child.Kind {
-		case ast.KindExportAssignment:
-			hasExplicit = true
-			return true
-		case ast.KindExportDeclaration:
-			hasExplicit = true
-			return true
-		}
-		return false
-	})
-	return !hasExplicit
+	return !containerHasExplicitExports(sf.AsNode(), ac)
 }
 
 func isTopLevelDeclaration(node *ast.Node) bool {
@@ -882,7 +906,7 @@ func isDestructuredArrayElement(node *ast.Node) bool {
 // ignore pattern, and whether the match should result in ignoring or
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
 // Returns: (shouldIgnore bool, matchesPattern bool)
-func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) (bool, bool) {
+func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, writeRefs []*ast.Node) (bool, bool) {
 	var re *regexp.Regexp
 
 	if isParameterNode(varInfo.Definition) {
@@ -904,7 +928,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 	// destructuredArrayIgnorePattern applies to array-destructured elements,
 	// checking both the declaration site AND assignment sites (e.g., `let _x; [_x] = arr`).
 	if !matched && opts.destructuredArrayIgnoreRe != nil {
-		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs, sym) {
+		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs) {
 			matched = opts.destructuredArrayIgnoreRe.MatchString(varName)
 		}
 	}
@@ -925,7 +949,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 // parameter that is used (or has a default value). Used for the "after-used"
 // args option: unused parameters before the last used one are allowed because
 // they serve as positional placeholders.
-func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
+func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, ac *analysisContext) bool {
 	if paramNode == nil || paramNode.Parent == nil {
 		return false
 	}
@@ -936,33 +960,25 @@ func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, allUsages 
 		return false
 	}
 
-	paramIndex := -1
-	for i, p := range params {
-		if p.AsNode() == paramNode {
-			paramIndex = i
-			break
-		}
-	}
-	if paramIndex < 0 {
-		return false
+	if boundary, ok := ac.parameterBounds[funcLike]; ok {
+		return boundary.lastUsed != nil && paramNode.Pos() < boundary.lastUsed.Pos()
 	}
 
-	for i := paramIndex + 1; i < len(params); i++ {
-		sibling := params[i]
-
+	var lastUsed *ast.Node
+	for _, p := range params {
 		// A parameter with a default value (initializer) counts as a
 		// meaningful position marker. ESLint's after-used skips params
 		// before a later param that has a default value.
-		if sibling.AsNode().Initializer() != nil {
-			return true
-		}
-
-		if isParamUsed(ctx, sibling.Name(), allUsages) {
-			return true
+		if p.AsNode().Initializer() != nil || isParamUsed(ctx, p.Name(), ac) {
+			lastUsed = p.AsNode()
 		}
 	}
 
-	return false
+	if ac.parameterBounds == nil {
+		ac.parameterBounds = make(map[*ast.Node]parameterBoundary)
+	}
+	ac.parameterBounds[funcLike] = parameterBoundary{lastUsed: lastUsed}
+	return lastUsed != nil && paramNode.Pos() < lastUsed.Pos()
 }
 
 // isExported checks if a variable is exported from the module. Exported variables
@@ -1384,32 +1400,9 @@ func isPropertyNameLikePosition(node *ast.Node) bool {
 	return false
 }
 
-// collectCandidateName records declarations processed by this rule. References
-// whose text does not match one of these names never need a checker lookup.
-func collectCandidateName(node *ast.Node, names map[string]struct{}) {
-	switch node.Kind {
-	case ast.KindVariableDeclaration:
-		// Covers catch clause variables and destructuring patterns.
-		utils.CollectBindingNames(node.AsVariableDeclaration().Name(), func(_ *ast.Node, name string) {
-			names[name] = struct{}{}
-		})
-	case ast.KindParameter:
-		utils.CollectBindingNames(node.AsParameterDeclaration().Name(), func(_ *ast.Node, name string) {
-			names[name] = struct{}{}
-		})
-	case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
-		ast.KindTypeParameter, ast.KindImportSpecifier, ast.KindImportClause,
-		ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
-		if name := node.Name(); name != nil && ast.IsIdentifier(name) {
-			names[name.AsIdentifier().Text] = struct{}{}
-		}
-	}
-}
-
 // collectLocalExportTargets resolves the exact in-scope symbols consumed by a
 // named local export. Source-bearing re-exports never refer to local bindings.
-func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, targets map[*ast.Symbol]bool) {
+func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, ac *analysisContext) {
 	if node.Kind != ast.KindExportDeclaration {
 		return
 	}
@@ -1430,21 +1423,24 @@ func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, targets map
 		if target == nil {
 			continue
 		}
-		targets[target] = true
+		if ac.localExportTargets == nil {
+			ac.localExportTargets = make(map[*ast.Symbol]bool)
+		}
+		ac.localExportTargets[target] = true
 		if resolved := ctx.TypeChecker.SkipAlias(target); resolved != target {
-			targets[resolved] = true
+			ac.localExportTargets[resolved] = true
 		}
 	}
 }
 
-func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, ac *analysisContext) {
+func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, collector *checkerReferenceCollector) {
 	// Keep TypeScript's ordinary location symbol for write-only shorthand
 	// destructuring targets. In `({ a } = value)`, that node is the property
 	// symbol; ESLint reports an unused `a` at its declaration rather than at
 	// this property-shaped write.
 	if isPartOfAssignment(node) {
 		if sym := ctx.TypeChecker.GetSymbolAtLocation(node); sym != nil {
-			ac.writeRefs[sym] = append(ac.writeRefs[sym], node)
+			collector.writeRefs[sym] = append(collector.writeRefs[sym], node)
 		}
 		return
 	}
@@ -1457,12 +1453,12 @@ func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, ac *analysisCo
 	// Compound assignments (+=, -=, etc.) and update expressions (++, --)
 	// are both read and write.
 	if sym != nil && (isCompoundAssignmentTarget(node) || isUpdateTarget(node)) {
-		ac.writeRefs[sym] = append(ac.writeRefs[sym], node)
+		collector.writeRefs[sym] = append(collector.writeRefs[sym], node)
 	}
 	if sym != nil {
-		ac.allUsages[sym] = append(ac.allUsages[sym], node)
+		collector.allUsages[sym] = append(collector.allUsages[sym], node)
 		if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != sym {
-			ac.allUsages[resolved] = append(ac.allUsages[resolved], node)
+			collector.allUsages[resolved] = append(collector.allUsages[resolved], node)
 		}
 		return
 	}
@@ -1476,178 +1472,303 @@ func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, ac *analysisCo
 		return
 	}
 	name := node.AsIdentifier().Text
-	ac.unresolvedRefs[name] = append(ac.unresolvedRefs[name], node)
+	collector.unresolvedRefs[name] = append(collector.unresolvedRefs[name], node)
 }
 
-// collectSymbolUsages gathers candidate declarations, reference identifiers,
-// JSX markers, and local export targets in one AST traversal. Checker work is
-// deferred until all candidate names are known, so unrelated identifiers are
-// discarded without a symbol lookup.
-func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, ac *analysisContext) {
-	candidateNames := make(map[string]struct{})
-	referenceCapacity := 0
-	if sf := sourceFile.AsSourceFile(); sf != nil {
-		// Use the parser's exact upper bound so the one-pass collector never
-		// has to grow this temporary slice.
-		referenceCapacity = sf.IdentifierCount
+// collectLocalExportTargetsInContainer visits only statement containers. Local
+// export declarations cannot appear in expressions or function bodies, so this
+// avoids a second whole-file walk while still handling nested namespaces.
+func collectLocalExportTargetsInContainer(ctx rule.RuleContext, container *ast.Node, ac *analysisContext) {
+	if container == nil {
+		return
 	}
-	referenceNodes := make([]*ast.Node, 0, referenceCapacity)
-	var firstJsx *ast.Node
-	var firstFragment *ast.Node
+	container.ForEachChild(func(child *ast.Node) bool {
+		switch child.Kind {
+		case ast.KindExportDeclaration:
+			collectLocalExportTargets(ctx, child, ac)
+		case ast.KindModuleDeclaration:
+			collectLocalExportTargetsInModule(ctx, child, ac)
+		}
+		return false
+	})
+}
 
+func collectLocalExportTargetsInModule(ctx rule.RuleContext, module *ast.Node, ac *analysisContext) {
+	for module != nil && module.Kind == ast.KindModuleDeclaration {
+		module = module.Body()
+	}
+	if module != nil && module.Kind == ast.KindModuleBlock {
+		collectLocalExportTargetsInContainer(ctx, module, ac)
+	}
+}
+
+func isImportDefinition(definition *ast.Node) bool {
+	if definition == nil {
+		return false
+	}
+	switch definition.Kind {
+	case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
+		return true
+	}
+	return false
+}
+
+// binderSymbolForDefinition returns the raw binder symbol expected by
+// RuleContext.Refs. The checker symbol is intentionally not used here because
+// declaration merging and alias resolution can replace it with a different
+// symbol object.
+func binderSymbolForDefinition(nameNode *ast.Node, definition *ast.Node) *ast.Symbol {
+	if definition != nil {
+		if sym := definition.Symbol(); sym != nil {
+			return sym
+		}
+	}
+	if nameNode != nil && nameNode.Parent != nil && nameNode.Parent.Name() == nameNode {
+		return nameNode.Parent.Symbol()
+	}
+	return nil
+}
+
+// classifyReferenceNodes separates write-only references while preserving
+// read/write references such as updates and compound assignments in usages.
+// The usage slice is reused directly unless a write-only reference is found.
+func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
+	info := referenceInfo{usages: refs}
+	var filtered []*ast.Node
+	for i, ref := range refs {
+		if isPartOfAssignment(ref) {
+			// In `({ x } = value)`, TypeScript exposes the shorthand node as
+			// the object's property symbol. Preserve the existing ESLint-
+			// compatible behavior: exclude it as a read, but report an unused
+			// local at its declaration rather than at this property-shaped write.
+			if ref.Parent == nil || ref.Parent.Kind != ast.KindShorthandPropertyAssignment {
+				info.writeRefs = append(info.writeRefs, ref)
+			}
+			if filtered == nil {
+				filtered = make([]*ast.Node, 0, len(refs)-1)
+				filtered = append(filtered, refs[:i]...)
+			}
+			continue
+		}
+		if isCompoundAssignmentTarget(ref) || isUpdateTarget(ref) {
+			info.writeRefs = append(info.writeRefs, ref)
+		}
+		if filtered != nil {
+			filtered = append(filtered, ref)
+		}
+	}
+	if filtered != nil {
+		info.usages = filtered
+	}
+	return info
+}
+
+// collectCheckerReferenceInfo handles the narrow cases ctx.Refs cannot model:
+// parameter-property names, empty namespaces, and declarations without a
+// binder symbol. Its syntactic candidate index is built at most once per file;
+// checker work remains limited to names that actually need the fallback.
+func collectCheckerReferenceInfo(
+	ctx rule.RuleContext,
+	name string,
+	definition *ast.Node,
+	checkerSym *ast.Symbol,
+	ac *analysisContext,
+) referenceInfo {
+	collector := &checkerReferenceCollector{
+		allUsages:      make(map[*ast.Symbol][]*ast.Node),
+		writeRefs:      make(map[*ast.Symbol][]*ast.Node),
+		unresolvedRefs: make(map[string][]*ast.Node),
+	}
+	sourceFile := ast.GetSourceFileOfNode(definition)
+	if sourceFile == nil {
+		return referenceInfo{}
+	}
+
+	if ac.fallbackCandidates == nil {
+		ac.fallbackCandidates = make(map[string][]*ast.Node)
+		var walk func(*ast.Node)
+		walk = func(node *ast.Node) {
+			if node == nil {
+				return
+			}
+			if ast.IsIdentifier(node) && !utils.IsDeclarationIdentifier(node) {
+				ac.fallbackCandidates[node.Text()] = append(ac.fallbackCandidates[node.Text()], node)
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				walk(child)
+				return false
+			})
+		}
+		sourceFile.AsNode().ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	for _, node := range ac.fallbackCandidates[name] {
+		collectIdentifierUsage(ctx, node, collector)
+	}
+
+	info := referenceInfo{
+		usages:    collector.allUsages[checkerSym],
+		writeRefs: collector.writeRefs[checkerSym],
+	}
+	if !isImportDefinition(definition) && checkerSym != nil {
+		resolved := ctx.TypeChecker.SkipAlias(checkerSym)
+		if len(info.usages) == 0 && resolved != checkerSym {
+			info.usages = collector.allUsages[resolved]
+		}
+		if len(info.writeRefs) == 0 && resolved != checkerSym {
+			info.writeRefs = collector.writeRefs[resolved]
+		}
+		if len(info.usages) == 0 {
+			info.usages = collector.unresolvedRefs[name]
+		}
+	}
+	return info
+}
+
+func getReferenceInfo(
+	ctx rule.RuleContext,
+	nameNode *ast.Node,
+	name string,
+	definition *ast.Node,
+	checkerSym *ast.Symbol,
+	ac *analysisContext,
+) referenceInfo {
+	isParameterProperty := definition != nil && definition.Kind == ast.KindParameter &&
+		ast.HasSyntacticModifier(definition, ast.ModifierFlagsParameterPropertyModifier)
+	if isParameterProperty && checkerSym != nil {
+		if info, ok := ac.fallbackInfos[checkerSym]; ok {
+			return info
+		}
+		// Property names in `this.property` are deliberately absent from
+		// ctx.Refs. Reuse the shared checker candidate index so multiple
+		// parameter properties require one AST walk, not one per property.
+		info := collectCheckerReferenceInfo(ctx, name, definition, checkerSym, ac)
+		if ac.fallbackInfos == nil {
+			ac.fallbackInfos = make(map[*ast.Symbol]referenceInfo)
+		}
+		ac.fallbackInfos[checkerSym] = info
+		return info
+	}
+
+	if rawSym := binderSymbolForDefinition(nameNode, definition); rawSym != nil && ctx.Refs != nil {
+		info := classifyReferenceNodes(ctx.Refs.References(rawSym))
+		if definition != nil && definition.Kind == ast.KindModuleDeclaration &&
+			len(info.usages) == 0 && len(info.writeRefs) == 0 && checkerSym != nil {
+			// The binder resolver can miss value references to empty
+			// namespaces. Keep a checker/name fallback for that residual case;
+			// its candidate index is shared so multiple empty namespaces stay
+			// linear rather than walking the file for every declaration.
+			if fallback, ok := ac.fallbackInfos[checkerSym]; ok {
+				info = fallback
+			} else {
+				info = collectCheckerReferenceInfo(ctx, name, definition, checkerSym, ac)
+				if ac.fallbackInfos == nil {
+					ac.fallbackInfos = make(map[*ast.Symbol]referenceInfo)
+				}
+				ac.fallbackInfos[checkerSym] = info
+			}
+		}
+		return info
+	}
+	if checkerSym == nil {
+		return referenceInfo{}
+	}
+	if info, ok := ac.fallbackInfos[checkerSym]; ok {
+		return info
+	}
+	info := collectCheckerReferenceInfo(ctx, name, definition, checkerSym, ac)
+	if ac.fallbackInfos == nil {
+		ac.fallbackInfos = make(map[*ast.Symbol]referenceInfo)
+	}
+	ac.fallbackInfos[checkerSym] = info
+	return info
+}
+
+func scanJsxNodes(sourceFile *ast.Node, ac *analysisContext) {
+	if ac.jsxScanned {
+		return
+	}
+	ac.jsxScanned = true
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
 			return
 		}
-
-		collectCandidateName(node, candidateNames)
-		collectLocalExportTargets(ctx, node, ac.localExportTargets)
-
 		switch node.Kind {
 		case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
-			if firstJsx == nil {
-				firstJsx = node
+			if ac.firstJsx == nil {
+				ac.firstJsx = node
 			}
 		case ast.KindJsxFragment:
-			if firstJsx == nil {
-				firstJsx = node
+			if ac.firstJsx == nil {
+				ac.firstJsx = node
 			}
-			if firstFragment == nil {
-				firstFragment = node
+			if ac.firstFragment == nil {
+				ac.firstFragment = node
 			}
 		}
-
-		if ast.IsIdentifier(node) && !utils.IsDeclarationIdentifier(node) {
-			referenceNodes = append(referenceNodes, node)
-		}
-
 		node.ForEachChild(func(child *ast.Node) bool {
 			walk(child)
 			return false
 		})
 	}
 	walk(sourceFile)
-
-	for _, node := range referenceNodes {
-		if _, ok := candidateNames[node.AsIdentifier().Text]; ok {
-			collectIdentifierUsage(ctx, node, ac)
-		}
-	}
-
-	// JSX factory references are implicit and have no identifier node.
-	markJsxFactoryUsed(ctx, sourceFile, firstJsx, firstFragment, ac.allUsages)
 }
 
-// markJsxFactoryUsed checks if the source file contains JSX and, if so, marks
-// the JSX factory (and fragment factory) imports as used. This runs for every
-// jsx mode: TS never produces an AST identifier reference to the factory, so
-// without this an `import React` whose only "use" is JSX would be falsely
-// reported. Mirrors @typescript-eslint/parser, which treats the jsxPragma
-// (default "React") as used whenever JSX is present, regardless of runtime.
-func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, firstJsx *ast.Node, firstFragment *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
-	if ctx.Program == nil {
-		return
+func jsxRootName(factory string) string {
+	if dot := strings.IndexByte(factory, '.'); dot >= 0 {
+		return factory[:dot]
+	}
+	return factory
+}
+
+// implicitJSXReference returns the JSX node that consumes an imported factory.
+// TypeScript produces no identifier reference for this implicit use, so it is
+// layered on top of ctx.Refs only for matching import declarations.
+func implicitJSXReference(
+	ctx rule.RuleContext,
+	name string,
+	definition *ast.Node,
+	ac *analysisContext,
+) *ast.Node {
+	if !isImportDefinition(definition) || ctx.Program == nil {
+		return nil
 	}
 	opts := ctx.Program.Options()
 	if opts == nil {
-		return
+		return nil
 	}
-	if firstJsx == nil && firstFragment == nil {
-		return
-	}
-	// Any JSX (element or fragment) marks the factory as used
+
 	factoryName := "React"
 	if opts.JsxFactory != "" {
-		factoryName = strings.Split(opts.JsxFactory, ".")[0]
+		factoryName = jsxRootName(opts.JsxFactory)
 	}
-	refNode := firstJsx
-	if refNode == nil {
-		refNode = firstFragment
+	isFactory := name == factoryName
+	isFragmentFactory := opts.JsxFragmentFactory != "" &&
+		name == jsxRootName(opts.JsxFragmentFactory)
+	if !isFactory && !isFragmentFactory {
+		return nil
 	}
-	markImportByNameAsUsed(ctx, sourceFile, factoryName, refNode, usages)
-	// JSX fragments additionally mark the fragment factory as used
-	if firstFragment != nil && opts.JsxFragmentFactory != "" {
-		fragmentFactoryName := strings.Split(opts.JsxFragmentFactory, ".")[0]
-		markImportByNameAsUsed(ctx, sourceFile, fragmentFactoryName, firstFragment, usages)
-	}
-}
 
-// markImportByNameAsUsed finds an import with the given name and adds refNode
-// as a usage reference for its symbol. We use refNode (a JSX element/fragment)
-// instead of the import's own name node because processVariable filters out
-// usages where usage.Pos() == declaration.Pos() (self-reference filtering).
-func markImportByNameAsUsed(ctx rule.RuleContext, sourceFile *ast.Node, name string, refNode *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
-	sf := sourceFile.AsSourceFile()
-	if sf == nil {
-		return
+	sourceFile := ast.GetSourceFileOfNode(definition)
+	if sourceFile == nil {
+		return nil
 	}
-	sf.AsNode().ForEachChild(func(child *ast.Node) bool {
-		// Handle import React = require('react')
-		if child.Kind == ast.KindImportEqualsDeclaration {
-			ieq := child.AsImportEqualsDeclaration()
-			if ieq != nil && ieq.Name() != nil && ieq.Name().AsIdentifier().Text == name {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(ieq.Name())
-				if sym != nil {
-					usages[sym] = append(usages[sym], refNode)
-				}
-				return true
-			}
-			return false
-		}
-		if child.Kind != ast.KindImportDeclaration {
-			return false
-		}
-		importDecl := child.AsImportDeclaration()
-		if importDecl == nil || importDecl.ImportClause == nil {
-			return false
-		}
-		clause := importDecl.ImportClause
-		// Check default import: import React from '...'
-		if clause.Name() != nil && clause.Name().AsIdentifier().Text == name {
-			sym := ctx.TypeChecker.GetSymbolAtLocation(clause.Name())
-			if sym != nil {
-				usages[sym] = append(usages[sym], refNode)
-			}
-			return true
-		}
-		if clause.AsImportClause().NamedBindings != nil {
-			bindings := clause.AsImportClause().NamedBindings
-			// Check namespace import: import * as React from '...'
-			if bindings.Kind == ast.KindNamespaceImport {
-				nsImport := bindings.AsNamespaceImport()
-				if nsImport != nil && nsImport.Name() != nil && nsImport.Name().AsIdentifier().Text == name {
-					sym := ctx.TypeChecker.GetSymbolAtLocation(nsImport.Name())
-					if sym != nil {
-						usages[sym] = append(usages[sym], refNode)
-					}
-					return true
-				}
-			}
-			// Check named imports: import { h } from '...'
-			if bindings.Kind == ast.KindNamedImports {
-				bindings.ForEachChild(func(spec *ast.Node) bool {
-					if spec.Kind == ast.KindImportSpecifier {
-						specName := spec.AsImportSpecifier().Name()
-						if specName != nil && specName.AsIdentifier().Text == name {
-							sym := ctx.TypeChecker.GetSymbolAtLocation(specName)
-							if sym != nil {
-								usages[sym] = append(usages[sym], refNode)
-							}
-							return true
-						}
-					}
-					return false
-				})
-			}
-		}
-		return false
-	})
+	scanJsxNodes(sourceFile.AsNode(), ac)
+	if isFactory && ac.firstJsx != nil {
+		return ac.firstJsx
+	}
+	if isFragmentFactory {
+		return ac.firstFragment
+	}
+	return nil
 }
 
 // processVariable determines whether a single declared variable/parameter/import
 // is unused and, if so, reports it. The decision pipeline:
-//  1. Resolve the symbol and look up usages (original sym → SkipAlias → unresolved fallback)
+//  1. Read binder-resolved usages from ctx.Refs (checker fallback for residual cases)
 //  2. Filter out self-references (same position, self-modifying, inside own declaration body)
 //  3. Classify remaining usages as value or type-only
 //  4. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
@@ -1669,66 +1790,42 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		if ac.seenMergedSymbols[sym] {
 			return
 		}
+		if ac.seenMergedSymbols == nil {
+			ac.seenMergedSymbols = make(map[*ast.Symbol]bool)
+		}
 		ac.seenMergedSymbols[sym] = true
 	}
-	if sym != nil {
-		// Look up usages by original symbol first. For import specifiers from
-		// resolvable modules, SkipAlias collapses all specifiers into the same
-		// module symbol, so we must NOT fall back to the resolved symbol for imports.
-		usageNodes, exists := ac.allUsages[sym]
-		isImportDef := definition != nil && (definition.Kind == ast.KindImportSpecifier ||
-			definition.Kind == ast.KindImportClause ||
-			definition.Kind == ast.KindNamespaceImport ||
-			definition.Kind == ast.KindImportEqualsDeclaration)
-		if !exists && !isImportDef {
-			resolved := ctx.TypeChecker.SkipAlias(sym)
-			if resolved != sym {
-				usageNodes, exists = ac.allUsages[resolved]
-			}
-		}
-		// Fallback: check unresolved references by name.
-		// This handles cases like empty namespaces where GetSymbolAtLocation
-		// returns nil for the reference but the namespace symbol is valid.
-		if !exists && !isImportDef {
-			if unresolved, ok := ac.unresolvedRefs[name]; ok {
-				for _, ref := range unresolved {
-					if ref.Pos() != nameNode.Pos() && !isInsideOwnDeclaration(ref, definition) {
-						usageNodes = append(usageNodes, ref)
-						exists = true
-					}
-				}
-			}
-		}
-		// For declaration merging (e.g., multiple interfaces with same name),
-		// collect all declarations so self-references in ANY declaration body
-		// are correctly filtered out.
-		allDecls := []*ast.Node{definition}
-		if len(sym.Declarations) > 1 {
-			allDecls = sym.Declarations
-		}
-		if exists {
-			varInfo.References = usageNodes
 
-			filteredUsages := []*ast.Node{}
-			for _, usage := range usageNodes {
-				if usage.Pos() != varInfo.Variable.Pos() &&
-					!isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode) &&
-					!isInsideAnyOwnDeclaration(usage, allDecls) {
-					filteredUsages = append(filteredUsages, usage)
-				}
-			}
+	info := getReferenceInfo(ctx, nameNode, name, definition, sym, ac)
+	varInfo.References = info.usages
 
-			if len(filteredUsages) > 0 {
-				onlyUsedAsType := true
-				for _, usage := range filteredUsages {
-					if !isTypeOnlyReference(usage) {
-						onlyUsedAsType = false
-						break
-					}
-				}
-				varInfo.Used = !onlyUsedAsType
-				varInfo.OnlyUsedAsType = onlyUsedAsType
+	// For declaration merging (e.g., multiple interfaces with same name),
+	// references inside any declaration body are self-references.
+	allDecls := []*ast.Node{definition}
+	if sym != nil && len(sym.Declarations) > 1 {
+		allDecls = sym.Declarations
+	}
+
+	if implicitJSXReference(ctx, name, definition, ac) != nil {
+		varInfo.Used = true
+	} else {
+		hasUsage := false
+		onlyUsedAsType := true
+		for _, usage := range info.usages {
+			if usage.Pos() == varInfo.Variable.Pos() ||
+				(sym != nil && isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode)) ||
+				isInsideAnyOwnDeclaration(usage, allDecls) {
+				continue
 			}
+			hasUsage = true
+			if !isTypeOnlyReference(usage) {
+				onlyUsedAsType = false
+				break
+			}
+		}
+		if hasUsage {
+			varInfo.Used = !onlyUsedAsType
+			varInfo.OnlyUsedAsType = onlyUsedAsType
 		}
 	}
 
@@ -1765,7 +1862,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
 	// If the variable matches its category's pattern and is unused → ignore silently.
 	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
-	shouldIgnore, matchedPattern := matchesIgnorePattern(name, varInfo, opts, ac.writeRefs, sym)
+	shouldIgnore, matchedPattern := matchesIgnorePattern(name, varInfo, opts, info.writeRefs)
 	if shouldIgnore {
 		return
 	}
@@ -1775,10 +1872,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// and reportUsedIgnorePattern is true (e.g., `export const x = _Foo`).
 		if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
 			reportNode := varInfo.Variable
-			if sym != nil {
-				if refs, exists := ac.writeRefs[sym]; exists && len(refs) > 0 {
-					reportNode = refs[len(refs)-1]
-				}
+			if len(info.writeRefs) > 0 {
+				reportNode = info.writeRefs[len(info.writeRefs)-1]
 			}
 			ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name))
 		}
@@ -1788,7 +1883,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// "after-used" for parameters: skip unused params before the last used param.
 	// Only applies to direct Parameter nodes, not destructured elements within them.
 	if !varInfo.Used && definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
-		if isBeforeLastUsedParam(ctx, definition, ac.allUsages) {
+		if isBeforeLastUsedParam(ctx, definition, ac) {
 			return
 		}
 	}
@@ -1796,26 +1891,24 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// ESLint reports at the last write reference position (e.g., `a = a + 1` reports
 	// at the LHS `a`). Fall back to the declaration name node if no write refs found.
 	reportNode := varInfo.Variable
-	if sym != nil {
-		if refs, exists := ac.writeRefs[sym]; exists && len(refs) > 0 {
-			reportNode = refs[len(refs)-1]
-		}
+	if len(info.writeRefs) > 0 {
+		reportNode = info.writeRefs[len(info.writeRefs)-1]
 	}
 
-	assigned := hasAssignment(definition, sym, ac.writeRefs)
+	assigned := hasAssignment(definition, info.writeRefs)
 
 	if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
 		ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name))
 	} else if varInfo.OnlyUsedAsType && opts.Vars == "all" {
 		ctx.ReportNode(reportNode, buildUsedOnlyAsTypeMessage(name, assigned))
 	} else if !varInfo.Used {
-		isImport := definition != nil && (definition.Kind == ast.KindImportSpecifier ||
-			definition.Kind == ast.KindImportClause ||
-			definition.Kind == ast.KindNamespaceImport ||
-			definition.Kind == ast.KindImportEqualsDeclaration)
+		isImport := isImportDefinition(definition)
 
 		// Track unused imports for allImportSpecifiersUnused check
 		if isImport {
+			if ac.reportedUnused == nil {
+				ac.reportedUnused = make(map[*ast.Node]bool)
+			}
 			ac.reportedUnused[definition] = true
 			reportUnusedImport(
 				ctx,
@@ -1838,23 +1931,18 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
-		ac := &analysisContext{
-			allUsages:          make(map[*ast.Symbol][]*ast.Node),
-			writeRefs:          make(map[*ast.Symbol][]*ast.Node),
-			unresolvedRefs:     make(map[string][]*ast.Node),
-			localExportTargets: make(map[*ast.Symbol]bool),
-			seenMergedSymbols:  make(map[*ast.Symbol]bool),
-			reportedUnused:     make(map[*ast.Node]bool),
-		}
-		collected := false
+		ac := &analysisContext{}
+		exportsCollected := false
 
-		seenWithoutBodyFuncSymbols := make(map[*ast.Symbol]bool)
+		var seenWithoutBodyFuncSymbols map[*ast.Symbol]bool
 
 		ensureCollected := func(node *ast.Node) {
-			if !collected {
+			if !exportsCollected {
 				sourceFile := ast.GetSourceFileOfNode(node)
-				collectSymbolUsages(ctx, sourceFile.AsNode(), ac)
-				collected = true
+				if sourceFile != nil {
+					collectLocalExportTargetsInContainer(ctx, sourceFile.AsNode(), ac)
+				}
+				exportsCollected = true
 			}
 		}
 
@@ -1906,7 +1994,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if varDecl == nil {
 					return
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				if opts.IgnoreUsingDeclarations && isUsingDeclaration(node) {
@@ -1942,7 +2030,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				ensureCollected(node)
 
 				if node.Body() == nil {
-					if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+					if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 						return
 					}
 					sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
@@ -1950,6 +2038,9 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 						resolved := ctx.TypeChecker.SkipAlias(sym)
 						if seenWithoutBodyFuncSymbols[resolved] {
 							return
+						}
+						if seenWithoutBodyFuncSymbols == nil {
+							seenWithoutBodyFuncSymbols = make(map[*ast.Symbol]bool)
 						}
 						seenWithoutBodyFuncSymbols[resolved] = true
 					}
@@ -1997,7 +2088,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 
 				// Skip inner namespaces inside ambient (declare) namespace declarations —
 				// they're part of the type definition, not standalone declarations.
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 
@@ -2022,7 +2113,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if classDecl == nil || classDecl.Name() == nil || !ast.IsIdentifier(classDecl.Name()) {
 					return
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				if opts.IgnoreClassWithStaticInitBlock && hasStaticInitBlock(node) {
@@ -2042,7 +2133,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if interfaceDecl == nil || interfaceDecl.Name() == nil || !ast.IsIdentifier(interfaceDecl.Name()) {
 					return
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				nameNode := interfaceDecl.Name()
@@ -2059,7 +2150,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if typeAlias == nil || typeAlias.Name() == nil || !ast.IsIdentifier(typeAlias.Name()) {
 					return
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				nameNode := typeAlias.Name()
@@ -2076,7 +2167,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if enumDecl == nil || enumDecl.Name() == nil || !ast.IsIdentifier(enumDecl.Name()) {
 					return
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				nameNode := enumDecl.Name()
@@ -2202,7 +2293,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 						return
 					}
 				}
-				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+				if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 					return
 				}
 				typeParam := node.AsTypeParameterDeclaration()
