@@ -3,13 +3,14 @@ package no_loss_of_precision
 import (
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 var noLossOfPrecisionMessage = rule.RuleMessage{
@@ -17,12 +18,22 @@ var noLossOfPrecisionMessage = rule.RuleMessage{
 	Description: "This number literal will lose precision at runtime.",
 }
 
-var (
-	binaryPattern      = regexp.MustCompile(`(?i)^0b[01]+$`)
-	octalPattern       = regexp.MustCompile(`(?i)^0o[0-7]+$`)
-	hexPattern         = regexp.MustCompile(`(?i)^0x[0-9a-f]+$`)
-	legacyOctalPattern = regexp.MustCompile(`^0[0-7]+$`)
+const maxExactDecimalInteger = "9007199254740992"
+
+const (
+	minCachedDecimalExponent = -324
+	maxCachedDecimalExponent = 423
 )
+
+type decimalPowerCacheEntry struct {
+	once  sync.Once
+	value *big.Rat
+}
+
+// decimalPowerCache initializes only the exponents a process actually uses.
+// Each value is immutable after publication, so rule listeners can safely
+// share it across files without imposing a full-table cold-start cost.
+var decimalPowerCache [maxCachedDecimalExponent - minCachedDecimalExponent + 1]decimalPowerCacheEntry
 
 // https://eslint.org/docs/latest/rules/no-loss-of-precision
 var NoLossOfPrecisionRule = rule.Rule{
@@ -33,9 +44,13 @@ var NoLossOfPrecisionRule = rule.Rule{
 				// tsgo normalizes NumericLiteral.Text at parse time, so ESLint parity
 				// requires reading the raw token text to preserve prefixes, separators,
 				// exponent spelling, and trailing fractional zeros.
-				raw := utils.TrimmedNodeText(ctx.SourceFile, node)
+				sourceText := ctx.SourceFile.Text()
+				start := scanner.SkipTrivia(sourceText, node.Pos())
+				raw := sourceText[start:node.End()]
 				if losesPrecision(raw) {
-					ctx.ReportNode(node, noLossOfPrecisionMessage)
+					// Reuse the range already found for the raw token. ReportNode
+					// would scan the same trivia a second time.
+					ctx.ReportRange(core.NewTextRange(start, node.End()), noLossOfPrecisionMessage)
 				}
 			},
 		}
@@ -49,44 +64,86 @@ func removeNumericSeparators(s string) string {
 func losesPrecision(raw string) bool {
 	normalized := removeNumericSeparators(raw)
 
-	if binaryPattern.MatchString(normalized) {
-		return notBaseTenLosesPrecision(normalized[2:], 2)
+	if len(normalized) >= 2 && normalized[0] == '0' {
+		switch normalized[1] {
+		case 'b', 'B':
+			return notBaseTenLosesPrecision(normalized[2:], 2)
+		case 'o', 'O':
+			return notBaseTenLosesPrecision(normalized[2:], 8)
+		case 'x', 'X':
+			return notBaseTenLosesPrecision(normalized[2:], 16)
+		}
 	}
-	if octalPattern.MatchString(normalized) {
-		return notBaseTenLosesPrecision(normalized[2:], 8)
-	}
-	if hexPattern.MatchString(normalized) {
-		return notBaseTenLosesPrecision(normalized[2:], 16)
-	}
-	if legacyOctalPattern.MatchString(normalized) {
+	if isLegacyOctal(normalized) {
 		return notBaseTenLosesPrecision(normalized[1:], 8)
+	}
+	if isExactDecimalInteger(normalized) {
+		return false
 	}
 
 	return baseTenLosesPrecision(normalized)
 }
 
+func isLegacyOctal(raw string) bool {
+	if len(raw) < 2 || raw[0] != '0' {
+		return false
+	}
+	for i := 1; i < len(raw); i++ {
+		if raw[i] < '0' || raw[i] > '7' {
+			return false
+		}
+	}
+	return true
+}
+
+// isExactDecimalInteger recognizes the overwhelmingly common integer fast
+// path. Every non-negative integer through 2^53 is exactly representable as a
+// float64; larger integers continue through the exact comparison below.
+func isExactDecimalInteger(raw string) bool {
+	firstSignificantDigit := len(raw)
+	for i := range len(raw) {
+		if raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+		if firstSignificantDigit == len(raw) && raw[i] != '0' {
+			firstSignificantDigit = i
+		}
+	}
+	if firstSignificantDigit == len(raw) {
+		return len(raw) > 0
+	}
+
+	significantDigits := raw[firstSignificantDigit:]
+	return len(significantDigits) < len(maxExactDecimalInteger) ||
+		len(significantDigits) == len(maxExactDecimalInteger) &&
+			significantDigits <= maxExactDecimalInteger
+}
+
 func notBaseTenLosesPrecision(digits string, base int) bool {
+	// Prefix signs are not part of a NumericLiteral token. Reject them here as
+	// the old full-token regular expressions did, rather than letting big.Int
+	// accept malformed direct inputs.
+	if len(digits) == 0 || digits[0] == '+' || digits[0] == '-' {
+		return false
+	}
 	original := new(big.Int)
-	_, ok := original.SetString(strings.ToLower(digits), base)
+	_, ok := original.SetString(digits, base)
 	if !ok {
 		return false
 	}
-
-	f, _ := new(big.Float).SetInt(original).Float64()
-	if math.IsInf(f, 0) {
-		return true
+	if original.Sign() == 0 {
+		return false
 	}
 
-	reconstructed := new(big.Int)
-	bf := new(big.Float).SetFloat64(f)
-	bf.Int(reconstructed)
-
-	return original.Cmp(reconstructed) != 0
+	// An integer is exactly representable as a finite float64 iff its highest
+	// set bit fits the finite exponent range and at most 53 significant bits
+	// remain after removing factors of two.
+	return original.BitLen() > 1024 ||
+		original.BitLen()-int(original.TrailingZeroBits()) > 53
 }
 
 func baseTenLosesPrecision(raw string) bool {
-	rawNumber := strings.ToLower(raw)
-	value, err := strconv.ParseFloat(rawNumber, 64)
+	value, err := strconv.ParseFloat(raw, 64)
 	if err != nil && !math.IsInf(value, 0) {
 		return false
 	}
@@ -97,7 +154,7 @@ func baseTenLosesPrecision(raw string) bool {
 		return true
 	}
 
-	normalizedRawNumber := convertNumberToScientificNotation(rawNumber, false)
+	normalizedRawNumber := convertNumberToScientificNotation(raw, false)
 	requestedPrecision := len(normalizedRawNumber.coefficient)
 	if requestedPrecision > 100 {
 		return true
@@ -120,16 +177,19 @@ type scientificNotation struct {
 }
 
 func convertNumberToScientificNotation(stringNumber string, parseAsFloat bool) scientificNotation {
-	splitNumber := strings.Split(stringNumber, "e")
-	originalCoefficient := splitNumber[0]
+	exponentIndex := strings.IndexAny(stringNumber, "eE")
+	originalCoefficient := stringNumber
+	if exponentIndex >= 0 {
+		originalCoefficient = stringNumber[:exponentIndex]
+	}
 	var normalizedNumber scientificNotation
 	if parseAsFloat || strings.Contains(stringNumber, ".") {
 		normalizedNumber = normalizeFloat(originalCoefficient)
 	} else {
 		normalizedNumber = normalizeInteger(originalCoefficient)
 	}
-	if len(splitNumber) > 1 {
-		exponent, _ := strconv.Atoi(splitNumber[1])
+	if exponentIndex >= 0 {
+		exponent, _ := strconv.Atoi(stringNumber[exponentIndex+1:])
 		normalizedNumber.magnitude += exponent
 	}
 	return normalizedNumber
@@ -198,19 +258,19 @@ func numberToPrecisionScientific(value float64, precision int) scientificNotatio
 	}
 
 	magnitude := int(math.Floor(math.Log10(math.Abs(value))))
-	for rat.Cmp(pow10Rat(magnitude)) < 0 {
+	for rat.Cmp(decimalPower(magnitude)) < 0 {
 		magnitude--
 	}
-	for rat.Cmp(pow10Rat(magnitude+1)) >= 0 {
+	for rat.Cmp(decimalPower(magnitude+1)) >= 0 {
 		magnitude++
 	}
 
-	scaled := new(big.Rat).Set(rat)
+	scaled := rat
 	scaleExponent := precision - 1 - magnitude
 	if scaleExponent >= 0 {
-		scaled.Mul(scaled, new(big.Rat).SetInt(pow10Int(scaleExponent)))
+		scaled.Mul(scaled, decimalPower(scaleExponent))
 	} else {
-		scaled.Quo(scaled, new(big.Rat).SetInt(pow10Int(-scaleExponent)))
+		scaled.Quo(scaled, decimalPower(-scaleExponent))
 	}
 
 	rounded := roundRatHalfUp(scaled)
@@ -234,20 +294,41 @@ func roundRatHalfUp(r *big.Rat) *big.Int {
 	remainder := new(big.Int)
 	quotient.QuoRem(r.Num(), r.Denom(), remainder)
 
-	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
-	if doubleRemainder.Cmp(r.Denom()) >= 0 {
+	remainder.Lsh(remainder, 1)
+	if remainder.Cmp(r.Denom()) >= 0 {
 		quotient.Add(quotient, big.NewInt(1))
 	}
 	return quotient
 }
 
-func pow10Rat(exponent int) *big.Rat {
-	if exponent >= 0 {
-		return new(big.Rat).SetInt(pow10Int(exponent))
+// decimalPower returns a shared, immutable power of ten for every exponent
+// reachable by a finite float64 at precisions 1 through 100.
+func decimalPower(exponent int) *big.Rat {
+	if exponent >= minCachedDecimalExponent && exponent <= maxCachedDecimalExponent {
+		entry := &decimalPowerCache[exponent-minCachedDecimalExponent]
+		entry.once.Do(func() {
+			entry.value = newDecimalPower(exponent)
+		})
+		return entry.value
 	}
-	return new(big.Rat).SetFrac(big.NewInt(1), pow10Int(-exponent))
+
+	// Keep the helper total for defensive direct callers, even though the rule's
+	// finite-float path cannot reach this branch.
+	return newDecimalPower(exponent)
 }
 
-func pow10Int(exponent int) *big.Int {
-	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
+func newDecimalPower(exponent int) *big.Rat {
+	absoluteExponent := exponent
+	if absoluteExponent < 0 {
+		absoluteExponent = -absoluteExponent
+	}
+	power := new(big.Int).Exp(
+		big.NewInt(10),
+		big.NewInt(int64(absoluteExponent)),
+		nil,
+	)
+	if exponent >= 0 {
+		return new(big.Rat).SetInt(power)
+	}
+	return new(big.Rat).SetFrac(big.NewInt(1), power)
 }
