@@ -32,21 +32,43 @@ var NoMisleadingCharacterClassRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
-		return rule.RuleListeners{
+		listeners := rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				handleRegexLiteral(ctx, node, opts)
 			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				handleRegExpConstructor(ctx, node, call.Expression, call.Arguments, opts, eval)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				newExpr := node.AsNewExpression()
-				handleRegExpConstructor(ctx, node, newExpr.Expression, newExpr.Arguments, opts, eval)
-			},
 		}
+		if !sourceMayUseRegExp(ctx.SourceFile) {
+			return listeners
+		}
+		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		listeners[ast.KindCallExpression] = func(node *ast.Node) {
+			call := node.AsCallExpression()
+			handleRegExpConstructor(ctx, node, call.Expression, call.Arguments, opts, eval)
+		}
+		listeners[ast.KindNewExpression] = func(node *ast.Node) {
+			newExpr := node.AsNewExpression()
+			handleRegExpConstructor(ctx, node, newExpr.Expression, newExpr.Arguments, opts, eval)
+		}
+		return listeners
 	},
+}
+
+func sourceMayUseRegExp(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	for _, name := range [...]string{
+		"RegExp",
+		"globalThis",
+		"window",
+		"self",
+		"global",
+	} {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 type ruleOptions struct {
@@ -832,17 +854,23 @@ func isIdentityEscapeForm(raw string) bool {
 func emitMatch(ctx rule.RuleContext, m foundMatch, pattern string, makeFixes func() []rule.RuleFix) {
 	msg := rule.RuleMessage{Id: m.kind, Description: messageDescriptionFor(m.kind)}
 	r := core.NewTextRange(m.srcStart, m.srcEnd)
-	if m.kind == "surrogatePairWithoutUFlag" && patternValidWithUFlag(pattern) {
-		fixes := makeFixes()
-		if fixes != nil {
-			ctx.ReportRangeWithSuggestions(r, msg, rule.RuleSuggestion{
-				Message:  rule.RuleMessage{Id: "suggestUnicodeFlag", Description: "Add unicode 'u' flag to regex."},
-				FixesArr: fixes,
-			})
-			return
-		}
+	if m.kind != "surrogatePairWithoutUFlag" {
+		ctx.ReportRange(r, msg)
+		return
 	}
-	ctx.ReportRange(r, msg)
+	ctx.ReportRangeWithDeferredSuggestions(r, msg, func() []rule.RuleSuggestion {
+		if !patternValidWithUFlag(pattern) {
+			return nil
+		}
+		fixes := makeFixes()
+		if fixes == nil {
+			return nil
+		}
+		return []rule.RuleSuggestion{{
+			Message:  rule.RuleMessage{Id: "suggestUnicodeFlag", Description: "Add unicode 'u' flag to regex."},
+			FixesArr: fixes,
+		}}
+	})
 }
 
 func messageDescriptionFor(kind string) string {

@@ -4,7 +4,11 @@ package no_misleading_character_class
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -451,6 +455,26 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 						},
 					},
 				},
+			},
+			{
+				Code: `var r = R\u0065gExp("[👍]", "")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "surrogatePairWithoutUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestUnicodeFlag",
+						Output:    `var r = R\u0065gExp("[👍]", "u")`,
+					}},
+				}},
+			},
+			{
+				Code: `var r = globalThis["RegExp"]("[👍]", "")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "surrogatePairWithoutUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestUnicodeFlag",
+						Output:    `var r = globalThis["RegExp"]("[👍]", "u")`,
+					}},
+				}},
 			},
 			{
 				Code: `var r = new RegExp("[👍]", "")`,
@@ -1214,4 +1238,58 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoMisleadingCharacterClassDefersSuggestions(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `/[\uD83D\uDC4D]/`, core.ScriptKindTS)
+
+	for _, testCase := range []struct {
+		name            string
+		demand          rule.EditDemand
+		wantBuilds      int
+		wantSuggestions bool
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix only", demand: rule.EditDemandAutofix},
+		{name: "suggestions", demand: rule.EditDemandSuggestion, wantBuilds: 1, wantSuggestions: true},
+		{name: "all edits", demand: rule.EditDemandAll, wantBuilds: 1, wantSuggestions: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			builds := 0
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{SourceFile: sourceFile}.WithDiagnosticConsumer(
+				NoMisleadingCharacterClassRule.Name,
+				rule.SeverityError,
+				rule.DiagnosticConsumer{
+					Demand: testCase.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			)
+
+			emitMatch(ctx, foundMatch{
+				kind:     "surrogatePairWithoutUFlag",
+				srcStart: 2,
+				srcEnd:   14,
+			}, `[\uD83D\uDC4D]`, func() []rule.RuleFix {
+				builds++
+				return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(0, 0), "u")}
+			})
+
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			if builds != testCase.wantBuilds {
+				t.Fatalf("suggestion builds = %d, want %d", builds, testCase.wantBuilds)
+			}
+			hasSuggestions := diagnostics[0].Suggestions != nil
+			if hasSuggestions != testCase.wantSuggestions {
+				t.Fatalf("suggestions present = %v, want %v", hasSuggestions, testCase.wantSuggestions)
+			}
+		})
+	}
 }
