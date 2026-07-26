@@ -756,11 +756,9 @@ var ObjectShorthandRule = rule.Rule{
 				}
 
 				if valueKind == ast.KindFunctionExpression {
-					if fixes := fixFunctionToMethod(node); fixes != nil {
-						ctx.ReportNodeWithFixes(node, msgExpectedMethodShorthand, fixes...)
-					} else {
-						ctx.ReportNode(node, msgExpectedMethodShorthand)
-					}
+					ctx.ReportNodeWithDeferredFixes(node, msgExpectedMethodShorthand, func() []rule.RuleFix {
+						return fixFunctionToMethod(node)
+					})
 					return
 				}
 
@@ -777,11 +775,9 @@ var ObjectShorthandRule = rule.Rule{
 				if arrowsWithLexicalIdentifiers[value] {
 					return
 				}
-				if fixes := fixArrowToMethod(node); fixes != nil {
-					ctx.ReportNodeWithFixes(node, msgExpectedMethodShorthand, fixes...)
-				} else {
-					ctx.ReportNode(node, msgExpectedMethodShorthand)
-				}
+				ctx.ReportNodeWithDeferredFixes(node, msgExpectedMethodShorthand, func() []rule.RuleFix {
+					return fixArrowToMethod(node)
+				})
 				return
 			}
 
