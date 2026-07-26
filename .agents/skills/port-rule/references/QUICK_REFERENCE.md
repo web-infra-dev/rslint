@@ -27,12 +27,26 @@ A quick reference for common commands, file locations, and checklists when porti
 
 ## File Locations
 
-| File Type         | Core Rules                                                     | Plugin Rules                                                     |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Go implementation | `internal/rules/<name>/`                                       | `internal/plugins/<plugin>/rules/<name>/`                        |
-| Go tests          | `internal/rules/<name>/<name>_test.go`                         | `internal/plugins/<plugin>/rules/<name>/<name>_test.go`          |
-| Documentation     | `internal/rules/<name>/<name>.md`                              | `internal/plugins/<plugin>/rules/<name>/<name>.md`               |
-| JS tests          | `packages/rslint-test-tools/tests/eslint/rules/<name>.test.ts` | `packages/rslint-test-tools/tests/<plugin>/rules/<name>.test.ts` |
+| File Type         | Core Rules                                                                | Plugin Rules                                                     |
+| ----------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Go implementation | `internal/rules/<name>/`                                                  | `internal/plugins/<plugin>/rules/<name>/`                        |
+| Go tests          | `<name>_upstream_test.go` + `<name>_extras_test.go` in the rule directory | Same two-file split in the plugin rule directory                 |
+| Documentation     | `internal/rules/<name>/<name>.md`                                         | `internal/plugins/<plugin>/rules/<name>/<name>.md`               |
+| JS tests          | `packages/rslint-test-tools/tests/eslint/rules/<name>.test.ts`            | `packages/rslint-test-tools/tests/<plugin>/rules/<name>.test.ts` |
+
+---
+
+## Framework Performance Defaults
+
+| Need                              | Use                                                                     | Avoid                                                                        |
+| --------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Autofixes or suggestions          | Matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method | Constructing edit-only text, ranges, slices, or suggestions before reporting |
+| References to one declared symbol | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
+| Every comment in the file         | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
+
+Deferred edit builders may return nil and run synchronously only when their
+artifact category is requested and the diagnostic is not suppressed. Detection,
+message, and report range must remain independent of edit demand.
 
 ---
 
@@ -109,7 +123,10 @@ import (
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
 - [ ] JS snapshots generated (`npx rstest run <name> -u`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
-- [ ] Go/JS test coverage aligned (same invalid cases, including comments/multi-line/nested)
+- [ ] Go/JS test coverage is semantically aligned (`JS ⊆ Go upstream`; extras remain Go-only)
+- [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
+- [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
+- [ ] Whole-file comment scans use `ctx.Comments.All()`
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Spell check passes (`pnpm -w run check-spell`)

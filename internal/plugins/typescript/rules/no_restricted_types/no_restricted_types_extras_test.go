@@ -180,7 +180,7 @@ func TestNoRestrictedTypesExtras(t *testing.T) {
 		// ---- Branch lock-in: object with BOTH fixWith and suggest emits fix + suggestions ----
 		// Upstream `context.report({...fix, suggest})` keeps both; we
 		// match by sending the diagnostic via
-		// ReportNodeWithFixesAndSuggestions.
+		// ReportNodeWithDeferredFixesAndSuggestions.
 		{
 			Code: `let value: Banned;`,
 			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
