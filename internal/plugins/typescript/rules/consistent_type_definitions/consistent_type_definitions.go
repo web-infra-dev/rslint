@@ -20,6 +20,164 @@ type ConsistentTypeDefinitionsOptions struct {
 	Style DefinitionStyle `json:"style"`
 }
 
+type consistentTypeDefinitionsFixer struct {
+	sourceFile *ast.SourceFile
+}
+
+// modifiersInfo builds a modifier prefix such as "export declare ". The
+// default modifier is intentionally excluded because export default
+// interfaces need to become a type declaration plus a separate default
+// export.
+func modifiersInfo(modifiers *ast.ModifierList) (prefix string, hasExport bool, hasDefault bool) {
+	if modifiers == nil {
+		return "", false, false
+	}
+	hasDeclare := false
+	for _, mod := range modifiers.Nodes {
+		switch mod.Kind {
+		case ast.KindExportKeyword:
+			hasExport = true
+		case ast.KindDefaultKeyword:
+			hasDefault = true
+		case ast.KindDeclareKeyword:
+			hasDeclare = true
+		}
+	}
+	var parts []string
+	if hasExport {
+		parts = append(parts, "export")
+	}
+	if hasDeclare {
+		parts = append(parts, "declare")
+	}
+	if len(parts) > 0 {
+		prefix = strings.Join(parts, " ") + " "
+	}
+	return prefix, hasExport, hasDefault
+}
+
+func (f consistentTypeDefinitionsFixer) typeParametersText(sourceText string, typeParameters *ast.NodeList) string {
+	if typeParameters == nil || len(typeParameters.Nodes) == 0 {
+		return ""
+	}
+	firstParameter := typeParameters.Nodes[0]
+	lastParameter := typeParameters.Nodes[len(typeParameters.Nodes)-1]
+	firstRange := utils.TrimNodeTextRange(f.sourceFile, firstParameter)
+	lastRange := utils.TrimNodeTextRange(f.sourceFile, lastParameter)
+	return sourceText[firstRange.Pos()-1 : lastRange.End()+1]
+}
+
+func (f consistentTypeDefinitionsFixer) typeAliasFix(node *ast.Node, typeAlias *ast.TypeAliasDeclaration) []rule.RuleFix {
+	sourceText := f.sourceFile.Text()
+	nameRange := utils.TrimNodeTextRange(f.sourceFile, typeAlias.Name())
+	nameText := sourceText[nameRange.Pos():nameRange.End()]
+	typeParametersText := f.typeParametersText(sourceText, typeAlias.TypeParameters)
+	prefix, _, _ := modifiersInfo(typeAlias.Modifiers())
+
+	unwrapped := ast.SkipTypeParentheses(typeAlias.Type)
+	bodyRange := utils.TrimNodeTextRange(f.sourceFile, unwrapped)
+	bodyText := sourceText[bodyRange.Pos():bodyRange.End()]
+
+	var commentText string
+	nameOrTypeParametersEnd := nameRange.End()
+	if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
+		lastParameter := typeAlias.TypeParameters.Nodes[len(typeAlias.TypeParameters.Nodes)-1]
+		lastRange := utils.TrimNodeTextRange(f.sourceFile, lastParameter)
+		nameOrTypeParametersEnd = lastRange.End() + 1
+	}
+
+	typeRange := utils.TrimNodeTextRange(f.sourceFile, typeAlias.Type)
+	betweenText := sourceText[nameOrTypeParametersEnd:typeRange.Pos()]
+	if index := strings.Index(betweenText, "/*"); index >= 0 {
+		endIndex := strings.Index(betweenText, "*/")
+		if endIndex >= 0 {
+			commentText = " " + strings.TrimSpace(betweenText[index:endIndex+2]) + " "
+		}
+	}
+
+	replacement := prefix + "interface " + nameText + typeParametersText + " " + bodyText
+	if commentText != "" {
+		replacement = prefix + "interface " + nameText + typeParametersText + commentText + bodyText
+	}
+
+	declarationRange := utils.TrimNodeTextRange(f.sourceFile, node)
+	return []rule.RuleFix{rule.RuleFixReplaceRange(declarationRange, replacement)}
+}
+
+func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDeclaration *ast.InterfaceDeclaration) []rule.RuleFix {
+	sourceText := f.sourceFile.Text()
+	nameRange := utils.TrimNodeTextRange(f.sourceFile, interfaceDeclaration.Name())
+	nameText := sourceText[nameRange.Pos():nameRange.End()]
+	typeParametersText := f.typeParametersText(sourceText, interfaceDeclaration.TypeParameters)
+	prefix, hasExport, hasDefault := modifiersInfo(interfaceDeclaration.Modifiers())
+	declarationRange := utils.TrimNodeTextRange(f.sourceFile, node)
+
+	var bodyStartScanPosition int
+	if interfaceDeclaration.HeritageClauses != nil && len(interfaceDeclaration.HeritageClauses.Nodes) > 0 {
+		lastClause := interfaceDeclaration.HeritageClauses.Nodes[len(interfaceDeclaration.HeritageClauses.Nodes)-1]
+		bodyStartScanPosition = lastClause.End()
+	} else if interfaceDeclaration.TypeParameters != nil && len(interfaceDeclaration.TypeParameters.Nodes) > 0 {
+		lastParameter := interfaceDeclaration.TypeParameters.Nodes[len(interfaceDeclaration.TypeParameters.Nodes)-1]
+		lastRange := utils.TrimNodeTextRange(f.sourceFile, lastParameter)
+		bodyStartScanPosition = lastRange.End() + 1
+	} else {
+		bodyStartScanPosition = nameRange.End()
+	}
+
+	sourceScanner := scanner.GetScannerForSourceFile(f.sourceFile, bodyStartScanPosition)
+	openBracePosition := -1
+	for sourceScanner.TokenStart() < declarationRange.End() {
+		if sourceScanner.Token() == ast.KindOpenBraceToken {
+			openBracePosition = sourceScanner.TokenStart()
+			break
+		}
+		sourceScanner.Scan()
+	}
+	if openBracePosition == -1 {
+		return nil
+	}
+
+	bodyText := sourceText[openBracePosition:declarationRange.End()]
+	var extendsTypes []string
+	if interfaceDeclaration.HeritageClauses != nil {
+		for _, clause := range interfaceDeclaration.HeritageClauses.Nodes {
+			heritageClause := clause.AsHeritageClause()
+			if heritageClause == nil || heritageClause.Token != ast.KindExtendsKeyword {
+				continue
+			}
+			if heritageClause.Types != nil {
+				for _, typeNode := range heritageClause.Types.Nodes {
+					typeRange := utils.TrimNodeTextRange(f.sourceFile, typeNode)
+					extendsTypes = append(extendsTypes, sourceText[typeRange.Pos():typeRange.End()])
+				}
+			}
+		}
+	}
+
+	if hasExport && hasDefault {
+		replacement := "type " + nameText + typeParametersText + " = " + bodyText
+		if len(extendsTypes) > 0 {
+			replacement += " & " + strings.Join(extendsTypes, " & ")
+		}
+		replacement += "\nexport default " + nameText
+		return []rule.RuleFix{rule.RuleFixReplaceRange(declarationRange, replacement)}
+	}
+
+	replacement := prefix + "type " + nameText + typeParametersText + " = " + bodyText
+	if len(extendsTypes) > 0 {
+		replacement += " & " + strings.Join(extendsTypes, " & ")
+	}
+
+	declarationEnd := declarationRange.End()
+	if declarationEnd < len(sourceText) && sourceText[declarationEnd] == ';' {
+		fixRange := declarationRange.WithEnd(declarationEnd + 1)
+		replacement += ";"
+		return []rule.RuleFix{rule.RuleFixReplaceRange(fixRange, replacement)}
+	}
+
+	return []rule.RuleFix{rule.RuleFixReplaceRange(declarationRange, replacement)}
+}
+
 // ConsistentTypeDefinitionsRule enforces consistent type definitions
 var ConsistentTypeDefinitionsRule = rule.CreateRule(rule.Rule{
 	Name: "consistent-type-definitions",
@@ -43,11 +201,8 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 	}
 
-	sourceText := ctx.SourceFile.Text()
-
-	// Helper to get source text for a range
-	getSourceRange := func(start, end int) string {
-		return sourceText[start:end]
+	fixer := consistentTypeDefinitionsFixer{
+		sourceFile: ctx.SourceFile,
 	}
 
 	// Helper to check if a type is an object type literal
@@ -106,50 +261,13 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		return false
 	}
 
-	// Helper to build modifiers prefix text (e.g. "export ", "export declare ")
-	// Returns the prefix and whether it has export/default/declare.
-	// Note: hasDefault is intentionally excluded from prefix because
-	// "export default interface" requires special handling (split into type decl + separate default export).
-	getModifiersInfo := func(modifiers *ast.ModifierList) (prefix string, hasExport bool, hasDefault bool, hasDeclare bool) {
-		if modifiers == nil {
-			return "", false, false, false
-		}
-		for _, mod := range modifiers.Nodes {
-			switch mod.Kind {
-			case ast.KindExportKeyword:
-				hasExport = true
-			case ast.KindDefaultKeyword:
-				hasDefault = true
-			case ast.KindDeclareKeyword:
-				hasDeclare = true
-			}
-		}
-		var parts []string
-		if hasExport {
-			parts = append(parts, "export")
-		}
-		if hasDeclare {
-			parts = append(parts, "declare")
-		}
-		if len(parts) > 0 {
-			prefix = strings.Join(parts, " ") + " "
-		}
-		return
+	interfaceOverTypeMessage := rule.RuleMessage{
+		Id:          "interfaceOverType",
+		Description: "Use an interface instead of a type literal.",
 	}
-
-	// Helper to get type parameters text including angle brackets
-	getTypeParamsText := func(typeParams *ast.NodeList) string {
-		if typeParams == nil || len(typeParams.Nodes) == 0 {
-			return ""
-		}
-		firstParam := typeParams.Nodes[0]
-		lastParam := typeParams.Nodes[len(typeParams.Nodes)-1]
-		firstRange := utils.TrimNodeTextRange(ctx.SourceFile, firstParam)
-		lastRange := utils.TrimNodeTextRange(ctx.SourceFile, lastParam)
-		// Include the angle brackets
-		start := firstRange.Pos() - 1
-		end := lastRange.End() + 1
-		return getSourceRange(start, end)
+	typeOverInterfaceMessage := rule.RuleMessage{
+		Id:          "typeOverInterface",
+		Description: "Use a type literal instead of an interface.",
 	}
 
 	checkTypeAlias := func(node *ast.Node) {
@@ -167,59 +285,9 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 			return
 		}
 
-		// Build the fix: convert type alias to interface
-		// Get name text
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, typeAlias.Name())
-		nameText := getSourceRange(nameRange.Pos(), nameRange.End())
-
-		// Get type parameters
-		typeParamsText := getTypeParamsText(typeAlias.TypeParameters)
-
-		// Get modifiers prefix
-		prefix, _, _, _ := getModifiersInfo(typeAlias.Modifiers())
-
-		// Get the body text from the unwrapped type literal
-		unwrapped := ast.SkipTypeParentheses(typeAlias.Type)
-		bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, unwrapped)
-		bodyText := getSourceRange(bodyRange.Pos(), bodyRange.End())
-
-		// Check for comments between name/type-params and '='
-		// We need to preserve any comments that exist between the name and the body
-		var commentText string
-		nameOrTypeParamsEnd := nameRange.End()
-		if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
-			lastParam := typeAlias.TypeParameters.Nodes[len(typeAlias.TypeParameters.Nodes)-1]
-			lastRange := utils.TrimNodeTextRange(ctx.SourceFile, lastParam)
-			nameOrTypeParamsEnd = lastRange.End() + 1 // +1 for '>'
-		}
-
-		// Check for comments in the region between name and '='
-		typeRange := utils.TrimNodeTextRange(ctx.SourceFile, typeAlias.Type)
-		betweenText := getSourceRange(nameOrTypeParamsEnd, typeRange.Pos())
-		// Look for /* ... */ style comments
-		if idx := strings.Index(betweenText, "/*"); idx >= 0 {
-			endIdx := strings.Index(betweenText, "*/")
-			if endIdx >= 0 {
-				commentText = " " + strings.TrimSpace(betweenText[idx:endIdx+2]) + " "
-			}
-		}
-
-		// Build the replacement
-		var replacement string
-		if commentText != "" {
-			replacement = prefix + "interface " + nameText + typeParamsText + commentText + bodyText
-		} else {
-			replacement = prefix + "interface " + nameText + typeParamsText + " " + bodyText
-		}
-
-		// Determine the range to replace: from start of declaration to end
-		// Need to handle trailing semicolon
-		declRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-
-		ctx.ReportNodeWithFixes(typeAlias.Name(), rule.RuleMessage{
-			Id:          "interfaceOverType",
-			Description: "Use an interface instead of a type literal.",
-		}, rule.RuleFixReplaceRange(declRange, replacement))
+		ctx.ReportNodeWithDeferredFixes(typeAlias.Name(), interfaceOverTypeMessage, func() []rule.RuleFix {
+			return fixer.typeAliasFix(node, typeAlias)
+		})
 	}
 
 	checkInterface := func(node *ast.Node) {
@@ -232,116 +300,15 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 			return
 		}
 
-		msg := rule.RuleMessage{
-			Id:          "typeOverInterface",
-			Description: "Use a type literal instead of an interface.",
-		}
-
 		// Don't fix interfaces in declare global modules (see typescript-eslint #2707)
 		if isInDeclareGlobal(node) {
-			ctx.ReportNode(interfaceDecl.Name(), msg)
+			ctx.ReportNode(interfaceDecl.Name(), typeOverInterfaceMessage)
 			return
 		}
 
-		// Get name text
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, interfaceDecl.Name())
-		nameText := getSourceRange(nameRange.Pos(), nameRange.End())
-
-		// Get type parameters
-		typeParamsText := getTypeParamsText(interfaceDecl.TypeParameters)
-
-		// Get modifiers info
-		prefix, hasExport, hasDefault, _ := getModifiersInfo(interfaceDecl.Modifiers())
-
-		// Get the body text: from '{' to '}'
-		// The Members list gives us the members, but we need the '{...}' block
-		// We'll scan for the opening '{' after the interface name/type-params/extends
-		declRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-
-		// Find the opening '{' by scanning from after extends clause or name
-		var bodyStartScanPos int
-		if interfaceDecl.HeritageClauses != nil && len(interfaceDecl.HeritageClauses.Nodes) > 0 {
-			lastClause := interfaceDecl.HeritageClauses.Nodes[len(interfaceDecl.HeritageClauses.Nodes)-1]
-			bodyStartScanPos = lastClause.End()
-		} else if interfaceDecl.TypeParameters != nil && len(interfaceDecl.TypeParameters.Nodes) > 0 {
-			lastParam := interfaceDecl.TypeParameters.Nodes[len(interfaceDecl.TypeParameters.Nodes)-1]
-			lastRange := utils.TrimNodeTextRange(ctx.SourceFile, lastParam)
-			bodyStartScanPos = lastRange.End() + 1 // +1 for '>'
-		} else {
-			bodyStartScanPos = nameRange.End()
-		}
-
-		// Scan to find the opening '{'
-		s := scanner.GetScannerForSourceFile(ctx.SourceFile, bodyStartScanPos)
-		openBracePos := -1
-		for s.TokenStart() < declRange.End() {
-			if s.Token() == ast.KindOpenBraceToken {
-				openBracePos = s.TokenStart()
-				break
-			}
-			s.Scan()
-		}
-		if openBracePos == -1 {
-			// Fallback: just report without fix
-			ctx.ReportNode(interfaceDecl.Name(), msg)
-			return
-		}
-
-		// Body is from '{' to the end of the interface declaration
-		bodyText := getSourceRange(openBracePos, declRange.End())
-
-		// Get extends types for intersection
-		var extendsTypes []string
-		if interfaceDecl.HeritageClauses != nil {
-			for _, clause := range interfaceDecl.HeritageClauses.Nodes {
-				heritageClause := clause.AsHeritageClause()
-				if heritageClause == nil || heritageClause.Token != ast.KindExtendsKeyword {
-					continue
-				}
-				if heritageClause.Types != nil {
-					for _, typeNode := range heritageClause.Types.Nodes {
-						typeRange := utils.TrimNodeTextRange(ctx.SourceFile, typeNode)
-						extendsTypes = append(extendsTypes, getSourceRange(typeRange.Pos(), typeRange.End()))
-					}
-				}
-			}
-		}
-
-		// Handle export default interface
-		if hasExport && hasDefault {
-			// Convert to: type Name = { ... }\nexport default Name
-			replacement := "type " + nameText + typeParamsText + " = " + bodyText
-			if len(extendsTypes) > 0 {
-				replacement += " & " + strings.Join(extendsTypes, " & ")
-			}
-			replacement += "\nexport default " + nameText
-
-			ctx.ReportNodeWithFixes(interfaceDecl.Name(), msg,
-				rule.RuleFixReplaceRange(declRange, replacement))
-			return
-		}
-
-		// Build replacement: type Name = { ... }
-		var replacement string
-		replacement = prefix + "type " + nameText + typeParamsText + " = " + bodyText
-		if len(extendsTypes) > 0 {
-			replacement += " & " + strings.Join(extendsTypes, " & ")
-		}
-
-		// Check for trailing semicolon after the interface declaration
-		afterDeclEnd := declRange.End()
-		if afterDeclEnd < len(sourceText) && sourceText[afterDeclEnd] == ';' {
-			// Include the trailing semicolon in the range so it gets replaced
-			// The semicolon after interface closing brace should be preserved in the output
-			fixRange := declRange.WithEnd(afterDeclEnd + 1)
-			replacement += ";"
-			ctx.ReportNodeWithFixes(interfaceDecl.Name(), msg,
-				rule.RuleFixReplaceRange(fixRange, replacement))
-			return
-		}
-
-		ctx.ReportNodeWithFixes(interfaceDecl.Name(), msg,
-			rule.RuleFixReplaceRange(declRange, replacement))
+		ctx.ReportNodeWithDeferredFixes(interfaceDecl.Name(), typeOverInterfaceMessage, func() []rule.RuleFix {
+			return fixer.interfaceFix(node, interfaceDecl)
+		})
 	}
 
 	return rule.RuleListeners{
