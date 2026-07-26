@@ -1,6 +1,9 @@
 package no_loss_of_precision
 
 import (
+	"math"
+	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -37,6 +40,7 @@ func TestNoLossOfPrecisionExtras(t *testing.T) {
 			{Code: `const { ...rest } = source;`},
 
 			// ---- Dimension 4: IEEE-754 boundary values that remain representable ----
+			{Code: `const safeIntegerBoundary = 9007199254740992;`},
 			{Code: `const min = 5e-324;`},
 			{Code: `const max = 1.7976931348623157e308;`},
 			{Code: `const carry = 9999999999999998;`},
@@ -44,6 +48,7 @@ func TestNoLossOfPrecisionExtras(t *testing.T) {
 			// ---- Dimension 4: non-decimal leading-zero spellings stay exact when the value is exact ----
 			{Code: `const exactHex = 0x0001fffffffffffff;`},
 			{Code: `const exactOctal = 0o000377777777777777777;`},
+			{Code: `const exactShiftedHex = 0x40000000000000;`},
 
 			// ---- Real-user: eslint/eslint#19957 plus-signed exponent remains valid ----
 			{Code: `const test = 9.000e+3;`},
@@ -70,6 +75,7 @@ func TestNoLossOfPrecisionExtras(t *testing.T) {
 
 			// ---- Dimension 4: comments/trivia before a literal do not affect raw token comparison ----
 			noLossInvalid(`const x = /* leading trivia */ 9007199254740993;`, `9007199254740993`),
+			noLossInvalid("const x =\n// leading line trivia\n9007199254740993;", `9007199254740993`),
 
 			// ---- Dimension 4: numeric property/key forms ----
 			noLossInvalid(`const x = { 9007199254740993: "value" };`, `9007199254740993`),
@@ -180,6 +186,16 @@ func TestNoLossOfPrecisionRawLiteralBranches(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "Locks in the largest integer guaranteed exact by the decimal fast path",
+			raw:  "9007199254740992",
+			want: false,
+		},
+		{
+			name: "Locks in the first integer above the exact decimal fast-path boundary",
+			raw:  "9007199254740993",
+			want: true,
+		},
+		{
 			name: "Locks in upstream valid leading-zero decimal with fractional part",
 			raw:  "019.5",
 			want: false,
@@ -213,6 +229,11 @@ func TestNoLossOfPrecisionRawLiteralBranches(t *testing.T) {
 			name: "Locks in non-decimal leading-zero lossy hexadecimal spelling",
 			raw:  "0x00020000000000001",
 			want: true,
+		},
+		{
+			name: "Locks in a hexadecimal integer wider than 53 bits but exact after removing powers of two",
+			raw:  "0x40000000000000",
+			want: false,
 		},
 		{
 			name: "Locks in non-decimal leading-zero exact octal spelling",
@@ -274,4 +295,189 @@ func TestNoLossOfPrecisionRawLiteralBranches(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNoLossOfPrecisionConcurrent(t *testing.T) {
+	tests := []struct {
+		raw  string
+		want bool
+	}{
+		{raw: "123.456", want: false},
+		{raw: "255.10000610351562", want: true},
+		{raw: "5e-324", want: false},
+		{raw: "4e-324", want: true},
+		{raw: "1.7976931348623157e308", want: false},
+		{raw: "1.7976931348623159e308", want: true},
+	}
+	type failure struct {
+		raw       string
+		got, want bool
+	}
+
+	start := make(chan struct{})
+	failures := make(chan failure, 64)
+	var waitGroup sync.WaitGroup
+	for range 64 {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			<-start
+			for range 32 {
+				for _, test := range tests {
+					if got := losesPrecision(test.raw); got != test.want {
+						failures <- failure{raw: test.raw, got: got, want: test.want}
+						return
+					}
+				}
+			}
+		}()
+	}
+	close(start)
+	waitGroup.Wait()
+	close(failures)
+
+	for failure := range failures {
+		t.Errorf("losesPrecision(%q) = %v, want %v", failure.raw, failure.got, failure.want)
+	}
+}
+
+func TestNotBaseTenLosesPrecisionMatchesFloat64(t *testing.T) {
+	t.Parallel()
+
+	for bitLength := 1; bitLength <= 1_050; bitLength++ {
+		for _, significantBits := range []int{1, 2, 52, 53, 54, 60} {
+			if significantBits > bitLength {
+				continue
+			}
+
+			significantValue := new(big.Int).Lsh(big.NewInt(1), uint(significantBits-1))
+			if significantBits > 1 {
+				significantValue.Add(significantValue, big.NewInt(1))
+			}
+			original := new(big.Int).Lsh(significantValue, uint(bitLength-significantBits))
+			want := referenceIntegerLosesPrecision(original)
+
+			for _, base := range []int{2, 8, 16} {
+				digits := original.Text(base)
+				if got := notBaseTenLosesPrecision(digits, base); got != want {
+					t.Fatalf(
+						"notBaseTenLosesPrecision(%q, %d) = %v, want %v (bit length %d, significant bits %d)",
+						digits,
+						base,
+						got,
+						want,
+						bitLength,
+						significantBits,
+					)
+				}
+			}
+		}
+	}
+}
+
+func referenceIntegerLosesPrecision(original *big.Int) bool {
+	value, _ := new(big.Float).SetInt(original).Float64()
+	if math.IsInf(value, 0) {
+		return true
+	}
+
+	reconstructed := new(big.Int)
+	new(big.Float).SetFloat64(value).Int(reconstructed)
+	return original.Cmp(reconstructed) != 0
+}
+
+func TestNumberToPrecisionScientificMatchesUncached(t *testing.T) {
+	t.Parallel()
+
+	const mantissaMask = uint64(1<<52 - 1)
+	mantissas := []uint64{0, 1, 1 << 51, mantissaMask}
+	precisions := []int{1, 2, 6, 17, 100}
+
+	for exponentBits := uint64(0); exponentBits < 0x7ff; exponentBits += 17 {
+		for _, mantissa := range mantissas {
+			value := math.Float64frombits(exponentBits<<52 | mantissa)
+			if value == 0 || math.IsInf(value, 0) || math.IsNaN(value) {
+				continue
+			}
+			for _, precision := range precisions {
+				got := numberToPrecisionScientific(value, precision)
+				want := uncachedNumberToPrecisionScientific(value, precision)
+				if got != want {
+					t.Fatalf(
+						"numberToPrecisionScientific(%g, %d) = %#v, want %#v",
+						value,
+						precision,
+						got,
+						want,
+					)
+				}
+			}
+		}
+	}
+}
+
+func uncachedNumberToPrecisionScientific(value float64, precision int) scientificNotation {
+	rat := new(big.Rat).SetFloat64(math.Abs(value))
+	if rat == nil {
+		return scientificNotation{}
+	}
+
+	magnitude := int(math.Floor(math.Log10(math.Abs(value))))
+	for rat.Cmp(uncachedDecimalPower(magnitude)) < 0 {
+		magnitude--
+	}
+	for rat.Cmp(uncachedDecimalPower(magnitude+1)) >= 0 {
+		magnitude++
+	}
+
+	scaled := new(big.Rat).Set(rat)
+	scaleExponent := precision - 1 - magnitude
+	if scaleExponent >= 0 {
+		scaled.Mul(scaled, uncachedDecimalPower(scaleExponent))
+	} else {
+		scaled.Quo(scaled, uncachedDecimalPower(-scaleExponent))
+	}
+
+	rounded := uncachedRoundRatHalfUp(scaled)
+	coefficient := rounded.String()
+	if len(coefficient) > precision {
+		magnitude += len(coefficient) - precision
+		coefficient = coefficient[:precision]
+	}
+	for len(coefficient) < precision {
+		coefficient = "0" + coefficient
+	}
+
+	return scientificNotation{
+		coefficient: coefficient,
+		magnitude:   magnitude,
+	}
+}
+
+func uncachedRoundRatHalfUp(rat *big.Rat) *big.Int {
+	quotient := new(big.Int)
+	remainder := new(big.Int)
+	quotient.QuoRem(rat.Num(), rat.Denom(), remainder)
+
+	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
+	if doubleRemainder.Cmp(rat.Denom()) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	return quotient
+}
+
+func uncachedDecimalPower(exponent int) *big.Rat {
+	absoluteExponent := exponent
+	if absoluteExponent < 0 {
+		absoluteExponent = -absoluteExponent
+	}
+	power := new(big.Int).Exp(
+		big.NewInt(10),
+		big.NewInt(int64(absoluteExponent)),
+		nil,
+	)
+	if exponent >= 0 {
+		return new(big.Rat).SetInt(power)
+	}
+	return new(big.Rat).SetFrac(big.NewInt(1), power)
 }
