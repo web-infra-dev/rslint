@@ -41,6 +41,12 @@ export const values = [EmptyA, EmptyB];`,
 export const joined = localJoin("a", "b");`,
 		},
 		{
+			Code: `interface Foo {
+  bar: string;
+}
+export = Foo;`,
+		},
+		{
 			Tsx: true,
 			Code: `import React from "react";
 export const node = <div />;`,
@@ -110,6 +116,16 @@ export namespace Container {
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unusedVar", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code: `interface Foo {
+  bar: string;
+}
+type Bar = 1;
+export = Foo;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 4, Column: 6},
 			},
 		},
 		{

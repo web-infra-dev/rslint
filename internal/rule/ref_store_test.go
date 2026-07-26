@@ -183,3 +183,25 @@ func TestRefStoreJsxNamespacedNameExcluded(t *testing.T) {
 		t.Fatalf("References = %v, want [%v] (the namespaced JSX tag's `bar` must be excluded)", got, useIdent)
 	}
 }
+
+func TestRefStoreExportAssignmentResolvesTypeOnlySymbol(t *testing.T) {
+	// Export assignments resolve entity names in value, type, and namespace
+	// space. An interface consumed by `export =` is therefore a real reference.
+	sourceFile, refs := newBoundRefStore(t, "/export-assignment.ts", core.ScriptKindTS,
+		"interface Foo { bar: string }\nexport = Foo;\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "Foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of Foo, got %d", len(occurrences))
+	}
+	declIdent, exportIdent := occurrences[0], occurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != exportIdent {
+		t.Fatalf("References = %v, want [%v] (the `export = Foo` reference)", got, exportIdent)
+	}
+}

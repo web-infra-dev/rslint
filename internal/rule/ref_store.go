@@ -165,6 +165,14 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		// `x is T` — the x names a parameter.
 		return ast.SymbolFlagsFunctionScopedVariable
 	}
+	if p != nil && p.Kind == ast.KindExportAssignment {
+		// `export = Foo` and `export default Foo` resolve entity names in all
+		// declaration spaces. In particular, TypeScript permits type-only
+		// declarations such as an interface to be consumed by `export =`.
+		// Mirror the checker's getSymbolOfNameOrPropertyAccessExpression path
+		// instead of treating the identifier as an ordinary value expression.
+		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
 	// `import a = b.c` — the right-hand side may name a value, type, or
 	// namespace.
 	entity := n
