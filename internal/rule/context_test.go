@@ -252,6 +252,80 @@ func TestDeferredFixesAndSuggestionsDemand(t *testing.T) {
 	}
 }
 
+func TestDeferredFixesAndSuggestionsAttachOnlyNonEmptyCategories(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, "const value = 1;", core.ScriptKindTS)
+	textRange := core.NewTextRange(0, 5)
+	message := RuleMessage{Id: "combined", Description: "combined report"}
+	fix := RuleFixReplaceRange(textRange, "let")
+	suggestion := RuleSuggestion{
+		Message:  RuleMessage{Id: "suggestion", Description: "use let"},
+		FixesArr: []RuleFix{fix},
+	}
+
+	tests := []struct {
+		name            string
+		fixes           []RuleFix
+		suggestions     []RuleSuggestion
+		wantFixes       bool
+		wantSuggestions bool
+	}{
+		{
+			name:      "fixes only",
+			fixes:     []RuleFix{fix},
+			wantFixes: true,
+		},
+		{
+			name:            "suggestions only",
+			suggestions:     []RuleSuggestion{suggestion},
+			wantSuggestions: true,
+		},
+		{name: "both empty"},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var got []RuleDiagnostic
+			ctx := RuleContext{
+				SourceFile:     sourceFile,
+				DisableManager: NewDisableManager(sourceFile, NewCommentStore(sourceFile)),
+			}.WithDiagnosticConsumer("test", SeverityWarning, DiagnosticConsumer{
+				Demand: EditDemandAll,
+				Report: func(diagnostic RuleDiagnostic) {
+					got = append(got, diagnostic)
+				},
+			})
+
+			ctx.ReportRangeWithDeferredFixesAndSuggestions(
+				textRange,
+				message,
+				func() []RuleFix { return testCase.fixes },
+				func() []RuleSuggestion { return testCase.suggestions },
+			)
+
+			if len(got) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(got))
+			}
+			if got[0].Range != textRange || !reflect.DeepEqual(got[0].Message, message) {
+				t.Errorf("diagnostic identity changed: %#v", got[0])
+			}
+			if (got[0].FixesPtr != nil) != testCase.wantFixes {
+				t.Errorf("fix presence = %v, want %v", got[0].FixesPtr != nil, testCase.wantFixes)
+			} else if testCase.wantFixes && !reflect.DeepEqual(*got[0].FixesPtr, testCase.fixes) {
+				t.Errorf("fixes = %#v, want %#v", *got[0].FixesPtr, testCase.fixes)
+			}
+			if (got[0].Suggestions != nil) != testCase.wantSuggestions {
+				t.Errorf("suggestion presence = %v, want %v", got[0].Suggestions != nil, testCase.wantSuggestions)
+			} else if testCase.wantSuggestions &&
+				!reflect.DeepEqual(*got[0].Suggestions, testCase.suggestions) {
+				t.Errorf("suggestions = %#v, want %#v", *got[0].Suggestions, testCase.suggestions)
+			}
+		})
+	}
+}
+
 func TestNodeDeferredFixesAndSuggestionsSkipsSuppressedBuilders(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
