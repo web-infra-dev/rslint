@@ -100,6 +100,9 @@ func TestNoDupeClassMembersRule(t *testing.T) {
 
 		// ─── __proto__ as single member (no collision) ───
 		{Code: `class A { __proto__() {} }`},
+		// Go maps do not need the "$" prefix used by the JavaScript
+		// implementation to avoid prototype-key collisions.
+		{Code: `class A { $() {} $$() {} }`},
 
 		// ─── property with function-expression initializer (single, no dup) ───
 		{Code: `class A { foo = () => {} }`},
@@ -136,7 +139,7 @@ func TestNoDupeClassMembersRule(t *testing.T) {
 		{
 			Code: `class A { foo() {} foo() {} }`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unexpected", Line: 1, Column: 20},
+				{MessageId: "unexpected", Message: "Duplicate name 'foo'.", Line: 1, Column: 20},
 			},
 		},
 		{
@@ -428,6 +431,12 @@ func TestNoDupeClassMembersRule(t *testing.T) {
 				{MessageId: "unexpected", Line: 1, Column: 26},
 			},
 		},
+		{
+			Code: `class A { $() {} ['$']() {} }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unexpected", Message: "Duplicate name '$'.", Line: 1, Column: 18},
+			},
+		},
 
 		// ─── class with extends: duplicates in child class still detected ───
 		{
@@ -551,4 +560,63 @@ func TestNoDupeClassMembersRule(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestRegisterMemberExhaustive(t *testing.T) {
+	type referenceState struct {
+		init bool
+		get  bool
+		set  bool
+	}
+
+	registerReference := func(state referenceState, kind memberKind) (referenceState, bool) {
+		var duplicate bool
+		switch kind {
+		case memberKindGet:
+			duplicate = state.init || state.get
+			state.get = true
+		case memberKindSet:
+			duplicate = state.init || state.set
+			state.set = true
+		default:
+			duplicate = state.init || state.get || state.set
+			state.init = true
+		}
+		return state, duplicate
+	}
+
+	toMemberState := func(state referenceState) memberState {
+		var result memberState
+		if state.init {
+			result |= memberStateInit
+		}
+		if state.get {
+			result |= memberStateGet
+		}
+		if state.set {
+			result |= memberStateSet
+		}
+		return result
+	}
+
+	kinds := [...]memberKind{memberKindInit, memberKindGet, memberKindSet}
+	var visit func(memberState, referenceState, []memberKind)
+	visit = func(actual memberState, expected referenceState, sequence []memberKind) {
+		if len(sequence) == 8 {
+			return
+		}
+		for _, kind := range kinds {
+			nextActual, gotDuplicate := registerMember(actual, kind)
+			nextExpected, wantDuplicate := registerReference(expected, kind)
+			nextSequence := append(sequence, kind)
+			if gotDuplicate != wantDuplicate {
+				t.Fatalf("sequence %v: duplicate = %v, want %v", nextSequence, gotDuplicate, wantDuplicate)
+			}
+			if wantState := toMemberState(nextExpected); nextActual != wantState {
+				t.Fatalf("sequence %v: state = %03b, want %03b", nextSequence, nextActual, wantState)
+			}
+			visit(nextActual, nextExpected, nextSequence)
+		}
+	}
+	visit(0, referenceState{}, nil)
 }

@@ -1,27 +1,54 @@
 package no_dupe_class_members
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+type memberKind uint8
+
+const (
+	memberKindInit memberKind = iota
+	memberKindGet
+	memberKindSet
+)
+
+type memberState uint8
+
+const (
+	memberStateInit memberState = 1 << iota
+	memberStateGet
+	memberStateSet
+)
+
+type stateEntry struct {
+	nonStatic memberState
+	static    memberState
+}
+
+func registerMember(state memberState, kind memberKind) (memberState, bool) {
+	var flag memberState
+	var conflicts memberState
+	switch kind {
+	case memberKindGet:
+		flag = memberStateGet
+		conflicts = memberStateInit | memberStateGet
+	case memberKindSet:
+		flag = memberStateSet
+		conflicts = memberStateInit | memberStateSet
+	default:
+		flag = memberStateInit
+		conflicts = memberStateInit | memberStateGet | memberStateSet
+	}
+	return state | flag, state&conflicts != 0
+}
+
 var NoDupeClassMembersRule = rule.CreateRule(rule.Rule{
 	Name: "no-dupe-class-members",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkClass := func(node *ast.Node) {
-			type memberState struct {
-				init bool
-				get  bool
-				set  bool
-			}
-			type stateEntry struct {
-				nonStatic memberState
-				static    memberState
-			}
-			stateMap := make(map[string]*stateEntry)
+			stateMap := make(map[string]stateEntry)
 
 			for _, member := range node.Members() {
 				// Skip the class constructor. In TypeScript-Go's AST, both keyword
@@ -42,17 +69,17 @@ var NoDupeClassMembersRule = rule.CreateRule(rule.Rule{
 
 				// Determine the duplicate-detection category.
 				// get + set for the same name is allowed; any other combination is a duplicate.
-				var kind string
+				var kind memberKind
 				switch {
 				case ast.IsGetAccessorDeclaration(member):
-					kind = "get"
+					kind = memberKindGet
 				case ast.IsSetAccessorDeclaration(member):
-					kind = "set"
+					kind = memberKindSet
 				case ast.IsMethodDeclaration(member), ast.IsPropertyDeclaration(member):
-					kind = "init"
+					kind = memberKindInit
 				case ast.IsConstructorDeclaration(member):
 					// Static constructor — treated as a static method named "constructor".
-					kind = "init"
+					kind = memberKindInit
 				default:
 					continue
 				}
@@ -73,29 +100,14 @@ var NoDupeClassMembersRule = rule.CreateRule(rule.Rule{
 					continue
 				}
 
-				// "$" prefix avoids collisions with built-in object keys like "__proto__".
-				key := "$" + name
-				if stateMap[key] == nil {
-					stateMap[key] = &stateEntry{}
-				}
-
-				state := &stateMap[key].nonStatic
-				if ast.IsStatic(member) {
-					state = &stateMap[key].static
-				}
-
+				entry := stateMap[name]
 				var isDuplicate bool
-				switch kind {
-				case "get":
-					isDuplicate = state.init || state.get
-					state.get = true
-				case "set":
-					isDuplicate = state.init || state.set
-					state.set = true
-				default: // "init"
-					isDuplicate = state.init || state.get || state.set
-					state.init = true
+				if ast.IsStatic(member) {
+					entry.static, isDuplicate = registerMember(entry.static, kind)
+				} else {
+					entry.nonStatic, isDuplicate = registerMember(entry.nonStatic, kind)
 				}
+				stateMap[name] = entry
 
 				if isDuplicate {
 					reportNode := nameNode
@@ -104,7 +116,7 @@ var NoDupeClassMembersRule = rule.CreateRule(rule.Rule{
 					}
 					ctx.ReportNode(reportNode, rule.RuleMessage{
 						Id:          "unexpected",
-						Description: fmt.Sprintf("Duplicate name '%s'.", name),
+						Description: "Duplicate name '" + name + "'.",
 					})
 				}
 			}
