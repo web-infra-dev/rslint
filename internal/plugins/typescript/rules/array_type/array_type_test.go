@@ -1,9 +1,13 @@
 package array_type
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -429,4 +433,165 @@ interface FooInterface {
 			Output: []string{"type Conditional<T> = Array<T extends string ? string : number>;"},
 		},
 	})
+}
+
+func TestArrayTypeEditDemand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		code        string
+		options     []any
+		wantFixText []string
+	}{
+		{
+			name: "generic to array",
+			code: `type Simple = Array<Value>;
+type Union = Array<string | number>;
+type ReadonlySimple = ReadonlyArray<Value>;
+type MissingTypeArgument = Array;
+type ReadonlyWrappedArray = Readonly<string[]>;
+type NestedReadonlyArray = ReadonlyArray<Value>[];
+type NestedReadonlyUnionArray = ReadonlyArray<string | number>[];
+type NestedReadonlyWrappedArray = Readonly<string[]>[];`,
+			wantFixText: []string{
+				"Value[]",
+				"(string | number)[]",
+				"readonly Value[]",
+				"any[]",
+				"readonly string[]",
+				"(readonly Value[])",
+				"(readonly (string | number)[])",
+				"(readonly string[])",
+			},
+		},
+		{
+			name: "array to generic",
+			code: `type Simple = Value[];
+type Union = (string | number)[];
+type ReadonlySimple = readonly Value[];`,
+			options: []any{map[string]any{"default": "generic"}},
+			wantFixText: []string{
+				"Array<Value>",
+				"Array<string | number>",
+				"ReadonlyArray<Value>",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+			program, sourceFile, err := helper.CreateTestProgram(
+				test.code,
+				"array-type-edit-demand.ts",
+				"tsconfig.json",
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+				t.Helper()
+
+				var diagnostics []rule.RuleDiagnostic
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program:      program,
+					File:         sourceFile.FileName(),
+					HasTypeInfo:  true,
+					ExcludePaths: []string{},
+					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+						return []linter.ConfiguredRule{{
+							Name:     ArrayTypeRule.Name,
+							Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return ArrayTypeRule.Run(ctx, test.options)
+							},
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{
+						Demand: demand,
+						Report: func(diagnostic rule.RuleDiagnostic) {
+							diagnostics = append(diagnostics, diagnostic)
+						},
+					},
+				})
+				if len(diagnostics) != len(test.wantFixText) {
+					t.Fatalf(
+						"demand %d: diagnostics = %d, want %d",
+						demand,
+						len(diagnostics),
+						len(test.wantFixText),
+					)
+				}
+				return diagnostics
+			}
+
+			diagnosticsOnly := run(rule.EditDemandNone)
+			autofixOnly := run(rule.EditDemandAutofix)
+			suggestionOnly := run(rule.EditDemandSuggestion)
+			allEdits := run(rule.EditDemandAll)
+
+			withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+				diagnostic.FixesPtr = nil
+				diagnostic.Suggestions = nil
+				return diagnostic
+			}
+
+			for index, wantText := range test.wantFixText {
+				wantIdentity := withoutEdits(allEdits[index])
+				for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+					rule.EditDemandNone:       diagnosticsOnly,
+					rule.EditDemandAutofix:    autofixOnly,
+					rule.EditDemandSuggestion: suggestionOnly,
+				} {
+					if got := withoutEdits(diagnostics[index]); !reflect.DeepEqual(got, wantIdentity) {
+						t.Errorf(
+							"demand %d changed diagnostic %d:\ngot  %#v\nwant %#v",
+							demand,
+							index,
+							got,
+							wantIdentity,
+						)
+					}
+				}
+
+				if diagnosticsOnly[index].FixesPtr != nil || suggestionOnly[index].FixesPtr != nil {
+					t.Fatalf("diagnostic %d: non-autofix demand materialized fixes", index)
+				}
+				for _, diagnostics := range [][]rule.RuleDiagnostic{
+					diagnosticsOnly,
+					autofixOnly,
+					suggestionOnly,
+					allEdits,
+				} {
+					if diagnostics[index].Suggestions != nil {
+						t.Fatalf("diagnostic %d: autofix-only rule materialized suggestions", index)
+					}
+				}
+
+				for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+					rule.EditDemandAutofix: autofixOnly,
+					rule.EditDemandAll:     allEdits,
+				} {
+					fixes := diagnostics[index].FixesPtr
+					if fixes == nil || len(*fixes) != 1 || (*fixes)[0].Text != wantText {
+						t.Fatalf(
+							"demand %d diagnostic %d: fixes = %#v, want one fix with text %q",
+							demand,
+							index,
+							fixes,
+							wantText,
+						)
+					}
+				}
+
+				if !reflect.DeepEqual(autofixOnly[index].FixesPtr, allEdits[index].FixesPtr) {
+					t.Fatalf("diagnostic %d: autofix and all-edits demands produced different fixes", index)
+				}
+			}
+		})
+	}
 }
