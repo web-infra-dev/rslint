@@ -127,7 +127,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     test('worker exit racing shutdown does not leak the respawn', async () => {
       const r = await runPoolScenario('worker-exit-race');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    }, 70_000);
 
     // A hung listener trips the per-task timeout, which terminates the worker
     // and respawns it; the next batch must succeed on the replacement. The
@@ -136,6 +136,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     test('hung listener → task_timeout → respawn → next batch succeeds', async () => {
       const r = await runPoolScenario('task-timeout');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 30_000);
+    }, 70_000);
   },
 );

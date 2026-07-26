@@ -2,10 +2,11 @@
 //
 // rstest tests call `runPoolScenario(name)`, which spawns runner.mjs in a
 // throwaway subprocess, lets it drive the real dist WorkerPool through a
-// terminate-churning scenario, and applies a MILESTONE-DRIVEN verdict. The
-// point: a native napi-terminate abort (Windows) crashes only that subprocess,
-// never this test process.
+// terminate-churning scenario, and applies a milestone-driven verdict. A
+// native napi-terminate abort (Windows) crashes only that subprocess, never
+// the rstest process.
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,7 +22,122 @@ const DIST_ESLINT_PLUGIN = path.resolve(
   '../../../dist/eslint-plugin/index.js',
 );
 
-export type Verdict = 'PASS' | 'TOLERATED-PASS' | 'FAIL';
+export const JOURNAL_VERSION = 1;
+export const POOL_ISOLATION_AUDIT_PREFIX = '[pool-isolation-audit] ';
+const AUDIT_VERSION = 1;
+const STDERR_LIMIT_BYTES = 256 * 1024;
+const JOURNAL_LIMIT_BYTES = 1024 * 1024;
+
+interface ScenarioContract {
+  /**
+   * Ordered state prefix required both for a clean pass and for the narrow
+   * Windows native-abort exception. The final item is always the exact
+   * Worker.prototype.terminate entry observed by runner.mjs.
+   */
+  requiredProgress: readonly string[];
+  requiredSuccessAsserts: readonly string[];
+}
+
+// One fail-closed contract table prevents allowlist, prerequisite, and
+// assertion requirements from drifting apart when a scenario is added.
+const SCENARIO_CONTRACTS = {
+  u11: {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'refed-plugin-loaded',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: ['pool-drained'],
+  },
+  'hang-shutdown': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'hang-entered',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'wedge-shutdown',
+      'pool-drained',
+      'second-shutdown-returned',
+    ],
+  },
+  'worker-exit-race': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'initial-worker-ready',
+      'respawn-in-flight',
+      'shutdown-started',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'one-worker-spawned',
+      'worker-hard-exit',
+      'respawn-in-flight',
+      'closed-before-respawn-release',
+      'pool-drained',
+      'lint-batch-rejects-closed',
+    ],
+  },
+  'task-timeout': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'hang-entered',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'one-task-timeout-captured',
+      'hang-task-timeout',
+      'recovery-ok',
+      'respawn-logged',
+      'pool-drained',
+    ],
+  },
+  'all-degraded': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'degraded-queue-ready',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'queue-enqueued',
+      'degraded-drain',
+      'queue-drained',
+    ],
+  },
+  'lint-batch-after-degraded': {
+    requiredProgress: [
+      'started',
+      'init-done',
+      'degraded-queue-ready',
+      'terminate-invoked',
+    ],
+    requiredSuccessAsserts: [
+      'first-queue-enqueued',
+      'first-degraded',
+      'terminal-state',
+      'second-degraded',
+      'queue-drained',
+    ],
+  },
+} as const satisfies Record<string, ScenarioContract>;
+
+export type Verdict = 'PASS' | 'EXPECTED-NATIVE-ABORT' | 'FAIL';
+
+export interface JournalRecord {
+  version: number;
+  runId: string;
+  scenario: string;
+  seq: number;
+  kind: 'milestone' | 'assert' | 'error';
+  name?: string;
+  pass?: boolean;
+  detail?: string;
+}
 
 export interface ScenarioResult {
   scenario: string;
@@ -29,26 +145,42 @@ export interface ScenarioResult {
   milestones: string[];
   asserts: { name: string; pass: boolean; detail?: string }[];
   error?: string;
+  journalError?: string;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
   stderr: string;
+  stderrTruncated: boolean;
 }
 
-interface Rec {
-  kind: 'milestone' | 'assert' | 'error';
-  name?: string;
-  pass?: boolean;
-  detail?: string;
+export interface JournalReadResult {
+  records: JournalRecord[];
+  error?: string;
+}
+
+export interface ClassificationInput {
+  scenario: string;
+  records: JournalRecord[];
+  journalError?: string;
+  processError?: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  platform?: NodeJS.Platform;
 }
 
 export async function runPoolScenario(
   scenario: string,
   opts: { timeoutMs?: number } = {},
 ): Promise<ScenarioResult> {
-  const timeoutMs = opts.timeoutMs ?? 15_000;
+  // This is only a dead-process/deadlock sentinel. Scenario correctness is
+  // established by recorded state transitions, never elapsed wall time.
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const runId = randomUUID();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-iso-'));
   const milestoneFile = path.join(tmpDir, 'milestones.ndjson');
+  const scenarioTmpDir = path.join(tmpDir, 'scenario');
+  fs.mkdirSync(scenarioTmpDir);
   fs.writeFileSync(milestoneFile, '');
 
   return new Promise<ScenarioResult>((resolve) => {
@@ -58,106 +190,368 @@ export async function runPoolScenario(
         ...process.env,
         RSLINT_MILESTONE_FILE: milestoneFile,
         RSLINT_DIST_ESLINT_PLUGIN: DIST_ESLINT_PLUGIN,
+        RSLINT_RUN_ID: runId,
+        RSLINT_SCENARIO_TMP_DIR: scenarioTmpDir,
       },
     });
-    let stderr = '';
-    child.stderr.on('data', (d) => (stderr += d.toString()));
 
-    let settled = false;
-    const finish = (
-      exitCode: number | null,
-      signal: NodeJS.Signals | null,
-      timedOut: boolean,
-    ): void => {
-      if (settled) return;
-      settled = true;
+    // Never let an unconsumed pipe backpressure the child. Scenario output is
+    // intentionally irrelevant; durable state lives in the journal.
+    child.stdout.resume();
+
+    const stderrChunks: Buffer[] = [];
+    let stderrBytes = 0;
+    let stderrTruncated = false;
+    child.stderr.on('data', (value: Buffer | string) => {
+      const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      const remaining = STDERR_LIMIT_BYTES - stderrBytes;
+      if (remaining > 0) {
+        const kept = chunk.subarray(0, remaining);
+        stderrChunks.push(kept);
+        stderrBytes += kept.length;
+      }
+      if (chunk.length > remaining) stderrTruncated = true;
+    });
+
+    let timedOut = false;
+    let spawnError: string | undefined;
+    const timer = setTimeout(() => {
+      // Do not resolve here: the journal and stdio are not final until
+      // ChildProcess emits `close`. A late `done` cannot override timedOut.
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, timeoutMs);
+
+    child.on('error', (err) => {
+      // Node guarantees `close` after `error`; let that single terminal path
+      // collect the complete journal and stream state.
+      spawnError = `failed to run isolated child: ${err.message}`;
+    });
+
+    child.on('close', (exitCode, signal) => {
       clearTimeout(timer);
-      const recs = readMilestones(milestoneFile);
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      const milestones = recs
+      const journal = readJournal(milestoneFile, { runId, scenario });
+      let cleanupError: string | undefined;
+      try {
+        fs.rmSync(tmpDir, {
+          recursive: true,
+          force: true,
+          maxRetries: 10,
+          retryDelay: 50,
+        });
+      } catch (err) {
+        cleanupError = `failed to remove scenario temp directory: ${String(
+          err,
+        )}`;
+      }
+
+      const milestones = journal.records
         .filter((r) => r.kind === 'milestone')
         .map((r) => r.name!);
-      const asserts = recs
+      const asserts = journal.records
         .filter((r) => r.kind === 'assert')
-        .map((r) => ({ name: r.name!, pass: !!r.pass, detail: r.detail }));
-      const error = recs.find((r) => r.kind === 'error')?.detail;
-      resolve({
+        .map((r) => ({ name: r.name!, pass: r.pass!, detail: r.detail }));
+      const reportedError = journal.records.find(
+        (r) => r.kind === 'error',
+      )?.detail;
+      const processError = reportedError ?? spawnError ?? cleanupError;
+      const stderr = Buffer.concat(stderrChunks).toString('utf8');
+
+      const result: ScenarioResult = {
         scenario,
-        verdict: classify(milestones, asserts, error, timedOut),
+        verdict: classifyScenario({
+          scenario,
+          records: journal.records,
+          journalError: journal.error,
+          processError,
+          exitCode,
+          signal,
+          timedOut,
+        }),
         milestones,
         asserts,
-        error,
+        error: processError,
+        journalError: journal.error,
         exitCode,
         signal,
         timedOut,
         stderr,
-      });
-    };
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      finish(null, 'SIGKILL', true);
-    }, timeoutMs);
-    child.on('exit', (code, signal) => finish(code, signal, false));
-    child.on('error', () => finish(-1, null, false));
+        stderrTruncated,
+      };
+
+      // Emit exactly one parent-authored, machine-readable record per isolated
+      // scenario. Child stdout is discarded, so it cannot forge this success
+      // evidence. In particular, CI logs now distinguish a clean PASS from the
+      // narrowly tolerated Windows EXPECTED-NATIVE-ABORT verdict.
+      process.stdout.write(`${formatScenarioAudit(result)}\n`);
+      resolve(result);
+    });
   });
 }
 
-function readMilestones(file: string): Rec[] {
+function readJournal(
+  file: string,
+  expected: { runId: string; scenario: string },
+): JournalReadResult {
   let text: string;
   try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return [];
-  }
-  const out: Rec[] = [];
-  for (const line of text.split('\n')) {
-    if (!line) continue;
-    try {
-      out.push(JSON.parse(line) as Rec);
-    } catch {
-      /* ignore a torn final line (process died mid-write) */
+    const size = fs.statSync(file).size;
+    if (size > JOURNAL_LIMIT_BYTES) {
+      return {
+        records: [],
+        error: `journal exceeds ${JOURNAL_LIMIT_BYTES} byte limit (size=${size})`,
+      };
     }
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return {
+      records: [],
+      error: `journal could not be read: ${String(err)}`,
+    };
   }
-  return out;
+  return parseJournalForTests(text, expected);
 }
 
-// MILESTONE-DRIVEN verdict (validated by the spike). Deliberately ignores exit
-// code/signal: a real napi abort on Windows can surface as exit code 0
-// (indistinguishable from a clean exit), and an orderly failure exits non-zero
-// — exit codes cannot tell them apart, but the child's own milestones can.
-function classify(
-  milestones: string[],
-  asserts: { pass: boolean }[],
-  error: string | undefined,
-  timedOut: boolean,
-): Verdict {
-  const reached = (m: string): boolean => milestones.includes(m);
-  if (asserts.some((a) => !a.pass)) return 'FAIL'; // in-child assertion failed
-  if (error) return 'FAIL'; // child reported an orderly error
-  if (reached('done')) return 'PASS'; // explicit success
-  if (timedOut) return 'FAIL'; // pool hung
-  // Silent abnormal exit with no done/error/failed-assert: tolerate ONLY if the
-  // pool provably reached the terminate step — that's the isolated native
-  // abort. Anything earlier is a real crash and must fail.
-  //
-  // Coverage note: a TOLERATED-PASS means the in-child asserts AFTER the
-  // terminate point did not run (the process aborted there). Those business
-  // invariants (drain / respawn / closed-rejection / no-leak) are still fully
-  // verified on mac/linux, where terminate is clean and the child runs through
-  // to `done` (PASS). The Windows abort path only confirms the pool reached the
-  // terminate step and the isolation held — the business assertions are
-  // guaranteed by the non-Windows runners, which is sound because those
-  // invariants are platform-independent.
-  return reached('terminate-point') ? 'TOLERATED-PASS' : 'FAIL';
+/** Pure parser exported for adversarial tests; production code uses readJournal. */
+export function parseJournalForTests(
+  text: string,
+  expected: { runId: string; scenario: string },
+): JournalReadResult {
+  if (text.length === 0) return { records: [] };
+  if (!text.endsWith('\n')) {
+    return {
+      records: [],
+      error: 'journal ended with a torn record (missing newline)',
+    };
+  }
+
+  const records: JournalRecord[] = [];
+  const lines = text.slice(0, -1).split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    const lineNumber = index + 1;
+    if (lines[index].length === 0) {
+      return {
+        records,
+        error: `journal contains an empty record at line ${lineNumber}`,
+      };
+    }
+
+    let value: unknown;
+    try {
+      value = JSON.parse(lines[index]);
+    } catch (err) {
+      return {
+        records,
+        error: `journal contains invalid JSON at line ${lineNumber}: ${String(
+          err,
+        )}`,
+      };
+    }
+
+    const recordError = validateRecord(value, {
+      ...expected,
+      seq: lineNumber,
+    });
+    if (recordError) {
+      return {
+        records,
+        error: `journal record ${lineNumber} is invalid: ${recordError}`,
+      };
+    }
+    records.push(value as JournalRecord);
+  }
+
+  const terminalIndexes = records.flatMap((record, index) =>
+    record.kind === 'error' ||
+    (record.kind === 'milestone' && record.name === 'done')
+      ? [index]
+      : [],
+  );
+  if (terminalIndexes.length > 1) {
+    return {
+      records,
+      error: 'journal contains more than one terminal record',
+    };
+  }
+  if (
+    terminalIndexes.length === 1 &&
+    terminalIndexes[0] !== records.length - 1
+  ) {
+    return {
+      records,
+      error: 'journal contains records after its terminal record',
+    };
+  }
+  const assertionNames = records
+    .filter((record) => record.kind === 'assert')
+    .map((record) => record.name!);
+  if (new Set(assertionNames).size !== assertionNames.length) {
+    return {
+      records,
+      error: 'journal contains duplicate assertion names',
+    };
+  }
+
+  return { records };
+}
+
+function validateRecord(
+  value: unknown,
+  expected: { runId: string; scenario: string; seq: number },
+): string | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return 'record must be an object';
+  }
+  const record = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    'version',
+    'runId',
+    'scenario',
+    'seq',
+    'kind',
+    'name',
+    'pass',
+    'detail',
+  ]);
+  const extraKey = Object.keys(record).find((key) => !allowedKeys.has(key));
+  if (extraKey) return `unknown field "${extraKey}"`;
+  if (record.version !== JOURNAL_VERSION) {
+    return `version must be ${JOURNAL_VERSION}`;
+  }
+  if (record.runId !== expected.runId) return 'runId does not match this run';
+  if (record.scenario !== expected.scenario) {
+    return 'scenario does not match this run';
+  }
+  if (record.seq !== expected.seq) {
+    return `seq must be ${expected.seq}`;
+  }
+  if (
+    record.kind !== 'milestone' &&
+    record.kind !== 'assert' &&
+    record.kind !== 'error'
+  ) {
+    return 'kind is not recognized';
+  }
+
+  if (record.kind === 'milestone') {
+    if (typeof record.name !== 'string' || record.name.length === 0) {
+      return 'milestone.name must be a non-empty string';
+    }
+    if (record.pass !== undefined || record.detail !== undefined) {
+      return 'milestone may not contain pass or detail';
+    }
+  } else if (record.kind === 'assert') {
+    if (typeof record.name !== 'string' || record.name.length === 0) {
+      return 'assert.name must be a non-empty string';
+    }
+    if (typeof record.pass !== 'boolean') {
+      return 'assert.pass must be a boolean';
+    }
+    if (record.detail !== undefined && typeof record.detail !== 'string') {
+      return 'assert.detail must be a string when present';
+    }
+  } else {
+    if (record.name !== undefined || record.pass !== undefined) {
+      return 'error may not contain name or pass';
+    }
+    if (typeof record.detail !== 'string' || record.detail.length === 0) {
+      return 'error.detail must be a non-empty string';
+    }
+  }
+  return undefined;
 }
 
 /**
- * Human-readable failure report for a scenario that did not pass. Surfaces the
- * failed in-child assertion(s) (name + detail), the child's error / timeout /
- * exit code, the milestones it reached, and the child stderr — so a CI failure
- * reads like a normal assertion report instead of a JSON blob. Pass it as
- * expect()'s second arg:
- *   expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL')
+ * Strict verdict oracle. Exported only so test code can attack every branch
+ * with synthetic journals without spawning more subprocesses.
+ */
+export function classifyScenario(input: ClassificationInput): Verdict {
+  const platform = input.platform ?? process.platform;
+  const assertions = input.records.filter((r) => r.kind === 'assert');
+  if (input.journalError) return 'FAIL';
+  if (input.records.some((record) => record.kind === 'error')) return 'FAIL';
+  if (assertions.some((record) => record.pass !== true)) return 'FAIL';
+  if (input.processError) return 'FAIL';
+  // A watchdog firing is terminal even if the child managed to write `done`
+  // just before it was killed.
+  if (input.timedOut) return 'FAIL';
+
+  const milestones = input.records
+    .filter((r) => r.kind === 'milestone')
+    .map((r) => r.name!);
+  const last = input.records.at(-1);
+  const contract = Object.prototype.hasOwnProperty.call(
+    SCENARIO_CONTRACTS,
+    input.scenario,
+  )
+    ? SCENARIO_CONTRACTS[input.scenario as keyof typeof SCENARIO_CONTRACTS]
+    : undefined;
+  if (!contract) return 'FAIL';
+  const hasRequiredProgress = containsOrdered(
+    milestones,
+    contract.requiredProgress,
+  );
+  if (last?.kind === 'milestone' && last.name === 'done') {
+    const assertNames = new Set(assertions.map((record) => record.name!));
+    const hasAllSuccessAssertions = contract.requiredSuccessAsserts.every(
+      (name) => assertNames.has(name),
+    );
+    return hasRequiredProgress &&
+      hasAllSuccessAssertions &&
+      input.exitCode === 0 &&
+      input.signal === null
+      ? 'PASS'
+      : 'FAIL';
+  }
+
+  // A native napi teardown abort is tolerated only on Windows, only in an
+  // explicitly enumerated terminate scenario, and only when the last durable
+  // record proves the real Worker.terminate() call was entered. A generic
+  // "about to terminate" marker is not sufficient.
+  const exactNativeAbortBoundary =
+    platform === 'win32' &&
+    hasRequiredProgress &&
+    last?.kind === 'milestone' &&
+    last.name === 'terminate-invoked';
+  return exactNativeAbortBoundary ? 'EXPECTED-NATIVE-ABORT' : 'FAIL';
+}
+
+function containsOrdered(
+  actual: readonly string[],
+  required: readonly string[],
+): boolean {
+  let requiredIndex = 0;
+  for (const value of actual) {
+    if (value === required[requiredIndex]) requiredIndex++;
+  }
+  return requiredIndex === required.length;
+}
+
+/**
+ * Stable, single-line evidence for auditing green CI runs.
+ */
+export function formatScenarioAudit(r: ScenarioResult): string {
+  return `${POOL_ISOLATION_AUDIT_PREFIX}${JSON.stringify({
+    version: AUDIT_VERSION,
+    scenario: r.scenario,
+    verdict: r.verdict,
+    exitCode: r.exitCode,
+    signal: r.signal,
+    timedOut: r.timedOut,
+    lastMilestone: r.milestones.at(-1) ?? null,
+    milestoneCount: r.milestones.length,
+    assertionCount: r.asserts.length,
+    failedAssertionCount: r.asserts.filter((assertion) => !assertion.pass)
+      .length,
+    journalValid: r.journalError === undefined,
+    harnessError: r.error !== undefined,
+    stderrBytes: Buffer.byteLength(r.stderr),
+    stderrTruncated: r.stderrTruncated,
+  })}`;
+}
+
+/**
+ * Human-readable failure report for a scenario that did not pass.
  */
 export function formatScenarioFailure(r: ScenarioResult): string {
   const lines: string[] = [
@@ -170,17 +564,20 @@ export function formatScenarioFailure(r: ScenarioResult): string {
       lines.push(`    x ${a.name}${a.detail ? ` - ${a.detail}` : ''}`);
     }
   }
-  if (r.error) lines.push(`  child error: ${r.error}`);
+  if (r.journalError) lines.push(`  invalid child journal: ${r.journalError}`);
+  if (r.error) lines.push(`  child/harness error: ${r.error}`);
   if (r.timedOut) {
-    lines.push('  child TIMED OUT - the pool hung and never exited');
+    lines.push('  child TIMED OUT - the scenario deadlocked or never exited');
   }
   lines.push(`  milestones reached: ${r.milestones.join(' > ') || '(none)'}`);
   lines.push(
     `  child exit: code=${r.exitCode ?? 'null'} signal=${r.signal ?? 'null'}`,
   );
   if (r.stderr.trim()) {
-    lines.push('  child stderr:');
-    for (const l of r.stderr.trim().split('\n')) lines.push(`    ${l}`);
+    lines.push(`  child stderr${r.stderrTruncated ? ' (truncated)' : ''}:`);
+    for (const line of r.stderr.trim().split('\n')) {
+      lines.push(`    ${line}`);
+    }
   }
   return lines.join('\n');
 }

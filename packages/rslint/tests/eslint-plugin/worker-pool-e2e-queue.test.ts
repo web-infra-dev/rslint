@@ -66,8 +66,10 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         })),
       );
 
-      // Let the enqueue actually happen before shutting down.
-      await new Promise((r) => setTimeout(r, 30));
+      // lintBatch enqueues synchronously before returning its Promise. Assert
+      // that state directly instead of sleeping and hoping the scheduler ran.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((pool as any).pendingQueue.length).toBe(5);
 
       // Tear down. shutdown() must drain pendingQueue and resolve
       // every queued task with the 'shutdown' marker.
@@ -94,7 +96,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     test('all workers degraded → pendingQueue drains as parseError:pool_degraded (no hang)', async () => {
       const r = await runPoolScenario('all-degraded');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    }, 70_000);
 
     // Queue-model regression suite — five tests pinning the design
     // properties that the Finding 3 refactor introduced.
@@ -227,6 +229,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     test('lintBatch issued AFTER the pool settled into the terminal degraded state resolves as pool_degraded (does not hang)', async () => {
       const r = await runPoolScenario('lint-batch-after-degraded');
       expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    }, 70_000);
   },
 );
