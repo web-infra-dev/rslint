@@ -1,10 +1,19 @@
 package no_unnecessary_type_constraint
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoUnnecessaryTypeConstraintRule(t *testing.T) {
@@ -1391,4 +1400,339 @@ function data<T>(x: T): T { return x; }`,
 			},
 		},
 	})
+}
+
+func TestNoUnnecessaryTypeConstraintSuggestionEdges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		fileName       string
+		source         string
+		reportText     string
+		typeName       string
+		constraintName string
+		wantOutput     string
+	}{
+		{
+			name:           "leading and interior comments",
+			fileName:       "leading-comments.ts",
+			source:         `function data</* keep before name */ T /* remove */ extends /* remove */ any>() {}`,
+			reportText:     `T /* remove */ extends /* remove */ any`,
+			typeName:       "T",
+			constraintName: "any",
+			wantOutput:     `function data</* keep before name */ T>() {}`,
+		},
+		{
+			name:     "multiline trivia",
+			fileName: "multiline.ts",
+			source: "function data<\n" +
+				"  // keep before name\n" +
+				"  T\n" +
+				"  /* remove with constraint */\n" +
+				"  extends\n" +
+				"  unknown\n" +
+				">() {}\n",
+			reportText: "T\n" +
+				"  /* remove with constraint */\n" +
+				"  extends\n" +
+				"  unknown",
+			typeName:       "T",
+			constraintName: "unknown",
+			wantOutput: "function data<\n" +
+				"  // keep before name\n" +
+				"  T\n" +
+				">() {}\n",
+		},
+		{
+			name:           "tsx comment before closing bracket",
+			fileName:       "comment.tsx",
+			source:         `const data = <T extends any /* keep */>() => {};`,
+			reportText:     `T extends any`,
+			typeName:       "T",
+			constraintName: "any",
+			wantOutput:     `const data = <T, /* keep */>() => {};`,
+		},
+		{
+			name:           "tsx comment before existing comma",
+			fileName:       "existing-comma.tsx",
+			source:         `const data = <T extends unknown /* keep */,>() => {};`,
+			reportText:     `T extends unknown`,
+			typeName:       "T",
+			constraintName: "unknown",
+			wantOutput:     `const data = <T /* keep */,>() => {};`,
+		},
+		{
+			name:           "tsx default prevents comma insertion",
+			fileName:       "default.tsx",
+			source:         `const data = <T extends any /* keep */ = unknown>() => {};`,
+			reportText:     `T extends any /* keep */ = unknown`,
+			typeName:       "T",
+			constraintName: "any",
+			wantOutput:     `const data = <T /* keep */ = unknown>() => {};`,
+		},
+		{
+			name:           "non ASCII identifier",
+			fileName:       "unicode.ts",
+			source:         `function data<类型 extends unknown>() {}`,
+			reportText:     `类型 extends unknown`,
+			typeName:       "类型",
+			constraintName: "unknown",
+			wantOutput:     `function data<类型>() {}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			program, sourceFile := createNoUnnecessaryTypeConstraintProgram(
+				t,
+				test.fileName,
+				test.source,
+			)
+			diagnostics := lintNoUnnecessaryTypeConstraintWithDemand(
+				program,
+				sourceFile,
+				rule.EditDemandSuggestion,
+			)
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+
+			diagnostic := diagnostics[0]
+			wantPos := strings.Index(test.source, test.reportText)
+			if wantPos < 0 {
+				t.Fatalf("test bug: report text %q not found", test.reportText)
+			}
+			wantEnd := wantPos + len(test.reportText)
+			if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+				t.Errorf(
+					"diagnostic range = [%d,%d), want [%d,%d) for %q",
+					diagnostic.Range.Pos(),
+					diagnostic.Range.End(),
+					wantPos,
+					wantEnd,
+					test.reportText,
+				)
+			}
+			if diagnostic.Message.Id != "unnecessaryConstraint" {
+				t.Errorf("diagnostic message id = %q", diagnostic.Message.Id)
+			}
+			wantMessage := "Constraining the generic type `" + test.typeName + "` to `" +
+				test.constraintName + "` does nothing and is unnecessary."
+			if diagnostic.Message.Description != wantMessage {
+				t.Errorf("diagnostic message = %q, want %q", diagnostic.Message.Description, wantMessage)
+			}
+			if diagnostic.FixesPtr != nil {
+				t.Errorf("suggestion-only demand unexpectedly materialized autofixes")
+			}
+			if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
+				t.Fatalf("suggestions = %#v, want exactly one", diagnostic.Suggestions)
+			}
+
+			suggestion := (*diagnostic.Suggestions)[0]
+			if suggestion.Message.Id != "removeUnnecessaryConstraint" {
+				t.Errorf("suggestion message id = %q", suggestion.Message.Id)
+			}
+			wantSuggestionMessage := "Remove the unnecessary `" + test.constraintName + "` constraint."
+			if suggestion.Message.Description != wantSuggestionMessage {
+				t.Errorf(
+					"suggestion message = %q, want %q",
+					suggestion.Message.Description,
+					wantSuggestionMessage,
+				)
+			}
+			gotOutput, unapplied, fixed := linter.ApplyRuleFixes(
+				test.source,
+				[]rule.RuleSuggestion{suggestion},
+			)
+			if !fixed || len(unapplied) != 0 {
+				t.Fatalf("suggestion was not cleanly applicable: fixed=%t unapplied=%#v", fixed, unapplied)
+			}
+			if gotOutput != test.wantOutput {
+				t.Errorf("suggestion output:\ngot:  %q\nwant: %q", gotOutput, test.wantOutput)
+			}
+		})
+	}
+}
+
+func TestNoUnnecessaryTypeConstraintEditDemand(t *testing.T) {
+	t.Parallel()
+
+	const source = "const data = <T extends any>() => {};\n"
+	program, sourceFile := createNoUnnecessaryTypeConstraintProgram(t, "edit-demand.tsx", source)
+
+	diagnostics := make(map[rule.EditDemand]rule.RuleDiagnostic, 4)
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		got := lintNoUnnecessaryTypeConstraintWithDemand(program, sourceFile, demand)
+		if len(got) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(got))
+		}
+		diagnostics[demand] = got[0]
+	}
+
+	diagnosticOnly := diagnostics[rule.EditDemandNone]
+	for demand, diagnostic := range diagnostics {
+		want := diagnosticOnly
+		want.FixesPtr = nil
+		want.Suggestions = nil
+		got := diagnostic
+		got.FixesPtr = nil
+		got.Suggestions = nil
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic metadata:\ngot:  %#v\nwant: %#v", demand, got, want)
+		}
+		if diagnostic.FixesPtr != nil {
+			t.Errorf("demand %d unexpectedly materialized autofixes", demand)
+		}
+	}
+
+	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix} {
+		if diagnostics[demand].Suggestions != nil {
+			t.Errorf("demand %d unexpectedly materialized suggestions", demand)
+		}
+	}
+	suggestionOnly := diagnostics[rule.EditDemandSuggestion].Suggestions
+	all := diagnostics[rule.EditDemandAll].Suggestions
+	if suggestionOnly == nil || all == nil || !reflect.DeepEqual(*suggestionOnly, *all) {
+		t.Fatalf("suggestion artifacts differ between suggestion-only and all demand")
+	}
+	if len(*suggestionOnly) != 1 {
+		t.Fatalf("suggestions = %#v, want exactly one", *suggestionOnly)
+	}
+
+	wantPos := strings.Index(source, "T extends any")
+	wantEnd := wantPos + len("T extends any")
+	if diagnosticOnly.Range.Pos() != wantPos || diagnosticOnly.Range.End() != wantEnd {
+		t.Errorf(
+			"diagnostic range = [%d,%d), want [%d,%d)",
+			diagnosticOnly.Range.Pos(),
+			diagnosticOnly.Range.End(),
+			wantPos,
+			wantEnd,
+		)
+	}
+	if diagnosticOnly.Message.Description !=
+		"Constraining the generic type `T` to `any` does nothing and is unnecessary." {
+		t.Errorf("unexpected diagnostic message %q", diagnosticOnly.Message.Description)
+	}
+
+	suggestion := (*suggestionOnly)[0]
+	if len(suggestion.FixesArr) != 1 {
+		t.Fatalf("suggestion fixes = %#v, want exactly one", suggestion.FixesArr)
+	}
+	wantFixPos := strings.Index(source, "T") + len("T")
+	if suggestion.FixesArr[0].Range.Pos() != wantFixPos ||
+		suggestion.FixesArr[0].Range.End() != wantEnd ||
+		suggestion.FixesArr[0].Text != "," {
+		t.Errorf("unexpected suggestion fix %#v", suggestion.FixesArr[0])
+	}
+	gotOutput, unapplied, fixed := linter.ApplyRuleFixes(
+		source,
+		[]rule.RuleSuggestion{suggestion},
+	)
+	if !fixed || len(unapplied) != 0 || gotOutput != "const data = <T,>() => {};\n" {
+		t.Errorf(
+			"suggestion application: fixed=%t unapplied=%#v output=%q",
+			fixed,
+			unapplied,
+			gotOutput,
+		)
+	}
+}
+
+func TestNoUnnecessaryTypeConstraintMalformedASTWithholdsSuggestion(t *testing.T) {
+	t.Parallel()
+
+	const source = "function data<T extends any>() {}\n"
+	program, sourceFile := createNoUnnecessaryTypeConstraintProgram(t, "malformed.ts", source)
+
+	var typeParameter *ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindTypeParameter {
+			typeParameter = node
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	if typeParameter == nil {
+		t.Fatal("test setup did not find a type parameter")
+	}
+
+	declaration := typeParameter.AsTypeParameterDeclaration()
+	name := declaration.Name()
+	declaration.Constraint.Loc = core.NewTextRange(name.Pos(), name.Pos())
+
+	diagnostics := lintNoUnnecessaryTypeConstraintWithDemand(
+		program,
+		sourceFile,
+		rule.EditDemandSuggestion,
+	)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+	if diagnostics[0].Suggestions != nil {
+		t.Errorf("malformed source order produced an unsafe suggestion: %#v", diagnostics[0].Suggestions)
+	}
+}
+
+func lintNoUnnecessaryTypeConstraintWithDemand(
+	program *compiler.Program,
+	sourceFile *ast.SourceFile,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:         program,
+		File:            sourceFile.FileName(),
+		HasTypeInfo:     true,
+		GetRulesForFile: noUnnecessaryTypeConstraintConfiguredRules,
+		ExcludePaths:    []string{},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	return diagnostics
+}
+
+func createNoUnnecessaryTypeConstraintProgram(
+	t testing.TB,
+	fileName string,
+	code string,
+) (*compiler.Program, *ast.SourceFile) {
+	t.Helper()
+
+	rootDir := fixtures.GetRootDir()
+	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
+	host := utils.CreateCompilerHost(rootDir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatalf("failed to create program: %v", err)
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil {
+		t.Fatalf("source file %q not found", fileName)
+	}
+	return program, sourceFile
+}
+
+func noUnnecessaryTypeConstraintConfiguredRules(*ast.SourceFile) []linter.ConfiguredRule {
+	return []linter.ConfiguredRule{{
+		Name:     NoUnnecessaryTypeConstraintRule.Name,
+		Severity: rule.SeverityError,
+		Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			return NoUnnecessaryTypeConstraintRule.Run(ctx, nil)
+		},
+	}}
 }

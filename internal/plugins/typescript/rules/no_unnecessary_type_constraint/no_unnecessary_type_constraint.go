@@ -1,8 +1,6 @@
 package no_unnecessary_type_constraint
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -13,14 +11,23 @@ import (
 func buildUnnecessaryConstraintMessage(name, constraint string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unnecessaryConstraint",
-		Description: fmt.Sprintf("Constraining the generic type `%s` to `%s` does nothing and is unnecessary.", name, constraint),
+		Description: "Constraining the generic type `" + name + "` to `" + constraint + "` does nothing and is unnecessary.",
 	}
 }
 
 func buildRemoveUnnecessaryConstraintMessage(constraint string) rule.RuleMessage {
+	var description string
+	switch constraint {
+	case "any":
+		description = "Remove the unnecessary `any` constraint."
+	case "unknown":
+		description = "Remove the unnecessary `unknown` constraint."
+	default:
+		description = "Remove the unnecessary `" + constraint + "` constraint."
+	}
 	return rule.RuleMessage{
 		Id:          "removeUnnecessaryConstraint",
-		Description: fmt.Sprintf("Remove the unnecessary `%s` constraint.", constraint),
+		Description: description,
 	}
 }
 
@@ -29,8 +36,8 @@ var disambiguationExtensions = []string{tspath.ExtensionCts, tspath.ExtensionMts
 var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 	Name: "no-unnecessary-type-constraint",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		needsDisambiguation := tspath.FileExtensionIsOneOf(ctx.SourceFile.FileName(), disambiguationExtensions)
-		text := ctx.SourceFile.Text()
+		needsDisambiguationResolved := false
+		needsDisambiguation := false
 
 		return rule.RuleListeners{
 			ast.KindTypeParameter: func(node *ast.Node) {
@@ -68,38 +75,48 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				inArrowFunction := parent.Kind == ast.KindArrowFunction
-
-				addTrailingComma := false
-				if inArrowFunction && needsDisambiguation && typeParam.DefaultType == nil {
-					if len(parent.TypeParameters()) == 1 {
-						nextPos := scanner.SkipTrivia(text, node.End())
-						if nextPos >= len(text) || text[nextPos] != ',' {
-							addTrailingComma = true
-						}
-					}
-				}
-
-				// Fix replaces ` extends <constraint>` (between name end and constraint end). This
-				// assumes source order `name extends constraint`. Bail if the AST ever violates
-				// that — better to skip than to emit a destructive fix.
-				if nameNode.End() > typeParam.Constraint.End() {
-					return
-				}
-
-				replacement := ""
-				if addTrailingComma {
-					replacement = ","
-				}
-
-				fixRange := core.NewTextRange(nameNode.End(), typeParam.Constraint.End())
-
-				ctx.ReportNodeWithSuggestions(
-					node,
+				reportRange := core.NewTextRange(
+					scanner.GetTokenPosOfNode(node, ctx.SourceFile, false),
+					node.End(),
+				)
+				ctx.ReportRangeWithDeferredSuggestions(
+					reportRange,
 					buildUnnecessaryConstraintMessage(nameNode.Text(), constraintName),
-					rule.RuleSuggestion{
-						Message:  buildRemoveUnnecessaryConstraintMessage(constraintName),
-						FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(fixRange, replacement)},
+					func() []rule.RuleSuggestion {
+						// The edit replaces ` extends <constraint>` between the name and
+						// constraint. Keep the diagnostic if a malformed AST violates that
+						// source order, but withhold its unsafe suggestion.
+						if nameNode.End() > typeParam.Constraint.End() {
+							return nil
+						}
+
+						replacement := ""
+						if parent.Kind == ast.KindArrowFunction &&
+							typeParam.DefaultType == nil &&
+							len(parent.TypeParameters()) == 1 {
+							if !needsDisambiguationResolved {
+								needsDisambiguation = tspath.FileExtensionIsOneOf(
+									ctx.SourceFile.FileName(),
+									disambiguationExtensions,
+								)
+								needsDisambiguationResolved = true
+							}
+							if needsDisambiguation {
+								text := ctx.SourceFile.Text()
+								nextPos := scanner.SkipTrivia(text, node.End())
+								if nextPos >= len(text) || text[nextPos] != ',' {
+									replacement = ","
+								}
+							}
+						}
+
+						return []rule.RuleSuggestion{{
+							Message: buildRemoveUnnecessaryConstraintMessage(constraintName),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
+								core.NewTextRange(nameNode.End(), typeParam.Constraint.End()),
+								replacement,
+							)},
+						}}
 					},
 				)
 			},
