@@ -18,7 +18,9 @@ Note: `languageOptions.globals` and `/*global ...*/` comments are automatically 
 
 Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). Use it instead of walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier, which is a known performance killer. See [AST_PATTERNS.md — Collecting Variable References](./AST_PATTERNS.md#collecting-variable-references-ctxrefs) for semantics and the nil guard.
 
-Note: every comment in the file is already collected once by the linter and exposed through `ctx.Comments` (`[]*ast.CommentRange`, sorted, deduplicated). If your rule needs to scan all of a file's comments (directive comments, "is this line comment-only", etc.), iterate `ctx.Comments` directly — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
+Note: every comment in the file is exposed lazily through `ctx.Comments.All()` as a source-ordered, deduplicated `[]*ast.CommentRange`. If your rule needs to scan all comments (directive comments, "is this line comment-only", etc.), iterate that shared slice — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
+
+Note: autofixes and suggestions are optional artifacts. New native rules must use the matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method so diagnostics-only consumers and suppressed diagnostics do not pay to construct replacement text, edit ranges/slices, or suggestions. Detection, message construction, and the diagnostic range remain eager and independent of edit demand; work used only to decide or materialize an edit belongs in the builder, which may return nil. See [AST_PATTERNS.md — Reporting Functions](./AST_PATTERNS.md#reporting-functions).
 
 When an upstream test case depends on other unsupported concepts (like `env` or `/*eslint*/` configurations):
 
@@ -78,7 +80,11 @@ Before starting, familiarize yourself with these key source locations:
 
 | File/Directory                        | Description                                                                                                                                                |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions                                   |
+| `internal/rule/rule.go`               | **Core rule interface** - `Rule` and `RuleListeners`                                                                                                       |
+| `internal/rule/context.go`            | `RuleContext`, edit demand, and diagnostic reporting APIs                                                                                                  |
+| `internal/rule/diagnostic.go`         | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                                                                                |
+| `internal/rule/ref_store.go`          | Lazy per-file reference index exposed as `ctx.Refs`                                                                                                        |
+| `internal/rule/comment_store.go`      | Lazy canonical comment list exposed as `ctx.Comments`                                                                                                      |
 | `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
 | `internal/config/config.go`           | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
 | `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
@@ -95,12 +101,13 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Example Rules (Recommended Reading)
 
-| Rule                    | Path                                                 | Highlights                              |
-| ----------------------- | ---------------------------------------------------- | --------------------------------------- |
-| `no-debugger`           | `internal/rules/no_debugger/`                        | Simplest rule example                   |
-| `constructor-super`     | `internal/rules/constructor_super/`                  | Complex control flow analysis           |
-| `array-callback-return` | `internal/rules/array_callback_return/`              | Options parsing, function body analysis |
-| `no-explicit-any`       | `internal/plugins/typescript/rules/no_explicit_any/` | TypeScript rule, Fix suggestions        |
+| Rule                    | Path                                                     | Highlights                              |
+| ----------------------- | -------------------------------------------------------- | --------------------------------------- |
+| `no-debugger`           | `internal/rules/no_debugger/`                            | Simplest rule example                   |
+| `constructor-super`     | `internal/rules/constructor_super/`                      | Complex control flow analysis           |
+| `array-callback-return` | `internal/rules/array_callback_return/`                  | Options parsing, function body analysis |
+| `no-var`                | `internal/rules/no_var/`                                 | `ctx.Refs`, deferred autofix            |
+| `no-restricted-types`   | `internal/plugins/typescript/rules/no_restricted_types/` | Deferred fixes and suggestions          |
 
 ---
 
@@ -202,6 +209,8 @@ Before starting, familiarize yourself with these key source locations:
    - Arguments with side effects (should suppress autofix)
    - Parenthesized expressions (multiple levels)
    - Multi-line code with varying whitespace
+   - Diagnostic count, message, and range must be identical for every edit demand
+   - Identify every source-text read, token scan, range calculation, string build, and slice allocation used only by the edit; these belong in a deferred builder
 
    **Dimension 4: Universal edge shapes** — walk this checklist for EVERY port, regardless of what the rule does. Mark rows as N/A when genuinely irrelevant (and briefly note why), and add ≥1 dedicated test for each applicable row. Upstream's own test suite rarely covers all of these; they are the most common source of "looks aligned but silently drifts" regressions:
    - **Receiver / expression wrappers on inputs the rule inspects**:
@@ -371,7 +380,7 @@ var MyCoreRule = rule.Rule{
 **Key Points**:
 
 - `RuleListeners` is a map from `ast.Kind` to a callback function
-- Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
+- Each callback receives a `*ast.Node` and reports diagnostics through `RuleContext`; reports with optional edits use the deferred methods
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
 - **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
@@ -452,6 +461,7 @@ Before moving on, walk through each check. Each one targets a class of AST-shape
 | Handles `foo?.bar` / `foo?.()`                                                  | Use `ast.IsOptionalChain(node)`; don't hand-check node flags.                                                                                                     | [AST_PATTERNS.md § Optional Chain](AST_PATTERNS.md#optional-chain)                   |
 | Compares literal values                                                         | Match the precise `Kind*Literal`; normalize numeric text via `utils.NormalizeNumericLiteral` before value comparison.                                             | [AST_PATTERNS.md § Literal Kinds](AST_PATTERNS.md#literal-kinds)                     |
 | Has separate ESLint listeners for `AssignmentExpression` / `SequenceExpression` | Collapse into one `BinaryExpression` listener and branch on `OperatorToken.Kind`.                                                                                 | [AST_PATTERNS.md § Binary Operator Kinds](AST_PATTERNS.md#binary-operator-kinds)     |
+| Emits autofixes or suggestions                                                  | Use the matching deferred report method. Keep diagnostic identity eager; put all edit-only work in the builder and return nil when no artifact applies.           | [AST_PATTERNS.md § Reporting Functions](AST_PATTERNS.md#reporting-functions)         |
 | Emits fix/suggestion text starting with an identifier                           | Guard against token fusion with the preceding character before emitting (otherwise e.g. `typeof` + `Number(foo)` becomes `typeofNumber(foo)`).                    | —                                                                                    |
 | Checks whether a name resolves to a global                                      | Use `utils.IsShadowed(node, name)`. Note: stricter than ESLint's scope manager on TS type-only bindings — document in the rule's `.md` if the difference matters. | —                                                                                    |
 | Reads source text for recommendation / fix                                      | Prefer `utils.TrimmedNodeText(sf, node)` (skips leading trivia) over raw `node.Pos()/End()`.                                                                      | [AST_PATTERNS.md § Node Text and Positions](AST_PATTERNS.md#node-text-and-positions) |
@@ -574,7 +584,7 @@ rule_tester.InvalidTestCase{
 }
 ```
 
-**Autofix Testing**: If the rule provides autofix, use the `Output` field to verify the fixed code:
+**Optional Edit Testing**: If the rule provides autofix, use the `Output` field to verify the fixed code:
 
 ```go
 // With autofix: provide Output field with the expected fixed code
@@ -590,6 +600,31 @@ rule_tester.InvalidTestCase{
     Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
 }
 ```
+
+For suggestions, assert both their message IDs and applied output on the
+diagnostic:
+
+```go
+rule_tester.InvalidTestCase{
+    Code: `const value = source as Type`,
+    Errors: []rule_tester.InvalidTestCaseError{{
+        MessageId: "unexpectedAssertion",
+        Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+            MessageId: "suggestAnnotation",
+            Output:    `const value: Type = source`,
+        }},
+    }},
+}
+```
+
+`RunRuleTester` requests all edit categories, so `Output` verifies final edit text but does not verify the demand boundary. For every rule with an autofix or suggestion, also add `Test<Rule>EditDemand` to the existing `<rule>_extras_test.go` file. Run the same representative diagnostic with:
+
+- `rule.EditDemandNone`
+- `rule.EditDemandAutofix`
+- `rule.EditDemandSuggestion`
+- `rule.EditDemandAll`
+
+Assert that diagnostic count, message, and range are identical in all four modes; fixes and suggestions appear only under their matching demand; and the requested artifacts equal the all-edits output. Do not create a standalone edit-demand test file. See `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types_extras_test.go` for a combined fix/suggestion example. The framework's own `internal/rule/context_test.go` covers the lower-level guarantee that an unrequested builder is not invoked.
 
 **Test Case Structs**: See `internal/rule_tester/rule_tester.go` for `ValidTestCase`, `InvalidTestCase`, and `InvalidTestCaseError` definitions.
 
@@ -752,6 +787,7 @@ Follow this **strict order** — each step depends on the previous one:
    **Diagnostic contract** (each invalid output is exactly what ESLint emits):
    - [ ] **Message text assertions**: each `messageId` has ≥1 test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
    - [ ] **Position assertions per container**: for each container the rule emits into (object literal / class / type / descriptor / …), ≥2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
+   - [ ] **Edit-demand invariance**: rules with autofixes or suggestions have `Test<Rule>EditDemand` in `<rule>_extras_test.go`, covering none/autofix/suggestion/all without changing diagnostic identity.
 
    **Options contract**:
    - [ ] **Schema match**: option names, types, and **defaults** match ESLint's schema exactly. Assert every default by running a case with no options vs. `[{}]` options and confirming identical output.

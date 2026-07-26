@@ -174,7 +174,7 @@ Prefer:
 - `utils.TrimmedNodeText(sourceFile, node)` — source text over that trimmed range.
 - `ctx.ReportNode(node, msg)` — diagnostic range already uses the trimmed span; no manual adjustment needed.
 
-For fixes:
+For fixes, construct these helpers inside the deferred report builder:
 
 - `rule.RuleFixReplace(sf, node, text)` — replaces the trimmed span.
 - `rule.RuleFixReplaceRange(range, text)` — replaces a specific range (useful for precision edits across multiple nodes).
@@ -298,7 +298,7 @@ if node.Kind == ast.KindPropertyAccessExpression {
     propertyName := propAccess.Name.Text()
 
     if propAccess.Expression.Kind == ast.KindIdentifier {
-        objectName = propAccess.Expression.AsIdentifier().Text()
+        objectName = propAccess.Expression.AsIdentifier().Text
     }
     // objectName = "console", propertyName = "log"
 }
@@ -363,12 +363,11 @@ var MyCoreRule = rule.Rule{
 
 See `typescript-go/_packages/api/src/api.ts` for full API:
 
-| Method                            | Description              |
-| --------------------------------- | ------------------------ |
-| `GetTypeAtLocation(node)`         | Get the type of a node   |
-| `GetSymbolAtLocation(node)`       | Get the symbol of a node |
-| `TypeToString(type)`              | Convert type to string   |
-| `GetSignaturesOfType(type, kind)` | Get function signatures  |
+| Method                            | Description             |
+| --------------------------------- | ----------------------- |
+| `GetTypeAtLocation(node)`         | Get the type of a node  |
+| `TypeToString(type)`              | Convert type to string  |
+| `GetSignaturesOfType(type, kind)` | Get function signatures |
 
 ---
 
@@ -518,7 +517,7 @@ return rule.RuleListeners{
 
 ### Type Annotation Checking
 
-Reference: `internal/plugins/typescript/rules/no_explicit_any/no_explicit_any.go`
+Reference: `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types.go`
 
 For rules that check type annotations:
 
@@ -532,7 +531,7 @@ func isAnyType(node *ast.Node) bool {
     if node.Kind == ast.KindTypeReference {
         typeRef := node.AsTypeReferenceNode()
         if typeRef.TypeName.Kind == ast.KindIdentifier {
-            return typeRef.TypeName.AsIdentifier().Text() == "any"
+            return typeRef.TypeName.AsIdentifier().Text == "any"
         }
     }
     return false
@@ -543,7 +542,7 @@ func isAnyType(node *ast.Node) bool {
 
 ## Reporting Functions
 
-`RuleContext` provides multiple reporting methods (defined in `internal/rule/rule.go`):
+`RuleContext` provides reporting methods in `internal/rule/context.go`.
 
 ### Basic Report
 
@@ -560,31 +559,70 @@ ctx.ReportNode(node, rule.RuleMessage{
 ctx.ReportRange(core.TextRange{Pos: start, End: end}, rule.RuleMessage{...})
 ```
 
-### Report with Autofix
+### Reports with Optional Edits
+
+Autofixes and suggestions are optional artifacts. New native rules must defer
+their construction so diagnostics-only consumers and suppressed diagnostics do
+not pay for replacement text, token scans, edit ranges/slices, or suggestion
+messages.
+
+| Artifact                     | Node-keyed method                           | Range-keyed method                           |
+| ---------------------------- | ------------------------------------------- | -------------------------------------------- |
+| Autofixes                    | `ReportNodeWithDeferredFixes`               | `ReportRangeWithDeferredFixes`               |
+| Suggestions                  | `ReportNodeWithDeferredSuggestions`         | `ReportRangeWithDeferredSuggestions`         |
+| Both, independently demanded | `ReportNodeWithDeferredFixesAndSuggestions` | `ReportRangeWithDeferredFixesAndSuggestions` |
+
+The diagnostic decision, message, and report range stay outside the builder and
+must not depend on edit demand. Work needed only to decide whether an edit is
+safe may be deferred too; return nil when the diagnostic has no artifact. Each
+requested builder runs synchronously during the report call, after suppression,
+and is never retained. It must not mutate detection state.
+
+#### Autofix
 
 ```go
-ctx.ReportNodeWithFixes(node, rule.RuleMessage{...},
-    rule.RuleFix{
-        Range: core.TextRange{Pos: start, End: end},
-        Text:  "replacement text",  // Note: field is "Text", not "NewText"
-    },
-)
+ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+    if !canFix(node) {
+        return nil
+    }
+    replacement := buildReplacement(ctx.SourceFile, node)
+    return []rule.RuleFix{
+        rule.RuleFixReplace(ctx.SourceFile, node, replacement),
+    }
+})
 ```
 
-### Report with Suggestions
-
-Suggestions are optional fixes that users can choose to apply:
+#### Suggestion
 
 ```go
-ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{...},
-    rule.RuleSuggestion{
+ctx.ReportNodeWithDeferredSuggestions(node, msg, func() []rule.RuleSuggestion {
+    replacement := buildReplacement(ctx.SourceFile, node)
+    return []rule.RuleSuggestion{{
         Message: rule.RuleMessage{
-            Id:          "suggestRemove",
-            Description: "Remove this statement",
+            Id:          "suggestReplace",
+            Description: "Replace this expression",
         },
-        FixesArr: []rule.RuleFix{  // Note: field is "FixesArr", not "Fixes"
-            {Range: core.TextRange{...}, Text: ""},
+        FixesArr: []rule.RuleFix{
+            rule.RuleFixReplace(ctx.SourceFile, node, replacement),
         },
+    }}
+})
+```
+
+#### Autofix and Suggestion
+
+When one diagnostic exposes both categories, use separate builders so the
+consumer materializes only what it requested:
+
+```go
+ctx.ReportNodeWithDeferredFixesAndSuggestions(
+    node,
+    msg,
+    func() []rule.RuleFix {
+        return buildFixes(ctx.SourceFile, node)
+    },
+    func() []rule.RuleSuggestion {
+        return buildSuggestions(ctx.SourceFile, node)
     },
 )
 ```
@@ -593,7 +631,7 @@ ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{...},
 
 ## Fix Helper Functions
 
-Defined in `internal/rule/rule.go`:
+Defined in `internal/rule/diagnostic.go`:
 
 ```go
 // Insert text before node (requires SourceFile)
@@ -621,10 +659,12 @@ To remove or replace multiple non-contiguous ranges in a single fix, pass multip
 
 ```go
 // Example: remove ".bind" and "(arg)" separately from "fn.bind(arg)"
-ctx.ReportNodeWithFixes(node, msg,
-    rule.RuleFixRemoveRange(core.NewTextRange(dotStart, bindEnd)),   // removes ".bind"
-    rule.RuleFixRemoveRange(core.NewTextRange(parenStart, parenEnd)), // removes "(arg)"
-)
+ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+    return []rule.RuleFix{
+        rule.RuleFixRemoveRange(core.NewTextRange(dotStart, bindEnd)),    // removes ".bind"
+        rule.RuleFixRemoveRange(core.NewTextRange(parenStart, parenEnd)), // removes "(arg)"
+    }
+})
 ```
 
 ---
