@@ -27,7 +27,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const pool = new WorkerPool({
         configs: localConfigs,
         workerCount: 1,
-        taskTimeoutMs: 10_000,
       });
       await pool.init();
 
@@ -45,7 +44,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       expect(results[0].diagnostics).toHaveLength(0);
 
       await pool.shutdown();
-    }, 20_000);
+    });
 
     test('queue: cancelTask drops a queued (not-yet-dispatched) task without posting to worker', async () => {
       // Drive the queue path: with the worker forced non-idle, the
@@ -97,7 +96,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       } finally {
         await pool.shutdown();
       }
-    }, 15_000);
+    });
 
     test('shutdown drain honors q.cancelled — cancelled-then-shutdown reports cancelled:true, not parseError:shutdown', async () => {
       // Regression for review P2 #15. Pre-fix, the drain loop in
@@ -137,8 +136,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         },
       );
 
-      // Let enqueue finish so onTaskDispatched fires for all 3.
-      await new Promise((r) => setTimeout(r, 30));
+      // lintBatch assigns all task ids and invokes the callback synchronously.
       expect(taskIds).toHaveLength(3);
 
       // Cancel the MIDDLE queued task — it must surface as
@@ -158,6 +156,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 
       expect(result[2].parseError).toBe('shutdown');
       expect(result[2].cancelled).toBe(false);
-    }, 15_000);
+    });
   },
 );

@@ -1,42 +1,18 @@
-import { spawn } from 'child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { runCliProcess, type CliProcessResult } from '../spawn-cli.js';
 
 export const RSLINT_BIN = require.resolve('@rslint/core/bin');
-
-export interface CliTestResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
 
 export async function runRslint(
   args: string[],
   cwd: string,
-): Promise<CliTestResult> {
-  return new Promise((resolve) => {
-    const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
-    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...cleanEnv, NO_COLOR: '1' },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout?.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    child.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code) => {
-      resolve({ exitCode: code || 0, stdout, stderr });
-    });
+): Promise<CliProcessResult> {
+  const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
+  return runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+    cwd,
+    env: { ...cleanEnv, NO_COLOR: '1' },
   });
 }
 

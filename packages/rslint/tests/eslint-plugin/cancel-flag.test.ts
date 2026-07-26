@@ -157,26 +157,58 @@ describe('CancelFlagPool', () => {
     expect(Atomics.load(earlyView, 0)).toBe(1);
   });
 
-  // Performance smoke: release on a full pool used to be O(N). With
-  // the byte-map fix it's O(1). We assert "fast" loosely by running a
-  // large number of acquire/release cycles in a budget that O(N²)
-  // would never make. This isn't a precise benchmark, just a guard
-  // against an accidental re-introduction of the includes-scan.
-  test('release is fast at full capacity (no O(N) regression)', () => {
-    const pool = new CancelFlagPool(1024);
-    const slots: number[] = [];
-    for (let i = 0; i < 1024; i++) slots.push(pool.acquire());
+  test('release never scans the free list and still deduplicates', () => {
+    const pool = new CancelFlagPool(8);
+    const slot = pool.acquire();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internals = pool as any;
+    const freeList = internals.freeList as number[];
+    let indexedReads = 0;
+    let lengthReads = 0;
+    const traversalMethods = new Set([
+      'entries',
+      'every',
+      'filter',
+      'find',
+      'findIndex',
+      'forEach',
+      'includes',
+      'indexOf',
+      'keys',
+      'lastIndexOf',
+      'map',
+      'reduce',
+      'reduceRight',
+      'some',
+      'values',
+    ]);
+    internals.freeList = new Proxy(freeList, {
+      get(target, property) {
+        if (property === 'push') {
+          return (...values: number[]) => target.push(...values);
+        }
+        if (
+          property === Symbol.iterator ||
+          (typeof property === 'string' && traversalMethods.has(property))
+        ) {
+          throw new Error(`release scanned freeList via ${String(property)}`);
+        }
+        if (property === 'length') lengthReads++;
+        if (typeof property === 'string' && /^\d+$/.test(property)) {
+          indexedReads++;
+        }
+        return Reflect.get(target, property);
+      },
+    });
 
-    const start = Date.now();
-    for (let cycle = 0; cycle < 100; cycle++) {
-      for (const s of slots) pool.release(s);
-      for (let i = 0; i < 1024; i++) slots[i] = pool.acquire();
-    }
-    const elapsed = Date.now() - start;
-
-    // 100 cycles × 1024 (release + acquire) = ~200k ops. Even on
-    // slow CI hardware this should comfortably finish in <500ms when
-    // the path is O(1). O(N) release would push it into seconds.
-    expect(elapsed).toBeLessThan(500);
+    expect(() => {
+      pool.release(slot);
+      pool.release(slot);
+    }).not.toThrow();
+    // O(1) implementations may inspect length or a tail element. A hand-written
+    // scan over the seven free slots would exceed these constant bounds.
+    expect(lengthReads).toBeLessThanOrEqual(4);
+    expect(indexedReads).toBeLessThanOrEqual(2);
+    expect(freeList.filter((value) => value === slot)).toHaveLength(1);
   });
 });

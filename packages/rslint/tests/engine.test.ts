@@ -1,4 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
+import { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import { PassThrough, Writable } from 'node:stream';
@@ -17,6 +18,7 @@ const EXIT_DURING_CONFIG_ACTIVATION_BIN = path.resolve(
   __dirname,
   './fixtures/fake-exit-during-config-activation.cjs',
 );
+const CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 /**
  * Runs the engine against the fake IPC binary, which echoes the `init`
@@ -196,101 +198,223 @@ describe('runEngine config activation', () => {
     }
   });
 
-  test('disposes a plugin host that finishes after the Go child exits', async () => {
-    const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'rslint-cli-config-exit-'),
-    );
-    const configPath = path.join(root, 'rslint.config.mjs');
-    fs.writeFileSync(
-      configPath,
-      'export default [{ plugins: { local: { rules: { example: {} } } } }];\n',
-    );
-    let buildStarted = false;
-    let shutdownCalls = 0;
+  test(
+    'disposes a plugin host that finishes after the Go child exits',
+    async () => {
+      const root = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'rslint-cli-config-exit-'),
+      );
+      const configPath = path.join(root, 'rslint.config.mjs');
+      fs.writeFileSync(
+        configPath,
+        'export default [{ plugins: { local: { rules: { example: {} } } } }];\n',
+      );
+      const buildMarker = path.join(root, 'plugin-host-build-started');
+      let buildStarted = false;
+      let shutdownCalls = 0;
+      let markShutdownStarted!: () => void;
+      const shutdownStarted = new Promise<void>((resolve) => {
+        markShutdownStarted = resolve;
+      });
+      let releaseShutdown!: () => void;
+      const shutdownGate = new Promise<void>((resolve) => {
+        releaseShutdown = resolve;
+      });
+      let markChildExited!: () => void;
+      const childExited = new Promise<void>((resolve) => {
+        markChildExited = resolve;
+      });
+      const originalOnce = ChildProcess.prototype.once;
+      let exitListenerWrapped = false;
+      ChildProcess.prototype.once = function (event, listener) {
+        if (event !== 'exit' || exitListenerWrapped) {
+          return originalOnce.call(this, event, listener);
+        }
+        exitListenerWrapped = true;
+        return originalOnce.call(this, event, function (...args: unknown[]) {
+          Reflect.apply(listener, this, args);
+          markChildExited();
+        });
+      } as typeof ChildProcess.prototype.once;
 
-    try {
-      const exitCode = await runEngine({
-        binPath: process.execPath,
-        goArgs: [EXIT_DURING_CONFIG_ACTIVATION_BIN, configPath],
-        stdout: new PassThrough(),
-        stderr: new PassThrough(),
-        createPluginLintHost: async () => {
-          buildStarted = true;
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          return {
+      try {
+        let run: Promise<number>;
+        try {
+          run = runEngine({
+            binPath: process.execPath,
+            goArgs: [
+              EXIT_DURING_CONFIG_ACTIVATION_BIN,
+              configPath,
+              buildMarker,
+            ],
+            stdout: new PassThrough(),
+            stderr: new PassThrough(),
+            createPluginLintHost: async () => {
+              buildStarted = true;
+              fs.writeFileSync(buildMarker, 'started');
+              await childExited;
+              return {
+                async lint() {
+                  return { results: [] };
+                },
+                async shutdown() {
+                  shutdownCalls++;
+                  markShutdownStarted();
+                  await shutdownGate;
+                },
+              };
+            },
+          });
+        } finally {
+          ChildProcess.prototype.once = originalOnce;
+        }
+        let runSettled = false;
+        const runBoundary = run.then(
+          () => {
+            runSettled = true;
+            return 'run-settled' as const;
+          },
+          () => {
+            runSettled = true;
+            return 'run-settled' as const;
+          },
+        );
+        const firstBoundary = await Promise.race([
+          shutdownStarted.then(() => 'shutdown-started' as const),
+          runBoundary,
+        ]);
+        expect(firstBoundary).toBe('shutdown-started');
+        // Holding the shutdown gate across a full event-loop turn distinguishes
+        // an awaited teardown from a fire-and-forget call that merely starts it.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(runSettled).toBe(false);
+        releaseShutdown();
+        const exitCode = await run;
+
+        expect(exitCode).toBe(0);
+        expect(exitListenerWrapped).toBe(true);
+        expect(buildStarted).toBe(true);
+        expect(fs.readFileSync(buildMarker, 'utf8')).toBe('started');
+        expect(shutdownCalls).toBe(1);
+      } finally {
+        releaseShutdown();
+        ChildProcess.prototype.once = originalOnce;
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+    CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,
+  );
+
+  test(
+    'disposes a staged host before returning when Go exits during post-prepare verification',
+    async () => {
+      const root = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'rslint-cli-config-staged-exit-'),
+      );
+      const configPath = path.join(root, 'rslint.config.mjs');
+      const postPrepareMarker = path.join(root, 'post-prepare-started');
+      fs.writeFileSync(configPath, '// stable config bytes\n');
+      let fingerprintReads = 0;
+      let releasePostPrepare!: () => void;
+      let markPostPrepareStarted!: () => void;
+      let markPostPrepareFinished!: () => void;
+      let postPrepareEntered = false;
+      const postPrepareStarted = new Promise<void>((resolve) => {
+        markPostPrepareStarted = resolve;
+      });
+      const postPrepareFinished = new Promise<void>((resolve) => {
+        markPostPrepareFinished = resolve;
+      });
+      const postPrepareGate = new Promise<void>((resolve) => {
+        releasePostPrepare = resolve;
+      });
+      const configModuleHost = new ConfigModuleHost({
+        loadCached: async () => [
+          { plugins: { local: { rules: { example: {} } } } },
+        ],
+        readSource: async (sourcePath) => {
+          fingerprintReads++;
+          if (fingerprintReads === 4) {
+            postPrepareEntered = true;
+            fs.writeFileSync(postPrepareMarker, 'started');
+            markPostPrepareStarted();
+            try {
+              await postPrepareGate;
+              return await fs.promises.readFile(sourcePath);
+            } finally {
+              markPostPrepareFinished();
+            }
+          }
+          return fs.promises.readFile(sourcePath);
+        },
+      });
+      let shutdownCalls = 0;
+      let markShutdownStarted!: () => void;
+      const shutdownStarted = new Promise<void>((resolve) => {
+        markShutdownStarted = resolve;
+      });
+      let releaseShutdown!: () => void;
+      const shutdownGate = new Promise<void>((resolve) => {
+        releaseShutdown = resolve;
+      });
+
+      try {
+        const run = runEngine({
+          binPath: process.execPath,
+          goArgs: [
+            EXIT_DURING_CONFIG_ACTIVATION_BIN,
+            configPath,
+            postPrepareMarker,
+          ],
+          stdout: new PassThrough(),
+          stderr: new PassThrough(),
+          configModuleHost,
+          createPluginLintHost: async () => ({
             async lint() {
               return { results: [] };
             },
             async shutdown() {
               shutdownCalls++;
+              markShutdownStarted();
+              await shutdownGate;
             },
-          };
-        },
-      });
+          }),
+        });
 
-      expect(exitCode).toBe(0);
-      expect(buildStarted).toBe(true);
-      expect(shutdownCalls).toBe(1);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  test('disposes a staged host before returning when Go exits during post-prepare verification', async () => {
-    const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'rslint-cli-config-staged-exit-'),
-    );
-    const configPath = path.join(root, 'rslint.config.mjs');
-    fs.writeFileSync(configPath, '// stable config bytes\n');
-    let fingerprintReads = 0;
-    let releasePostPrepare!: () => void;
-    let markPostPrepareStarted!: () => void;
-    const postPrepareStarted = new Promise<void>((resolve) => {
-      markPostPrepareStarted = resolve;
-    });
-    const postPrepareGate = new Promise<void>((resolve) => {
-      releasePostPrepare = resolve;
-    });
-    const configModuleHost = new ConfigModuleHost({
-      loadCached: async () => [
-        { plugins: { local: { rules: { example: {} } } } },
-      ],
-      readSource: async (sourcePath) => {
-        fingerprintReads++;
-        if (fingerprintReads === 4) {
-          markPostPrepareStarted();
-          await postPrepareGate;
-        }
-        return fs.promises.readFile(sourcePath);
-      },
-    });
-    let shutdownCalls = 0;
-
-    try {
-      const run = runEngine({
-        binPath: process.execPath,
-        goArgs: [EXIT_DURING_CONFIG_ACTIVATION_BIN, configPath],
-        stdout: new PassThrough(),
-        stderr: new PassThrough(),
-        configModuleHost,
-        createPluginLintHost: async () => ({
-          async lint() {
-            return { results: [] };
+        let runSettled = false;
+        const runBoundary = run.then(
+          () => {
+            runSettled = true;
+            return 'run-settled' as const;
           },
-          async shutdown() {
-            shutdownCalls++;
+          () => {
+            runSettled = true;
+            return 'run-settled' as const;
           },
-        }),
-      });
-
-      await postPrepareStarted;
-      const exitCode = await run;
-      expect(exitCode).toBe(0);
-      expect(shutdownCalls).toBe(1);
-    } finally {
-      releasePostPrepare();
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
+        );
+        const activationBoundary = await Promise.race([
+          postPrepareStarted.then(() => 'post-prepare-started' as const),
+          runBoundary,
+        ]);
+        expect(activationBoundary).toBe('post-prepare-started');
+        const firstBoundary = await Promise.race([
+          shutdownStarted.then(() => 'shutdown-started' as const),
+          runBoundary,
+        ]);
+        expect(firstBoundary).toBe('shutdown-started');
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(runSettled).toBe(false);
+        releaseShutdown();
+        const exitCode = await run;
+        expect(exitCode).toBe(0);
+        expect(shutdownCalls).toBe(1);
+      } finally {
+        releaseShutdown();
+        releasePostPrepare();
+        if (postPrepareEntered) await postPrepareFinished;
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+    CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,
+  );
 });

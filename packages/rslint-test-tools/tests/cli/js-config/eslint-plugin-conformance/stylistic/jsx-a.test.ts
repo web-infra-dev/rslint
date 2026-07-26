@@ -14,6 +14,9 @@
 import { runConformanceSuite } from '../conformance.js';
 import type { DiffCase } from '../harness.js';
 
+const JSX_INDENT_DEPRECATION =
+  '[rslint:plugin] [@stylistic/eslint-plugin]: You are using deprecated rule("jsx-indent"), please use "indent" instead.';
+
 const CASES: DiffCase[] = [
   {
     pkg: '@stylistic/eslint-plugin',
@@ -157,11 +160,13 @@ const CASES: DiffCase[] = [
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-indent',
     code: '\n        <App>\n          <Foo />\n        </App>\n      ',
+    expectedStderr: JSX_INDENT_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-indent',
     code: '\n        <>\n          <Foo />\n        </>\n      ',
+    expectedStderr: JSX_INDENT_DEPRECATION,
   },
 ];
 
@@ -282,12 +287,14 @@ const CLEAN_CASES: DiffCase[] = [
     rule: 'jsx-indent',
     code: '\n        <App>\n          <Foo />\n        </App>\n      ',
     options: [2],
+    expectedStderr: JSX_INDENT_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-indent',
     code: '\n\t\t\t\t<App>\n\t\t\t\t\t<Foo />\n\t\t\t\t</App>\n\t\t\t',
     options: ['tab'],
+    expectedStderr: JSX_INDENT_DEPRECATION,
   },
 ];
 

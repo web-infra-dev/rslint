@@ -3,6 +3,8 @@ import { describe, expect, test } from '@rstest/core';
 import {
   JOURNAL_VERSION,
   POOL_ISOLATION_AUDIT_PREFIX,
+  WINDOWS_ACCESS_VIOLATION_EXIT_CODE,
+  WINDOWS_ACCESS_VIOLATION_SIGNED_EXIT_CODE,
   classifyScenario,
   formatScenarioAudit,
   parseJournalForTests,
@@ -66,6 +68,11 @@ describe('pool-isolation verdict is fail-closed', () => {
     expect(classify({ exitCode: null, signal: 'SIGTERM' })).toBe('FAIL');
   });
 
+  test('clean child stderr cannot hide behind a complete journal', () => {
+    expect(classify({ stderr: 'unexpected native warning\n' })).toBe('FAIL');
+    expect(classify({ stderr: '  \n' })).toBe('PASS');
+  });
+
   test('clean exit still requires the exact terminate boundary', () => {
     expect(
       classify({
@@ -108,10 +115,55 @@ describe('pool-isolation verdict is fail-closed', () => {
     expect(
       classify({
         records: nativeAbortRecords,
-        exitCode: 0,
+        exitCode: null,
+        signal: 'SIGABRT',
         platform: 'win32',
       }),
     ).toBe('EXPECTED-NATIVE-ABORT');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: null,
+        signal: 'SIGTERM',
+        platform: 'win32',
+      }),
+    ).toBe('FAIL');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: 3,
+        platform: 'win32',
+      }),
+    ).toBe('FAIL');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: WINDOWS_ACCESS_VIOLATION_EXIT_CODE,
+        platform: 'win32',
+      }),
+    ).toBe('EXPECTED-NATIVE-ABORT');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: WINDOWS_ACCESS_VIOLATION_SIGNED_EXIT_CODE,
+        platform: 'win32',
+      }),
+    ).toBe('EXPECTED-NATIVE-ABORT');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: 0,
+        platform: 'win32',
+      }),
+    ).toBe('FAIL');
+    expect(
+      classify({
+        records: nativeAbortRecords,
+        exitCode: null,
+        signal: null,
+        platform: 'win32',
+      }),
+    ).toBe('FAIL');
     expect(
       classify({
         records: nativeAbortRecords,

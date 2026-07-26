@@ -52,7 +52,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       } finally {
         await host.shutdown();
       }
-    }, 20_000);
+    });
 
     test('aborting after dispatch cancels via the onAbort listener (mid-flight)', async () => {
       const cancelSpy = rs.spyOn(WorkerPool.prototype, 'cancelTask');
@@ -73,6 +73,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         cancelSpy.mockRestore();
         await host.shutdown();
       }
-    }, 20_000);
+    });
   },
 );

@@ -40,8 +40,8 @@ export function runConformanceSuite(
   cleanCases: DiffCase[] = [],
 ): void {
   const alias = ALIASES[pkg];
-  // Both engines run once per set, lazily on first test + memoized; the
-  // per-test `--testTimeout=0` covers the one-off batch cost.
+  // Both engines run once per set, lazily on first test + memoized. The
+  // package-level watchdog covers the one-off batch cost.
   let cv: Promise<Verdict[]> | undefined;
   const verdicts = () => (cv ??= compareCases(cases));
   let clv: Promise<Verdict[]> | undefined;

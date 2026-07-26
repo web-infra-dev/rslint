@@ -1,4 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
+import { EventEmitter } from 'node:events';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
@@ -8,7 +9,26 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
 } from './pool-isolation/harness.js';
+
+class QueueFakeWorker extends EventEmitter {
+  readonly posted: unknown[] = [];
+
+  postMessage(message: unknown): void {
+    this.posted.push(message);
+    if (
+      (message as { kind?: string }).kind === 'shutdown' &&
+      this.listenerCount('exit') > 0
+    ) {
+      queueMicrotask(() => this.emit('exit', 0));
+    }
+  }
+
+  terminate(): Promise<number> {
+    return Promise.resolve(0);
+  }
+}
 
 /**
  * WorkerPool end-to-end — queue model: tasks wait in `pendingQueue`
@@ -87,62 +107,146 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // No leaked queue entries.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((pool as any).pendingQueue.length).toBe(0);
-    }, 15_000);
+    });
 
     // Driving every slot past its respawn cap (crashCount=cap + terminate)
     // drains the in-flight batch as parseError:pool_degraded. The terminate of
     // an oxc-napi worker can native-abort on Windows — run it isolated (see
     // ./pool-isolation). The in-child asserts pin the pool_degraded drain.
-    test('all workers degraded → pendingQueue drains as parseError:pool_degraded (no hang)', async () => {
-      const r = await runPoolScenario('all-degraded');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 70_000);
+    test(
+      'all workers degraded → pendingQueue drains as parseError:pool_degraded (no hang)',
+      async () => {
+        const r = await runPoolScenario('all-degraded');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     // Queue-model regression suite — five tests pinning the design
     // properties that the Finding 3 refactor introduced.
 
-    test('queue: large batch on a single worker completes without queue-time timeout', async () => {
-      // 20 tasks on 1 worker × 600ms timer = 12 s total work. Pre-
-      // refactor, the timer started at lintBatch enqueue time, so
-      // tasks 2-20 raced their 600ms deadline against a 1-worker
-      // serial backlog and most would land as task_timeout. Post-
-      // refactor, each task's timer starts only when the worker
-      // actually takes it off the queue — so every task gets its
-      // full 600ms execution budget regardless of position.
+    test('queue: timers start only when each queued task is dispatched', async () => {
+      // Pre-refactor every queued task armed its timer synchronously.
+      // The queue model must arm only the one dispatched task; the remaining
+      // 19 receive a timer only when a worker actually takes them. An
+      // in-memory Worker drives each result event deterministically here; the
+      // real-worker backpressure test below separately covers integration.
+      const nonFiringTaskTimeoutMs = 24 * 60 * 60 * 1_000;
       const pool = new WorkerPool({
-        configs: localConfigs,
-        workerCount: 1,
-        taskTimeoutMs: 600,
+        configs: [],
+        taskTimeoutMs: nonFiringTaskTimeoutMs,
       });
-      await pool.init();
-      try {
-        const tasks: LintTask[] = [];
-        for (let i = 0; i < 20; i++) {
-          tasks.push({
-            filePath: `f${i}.ts`,
-            text: 'const x = null;\n',
-            rules: { 'local/no-null': { options: [] } },
-            collectFixes: false,
-            suggestionsMode: 'off',
-            configKey: LOCAL_CONFIG_DIR,
-          });
+      const internals = pool as any;
+      const worker = new QueueFakeWorker();
+      const slot = {
+        id: 0,
+        worker,
+        ready: true,
+        exited: false,
+        respawning: false,
+        inflight: new Map(),
+        crashCount: 0,
+      };
+      internals.opts.workerCount = 1;
+      internals.workers = [slot];
+      internals.attachOngoingHandlers(slot);
+
+      const tasks: LintTask[] = [];
+      for (let i = 0; i < 20; i++) {
+        tasks.push({
+          filePath: `f${i}.ts`,
+          text: 'const x = null;\n',
+          rules: { 'local/no-null': { options: [] } },
+          collectFixes: false,
+          suggestionsMode: 'off',
+          configKey: LOCAL_CONFIG_DIR,
+        });
+      }
+      // Instrument this pool instance rather than retaining a global timer
+      // patch across an async boundary. Every dequeue enters dispatch
+      // synchronously, so each wrapper captures its exact product timer and
+      // restores the global before yielding.
+      const originalDispatch = internals.dispatchToWorker;
+      const taskTimers: NodeJS.Timeout[] = [];
+      let dispatchCalls = 0;
+      internals.dispatchToWorker = function (...args: unknown[]) {
+        dispatchCalls++;
+        const originalSetTimeout = globalThis.setTimeout;
+        globalThis.setTimeout = ((
+          callback: (...callbackArgs: any[]) => void,
+          delay?: number,
+          ...callbackArgs: any[]
+        ) => {
+          const handle = originalSetTimeout(callback, delay, ...callbackArgs);
+          if (delay === nonFiringTaskTimeoutMs) {
+            handle.unref();
+            taskTimers.push(handle);
+          }
+          return handle;
+        }) as typeof setTimeout;
+        try {
+          return originalDispatch.apply(this, args);
+        } finally {
+          globalThis.setTimeout = originalSetTimeout;
         }
-        const results = await pool.lintBatch(tasks);
+      };
+
+      try {
+        const resultsPromise = pool.lintBatch(tasks);
+        expect(dispatchCalls).toBe(1);
+        expect(taskTimers).toHaveLength(1);
+        expect(internals.pendingQueue).toHaveLength(19);
+
+        for (let i = 0; i < tasks.length; i++) {
+          expect(taskTimers).toHaveLength(i + 1);
+          expect(internals.pendingQueue).toHaveLength(tasks.length - i - 1);
+          expect(worker.posted).toHaveLength(i + 1);
+          const message = worker.posted[i] as {
+            kind: string;
+            taskId: number;
+          };
+          expect(message.kind).toBe('task');
+          worker.emit('message', {
+            kind: 'result',
+            taskId: message.taskId,
+            result: {
+              filePath: tasks[i].filePath,
+              diagnostics: [{ ruleName: 'local/no-null' }],
+              fixes: [],
+              suggestionsCount: 0,
+              cancelled: false,
+            },
+          });
+          expect(
+            (
+              taskTimers[i] as unknown as {
+                _destroyed?: boolean;
+              }
+            )._destroyed,
+          ).toBe(true);
+        }
+
+        const results = await resultsPromise;
+        expect(dispatchCalls).toBe(20);
+        expect(taskTimers).toHaveLength(20);
+        expect(
+          taskTimers.every(
+            (handle) =>
+              (handle as unknown as { _destroyed?: boolean })._destroyed ===
+              true,
+          ),
+        ).toBe(true);
         expect(results).toHaveLength(20);
-        // Every file has exactly ONE `null` literal → exactly ONE
-        // `local/no-null` diagnostic. `toBe(1)` (not `> 0`) proves the
-        // task ran AND catches a queue-reuse regression where a file is
-        // dispatched twice and its diagnostics merged (→ 2). None should
-        // be task_timeout: a queue-time timeout regression would land
-        // most as parseError.
-        for (const r of results) {
-          expect(r.parseError).toBeUndefined();
-          expect(r.diagnostics.length).toBe(1);
+        for (const result of results) {
+          expect(result.parseError).toBeUndefined();
+          expect(result.diagnostics).toHaveLength(1);
         }
       } finally {
+        internals.dispatchToWorker = originalDispatch;
+        for (const handle of taskTimers) clearTimeout(handle);
         await pool.shutdown();
       }
-    }, 30_000);
+    });
 
     test('queue: kickQueue is idempotent + safe with empty queue', async () => {
       // kickQueue gets called from multiple async paths (result
@@ -180,7 +284,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       } finally {
         await pool.shutdown();
       }
-    }, 15_000);
+    });
 
     test('queue: when batch size > worker count, all tasks complete (backpressure)', async () => {
       // 30 tasks on 2 workers — only 2 inflight at a time, the
@@ -219,16 +323,20 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       } finally {
         await pool.shutdown();
       }
-    }, 30_000);
+    });
 
     // A SECOND batch issued AFTER the pool settled into the terminal degraded
     // state must also resolve pool_degraded (not hang) — Fix A. Reaching that
     // state needs a forced terminate of an oxc-napi worker, which can
     // native-abort on Windows, so run it isolated (see ./pool-isolation). The
     // in-child asserts pin the terminal-state sanity checks and both drains.
-    test('lintBatch issued AFTER the pool settled into the terminal degraded state resolves as pool_degraded (does not hang)', async () => {
-      const r = await runPoolScenario('lint-batch-after-degraded');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 70_000);
+    test(
+      'lintBatch issued AFTER the pool settled into the terminal degraded state resolves as pool_degraded (does not hang)',
+      async () => {
+        const r = await runPoolScenario('lint-batch-after-degraded');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
   },
 );

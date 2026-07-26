@@ -59,6 +59,18 @@ interface TestPoolState {
   closed: boolean;
 }
 
+function makeSlot(worker: FakeWorker, id: number): TestSlot {
+  return {
+    id,
+    worker,
+    ready: true,
+    exited: false,
+    respawning: false,
+    inflight: new Map(),
+    crashCount: 0,
+  };
+}
+
 function makePool(...workers: FakeWorker[]): {
   pool: WorkerPool;
   state: TestPoolState;
@@ -68,15 +80,7 @@ function makePool(...workers: FakeWorker[]): {
   // tests then install structurally faithful in-memory slots.
   const pool = new WorkerPool({ configs: [] });
   const state = pool as unknown as TestPoolState;
-  const slots = workers.map<TestSlot>((worker, id) => ({
-    id,
-    worker,
-    ready: true,
-    exited: false,
-    respawning: false,
-    inflight: new Map(),
-    crashCount: 0,
-  }));
+  const slots = workers.map<TestSlot>(makeSlot);
   for (const slot of slots) {
     slot.worker.on('exit', () => {
       slot.ready = false;
@@ -243,6 +247,168 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     await second.shutdown;
     expect(second.timers).toEqual([]);
     expect(worker.terminateCalls).toBe(0);
+  });
+
+  test('empty pool shutdown arms no timer', async () => {
+    const { pool, state } = makePool();
+    const capture = beginShutdownWithCapturedTimers(pool);
+    capture.restore();
+    await capture.shutdown;
+
+    expect(capture.timers).toEqual([]);
+    expect(state.workers).toEqual([]);
+  });
+
+  test('a pending sibling respawn survives another respawn rejection and services the queue', async () => {
+    const firstWorker = new FakeWorker([]);
+    const secondWorker = new FakeWorker([]);
+    const replacementWorker = new FakeWorker([]);
+    const { pool, state, slots } = makePool(firstWorker, secondWorker);
+    const internals = pool as any;
+    internals.attachOngoingHandlers(slots[0]);
+    internals.attachOngoingHandlers(slots[1]);
+    slots[0].ready = false;
+    slots[1].ready = false;
+
+    const batch = pool.lintBatch([
+      {
+        filePath: 'queued.ts',
+        text: '',
+        rules: {},
+        collectFixes: false,
+        suggestionsMode: 'off',
+      },
+    ]);
+    let batchSettled = false;
+    void batch.then(
+      () => {
+        batchSettled = true;
+      },
+      () => {
+        batchSettled = true;
+      },
+    );
+    expect(internals.pendingQueue).toHaveLength(1);
+
+    const replacementSlot = makeSlot(replacementWorker, 1);
+    internals.attachOngoingHandlers(replacementSlot);
+    let releaseSecondRespawn!: () => void;
+    const secondRespawnGate = new Promise<void>((resolve) => {
+      releaseSecondRespawn = resolve;
+    });
+    internals.spawnWorker = async (id: number) => {
+      if (id === 0) throw new Error('first respawn rejected');
+      expect(id).toBe(1);
+      await secondRespawnGate;
+      return replacementSlot;
+    };
+
+    // Start B's pending respawn first, then reject A's. Both transitions run
+    // through the real ongoing exit handler; no state is injected manually.
+    secondWorker.emit('exit', 42);
+    firstWorker.emit('exit', 43);
+    const respawns = [...internals.respawns] as Promise<void>[];
+    expect(respawns).toHaveLength(2);
+    await respawns[1];
+
+    expect(slots[0].respawning).toBe(false);
+    expect(slots[1].respawning).toBe(true);
+    expect(batchSettled).toBe(false);
+    expect(internals.pendingQueue).toHaveLength(1);
+
+    releaseSecondRespawn();
+    await Promise.all(respawns);
+    expect(state.workers[1]).toBe(replacementSlot);
+    expect(replacementWorker.posted).toHaveLength(1);
+    expect(internals.pendingQueue).toEqual([]);
+
+    const posted = replacementWorker.posted[0] as { taskId: number };
+    replacementWorker.emit('message', {
+      kind: 'result',
+      taskId: posted.taskId,
+      result: {
+        filePath: 'queued.ts',
+        diagnostics: [],
+        fixes: [],
+        suggestionsCount: 0,
+        cancelled: false,
+      },
+    });
+    await expect(batch).resolves.toMatchObject([
+      {
+        filePath: 'queued.ts',
+        cancelled: false,
+      },
+    ]);
+  });
+
+  test('a worker published during init can be replaced before sibling spawn settles', async () => {
+    const pool = new WorkerPool({
+      configs: [{ configPath: 'fake', configDirectory: 'fake' }],
+      workerCount: 2,
+    });
+    const internals = pool as any;
+    const first = new FakeWorker([]);
+    const second = new FakeWorker([]);
+    const replacement = new FakeWorker([]);
+    const firstSlot = makeSlot(first, 0);
+    const secondSlot = makeSlot(second, 1);
+    const replacementSlot = makeSlot(replacement, 0);
+    internals.attachOngoingHandlers(firstSlot);
+    internals.attachOngoingHandlers(secondSlot);
+    internals.attachOngoingHandlers(replacementSlot);
+
+    let releaseSecond!: () => void;
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    let markFirstPublished!: () => void;
+    const firstPublished = new Promise<void>((resolve) => {
+      markFirstPublished = resolve;
+    });
+    const workers: TestSlot[] = [];
+    internals.workers = new Proxy(workers, {
+      get(target, property, receiver) {
+        if (property === 'push') {
+          return (...values: TestSlot[]) => {
+            const length = target.push(...values);
+            if (values.includes(firstSlot)) markFirstPublished();
+            return length;
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    let spawnCall = 0;
+    let markRespawnStarted!: () => void;
+    const respawnStarted = new Promise<void>((resolve) => {
+      markRespawnStarted = resolve;
+    });
+    internals.spawnWorker = async (id: number) => {
+      spawnCall++;
+      if (spawnCall === 1) return firstSlot;
+      if (spawnCall === 2) {
+        await secondGate;
+        return secondSlot;
+      }
+      expect(id).toBe(0);
+      markRespawnStarted();
+      return replacementSlot;
+    };
+
+    const init = pool.init();
+    await firstPublished;
+    expect(workers).toEqual([firstSlot]);
+    first.emit('exit', 42);
+    await respawnStarted;
+    await Promise.all([...internals.respawns]);
+    expect(workers[0]).toBe(replacementSlot);
+
+    releaseSecond();
+    await init;
+    expect(workers).toHaveLength(2);
+    expect(workers.every((slot) => slot.ready)).toBe(true);
   });
 
   test('mixed slots wait for graceful exit and forced exit together', async () => {

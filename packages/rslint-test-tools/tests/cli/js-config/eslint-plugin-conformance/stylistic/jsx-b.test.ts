@@ -6,6 +6,11 @@
 import { runConformanceSuite } from '../conformance.js';
 import type { DiffCase } from '../harness.js';
 
+const JSX_PROPS_NO_MULTI_SPACES_DEPRECATION =
+  '[rslint:plugin] [@stylistic/eslint-plugin]: You are using deprecated rule("jsx-props-no-multi-spaces"), please use "no-multi-spaces" instead.';
+const JSX_SORT_PROPS_DEPRECATION =
+  '[rslint:plugin] [@stylistic/eslint-plugin]: You are using deprecated rule("jsx-sort-props"), please use "sort-jsx-props" in "eslint-plugin-perfectionist" instead.';
+
 const CASES: DiffCase[] = [
   {
     pkg: '@stylistic/eslint-plugin',
@@ -84,21 +89,25 @@ const CASES: DiffCase[] = [
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '\n        <App  foo />\n      ',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '\n        <App foo="with  spaces   "   bar />\n      ',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '<Foo.Bar  baz="quux" />',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '\n        <button\n          title=\'Some button\'\n\n          type="button"\n        />\n      ',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
@@ -147,16 +156,19 @@ const CASES: DiffCase[] = [
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-sort-props',
     code: '<App b a />;',
+    expectedStderr: JSX_SORT_PROPS_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-sort-props',
     code: '<App aB a />;',
+    expectedStderr: JSX_SORT_PROPS_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-sort-props',
     code: '<App fistName="John" tel={5555555} name="John Smith" lastName="Smith" Number="2" />;',
+    expectedStderr: JSX_SORT_PROPS_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
@@ -243,11 +255,13 @@ const CLEAN_CASES: DiffCase[] = [
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '\n        <App foo bar />\n      ',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-props-no-multi-spaces',
     code: '\n        <App foo="with  spaces   " bar />\n      ',
+    expectedStderr: JSX_PROPS_NO_MULTI_SPACES_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
@@ -275,12 +289,14 @@ const CLEAN_CASES: DiffCase[] = [
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-sort-props',
     code: '<App a b c />;',
+    expectedStderr: JSX_SORT_PROPS_DEPRECATION,
   },
   {
     pkg: '@stylistic/eslint-plugin',
     rule: 'jsx-sort-props',
     code: '<App a z onBar onFoo />;',
     options: [{ callbacksLast: true }],
+    expectedStderr: JSX_SORT_PROPS_DEPRECATION,
   },
   { pkg: '@stylistic/eslint-plugin', rule: 'jsx-tag-spacing', code: '<App />' },
   {

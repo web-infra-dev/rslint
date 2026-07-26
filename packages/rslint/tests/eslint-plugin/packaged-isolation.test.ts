@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from '@rstest/core';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -37,6 +37,10 @@ const require = createRequire(import.meta.url);
 const TUPLE = platformTuple();
 const PKG_BASE = `native-${TUPLE}`;
 const NODE_FILE = `rslint.${TUPLE}.node`;
+// Success is the validated process close, not a duration. This only releases
+// an isolated packaged-layout process that has not exited for 30 minutes.
+const PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
+const PACKAGED_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
 
 // A self-contained `.mjs` plugin + config — `.mjs` needs no `jiti`, isolating
 // this test to the native-parser resolution it is meant to guard.
@@ -80,10 +84,11 @@ await host.shutdown();
 const d = res.results?.[0]?.diagnostics ?? [];
 if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
   console.log('PACKAGED_OK');
-  process.exit(0);
+  process.exitCode = 0;
+} else {
+  console.error('UNEXPECTED ' + JSON.stringify(res));
+  process.exitCode = 1;
 }
-console.error('UNEXPECTED ' + JSON.stringify(res));
-process.exit(1);
 `;
 
 /** Stage a packaged layout under `root`; omit the nested native for the negative control. */
@@ -149,49 +154,61 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
     });
 
-    test('worker loads the platform package from the nested node_modules and a plugin rule fires', () => {
-      const root = path.join(tmp, 'ok');
-      fs.mkdirSync(root, { recursive: true });
-      stage(root, { withNative: true });
-      // timeout + SIGKILL so a worker wedged in native teardown (the win32
-      // abort this validates) fails loudly instead of hanging CI forever.
-      // Clear NODE_PATH: rstest injects it pointing at the pnpm virtual store
-      // (which holds the workspace platform packages), but a packaged vsix has
-      // none. Clearing it reproduces the real packaged resolution — nested
-      // walk-up only — for this test and the negative control below.
-      const out = execFileSync('node', ['runner.mjs'], {
-        cwd: root,
-        encoding: 'utf8',
-        timeout: 30_000,
-        killSignal: 'SIGKILL',
-        env: { ...process.env, NODE_PATH: '' },
-      });
-      expect(out).toContain('PACKAGED_OK');
-    });
-
-    test('without the nested platform package the host fails (no workspace fallback)', () => {
-      const root = path.join(tmp, 'no-native');
-      fs.mkdirSync(root, { recursive: true });
-      stage(root, { withNative: false });
-      let stderr = '';
-      let threw = false;
-      try {
-        execFileSync('node', ['runner.mjs'], {
+    test(
+      'worker loads the platform package from the nested node_modules and a plugin rule fires',
+      () => {
+        const root = path.join(tmp, 'ok');
+        fs.mkdirSync(root, { recursive: true });
+        stage(root, { withNative: true });
+        // timeout + SIGKILL so a worker wedged in native teardown (the win32
+        // abort this validates) fails loudly instead of hanging CI forever.
+        // Clear NODE_PATH: rstest injects it pointing at the pnpm virtual store
+        // (which holds the workspace platform packages), but a packaged vsix has
+        // none. Clearing it reproduces the real packaged resolution — nested
+        // walk-up only — for this test and the negative control below.
+        const result = spawnSync(process.execPath, ['runner.mjs'], {
           cwd: root,
           encoding: 'utf8',
-          timeout: 30_000,
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
           killSignal: 'SIGKILL',
+          maxBuffer: 16 * 1024 * 1024,
           env: { ...process.env, NODE_PATH: '' },
         });
-      } catch (err) {
-        threw = true;
-        stderr = String((err as { stderr?: string }).stderr ?? '');
-      }
-      expect(threw).toBe(true);
-      // The core loader throws its own diagnostic naming the missing platform
-      // package — no workspace fallback.
-      expect(stderr).toContain('failed to load the native parser');
-      expect(stderr).toContain(`@rslint/${PKG_BASE}`);
-    });
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status).toBe(0);
+        expect(result.stdout.trim()).toBe('PACKAGED_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
+
+    test(
+      'without the nested platform package the host fails (no workspace fallback)',
+      () => {
+        const root = path.join(tmp, 'no-native');
+        fs.mkdirSync(root, { recursive: true });
+        stage(root, { withNative: false });
+        const result = spawnSync(process.execPath, ['runner.mjs'], {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          maxBuffer: 16 * 1024 * 1024,
+          env: { ...process.env, NODE_PATH: '' },
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status).toBe(1);
+        // The core loader throws its own diagnostic naming the missing platform
+        // package — no workspace fallback.
+        expect(result.stderr).toContain('failed to load the native parser');
+        expect(result.stderr).toContain(`@rslint/${PKG_BASE}`);
+        expect(`${result.stdout}\n${result.stderr}`).not.toMatch(
+          /task_timeout|worker_crashed|EXPECTED-NATIVE-ABORT/,
+        );
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
   },
 );

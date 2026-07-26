@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
@@ -27,7 +28,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const pool = new WorkerPool({
         configs: [{ configPath: missingPath, configDirectory: missingDir }],
         workerCount: 1,
-        workerInitTimeoutMs: 5000,
       });
 
       // The fixture config imports a non-existent plugin package; the
@@ -59,7 +59,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         const pool = new WorkerPool({
           configs: [{ configPath: missingPath, configDirectory: missingDir }],
           workerCount: 1,
-          workerInitTimeoutMs: 5000,
         });
         await expect(pool.init()).rejects.toThrow(
           /eslint-plugin-this-does-not-exist/,
@@ -67,37 +66,60 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       }
     });
 
-    test('init failure + async worker fault keeps the host alive (error safety net)', async () => {
-      // The fixture fails init AND schedules an async throw that fires after
-      // sendInitError, making the worker emit an 'error' event. An unhandled
-      // Worker 'error' is re-thrown by Node as an uncaught exception in the
-      // host — so the pool must keep an 'error' listener through the
-      // init-error window. Capture host uncaughtException to assert none leaks.
-      const faults: string[] = [];
-      const onUncaught = (e: Error) => {
-        faults.push(e.message);
-      };
-      process.on('uncaughtException', onUncaught);
+    test('init failure retains the Worker error safety net', async () => {
+      // Capture the actual Worker when spawnWorker installs its init-phase
+      // error listener. After init-error rejection that listener must remain:
+      // otherwise a later Worker error is re-thrown by Node in the host.
+      const originalOnce = Worker.prototype.once;
+      let failedWorker: Worker | undefined;
+      let markWorkerExited!: () => void;
+      const workerExited = new Promise<void>((resolve) => {
+        markWorkerExited = resolve;
+      });
+      Worker.prototype.once = function (event, listener) {
+        if (event === 'error' && !failedWorker) {
+          failedWorker = this;
+          originalOnce.call(this, 'exit', () => {
+            markWorkerExited();
+          });
+        }
+        return originalOnce.call(this, event, listener);
+      } as typeof Worker.prototype.once;
+      let initPromise: Promise<void>;
       try {
         const cfgPath = path.resolve(
           __dirname,
           'fixtures',
-          'init-error-async-fault.config.mjs',
+          'missing-plugin.config.mjs',
         );
         const pool = new WorkerPool({
           configs: [
             { configPath: cfgPath, configDirectory: path.dirname(cfgPath) },
           ],
           workerCount: 1,
-          workerInitTimeoutMs: 5000,
         });
-        await expect(pool.init()).rejects.toThrow(/init eval failure/);
-        // Let the worker's scheduled async fault (20ms) fire + propagate.
-        await new Promise((r) => setTimeout(r, 200));
-        expect(faults).toEqual([]);
+        // Worker construction and init-phase listener installation are
+        // synchronous up to pool.init() returning its promise. Restore the
+        // shared prototype before any async wait so a stalled init cannot
+        // pollute later tests after Rstest's outer timeout.
+        initPromise = pool.init();
       } finally {
-        process.off('uncaughtException', onUncaught);
+        Worker.prototype.once = originalOnce;
       }
+      await expect(initPromise!).rejects.toThrow(
+        /eslint-plugin-this-does-not-exist/,
+      );
+      expect(failedWorker).toBeDefined();
+      expect(failedWorker!.listenerCount('error')).toBeGreaterThan(0);
+      let handled = false;
+      expect(() => {
+        handled = failedWorker!.emit(
+          'error',
+          new Error('synthetic late init fault'),
+        );
+      }).not.toThrow();
+      expect(handled).toBe(true);
+      await workerExited;
     });
 
     test('init-failure path awaits in-flight respawns before throwing (symmetric with shutdown)', async () => {
@@ -109,84 +131,58 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // `closed===true` and self-terminates the freshly-spawned worker —
       // but `init()` would `throw` BEFORE that orphan thread was reaped.
       // Fix: the init-failure branch mirrors shutdown and awaits the set.
-      const missingPath = path.resolve(
-        __dirname,
-        'fixtures',
-        'missing-plugin.config.mjs',
-      );
       const pool = new WorkerPool({
-        configs: [
-          {
-            configPath: missingPath,
-            configDirectory: path.dirname(missingPath),
-          },
-        ],
+        configs: [{ configPath: 'synthetic', configDirectory: 'synthetic' }],
         workerCount: 1,
-        workerInitTimeoutMs: 5_000,
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const internals = pool as any;
+      internals.spawnWorker = async () => {
+        throw new Error('synthetic init failure');
+      };
 
-      // Inject an in-flight respawn that NEVER settles on its own — only
-      // we resolve it. This makes the assertion fully deterministic with
-      // no reliance on timer ordering: with the fix, init() blocks at
-      // `await Promise.allSettled([...this.respawns])` and cannot reject
-      // until we resolve this; without the fix, init() rejects the moment
-      // the (missing-plugin) spawn fails, never awaiting this promise.
-      let resolveRespawn!: () => void;
-      let respawnSettled = false;
-      const respawnTeardown = new Promise<void>((res) => {
-        resolveRespawn = res;
-      }).then(() => {
-        respawnSettled = true;
+      let releaseRespawn!: () => void;
+      const respawnGate = new Promise<void>((resolve) => {
+        releaseRespawn = resolve;
       });
-      internals.respawns.add(respawnTeardown);
+      let markSubscribed!: () => void;
+      const subscribed = new Promise<void>((resolve) => {
+        markSubscribed = resolve;
+      });
+      const observedThenable = {
+        then(
+          onFulfilled: (value: void) => unknown,
+          onRejected: (reason: unknown) => unknown,
+        ) {
+          markSubscribed();
+          return respawnGate.then(onFulfilled, onRejected);
+        },
+      };
+      internals.respawns.add(observedThenable);
 
-      // Kick off init() without awaiting. It will fail its spawn (the
-      // config imports a non-existent plugin) within ~tens of ms.
       let initSettled = false;
-      let initRejected = false;
-      let settledAtInitReject = false;
+      let initError: Error | undefined;
       const initP = pool
         .init()
-        .then(
-          () => {
-            /* unexpected resolve — asserted below */
-          },
-          () => {
-            initRejected = true;
-            // Capture whether the injected respawn had ALREADY settled at
-            // the instant init() rejected. With the fix this is true (init
-            // awaited it); without the fix it is false (init threw first).
-            settledAtInitReject = respawnSettled;
-          },
-        )
+        .catch((error: Error) => {
+          initError = error;
+        })
         .finally(() => {
           initSettled = true;
         });
 
-      // Wait well beyond the measured ~32ms spawn-failure latency so the
-      // spawn has DEFINITELY failed. After this, the only thing that can
-      // keep init() pending is the fix's `await` on the injected respawn.
-      await new Promise((r) => setTimeout(r, 800));
-
-      // Discriminating assertion: the spawn has failed, yet init() is
-      // still pending — it is blocked awaiting the injected respawn.
-      // Without the fix init() would have rejected during this window.
+      // Promise.allSettled calling the injected thenable proves init reached
+      // the exact respawn-await boundary; it must remain pending until release.
+      await subscribed;
       expect(initSettled).toBe(false);
-      expect(respawnSettled).toBe(false);
-
-      // Release the injected respawn; init() can now finish and throw.
-      resolveRespawn();
+      releaseRespawn();
       await initP;
 
-      expect(initRejected).toBe(true);
-      // init() awaited the respawn's teardown BEFORE throwing.
-      expect(settledAtInitReject).toBe(true);
+      expect(initError?.message).toBe('synthetic init failure');
       // Post-conditions of the init-failure branch still hold.
       expect(internals.closed).toBe(true);
       expect(internals.workers).toHaveLength(0);
-    }, 15_000);
+    });
   },
 );

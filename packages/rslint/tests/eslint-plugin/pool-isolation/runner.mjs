@@ -26,6 +26,8 @@ const MILESTONE_FILE = process.env.RSLINT_MILESTONE_FILE;
 const RUN_ID = process.env.RSLINT_RUN_ID;
 const SCENARIO_TMP_DIR = process.env.RSLINT_SCENARIO_TMP_DIR;
 const JOURNAL_RECORD_LIMIT = 1_024;
+const NON_FIRING_TASK_TIMEOUT_MS = 24 * 60 * 60 * 1_000;
+const FIXTURE_KEEPALIVE_INTERVAL_MS = 60_000;
 let sequence = 0;
 let terminalRecordWritten = false;
 
@@ -98,16 +100,15 @@ const markerPath = (name) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Polling is used only to observe an explicit cross-thread file barrier. The
-// deadline is a deadlock sentinel, never a product performance assertion.
-async function waitForFile(file, description, timeoutMs = 30_000) {
-  const deadline = Date.now() + timeoutMs;
+// Polling is used only to observe an explicit cross-thread file barrier.
+// The parent harness owns the one deadlock watchdog for the whole scenario;
+// a shorter child deadline would turn Windows scheduler contention into a
+// second, non-product failure boundary.
+async function waitForFile(file, description) {
   while (!fs.existsSync(file)) {
-    if (Date.now() >= deadline) {
-      throw new Error(`timed out waiting for ${description}: ${file}`);
-    }
     await delay(10);
   }
+  void description;
 }
 
 // Observe the exact JS entry to Worker.terminate without changing its returned
@@ -179,7 +180,7 @@ const scenarios = {
       'plugin.mjs':
         "import fs from 'node:fs';\n" +
         `fs.writeFileSync(${JSON.stringify(loadedFile)}, 'loaded');\n` +
-        'const _interval = setInterval(() => {}, 60_000);\n' +
+        `const _interval = setInterval(() => {}, ${FIXTURE_KEEPALIVE_INTERVAL_MS});\n` +
         "export default { meta: { name: 'u11' }, rules: { noop: { meta: {}, create() { return {}; } } } };\n",
       'config.mjs':
         "import plugin from './plugin.mjs';\nexport default [{ plugins: { u11: plugin } }];\n",
@@ -211,7 +212,7 @@ const scenarios = {
     const pool = new WorkerPool({
       configs: [HANG_CONFIG],
       workerCount: 1,
-      taskTimeoutMs: 60_000,
+      taskTimeoutMs: NON_FIRING_TASK_TIMEOUT_MS,
     });
     await pool.init();
     milestone('init-done');
@@ -269,7 +270,6 @@ const scenarios = {
         { configPath: path.join(dir, 'config.mjs'), configDirectory: dir },
       ],
       workerCount: 1,
-      taskTimeoutMs: 5_000,
     });
     await pool.init();
     milestone('init-done');
@@ -329,7 +329,7 @@ const scenarios = {
     const enteredFile = markerPath('task-timeout-hang-entered');
     process.env.RSLINT_HANG_ENTERED_FILE = enteredFile;
     const logs = [];
-    const capturedDelay = 86_400_000;
+    const capturedDelay = NON_FIRING_TASK_TIMEOUT_MS;
     const pool = new WorkerPool({
       configs: [HANG_CONFIG],
       workerCount: 1,
@@ -377,8 +377,9 @@ const scenarios = {
     check('pool-drained', pool.workers.length === 0, '');
   },
 
-  // Enqueue is synchronous. Observe the actual queue state before terminating
-  // the exhausted slot; no scheduler delay is needed.
+  // Enqueue is synchronous. Force the replacement spawn to reject and prove
+  // that terminal path drains the queue without a scheduler delay. The
+  // lint-batch-after-degraded scenario separately covers retry-cap exhaustion.
   'all-degraded': async () => {
     const WorkerPool = await loadWorkerPool();
     const pool = new WorkerPool({
@@ -389,6 +390,11 @@ const scenarios = {
     await pool.init();
     milestone('init-done');
     pool.workers[0].ready = false;
+    let respawnAttempts = 0;
+    pool.spawnWorker = async () => {
+      respawnAttempts++;
+      throw new Error('injected respawn rejection');
+    };
     const batchP = pool.lintBatch(
       [1, 2].map((index) => localTask(`q${index}.ts`, 'const x = null;\n')),
     );
@@ -398,9 +404,15 @@ const scenarios = {
       `pending=${pool.pendingQueue.length}`,
     );
     milestone('degraded-queue-ready');
-    pool.workers[0].crashCount = pool.opts.retryCap;
     await pool.workers[0].worker.terminate();
     const result = await batchP;
+    check(
+      'respawn-rejected',
+      respawnAttempts === 1 &&
+        pool.workers[0].ready === false &&
+        pool.workers[0].respawning === false,
+      `attempts=${respawnAttempts} ready=${pool.workers[0]?.ready} respawning=${pool.workers[0]?.respawning}`,
+    );
     check(
       'degraded-drain',
       result.length === 2 &&
