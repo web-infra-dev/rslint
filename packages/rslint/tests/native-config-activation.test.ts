@@ -13,6 +13,48 @@ import {
 } from '../src/config/config-loader.js';
 
 describe('native API config activation', () => {
+  test('shutdownAll does not settle before every host shutdown settles', async () => {
+    const lifecycle = new PluginHostLifecycle();
+    let shutdownCalls = 0;
+    let markShutdownStarted!: () => void;
+    const shutdownStarted = new Promise<void>((resolve) => {
+      markShutdownStarted = resolve;
+    });
+    let releaseShutdown!: () => void;
+    const shutdownGate = new Promise<void>((resolve) => {
+      releaseShutdown = resolve;
+    });
+    lifecycle.stage({
+      async lint() {
+        return { results: [] };
+      },
+      async shutdown() {
+        shutdownCalls++;
+        markShutdownStarted();
+        await shutdownGate;
+      },
+    });
+
+    let settled = false;
+    const shutdownAll = lifecycle.shutdownAll().finally(() => {
+      settled = true;
+    });
+    try {
+      await shutdownStarted;
+      // Hold the semantic gate across a full turn. A fire-and-forget
+      // shutdownAll implementation would settle here even though the host
+      // teardown is still deliberately blocked.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(settled).toBe(false);
+      expect(shutdownCalls).toBe(1);
+    } finally {
+      releaseShutdown();
+    }
+    await shutdownAll;
+    expect(settled).toBe(true);
+    expect(shutdownCalls).toBe(1);
+  });
+
   test('shuts down a newly created plugin host when its config changes during creation', async () => {
     const root = fs.mkdtempSync(
       path.join(os.tmpdir(), 'rslint-api-config-activation-'),

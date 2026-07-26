@@ -1,5 +1,8 @@
 import { describe, test, expect } from '@rstest/core';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
+import { finished } from 'node:stream/promises';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
@@ -42,7 +45,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           },
         ],
         workerCount: 1, // single worker holds both configs, exercises the per-config map
-        taskTimeoutMs: 10_000,
       });
       await pool.init();
 
@@ -103,7 +105,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       );
 
       await pool.shutdown();
-    }, 20_000);
+    });
 
     // Same monorepo-style dispatch as the cfgA/cfgB test above, but
     // BOTH dimensions diverge: cfgX exposes only `plugin-x` (module
@@ -131,7 +133,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           },
         ],
         workerCount: 1, // single worker holds both → exercises per-config map
-        taskTimeoutMs: 10_000,
       });
       await pool.init();
 
@@ -206,7 +207,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       );
 
       await pool.shutdown();
-    }, 20_000);
+    });
 
     // Unknown configKey on the wire is treated as an internal-invariant
     // violation: the host contract guarantees every configKey was declared
@@ -224,7 +225,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
           },
         ],
         workerCount: 1,
-        taskTimeoutMs: 10_000,
       });
       await pool.init();
 
@@ -251,35 +251,25 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       expect(results[0].parseError).toContain(cfgADir);
 
       await pool.shutdown();
-    }, 20_000);
+    });
 
     // R4: rule-side warnings (listener throw, fix() throw, suggest fix
     // throw, invalid fix return) used to go through `process.stderr.write`
     // directly. Under LSP that lands in VS Code's hidden "Window"
     // channel — invisible to a user trying to debug a misbehaving
-    // plugin. After R4, the runner uses `console.error`, which
-    // `lint-worker.ts` monkey-patches into `parentPort.postMessage(
-    // { kind: 'log', level: 'error', text })`. This propagates through
-    // the WorkerPool's `onLog` callback to the host, which in turn
-    // surfaces it in the user-visible log channel.
+    // plugin. After R4, the runner uses `console.error`; WorkerPool captures
+    // the worker's stderr and forwards it through `onLog` to the host's
+    // user-visible log channel.
     //
     // This test pins the wire path end-to-end: a fixture rule whose
     // fix() throws → onLog sees the forwarded error string. Pre-fix,
     // the rule's stderr never reached `onLog`.
     test('R4: rule fix() throw is forwarded through onLog (LSP-visible)', async () => {
-      // Inline a fixture plugin that always errors in fix(). Reuse the
-      // local config dir's plugin path so config plumbing matches the
-      // pool's expectations, but override the rule resolution via the
-      // request's `rules` map. (The pool config still loads the local
-      // plugin so worker init succeeds; the task explicitly requests a
-      // non-existent rule so we exercise the no-rule path instead.)
-      //
-      // Cleaner: write a tiny fixture plugin + config.
-      const fs = await import('node:fs/promises');
-      const fxDir = path.resolve(__dirname, 'fixtures');
+      // Write a tiny fixture plugin + config that always errors in fix().
+      const fxDir = await mkdtemp(path.join(os.tmpdir(), 'rslint-r4-log-'));
       const pluginPath = path.join(fxDir, '_r4-bad-fix-plugin.mjs');
       const cfgPath = path.join(fxDir, '_r4-bad-fix.config.mjs');
-      await fs.writeFile(
+      await writeFile(
         pluginPath,
         `export default {
   meta: { name: 'r4', version: '0.0.0' },
@@ -307,7 +297,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
 `,
         'utf8',
       );
-      await fs.writeFile(
+      await writeFile(
         cfgPath,
         `import p from './_r4-bad-fix-plugin.mjs';
 export default [{ plugins: { r4: p } }];
@@ -315,15 +305,36 @@ export default [{ plugins: { r4: p } }];
         'utf8',
       );
 
-      const logs: Array<{ level: string; source: string; text: string }> = [];
+      let errorText = '';
+      let matchedSource: string | undefined;
       const pool = new WorkerPool({
         configs: [{ configPath: cfgPath, configDirectory: fxDir }],
         workerCount: 1,
-        onLog: (rec) => logs.push(rec),
+        onLog: (rec) => {
+          if (rec.level !== 'error') return;
+          errorText += rec.text;
+          if (
+            matchedSource === undefined &&
+            /r4\/bad-fix.*fix\(\) threw.*R4_FIX_BOOM/.test(errorText)
+          ) {
+            matchedSource = rec.source;
+          }
+        },
       });
 
       try {
         await pool.init();
+        // Register the terminal stream barrier before asking the worker to
+        // emit. If forwarding regresses, shutdown still ends/closes stderr;
+        // the subsequent synchronous marker assertion then fails instead of
+        // awaiting a semantic promise forever.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const workerStderr = (pool as any).workers[0]?.worker.stderr;
+        expect(workerStderr).toBeDefined();
+        const stderrDrained = finished(workerStderr);
+        // Mark an early stream failure as handled immediately; awaiting the
+        // original promise below still fails the test with the exact error.
+        void stderrDrained.catch(() => undefined);
         await pool.lintBatch([
           {
             filePath: 't.ts',
@@ -344,37 +355,21 @@ export default [{ plugins: { r4: p } }];
         // Linux). Drive the worker to exit first — shutdown() posts
         // {kind:'shutdown'} → parentPort.close() → stderr EOF →
         // flushOnEnd, forcing every buffered chunk out regardless of pipe
-        // buffering — then poll to absorb the residual gap between the
-        // worker's 'exit' (which shutdown awaits) and the host stream
-        // draining its final 'data' events.
+        // buffering. Stream termination is the fail-fast observation
+        // boundary; marker presence remains the semantic success condition.
         await pool.shutdown();
-        // The forwarded line must carry the rule name + a failure-path
-        // hint; pre-R4 it went to raw stderr and never reached `logs`.
-        const findMatch = () =>
-          logs
-            .filter((r) => r.level === 'error')
-            .find((r) =>
-              /r4\/bad-fix.*fix\(\) threw.*R4_FIX_BOOM/.test(r.text),
-            );
-        let matched = findMatch();
-        for (let i = 0; !matched && i < 200; i++) {
-          await new Promise((r) => setTimeout(r, 10));
-          matched = findMatch();
-        }
-        expect(matched).toBeDefined();
+        await stderrDrained;
+        expect(errorText).toMatch(/r4\/bad-fix.*fix\(\) threw.*R4_FIX_BOOM/);
         // Source must be 'plugin' (runner-side console.error from
         // diagnostic-builder running inside the worker, forwarded through
         // the worker's captured stderr stream).
-        expect(matched!.source).toBe('plugin');
+        expect(matchedSource).toBe('plugin');
       } finally {
         // Idempotent (this.closed guard) — the in-body shutdown already
         // ran on the happy path; this also covers an early throw before it.
         await pool.shutdown();
-        await Promise.all([
-          fs.rm(pluginPath, { force: true }),
-          fs.rm(cfgPath, { force: true }),
-        ]);
+        await rm(fxDir, { recursive: true, force: true });
       }
-    }, 15_000);
+    });
   },
 );

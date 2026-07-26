@@ -24,9 +24,16 @@ const DIST_ESLINT_PLUGIN = path.resolve(
 
 export const JOURNAL_VERSION = 1;
 export const POOL_ISOLATION_AUDIT_PREFIX = '[pool-isolation-audit] ';
+export const POOL_SCENARIO_PROCESS_TIMEOUT_MS = 60_000;
+export const POOL_SCENARIO_OUTER_TIMEOUT_MS =
+  POOL_SCENARIO_PROCESS_TIMEOUT_MS + 10_000;
 const AUDIT_VERSION = 1;
 const STDERR_LIMIT_BYTES = 256 * 1024;
 const JOURNAL_LIMIT_BYTES = 1024 * 1024;
+/** Windows status code 0xC0000005: access violation in native code. */
+export const WINDOWS_ACCESS_VIOLATION_EXIT_CODE = 0xc0000005;
+/** The same status when Node/libuv exposes it as a signed int32. */
+export const WINDOWS_ACCESS_VIOLATION_SIGNED_EXIT_CODE = -0x3ffffffb;
 
 interface ScenarioContract {
   /**
@@ -105,6 +112,7 @@ const SCENARIO_CONTRACTS = {
     ],
     requiredSuccessAsserts: [
       'queue-enqueued',
+      'respawn-rejected',
       'degraded-drain',
       'queue-drained',
     ],
@@ -166,6 +174,7 @@ export interface ClassificationInput {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
+  stderr?: string;
   platform?: NodeJS.Platform;
 }
 
@@ -175,7 +184,7 @@ export async function runPoolScenario(
 ): Promise<ScenarioResult> {
   // This is only a dead-process/deadlock sentinel. Scenario correctness is
   // established by recorded state transitions, never elapsed wall time.
-  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const timeoutMs = opts.timeoutMs ?? POOL_SCENARIO_PROCESS_TIMEOUT_MS;
   const runId = randomUUID();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-iso-'));
   const milestoneFile = path.join(tmpDir, 'milestones.ndjson');
@@ -254,8 +263,18 @@ export async function runPoolScenario(
       const reportedError = journal.records.find(
         (r) => r.kind === 'error',
       )?.detail;
-      const processError = reportedError ?? spawnError ?? cleanupError;
       const stderr = Buffer.concat(stderrChunks).toString('utf8');
+      const unexpectedCleanStderr =
+        exitCode === 0 && signal === null && stderr.trim() !== ''
+          ? `clean child wrote unexpected stderr (${Buffer.byteLength(stderr)} bytes)`
+          : undefined;
+      const processError =
+        reportedError ??
+        spawnError ??
+        cleanupError ??
+        (stderrTruncated
+          ? `child stderr exceeded ${STDERR_LIMIT_BYTES} byte limit`
+          : unexpectedCleanStderr);
 
       const result: ScenarioResult = {
         scenario,
@@ -267,6 +286,7 @@ export async function runPoolScenario(
           exitCode,
           signal,
           timedOut,
+          stderr,
         }),
         milestones,
         asserts,
@@ -281,8 +301,8 @@ export async function runPoolScenario(
 
       // Emit exactly one parent-authored, machine-readable record per isolated
       // scenario. Child stdout is discarded, so it cannot forge this success
-      // evidence. In particular, CI logs now distinguish a clean PASS from the
-      // narrowly tolerated Windows EXPECTED-NATIVE-ABORT verdict.
+      // evidence. In particular, CI logs distinguish a clean PASS from the
+      // diagnostic-only Windows EXPECTED-NATIVE-ABORT verdict.
       process.stdout.write(`${formatScenarioAudit(result)}\n`);
       resolve(result);
     });
@@ -472,6 +492,13 @@ export function classifyScenario(input: ClassificationInput): Verdict {
   if (input.records.some((record) => record.kind === 'error')) return 'FAIL';
   if (assertions.some((record) => record.pass !== true)) return 'FAIL';
   if (input.processError) return 'FAIL';
+  if (
+    input.exitCode === 0 &&
+    input.signal === null &&
+    (input.stderr ?? '').trim() !== ''
+  ) {
+    return 'FAIL';
+  }
   // A watchdog firing is terminal even if the child managed to write `done`
   // just before it was killed.
   if (input.timedOut) return 'FAIL';
@@ -508,11 +535,16 @@ export function classifyScenario(input: ClassificationInput): Verdict {
   // explicitly enumerated terminate scenario, and only when the last durable
   // record proves the real Worker.terminate() call was entered. A generic
   // "about to terminate" marker is not sufficient.
+  const knownWindowsNativeAbort =
+    input.signal === 'SIGABRT' ||
+    input.exitCode === WINDOWS_ACCESS_VIOLATION_EXIT_CODE ||
+    input.exitCode === WINDOWS_ACCESS_VIOLATION_SIGNED_EXIT_CODE;
   const exactNativeAbortBoundary =
     platform === 'win32' &&
     hasRequiredProgress &&
     last?.kind === 'milestone' &&
-    last.name === 'terminate-invoked';
+    last.name === 'terminate-invoked' &&
+    knownWindowsNativeAbort;
   return exactNativeAbortBoundary ? 'EXPECTED-NATIVE-ABORT' : 'FAIL';
 }
 

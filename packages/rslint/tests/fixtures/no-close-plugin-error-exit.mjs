@@ -23,4 +23,5 @@ try {
     process.exit(3);
   }
 }
+console.log('FIXTURE_OK:no-close-plugin-error');
 // Intentionally no rslint.close().

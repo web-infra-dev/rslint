@@ -1,45 +1,20 @@
 import { describe, test, expect } from '@rstest/core';
-import { spawn } from 'child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
 
-interface CliTestResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
-
-async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
-  return new Promise((resolve) => {
-    // Strip GITHUB_ACTIONS env to prevent setupColors() from force-enabling colors,
-    // which would override --no-color and embed ANSI codes in the output.
-    const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
-    const child = spawn(process.execPath, [RSLINT_BIN, '--no-color', ...args], {
-      cwd: cwd || process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...cleanEnv, NO_COLOR: '1' },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout?.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    child.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code) => {
-      resolve({
-        exitCode: code || 0,
-        stdout,
-        stderr,
-      });
-    });
+async function runRslint(
+  args: string[],
+  cwd?: string,
+): Promise<CliProcessResult> {
+  // Strip GITHUB_ACTIONS env to prevent setupColors() from force-enabling colors,
+  // which would override --no-color and embed ANSI codes in the output.
+  const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
+  return runCliProcess(process.execPath, [RSLINT_BIN, '--no-color', ...args], {
+    cwd: cwd || process.cwd(),
+    env: { ...cleanEnv, NO_COLOR: '1' },
   });
 }
 

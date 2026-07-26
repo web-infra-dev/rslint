@@ -118,6 +118,98 @@ const CASES: DiffCase[] = [
     code: 'Uint8ClampedArray',
   },
   { pkg: 'eslint-plugin-es-x', rule: 'no-typed-arrays', code: 'Int16Array' },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-frombase64',
+    code: 'Uint8Array.fromBase64',
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-frombase64',
+    code: 'if (Uint8Array.fromBase64) { Uint8Array.fromBase64 }',
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-fromhex',
+    code: 'Uint8Array.fromHex',
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-fromhex',
+    code: 'if (Uint8Array.fromHex) { Uint8Array.fromHex }',
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-prototype-setfrombase64',
+    code: `
+      const t = new Uint8Array([])
+      if (Uint8Array.prototype.setFromBase64) {
+        console.log(t.setFromBase64(other))
+      }
+      if (typeof Uint8Array.prototype.setFromBase64 === 'undefined') {
+        console.log(t.setFromBase64(other))
+      } else {
+        console.log(t.setFromBase64(other))
+      }
+      const a = Uint8Array.prototype.setFromBase64
+        ? t.setFromBase64(other)
+        : t.setFromBase64(other);`,
+    options: [{ allowTestedProperty: true }],
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-prototype-setfromhex',
+    code: `
+      const t = new Uint8Array([])
+      if (Uint8Array.prototype.setFromHex) {
+        console.log(t.setFromHex(other))
+      }
+      if (typeof Uint8Array.prototype.setFromHex === 'undefined') {
+        console.log(t.setFromHex(other))
+      } else {
+        console.log(t.setFromHex(other))
+      }
+      const a = Uint8Array.prototype.setFromHex
+        ? t.setFromHex(other)
+        : t.setFromHex(other);`,
+    options: [{ allowTestedProperty: true }],
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-prototype-tobase64',
+    code: `
+      const t = new Uint8Array([])
+      if (Uint8Array.prototype.toBase64) {
+        console.log(t.toBase64(other))
+      }
+      if (typeof Uint8Array.prototype.toBase64 === 'undefined') {
+        console.log(t.toBase64(other))
+      } else {
+        console.log(t.toBase64(other))
+      }
+      const a = Uint8Array.prototype.toBase64
+        ? t.toBase64(other)
+        : t.toBase64(other);`,
+    options: [{ allowTestedProperty: true }],
+  },
+  {
+    pkg: 'eslint-plugin-es-x',
+    rule: 'no-uint8array-prototype-tohex',
+    code: `
+      const t = new Uint8Array([])
+      if (Uint8Array.prototype.toHex) {
+        console.log(t.toHex(other))
+      }
+      if (typeof Uint8Array.prototype.toHex === 'undefined') {
+        console.log(t.toHex(other))
+      } else {
+        console.log(t.toHex(other))
+      }
+      const a = Uint8Array.prototype.toHex
+        ? t.toHex(other)
+        : t.toHex(other);`,
+    options: [{ allowTestedProperty: true }],
+  },
 ];
 
 const CLEAN_CASES: DiffCase[] = [
@@ -535,32 +627,12 @@ const CLEAN_CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-frombase64',
-    code: 'Uint8Array.',
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-frombase64',
-    code: 'if (Uint8Array.) { Uint8Array. }',
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-frombase64',
     code: 'Uint8Array',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-frombase64',
     code: 'Uint8Array.raw',
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-fromhex',
-    code: 'Uint8Array.',
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-fromhex',
-    code: 'if (Uint8Array.) { Uint8Array. }',
   },
   {
     pkg: 'eslint-plugin-es-x',
@@ -575,62 +647,42 @@ const CLEAN_CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-setfrombase64',
-    code: 'foo.(other)',
+    code: 'foo.setFromBase64(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-setfrombase64',
-    code: "\n            const t = new Uint8Array([])\n            if (Uint8Array.prototype.) {\n                console.log(t.(other))\n            }\n            if (typeof Uint8Array.prototype. === 'undefined') {\n                console.log(t.(other))\n            } else {\n                console.log(t.(other))\n            }\n            const a = Uint8Array.prototype.\n              ? t.(other)\n              : t.(other);",
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-prototype-setfrombase64',
-    code: '(other)',
+    code: 'setFromBase64(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-setfromhex',
-    code: 'foo.(other)',
+    code: 'foo.setFromHex(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-setfromhex',
-    code: "\n            const t = new Uint8Array([])\n            if (Uint8Array.prototype.) {\n                console.log(t.(other))\n            }\n            if (typeof Uint8Array.prototype. === 'undefined') {\n                console.log(t.(other))\n            } else {\n                console.log(t.(other))\n            }\n            const a = Uint8Array.prototype.\n              ? t.(other)\n              : t.(other);",
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-prototype-setfromhex',
-    code: '(other)',
+    code: 'setFromHex(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-tobase64',
-    code: 'foo.(other)',
+    code: 'foo.toBase64(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-tobase64',
-    code: "\n            const t = new Uint8Array([])\n            if (Uint8Array.prototype.) {\n                console.log(t.(other))\n            }\n            if (typeof Uint8Array.prototype. === 'undefined') {\n                console.log(t.(other))\n            } else {\n                console.log(t.(other))\n            }\n            const a = Uint8Array.prototype.\n              ? t.(other)\n              : t.(other);",
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-prototype-tobase64',
-    code: '(other)',
+    code: 'toBase64(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-tohex',
-    code: 'foo.(other)',
+    code: 'foo.toHex(other)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-uint8array-prototype-tohex',
-    code: "\n            const t = new Uint8Array([])\n            if (Uint8Array.prototype.) {\n                console.log(t.(other))\n            }\n            if (typeof Uint8Array.prototype. === 'undefined') {\n                console.log(t.(other))\n            } else {\n                console.log(t.(other))\n            }\n            const a = Uint8Array.prototype.\n              ? t.(other)\n              : t.(other);",
-  },
-  {
-    pkg: 'eslint-plugin-es-x',
-    rule: 'no-uint8array-prototype-tohex',
-    code: '(other)',
+    code: 'toHex(other)',
   },
 ];
 

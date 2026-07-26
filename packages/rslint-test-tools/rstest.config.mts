@@ -3,10 +3,16 @@ import { defineConfig } from '@rstest/core';
 export default defineConfig({
   testEnvironment: 'node',
   globals: true,
-  testTimeout: 600000,
+  // Each CLI test can create a WorkerPool with up to eight threads in addition
+  // to its Rstest fork, CLI Node process, and Go child. Run test files serially
+  // so outer file scheduling cannot multiply those nested pools. Concurrency
+  // semantics remain covered inside the dedicated WorkerPool tests.
+  pool: { maxWorkers: 1 },
+  testTimeout: 600_000,
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/spawn-cli.test.ts',
     './tests/cli/color-matrix.test.ts',
     './tests/cli/file-args.test.ts',
     './tests/cli/disable-comments.test.ts',

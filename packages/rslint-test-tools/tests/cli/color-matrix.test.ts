@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from '@rstest/core';
-import { spawn } from 'child_process';
 import { RSLINT_BIN, createTempDir, cleanupTempDir } from './js-config/helpers';
+import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 
 /**
  * End-to-end pins for the color-decision behavior matrix (issue #1080).
@@ -16,12 +16,6 @@ import { RSLINT_BIN, createTempDir, cleanupTempDir } from './js-config/helpers';
 
 const ANSI = /\x1b\[/;
 
-interface CliResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
-
 // Baseline env: strip every color-deciding variable inherited from the
 // runner (CI sets GITHUB_ACTIONS; developers may set the others), then pin
 // TERM so a TERM=dumb runner can't flip tier 5. Each row layers its own
@@ -33,20 +27,10 @@ function runCli(
   args: string[],
   cwd: string,
   envOverrides: Record<string, string> = {},
-): Promise<CliResult> {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...BASE_ENV, ...envOverrides },
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
-    child.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
-    child.on('close', (code) => {
-      resolve({ exitCode: code ?? 0, stdout, stderr });
-    });
+): Promise<CliProcessResult> {
+  return runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+    cwd,
+    env: { ...BASE_ENV, ...envOverrides },
   });
 }
 

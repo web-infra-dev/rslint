@@ -945,7 +945,7 @@ const CLEAN_CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-octal-numeric-literals',
-    code: '0123',
+    code: '0x123',
   },
   {
     pkg: 'eslint-plugin-es-x',
@@ -1069,22 +1069,22 @@ const CLEAN_CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-weakmap-prototype-getorinsert',
-    code: 'foo.(key, value)',
+    code: 'foo.getOrInsert(key, value)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-weakmap-prototype-getorinsert',
-    code: '(key, value)',
+    code: 'getOrInsert(key, value)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-weakmap-prototype-getorinsertcomputed',
-    code: 'foo.(key, callbackFn)',
+    code: 'foo.getOrInsertComputed(key, callbackFn)',
   },
   {
     pkg: 'eslint-plugin-es-x',
     rule: 'no-weakmap-prototype-getorinsertcomputed',
-    code: '(key, callbackFn)',
+    code: 'getOrInsertComputed(key, callbackFn)',
   },
 ];
 
