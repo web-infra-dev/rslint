@@ -261,28 +261,38 @@ var NoUselessComputedKeyRule = rule.Rule{
 			// brackets — preserving comments across a token replacement
 			// would require splicing them back in and isn't worth the
 			// complexity, matching ESLint's behavior.
-			if hasCommentsBetween(sourceText, leftBracketPos+1, endPos-1) {
+			//
+			// The literal itself cannot contain comments. Checking only the
+			// surrounding text both preserves comment-like text inside string
+			// keys and avoids scanning the key again solely to skip over it.
+			leftContentStart := leftBracketPos + 1
+			rightContentEnd := endPos - 1
+			if (leftContentStart < keyStart &&
+				hasCommentsBetween(sourceText, leftContentStart, keyStart)) ||
+				(keyEnd < rightContentEnd &&
+					hasCommentsBetween(sourceText, keyEnd, rightContentEnd)) {
 				ctx.ReportNode(container, msg)
 				return
 			}
 
-			replacement := keyRaw
-			if leftBracketPos > 0 && len(keyRaw) > 0 {
-				prev := sourceText[leftBracketPos-1]
-				// Only add a separator space when the previous token and
-				// the key would fuse into one identifier (e.g. `get` + `2`
-				// → `get2`). `get` + `'foo'` is fine because `'` can't
-				// continue an identifier.
-				if isIdentPart(prev) && isIdentPart(keyRaw[0]) {
-					replacement = " " + keyRaw
+			ctx.ReportNodeWithDeferredFixes(container, msg, func() []rule.RuleFix {
+				replacement := keyRaw
+				if leftBracketPos > 0 && len(keyRaw) > 0 {
+					prev := sourceText[leftBracketPos-1]
+					// Only add a separator space when the previous token and
+					// the key would fuse into one identifier (e.g. `get` + `2`
+					// → `get2`). `get` + `'foo'` is fine because `'` can't
+					// continue an identifier.
+					if isIdentPart(prev) && isIdentPart(keyRaw[0]) {
+						replacement = " " + keyRaw
+					}
 				}
-			}
 
-			fix := rule.RuleFixReplaceRange(
-				core.NewTextRange(leftBracketPos, endPos),
-				replacement,
-			)
-			ctx.ReportNodeWithFixes(container, msg, fix)
+				return []rule.RuleFix{rule.RuleFixReplaceRange(
+					core.NewTextRange(leftBracketPos, endPos),
+					replacement,
+				)}
+			})
 		}
 
 		nameIfComputed := func(n *ast.Node) *ast.Node {
