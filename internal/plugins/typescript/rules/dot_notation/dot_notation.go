@@ -152,6 +152,94 @@ func literalKey(n *ast.Node) (string, bool) {
 	return "", false
 }
 
+type dotNotationFixer struct {
+	sourceFile *ast.SourceFile
+	sourceText string
+}
+
+// buildUseDotFix constructs the bracket-to-dot replacement after the rule has
+// already decided to report. Keeping source ranges, comment inspection, and
+// replacement text construction here lets diagnostics-only consumers skip
+// every fix-specific source operation.
+func (f *dotNotationFixer) buildUseDotFix(
+	node *ast.Node,
+	elem *ast.ElementAccessExpression,
+	propName string,
+) []rule.RuleFix {
+	nodeRange := utils.TrimNodeTextRange(f.sourceFile, node)
+	exprRange := utils.TrimNodeTextRange(f.sourceFile, elem.Expression)
+
+	bracketStart := exprRange.End()
+	for bracketStart < nodeRange.End() && f.sourceText[bracketStart] != '[' {
+		bracketStart++
+	}
+	bracketEnd := nodeRange.End() - 1
+	for bracketEnd > bracketStart && f.sourceText[bracketEnd] != ']' {
+		bracketEnd--
+	}
+
+	insideBrackets := core.NewTextRange(bracketStart+1, bracketEnd)
+	if utils.HasCommentsInRange(f.sourceFile, insideBrackets) {
+		return nil
+	}
+
+	whitespace := ""
+	if bracketStart > exprRange.End() {
+		whitespace = f.sourceText[exprRange.End():bracketStart]
+	}
+	objectText := f.sourceText[exprRange.Pos():exprRange.End()]
+	replacement := objectText + whitespace + "." + propName
+
+	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
+}
+
+// buildUseBracketsFix constructs the dot-to-bracket replacement after the
+// keyword access has been detected. It deliberately preserves the existing
+// whole-node replacement and trivia behavior; this helper only changes when
+// the work is materialized.
+func (f *dotNotationFixer) buildUseBracketsFix(
+	node *ast.Node,
+	pae *ast.PropertyAccessExpression,
+	name string,
+	isOptional bool,
+) []rule.RuleFix {
+	nameRange := utils.TrimNodeTextRange(f.sourceFile, pae.Name())
+	objRange := utils.TrimNodeTextRange(f.sourceFile, pae.Expression)
+
+	// Locate the start of the access operator — either `?.` (optional
+	// chain) or `.`. Any whitespace between the object end and the
+	// operator belongs to the replacement.
+	accessStart := objRange.End()
+	for accessStart < nameRange.Pos() && f.sourceText[accessStart] != '?' && f.sourceText[accessStart] != '.' {
+		accessStart++
+	}
+
+	// Suppress autofix if a comment lives between the operator and the
+	// property name (ESLint parity). The operator is 1 byte for `.` or
+	// 2 bytes for `?.`.
+	opLen := 1
+	if f.sourceText[accessStart] == '?' {
+		opLen = 2
+	}
+	gapStart := accessStart + opLen
+	if gapStart > nameRange.Pos() {
+		gapStart = nameRange.Pos()
+	}
+	if utils.HasCommentsInRange(f.sourceFile, core.NewTextRange(gapStart, nameRange.Pos())) {
+		return nil
+	}
+
+	objectText := f.sourceText[objRange.Pos():objRange.End()]
+	preOp := f.sourceText[objRange.End():accessStart] // whitespace before operator
+	var replacement string
+	if isOptional {
+		replacement = objectText + preOp + "?.[\"" + name + "\"]"
+	} else {
+		replacement = objectText + preOp + "[\"" + name + "\"]"
+	}
+	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
+}
+
 // DotNotationRule enforces dot-notation when safe and allowed by options.
 //
 // KNOWN LIMITATION: The test infrastructure in /packages/rule-tester doesn't properly pass
@@ -183,6 +271,10 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			_ = ctx.Program.Options()
 		}
 
+		fixer := dotNotationFixer{
+			sourceFile: ctx.SourceFile,
+			sourceText: ctx.SourceFile.Text(),
+		}
 		listeners := rule.RuleListeners{}
 
 		// Compute allowIndexSignaturePropertyAccess once — respects both the
@@ -273,36 +365,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Build the fix: replace `['prop']` with `.prop`, preserving any
-			// whitespace between the object and the bracket. Skip the fix if a
-			// comment lives inside the brackets (ESLint behavior).
-			text := ctx.SourceFile.Text()
-			nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			exprRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.Expression)
-
-			bracketStart := exprRange.End()
-			for bracketStart < nodeRange.End() && text[bracketStart] != '[' {
-				bracketStart++
-			}
-			bracketEnd := nodeRange.End() - 1
-			for bracketEnd > bracketStart && text[bracketEnd] != ']' {
-				bracketEnd--
-			}
-
-			insideBrackets := core.NewTextRange(bracketStart+1, bracketEnd)
-			if utils.HasCommentsInRange(ctx.SourceFile, insideBrackets) {
-				ctx.ReportNode(elem.ArgumentExpression, buildUseDotMessage())
-				return
-			}
-
-			whitespace := ""
-			if bracketStart > exprRange.End() {
-				whitespace = text[exprRange.End():bracketStart]
-			}
-			objectText := text[exprRange.Pos():exprRange.End()]
-			replacement := objectText + whitespace + "." + propName
-
-			ctx.ReportNodeWithFixes(elem.ArgumentExpression, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+			ctx.ReportNodeWithDeferredFixes(elem.ArgumentExpression, buildUseDotMessage(), func() []rule.RuleFix {
+				return fixer.buildUseDotFix(node, elem, propName)
+			})
 		}
 
 		// Handle dot → bracket (PropertyAccessExpression) when keywords are disallowed.
@@ -333,43 +398,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			text := ctx.SourceFile.Text()
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, pae.Name())
-			objRange := utils.TrimNodeTextRange(ctx.SourceFile, pae.Expression)
-
-			// Locate the start of the access operator — either `?.` (optional
-			// chain) or `.`. Any whitespace between the object end and the
-			// operator belongs to the replacement.
-			accessStart := objRange.End()
-			for accessStart < nameRange.Pos() && text[accessStart] != '?' && text[accessStart] != '.' {
-				accessStart++
-			}
-
-			// Suppress autofix if a comment lives between the operator and the
-			// property name (ESLint parity). The operator is 1 byte for `.` or
-			// 2 bytes for `?.`.
-			opLen := 1
-			if text[accessStart] == '?' {
-				opLen = 2
-			}
-			gapStart := accessStart + opLen
-			if gapStart > nameRange.Pos() {
-				gapStart = nameRange.Pos()
-			}
-			if utils.HasCommentsInRange(ctx.SourceFile, core.NewTextRange(gapStart, nameRange.Pos())) {
-				ctx.ReportNode(pae.Name(), buildUseBracketsMessage(name))
-				return
-			}
-
-			objectText := text[objRange.Pos():objRange.End()]
-			preOp := text[objRange.End():accessStart] // whitespace before operator
-			var replacement string
-			if isOptional {
-				replacement = objectText + preOp + "?.[\"" + name + "\"]"
-			} else {
-				replacement = objectText + preOp + "[\"" + name + "\"]"
-			}
-			ctx.ReportNodeWithFixes(pae.Name(), buildUseBracketsMessage(name), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+			ctx.ReportNodeWithDeferredFixes(pae.Name(), buildUseBracketsMessage(name), func() []rule.RuleFix {
+				return fixer.buildUseBracketsFix(node, pae, name, isOptional)
+			})
 		}
 
 		return listeners
