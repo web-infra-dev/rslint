@@ -3,8 +3,13 @@ package no_import_assign
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoImportAssignRule(t *testing.T) {
@@ -381,4 +386,344 @@ func TestNoImportAssignRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoImportAssignRuleAdversarial(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoImportAssignRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `import { a } from "mod";
+				{ let a = 0; a = 1; }
+				const object = { a: 1 };
+				const shorthand = { a };
+				const computed = { [a]: 1 };
+				object.a = 2;
+				export { a };
+				a: for (;;) { break a; }`,
+			},
+			{
+				Code: `import * as ns from "mod";
+					{ const Object = factory; ((Object)).assign(((ns)), source); }
+					Object[method](((ns)), source);`,
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				// References from bindings in one declaration must retain source order.
+				Code: `import { a, b } from "mod";
+					b = 1;
+					a = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'b' is read-only.", Line: 2, Column: 6},
+					{MessageId: "readonly", Message: "'a' is read-only.", Line: 3, Column: 6},
+				},
+			},
+			{
+				// Separate declarations retain declaration-grouped report order.
+				Code: `import { a } from "a";
+					import { b } from "b";
+					b = 1;
+					a = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'a' is read-only.", Line: 4, Column: 6},
+					{MessageId: "readonly", Message: "'b' is read-only.", Line: 3, Column: 6},
+				},
+			},
+			{
+				// Import declarations are hoisted, so references before the declaration count.
+				Code: `a = 1;
+					import { a } from "mod";`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'a' is read-only.", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `ns.value = 1;
+					import * as ns from "mod";`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 1, Column: 1},
+				},
+			},
+			{
+				// Parentheses around a namespace reference are semantically transparent.
+				Code: `import * as ns from "mod";
+					((ns)).value = 1;
+					Object.assign(((ns)), source);
+					delete (((ns).removed));
+					((Object)).defineProperty(((ns)), key, descriptor);
+					Object["assign"](((ns)), source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 2},
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 3},
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 4},
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 5},
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 6},
+				},
+			},
+			{
+				// RefStore resolves shorthand assignment patterns that the
+				// checker returns as property symbols rather than import aliases.
+				Code: `import { value } from "mod";
+					({ value } = source);
+					({ value = 0 } = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 2},
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 3},
+				},
+			},
+		},
+	)
+}
+
+func TestNoImportAssignRuleWithoutRefStore(t *testing.T) {
+	fallbackRule := NoImportAssignRule
+	fallbackRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.Refs = nil
+		return NoImportAssignRule.Run(ctx, options)
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&fallbackRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { value } from "mod"; { let value = 0; value = 1; }`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { value } from "mod"; value = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 1, Column: 30},
+				},
+			},
+			{
+				Code: `import * as ns from "mod"; Object.assign(ns, value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonlyMember", Message: "The members of 'ns' are read-only.", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `import { value } from "mod"; ({ value = 0 } = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 1, Column: 33},
+				},
+			},
+		},
+	)
+}
+
+func TestNoImportAssignRuleWithRefStoreWithoutTypeChecker(t *testing.T) {
+	noCheckerRule := NoImportAssignRule
+	noCheckerRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return NoImportAssignRule.Run(ctx, options)
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&noCheckerRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { value } from "mod"; { let value = 0; value = 1; }`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { value } from "mod";
+					{ let value = 0; value = 1; }
+					value = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 3},
+				},
+			},
+		},
+	)
+}
+
+type noImportAssignDiagnosticFingerprint struct {
+	messageID   string
+	description string
+	pos         int
+	end         int
+}
+
+func lintNoImportAssignForComparison(
+	t *testing.T,
+	code string,
+	useRefStore bool,
+) []noImportAssignDiagnosticFingerprint {
+	t.Helper()
+
+	rootDir := fixtures.GetRootDir()
+	fileName := "file.ts"
+	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
+	host := utils.CreateCompilerHost(rootDir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil {
+		t.Fatal("comparison source file was not loaded")
+	}
+
+	var diagnostics []noImportAssignDiagnosticFingerprint
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:      program,
+		File:         sourceFile.FileName(),
+		HasTypeInfo:  true,
+		ExcludePaths: []string{},
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     NoImportAssignRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if !useRefStore {
+						ctx.Refs = nil
+						return noImportAssignListeners(ctx, noImportAssignRefStoreDisabled)
+					}
+					return noImportAssignListeners(ctx, noImportAssignRefStoreEnabled)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandNone,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, noImportAssignDiagnosticFingerprint{
+					messageID:   diagnostic.Message.Id,
+					description: diagnostic.Message.Description,
+					pos:         diagnostic.Range.Pos(),
+					end:         diagnostic.Range.End(),
+				})
+			},
+		},
+	})
+	return diagnostics
+}
+
+func TestNoImportAssignRefStoreMatchesFallback(t *testing.T) {
+	testCases := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "direct writes and ordering",
+			code: `before = 0;
+				import before, { first as alpha, second as beta } from "one";
+				beta += 1;
+				[alpha] = source;
+				before++;
+				({ alpha = 0, beta: before } = source);`,
+		},
+		{
+			name: "multiple declaration groups",
+			code: `import { a } from "a";
+				import { b, c } from "bc";
+				b = 1;
+				a = 2;
+				c = 3;`,
+		},
+		{
+			name: "namespace mutations and escapes",
+			code: `ns.value = 1;
+					import * as ns from "mod";
+					ns["element"]++;
+					delete ns.deleted;
+					Object.assign(ns, source);
+					Reflect.set(ns, key, value);
+					((ns)).wrapped = 1;
+					Object.assign(((ns)), source);
+					Object["assign"](((ns)), source);
+					(ns.escaped as any) = 1;
+					ns.deep.value = 1;`,
+		},
+		{
+			name: "local shadows and syntactic names",
+			code: `import { value } from "value";
+				import * as ns from "ns";
+				{ let value = 0; value = 1; }
+				{ let ns = {}; ns.value = 1; }
+				const object = { value: 1 };
+				object.value = 2;
+				value: for (;;) { break value; }
+				value = 3;
+				ns.value = 4;`,
+		},
+		{
+			name: "shadowed mutation globals",
+			code: `import * as ns from "ns";
+				{ const Object = factory; Object.assign(ns, source); }
+				Object.assign(ns, source);
+				function f(Reflect) { Reflect.set(ns, key, value); }
+				Reflect.set(ns, key, value);`,
+		},
+		{
+			name: "type-only imports",
+			code: `import type { T } from "types";
+				import { type U, V } from "mixed";
+				V = 1;
+				T = 2;
+				U = 3;`,
+		},
+		{
+			name: "import attributes",
+			code: `import data from "pkg" with { type: "json" };
+				let type = 0;
+				type = 1;
+				data = replacement;`,
+		},
+		{
+			name: "duplicate aliases in recovered syntax",
+			code: `import { x as duplicate } from "x";
+				import { y as duplicate } from "y";
+				duplicate = 1;`,
+		},
+		{
+			name: "duplicate local binding in recovered syntax",
+			code: `import { x as duplicate } from "x";
+				let duplicate;
+				duplicate = 1;`,
+		},
+		{
+			name: "nested import in recovered syntax",
+			code: `if (condition) {
+					import { nested } from "nested";
+					nested = 1;
+				}`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fast := lintNoImportAssignForComparison(t, testCase.code, true)
+			fallback := lintNoImportAssignForComparison(t, testCase.code, false)
+			if len(fast) != len(fallback) {
+				t.Fatalf("diagnostic count differs: RefStore=%+v fallback=%+v", fast, fallback)
+			}
+			for i := range fast {
+				if fast[i] != fallback[i] {
+					t.Fatalf("diagnostic %d differs: RefStore=%+v fallback=%+v", i, fast[i], fallback[i])
+				}
+			}
+		})
+	}
+}
+
+func TestNoImportAssignRefStoreHonorsDisableDirectives(t *testing.T) {
+	diagnostics := lintNoImportAssignForComparison(t, `import { a, b } from "mod";
+		// eslint-disable-next-line no-import-assign
+		a = 1;
+		b = 2;`, true)
+
+	if len(diagnostics) != 1 {
+		t.Fatalf("got diagnostics %+v, want one unsuppressed diagnostic", diagnostics)
+	}
+	if diagnostics[0].description != "'b' is read-only." {
+		t.Fatalf("got diagnostic %+v, want the write to b", diagnostics[0])
+	}
 }
