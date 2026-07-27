@@ -72,12 +72,8 @@ func parseOptions(raw []any) options {
 				}
 			}
 		}
-		if v, ok := m["checkLocalVariables"].(bool); ok {
-			opts.checkLocalVariables = v
-		}
-		if v, ok := m["checkInlineFunction"].(bool); ok {
-			opts.checkInlineFunction = v
-		}
+		opts.checkLocalVariables, _ = m["checkLocalVariables"].(bool)
+		opts.checkInlineFunction, _ = m["checkInlineFunction"].(bool)
 		if v, ok := m["ignoreComponentNames"].([]interface{}); ok {
 			for _, p := range v {
 				if s, ok := p.(string); ok {

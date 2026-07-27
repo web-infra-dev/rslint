@@ -95,9 +95,7 @@ func parseConfig(options []any) ruleConfig {
 			applyToNestedElements: true,
 		}
 		populateElementConfig(child, childMap)
-		if v, ok := childMap["allowElement"].(bool); ok {
-			child.allowElement = v
-		}
+		child.allowElement, _ = childMap["allowElement"].(bool)
 		// applyToNestedElements defaults to true; only an explicit falsy
 		// value flips it. Upstream's `typeof v === 'undefined' || !!v`
 		// collapses to: present and JS-falsy → false; otherwise → true.
@@ -110,15 +108,9 @@ func parseConfig(options []any) ruleConfig {
 }
 
 func populateElementConfig(c *elementConfig, m map[string]interface{}) {
-	if v, ok := m["noStrings"].(bool); ok {
-		c.noStrings = v
-	}
-	if v, ok := m["ignoreProps"].(bool); ok {
-		c.ignoreProps = v
-	}
-	if v, ok := m["noAttributeStrings"].(bool); ok {
-		c.noAttributeStrings = v
-	}
+	c.noStrings, _ = m["noStrings"].(bool)
+	c.ignoreProps, _ = m["ignoreProps"].(bool)
+	c.noAttributeStrings, _ = m["noAttributeStrings"].(bool)
 	populateStringSetFromMap(m, "allowedStrings", c.allowedStrings)
 	populateStringSetFromMap(m, "restrictedAttributes", c.restrictedAttributes)
 }

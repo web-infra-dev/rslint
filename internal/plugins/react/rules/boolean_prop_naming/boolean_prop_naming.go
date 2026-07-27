@@ -50,9 +50,7 @@ func parseOptions(input []any) ruleOptions {
 		return opts
 	}
 	optsMap, _ := input[0].(map[string]interface{})
-	if pat, ok := optsMap["rule"].(string); ok {
-		opts.rulePattern = pat
-	}
+	opts.rulePattern, _ = optsMap["rule"].(string)
 	if names, ok := optsMap["propTypeNames"].([]interface{}); ok {
 		set := map[string]bool{}
 		for _, n := range names {
@@ -63,12 +61,8 @@ func parseOptions(input []any) ruleOptions {
 		// Even when set is empty, swap it in — caller cleared the list.
 		opts.propTypeNames = set
 	}
-	if msg, ok := optsMap["message"].(string); ok {
-		opts.customMessage = msg
-	}
-	if v, ok := optsMap["validateNested"].(bool); ok {
-		opts.validateNested = v
-	}
+	opts.customMessage, _ = optsMap["message"].(string)
+	opts.validateNested, _ = optsMap["validateNested"].(bool)
 	return opts
 }
 

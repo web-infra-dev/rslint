@@ -119,9 +119,7 @@ func parseConfig(options []any, settings map[string]interface{}) reactutil.Compo
 
 	readIncludeFromSettings := func(raw any) {
 		objOpt, _ := raw.(map[string]interface{})
-		if v, ok := objOpt["includeFromSettings"].(bool); ok {
-			includeFromSettings = v
-		}
+		includeFromSettings, _ = objOpt["includeFromSettings"].(bool)
 	}
 	if len(options) > 0 {
 		if inner, ok := options[0].([]interface{}); ok {

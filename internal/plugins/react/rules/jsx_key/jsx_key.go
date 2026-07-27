@@ -24,15 +24,9 @@ func parseOptions(raw []any) options {
 		return opts
 	}
 	m, _ := raw[0].(map[string]interface{})
-	if v, ok := m["checkFragmentShorthand"].(bool); ok {
-		opts.checkFragmentShorthand = v
-	}
-	if v, ok := m["checkKeyMustBeforeSpread"].(bool); ok {
-		opts.checkKeyMustBeforeSpread = v
-	}
-	if v, ok := m["warnOnDuplicates"].(bool); ok {
-		opts.warnOnDuplicates = v
-	}
+	opts.checkFragmentShorthand, _ = m["checkFragmentShorthand"].(bool)
+	opts.checkKeyMustBeforeSpread, _ = m["checkKeyMustBeforeSpread"].(bool)
+	opts.warnOnDuplicates, _ = m["warnOnDuplicates"].(bool)
 	return opts
 }
 

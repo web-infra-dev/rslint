@@ -25,9 +25,7 @@ func parseOptions(input []any) ruleOptions {
 		return opts
 	}
 	m, _ := input[0].(map[string]interface{})
-	if v, ok := m["allowInPropTypes"].(bool); ok {
-		opts.allowInPropTypes = v
-	}
+	opts.allowInPropTypes, _ = m["allowInPropTypes"].(bool)
 	return opts
 }
 

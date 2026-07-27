@@ -209,9 +209,7 @@ func parseOptions(options []any) (indentType string, indentSize int, indentChar 
 	var indentMode any
 	if m, ok := first.(map[string]interface{}); ok {
 		indentMode = m["indentMode"]
-		if v, ok := m["ignoreTernaryOperator"].(bool); ok {
-			ignoreTernaryOperator = v
-		}
+		ignoreTernaryOperator, _ = m["ignoreTernaryOperator"].(bool)
 	} else {
 		indentMode = first
 	}

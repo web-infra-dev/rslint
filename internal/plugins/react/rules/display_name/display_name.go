@@ -35,12 +35,8 @@ func parseOptions(options []any) Options {
 	opts := Options{}
 	if len(options) > 0 {
 		optsMap, _ := options[0].(map[string]interface{})
-		if v, ok := optsMap["ignoreTranspilerName"].(bool); ok {
-			opts.IgnoreTranspilerName = v
-		}
-		if v, ok := optsMap["checkContextObjects"].(bool); ok {
-			opts.CheckContextObjects = v
-		}
+		opts.IgnoreTranspilerName, _ = optsMap["ignoreTranspilerName"].(bool)
+		opts.CheckContextObjects, _ = optsMap["checkContextObjects"].(bool)
 	}
 	return opts
 }

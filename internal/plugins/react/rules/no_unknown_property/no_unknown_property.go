@@ -561,9 +561,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				}
 			}
 		}
-		if v, ok := optsMap["requireDataLowercase"].(bool); ok {
-			requireDataLowercase = v
-		}
+		requireDataLowercase, _ = optsMap["requireDataLowercase"].(bool)
 	}
 	// Precompute the version-dependent DOM property lookup map once per run;
 	// settings are static for the duration of a rule invocation.

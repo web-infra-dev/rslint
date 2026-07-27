@@ -42,15 +42,9 @@ func parseOptions(opts []any) pascalCaseOptions {
 		return cfg
 	}
 	optsMap, _ := opts[0].(map[string]interface{})
-	if v, ok := optsMap["allowAllCaps"].(bool); ok {
-		cfg.allowAllCaps = v
-	}
-	if v, ok := optsMap["allowLeadingUnderscore"].(bool); ok {
-		cfg.allowLeadingUnderscore = v
-	}
-	if v, ok := optsMap["allowNamespace"].(bool); ok {
-		cfg.allowNamespace = v
-	}
+	cfg.allowAllCaps, _ = optsMap["allowAllCaps"].(bool)
+	cfg.allowLeadingUnderscore, _ = optsMap["allowLeadingUnderscore"].(bool)
+	cfg.allowNamespace, _ = optsMap["allowNamespace"].(bool)
 	if raw, ok := optsMap["ignore"].([]interface{}); ok {
 		for _, entry := range raw {
 			if s, ok := entry.(string); ok {

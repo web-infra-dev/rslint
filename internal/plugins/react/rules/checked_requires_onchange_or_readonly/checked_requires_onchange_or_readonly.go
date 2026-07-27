@@ -39,12 +39,8 @@ func parseOptions(opts []any) options {
 		return o
 	}
 	optsMap, _ := opts[0].(map[string]interface{})
-	if v, ok := optsMap["ignoreMissingProperties"].(bool); ok {
-		o.ignoreMissingProperties = v
-	}
-	if v, ok := optsMap["ignoreExclusiveCheckedAttribute"].(bool); ok {
-		o.ignoreExclusiveCheckedAttribute = v
-	}
+	o.ignoreMissingProperties, _ = optsMap["ignoreMissingProperties"].(bool)
+	o.ignoreExclusiveCheckedAttribute, _ = optsMap["ignoreExclusiveCheckedAttribute"].(bool)
 	return o
 }
 

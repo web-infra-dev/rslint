@@ -46,9 +46,7 @@ func parseOptions(options []any) *forbidConfig {
 	var forbidList []interface{}
 	if len(options) > 0 {
 		optsMap, _ := options[0].(map[string]interface{})
-		if raw, ok := optsMap["forbid"].([]interface{}); ok {
-			forbidList = raw
-		}
+		forbidList, _ = optsMap["forbid"].([]interface{})
 	}
 	// Upstream defaults to `DEFAULTS = []` — empty list. With `forbid: []`
 	// (or no options at all) the rule is effectively a no-op; both paths land

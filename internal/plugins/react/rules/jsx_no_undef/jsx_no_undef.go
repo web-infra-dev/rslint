@@ -21,9 +21,7 @@ var JsxNoUndefRule = rule.Rule{
 		allowGlobals := false
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if v, ok := optsMap["allowGlobals"].(bool); ok {
-				allowGlobals = v
-			}
+			allowGlobals, _ = optsMap["allowGlobals"].(bool)
 		}
 		// Upstream only consults the outer global scope (config
 		// `languageOptions.globals` / `/* global */` comments) for script

@@ -24,9 +24,7 @@ func parseOptions(options []any) Options {
 	opts := Options{}
 	if len(options) > 0 {
 		optsMap, _ := options[0].(map[string]interface{})
-		if v, ok := optsMap["ignorePureComponents"].(bool); ok {
-			opts.IgnorePureComponents = v
-		}
+		opts.IgnorePureComponents, _ = optsMap["ignorePureComponents"].(bool)
 	}
 	return opts
 }

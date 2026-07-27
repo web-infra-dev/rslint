@@ -19,9 +19,7 @@ var JsxNoDuplicatePropsRule = rule.Rule{
 		ignoreCase := false
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if v, ok := optsMap["ignoreCase"].(bool); ok {
-				ignoreCase = v
-			}
+			ignoreCase, _ = optsMap["ignoreCase"].(bool)
 		}
 
 		check := func(node *ast.Node) {

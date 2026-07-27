@@ -20,13 +20,11 @@ var StylePropObjectRule = rule.Rule{
 		var allowedComponents map[string]bool
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if allowList, ok := optsMap["allow"]; ok {
-				if arr, ok := allowList.([]interface{}); ok {
-					allowedComponents = make(map[string]bool)
-					for _, item := range arr {
-						if name, ok := item.(string); ok {
-							allowedComponents[name] = true
-						}
+			if arr, ok := optsMap["allow"].([]interface{}); ok {
+				allowedComponents = make(map[string]bool)
+				for _, item := range arr {
+					if name, ok := item.(string); ok {
+						allowedComponents[name] = true
 					}
 				}
 			}

@@ -67,9 +67,7 @@ func parseOptions(options []any) map[string]forbidEntry {
 				continue
 			}
 			entry := forbidEntry{element: elem}
-			if msg, ok := v["message"].(string); ok {
-				entry.message = msg
-			}
+			entry.message, _ = v["message"].(string)
 			indexed[elem] = entry
 		}
 	}

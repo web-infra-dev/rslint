@@ -55,9 +55,7 @@ func parseOptions(raw []any) options {
 		return opts
 	}
 	optsMap, _ := raw[0].(map[string]interface{})
-	if v, ok := optsMap["allowAsProps"].(bool); ok {
-		opts.allowAsProps = v
-	}
+	opts.allowAsProps, _ = optsMap["allowAsProps"].(bool)
 	if v, ok := optsMap["propNamePattern"].(string); ok && v != "" {
 		opts.propNamePattern = v
 	}

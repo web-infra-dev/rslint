@@ -40,9 +40,7 @@ func parseOptions(options []any) ruleOptions {
 		return opts
 	}
 	m, _ := options[0].(map[string]interface{})
-	if v, ok := m["ignoreAttributes"].(bool); ok {
-		opts.ignoreAttributes = v
-	}
+	opts.ignoreAttributes, _ = m["ignoreAttributes"].(bool)
 	if v, ok := m["validStrategies"].([]interface{}); ok {
 		var strategies []string
 		seen := map[string]bool{}

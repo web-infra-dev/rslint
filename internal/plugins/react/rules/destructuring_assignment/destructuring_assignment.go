@@ -398,9 +398,7 @@ func parseOptions(options []any) ruleOptions {
 	}
 	if len(options) > 1 {
 		if m, ok := options[1].(map[string]interface{}); ok {
-			if v, ok := m["ignoreClassFields"].(bool); ok {
-				opts.ignoreClassFields = v
-			}
+			opts.ignoreClassFields, _ = m["ignoreClassFields"].(bool)
 			if v, ok := m["destructureInSignature"].(string); ok {
 				opts.destructureInSignature = v
 			}

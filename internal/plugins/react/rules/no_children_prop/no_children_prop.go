@@ -25,9 +25,7 @@ var NoChildrenPropRule = rule.Rule{
 		allowFunctions := false
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if v, ok := optsMap["allowFunctions"].(bool); ok {
-				allowFunctions = v
-			}
+			allowFunctions, _ = optsMap["allowFunctions"].(bool)
 		}
 
 		// Mirrors upstream `isFunction`: the value must be an arrow / non-arrow

@@ -43,21 +43,15 @@ func parseOptions(raw []any) options {
 		return opts
 	}
 	m, _ := raw[0].(map[string]interface{})
-	if v, ok := m["allowReferrer"].(bool); ok {
-		opts.allowReferrer = v
-	}
+	opts.allowReferrer, _ = m["allowReferrer"].(bool)
 	if v, ok := m["enforceDynamicLinks"].(string); ok && (v == "always" || v == "never") {
 		opts.enforceDynamicLinks = v
 	}
-	if v, ok := m["warnOnSpreadAttributes"].(bool); ok {
-		opts.warnOnSpreadAttributes = v
-	}
+	opts.warnOnSpreadAttributes, _ = m["warnOnSpreadAttributes"].(bool)
 	if v, ok := m["links"].(bool); ok {
 		opts.links = v
 	}
-	if v, ok := m["forms"].(bool); ok {
-		opts.forms = v
-	}
+	opts.forms, _ = m["forms"].(bool)
 	return opts
 }
 

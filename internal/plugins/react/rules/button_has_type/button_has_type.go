@@ -24,20 +24,14 @@ func parseOptions(opts []any) buttonHasTypeOptions {
 		return cfg
 	}
 	optsMap, _ := opts[0].(map[string]interface{})
-	if v, ok := optsMap["button"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.button = b
-		}
+	if b, ok := optsMap["button"].(bool); ok {
+		cfg.button = b
 	}
-	if v, ok := optsMap["submit"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.submit = b
-		}
+	if b, ok := optsMap["submit"].(bool); ok {
+		cfg.submit = b
 	}
-	if v, ok := optsMap["reset"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.reset = b
-		}
+	if b, ok := optsMap["reset"].(bool); ok {
+		cfg.reset = b
 	}
 	return cfg
 }

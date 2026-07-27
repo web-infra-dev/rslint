@@ -18,9 +18,7 @@ var NoStringRefsRule = rule.Rule{
 		detectTemplateLiterals := false
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if v, ok := optsMap["noTemplateLiterals"].(bool); ok {
-				detectTemplateLiterals = v
-			}
+			detectTemplateLiterals, _ = optsMap["noTemplateLiterals"].(bool)
 		}
 
 		pragma := reactutil.GetReactPragma(ctx.Settings)

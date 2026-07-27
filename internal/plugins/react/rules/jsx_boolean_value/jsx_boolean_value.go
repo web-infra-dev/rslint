@@ -43,11 +43,7 @@ var JsxBooleanValueRule = rule.Rule{
 						}
 					}
 				}
-				if v, ok := optsObj["assumeUndefinedIsFalse"]; ok {
-					if b, ok := v.(bool); ok {
-						assumeUndefinedIsFalse = b
-					}
-				}
+				assumeUndefinedIsFalse, _ = optsObj["assumeUndefinedIsFalse"].(bool)
 			}
 		}
 

@@ -594,12 +594,8 @@ func parseSecondOption(options []any) (bool, bool) {
 	if !ok {
 		return checkAttributes, indentLogicalExpressions
 	}
-	if v, ok := m["checkAttributes"].(bool); ok {
-		checkAttributes = v
-	}
-	if v, ok := m["indentLogicalExpressions"].(bool); ok {
-		indentLogicalExpressions = v
-	}
+	checkAttributes, _ = m["checkAttributes"].(bool)
+	indentLogicalExpressions, _ = m["indentLogicalExpressions"].(bool)
 	return checkAttributes, indentLogicalExpressions
 }
 

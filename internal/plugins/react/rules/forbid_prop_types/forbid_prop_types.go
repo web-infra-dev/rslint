@@ -47,12 +47,8 @@ func parseOptions(input []any) ruleOptions {
 		}
 		opts.forbid = list
 	}
-	if v, ok := optsMap["checkContextTypes"].(bool); ok {
-		opts.checkContextTypes = v
-	}
-	if v, ok := optsMap["checkChildContextTypes"].(bool); ok {
-		opts.checkChildContextTypes = v
-	}
+	opts.checkContextTypes, _ = optsMap["checkContextTypes"].(bool)
+	opts.checkChildContextTypes, _ = optsMap["checkChildContextTypes"].(bool)
 	return opts
 }
 

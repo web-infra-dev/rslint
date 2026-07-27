@@ -23,15 +23,11 @@ var SelfClosingCompRule = rule.Rule{
 
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if v, ok := optsMap["component"]; ok {
-				if b, ok := v.(bool); ok {
-					checkComponent = b
-				}
+			if b, ok := optsMap["component"].(bool); ok {
+				checkComponent = b
 			}
-			if v, ok := optsMap["html"]; ok {
-				if b, ok := v.(bool); ok {
-					checkHTML = b
-				}
+			if b, ok := optsMap["html"].(bool); ok {
+				checkHTML = b
 			}
 		}
 

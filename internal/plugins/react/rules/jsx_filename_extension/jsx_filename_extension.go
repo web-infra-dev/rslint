@@ -28,22 +28,18 @@ var JsxFilenameExtensionRule = rule.Rule{
 
 		if len(options) > 0 {
 			optsMap, _ := options[0].(map[string]interface{})
-			if exts, ok := optsMap["extensions"]; ok {
-				if extArr, ok := exts.([]interface{}); ok {
-					extensions = nil
-					for _, e := range extArr {
-						if s, ok := e.(string); ok {
-							extensions = append(extensions, s)
-						}
+			if extArr, ok := optsMap["extensions"].([]interface{}); ok {
+				extensions = nil
+				for _, e := range extArr {
+					if s, ok := e.(string); ok {
+						extensions = append(extensions, s)
 					}
 				}
 			}
 			if a, ok := optsMap["allow"].(string); ok {
 				allow = a
 			}
-			if v, ok := optsMap["ignoreFilesWithoutCode"].(bool); ok {
-				ignoreFilesWithoutCode = v
-			}
+			ignoreFilesWithoutCode, _ = optsMap["ignoreFilesWithoutCode"].(bool)
 		}
 
 		isExtensionAllowed := func(ext string) bool {

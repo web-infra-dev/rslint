@@ -48,21 +48,11 @@ func parseOptions(raw []any) options {
 		return opts
 	}
 	optsMap, _ := raw[0].(map[string]interface{})
-	if v, ok := optsMap["allowArrowFunctions"].(bool); ok {
-		opts.allowArrowFunctions = v
-	}
-	if v, ok := optsMap["allowBind"].(bool); ok {
-		opts.allowBind = v
-	}
-	if v, ok := optsMap["allowFunctions"].(bool); ok {
-		opts.allowFunctions = v
-	}
-	if v, ok := optsMap["ignoreRefs"].(bool); ok {
-		opts.ignoreRefs = v
-	}
-	if v, ok := optsMap["ignoreDOMComponents"].(bool); ok {
-		opts.ignoreDOMComponents = v
-	}
+	opts.allowArrowFunctions, _ = optsMap["allowArrowFunctions"].(bool)
+	opts.allowBind, _ = optsMap["allowBind"].(bool)
+	opts.allowFunctions, _ = optsMap["allowFunctions"].(bool)
+	opts.ignoreRefs, _ = optsMap["ignoreRefs"].(bool)
+	opts.ignoreDOMComponents, _ = optsMap["ignoreDOMComponents"].(bool)
 	return opts
 }
 
