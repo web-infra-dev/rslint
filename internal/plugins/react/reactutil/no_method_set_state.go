@@ -11,6 +11,13 @@ import (
 //go:embed no_method_set_state.schema.json
 var schemaJSON []byte
 
+// sharedSchema is the one schema value every rule the factory produces points
+// at — they all take the same single option. Building it here rather than
+// inside [MakeNoMethodSetStateRule] means the schema compiles once for all
+// three rules, and the config layer's per-schema dedup (which keys off the
+// *rule.Schema pointer) can collapse them.
+var sharedSchema = rule.NewSchema(schemaJSON)
+
 // NoMethodSetStateConfig configures the rule produced by [MakeNoMethodSetStateRule].
 //
 // The fields mirror upstream's `makeNoMethodSetStateRule(methodName, shouldCheckUnsafeCb)`
@@ -55,10 +62,8 @@ type NoMethodSetStateConfig struct {
 // inline these helpers in any new rule — extend the factory instead.
 func MakeNoMethodSetStateRule(cfg NoMethodSetStateConfig) rule.Rule {
 	return rule.Rule{
-		Name: cfg.RuleName,
-		// All three rules the factory produces take the same single option,
-		// so they share one schema rather than each embedding a copy.
-		Schema: rule.NewSchema(schemaJSON),
+		Name:   cfg.RuleName,
+		Schema: sharedSchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			if cfg.ShouldBeNoop != nil && cfg.ShouldBeNoop(ctx.Settings) {
 				return rule.RuleListeners{}

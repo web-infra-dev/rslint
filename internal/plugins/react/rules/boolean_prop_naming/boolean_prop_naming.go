@@ -31,8 +31,11 @@ type ruleOptions struct {
 // parseOptions extracts the rule's options from rslint's weakly-typed input.
 //
 // Mirrors upstream's behavior at the boundary:
-//   - missing / non-object options → all defaults; rule is a no-op (rule is
-//     gated by an explicit `rule` regex below).
+//   - no options at all → `rulePattern` stays empty and the rule is a no-op
+//     (it is gated by an explicit `rule` regex below). An options object,
+//     even `{}`, is different: the schema's `rule` default is filled into it
+//     before the rule runs, the way ajv's `useDefaults` does for ESLint, so
+//     the rule gates on that default pattern instead.
 //   - missing `propTypeNames` → defaults to `["bool"]`.
 //   - empty `propTypeNames` array (`[]`) → user explicitly cleared the
 //     allow-list, so no PropTypes-style identifier counts as a boolean
@@ -41,7 +44,9 @@ type ruleOptions struct {
 //     never reaches this: the schema's `minItems: 1` rejects it first, the
 //     way upstream's does.
 //   - `rule` is read as a string. An empty string ("") is preserved and
-//     produces a no-op (matching upstream's `config.rule ? ... : null`).
+//     produces a no-op (matching upstream's `config.rule ? ... : null`), but
+//     the schema's `minLength: 1` rejects an explicit "", so that only
+//     happens when a caller bypasses validation.
 func parseOptions(input []any) ruleOptions {
 	opts := ruleOptions{
 		propTypeNames: map[string]bool{"bool": true},
