@@ -3,8 +3,15 @@ package no_useless_backreference
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoUselessBackreferenceRule(t *testing.T) {
@@ -322,6 +329,58 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 				},
 			},
 			{
+				Code: `const r = RegExp; r('\\1(a)'); { const r = (value: string) => value; r('\\1(a)'); } r('\\1(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `declare const regexpFactory: RegExpConstructor; regexpFactory('\\1(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `
+declare const condition: boolean;
+declare function isRegExpConstructor(
+	value: RegExpConstructor | ((pattern: string) => string),
+): value is RegExpConstructor;
+const r: RegExpConstructor | ((pattern: string) => string) =
+	condition ? RegExp : value => value;
+if (isRegExpConstructor(r)) {
+	r('\\1(a)');
+} else {
+	r('\\1(a)');
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `
+let r: RegExpConstructor | ((pattern: string) => string) = value => value;
+r('\\1(a)');
+r = RegExp;
+r('\\1(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `const r = globalThis["RegExp"]; r('\\1(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `R\u0065gExp('\\1(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
 				Code: `new RegExp(true ? '\\1(a)' : '(a)');`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward", Line: 1, Column: 1},
@@ -471,4 +530,271 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestImportedRegExpConstructorAlias(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	helperPath := tspath.ResolvePath(rootDir, "foo.ts")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		filePath:   `import { regexpFactory } from "./foo"; regexpFactory("\\1(a)");`,
+		helperPath: `export const regexpFactory = RegExp;`,
+	})
+	host := utils.CreateCompilerHost(rootDir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile("file.ts")
+	if sourceFile == nil {
+		t.Fatal("file.ts was not loaded")
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.RunLinterInProgram(
+		program,
+		[]string{sourceFile.FileName()},
+		nil,
+		nil,
+		func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     NoUselessBackreferenceRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoUselessBackreferenceRule.Run(ctx, nil)
+				},
+			}}
+		},
+		false,
+		func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+		nil,
+		nil,
+	)
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
+		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
+	}
+}
+
+func TestMayContainBackreference(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		want    bool
+	}{
+		{name: "plain", pattern: `abc`, want: false},
+		{name: "non backreference escapes", pattern: `\d+\s+\w+`, want: false},
+		{name: "numeric", pattern: `\1(a)`, want: true},
+		{name: "named", pattern: `\k<name>(?<name>a)`, want: true},
+		{name: "escaped numeric", pattern: `\\1(a)`, want: false},
+		{name: "escaped named", pattern: `\\k<name>`, want: false},
+		{name: "backreference after escaped slash", pattern: `\\\1(a)`, want: true},
+		{name: "zero escape", pattern: `\0(a)`, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := mayContainBackreference(test.pattern); got != test.want {
+				t.Fatalf("mayContainBackreference(%q) = %v, want %v", test.pattern, got, test.want)
+			}
+		})
+	}
+}
+
+func TestMayContainBackreferenceDoesNotMissParsedBackrefs(t *testing.T) {
+	parts := []string{
+		`a`,
+		`(a)`,
+		`(?:a)`,
+		`(?<name>a)`,
+		`\1`,
+		`\2`,
+		`\k<name>`,
+		`\\`,
+		`\\\1`,
+		`[\1]`,
+		`[\\1]`,
+		`|`,
+	}
+	parsedBackrefs := 0
+	for _, first := range parts {
+		for _, second := range parts {
+			for _, third := range parts {
+				pattern := first + second + third
+				_, backrefs, ok := parsePattern(pattern, utils.RegexFlags{})
+				if !ok || len(backrefs) == 0 {
+					continue
+				}
+				parsedBackrefs += len(backrefs)
+				if !mayContainBackreference(pattern) {
+					t.Fatalf("mayContainBackreference(%q) missed %d parsed backreferences", pattern, len(backrefs))
+				}
+			}
+		}
+	}
+	if parsedBackrefs < 100 {
+		t.Fatalf("only exercised %d parsed backreferences; want an adversarial corpus", parsedBackrefs)
+	}
+}
+
+func TestAnalyzeBackrefMatchesLegacyDecision(t *testing.T) {
+	patterns := []string{
+		`\1(a)`,
+		`(a)\1`,
+		`(\1)`,
+		`(a)|\1`,
+		`(?!(a)).\1`,
+		`(?<!(a)).\1`,
+		`(?<=(a)\1)`,
+		`(?<=\1(a))`,
+		`\k<name>(?<name>a)`,
+		`(?<name>a)|\k<name>`,
+		`\k<name>((?<name>a)|(?<name>b)|(?<name>c))`,
+		`((?<name>a)|\k<name>(?<name>b)|(?<name>c))`,
+	}
+	wrappers := []func(string) string{
+		func(pattern string) string { return `(?:` + pattern + `)` },
+		func(pattern string) string { return `(` + pattern + `)` },
+		func(pattern string) string { return `(?=` + pattern + `)` },
+		func(pattern string) string { return `(?!` + pattern + `)` },
+		func(pattern string) string { return `(?<=` + pattern + `)` },
+		func(pattern string) string { return `(?<!` + pattern + `)` },
+		func(pattern string) string { return pattern + `|x` },
+		func(pattern string) string { return `x|` + pattern },
+	}
+	frontier := append([]string(nil), patterns...)
+	for range 2 {
+		next := make([]string, 0, len(frontier)*len(wrappers))
+		for _, pattern := range frontier {
+			for _, wrap := range wrappers {
+				next = append(next, wrap(pattern))
+			}
+		}
+		patterns = append(patterns, next...)
+		frontier = next
+	}
+
+	compared := 0
+	for _, pattern := range patterns {
+		_, backrefs, ok := parsePattern(pattern, utils.RegexFlags{})
+		if !ok {
+			continue
+		}
+		for index, backref := range backrefs {
+			gotFirst, gotCount, gotOK := analyzeBackref(backref)
+			wantFirst, wantCount, wantOK := legacyAnalyzeBackref(backref)
+			compared++
+			if gotOK != wantOK ||
+				gotCount != wantCount ||
+				gotFirst.messageId != wantFirst.messageId ||
+				gotFirst.group != wantFirst.group {
+				t.Fatalf(
+					"pattern %q backref %d: analyzeBackref() = (%q, %d, %v), legacy = (%q, %d, %v)",
+					pattern,
+					index,
+					gotFirst.messageId,
+					gotCount,
+					gotOK,
+					wantFirst.messageId,
+					wantCount,
+					wantOK,
+				)
+			}
+		}
+	}
+	if compared < 500 {
+		t.Fatalf("only compared %d backreferences; want an adversarial corpus", compared)
+	}
+}
+
+func legacyAnalyzeBackref(bref *rxNode) (first problem, problemCount int, hasProblem bool) {
+	groups := bref.resolved
+	if len(groups) == 0 {
+		return problem{}, 0, false
+	}
+	brefPath := legacyPathToRoot(bref)
+	problems := make([]*problem, 0, len(groups))
+	for _, group := range groups {
+		problems = append(problems, legacyClassifyPair(brefPath, bref, group))
+	}
+	for _, current := range problems {
+		if current == nil {
+			return problem{}, 0, false
+		}
+	}
+
+	sameDisjunction := make([]*problem, 0, len(problems))
+	for _, current := range problems {
+		if current.messageId != "disjunctive" {
+			sameDisjunction = append(sameDisjunction, current)
+		}
+	}
+	toReport := problems
+	if len(sameDisjunction) > 0 {
+		toReport = sameDisjunction
+	}
+	if len(toReport) == 0 {
+		panic("legacy analyzer produced no result")
+	}
+	return *toReport[0], len(toReport), true
+}
+
+func legacyClassifyPair(brefPath []*rxNode, bref *rxNode, group *rxNode) *problem {
+	if legacyNodeContains(brefPath, group) {
+		return &problem{messageId: "nested", group: group}
+	}
+
+	groupPath := legacyPathToRoot(group)
+	i := len(brefPath) - 1
+	j := len(groupPath) - 1
+	for i >= 0 && j >= 0 && brefPath[i] == groupPath[j] {
+		i--
+		j--
+	}
+	indexOfLCA := j + 1
+	groupCut := groupPath[:indexOfLCA]
+	commonPath := groupPath[indexOfLCA:]
+
+	var lowestCommonLookaround *rxNode
+	for _, current := range commonPath {
+		if isLookaround(current) {
+			lowestCommonLookaround = current
+			break
+		}
+	}
+	matchingBackward := lowestCommonLookaround != nil && isLookbehind(lowestCommonLookaround)
+
+	if len(groupCut) > 0 && groupCut[len(groupCut)-1].kind == nkAlternative {
+		return &problem{messageId: "disjunctive", group: group}
+	}
+	if !matchingBackward && bref.end <= group.start {
+		return &problem{messageId: "forward", group: group}
+	}
+	if matchingBackward && group.end <= bref.start {
+		return &problem{messageId: "backward", group: group}
+	}
+	for _, current := range groupCut {
+		if isNegativeLookaround(current) {
+			return &problem{messageId: "intoNegativeLookaround", group: group}
+		}
+	}
+	return nil
+}
+
+func legacyPathToRoot(node *rxNode) []*rxNode {
+	var path []*rxNode
+	for current := node; current != nil; current = current.parent {
+		path = append(path, current)
+	}
+	return path
+}
+
+func legacyNodeContains(path []*rxNode, target *rxNode) bool {
+	for _, current := range path {
+		if current == target {
+			return true
+		}
+	}
+	return false
 }

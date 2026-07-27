@@ -50,8 +50,8 @@ type rxNode struct {
 	negate  bool
 
 	// for backreferences
-	refName  string   // for \k<name>
-	refNum   int      // for \N (1-based, 0 if name-based)
+	refName  string    // for \k<name>
+	refNum   int       // for \N (1-based, 0 if name-based)
 	resolved []*rxNode // resolved capture groups (multiple under ES2025 named-duplicate alternatives)
 }
 
@@ -464,26 +464,6 @@ func skipBackrefAwareEscape(pattern string, i int, flags utils.RegexFlags) (int,
 		}
 	}
 	return utils.SkipPatternEscape(pattern, i, flags)
-}
-
-// pathToRoot returns [n, n.parent, …, root].
-func pathToRoot(n *rxNode) []*rxNode {
-	var out []*rxNode
-	cur := n
-	for cur != nil {
-		out = append(out, cur)
-		cur = cur.parent
-	}
-	return out
-}
-
-func nodeContains(path []*rxNode, target *rxNode) bool {
-	for _, n := range path {
-		if n == target {
-			return true
-		}
-	}
-	return false
 }
 
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }
