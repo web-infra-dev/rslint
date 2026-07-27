@@ -2,6 +2,7 @@
 package no_misleading_character_class
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoMisleadingCharacterClassRule(t *testing.T) {
@@ -58,6 +60,10 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `var r = new RegExp('[🇯🇵]', ` + "`${foo}`" + `)`},
 			{Code: `var r = new RegExp("[👍]", flags)`},
 			{Code: `const args = ['[👍]', 'i']; new RegExp(...args);`},
+			// Keep the constructor gate open while repeatedly exercising a
+			// non-RegExp callee type; cached negative results must stay local
+			// to that type and must not produce diagnostics.
+			{Code: `function fake(pattern: string, flags: string) {} const marker = globalThis; fake("[👍]", ""); fake("[🇯🇵]", "u");`},
 
 			// ---- ES2024 v flag ----
 			{Code: `var r = /[👍]/v`},
@@ -876,6 +882,21 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 					{MessageId: "regionalIndicatorSymbol"},
 				},
 			},
+			{
+				// Interleave cached false and true callee types, then reuse
+				// both. This attacks accidental cache poisoning between an
+				// ordinary function and a destructured built-in alias.
+				Code: `function fake(pattern: string, flags: string) {} const {RegExp: A} = globalThis; fake("[👍]", ""); A("[👍]", ""); fake("[🇯🇵]", "u"); A("[🇯🇵]", "u");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `function fake(pattern: string, flags: string) {} const {RegExp: A} = globalThis; fake("[👍]", ""); A("[👍]", "u"); fake("[🇯🇵]", "u"); A("[🇯🇵]", "u");`},
+						},
+					},
+					{MessageId: "regionalIndicatorSymbol"},
+				},
+			},
 
 			// ==== Heuristic: pattern validity under u flag ====
 			// `\a` identity-letter → suggestion suppressed
@@ -1292,4 +1313,329 @@ func TestNoMisleadingCharacterClassDefersSuggestions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSourceMayUseRegExp(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "ordinary calls", code: `fn(); other();`},
+		// Global-object identifiers deliberately keep the gate open. Their
+		// computed property can be assembled from arbitrary static pieces,
+		// so rejecting the file here could hide a real RegExp reference.
+		{name: "conservative global reference", code: `const value = global; fn();`, want: true},
+		{name: "direct constructor", code: `RegExp("x")`, want: true},
+		{name: "escaped constructor identifier", code: `R\u0065gExp("x")`, want: true},
+		{name: "computed global member", code: `globalThis["RegExp"]("x")`, want: true},
+		{name: "folded computed global member", code: `globalThis["Reg" + "Exp"]("x")`, want: true},
+		{name: "escaped computed global member", code: `globalThis["\u0052egExp"]("x")`, want: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/source-gate.ts",
+				Path:     "/source-gate.ts",
+			}, testCase.code, core.ScriptKindTS)
+			if got := sourceMayUseRegExp(sourceFile); got != testCase.want {
+				t.Fatalf("sourceMayUseRegExp(%q) = %v, want %v", testCase.code, got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestRunDetectorsOnCharsParity exhaustively compares the allocation-free
+// detector path with the frozen pre-optimization implementation below. The
+// alphabet covers every detector category, both sequence sentinels, escaped
+// and unescaped forms, and the u-brace discriminator.
+func TestRunDetectorsOnCharsParity(t *testing.T) {
+	const maxLength = 4
+	for length := 0; length <= maxLength; length++ {
+		combinations := 1
+		for range length {
+			combinations *= detectorParityAlphabetSize
+		}
+		for encoded := range combinations {
+			chars := detectorParityChars(encoded, length)
+			for _, flags := range []utils.RegexFlags{
+				{},
+				{Unicode: true},
+				{UnicodeSets: true},
+			} {
+				for _, allowEscape := range []bool{false, true} {
+					assertDetectorParity(t, chars, flags, allowEscape)
+				}
+			}
+		}
+	}
+
+	// Length four covers an individual ZWJ triplet; these explicit inputs
+	// cover chained and interrupted sequences beyond the exhaustive bound.
+	for _, chars := range [][]regexChar{
+		detectorParityCharsFromIndexes(5, 9, 5, 9, 5),
+		detectorParityCharsFromIndexes(5, 9, 5, 10, 5, 9, 5),
+		detectorParityCharsFromIndexes(5, 9, 11, 9, 5),
+		detectorParityCharsFromIndexes(5, 9, 5, 12, 5, 9, 5),
+	} {
+		for _, flags := range []utils.RegexFlags{{}, {Unicode: true}} {
+			for _, allowEscape := range []bool{false, true} {
+				assertDetectorParity(t, chars, flags, allowEscape)
+			}
+		}
+	}
+}
+
+func TestCollapseSurrogatePairsInPlace(t *testing.T) {
+	input := []regexChar{
+		{value: 0xD83D, srcStart: 0, srcEnd: 6, raw: `\uD83D`},
+		{value: 0xDC4D, srcStart: 6, srcEnd: 12, raw: `\uDC4D`},
+		{value: 'A', srcStart: 12, srcEnd: 13, raw: "A"},
+		{value: 0xD83C, srcStart: 13, srcEnd: 19, raw: `\uD83C`},
+		{value: 0xDDEF, srcStart: 19, srcEnd: 25, raw: `\uDDEF`},
+		{value: 0xD83D, srcStart: 25, srcEnd: 34, raw: `\u{D83D}`, isUBrace: true},
+		{value: 0xDC4D, srcStart: 34, srcEnd: 40, raw: `\uDC4D`},
+	}
+	first := &input[0]
+	got := collapseSurrogatePairs(input)
+	want := []regexChar{
+		{value: 0x1F44D, srcStart: 0, srcEnd: 12, raw: `\uD83D\uDC4D`},
+		{value: 'A', srcStart: 12, srcEnd: 13, raw: "A"},
+		{value: 0x1F1EF, srcStart: 13, srcEnd: 25, raw: `\uD83C\uDDEF`},
+		{value: 0xD83D, srcStart: 25, srcEnd: 34, raw: `\u{D83D}`, isUBrace: true},
+		{value: 0xDC4D, srcStart: 34, srcEnd: 40, raw: `\uDC4D`},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("collapsed chars = %+v, want %+v", got, want)
+	}
+	if len(got) > 0 && &got[0] != first {
+		t.Fatal("collapseSurrogatePairs allocated a new backing slice")
+	}
+}
+
+func FuzzRunDetectorsOnCharsParity(f *testing.F) {
+	for _, seed := range [][]byte{
+		nil,
+		{0, 1, 2, 3},
+		{5, 9, 5, 9, 5},
+		{6, 7},
+		{11, 6, 7, 12},
+		{5, 3, 4},
+	} {
+		for mode := range uint8(3) {
+			f.Add(seed, mode, false)
+			f.Add(seed, mode, true)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, input []byte, mode uint8, allowEscape bool) {
+		if len(input) > 256 {
+			t.Skip()
+		}
+		chars := make([]regexChar, len(input))
+		for i, value := range input {
+			chars[i] = detectorParityChar(int(value)%detectorParityAlphabetSize, i)
+		}
+		var flags utils.RegexFlags
+		switch mode % 3 {
+		case 1:
+			flags.Unicode = true
+		case 2:
+			flags.UnicodeSets = true
+		}
+		assertDetectorParity(t, chars, flags, allowEscape)
+	})
+}
+
+func assertDetectorParity(t *testing.T, chars []regexChar, flags utils.RegexFlags, allowEscape bool) {
+	t.Helper()
+	got := runDetectorsOnChars(chars, flags, ruleOptions{allowEscape: allowEscape})
+	want := runDetectorsBeforeOptimization(chars, flags, ruleOptions{allowEscape: allowEscape})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf(
+			"detector mismatch for chars %+v, flags %+v, allowEscape %v:\ngot  %+v\nwant %+v",
+			chars, flags, allowEscape, got, want,
+		)
+	}
+}
+
+const detectorParityAlphabetSize = 13
+
+func detectorParityChars(encoded, length int) []regexChar {
+	chars := make([]regexChar, length)
+	for i := range chars {
+		chars[i] = detectorParityChar(encoded%detectorParityAlphabetSize, i)
+		encoded /= detectorParityAlphabetSize
+	}
+	return chars
+}
+
+func detectorParityCharsFromIndexes(indexes ...int) []regexChar {
+	chars := make([]regexChar, len(indexes))
+	for i, index := range indexes {
+		chars[i] = detectorParityChar(index, i)
+	}
+	return chars
+}
+
+func detectorParityChar(index, position int) regexChar {
+	char := [...]regexChar{
+		{value: 'A', raw: "A"},
+		{value: 0x0301, raw: "\u0301"},
+		{value: 0x0301, raw: `\u0301`},
+		{value: 0x1F466, raw: "👦"},
+		{value: 0x1F3FB, raw: `\u{1F3FB}`, isUBrace: true},
+		{value: 0x1F1EF, raw: "🇯"},
+		{value: 0xD83D, raw: `\uD83D`},
+		{value: 0xDC4D, raw: `\uDC4D`},
+		{value: 0xD83D, raw: `\u{D83D}`, isUBrace: true},
+		{value: 0x200D, raw: "\u200D"},
+		{value: sentinelBreaker},
+		{value: sentinelRangeBoundary},
+		{value: 0x1F1F5, raw: "🇵"},
+	}[index]
+	char.srcStart = position * 3
+	char.srcEnd = char.srcStart + 2
+	return char
+}
+
+// runDetectorsBeforeOptimization is a frozen copy of the pre-optimization
+// sequence materialization and detector dispatch. It is intentionally kept in
+// test code as an independent behavioral oracle for the flat-slice rewrite.
+func runDetectorsBeforeOptimization(chars []regexChar, flags utils.RegexFlags, opts ruleOptions) []foundMatch {
+	var matches []foundMatch
+	for _, sequence := range splitOnBreakerBeforeOptimization(chars) {
+		active := sequence
+		if opts.allowEscape {
+			active = make([]*regexChar, len(sequence))
+			for i, char := range sequence {
+				if char == nil || isAcceptableEscape(char) {
+					continue
+				}
+				active[i] = char
+			}
+		}
+		matches = appendDetectorMatchesBeforeOptimization(matches, active, sequence, flags)
+	}
+	return matches
+}
+
+func splitOnBreakerBeforeOptimization(chars []regexChar) [][]*regexChar {
+	var sequences [][]*regexChar
+	var sequence []*regexChar
+	flush := func() {
+		if len(sequence) == 0 {
+			return
+		}
+		sequences = append(sequences, sequence)
+		sequence = nil
+	}
+	for _, char := range chars {
+		switch char.value {
+		case sentinelBreaker, sentinelRangeBoundary:
+			flush()
+		default:
+			charCopy := char
+			sequence = append(sequence, &charCopy)
+		}
+	}
+	flush()
+	return sequences
+}
+
+func appendDetectorMatchesBeforeOptimization(matches []foundMatch, chars, unfiltered []*regexChar, flags utils.RegexFlags) []foundMatch {
+	if !flags.UV() {
+		for i := 1; i < len(chars); i++ {
+			previous, current := chars[i-1], chars[i]
+			if previous != nil && current != nil &&
+				isSurrogatePair(previous.value, current.value) &&
+				!previous.isUBrace && !current.isUBrace {
+				matches = append(matches, foundMatch{
+					kind:     "surrogatePairWithoutUFlag",
+					srcStart: previous.srcStart,
+					srcEnd:   current.srcEnd,
+				})
+			}
+		}
+	} else {
+		for i := 1; i < len(chars); i++ {
+			previous, current := chars[i-1], chars[i]
+			if previous != nil && current != nil &&
+				isSurrogatePair(previous.value, current.value) &&
+				(previous.isUBrace || current.isUBrace) {
+				matches = append(matches, foundMatch{
+					kind:     "surrogatePair",
+					srcStart: previous.srcStart,
+					srcEnd:   current.srcEnd,
+				})
+			}
+		}
+	}
+
+	for i := 1; i < len(chars); i++ {
+		previous, current := unfiltered[i-1], chars[i]
+		if previous != nil && current != nil &&
+			isCombiningCharacter(current.value) &&
+			!isCombiningCharacter(previous.value) {
+			matches = append(matches, foundMatch{
+				kind:     "combiningClass",
+				srcStart: previous.srcStart,
+				srcEnd:   current.srcEnd,
+			})
+		}
+	}
+	for i := 1; i < len(chars); i++ {
+		previous, current := chars[i-1], chars[i]
+		if previous != nil && current != nil &&
+			isEmojiModifier(current.value) &&
+			!isEmojiModifier(previous.value) {
+			matches = append(matches, foundMatch{
+				kind:     "emojiModifier",
+				srcStart: previous.srcStart,
+				srcEnd:   current.srcEnd,
+			})
+		}
+	}
+	for i := 1; i < len(chars); i++ {
+		previous, current := chars[i-1], chars[i]
+		if previous != nil && current != nil &&
+			isRegionalIndicatorSymbol(current.value) &&
+			isRegionalIndicatorSymbol(previous.value) {
+			matches = append(matches, foundMatch{
+				kind:     "regionalIndicatorSymbol",
+				srcStart: previous.srcStart,
+				srcEnd:   current.srcEnd,
+			})
+		}
+	}
+
+	sequenceStart, sequenceEnd := -1, -1
+	for i := 1; i < len(chars)-1; i++ {
+		previous, current, next := chars[i-1], chars[i], chars[i+1]
+		if previous == nil || current == nil || next == nil {
+			continue
+		}
+		if current.value == 0x200D && previous.value != 0x200D && next.value != 0x200D {
+			if sequenceStart >= 0 && sequenceEnd == previous.srcEnd {
+				sequenceEnd = next.srcEnd
+			} else {
+				if sequenceStart >= 0 {
+					matches = append(matches, foundMatch{
+						kind:     "zwj",
+						srcStart: sequenceStart,
+						srcEnd:   sequenceEnd,
+					})
+				}
+				sequenceStart = previous.srcStart
+				sequenceEnd = next.srcEnd
+			}
+		}
+	}
+	if sequenceStart >= 0 {
+		matches = append(matches, foundMatch{
+			kind:     "zwj",
+			srcStart: sequenceStart,
+			srcEnd:   sequenceEnd,
+		})
+	}
+	return matches
 }
