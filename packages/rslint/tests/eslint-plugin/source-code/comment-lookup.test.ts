@@ -14,8 +14,8 @@
  * The tests below pin that rewrite to the ORIGINAL predicates: each
  * reference implementation here is the pre-change filter, verbatim, and
  * the assertions sweep every interesting offset in a comment-dense
- * fixture (comment/token boundaries and their +-1 neighbourhoods, plus
- * both ends of the file) so boundary-off-by-one is not representable.
+ * fixture (every comment/token boundary and the offsets +-1 around it,
+ * plus both ends of the file) so boundary-off-by-one is not representable.
  */
 
 import { describe, test, expect } from '@rstest/core';
@@ -167,8 +167,8 @@ function refPaddedSlice(
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Probe offsets: every token / comment boundary and its +-1
-// neighbourhood, plus both ends of the file.
+// Probe offsets: every token / comment boundary and the offsets +-1
+// around it, plus both ends of the file.
 // ────────────────────────────────────────────────────────────────────
 
 const OFFSETS: number[] = (() => {
