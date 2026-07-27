@@ -289,6 +289,42 @@ func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
 // nested classes should iterate them via IterateRegexCharacterClasses and
 // call ParseRegexCharacterClass on each separately.
 func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]RegexCharElement, int, bool) {
+	return parseRegexCharacterClass(pattern, start, flags, 0)
+}
+
+// ParseRegexCharacterClassWithEnd is ParseRegexCharacterClass with a
+// previously discovered class end. Non-v callers use the known byte span as
+// an element-capacity hint to avoid repeated slice growth for large classes.
+// Unicode-set classes deliberately skip that preallocation:
+// each nested callback receives the outer span, whose byte length can be much
+// larger than its own flat element count. The cap also bounds over-allocation
+// for escape-heavy and multibyte input, where bytes can outnumber elements.
+func ParseRegexCharacterClassWithEnd(pattern string, start, end int, flags RegexFlags) ([]RegexCharElement, int, bool) {
+	if start < 0 || end <= start || end > len(pattern) || pattern[end-1] != ']' {
+		return nil, start, false
+	}
+	elementCapacity := 0
+	if !flags.UnicodeSets {
+		elementCapacity = end - start - 2
+		if elementCapacity < 0 {
+			elementCapacity = 0
+		} else if elementCapacity > maxRegexCharacterClassPreallocation {
+			elementCapacity = maxRegexCharacterClassPreallocation
+		}
+	}
+	elements, parsedEnd, ok := parseRegexCharacterClass(pattern, start, flags, elementCapacity)
+	if !ok || parsedEnd != end {
+		return nil, start, false
+	}
+	if len(elements) == 0 {
+		elements = nil
+	}
+	return elements, parsedEnd, true
+}
+
+const maxRegexCharacterClassPreallocation = 16 << 10
+
+func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, elementCapacity int) ([]RegexCharElement, int, bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
 		return nil, start, false
 	}
@@ -298,6 +334,9 @@ func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]Re
 	}
 
 	var out []RegexCharElement
+	if elementCapacity > 0 {
+		out = make([]RegexCharElement, 0, elementCapacity)
+	}
 	pendingIdx := -1 // index into `out` of the last RegexCharSingle (candidate for range start)
 
 	for i < len(pattern) {
