@@ -2,7 +2,7 @@
   "type": "array",
   "items": [
     {
-      "anyOf": [
+      "oneOf": [
         {
           "properties": {
             "case": {

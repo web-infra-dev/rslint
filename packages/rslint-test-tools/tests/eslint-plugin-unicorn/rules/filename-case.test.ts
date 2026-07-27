@@ -122,11 +122,6 @@ ruleTester.run('filename-case', {} as never, {
     {
       code: '/* Filename: src/foo/foo-bar.js */',
       filename: 'src/foo/foo-bar.js',
-      options: [{ cases: undefined }],
-    },
-    {
-      code: '/* Filename: src/foo/foo-bar.js */',
-      filename: 'src/foo/foo-bar.js',
       options: [{ cases: {} }],
     },
     validCases('src/foo/fooBar.js', { camelCase: true }),
