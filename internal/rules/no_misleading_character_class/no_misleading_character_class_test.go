@@ -60,10 +60,25 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `var r = new RegExp('[🇯🇵]', ` + "`${foo}`" + `)`},
 			{Code: `var r = new RegExp("[👍]", flags)`},
 			{Code: `const args = ['[👍]', 'i']; new RegExp(...args);`},
-			// Keep the constructor gate open while repeatedly exercising a
-			// non-RegExp callee type; cached negative results must stay local
-			// to that type and must not produce diagnostics.
+			// An unrelated global-object use must not turn ordinary calls into
+			// RegExp constructor candidates.
 			{Code: `function fake(pattern: string, flags: string) {} const marker = globalThis; fake("[👍]", ""); fake("[🇯🇵]", "u");`},
+			// ReferenceTracker roots: lexical shadows, disabled globals, and a
+			// modified global binding are not the built-in RegExp value.
+			{Code: `function fake(pattern: string, flags: string) {} { const RegExp = fake; RegExp("[👍]", ""); }`},
+			{Code: `function run(RegExp: (pattern: string, flags: string) => void) { RegExp("[👍]", ""); }`},
+			{Code: `const { RegExp } = { RegExp(pattern: string, flags: string) {} }; RegExp("[👍]", "");`},
+			{Code: `const window = { RegExp(pattern: string, flags: string) {} }; window.RegExp("[👍]", "");`},
+			{Code: `namespace RegExp {} RegExp("[👍]", "");`},
+			{Code: `enum RegExp { Value } RegExp("[👍]", "");`},
+			{Code: `function fake(pattern: string, flags: string) {} RegExp = fake; RegExp("[👍]", "");`},
+			{Code: `function fake(pattern: string, flags: string) {} RegExp += fake; RegExp("[👍]", "");`},
+			{Code: `function fake(pattern: string, flags: string) {} (RegExp, fake)("[👍]", "");`},
+			{Code: `function run(RegExp = RegExp) { RegExp("[👍]", ""); }`},
+			{Code: `const key = "RegExp"; globalThis[key]("[👍]", "");`},
+			{Code: `RegExp("[👍]", "");`, Globals: map[string]bool{"RegExp": false}},
+			{Code: `const R = RegExp; R(/[👍]/, "u");`},
+			{Code: `const R = RegExp; const flags = getFlags(); R(/[👍]/, flags);`},
 
 			// ---- ES2024 v flag ----
 			{Code: `var r = /[👍]/v`},
@@ -865,7 +880,110 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				},
 			},
 
-			// ==== Destructured RegExp alias via TypeChecker ====
+			// ==== RegExp aliases via ReferenceTracker ====
+			{
+				Code: `const R = RegExp; R("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `let R; R = RegExp; new R("[🇯🇵]", "u");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regionalIndicatorSymbol"},
+				},
+			},
+			{
+				// ReferenceTracker is deliberately flow-insensitive: a later
+				// write does not erase an alias established by an initializer.
+				Code: `function fake(pattern: string, flags: string) {} let R = RegExp; R = fake; R("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `declare const condition: boolean; function fake(pattern: string, flags: string) {} const R = condition ? RegExp : fake; R("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `const root = globalThis; const { ["Reg" + "Exp"]: R } = root; R("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `let R; ({ RegExp: R } = globalThis); R("[🇯🇵]", "u");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regionalIndicatorSymbol"},
+				},
+			},
+			{
+				Code:    `Alias = RegExp; Alias("[Á]", "");`,
+				Globals: map[string]bool{"Alias": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `let A = RegExp; let B = A; A = B; B("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `globalThis.RegExp = function fake() {} as RegExpConstructor; globalThis.RegExp("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `(RegExp as RegExpConstructor)("[Á]", ""); RegExp?.("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `function fake() {} (fake, RegExp)("[Á]", ""); function run(R = RegExp) { R("[Á]", ""); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `type RegExp = string; interface Window {} RegExp("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `{ const RegExp = function fake() {}; RegExp("[Á]", ""); } RegExp("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code: `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code:    `Alias = RegExp; { namespace Alias {} Alias("[Á]", ""); } Alias("[Á]", "");`,
+				Globals: map[string]bool{"Alias": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
+				Code:    `globalThis.RegExp("[Á]", "");`,
+				Globals: map[string]bool{"RegExp": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
 			{
 				Code: `const {RegExp: A} = globalThis; new A("[👍]", "");`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -883,9 +1001,8 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				},
 			},
 			{
-				// Interleave cached false and true callee types, then reuse
-				// both. This attacks accidental cache poisoning between an
-				// ordinary function and a destructured built-in alias.
+				// Interleave ordinary calls and a destructured built-in alias.
+				// Only references reachable from the global root may report.
 				Code: `function fake(pattern: string, flags: string) {} const {RegExp: A} = globalThis; fake("[👍]", ""); A("[👍]", ""); fake("[🇯🇵]", "u"); A("[🇯🇵]", "u");`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
