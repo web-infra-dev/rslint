@@ -1,10 +1,15 @@
 package no_standalone_expect
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_standalone_expect.schema.json
+var schemaJSON []byte
 
 type blockType string
 
@@ -35,28 +40,14 @@ func buildUnexpectedExpectMessage() rule.RuleMessage {
 	}
 }
 
-func parseOptions(raw any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{additionalTestBlockFunctions: map[string]struct{}{}}
-	if raw == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
 
-	optArray := rule.NormalizeOptions(raw)
-	if len(optArray) == 0 {
-		return opts
-	}
-
-	optsMap, ok := optArray[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
-
-	rawFns, ok := optsMap["additionalTestBlockFunctions"]
-	if !ok || rawFns == nil {
-		return opts
-	}
-
-	list, ok := rawFns.([]interface{})
+	optsMap, _ := rawOptions[0].(map[string]interface{})
+	list, ok := optsMap["additionalTestBlockFunctions"].([]interface{})
 	if !ok {
 		return opts
 	}
@@ -154,9 +145,9 @@ func getTemplateScopeRange(node *ast.Node) (int, int, bool) {
 }
 
 var NoStandaloneExpectRule = rule.Rule{
-	Name: "jest/no-standalone-expect",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/no-standalone-expect",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		scopeStack := make([]scopeEntry, 0, 8)
 

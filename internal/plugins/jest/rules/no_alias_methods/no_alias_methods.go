@@ -33,7 +33,8 @@ var methodNames = map[string]string{
 }
 
 var NoAliasMethodsRule = rule.Rule{
-	Name: "jest/no-alias-methods",
+	Name:   "jest/no-alias-methods",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

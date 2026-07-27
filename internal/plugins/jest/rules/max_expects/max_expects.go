@@ -1,13 +1,18 @@
 package max_expects
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed max_expects.schema.json
+var schemaJSON []byte
 
 const defaultMax = 5
 
@@ -15,35 +20,15 @@ type options struct {
 	Max int
 }
 
-func parseOptions(raw any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{Max: defaultMax}
-	if raw == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
 
-	optArray := rule.NormalizeOptions(raw)
-	if len(optArray) == 0 {
-		return opts
-	}
-
-	optsMap, ok := optArray[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
-
-	switch v := optsMap["max"].(type) {
-	case float64:
-		if v == float64(int(v)) {
-			opts.Max = int(v)
-		}
-	case int:
-		opts.Max = v
-	case int64:
-		opts.Max = int(v)
-	}
-
-	if opts.Max < 1 {
-		return options{Max: defaultMax}
+	optsMap, _ := rawOptions[0].(map[string]interface{})
+	if max, ok := internalUtils.CoerceIntegral(optsMap["max"]); ok && max >= 1 {
+		opts.Max = max
 	}
 
 	return opts
@@ -94,9 +79,9 @@ func maybeResetCountForFunctionLike(node *ast.Node, ctx rule.RuleContext, count 
 }
 
 var MaxExpectsRule = rule.Rule{
-	Name: "jest/max-expects",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/max-expects",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		count := 0
 

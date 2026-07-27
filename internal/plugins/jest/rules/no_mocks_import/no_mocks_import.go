@@ -31,7 +31,8 @@ func isStringNode(node *ast.Node) bool {
 // NewRule creates a no-mocks-import rule for a test framework.
 func NewRule(name string, mockFunction string) rule.Rule {
 	return rule.Rule{
-		Name: name,
+		Name:   name,
+		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			return rule.RuleListeners{
 				ast.KindImportDeclaration: func(node *ast.Node) {

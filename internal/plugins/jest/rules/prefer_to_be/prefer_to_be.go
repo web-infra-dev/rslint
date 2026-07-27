@@ -192,7 +192,8 @@ func reportPreferToBe(ctx rule.RuleContext, kind preferKind, jestFnCall *utils.P
 }
 
 var PreferToBeRule = rule.Rule{
-	Name: "jest/prefer-to-be",
+	Name:   "jest/prefer-to-be",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

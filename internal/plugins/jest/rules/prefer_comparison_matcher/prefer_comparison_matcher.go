@@ -60,7 +60,8 @@ func buildModifierText(jestFnCall *utils.ParsedJestFnCall) string {
 }
 
 var PreferComparisonMatcherRule = rule.Rule{
-	Name: "jest/prefer-comparison-matcher",
+	Name:   "jest/prefer-comparison-matcher",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

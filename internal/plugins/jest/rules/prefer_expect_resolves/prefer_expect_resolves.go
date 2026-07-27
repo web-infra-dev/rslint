@@ -18,7 +18,8 @@ func buildExpectResolvesErrorMessage() rule.RuleMessage {
 }
 
 var PreferExpectResolvesRule = rule.Rule{
-	Name: "jest/prefer-expect-resolves",
+	Name:   "jest/prefer-expect-resolves",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
