@@ -37,15 +37,15 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "catalog:test",
-    "@types/react": "catalog:types",
-    "ajv": "catalog:tools",
-    "husky": "catalog:tools",
-    "lint-staged": "catalog:tools",
-    "prettier": "catalog:tools",
-    "typescript": "catalog:types",
-    "@typescript/native-preview": "catalog:types",
-    "zx": "catalog:tools"
+    "@rstest/core": "catalog:",
+    "@types/react": "catalog:",
+    "ajv": "catalog:",
+    "husky": "catalog:",
+    "lint-staged": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "zx": "catalog:"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

@@ -17,9 +17,9 @@
   "license": "MIT",
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
-    "@rslib/core": "catalog:build",
-    "@types/node": "catalog:types",
-    "@typescript/native-preview": "catalog:types"
+    "@rslib/core": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:"
   },
   "publishConfig": {
     "access": "public"

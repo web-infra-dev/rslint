@@ -32,9 +32,9 @@
   "license": "MIT",
   "description": "Rule testing utilities for rslint",
   "devDependencies": {
-    "@types/node": "catalog:types",
-    "typescript": "catalog:types",
-    "@typescript/native-preview": "catalog:types"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@typescript/native-preview": "catalog:"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"

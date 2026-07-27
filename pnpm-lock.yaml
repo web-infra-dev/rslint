@@ -5,47 +5,85 @@ settings:
   excludeLinksFromLockfile: false
 
 catalogs:
-  build:
-    '@microsoft/api-extractor':
-      specifier: ^7.58.12
-      version: 7.58.12
-    '@napi-rs/cli':
-      specifier: ^3.7.4
-      version: 3.7.4
-    '@rslib/core':
-      specifier: ^0.23.2
-      version: 0.23.2
-    '@types/picomatch':
-      specifier: ^4.0.3
-      version: 4.0.3
-    esbuild:
-      specifier: ^0.28.1
-      version: 0.28.1
-    fast-glob:
-      specifier: ^3.3.3
-      version: 3.3.3
-    jiti:
-      specifier: ^2.7.0
-      version: 2.7.0
-    picomatch:
-      specifier: ^4.0.5
-      version: 4.0.5
-    rimraf:
-      specifier: ^6.1.3
-      version: 6.1.3
-    tinyglobby:
-      specifier: ^0.2.17
-      version: 0.2.17
-  lint:
+  default:
+    '@codspeed/tinybench-plugin':
+      specifier: ^5.7.1
+      version: 5.7.1
     '@eslint-community/eslint-plugin-eslint-comments':
       specifier: ^4.7.2
       version: 4.7.2
     '@eslint/plugin-kit':
       specifier: ^0.7.2
       version: 0.7.2
+    '@microsoft/api-extractor':
+      specifier: ^7.58.12
+      version: 7.58.12
+    '@napi-rs/cli':
+      specifier: ^3.7.4
+      version: 3.7.4
+    '@radix-ui/react-label':
+      specifier: ^2.1.13
+      version: 2.1.13
+    '@radix-ui/react-select':
+      specifier: ^2.3.5
+      version: 2.3.5
+    '@radix-ui/react-slot':
+      specifier: ^1.3.1
+      version: 1.3.1
+    '@radix-ui/react-toggle':
+      specifier: ^1.1.16
+      version: 1.1.16
+    '@radix-ui/react-toggle-group':
+      specifier: ^1.1.17
+      version: 1.1.17
+    '@rsbuild/plugin-node-polyfill':
+      specifier: ^1.4.6
+      version: 1.4.6
+    '@rsbuild/plugin-sass':
+      specifier: ^1.5.3
+      version: 1.5.3
+    '@rslib/core':
+      specifier: ^0.23.2
+      version: 0.23.2
+    '@rspress/core':
+      specifier: ^2.0.18
+      version: 2.0.18
+    '@rspress/plugin-sitemap':
+      specifier: ^2.0.18
+      version: 2.0.18
+    '@rstack-dev/doc-ui':
+      specifier: ^1.14.7
+      version: 1.14.7
+    '@rstest/core':
+      specifier: ^0.11.3
+      version: 0.11.3
     '@stylistic/eslint-plugin':
       specifier: ^5.10.0
       version: 5.10.0
+    '@tailwindcss/postcss':
+      specifier: ^4.3.3
+      version: 4.3.3
+    '@types/dagre':
+      specifier: ^0.7.54
+      version: 0.7.54
+    '@types/mocha':
+      specifier: ^10.0.10
+      version: 10.0.10
+    '@types/node':
+      specifier: ^26.1.1
+      version: 26.1.1
+    '@types/picomatch':
+      specifier: ^4.0.3
+      version: 4.0.3
+    '@types/react':
+      specifier: ^19.2.17
+      version: 19.2.17
+    '@types/react-dom':
+      specifier: ^19.2.3
+      version: 19.2.3
+    '@types/vscode':
+      specifier: ^1.125.0
+      version: 1.125.0
     '@typescript-eslint/parser':
       specifier: ^8.65.0
       version: 8.65.0
@@ -55,6 +93,45 @@ catalogs:
     '@typescript-eslint/visitor-keys':
       specifier: ^8.65.0
       version: 8.65.0
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20250904.1
+      version: 7.0.0-dev.20250904.1
+    '@vscode/test-cli':
+      specifier: ^0.0.15
+      version: 0.0.15
+    '@vscode/test-electron':
+      specifier: ^2.5.2
+      version: 2.5.2
+    '@vscode/vsce':
+      specifier: ^3.9.2
+      version: 3.9.2
+    '@wasmer/wasmfs':
+      specifier: ^0.12.0
+      version: 0.12.0
+    ajv:
+      specifier: ^6.15.0
+      version: 6.15.0
+    buffer:
+      specifier: ^6.0.3
+      version: 6.0.3
+    class-variance-authority:
+      specifier: ^0.7.1
+      version: 0.7.1
+    clsx:
+      specifier: ^2.1.1
+      version: 2.1.1
+    cross-env:
+      specifier: ^10.1.0
+      version: 10.1.0
+    dagre:
+      specifier: ^0.8.5
+      version: 0.8.5
+    esbuild:
+      specifier: ^0.28.1
+      version: 0.28.1
+    esbuild-plugin-polyfill-node:
+      specifier: ^0.3.0
+      version: 0.3.0
     eslint:
       specifier: ^10.7.0
       version: 10.7.0
@@ -94,162 +171,57 @@ catalogs:
     esquery:
       specifier: ^1.7.0
       version: 1.7.0
+    fast-glob:
+      specifier: ^3.3.3
+      version: 3.3.3
     globals:
       specifier: ^17.7.0
       version: 17.7.0
-  test:
-    '@codspeed/tinybench-plugin':
-      specifier: ^5.7.1
-      version: 5.7.1
-    '@rstest/core':
-      specifier: ^0.11.3
-      version: 0.11.3
-    tinybench:
-      specifier: ^6.1.1
-      version: 6.1.1
-  tools:
-    ajv:
-      specifier: ^6.15.0
-      version: 6.15.0
     husky:
       specifier: ^9.1.7
       version: 9.1.7
-    lint-staged:
-      specifier: ^16.4.0
-      version: 16.4.0
-    prettier:
-      specifier: ^3.9.6
-      version: 3.9.6
-    zx:
-      specifier: ^8.8.5
-      version: 8.8.5
-  types:
-    '@types/mocha':
-      specifier: ^10.0.10
-      version: 10.0.10
-    '@types/node':
-      specifier: ^26.1.1
-      version: 26.1.1
-    '@types/react':
-      specifier: ^19.2.17
-      version: 19.2.17
-    '@types/vscode':
-      specifier: ^1.125.0
-      version: 1.125.0
-    '@typescript/native-preview':
-      specifier: 7.0.0-dev.20250904.1
-      version: 7.0.0-dev.20250904.1
-    typescript:
-      specifier: 5.9.3
-      version: 5.9.3
-  vscode:
-    '@vscode/test-cli':
-      specifier: ^0.0.15
-      version: 0.0.15
-    '@vscode/test-electron':
-      specifier: ^2.5.2
-      version: 2.5.2
-    '@vscode/vsce':
-      specifier: ^3.9.2
-      version: 3.9.2
-    mocha:
-      specifier: ^10.8.2
-      version: 10.8.2
-    ovsx:
-      specifier: ^0.10.12
-      version: 0.10.12
-    vscode-languageclient:
-      specifier: ^9.0.1
-      version: 9.0.1
-    vscode-languageserver:
-      specifier: ^9.0.1
-      version: 9.0.1
-    vscode-languageserver-textdocument:
-      specifier: ^1.0.12
-      version: 1.0.12
-  wasm:
-    '@wasmer/wasmfs':
-      specifier: ^0.12.0
-      version: 0.12.0
-    buffer:
-      specifier: ^6.0.3
-      version: 6.0.3
-    cross-env:
-      specifier: ^10.1.0
-      version: 10.1.0
-    esbuild-plugin-polyfill-node:
-      specifier: ^0.3.0
-      version: 0.3.0
-    memfs:
-      specifier: ^4.64.0
-      version: 4.64.0
-    prebundle:
-      specifier: ^1.6.5
-      version: 1.6.5
-  website:
-    '@radix-ui/react-label':
-      specifier: ^2.1.13
-      version: 2.1.13
-    '@radix-ui/react-select':
-      specifier: ^2.3.5
-      version: 2.3.5
-    '@radix-ui/react-slot':
-      specifier: ^1.3.1
-      version: 1.3.1
-    '@radix-ui/react-toggle':
-      specifier: ^1.1.16
-      version: 1.1.16
-    '@radix-ui/react-toggle-group':
-      specifier: ^1.1.17
-      version: 1.1.17
-    '@rsbuild/plugin-node-polyfill':
-      specifier: ^1.4.6
-      version: 1.4.6
-    '@rsbuild/plugin-sass':
-      specifier: ^1.5.3
-      version: 1.5.3
-    '@rspress/core':
-      specifier: ^2.0.18
-      version: 2.0.18
-    '@rspress/plugin-sitemap':
-      specifier: ^2.0.18
-      version: 2.0.18
-    '@rstack-dev/doc-ui':
-      specifier: ^1.14.7
-      version: 1.14.7
-    '@tailwindcss/postcss':
-      specifier: ^4.3.3
-      version: 4.3.3
-    '@types/dagre':
-      specifier: ^0.7.54
-      version: 0.7.54
-    '@types/react-dom':
-      specifier: ^19.2.3
-      version: 19.2.3
-    class-variance-authority:
-      specifier: ^0.7.1
-      version: 0.7.1
-    clsx:
-      specifier: ^2.1.1
-      version: 2.1.1
-    dagre:
-      specifier: ^0.8.5
-      version: 0.8.5
     input-otp:
       specifier: ^1.4.2
       version: 1.4.2
+    jiti:
+      specifier: ^2.7.0
+      version: 2.7.0
+    lint-staged:
+      specifier: ^16.4.0
+      version: 16.4.0
     lucide-react:
       specifier: ^0.577.0
       version: 0.577.0
+    memfs:
+      specifier: ^4.64.0
+      version: 4.64.0
+    mocha:
+      specifier: ^10.8.2
+      version: 10.8.2
     monaco-editor:
       specifier: ^0.56.0
       version: 0.56.0
+    ovsx:
+      specifier: ^0.10.12
+      version: 0.10.12
+    picomatch:
+      specifier: ^4.0.5
+      version: 4.0.5
+    prebundle:
+      specifier: ^1.6.5
+      version: 1.6.5
+    prettier:
+      specifier: ^3.9.6
+      version: 3.9.6
     react:
       specifier: ^19.2.8
       version: 19.2.8
     react-dom:
       specifier: ^19.2.8
       version: 19.2.8
+    rimraf:
+      specifier: ^6.1.3
+      version: 6.1.3
     rsbuild-plugin-google-analytics:
       specifier: ^1.0.6
       version: 1.0.6
@@ -268,9 +240,30 @@ catalogs:
     tailwindcss:
       specifier: ^4.3.3
       version: 4.3.3
+    tinybench:
+      specifier: ^6.1.1
+      version: 6.1.1
+    tinyglobby:
+      specifier: ^0.2.17
+      version: 0.2.17
     tw-animate-css:
       specifier: ^1.4.0
       version: 1.4.0
+    typescript:
+      specifier: 5.9.3
+      version: 5.9.3
+    vscode-languageclient:
+      specifier: ^9.0.1
+      version: 9.0.1
+    vscode-languageserver:
+      specifier: ^9.0.1
+      version: 9.0.1
+    vscode-languageserver-textdocument:
+      specifier: ^1.0.12
+      version: 1.0.12
+    zx:
+      specifier: ^8.8.5
+      version: 8.8.5
 
 importers:
 
@@ -280,37 +273,37 @@ importers:
         specifier: workspace:*
         version: link:packages/rslint
       '@rstest/core':
-        specifier: catalog:test
+        specifier: 'catalog:'
         version: 0.11.3(core-js@3.47.0)
       '@types/react':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 19.2.17
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
       ajv:
-        specifier: catalog:tools
+        specifier: 'catalog:'
         version: 6.15.0
       husky:
-        specifier: catalog:tools
+        specifier: 'catalog:'
         version: 9.1.7
       lint-staged:
-        specifier: catalog:tools
+        specifier: 'catalog:'
         version: 16.4.0
       prettier:
-        specifier: catalog:tools
+        specifier: 'catalog:'
         version: 3.9.6
       typescript:
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 5.9.3
       zx:
-        specifier: catalog:tools
+        specifier: 'catalog:'
         version: 8.8.5
 
   crates/rslint-native:
     devDependencies:
       '@napi-rs/cli':
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 3.7.4(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.1.1)(node-addon-api@7.1.1)
 
   npm/rslint/darwin-arm64: {}
@@ -344,56 +337,56 @@ importers:
   packages/rslint:
     dependencies:
       jiti:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 2.7.0
       picomatch:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 4.0.5
     devDependencies:
       '@eslint/plugin-kit':
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 0.7.2
       '@rslib/core':
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@5.9.3)
       '@rslint/api':
         specifier: workspace:*
         version: link:../rslint-api
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@types/picomatch':
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 4.0.3
       '@typescript-eslint/scope-manager':
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 8.65.0
       '@typescript-eslint/visitor-keys':
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 8.65.0
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
       eslint-scope:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 9.1.2
       eslint-visitor-keys:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 5.0.1
       espree:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 11.2.0
       esquery:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 1.7.0
       globals:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 17.7.0
       tinyglobby:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 0.2.17
       typescript:
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 5.9.3
     optionalDependencies:
       '@rslint/native-darwin-arm64':
@@ -424,35 +417,35 @@ importers:
   packages/rslint-api:
     devDependencies:
       '@rslib/core':
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 0.23.2(@microsoft/api-extractor@7.58.12(@types/node@26.1.1))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@6.0.3)
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
 
   packages/rslint-test-tools:
     devDependencies:
       '@eslint-community/eslint-plugin-eslint-comments':
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 4.7.2(eslint@10.7.0(jiti@2.7.0))
       '@rslint/core':
         specifier: workspace:*
         version: link:../rslint
       '@rstest/core':
-        specifier: catalog:test
+        specifier: 'catalog:'
         version: 0.11.3(core-js@3.47.0)
       '@stylistic/eslint-plugin':
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 5.10.0(eslint@10.7.0(jiti@2.7.0))
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@typescript-eslint/parser':
-        specifier: catalog:lint
-        version: 8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3)
+        specifier: 'catalog:'
+        version: 8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3)
       '@typescript-eslint/rule-tester':
         specifier: workspace:*
         version: link:../rule-tester
@@ -460,31 +453,31 @@ importers:
         specifier: workspace:*
         version: link:../utils
       eslint:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 10.7.0(jiti@2.7.0)
       eslint-plugin-cypress:
-        specifier: catalog:lint
-        version: 6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.7.0(jiti@2.7.0))
+        specifier: 'catalog:'
+        version: 6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-es-x:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 9.7.0(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-playwright:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 2.10.5(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-promise:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 7.3.0(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-security:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 4.0.1
       eslint-plugin-simple-import-sort:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 13.0.0(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-sonarjs:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 4.0.3(eslint@10.7.0(jiti@2.7.0))
       eslint-plugin-unicorn:
-        specifier: catalog:lint
+        specifier: 'catalog:'
         version: 64.0.0(eslint@10.7.0(jiti@2.7.0))
 
   packages/rslint-wasm:
@@ -494,32 +487,32 @@ importers:
         version: link:../rslint
     devDependencies:
       '@microsoft/api-extractor':
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 7.58.12(@types/node@26.1.1)
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
       '@wasmer/wasmfs':
-        specifier: catalog:wasm
+        specifier: 'catalog:'
         version: 0.12.0
       buffer:
-        specifier: catalog:wasm
+        specifier: 'catalog:'
         version: 6.0.3
       cross-env:
-        specifier: catalog:wasm
+        specifier: 'catalog:'
         version: 10.1.0
       esbuild:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 0.28.1
       esbuild-plugin-polyfill-node:
-        specifier: catalog:wasm
+        specifier: 'catalog:'
         version: 0.3.0(esbuild@0.28.1)
       memfs:
-        specifier: catalog:wasm
+        specifier: 'catalog:'
         version: 4.64.0(tslib@2.8.1)
       prebundle:
-        specifier: catalog:wasm
-        version: 1.6.5(typescript@6.0.3)
+        specifier: 'catalog:'
+        version: 1.6.5(typescript@5.9.3)
 
   packages/rule-tester:
     dependencies:
@@ -528,13 +521,13 @@ importers:
         version: link:../rslint
     devDependencies:
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
       typescript:
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/tsgo:
@@ -566,116 +559,116 @@ importers:
         specifier: workspace:*
         version: link:../rslint
       '@types/mocha':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 10.0.10
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@types/vscode':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 1.125.0
       '@typescript/native-preview':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
       '@vscode/test-cli':
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 0.0.15
       '@vscode/test-electron':
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 2.5.2
       '@vscode/vsce':
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 3.9.2
       esbuild:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 0.28.1
       fast-glob:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 3.3.3
       mocha:
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 10.8.2
       ovsx:
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 0.10.12
       rimraf:
-        specifier: catalog:build
+        specifier: 'catalog:'
         version: 6.1.3
       typescript:
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 5.9.3
       vscode-languageclient:
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 9.0.1
       vscode-languageserver:
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 9.0.1
       vscode-languageserver-textdocument:
-        specifier: catalog:vscode
+        specifier: 'catalog:'
         version: 1.0.12
 
   tests/bench-cli:
     devDependencies:
       '@codspeed/tinybench-plugin':
-        specifier: catalog:test
+        specifier: 'catalog:'
         version: 5.7.1(tinybench@6.1.1)
       '@rslint/core':
         specifier: workspace:*
         version: link:../../packages/rslint
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       tinybench:
-        specifier: catalog:test
+        specifier: 'catalog:'
         version: 6.1.1
 
   website:
     dependencies:
       '@radix-ui/react-label':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.1.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-select':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.3.5(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-slot':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.3.1(@types/react@19.2.17)(react@19.2.8)
       '@radix-ui/react-toggle':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.1.16(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-toggle-group':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.1.17(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       class-variance-authority:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 0.7.1
       clsx:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.1.1
       dagre:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 0.8.5
       input-otp:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.4.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       lucide-react:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 0.577.0(react@19.2.8)
       swr:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.4.2(react@19.2.8)
       tailwind-merge:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 3.6.0
       tw-animate-css:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.4.0
     devDependencies:
       '@rsbuild/plugin-node-polyfill':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.4.6(@rsbuild/core@2.1.7(core-js@3.47.0))
       '@rsbuild/plugin-sass':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.5.3(@rsbuild/core@2.1.7(core-js@3.47.0))
       '@rslint/api':
         specifier: workspace:*
@@ -687,52 +680,52 @@ importers:
         specifier: workspace:*
         version: link:../packages/rslint-wasm
       '@rspress/core':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.0.18(@rspack/core@2.1.5(@swc/helpers@0.5.23))(@types/mdast@4.0.4)(@types/react@19.2.17)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2)
       '@rspress/plugin-sitemap':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 2.0.18(@rspress/core@2.0.18(@rspack/core@2.1.5(@swc/helpers@0.5.23))(@types/mdast@4.0.4)(@types/react@19.2.17)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))
       '@rstack-dev/doc-ui':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.14.7(@rspress/core@2.0.18(@rspack/core@2.1.5(@swc/helpers@0.5.23))(@types/mdast@4.0.4)(@types/react@19.2.17)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))
       '@tailwindcss/postcss':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 4.3.3
       '@types/dagre':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 0.7.54
       '@types/node':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 26.1.1
       '@types/react':
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 19.2.17
       '@types/react-dom':
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.17)
       monaco-editor:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 0.56.0
       react:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 19.2.8
       react-dom:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
       rsbuild-plugin-google-analytics:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.0.6(@rsbuild/core@2.1.7(core-js@3.47.0))
       rsbuild-plugin-open-graph:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.1.3(@rsbuild/core@2.1.7(core-js@3.47.0))
       rspress-plugin-font-open-sans:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 1.0.4(@rspress/core@2.0.18(@rspack/core@2.1.5(@swc/helpers@0.5.23))(@types/mdast@4.0.4)(@types/react@19.2.17)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))
       tailwindcss:
-        specifier: catalog:website
+        specifier: 'catalog:'
         version: 4.3.3
       typescript:
-        specifier: catalog:types
+        specifier: 'catalog:'
         version: 5.9.3
 
 packages:
@@ -8523,24 +8516,24 @@ snapshots:
 
   '@types/vscode@1.125.0': {}
 
-  '@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3)':
+  '@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.65.0
       '@typescript-eslint/types': 8.65.0
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.7.0(jiti@2.7.0)
-      typescript: 6.0.3
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/project-service@8.65.0(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
-      typescript: 6.0.3
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -8549,24 +8542,24 @@ snapshots:
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
 
-  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@5.9.3)':
     dependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
 
   '@typescript-eslint/types@8.65.0': {}
 
-  '@typescript-eslint/typescript-estree@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/typescript-estree@8.65.0(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.65.0(typescript@6.0.3)
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/project-service': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.5
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
+      ts-api-utils: 2.5.0(typescript@5.9.3)
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -9492,12 +9485,12 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.7.0(jiti@2.7.0)):
+  eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.7.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.7.0(jiti@2.7.0)
       globals: 17.7.0
     optionalDependencies:
-      '@typescript-eslint/parser': 8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3)
 
   eslint-plugin-es-x@9.7.0(eslint@10.7.0(jiti@2.7.0)):
     dependencies:
@@ -10518,7 +10511,7 @@ snapshots:
 
   md5.js@1.3.5:
     dependencies:
-      hash-base: 3.0.5
+      hash-base: 3.1.2
       inherits: 2.0.4
       safe-buffer: 5.2.1
 
@@ -11391,13 +11384,13 @@ snapshots:
       tunnel-agent: 0.6.0
     optional: true
 
-  prebundle@1.6.5(typescript@6.0.3):
+  prebundle@1.6.5(typescript@5.9.3):
     dependencies:
       '@vercel/ncc': 0.38.4
       cac: 7.0.0
       prettier: 3.9.6
       rollup: 4.62.2
-      rollup-plugin-dts: 6.4.1(rollup@4.62.2)(typescript@6.0.3)
+      rollup-plugin-dts: 6.4.1(rollup@4.62.2)(typescript@5.9.3)
       terser: 5.49.0
     transitivePeerDependencies:
       - typescript
@@ -11749,14 +11742,14 @@ snapshots:
       hash-base: 3.1.2
       inherits: 2.0.4
 
-  rollup-plugin-dts@6.4.1(rollup@4.62.2)(typescript@6.0.3):
+  rollup-plugin-dts@6.4.1(rollup@4.62.2)(typescript@5.9.3):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
       convert-source-map: 2.0.0
       magic-string: 0.30.21
       rollup: 4.62.2
-      typescript: 6.0.3
+      typescript: 5.9.3
     optionalDependencies:
       '@babel/code-frame': 7.29.7
 
@@ -12306,6 +12299,10 @@ snapshots:
   trim-lines@3.0.1: {}
 
   trough@2.2.0: {}
+
+  ts-api-utils@2.5.0(typescript@5.9.3):
+    dependencies:
+      typescript: 5.9.3
 
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:

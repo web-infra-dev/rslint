@@ -21,6 +21,6 @@
     "build:debug": "napi build --platform --no-js && node ../../scripts/place-host-build.mjs node"
   },
   "devDependencies": {
-    "@napi-rs/cli": "catalog:build"
+    "@napi-rs/cli": "catalog:"
   }
 }

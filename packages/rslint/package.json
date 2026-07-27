@@ -59,24 +59,24 @@
     "go"
   ],
   "devDependencies": {
-    "@eslint/plugin-kit": "catalog:lint",
-    "@rslib/core": "catalog:build",
+    "@eslint/plugin-kit": "catalog:",
+    "@rslib/core": "catalog:",
     "@rslint/api": "workspace:*",
-    "@types/node": "catalog:types",
-    "@types/picomatch": "catalog:build",
-    "@typescript-eslint/scope-manager": "catalog:lint",
-    "@typescript-eslint/visitor-keys": "catalog:lint",
-    "@typescript/native-preview": "catalog:types",
-    "eslint-scope": "catalog:lint",
-    "eslint-visitor-keys": "catalog:lint",
-    "espree": "catalog:lint",
-    "esquery": "catalog:lint",
-    "globals": "catalog:lint",
-    "tinyglobby": "catalog:build",
-    "typescript": "catalog:types"
+    "@types/node": "catalog:",
+    "@types/picomatch": "catalog:",
+    "@typescript-eslint/scope-manager": "catalog:",
+    "@typescript-eslint/visitor-keys": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "eslint-scope": "catalog:",
+    "eslint-visitor-keys": "catalog:",
+    "espree": "catalog:",
+    "esquery": "catalog:",
+    "globals": "catalog:",
+    "tinyglobby": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
-    "jiti": "catalog:build"
+    "jiti": "catalog:"
   },
   "peerDependenciesMeta": {
     "jiti": {
@@ -94,6 +94,6 @@
     "@rslint/native-win32-x64-msvc": "workspace:*"
   },
   "dependencies": {
-    "picomatch": "catalog:build"
+    "picomatch": "catalog:"
   }
 }

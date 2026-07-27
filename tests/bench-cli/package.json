@@ -10,9 +10,9 @@
     "bench": "pnpm run bench:cli"
   },
   "devDependencies": {
-    "@codspeed/tinybench-plugin": "catalog:test",
+    "@codspeed/tinybench-plugin": "catalog:",
     "@rslint/core": "workspace:*",
-    "@types/node": "catalog:types",
-    "tinybench": "catalog:test"
+    "@types/node": "catalog:",
+    "tinybench": "catalog:"
   }
 }
