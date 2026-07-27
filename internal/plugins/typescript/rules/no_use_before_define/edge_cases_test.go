@@ -259,6 +259,13 @@ declare global {
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
 				},
 			},
+			// ----- Field initializer before constructor parameter property assignment -----
+			{
+				Code: `class C { field = this.value; constructor(private value: number) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 24},
+				},
+			},
 
 			// ----- Static block referencing variable declared after -----
 			{
