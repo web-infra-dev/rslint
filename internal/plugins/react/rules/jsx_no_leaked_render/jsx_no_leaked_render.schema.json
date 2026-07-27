@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignoreAttributes": {
+          "type": "boolean",
+          "default": false
+        },
+        "validStrategies": {
+          "type": "array",
+          "items": {
+            "enum": ["ternary", "coerce"]
+          },
+          "uniqueItems": true,
+          "default": ["ternary", "coerce"]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

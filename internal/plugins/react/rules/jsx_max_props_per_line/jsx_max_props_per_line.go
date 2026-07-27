@@ -1,6 +1,7 @@
 package jsx_max_props_per_line
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -11,11 +12,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_max_props_per_line.schema.json
+var schemaJSON []byte
+
 // JsxMaxPropsPerLineRule limits the maximum number of props on a single line in JSX.
 var JsxMaxPropsPerLineRule = rule.Rule{
-	Name: "react/jsx-max-props-per-line",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-max-props-per-line",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Defaults
 		singleLimit := 0 // 0 means "not explicitly set"
 		multiLimit := 0
@@ -24,8 +28,8 @@ var JsxMaxPropsPerLineRule = rule.Rule{
 		maximumIsObject := false
 
 		// Parse options
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			if w, ok := optsMap["when"].(string); ok {
 				when = w
 			}

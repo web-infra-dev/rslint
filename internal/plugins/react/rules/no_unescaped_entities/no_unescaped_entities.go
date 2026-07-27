@@ -1,14 +1,17 @@
 package no_unescaped_entities
 
 import (
+	_ "embed"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unescaped_entities.schema.json
+var schemaJSON []byte
 
 type entity struct {
 	// char is the original entity character for use in error messages.
@@ -60,11 +63,11 @@ func newEntity(char string, alts []string) entity {
 // (or malformed) defaults are used; when it is explicitly provided — even
 // as an empty array — the caller's list is respected verbatim, matching
 // ESLint's `configuration.forbid || DEFAULTS` semantics.
-func parseEntities(options any) []entity {
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+func parseEntities(options []any) []entity {
+	if len(options) == 0 {
 		return defaultEntities
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	rawForbid, ok := optsMap["forbid"]
 	if !ok {
 		return defaultEntities
@@ -96,9 +99,9 @@ func parseEntities(options any) []entity {
 }
 
 var NoUnescapedEntitiesRule = rule.Rule{
-	Name: "react/no-unescaped-entities",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-unescaped-entities",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		entities := parseEntities(options)
 		if len(entities) == 0 {
 			return rule.RuleListeners{}

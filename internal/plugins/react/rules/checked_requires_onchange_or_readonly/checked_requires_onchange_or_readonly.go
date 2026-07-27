@@ -1,11 +1,15 @@
 package checked_requires_onchange_or_readonly
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed checked_requires_onchange_or_readonly.schema.json
+var schemaJSON []byte
 
 const (
 	msgMissingProperty           = "`checked` should be used with either `onChange` or `readOnly`."
@@ -29,12 +33,12 @@ type options struct {
 	ignoreExclusiveCheckedAttribute bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(opts []any) options {
 	o := options{}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(opts) == 0 {
 		return o
 	}
+	optsMap, _ := opts[0].(map[string]interface{})
 	if v, ok := optsMap["ignoreMissingProperties"].(bool); ok {
 		o.ignoreMissingProperties = v
 	}
@@ -45,10 +49,10 @@ func parseOptions(opts any) options {
 }
 
 var CheckedRequiresOnchangeOrReadonlyRule = rule.Rule{
-	Name: "react/checked-requires-onchange-or-readonly",
-	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.LegacyUnwrapOptions(_opts)
-		o := parseOptions(opts)
+	Name:   "react/checked-requires-onchange-or-readonly",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		o := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 
 		// checkAndReport mirrors upstream's `checkAttributesAndReport`: report

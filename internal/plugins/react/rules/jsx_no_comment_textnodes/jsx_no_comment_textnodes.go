@@ -73,7 +73,8 @@ func isJsWhitespace(r rune) bool {
 }
 
 var JsxNoCommentTextnodesRule = rule.Rule{
-	Name: "react/jsx-no-comment-textnodes",
+	Name:   "react/jsx-no-comment-textnodes",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			// In tsgo, comment-like source (e.g. `<div>// foo</div>`) is parsed

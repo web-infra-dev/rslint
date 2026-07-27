@@ -1,0 +1,35 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "enum": ["tab", "first"]
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "indentMode": {
+              "anyOf": [
+                {
+                  "enum": ["tab", "first"]
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "ignoreTernaryOperator": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "props": {
+              "enum": ["always", "never", "ignore"]
+            },
+            "children": {
+              "enum": ["always", "never", "ignore"]
+            },
+            "propElementValues": {
+              "enum": ["always", "never", "ignore"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "enum": ["always", "never", "ignore"]
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

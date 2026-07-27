@@ -39,7 +39,8 @@ func isPropertyOwnedSFC(component *ast.Node) bool {
 }
 
 var NoThisInSfcRule = rule.Rule{
-	Name: "react/no-this-in-sfc",
+	Name:   "react/no-this-in-sfc",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)

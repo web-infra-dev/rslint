@@ -1,6 +1,7 @@
 package jsx_max_depth
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_max_depth.schema.json
+var schemaJSON []byte
 
 // Bound on the identifier-resolution chain length. Upstream uses ESLint's
 // `containDuplicates` check on the scope reference list; we approximate it
@@ -26,12 +29,12 @@ type options struct {
 	max int
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{max: defaultMaxDepth}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if v, ok := m["max"]; ok {
 		// JS-config / CLI numbers come through as float64 (json.Unmarshal default);
 		// Go-test maps may pass int / int64 directly. Reject negatives — upstream's
@@ -1007,10 +1010,10 @@ func checkDescendant(ctx rule.RuleContext, baseDepth, maxDepth int, children []*
 }
 
 var JsxMaxDepthRule = rule.Rule{
-	Name: "react/jsx-max-depth",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-max-depth",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		handleJSX := func(node *ast.Node) {
 			// Only the OUTERMOST leaf in a leaf chain reports here; non-leaf

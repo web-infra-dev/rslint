@@ -1,14 +1,17 @@
 package forbid_component_props
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed forbid_component_props.schema.json
+var schemaJSON []byte
 
 const msgPropIsForbidden = `Prop "{{prop}}" is forbidden on Components`
 
@@ -31,11 +34,12 @@ type forbidConfig struct {
 	ordered []*forbidEntry
 }
 
-func parseOptions(options any) *forbidConfig {
+func parseOptions(options []any) *forbidConfig {
 	cfg := &forbidConfig{byKey: map[string]*forbidEntry{}}
 
 	var forbidList []interface{}
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
 		if raw, ok := optsMap["forbid"].([]interface{}); ok {
 			forbidList = raw
 		}
@@ -283,9 +287,9 @@ func getTagShape(tagName *ast.Node) (tagShape, bool) {
 }
 
 var ForbidComponentPropsRule = rule.Rule{
-	Name: "react/forbid-component-props",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/forbid-component-props",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {

@@ -1,0 +1,44 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "maximum": {
+              "type": "object",
+              "properties": {
+                "single": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "multi": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "maximum": {
+              "type": "number",
+              "minimum": 1
+            },
+            "when": {
+              "type": "string",
+              "enum": ["always", "multiline"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

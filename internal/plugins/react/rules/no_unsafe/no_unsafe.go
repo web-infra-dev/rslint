@@ -1,11 +1,15 @@
 package no_unsafe
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unsafe.schema.json
+var schemaJSON []byte
 
 // unsafeMeta mirrors upstream's per-method record: the new method to suggest
 // in the message body, plus a `details` tail (always the React async-rendering
@@ -65,13 +69,12 @@ func memberKeyName(node *ast.Node) string {
 
 // parseOptions extracts `checkAliases` from the rule's options. Upstream
 // reads `context.options[0] || {}` and falls back to `false` when the key is
-// missing or non-boolean. The CLI-vs-test option-shape unification is
-// delegated to `utils.GetOptionsMap` (see PORT_RULE.md "Handling Options").
-func parseOptions(options any) bool {
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+// missing or non-boolean.
+func parseOptions(options []any) bool {
+	if len(options) == 0 {
 		return false
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	v, ok := optsMap["checkAliases"].(bool)
 	if !ok {
 		return false
@@ -80,9 +83,9 @@ func parseOptions(options any) bool {
 }
 
 var NoUnsafeRule = rule.Rule{
-	Name: "react/no-unsafe",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-unsafe",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// `testReactVersion(context, '>= 16.3.0')` — at React < 16.3 the
 		// `UNSAFE_` lifecycle aliases didn't exist, so the rule disables
 		// itself entirely. Default version (no `settings.react.version`)

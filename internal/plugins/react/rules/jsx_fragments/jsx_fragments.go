@@ -1,11 +1,16 @@
 package jsx_fragments
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_fragments.schema.json
+var schemaJSON []byte
 
 const (
 	modeSyntax  = "syntax"
@@ -13,10 +18,10 @@ const (
 )
 
 var JsxFragmentsRule = rule.Rule{
-	Name: "react/jsx-fragments",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		mode := parseMode(rawOptions)
+	Name:   "react/jsx-fragments",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		mode := parseMode(options)
 		reactPragma := reactutil.GetReactPragma(ctx.Settings)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)
 		openFragLong := "<" + reactPragma + "." + fragmentPragma + ">"
@@ -102,8 +107,7 @@ var JsxFragmentsRule = rule.Rule{
 	},
 }
 
-func parseMode(raw any) string {
-	options := rule.NormalizeOptions(raw)
+func parseMode(options []any) string {
 	if len(options) == 0 {
 		return modeSyntax
 	}

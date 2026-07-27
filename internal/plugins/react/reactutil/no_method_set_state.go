@@ -1,11 +1,15 @@
 package reactutil
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_method_set_state.schema.json
+var schemaJSON []byte
 
 // NoMethodSetStateConfig configures the rule produced by [MakeNoMethodSetStateRule].
 //
@@ -52,8 +56,10 @@ type NoMethodSetStateConfig struct {
 func MakeNoMethodSetStateRule(cfg NoMethodSetStateConfig) rule.Rule {
 	return rule.Rule{
 		Name: cfg.RuleName,
-		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.LegacyUnwrapOptions(_options)
+		// All three rules the factory produces take the same single option,
+		// so they share one schema rather than each embedding a copy.
+		Schema: rule.NewSchema(schemaJSON),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			if cfg.ShouldBeNoop != nil && cfg.ShouldBeNoop(ctx.Settings) {
 				return rule.RuleListeners{}
 			}
@@ -185,20 +191,13 @@ func EsTreeName(nameNode *ast.Node) string {
 }
 
 // parseDisallowInFunc recognizes the rule's single string option,
-// `"disallow-in-func"`, in both the bare and array-wrapped shapes the
-// rule_tester / config layers may produce.
-func parseDisallowInFunc(options any) bool {
-	switch v := options.(type) {
-	case string:
-		return v == "disallow-in-func"
-	case []interface{}:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok {
-				return s == "disallow-in-func"
-			}
-		}
+// `"disallow-in-func"`.
+func parseDisallowInFunc(options []any) bool {
+	if len(options) == 0 {
+		return false
 	}
-	return false
+	s, _ := options[0].(string)
+	return s == "disallow-in-func"
 }
 
 // MethodNoopAtReactVersion returns a [NoMethodSetStateConfig.ShouldBeNoop]

@@ -9,7 +9,8 @@ import (
 // JsxPropsNoSpreadMultiRule disallows spreading the same identifier multiple
 // times in one JSX opening element.
 var JsxPropsNoSpreadMultiRule = rule.Rule{
-	Name: "react/jsx-props-no-spread-multi",
+	Name:   "react/jsx-props-no-spread-multi",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)

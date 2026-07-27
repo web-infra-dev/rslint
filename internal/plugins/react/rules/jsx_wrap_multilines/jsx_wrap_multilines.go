@@ -1,6 +1,8 @@
 package jsx_wrap_multilines
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -8,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_wrap_multilines.schema.json
+var schemaJSON []byte
 
 // Default option values for each context.
 var defaultOptions = map[string]string{
@@ -22,17 +27,17 @@ var defaultOptions = map[string]string{
 
 // JsxWrapMultilinesRule enforces parentheses around multiline JSX.
 var JsxWrapMultilinesRule = rule.Rule{
-	Name: "react/jsx-wrap-multilines",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-wrap-multilines",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Build effective options from defaults
 		opts := make(map[string]string)
 		for k, v := range defaultOptions {
 			opts[k] = v
 		}
 
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			for key := range defaultOptions {
 				if val, ok := optsMap[key]; ok {
 					switch v := val.(type) {

@@ -1,6 +1,7 @@
 package jsx_no_target_blank
 
 import (
+	_ "embed"
 	"regexp"
 	"slices"
 	"strings"
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_target_blank.schema.json
+var schemaJSON []byte
 
 const (
 	msgNoreferrer = `Using target="_blank" without rel="noreferrer" (which implies rel="noopener") is a security risk in older browsers: see https://mathiasbynens.github.io/rel-noopener/#recommendations`
@@ -28,7 +31,7 @@ type options struct {
 	forms                  bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{
 		allowReferrer:          false,
 		enforceDynamicLinks:    "always",
@@ -36,10 +39,10 @@ func parseOptions(raw any) options {
 		links:                  true,
 		forms:                  false,
 	}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	if v, ok := m["allowReferrer"].(bool); ok {
 		opts.allowReferrer = v
 	}
@@ -413,10 +416,10 @@ func reportWithOptionalFix(ctx rule.RuleContext, node *ast.Node, messageId, desc
 }
 
 var JsxNoTargetBlankRule = rule.Rule{
-	Name: "react/jsx-no-target-blank",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-no-target-blank",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		linkComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "linkComponents", "linkAttribute", "href", reactutil.DefaultLinkComponents())
 		formComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "formComponents", "formAttribute", "action", reactutil.DefaultFormComponents())
 

@@ -1893,3 +1893,16 @@ func TestForbidDomPropsOptionParsing(t *testing.T) {
 		},
 	})
 }
+
+// TestForbidDomPropsSchema locks in `disallowedValues`, which this rule
+// implements (see forbid-dom-props.md) but upstream's `meta.schema` does not
+// declare — so a config using it would otherwise be undocumented by the
+// schema and, once options types are generated from it, untyped.
+func TestForbidDomPropsSchema(t *testing.T) {
+	valid := []any{map[string]any{"forbid": []any{
+		map[string]any{"propName": "id", "disallowedValues": []any{"foo"}, "message": "no foo ids"},
+	}}}
+	if err := ForbidDomPropsRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected disallowedValues to pass schema validation, got: %v", err)
+	}
+}

@@ -1,6 +1,7 @@
 package prefer_stateless_function
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -11,15 +12,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed prefer_stateless_function.schema.json
+var schemaJSON []byte
+
 // Options carries the user-supplied options for this rule.
 type Options struct {
 	IgnorePureComponents bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
 		if v, ok := optsMap["ignorePureComponents"].(bool); ok {
 			opts.IgnorePureComponents = v
 		}
@@ -960,9 +964,9 @@ func analyzeES5Object(obj *ast.Node, flags *componentFlags, pragma, createClass 
 }
 
 var PreferStatelessFunctionRule = rule.Rule{
-	Name: "react/prefer-stateless-function",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/prefer-stateless-function",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

@@ -902,7 +902,8 @@ func processElementAccess(ci *classInfo, node *ast.Node) {
 }
 
 var NoUnusedStateRule = rule.Rule{
-	Name: "react/no-unused-state",
+	Name:   "react/no-unused-state",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

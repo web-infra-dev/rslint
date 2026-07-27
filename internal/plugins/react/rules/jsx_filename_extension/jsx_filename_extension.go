@@ -1,6 +1,7 @@
 package jsx_filename_extension
 
 import (
+	_ "embed"
 	"fmt"
 	"path"
 	"strings"
@@ -8,23 +9,25 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_filename_extension.schema.json
+var schemaJSON []byte
 
 // JsxFilenameExtensionRule restricts file extensions that may contain JSX.
 var JsxFilenameExtensionRule = rule.Rule{
-	Name: "react/jsx-filename-extension",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-filename-extension",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Default options
 		extensions := []string{".jsx"}
 		allow := "always"
 
 		// Parse options
-		optsMap := utils.GetOptionsMap(options)
 		ignoreFilesWithoutCode := false
 
-		if optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			if exts, ok := optsMap["extensions"]; ok {
 				if extArr, ok := exts.([]interface{}); ok {
 					extensions = nil

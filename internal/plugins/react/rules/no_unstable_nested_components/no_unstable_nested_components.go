@@ -1,13 +1,17 @@
 package no_unstable_nested_components
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unstable_nested_components.schema.json
+var schemaJSON []byte
 
 // Message text mirrors eslint-plugin-react v7.37.x byte-for-byte, including
 // the typographic apostrophe (U+2019) in "subtree's" and the typographic
@@ -45,12 +49,12 @@ type options struct {
 	propNamePattern string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{propNamePattern: "render*"}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	optsMap, _ := raw[0].(map[string]interface{})
 	if v, ok := optsMap["allowAsProps"].(bool); ok {
 		opts.allowAsProps = v
 	}
@@ -508,10 +512,10 @@ func generateErrorMessageWithParentName(parentName string) string {
 }
 
 var NoUnstableNestedComponentsRule = rule.Rule{
-	Name: "react/no-unstable-nested-components",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/no-unstable-nested-components",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		// componentEnv bundles every per-invocation derivative the helpers
 		// below need. Building it once at rule entry avoids both repeated
 		// `ctx.Settings` lookups and the risk of helpers drifting on

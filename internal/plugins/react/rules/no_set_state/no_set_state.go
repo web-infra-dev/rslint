@@ -25,7 +25,8 @@ import (
 //     enclosing-walk we do here — no later observation can flip a
 //     component into "not a component", so there's no need to defer.
 var NoSetStateRule = rule.Rule{
-	Name: "react/no-set-state",
+	Name:   "react/no-set-state",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

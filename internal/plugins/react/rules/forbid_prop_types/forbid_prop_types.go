@@ -1,6 +1,7 @@
 package forbid_prop_types
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed forbid_prop_types.schema.json
+var schemaJSON []byte
 
 const msgForbiddenPropType = `Prop type "{{target}}" is forbidden`
 
@@ -28,12 +32,12 @@ type ruleOptions struct {
 //   - non-string entries inside `forbid` are silently dropped, matching
 //     upstream's `forbid.indexOf(type) >= 0` membership check (which can't
 //     match anything but strings anyway)
-func parseOptions(input any) ruleOptions {
+func parseOptions(input []any) ruleOptions {
 	opts := ruleOptions{forbid: defaultForbid}
-	optsMap := utils.GetOptionsMap(input)
-	if optsMap == nil {
+	if len(input) == 0 {
 		return opts
 	}
+	optsMap, _ := input[0].(map[string]interface{})
 	if raw, ok := optsMap["forbid"].([]interface{}); ok {
 		list := make([]string, 0, len(raw))
 		for _, x := range raw {
@@ -68,9 +72,9 @@ func getPropertyAccessName(node *ast.Node) string {
 }
 
 var ForbidPropTypesRule = rule.Rule{
-	Name: "react/forbid-prop-types",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/forbid-prop-types",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		propWrappers := reactutil.GetPropWrapperFunctions(ctx.Settings)
 

@@ -1793,3 +1793,24 @@ export const WithAttributesAndChildren = ({}) => (
 		},
 	})
 }
+
+// TestJsxNoLiteralsSchema locks in the two options this rule implements (see
+// jsx-no-literals.md) that upstream's `meta.schema` does not declare:
+// `restrictedAttributes`, and `allowElement` inside `elementOverrides`. The
+// options object is closed with `additionalProperties: false`, so copying
+// upstream's schema verbatim would make `restrictedAttributes` a config error.
+func TestJsxNoLiteralsSchema(t *testing.T) {
+	valid := []any{map[string]any{
+		"restrictedAttributes": []any{"className"},
+		"elementOverrides": map[string]any{
+			"Trans": map[string]any{"allowElement": true, "restrictedAttributes": []any{"title"}},
+		},
+	}}
+	if err := JsxNoLiteralsRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected rslint's own options to pass schema validation, got: %v", err)
+	}
+	invalid := []any{map[string]any{"restrictedAttribute": []any{"className"}}}
+	if err := JsxNoLiteralsRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an unknown option name to fail schema validation")
+	}
+}

@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "enum": ["tab"]
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "checkAttributes": {
+          "type": "boolean"
+        },
+        "indentLogicalExpressions": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

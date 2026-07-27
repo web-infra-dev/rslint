@@ -1,20 +1,24 @@
 package jsx_no_duplicate_props
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_no_duplicate_props.schema.json
+var schemaJSON []byte
+
 var JsxNoDuplicatePropsRule = rule.Rule{
-	Name: "react/jsx-no-duplicate-props",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-no-duplicate-props",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		ignoreCase := false
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			if v, ok := optsMap["ignoreCase"].(bool); ok {
 				ignoreCase = v
 			}

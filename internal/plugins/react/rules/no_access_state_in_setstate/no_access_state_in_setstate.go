@@ -300,7 +300,8 @@ func findEnclosingClassMethod(node *ast.Node) *ast.Node {
 }
 
 var NoAccessStateInSetstateRule = rule.Rule{
-	Name: "react/no-access-state-in-setstate",
+	Name:   "react/no-access-state-in-setstate",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

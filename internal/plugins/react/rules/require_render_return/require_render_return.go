@@ -181,7 +181,8 @@ func renderReturns(fn *ast.Node) bool {
 }
 
 var RequireRenderReturnRule = rule.Rule{
-	Name: "react/require-render-return",
+	Name:   "react/require-render-return",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

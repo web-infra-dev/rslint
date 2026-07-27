@@ -1,10 +1,15 @@
 package forbid_foreign_prop_types
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed forbid_foreign_prop_types.schema.json
+var schemaJSON []byte
 
 const msgForbiddenPropType = "Using propTypes from another component is not safe because they may be removed in production builds"
 
@@ -14,12 +19,12 @@ type ruleOptions struct {
 
 // parseOptions reads `allowInPropTypes` (boolean) from the rule options.
 // Mirrors upstream's defaults — missing option / non-bool falls back to false.
-func parseOptions(input any) ruleOptions {
+func parseOptions(input []any) ruleOptions {
 	opts := ruleOptions{}
-	m := utils.GetOptionsMap(input)
-	if m == nil {
+	if len(input) == 0 {
 		return opts
 	}
+	m, _ := input[0].(map[string]interface{})
 	if v, ok := m["allowInPropTypes"].(bool); ok {
 		opts.allowInPropTypes = v
 	}
@@ -177,9 +182,9 @@ func findPropTypesKey(elements []*ast.Node) *ast.Node {
 }
 
 var ForbidForeignPropTypesRule = rule.Rule{
-	Name: "react/forbid-foreign-prop-types",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/forbid-foreign-prop-types",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		msg := rule.RuleMessage{
 			Id:          "forbiddenPropType",

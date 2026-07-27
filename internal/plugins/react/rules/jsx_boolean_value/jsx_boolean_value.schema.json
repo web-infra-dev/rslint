@@ -1,0 +1,65 @@
+{
+  "anyOf": [
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": ["always", "never"]
+        }
+      ],
+      "additionalItems": false
+    },
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": ["always"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "never": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "assumeUndefinedIsFalse": {
+              "type": "boolean"
+            }
+          }
+        }
+      ],
+      "additionalItems": false
+    },
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": ["never"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "always": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "assumeUndefinedIsFalse": {
+              "type": "boolean"
+            }
+          }
+        }
+      ],
+      "additionalItems": false
+    }
+  ]
+}

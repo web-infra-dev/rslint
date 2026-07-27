@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "customValidators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowAsProps": {
+          "type": "boolean"
+        },
+        "propNamePattern": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

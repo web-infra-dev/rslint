@@ -1,0 +1,18 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "ignoreMissingProperties": {
+          "type": "boolean"
+        },
+        "ignoreExclusiveCheckedAttribute": {
+          "type": "boolean"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

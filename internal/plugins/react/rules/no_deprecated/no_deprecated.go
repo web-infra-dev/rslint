@@ -240,7 +240,8 @@ func formatMessage(methodName string, d deprecationInfo) string {
 }
 
 var NoDeprecatedRule = rule.Rule{
-	Name: "react/no-deprecated",
+	Name:   "react/no-deprecated",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Determine pragma: `@jsx` directive in source wins over
 		// `settings.react.pragma`, matching upstream's `pragmaUtil.getFromContext`.

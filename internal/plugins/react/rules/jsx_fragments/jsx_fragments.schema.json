@@ -1,0 +1,10 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["syntax", "element"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

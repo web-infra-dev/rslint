@@ -1,12 +1,16 @@
 package require_optimization
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed require_optimization.schema.json
+var schemaJSON []byte
 
 // Options mirrors upstream's schema:
 //
@@ -24,12 +28,12 @@ type Options struct {
 	AllowDecorators []string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowDecorators"].([]interface{}); ok {
 		for _, name := range v {
 			if s, ok := name.(string); ok {
@@ -271,9 +275,9 @@ func methodNameIsSCU(node *ast.Node) bool {
 }
 
 var RequireOptimizationRule = rule.Rule{
-	Name: "react/require-optimization",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/require-optimization",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

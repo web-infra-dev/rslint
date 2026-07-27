@@ -2,6 +2,7 @@
 package jsx_no_literals
 
 import (
+	_ "embed"
 	"html"
 	"math"
 	"regexp"
@@ -12,6 +13,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_literals.schema.json
+var schemaJSON []byte
 
 // reOverridableElement mirrors upstream's `^[A-Z][\w.]*$` — overrides apply
 // only to user-component names (capitalized identifiers, optionally
@@ -60,7 +64,7 @@ func (c *ruleConfig) hasElementOverrides() bool {
 	return len(c.elementOverrides) > 0
 }
 
-func parseConfig(options any) ruleConfig {
+func parseConfig(options []any) ruleConfig {
 	cfg := ruleConfig{
 		base: elementConfig{
 			configType:           configTypeElement,
@@ -69,10 +73,10 @@ func parseConfig(options any) ruleConfig {
 		},
 		elementOverrides: map[string]*elementConfig{},
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return cfg
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	populateElementConfig(&cfg.base, optsMap)
 	rawOverrides, _ := optsMap["elementOverrides"].(map[string]interface{})
 	for elementName, raw := range rawOverrides {
@@ -699,9 +703,9 @@ func handleTemplate(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renam
 }
 
 var JsxNoLiteralsRule = rule.Rule{
-	Name: "react/jsx-no-literals",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-no-literals",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseConfig(options)
 		var renamedImports map[string]string
 		if cfg.hasElementOverrides() {

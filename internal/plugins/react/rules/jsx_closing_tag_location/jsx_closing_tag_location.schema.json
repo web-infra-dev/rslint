@@ -1,0 +1,23 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "enum": ["tag-aligned", "line-aligned"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "location": {
+              "enum": ["tag-aligned", "line-aligned"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

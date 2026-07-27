@@ -1,11 +1,16 @@
 package jsx_indent_props
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_indent_props.schema.json
+var schemaJSON []byte
 
 // JsxIndentPropsRule is the eslint-plugin-react variant of jsx-indent-props.
 var JsxIndentPropsRule = BuildRule("react/jsx-indent-props")
@@ -38,9 +43,9 @@ var JsxIndentPropsRule = BuildRule("react/jsx-indent-props")
 // set so the bump carries to the following props.
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
-		Name: name,
-		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.LegacyUnwrapOptions(_options)
+		Name:   name,
+		Schema: rule.NewSchema(schemaJSON),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			indentType, indentSize, indentChar, indentIsFirst, ignoreTernaryOperator := parseOptions(options)
 
 			text := ctx.SourceFile.Text()
@@ -191,25 +196,15 @@ func BuildRule(name string) rule.Rule {
 //     above, plus optional ignoreTernaryOperator boolean
 //
 // Default: 4-space indent, ignoreTernaryOperator off.
-func parseOptions(options any) (indentType string, indentSize int, indentChar byte, indentIsFirst bool, ignoreTernaryOperator bool) {
+func parseOptions(options []any) (indentType string, indentSize int, indentChar byte, indentIsFirst bool, ignoreTernaryOperator bool) {
 	indentType = "space"
 	indentSize = 4
 	indentChar = ' '
 
-	var first any
-	if options == nil {
+	if len(options) == 0 || options[0] == nil {
 		return indentType, indentSize, indentChar, indentIsFirst, ignoreTernaryOperator
 	}
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			first = arr[0]
-		}
-	} else {
-		first = options
-	}
-	if first == nil {
-		return indentType, indentSize, indentChar, indentIsFirst, ignoreTernaryOperator
-	}
+	first := options[0]
 
 	var indentMode any
 	if m, ok := first.(map[string]interface{}); ok {

@@ -1,0 +1,75 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "elementOverrides": {
+          "type": "object",
+          "patternProperties": {
+            "^[A-Z][\\w.]*$": {
+              "type": "object",
+              "properties": {
+                "applyToNestedElements": {
+                  "type": "boolean"
+                },
+                "allowElement": {
+                  "type": "boolean"
+                },
+                "noStrings": {
+                  "type": "boolean"
+                },
+                "allowedStrings": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ignoreProps": {
+                  "type": "boolean"
+                },
+                "noAttributeStrings": {
+                  "type": "boolean"
+                },
+                "restrictedAttributes": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "noStrings": {
+          "type": "boolean"
+        },
+        "allowedStrings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignoreProps": {
+          "type": "boolean"
+        },
+        "noAttributeStrings": {
+          "type": "boolean"
+        },
+        "restrictedAttributes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -1,0 +1,57 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "enum": [
+            "after-props",
+            "props-aligned",
+            "tag-aligned",
+            "line-aligned"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "location": {
+              "enum": [
+                "after-props",
+                "props-aligned",
+                "tag-aligned",
+                "line-aligned"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nonEmpty": {
+              "enum": [
+                "after-props",
+                "props-aligned",
+                "tag-aligned",
+                "line-aligned",
+                false
+              ]
+            },
+            "selfClosing": {
+              "enum": [
+                "after-props",
+                "props-aligned",
+                "tag-aligned",
+                "line-aligned",
+                false
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

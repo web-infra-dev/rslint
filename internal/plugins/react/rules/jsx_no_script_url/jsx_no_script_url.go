@@ -1,6 +1,7 @@
 package jsx_no_script_url
 
 import (
+	_ "embed"
 	"regexp"
 	"slices"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed jsx_no_script_url.schema.json
+var schemaJSON []byte
 
 // isJavaScriptProtocol matches the `javascript:` scheme with optional control
 // characters (\u0000-\u001F) and spaces before the scheme, and optional \r \n
@@ -21,9 +25,9 @@ const noScriptURLMessage = "A future version of React will block javascript: URL
 	"Use event handlers instead if you can. If you need to generate unsafe HTML, try using dangerouslySetInnerHTML instead."
 
 var JsxNoScriptUrlRule = rule.Rule{
-	Name: "react/jsx-no-script-url",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-no-script-url",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		config := parseConfig(options, ctx.Settings)
 
 		return rule.RuleListeners{
@@ -104,39 +108,29 @@ func shouldVerifyProp(node *ast.Node, config reactutil.ComponentMap) bool {
 
 // parseConfig builds the component→props map from rule options and settings.
 //
-// Options format (after config.go unwrapping):
-//   - nil → default {"a": ["href"]}
-//   - map{"includeFromSettings": true} → merge settings
-//   - [{name, props}, ...] → legacy custom components
+// Options format:
+//   - [] → default {"a": ["href"]}
+//   - [{includeFromSettings: true}] → merge settings
+//   - [[{name, props}, ...]] → legacy custom components
 //   - [[{name, props}, ...], {includeFromSettings: true}] → both
-func parseConfig(options any, settings map[string]interface{}) reactutil.ComponentMap {
+func parseConfig(options []any, settings map[string]interface{}) reactutil.ComponentMap {
 	var legacyOptions []interface{}
 	includeFromSettings := false
 
-	switch opts := options.(type) {
-	case nil:
-		// no options
-	case map[string]interface{}:
-		// Object option only: {includeFromSettings: true}
-		if v, ok := opts["includeFromSettings"].(bool); ok {
+	readIncludeFromSettings := func(raw any) {
+		objOpt, _ := raw.(map[string]interface{})
+		if v, ok := objOpt["includeFromSettings"].(bool); ok {
 			includeFromSettings = v
 		}
-	case []interface{}:
-		if len(opts) > 0 {
-			if inner, ok := opts[0].([]interface{}); ok {
-				// Shape: [[{name, props}, ...], {includeFromSettings}]
-				legacyOptions = inner
-				if len(opts) > 1 {
-					if objOpt, ok := opts[1].(map[string]interface{}); ok {
-						if v, ok := objOpt["includeFromSettings"].(bool); ok {
-							includeFromSettings = v
-						}
-					}
-				}
-			} else {
-				// Shape: [{name, props}, ...] — config.go unwrapped single-element
-				legacyOptions = opts
+	}
+	if len(options) > 0 {
+		if inner, ok := options[0].([]interface{}); ok {
+			legacyOptions = inner
+			if len(options) > 1 {
+				readIncludeFromSettings(options[1])
 			}
+		} else {
+			readIncludeFromSettings(options[0])
 		}
 	}
 

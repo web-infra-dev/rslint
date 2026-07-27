@@ -30,7 +30,8 @@ var voidElements = map[string]bool{
 }
 
 var VoidDomElementsNoChildrenRule = rule.Rule{
-	Name: "react/void-dom-elements-no-children",
+	Name:   "react/void-dom-elements-no-children",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

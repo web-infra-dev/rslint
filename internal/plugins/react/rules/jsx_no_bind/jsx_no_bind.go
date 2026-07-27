@@ -1,11 +1,15 @@
 package jsx_no_bind
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_bind.schema.json
+var schemaJSON []byte
 
 // Violation kinds correspond to ESLint messageIds. The `bindExpression` kind
 // (ES `::` proposal) is omitted because TypeScript does not parse it.
@@ -38,12 +42,12 @@ type options struct {
 	ignoreDOMComponents bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	optsMap, _ := raw[0].(map[string]interface{})
 	if v, ok := optsMap["allowArrowFunctions"].(bool); ok {
 		opts.allowArrowFunctions = v
 	}
@@ -76,10 +80,10 @@ func message(id string) rule.RuleMessage {
 }
 
 var JsxNoBindRule = rule.Rule{
-	Name: "react/jsx-no-bind",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-no-bind",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// blockVariableNameSets tracks, per enclosing Block (keyed by node
 		// position), the names of const-bound variables and local function

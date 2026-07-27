@@ -40,7 +40,8 @@ func isCreateElementCallee(callee *ast.Node) bool {
 const dangerWithChildrenMessage = "Only set one of `children` or `props.dangerouslySetInnerHTML`"
 
 var NoDangerWithChildrenRule = rule.Rule{
-	Name: "react/no-danger-with-children",
+	Name:   "react/no-danger-with-children",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// resolveObjectLiteralInit walks an Identifier back to its
 		// VariableDeclaration via the TypeChecker and returns the initializer

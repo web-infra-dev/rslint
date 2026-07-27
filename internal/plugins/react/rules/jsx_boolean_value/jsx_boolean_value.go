@@ -1,55 +1,53 @@
 package jsx_boolean_value
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_boolean_value.schema.json
+var schemaJSON []byte
+
 var JsxBooleanValueRule = rule.Rule{
-	Name: "react/jsx-boolean-value",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-boolean-value",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		mode := "never" // default mode
 		var exceptions map[string]bool
 		assumeUndefinedIsFalse := false
 
 		// Parse options: first element is mode string, second is options object
-		if arr, ok := options.([]interface{}); ok {
-			if len(arr) > 0 {
-				if m, ok := arr[0].(string); ok {
-					mode = m
-				}
+		if len(options) > 0 {
+			if m, ok := options[0].(string); ok {
+				mode = m
 			}
-			if len(arr) > 1 {
-				if optsObj, ok := arr[1].(map[string]interface{}); ok {
-					// ESLint schema: when mode is "always", exceptions are in "never" key and vice versa
-					exKey := "always"
-					if mode == "always" {
-						exKey = "never"
-					}
-					if exList, ok := optsObj[exKey]; ok {
-						if exArr, ok := exList.([]interface{}); ok {
-							exceptions = make(map[string]bool)
-							for _, item := range exArr {
-								if name, ok := item.(string); ok {
-									exceptions[name] = true
-								}
+		}
+		if len(options) > 1 {
+			if optsObj, ok := options[1].(map[string]interface{}); ok {
+				// ESLint schema: when mode is "always", exceptions are in "never" key and vice versa
+				exKey := "always"
+				if mode == "always" {
+					exKey = "never"
+				}
+				if exList, ok := optsObj[exKey]; ok {
+					if exArr, ok := exList.([]interface{}); ok {
+						exceptions = make(map[string]bool)
+						for _, item := range exArr {
+							if name, ok := item.(string); ok {
+								exceptions[name] = true
 							}
 						}
 					}
-					if v, ok := optsObj["assumeUndefinedIsFalse"]; ok {
-						if b, ok := v.(bool); ok {
-							assumeUndefinedIsFalse = b
-						}
+				}
+				if v, ok := optsObj["assumeUndefinedIsFalse"]; ok {
+					if b, ok := v.(bool); ok {
+						assumeUndefinedIsFalse = b
 					}
 				}
-			}
-		} else {
-			// Also try single string option
-			if m, ok := options.(string); ok {
-				mode = m
 			}
 		}
 

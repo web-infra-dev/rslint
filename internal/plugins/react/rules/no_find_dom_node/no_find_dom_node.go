@@ -37,7 +37,8 @@ func matchesFindDOMNodeCallee(callee *ast.Node) bool {
 }
 
 var NoFindDomNodeRule = rule.Rule{
-	Name: "react/no-find-dom-node",
+	Name:   "react/no-find-dom-node",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
