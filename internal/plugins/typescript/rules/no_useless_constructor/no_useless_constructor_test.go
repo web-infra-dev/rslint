@@ -1,9 +1,15 @@
 package no_useless_constructor
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -168,6 +174,10 @@ class A {
 abstract class A {
   constructor();
 }`},
+		// tsgo parses these as constructors, but ESTree exposes methods whose
+		// kind is "method", so the upstream rule ignores them.
+		{Code: `class A { static constructor() {} }`},
+		{Code: `class A extends B { static constructor() {} }`},
 		// Overload + implementation with body
 		{Code: `
 class A {
@@ -475,16 +485,6 @@ class A extends B implements I {
 }`},
 
 		// ============================================================
-		// Rest with destructuring (not simple)
-		// ============================================================
-		{Code: `
-class A extends B {
-  constructor(...[x, y]) {
-    super(...arguments);
-  }
-}`},
-
-		// ============================================================
 		// new.target usage (useful body)
 		// ============================================================
 		{Code: `
@@ -645,7 +645,7 @@ class A {
   constructor() {}
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noUselessConstructor", Line: 3, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "noUselessConstructor", Line: 3, Column: 3, EndLine: 3, EndColumn: 14, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "removeConstructor", Output: "\nclass A {\n  \n}"},
 				}},
 			},
@@ -664,6 +664,40 @@ class A extends B {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noUselessConstructor", Line: 3, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "removeConstructor", Output: "\nclass A extends B {\n  \n}"},
+				}},
+			},
+		},
+		// ESTree erases grouping parentheses around expressions. tsgo keeps
+		// them, so they must not hide the same redundant-super shapes.
+		{
+			Code: `class A extends B { constructor() { (((super()))); } }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A extends B {  }"},
+				}},
+			},
+		},
+		{
+			Code: `class A extends B { constructor(value) { super((value)); } }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A extends B {  }"},
+				}},
+			},
+		},
+		{
+			Code: `class A extends B { constructor(...values) { super(...(values)); } }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A extends B {  }"},
+				}},
+			},
+		},
+		{
+			Code: `class A extends B { constructor() { super(...(arguments)); } }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A extends B {  }"},
 				}},
 			},
 		},
@@ -737,6 +771,21 @@ class A extends B {
 				}},
 			},
 		},
+		// ESTree treats every RestElement as simple. The binding pattern does
+		// not block a direct ...arguments pass-through.
+		{
+			Code: `
+class A extends B {
+  constructor(...[x, y]) {
+    super(...arguments);
+  }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 3, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A extends B {\n  \n}"},
+				}},
+			},
+		},
 		// Rest params matching forward
 		{
 			Code: `
@@ -748,6 +797,48 @@ class A extends B {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noUselessConstructor", Line: 3, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "removeConstructor", Output: "\nclass A extends B {\n  \n}"},
+				}},
+			},
+		},
+
+		// Removing a constructor must not let a preceding field initializer
+		// consume the next computed member through ASI.
+		{
+			Code: `
+class A {
+  field = 'value'
+  constructor() {}
+  [0]() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = 'value'\n  ;\n  [0]() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  field = 2
+  constructor() {}
+  *iterator() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = 2\n  ;\n  *iterator() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  method() {}
+  constructor() {}
+  [0]() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  method() {}\n  \n  [0]() {}\n}"},
 				}},
 			},
 		},
@@ -1181,5 +1272,190 @@ class A {
 				}},
 			},
 		},
+		{
+			Code: `class A { "\u0063` + `on` + `struct` + `or" /* before paren */ () {} }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 11, EndLine: 1, EndColumn: 29, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A {  }"},
+				}},
+			},
+		},
 	})
+}
+
+func TestNoUselessConstructorEditDemand(t *testing.T) {
+	t.Parallel()
+
+	const source = `class A {
+  /* keep */
+  public constructor() {}
+}
+class B extends A {
+  constructor(value: number) {
+    super(value);
+  }
+}
+class C {
+  field = 'value'
+  constructor() {}
+  [0]() {}
+}`
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		source,
+		"no-useless-constructor-edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     NoUselessConstructorRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return NoUselessConstructorRule.Run(ctx, nil)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 3 {
+			t.Fatalf("demand %d: diagnostics = %d, want 3", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnostics := map[rule.EditDemand][]rule.RuleDiagnostic{
+		rule.EditDemandNone:       run(rule.EditDemandNone),
+		rule.EditDemandAutofix:    run(rule.EditDemandAutofix),
+		rule.EditDemandSuggestion: run(rule.EditDemandSuggestion),
+		rule.EditDemandAll:        run(rule.EditDemandAll),
+	}
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+
+	for index := range diagnostics[rule.EditDemandAll] {
+		want := withoutEdits(diagnostics[rule.EditDemandAll][index])
+		for demand, demandDiagnostics := range diagnostics {
+			if got := withoutEdits(demandDiagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("diagnostic %d changed for demand %d:\ngot:  %#v\nwant: %#v", index, demand, got, want)
+			}
+			if demandDiagnostics[index].FixesPtr != nil {
+				t.Errorf("diagnostic %d demand %d unexpectedly has autofixes", index, demand)
+			}
+		}
+
+		if diagnostics[rule.EditDemandNone][index].Suggestions != nil ||
+			diagnostics[rule.EditDemandAutofix][index].Suggestions != nil {
+			t.Fatalf("diagnostic %d materialized suggestions without suggestion demand", index)
+		}
+
+		suggestionOnly := diagnostics[rule.EditDemandSuggestion][index].Suggestions
+		allEdits := diagnostics[rule.EditDemandAll][index].Suggestions
+		if suggestionOnly == nil || !reflect.DeepEqual(suggestionOnly, allEdits) {
+			t.Fatalf("diagnostic %d: suggestion and all-edits demands produced different suggestions", index)
+		}
+		if len(*suggestionOnly) != 1 || len((*suggestionOnly)[0].Fixes()) != 1 {
+			t.Fatalf("diagnostic %d suggestions = %#v, want one suggestion with one fix", index, *suggestionOnly)
+		}
+		fix := (*suggestionOnly)[0].Fixes()[0]
+		wantReportText := []string{"public constructor", "constructor", "constructor"}[index]
+		if got := source[want.Range.Pos():want.Range.End()]; got != wantReportText {
+			t.Fatalf("diagnostic %d report range covers %q, want %q", index, got, wantReportText)
+		}
+		wantFixText := []string{
+			"public constructor() {}",
+			"constructor(value: number) {\n    super(value);\n  }",
+			"constructor() {}",
+		}[index]
+		if got := source[fix.Range.Pos():fix.Range.End()]; got != wantFixText {
+			t.Fatalf("diagnostic %d fix range covers %q, want %q", index, got, wantFixText)
+		}
+		wantReplacement := []string{"", "", ";"}[index]
+		if fix.Text != wantReplacement {
+			t.Fatalf("diagnostic %d replacement = %q, want %q", index, fix.Text, wantReplacement)
+		}
+	}
+}
+
+func TestNoUselessConstructorRecoveryAST(t *testing.T) {
+	t.Parallel()
+
+	for _, source := range []string{
+		`class A extends B { constructor() {`,
+		`class A extends B { constructor(value) { super(`,
+		`class A { public /* between */ constructor /* before paren */ (`,
+		`class A { 'constructor`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/no-useless-constructor-recovery.ts",
+				Path:     "/no-useless-constructor-recovery.ts",
+			}, source, core.ScriptKindTS)
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				DisableManager: rule.NewDisableManager(sourceFile, rule.NewCommentStore(sourceFile)),
+			}.WithDiagnosticConsumer(
+				NoUselessConstructorRule.Name,
+				rule.SeverityError,
+				rule.DiagnosticConsumer{
+					Demand: rule.EditDemandSuggestion,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			)
+			listener := NoUselessConstructorRule.Run(ctx, nil)[ast.KindConstructor]
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if node.Kind == ast.KindConstructor {
+					listener(node)
+				}
+				return node.ForEachChild(visit)
+			}
+			sourceFile.AsNode().ForEachChild(visit)
+
+			for _, diagnostic := range diagnostics {
+				if diagnostic.Range.Pos() < 0 ||
+					diagnostic.Range.End() < diagnostic.Range.Pos() ||
+					diagnostic.Range.End() > len(source) {
+					t.Fatalf("out-of-bounds diagnostic range %#v for source length %d", diagnostic.Range, len(source))
+				}
+				if diagnostic.Suggestions == nil {
+					continue
+				}
+				for _, suggestion := range *diagnostic.Suggestions {
+					for _, fix := range suggestion.Fixes() {
+						if fix.Range.Pos() < 0 ||
+							fix.Range.End() < fix.Range.Pos() ||
+							fix.Range.End() > len(source) {
+							t.Fatalf("out-of-bounds fix range %#v for source length %d", fix.Range, len(source))
+						}
+					}
+				}
+			}
+		})
+	}
 }
