@@ -1,6 +1,7 @@
 package filename_case
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 	"unicode"
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed filename_case.schema.json
+var schemaJSON []byte
 
 // caseStyle is one of the four supported filename case styles.
 type caseStyle struct {
@@ -71,7 +75,7 @@ type Options struct {
 	MultipleFileExtensions bool
 }
 
-func parseOptions(rawOpts any) Options {
+func parseOptions(rawOpts []any) Options {
 	opts := Options{
 		Cases:                  []caseStyle{caseByKey["kebabCase"]},
 		MultipleFileExtensions: true,
@@ -442,14 +446,14 @@ func backtickList(items []string) []string {
 func isLowerCase(s string) bool { return s == strings.ToLower(s) }
 
 var FilenameCaseRule = rule.Rule{
-	Name: "unicorn/filename-case",
+	Name:   "unicorn/filename-case",
+	Schema: rule.NewSchema(schemaJSON),
 	// The rule is purely filename-driven — it does not inspect any AST node.
 	// `Run` is invoked once per source file, so we do the work here and
 	// return an empty listener map. (The linter's visitor walks SourceFile
 	// children but never the SourceFile node itself, so a
 	// `ast.KindSourceFile` listener would silently never fire.)
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}

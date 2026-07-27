@@ -55,7 +55,8 @@ func callParenthesesRange(sourceFile *ast.SourceFile, node *ast.Node) (core.Text
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/require-number-to-fixed-digits-argument.md
 var RequireNumberToFixedDigitsArgumentRule = rule.Rule{
-	Name: "unicorn/require-number-to-fixed-digits-argument",
+	Name:   "unicorn/require-number-to-fixed-digits-argument",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		zeroArguments := 0
 		return rule.RuleListeners{
