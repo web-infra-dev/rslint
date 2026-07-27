@@ -56,7 +56,7 @@ import {
 } from './source-code-helpers.js';
 import {
   buildTokens,
-  tokenIndexAtOrAfter,
+  spanIndexStartingAtOrAfter,
   type Comment,
   type Token,
 } from './token-builder.js';
@@ -767,7 +767,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Binary-search the first token starting at/after `targetStart`;
       // the backward scan starts just before it. Only a token that
       // CONTAINS `targetStart` can still trip the range guard below.
-      const idxAfter = tokenIndexAtOrAfter(stream, targetStart);
+      const idxAfter = spanIndexStartingAtOrAfter(stream, targetStart);
       let skipped = 0;
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
@@ -791,7 +791,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const targetEnd = node.range[1];
       // Binary search guarantees every token from `start` on has
       // `range[0] >= targetEnd`, so no per-token range guard is needed.
-      const start = tokenIndexAtOrAfter(stream, targetEnd);
+      const start = spanIndexStartingAtOrAfter(stream, targetEnd);
       if (start < 0) return null;
       let skipped = 0;
       for (let i = start; i < stream.length; i++) {
@@ -810,7 +810,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const stream = streamFor(includeComments);
       // Binary search to the first token starting inside the node's
       // range; from there every token has `range[0] >= node.range[0]`.
-      const start = tokenIndexAtOrAfter(stream, node.range[0]);
+      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
       if (start < 0) return null;
       let skipped = 0;
       for (let i = start; i < stream.length; i++) {
@@ -831,7 +831,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Binary-search the first token starting at/after the node's end;
       // the backward scan starts just before it. Only a token that
       // straddles `node.range[1]` can still trip the range guard below.
-      const idxAfter = tokenIndexAtOrAfter(stream, node.range[1]);
+      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[1]);
       let skipped = 0;
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
@@ -879,7 +879,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const out: Token[] = [];
       // Binary search to the node's start; stop once tokens begin at/after
       // the node's end (no non-empty token starting there can be contained).
-      const start = tokenIndexAtOrAfter(stream, node.range[0]);
+      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -907,7 +907,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       }
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, left.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -926,7 +926,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     getFirstTokenBetween(left, right, opts) {
       const { skip, filter, includeComments } = normalizeSkipOpts(opts);
       const stream = streamFor(includeComments);
-      const start = tokenIndexAtOrAfter(stream, left.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
       if (start < 0) return null;
       let matched = 0;
       for (let i = start; i < stream.length; i++) {
@@ -942,7 +942,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, left.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -961,7 +961,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const stream = streamFor(includeComments);
       // Collect all candidates first, then walk from the end.
       const matches: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, left.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
       if (start < 0) return null;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -976,7 +976,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const matches: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, left.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, left.range[1]);
       if (start < 0) return matches;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -991,7 +991,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, node.range[0]);
+      const start = spanIndexStartingAtOrAfter(stream, node.range[0]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -1009,7 +1009,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const idxAfter = tokenIndexAtOrAfter(stream, node.range[1]);
+      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[1]);
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
@@ -1031,7 +1031,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const idxAfter = tokenIndexAtOrAfter(stream, node.range[0]);
+      const idxAfter = spanIndexStartingAtOrAfter(stream, node.range[0]);
       for (
         let i = idxAfter < 0 ? stream.length - 1 : idxAfter - 1;
         i >= 0;
@@ -1052,7 +1052,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { count, filter, includeComments } = normalizeCountOpts(opts);
       const stream = streamFor(includeComments);
       const out: Token[] = [];
-      const start = tokenIndexAtOrAfter(stream, node.range[1]);
+      const start = spanIndexStartingAtOrAfter(stream, node.range[1]);
       if (start < 0) return out;
       for (let i = start; i < stream.length; i++) {
         const t = stream[i];
@@ -1076,7 +1076,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // Stream is sorted by range[0]; binary search to the candidate
       // index, then verify exact match (range[0] could equal `start - 1`
       // if `start` lands in a gap).
-      const idx = tokenIndexAtOrAfter(stream, start);
+      const idx = spanIndexStartingAtOrAfter(stream, start);
       if (idx < 0) return null;
       const t = stream[idx];
       return t.range[0] === start ? t : null;
@@ -1095,33 +1095,62 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     // The fix walks the code-token stream once to find the
     // immediately-prior/-next CODE token and then bounds the comment
     // filter by the gap between that token and the node.
+    //
+    // All three getters below binary-search `comments` (sorted by
+    // `range[0]`, like the token stream) to the first candidate and then
+    // walk forward only across the comments that can still fall inside
+    // the bound. A `comments.filter(...)` here scanned the WHOLE file's
+    // comment array per call, so a rule asking for the comments before
+    // every declaration (`local/jsdoc-format` in the TypeScript repo, any
+    // JSDoc-driven rule) was quadratic in a JSDoc-heavy file.
     getCommentsBefore(node) {
       const { tokens, comments } = ensureTokens();
       // tokens are sorted by range[0]. The nearest code token *before*
-      // `node` sits at index `tokenIndexAtOrAfter(node.range[0]) - 1`
+      // `node` sits at index `spanIndexStartingAtOrAfter(node.range[0]) - 1`
       // (or the last token if no token starts at/after node).
       let prevTokenEnd = 0;
-      const idxAfter = tokenIndexAtOrAfter(tokens, node.range[0]);
+      const idxAfter = spanIndexStartingAtOrAfter(tokens, node.range[0]);
       const prevIdx = idxAfter < 0 ? tokens.length - 1 : idxAfter - 1;
       if (prevIdx >= 0) prevTokenEnd = tokens[prevIdx].range[1];
-      return comments.filter(
-        (c) => c.range[0] >= prevTokenEnd && c.range[1] <= node.range[0],
-      );
+      const out: Comment[] = [];
+      const start = spanIndexStartingAtOrAfter(comments, prevTokenEnd);
+      if (start < 0) return out;
+      for (let i = start; i < comments.length; i++) {
+        const c = comments[i];
+        // Comments are non-empty and non-overlapping, so once one starts
+        // at/after the node there is no later comment that still ends
+        // at/before it.
+        if (c.range[0] >= node.range[0]) break;
+        if (c.range[1] <= node.range[0]) out.push(c);
+      }
+      return out;
     },
     getCommentsAfter(node) {
       const { tokens, comments } = ensureTokens();
       // First code token whose start >= node.range[1] — binary search.
-      const idx = tokenIndexAtOrAfter(tokens, node.range[1]);
+      const idx = spanIndexStartingAtOrAfter(tokens, node.range[1]);
       const nextTokenStart = idx < 0 ? text.length : tokens[idx].range[0];
-      return comments.filter(
-        (c) => c.range[0] >= node.range[1] && c.range[1] <= nextTokenStart,
-      );
+      const out: Comment[] = [];
+      const start = spanIndexStartingAtOrAfter(comments, node.range[1]);
+      if (start < 0) return out;
+      for (let i = start; i < comments.length; i++) {
+        const c = comments[i];
+        if (c.range[0] >= nextTokenStart) break;
+        if (c.range[1] <= nextTokenStart) out.push(c);
+      }
+      return out;
     },
     getCommentsInside(node) {
       const { comments } = ensureTokens();
-      return comments.filter(
-        (c) => c.range[0] >= node.range[0] && c.range[1] <= node.range[1],
-      );
+      const out: Comment[] = [];
+      const start = spanIndexStartingAtOrAfter(comments, node.range[0]);
+      if (start < 0) return out;
+      for (let i = start; i < comments.length; i++) {
+        const c = comments[i];
+        if (c.range[0] >= node.range[1]) break;
+        if (c.range[1] <= node.range[1]) out.push(c);
+      }
+      return out;
     },
     getAllComments() {
       // Cheap path when `parsedComments` was provided at construction —
@@ -1134,10 +1163,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       const { comments } = ensureTokens();
       // comments are sorted by range[0]. Binary search to the first
       // candidate, then O(1) check that it ends before `right`.
-      const idx = tokenIndexAtOrAfter(
-        comments as unknown as readonly Token[],
-        left.range[1],
-      );
+      const idx = spanIndexStartingAtOrAfter(comments, left.range[1]);
       if (idx < 0) return false;
       return comments[idx].range[1] <= right.range[0];
     },
@@ -1178,14 +1204,14 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
       // identity check works because streamFor reuses the live
       // token/comment objects without cloning (starts are unique, so a
       // stream member is found exactly at its own index).
-      let i = tokenIndexAtOrAfter(stream, startAnchor.range[0]);
+      let i = spanIndexStartingAtOrAfter(stream, startAnchor.range[0]);
       if (i < 0 || stream[i] !== startAnchor) {
         // Fallback: if the anchor isn't a tokenizer-emitted object
         // (e.g. the caller passed a raw Token literal we don't know
         // about), binary-search to the last token whose start < the
         // anchor's end — i.e. first index where range[0] >= anchor.end,
         // minus one.
-        const after = tokenIndexAtOrAfter(stream, startAnchor.range[1]);
+        const after = spanIndexStartingAtOrAfter(stream, startAnchor.range[1]);
         i = after < 0 ? stream.length - 1 : after - 1;
         if (i < 0) i = 0;
       }
@@ -1193,6 +1219,12 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
         const cur = stream[i];
         const next = stream[i + 1];
         if (cur === endAnchor) break;
+        // Positional stop, in case `endAnchor` is not a stream member (the
+        // fallback branch above accepts a caller-built Token literal). The
+        // identity break fires at this same index when the anchor IS in the
+        // stream — starts are unique — so this only bounds the walk that
+        // would otherwise run to the end of the file.
+        if (cur.range[0] >= endAnchor.range[0]) break;
         if (cur.range[1] !== next.range[0]) return true;
         i++;
         if (next === endAnchor) break;
