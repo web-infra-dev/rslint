@@ -86,3 +86,21 @@ func TestNoHooksRule(t *testing.T) {
 		},
 	)
 }
+
+// TestNoHooksAllowSchema locks in the divergence from upstream's `meta.schema`,
+// which constrains `allow` with `contains: ["beforeAll", ...]`. `contains` is a
+// draft-6 keyword whose value must be a schema, so under the draft-4 dialect
+// ESLint (and rslint) validate with, it is an unknown keyword and ignored
+// entirely — leaving `allow` to accept any array at all. Every element must be
+// one of the four hook names the rule can act on, which is what `items`/`enum`
+// says, so a typo fails validation instead of silently never matching.
+func TestNoHooksAllowSchema(t *testing.T) {
+	valid := []any{map[string]any{"allow": []any{"beforeEach", "afterAll"}}}
+	if err := no_hooks.NoHooksRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected hook names to pass schema validation, got: %v", err)
+	}
+	invalid := []any{map[string]any{"allow": []any{"beforeeach"}}}
+	if err := no_hooks.NoHooksRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected a non-hook name to fail schema validation")
+	}
+}

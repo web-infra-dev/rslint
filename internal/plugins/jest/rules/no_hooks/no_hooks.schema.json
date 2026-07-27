@@ -6,7 +6,10 @@
       "properties": {
         "allow": {
           "type": "array",
-          "contains": ["beforeAll", "beforeEach", "afterAll", "afterEach"]
+          "items": {
+            "type": "string",
+            "enum": ["beforeAll", "beforeEach", "afterAll", "afterEach"]
+          }
         }
       },
       "additionalProperties": false
