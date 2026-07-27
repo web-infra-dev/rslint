@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -12,10 +14,11 @@ import (
 var NoUselessBackreferenceRule = rule.Rule{
 	Name: "no-useless-backreference",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
-		return rule.RuleListeners{
+		mayUseRegExp := sourceMayUseRegExp(ctx)
+		var calleeCache *regExpCalleeCache
+		listeners := rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				if isRegexLiteralHandledByConstructor(ctx, node) {
+				if mayUseRegExp && isRegexLiteralHandledByConstructor(ctx, node, calleeCache) {
 					return
 				}
 				pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
@@ -25,24 +28,73 @@ var NoUselessBackreferenceRule = rule.Rule{
 				rxFlags := utils.ParseRegexFlags(flags)
 				checkRegex(ctx, node, pattern, rxFlags)
 			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				handleRegExpConstructor(ctx, node, call.Expression, call.Arguments, eval)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				newExpr := node.AsNewExpression()
-				handleRegExpConstructor(ctx, node, newExpr.Expression, newExpr.Arguments, eval)
-			},
 		}
+		if !mayUseRegExp {
+			return listeners
+		}
+		calleeCache = &regExpCalleeCache{}
+
+		var eval *utils.StaticStringEvaluator
+		getEval := func() *utils.StaticStringEvaluator {
+			if eval == nil {
+				eval = utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+			}
+			return eval
+		}
+		listeners[ast.KindCallExpression] = func(node *ast.Node) {
+			call := node.AsCallExpression()
+			handleRegExpConstructor(ctx, node, call.Expression, call.Arguments, getEval, calleeCache)
+		}
+		listeners[ast.KindNewExpression] = func(node *ast.Node) {
+			newExpr := node.AsNewExpression()
+			handleRegExpConstructor(ctx, node, newExpr.Expression, newExpr.Arguments, getEval, calleeCache)
+		}
+		return listeners
 	},
 }
 
-func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, eval *utils.StaticStringEvaluator) {
-	callee = ast.SkipParentheses(callee)
-	if !isBuiltinRegExpCallee(ctx, callee) {
+func sourceMayUseRegExp(ctx rule.RuleContext) bool {
+	// With type information, an alias can arrive through an import or ambient
+	// declaration without any RegExp-related identifier in this source file.
+	// Keep the broad listeners in that case so those aliases remain observable.
+	if ctx.TypeChecker != nil && ctx.Program != nil {
+		return true
+	}
+
+	// Without type information only the syntactically recognized global
+	// constructor forms can match, so files lacking all of their names can
+	// safely avoid broad call/new listeners.
+	sourceFile := ctx.SourceFile
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	for _, name := range [...]string{
+		"RegExp",
+		"globalThis",
+		"window",
+		"self",
+		"global",
+	} {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func handleRegExpConstructor(
+	ctx rule.RuleContext,
+	callNode *ast.Node,
+	callee *ast.Node,
+	args *ast.NodeList,
+	getEval func() *utils.StaticStringEvaluator,
+	calleeCache *regExpCalleeCache,
+) {
+	if args == nil || len(args.Nodes) == 0 {
 		return
 	}
-	if args == nil || len(args.Nodes) == 0 {
+	callee = ast.SkipParentheses(callee)
+	if !isBuiltinRegExpCallee(ctx, callee, calleeCache) {
 		return
 	}
 
@@ -53,11 +105,16 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 
 	flags := ""
 	var pattern string
-	if patternNode.Kind == ast.KindRegularExpressionLiteral {
+	switch patternNode.Kind {
+	case ast.KindRegularExpressionLiteral:
 		pattern, flags = utils.ExtractRegexPatternAndFlags(patternNode.Text())
-	} else {
+	case ast.KindStringLiteral:
+		pattern = patternNode.AsStringLiteral().Text
+	case ast.KindNoSubstitutionTemplateLiteral:
+		pattern = patternNode.AsNoSubstitutionTemplateLiteral().Text
+	default:
 		var patternOk bool
-		pattern, patternOk = eval.Eval(patternNode)
+		pattern, patternOk = getEval().Eval(patternNode)
 		if !patternOk {
 			return
 		}
@@ -66,7 +123,9 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	if len(args.Nodes) >= 2 {
 		flagsNode := ast.SkipParentheses(args.Nodes[1])
 		if flagsNode != nil {
-			if v, ok := eval.Eval(flagsNode); ok {
+			if v, ok := literalStringValue(flagsNode); ok {
+				flags = v
+			} else if v, ok := getEval().Eval(flagsNode); ok {
 				flags = v
 			} else {
 				flags = ""
@@ -78,10 +137,21 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	checkRegex(ctx, callNode, pattern, rxFlags)
 }
 
+func literalStringValue(node *ast.Node) (string, bool) {
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text, true
+	default:
+		return "", false
+	}
+}
+
 // isRegexLiteralHandledByConstructor returns true when this regex literal is
 // the first arg of a `RegExp(literal, flags)` call — in that case the
 // constructor listener owns it (using the override flags).
-func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bool {
+func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node, calleeCache *regExpCalleeCache) bool {
 	parent := node.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
 		parent = parent.Parent
@@ -103,7 +173,7 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bo
 	default:
 		return false
 	}
-	if !isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee)) {
+	if !isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee), calleeCache) {
 		return false
 	}
 	if args == nil || len(args.Nodes) == 0 {
@@ -115,7 +185,14 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bo
 	return true
 }
 
-func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
+type regExpCalleeCache struct {
+	// Cache the pure builtin-type predicate, not identifier symbols: the
+	// checker may give one const/import/global symbol different flow-narrowed
+	// types at different call sites.
+	types map[*checker.Type]bool
+}
+
+func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *regExpCalleeCache) bool {
 	if callee == nil {
 		return false
 	}
@@ -146,9 +223,18 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		// over-matching arbitrary identifiers when type info is unavailable.
 		if ctx.TypeChecker != nil && ctx.Program != nil {
 			t := ctx.TypeChecker.GetTypeAtLocation(callee)
-			if t != nil && utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor") {
-				return true
+			if t == nil {
+				return false
 			}
+			if cached, ok := calleeCache.types[t]; ok {
+				return cached
+			}
+			result := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor")
+			if calleeCache.types == nil {
+				calleeCache.types = make(map[*checker.Type]bool)
+			}
+			calleeCache.types[t] = result
+			return result
 		}
 		return false
 	}
@@ -167,14 +253,45 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 // checkRegex parses the pattern and reports useless backreferences. `node` is
 // the AST node receiving the diagnostic (the regex literal or RegExp call).
 func checkRegex(ctx rule.RuleContext, node *ast.Node, pattern string, flags utils.RegexFlags) {
+	if !mayContainBackreference(pattern) {
+		return
+	}
 	_, brefs, ok := parsePattern(pattern, flags)
 	if !ok {
 		return
 	}
 
+	var reportRange core.TextRange
+	hasReportRange := false
 	for _, bref := range brefs {
-		analyzeBackref(ctx, node, bref)
+		first, problemCount, hasProblem := analyzeBackref(bref)
+		if !hasProblem {
+			continue
+		}
+		if !hasReportRange {
+			reportRange = utils.TrimNodeTextRange(ctx.SourceFile, node)
+			hasReportRange = true
+		}
+		reportBackref(ctx, reportRange, bref, first, problemCount)
 	}
+}
+
+func mayContainBackreference(pattern string) bool {
+	// Patterns without a numeric or named backreference do not need an AST.
+	// Advance over escape pairs so escaped backslashes (`\\1`) do not look
+	// like references.
+	for i := 0; i+1 < len(pattern); {
+		if pattern[i] != '\\' {
+			i++
+			continue
+		}
+		next := pattern[i+1]
+		if next == 'k' || next >= '1' && next <= '9' {
+			return true
+		}
+		i += 2
+	}
+	return false
 }
 
 type problem struct {
@@ -182,40 +299,40 @@ type problem struct {
 	group     *rxNode
 }
 
-func analyzeBackref(ctx rule.RuleContext, node *ast.Node, bref *rxNode) {
+func analyzeBackref(bref *rxNode) (first problem, problemCount int, hasProblem bool) {
 	groups := bref.resolved
 	if len(groups) == 0 {
-		return
+		return problem{}, 0, false
 	}
-	brefPath := pathToRoot(bref)
 
-	problems := make([]*problem, 0, len(groups))
+	var firstSameDisjunction problem
+	sameDisjunctionCount := 0
 	for _, group := range groups {
-		problems = append(problems, classifyPair(brefPath, bref, group))
-	}
-
-	// If any pair has no problem, the backreference can match — bail.
-	for _, prob := range problems {
-		if prob == nil {
-			return
+		current, ok := classifyPair(bref, group)
+		if !ok {
+			// If any pair has no problem, the backreference can match.
+			return problem{}, 0, false
+		}
+		if problemCount == 0 {
+			first = current
+		}
+		problemCount++
+		if current.messageId != "disjunctive" {
+			if sameDisjunctionCount == 0 {
+				firstSameDisjunction = current
+			}
+			sameDisjunctionCount++
 		}
 	}
-
-	// Prefer same-disjunction problems over disjunctive ones.
-	sameDisjunction := make([]*problem, 0, len(problems))
-	for _, prob := range problems {
-		if prob.messageId != "disjunctive" {
-			sameDisjunction = append(sameDisjunction, prob)
-		}
+	if sameDisjunctionCount > 0 {
+		return firstSameDisjunction, sameDisjunctionCount, true
 	}
-	toReport := problems
-	if len(sameDisjunction) > 0 {
-		toReport = sameDisjunction
-	}
+	return first, problemCount, true
+}
 
-	first := toReport[0]
+func reportBackref(ctx rule.RuleContext, reportRange core.TextRange, bref *rxNode, first problem, problemCount int) {
 	otherGroups := ""
-	otherCount := len(toReport) - 1
+	otherCount := problemCount - 1
 	switch {
 	case otherCount == 1:
 		otherGroups = " and another group"
@@ -224,56 +341,76 @@ func analyzeBackref(ctx rule.RuleContext, node *ast.Node, bref *rxNode) {
 	}
 
 	desc := descriptionFor(first.messageId, bref.raw, first.group.raw, otherGroups)
-	ctx.ReportNode(node, rule.RuleMessage{
+	ctx.ReportRange(reportRange, rule.RuleMessage{
 		Id:          first.messageId,
 		Description: desc,
 	})
 }
 
-func classifyPair(brefPath []*rxNode, bref *rxNode, group *rxNode) *problem {
-	if nodeContains(brefPath, group) {
+func classifyPair(bref *rxNode, group *rxNode) (problem, bool) {
+	for current := bref; current != nil; current = current.parent {
+		if current != group {
+			continue
+		}
 		// Group is bref's ancestor → bref is nested within the group, which
 		// hasn't matched yet when bref starts to match.
-		return &problem{messageId: "nested", group: group}
+		return problem{messageId: "nested", group: group}, true
 	}
 
-	groupPath := pathToRoot(group)
-
-	// Walk both paths from the root downward to find the lowest common ancestor.
-	i := len(brefPath) - 1
-	j := len(groupPath) - 1
-	for i >= 0 && j >= 0 && brefPath[i] == groupPath[j] {
-		i--
-		j--
+	brefDepth := rxNodeDepth(bref)
+	groupDepth := rxNodeDepth(group)
+	brefAncestor := bref
+	groupAncestor := group
+	for brefDepth > groupDepth {
+		brefAncestor = brefAncestor.parent
+		brefDepth--
 	}
-	indexOfLCA := j + 1
-	groupCut := groupPath[:indexOfLCA]
-	commonPath := groupPath[indexOfLCA:]
+	for groupDepth > brefDepth {
+		groupAncestor = groupAncestor.parent
+		groupDepth--
+	}
+	for brefAncestor != groupAncestor {
+		brefAncestor = brefAncestor.parent
+		groupAncestor = groupAncestor.parent
+	}
+	lowestCommonAncestor := groupAncestor
 
 	var lowestCommonLookaround *rxNode
-	for _, n := range commonPath {
-		if isLookaround(n) {
-			lowestCommonLookaround = n
+	for current := lowestCommonAncestor; current != nil; current = current.parent {
+		if isLookaround(current) {
+			lowestCommonLookaround = current
 			break
 		}
 	}
 	matchingBackward := lowestCommonLookaround != nil && isLookbehind(lowestCommonLookaround)
 
-	if len(groupCut) > 0 && groupCut[len(groupCut)-1].kind == nkAlternative {
-		return &problem{messageId: "disjunctive", group: group}
+	groupBranch := group
+	for groupBranch.parent != lowestCommonAncestor {
+		groupBranch = groupBranch.parent
+	}
+	if groupBranch.kind == nkAlternative {
+		return problem{messageId: "disjunctive", group: group}, true
 	}
 	if !matchingBackward && bref.end <= group.start {
-		return &problem{messageId: "forward", group: group}
+		return problem{messageId: "forward", group: group}, true
 	}
 	if matchingBackward && group.end <= bref.start {
-		return &problem{messageId: "backward", group: group}
+		return problem{messageId: "backward", group: group}, true
 	}
-	for _, n := range groupCut {
-		if isNegativeLookaround(n) {
-			return &problem{messageId: "intoNegativeLookaround", group: group}
+	for current := group; current != lowestCommonAncestor; current = current.parent {
+		if isNegativeLookaround(current) {
+			return problem{messageId: "intoNegativeLookaround", group: group}, true
 		}
 	}
-	return nil
+	return problem{}, false
+}
+
+func rxNodeDepth(node *rxNode) int {
+	depth := 0
+	for current := node; current != nil; current = current.parent {
+		depth++
+	}
+	return depth
 }
 
 func descriptionFor(messageId, bref, group, otherGroups string) string {
