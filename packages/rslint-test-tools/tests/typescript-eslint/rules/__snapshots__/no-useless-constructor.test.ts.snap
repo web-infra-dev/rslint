@@ -13,7 +13,7 @@ class A {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 19,
+          "column": 14,
           "line": 3,
         },
         "start": {
@@ -45,8 +45,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -77,8 +77,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -109,8 +109,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -141,8 +141,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -173,8 +173,8 @@ class A extends B.C {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -205,8 +205,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -237,8 +237,8 @@ class A extends B {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 4,
-          "line": 5,
+          "column": 14,
+          "line": 3,
         },
         "start": {
           "column": 3,
@@ -267,7 +267,7 @@ class A {
       "messageId": "noUselessConstructor",
       "range": {
         "end": {
-          "column": 26,
+          "column": 21,
           "line": 3,
         },
         "start": {
