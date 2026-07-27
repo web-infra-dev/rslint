@@ -2,6 +2,7 @@ package no_loop_func
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -20,6 +21,10 @@ type RunState struct {
 	Ctx          rule.RuleContext
 	SkippedIIFEs map[*ast.Node]bool
 	refIndex     *utils.ReferenceIndex
+	// checkerRefs memoizes the checker-based fallback reference list per
+	// symbol, since isSafeCore may query the same outer symbol once for every
+	// function-in-loop that closes over it.
+	checkerRefs map[*ast.Symbol][]*ast.Node
 }
 
 // NewRunState constructs a RunState ready for one source-file pass.
@@ -335,11 +340,95 @@ func (s *RunState) buildRefIndex() {
 }
 
 // forEachReference invokes `cb` for every identifier node resolving to `sym`,
-// in source order. Returns early when `cb` returns true. The underlying index
-// is built on first use via buildRefIndex so subsequent calls are O(refs).
+// in source order. Returns early when `cb` returns true.
 func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
+	for _, refNode := range s.references(sym) {
+		if cb(refNode) {
+			return
+		}
+	}
+}
+
+// references returns every identifier resolving to `sym`, in source order,
+// preferring `ctx.Refs` — a per-file reference index built once and shared by
+// every query — over the checker's GetReferencesToSymbolInFile, which
+// recomputes references for the whole file from scratch on every call.
+// isSafeCore queries this once per (loop-function, through-reference) pair,
+// so a symbol closed over by many functions in a file pays the checker's
+// whole-file cost once per closure under the old path.
+func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
+	if refs, ok := s.binderReferences(sym); ok {
+		return refs
+	}
+	return s.checkerReferences(sym)
+}
+
+// binderReferences returns sym's references via ctx.Refs, reporting false
+// when the binder-based index can't be trusted to answer for this symbol.
+//
+// ctx.Refs keys on raw binder symbols, while sym here comes from the checker
+// (utils.GetReferenceSymbol in CollectThroughReferences), which hands out
+// merged symbols that can compare unequal to the ones the binder's scope walk
+// returns — for example a namespace merged with a value, or a symbol declared
+// in lib/ambient code. A declaration keeps its own unmerged symbol, so
+// requiring decl.Symbol() == sym on every declaration (and that it lives in
+// this file, since ctx.Refs is per-file) is an exact identity test; failing
+// it falls back to the checker instead of risking a wrong answer.
+//
+// ctx.Refs also excludes declaration-name identifiers (they declare the
+// symbol rather than reference it), but ESLint's scope manager — and
+// IsWriteRef, which mirrors it — treats several of them as write references:
+// var/let/const bindings with initializers, for-in/of loop bindings, and
+// catch parameters. Those names are merged back into the result in source
+// order so isSafeCore keeps seeing them.
+func (s *RunState) binderReferences(sym *ast.Symbol) ([]*ast.Node, bool) {
+	if s.Ctx.Refs == nil || sym == nil || len(sym.Declarations) == 0 {
+		return nil, false
+	}
+	declNames := make([]*ast.Node, 0, len(sym.Declarations))
+	for _, decl := range sym.Declarations {
+		if decl.Symbol() != sym || ast.GetSourceFileOfNode(decl) != s.Ctx.SourceFile {
+			return nil, false
+		}
+		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			declNames = append(declNames, name)
+		}
+	}
+	refs := s.Ctx.Refs.References(sym)
+	if len(declNames) == 0 {
+		return refs, true
+	}
+	sort.Slice(declNames, func(i, j int) bool { return declNames[i].Pos() < declNames[j].Pos() })
+	merged := make([]*ast.Node, 0, len(refs)+len(declNames))
+	next := 0
+	for _, name := range declNames {
+		for next < len(refs) && refs[next].Pos() < name.Pos() {
+			merged = append(merged, refs[next])
+			next++
+		}
+		merged = append(merged, name)
+	}
+	return append(merged, refs[next:]...), true
+}
+
+// checkerReferences returns sym's references via the TypeChecker, memoized
+// per symbol since the same fallback symbol may be queried by more than one
+// loop-function closure in the file.
+func (s *RunState) checkerReferences(sym *ast.Symbol) []*ast.Node {
+	if refs, ok := s.checkerRefs[sym]; ok {
+		return refs
+	}
 	s.buildRefIndex()
-	s.refIndex.ForEachReference(sym, cb)
+	var refs []*ast.Node
+	s.refIndex.ForEachReference(sym, func(refNode *ast.Node) bool {
+		refs = append(refs, refNode)
+		return false
+	})
+	if s.checkerRefs == nil {
+		s.checkerRefs = map[*ast.Symbol][]*ast.Node{}
+	}
+	s.checkerRefs[sym] = refs
+	return refs
 }
 
 // checkForLoops processes a function-like node: if it is inside a loop and
