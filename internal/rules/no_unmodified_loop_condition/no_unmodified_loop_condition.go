@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -81,32 +80,32 @@ func extractGroups(node *ast.Node) []*ast.Node {
 
 // collectIdentifierSymbols collects unique identifier references (by symbol) from a node.
 // Returns nil if any dynamic expression is found.
-func collectIdentifierSymbols(node *ast.Node, tc *checker.Checker) []identifierRef {
+func collectIdentifierSymbols(node *ast.Node, refs *rule.RefStore) []identifierRef {
 	if node == nil {
 		return nil
 	}
 	if hasDynamicExpression(node) {
 		return nil
 	}
-	var refs []identifierRef
+	var result []identifierRef
 	var walk func(n *ast.Node)
 	walk = func(n *ast.Node) {
 		if n == nil {
 			return
 		}
 		if n.Kind == ast.KindIdentifier {
-			sym := tc.GetSymbolAtLocation(n)
+			sym := refs.Resolve(n)
 			if sym != nil {
 				// Deduplicate by symbol
 				dup := false
-				for _, r := range refs {
+				for _, r := range result {
 					if r.symbol == sym {
 						dup = true
 						break
 					}
 				}
 				if !dup {
-					refs = append(refs, identifierRef{symbol: sym, node: n})
+					result = append(result, identifierRef{symbol: sym, node: n})
 				}
 			}
 			return
@@ -117,48 +116,44 @@ func collectIdentifierSymbols(node *ast.Node, tc *checker.Checker) []identifierR
 		})
 	}
 	walk(node)
-	return refs
+	return result
 }
 
-// isSymbolWrittenInBody walks the body (and optionally the incrementor) looking for
-// any write reference to the given symbol. Does NOT skip function boundaries —
-// ESLint uses range-based checking where any write within the loop's text range
-// counts as a modification, even inside nested functions.
-func isSymbolWrittenInBody(body *ast.Node, sym *ast.Symbol, tc *checker.Checker) bool {
-	if body == nil {
+// isWrittenInRange reports whether sym has a write reference positioned inside
+// rangeNode. It scans sym's whole-file reference list (built once per symbol
+// and shared across every loop/group that queries it) rather than re-walking
+// rangeNode's subtree per query — the old TypeChecker-based implementation
+// walked the (potentially large) loop body/incrementor once per condition
+// identifier, which dominates cost when loops are large or numerous.
+func isWrittenInRange(refs *rule.RefStore, sym *ast.Symbol, rangeNode *ast.Node) bool {
+	if rangeNode == nil {
 		return false
 	}
-
-	found := false
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || found {
-			return
+	lo, hi := rangeNode.Pos(), rangeNode.End()
+	for _, ref := range refs.References(sym) {
+		if ref.Pos() >= lo && ref.End() <= hi && utils.IsWriteReference(ref) {
+			return true
 		}
-		if n.Kind == ast.KindIdentifier {
-			refSym := tc.GetSymbolAtLocation(n)
-			if refSym == sym && utils.IsWriteReference(n) {
-				found = true
-				return
-			}
-		}
-		// ShorthandPropertyAssignment in destructuring: ({x} = {x: 1})
-		// TypeChecker resolves shorthand name to property symbol, not variable symbol.
-		// Use GetShorthandAssignmentValueSymbol to get the variable symbol.
-		if n.Kind == ast.KindShorthandPropertyAssignment && utils.IsInDestructuringAssignment(n) {
-			valSym := tc.GetShorthandAssignmentValueSymbol(n)
-			if valSym == sym {
-				found = true
-				return
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
 	}
-	walk(body)
-	return found
+	return false
+}
+
+// isReferencedInRange reports whether any symbol in funcSymbols has a
+// reference positioned inside rangeNode, using the same whole-file reference
+// lists as isWrittenInRange instead of walking rangeNode per query.
+func isReferencedInRange(refs *rule.RefStore, funcSymbols []*ast.Symbol, rangeNode *ast.Node) bool {
+	if rangeNode == nil {
+		return false
+	}
+	lo, hi := rangeNode.Pos(), rangeNode.End()
+	for _, funcSym := range funcSymbols {
+		for _, ref := range refs.References(funcSym) {
+			if ref.Pos() >= lo && ref.End() <= hi {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isModifiedByCalledFunction checks if the symbol is modified inside a
@@ -166,13 +161,14 @@ func isSymbolWrittenInBody(body *ast.Node, sym *ast.Symbol, tc *checker.Checker)
 // This matches ESLint's secondary check: if a write reference to the variable
 // is inside a FunctionDeclaration, and that function's name is referenced
 // within the loop, the variable counts as modified.
-func isModifiedByCalledFunction(loopBody *ast.Node, incrementor *ast.Node, sym *ast.Symbol, tc *checker.Checker) bool {
+func isModifiedByCalledFunction(refs *rule.RefStore, loopBody *ast.Node, incrementor *ast.Node, sym *ast.Symbol) bool {
 	scope := utils.FindEnclosingScope(loopBody)
 	if scope == nil {
 		return false
 	}
 
-	// Step 1: find FunctionDeclarations that write to sym anywhere in scope.
+	// Step 1: find (top-level, non-nested) FunctionDeclarations in scope that
+	// write to sym anywhere in their body.
 	var modifyingFuncSymbols []*ast.Symbol
 	var findFuncs func(n *ast.Node)
 	findFuncs = func(n *ast.Node) {
@@ -180,9 +176,8 @@ func isModifiedByCalledFunction(loopBody *ast.Node, incrementor *ast.Node, sym *
 			return
 		}
 		if ast.IsFunctionDeclaration(n) && n.Name() != nil {
-			if functionBodyWritesSymbol(n, sym, tc) {
-				funcSym := tc.GetSymbolAtLocation(n.Name())
-				if funcSym != nil {
+			if isWrittenInRange(refs, sym, n) {
+				if funcSym := n.Symbol(); funcSym != nil {
 					modifyingFuncSymbols = append(modifyingFuncSymbols, funcSym)
 				}
 			}
@@ -202,56 +197,13 @@ func isModifiedByCalledFunction(loopBody *ast.Node, incrementor *ast.Node, sym *
 	// Step 2: check if any of those functions are referenced in the loop
 	// (body or incrementor). ESLint uses range-based checking — any reference
 	// (not just calls) to the function within the loop counts.
-	if nodeReferencesAnySymbol(loopBody, modifyingFuncSymbols, tc) {
+	if isReferencedInRange(refs, modifyingFuncSymbols, loopBody) {
 		return true
 	}
-	if incrementor != nil && nodeReferencesAnySymbol(incrementor, modifyingFuncSymbols, tc) {
+	if incrementor != nil && isReferencedInRange(refs, modifyingFuncSymbols, incrementor) {
 		return true
 	}
 	return false
-}
-
-// functionBodyWritesSymbol checks if a function body contains a write to sym.
-// Does NOT skip nested functions — ESLint uses range-based scope analysis.
-func functionBodyWritesSymbol(funcNode *ast.Node, sym *ast.Symbol, tc *checker.Checker) bool {
-	body := funcNode.Body()
-	if body == nil {
-		return false
-	}
-	return isSymbolWrittenInBody(body, sym, tc)
-}
-
-// nodeReferencesAnySymbol checks if a node tree contains any identifier
-// referencing one of the given symbols. Does not skip function boundaries
-// (ESLint uses range-based checking).
-func nodeReferencesAnySymbol(node *ast.Node, symbols []*ast.Symbol, tc *checker.Checker) bool {
-	if node == nil {
-		return false
-	}
-	found := false
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || found {
-			return
-		}
-		if n.Kind == ast.KindIdentifier {
-			refSym := tc.GetSymbolAtLocation(n)
-			if refSym != nil {
-				for _, s := range symbols {
-					if refSym == s {
-						found = true
-						return
-					}
-				}
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(node)
-	return found
 }
 
 // checkLoopCondition checks identifiers in a loop condition and reports those
@@ -261,28 +213,28 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 		return
 	}
 
-	tc := ctx.TypeChecker
+	refs := ctx.Refs
 	groups := extractGroups(condition)
 
 	for _, group := range groups {
-		refs := collectIdentifierSymbols(group, tc)
-		if refs == nil {
+		idRefs := collectIdentifierSymbols(group, refs)
+		if idRefs == nil {
 			continue // dynamic expression found, skip this group
 		}
 
 		// Check if any identifier in this group is modified
 		anyModified := false
-		for _, ref := range refs {
-			if isSymbolWrittenInBody(body, ref.symbol, tc) ||
-				(incrementor != nil && isSymbolWrittenInBody(incrementor, ref.symbol, tc)) ||
-				isModifiedByCalledFunction(body, incrementor, ref.symbol, tc) {
+		for _, ref := range idRefs {
+			if isWrittenInRange(refs, ref.symbol, body) ||
+				(incrementor != nil && isWrittenInRange(refs, ref.symbol, incrementor)) ||
+				isModifiedByCalledFunction(refs, body, incrementor, ref.symbol) {
 				anyModified = true
 				break
 			}
 		}
 
 		if !anyModified {
-			for _, ref := range refs {
+			for _, ref := range idRefs {
 				ctx.ReportNode(ref.node, buildLoopConditionNotModifiedMessage(ref.node.Text()))
 			}
 		}
