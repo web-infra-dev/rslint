@@ -27,8 +27,8 @@ func parseOptions(rawOptions []any) options {
 	}
 
 	optsMap, _ := rawOptions[0].(map[string]interface{})
-	if max, ok := internalUtils.CoerceIntegral(optsMap["max"]); ok && max >= 1 {
-		opts.Max = max
+	if maxVal, ok := internalUtils.CoerceIntegral(optsMap["max"]); ok && maxVal >= 1 {
+		opts.Max = maxVal
 	}
 
 	return opts
