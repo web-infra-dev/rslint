@@ -184,6 +184,7 @@ func runMain() int {
 	checkResult.SourceFileExtra = []SourceFileExtra{}
 
 	initPrimitiveTypes(tc, &checkResult.Semantic)
+	collectKnownExternalSymbols(tc, &checkResult.Semantic)
 	fileMap := make(map[string]int32)
 	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))

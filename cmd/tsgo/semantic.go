@@ -39,6 +39,11 @@ type SymbolInfo struct {
 	// Declaration node reference (if available)
 	Decl *NodeReference `json:"decl,omitempty"`
 }
+type ExternalSymbolData struct {
+	Name       CString `json:"name"`
+	LoadEffect bool    `json:"load_effect"`
+	CallEffect bool    `json:"call_effect"`
+}
 type TypeExtra struct {
 	Name map[int]CString      `json:"name"`
 	Func map[int]FunctionData `json:"func"`
@@ -66,6 +71,8 @@ func CollectSemantic(program *compiler.Program) Semantic {
 
 	tc, done := program.GetTypeChecker(context.Background())
 	defer done()
+
+	collectKnownExternalSymbols(tc, &semantic)
 
 	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
@@ -112,6 +119,8 @@ type Semantic struct {
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
+	// ExternalSymbols contains known default-library symbols and their load/call effects.
+	ExternalSymbols map[ast.SymbolId]ExternalSymbolData `json:"external_symbols"`
 }
 
 func NewSemantic() Semantic {
@@ -125,6 +134,7 @@ func NewSemantic() Semantic {
 		NodeFlags:                make(map[NodeReference]uint32),
 		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
 		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
+		ExternalSymbols:          make(map[ast.SymbolId]ExternalSymbolData),
 		Primtypes:                PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
@@ -348,6 +358,48 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 	}
 
 	visit(file.AsNode())
+}
+
+func collectKnownExternalSymbols(tc *checker.Checker, semantic *Semantic) {
+	if tc == nil || semantic == nil {
+		return
+	}
+
+	resolveKnownGlobalSymbol := func(tc *checker.Checker, name string) *ast.Symbol {
+		path := strings.Split(name, ".")
+		if len(path) == 0 {
+			return nil
+		}
+
+		symbol := tc.GetGlobalSymbol(path[0], ast.SymbolFlagsValue, nil)
+		if symbol == nil {
+			return nil
+		}
+		for _, property := range path[1:] {
+			ty := tc.GetTypeOfSymbol(symbol)
+			if ty == nil {
+				return nil
+			}
+			symbol = tc.GetPropertyOfType(ty, property)
+			if symbol == nil {
+				return nil
+			}
+		}
+		return symbol
+	}
+
+	for _, known := range knownGlobalSymbols {
+		symbol := resolveKnownGlobalSymbol(tc, known.Name)
+		if symbol == nil {
+			continue
+		}
+		semantic.ExternalSymbols[ast.GetSymbolId(symbol)] = ExternalSymbolData{
+			Name:       []byte(known.Name),
+			LoadEffect: !known.LoadPure,
+			CallEffect: !known.CallPure,
+		}
+	}
+
 }
 
 func IsTypeFlagSet(t *checker.Type, flags checker.TypeFlags) bool {
