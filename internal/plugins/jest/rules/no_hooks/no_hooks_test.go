@@ -99,7 +99,7 @@ func TestNoHooksAllowSchema(t *testing.T) {
 	if err := no_hooks.NoHooksRule.Schema.Validate(valid); err != nil {
 		t.Errorf("expected hook names to pass schema validation, got: %v", err)
 	}
-	invalid := []any{map[string]any{"allow": []any{"beforeeach"}}}
+	invalid := []any{map[string]any{"allow": []any{"beforeeach"}}} // cspell:ignore beforeeach
 	if err := no_hooks.NoHooksRule.Schema.Validate(invalid); err == nil {
 		t.Error("expected a non-hook name to fail schema validation")
 	}
