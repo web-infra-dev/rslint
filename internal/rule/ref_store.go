@@ -63,16 +63,34 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 		s.walked = true
 		s.collectCandidates()
 	}
-	if pending, ok := s.candidates[sym.Name]; ok {
-		delete(s.candidates, sym.Name)
-		for _, id := range pending {
-			target := s.resolver.Resolve(id, id.Text(), referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
-			if target != nil {
-				s.refs[target] = append(s.refs[target], id)
-			}
+	s.resolvePending(sym.Name)
+	// A symbol's name is not always the name its references are written with:
+	// `export default function foo() {}` binds the declaration to an export
+	// symbol named "default", while every reference still spells `foo`. Drain
+	// the bucket of each declared name too, or those references stay pending
+	// forever.
+	for _, decl := range sym.Declarations {
+		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier && name.Text() != sym.Name {
+			s.resolvePending(name.Text())
 		}
 	}
 	return s.refs[sym]
+}
+
+// resolvePending resolves every not-yet-resolved candidate identifier spelled
+// name and files each one under the symbol it references.
+func (s *RefStore) resolvePending(name string) {
+	pending, ok := s.candidates[name]
+	if !ok {
+		return
+	}
+	delete(s.candidates, name)
+	for _, id := range pending {
+		target := s.resolver.Resolve(id, name, referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
+		if target != nil {
+			s.refs[target] = append(s.refs[target], id)
+		}
+	}
 }
 
 // collectCandidates walks the file once and buckets by name every identifier

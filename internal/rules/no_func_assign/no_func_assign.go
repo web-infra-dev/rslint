@@ -16,14 +16,18 @@ func buildMessage(name string) rule.RuleMessage {
 // checkReassignments reports every write-reference to declNode's own symbol.
 // RefStore resolution is scope-correct by construction, so a local binding
 // that shadows the function name is never returned as a reference here.
-func checkReassignments(declNode *ast.Node, ctx *rule.RuleContext) {
+//
+// name comes from the declaration's name node rather than the symbol: a
+// default-exported function is bound to an export symbol named "default",
+// while the reported name must be the one written in the source.
+func checkReassignments(declNode *ast.Node, name string, ctx *rule.RuleContext) {
 	sym := declNode.Symbol()
 	if sym == nil {
 		return
 	}
 	for _, ref := range ctx.Refs.References(sym) {
 		if utils.IsWriteReference(ref) {
-			ctx.ReportNode(ref, buildMessage(sym.Name))
+			ctx.ReportNode(ref, buildMessage(name))
 		}
 	}
 }
@@ -38,7 +42,7 @@ var NoFuncAssignRule = rule.Rule{
 				if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 					return
 				}
-				checkReassignments(node, &ctx)
+				checkReassignments(node, nameNode.Text(), &ctx)
 			},
 
 			// Named function expressions: the name is only visible inside the
@@ -49,7 +53,7 @@ var NoFuncAssignRule = rule.Rule{
 				if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 					return
 				}
-				checkReassignments(node, &ctx)
+				checkReassignments(node, nameNode.Text(), &ctx)
 			},
 		}
 	},

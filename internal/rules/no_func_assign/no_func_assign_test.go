@@ -59,6 +59,14 @@ func TestNoFuncAssignRule(t *testing.T) {
 
 			// Catch clause parameter shadows function name
 			{Code: `function foo() {} try {} catch(foo) { foo = 1; }`},
+
+			// Local var shadows a default-exported function's name
+			{Code: `export default function foo() {}
+function bar() { var foo; foo = 1; }`},
+
+			// Re-exporting a function is not a reassignment
+			{Code: `export default function foo() {}
+export { foo as bar };`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -252,6 +260,43 @@ func TestNoFuncAssignRule(t *testing.T) {
 				Code: `function foo() {} try { foo = 1; } catch(foo) { foo = 2; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "isAFunction", Line: 1, Column: 25},
+				},
+			},
+
+			// Default-exported function reassigned at module level: the
+			// declaration is bound to an export symbol named "default", but the
+			// reference — and the reported name — use the local name.
+			{
+				Code: `export default function foo() {}
+foo = bar;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "isAFunction", Message: "'foo' is a function.", Line: 2, Column: 1},
+				},
+			},
+
+			// Default-exported function reassigned inside its own body
+			{
+				Code: `export default function foo() { foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "isAFunction", Line: 1, Column: 33},
+				},
+			},
+
+			// Destructuring assignment to a default-exported function
+			{
+				Code: `export default function foo() {}
+[foo] = [1];`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "isAFunction", Line: 2, Column: 2},
+				},
+			},
+
+			// Named export reassigned at module level
+			{
+				Code: `export function foo() {}
+foo = bar;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "isAFunction", Line: 2, Column: 1},
 				},
 			},
 		},
