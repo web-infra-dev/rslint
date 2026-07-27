@@ -191,19 +191,51 @@ function isHexDigit(ch: number): boolean {
 }
 
 /**
- * Index of the first token at or after `offset` (binary search on `range[0]`), or -1 if
- * none. Migrated from the deleted tokenizer; used by the SourceCode token getters.
+ * One entry of a sorted, non-overlapping source stream. The two lookups below run over the
+ * code-token array, the comment array, and the merged tokens+comments stream alike, so they
+ * take this shape rather than `Token`.
  */
-export function tokenIndexAtOrAfter(
-  tokens: readonly Token[],
+export interface Span {
+  range: [number, number];
+}
+
+/**
+ * Index of the first span starting at or after `offset` (binary search on `range[0]`), or
+ * -1 if none. Migrated from the deleted tokenizer; used by the SourceCode token and comment
+ * getters.
+ */
+export function spanIndexStartingAtOrAfter(
+  spans: readonly Span[],
   offset: number,
 ): number {
   let lo = 0;
-  let hi = tokens.length;
+  let hi = spans.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (tokens[mid].range[0] < offset) lo = mid + 1;
+    if (spans[mid].range[0] < offset) lo = mid + 1;
     else hi = mid;
   }
-  return lo < tokens.length ? lo : -1;
+  return lo < spans.length ? lo : -1;
+}
+
+/**
+ * Index of the LAST span whose `range[1]` is at or before `offset`, or -1 if none. The
+ * end-bounded counterpart to `spanIndexStartingAtOrAfter`.
+ *
+ * Binary search is valid on `range[1]` for the same reason it is on `range[0]`: the stream
+ * is sorted by start and its entries never overlap, so ends are increasing too. Callers
+ * must therefore pass one of those streams and not an arbitrarily-ordered array.
+ */
+export function spanIndexEndingAtOrBefore(
+  spans: readonly Span[],
+  offset: number,
+): number {
+  let lo = 0;
+  let hi = spans.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (spans[mid].range[1] <= offset) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - 1;
 }
