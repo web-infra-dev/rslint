@@ -21,51 +21,54 @@
           "items": {
             "type": "string"
           }
-        }
-      },
-      "patternProperties": {
-        "^must(?:Not)?Match$": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1,
-              "maxItems": 2,
-              "additionalItems": false
-            },
-            {
-              "type": "object",
-              "propertyNames": {
-                "enum": ["describe", "test", "it"]
-              },
-              "additionalProperties": {
-                "oneOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "minItems": 1,
-                    "maxItems": 2,
-                    "additionalItems": false
-                  }
-                ]
-              }
-            }
-          ]
+        },
+        "mustMatch": {
+          "$ref": "#/definitions/matcher"
+        },
+        "mustNotMatch": {
+          "$ref": "#/definitions/matcher"
         }
       },
       "additionalProperties": false
     }
   ],
   "minItems": 0,
-  "maxItems": 1
+  "maxItems": 1,
+  "definitions": {
+    "matcher": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/patternWithMessage"
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "enum": ["describe", "test", "it"]
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/definitions/patternWithMessage"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "patternWithMessage": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "additionalItems": false
+    }
+  }
 }
