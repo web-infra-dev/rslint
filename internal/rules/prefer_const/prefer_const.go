@@ -256,11 +256,12 @@ func isInForInOrOf(node *ast.Node) bool {
 }
 
 // countWriteReferences counts the number of write references among refs (as
-// returned by ctx.Refs.References(sym)). Declaration names are never included
-// in refs, so this naturally excludes the declaration itself; a write inside
-// the same declaration's initializer (e.g. `let x = (x = 1)`) is still a
-// descendant of the initializer rather than of the binding name, so it is
-// still counted.
+// returned by ctx.Refs.References(sym)). Binding names are not reference
+// positions, so refs naturally excludes the declaration itself; the one
+// declaration name refs does keep is the shorthand in `({ x } = obj)`, which
+// is a genuine write. A write inside the same declaration's initializer
+// (e.g. `let x = (x = 1)`) is a descendant of the initializer rather than of
+// the binding name, so it is still counted.
 func countWriteReferences(refs []*ast.Node) int {
 	count := 0
 	for _, ref := range refs {
