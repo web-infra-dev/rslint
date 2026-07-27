@@ -170,6 +170,29 @@ func (r ReferenceEntry) Node() *ast.Node { return r.node }
 // Symbol returns the resolved symbol for the reference, or nil if unresolved.
 func (r ReferenceEntry) Symbol() *ast.Symbol { return r.symbol }
 
+// resolveReference resolves an identifier to its referenced symbol, trying
+// ctx.Refs first: it answers from a per-node binder scope-walk with no
+// TypeChecker round-trip, and correctly resolves same-file locals — the
+// overwhelming majority of through-references a loop-closure can actually
+// capture (loop counters, outer function locals, imported bindings, which are
+// all declared, and therefore locally bound, in this file). It returns nil
+// for identifiers naming a symbol declared outside this file — ambient/lib
+// globals (`console`, `Array`, ...) and checker-merged declarations (a
+// namespace merged with a value, for instance) — which only the TypeChecker
+// can see, so it's used as a fallback there when available. Falling all the
+// way through to nil (no TypeChecker either) simply excludes the reference
+// from the through-reference set — the same outcome as if it had resolved
+// but turned out to be declared outside `funcNode` and never written to.
+func (s *RunState) resolveReference(n *ast.Node) *ast.Symbol {
+	if sym := s.Ctx.Refs.Resolve(n); sym != nil {
+		return sym
+	}
+	if s.Ctx.TypeChecker != nil {
+		return utils.GetReferenceSymbol(n, s.Ctx.TypeChecker)
+	}
+	return nil
+}
+
 // collectThroughReferences walks the function-like node's parameters and body
 // and returns all identifier references whose resolved symbol has at least one
 // declaration outside the function subtree. The function's own name node is
@@ -199,7 +222,7 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 		}
 
 		if n.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(n) {
-			sym := utils.GetReferenceSymbol(n, s.Ctx.TypeChecker)
+			sym := s.resolveReference(n)
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
@@ -366,14 +389,16 @@ func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
 // binderReferences returns sym's references via ctx.Refs, reporting false
 // when the binder-based index can't be trusted to answer for this symbol.
 //
-// ctx.Refs keys on raw binder symbols, while sym here comes from the checker
-// (utils.GetReferenceSymbol in CollectThroughReferences), which hands out
-// merged symbols that can compare unequal to the ones the binder's scope walk
-// returns — for example a namespace merged with a value, or a symbol declared
-// in lib/ambient code. A declaration keeps its own unmerged symbol, so
-// requiring decl.Symbol() == sym on every declaration (and that it lives in
-// this file, since ctx.Refs is per-file) is an exact identity test; failing
-// it falls back to the checker instead of risking a wrong answer.
+// ctx.Refs keys on raw binder symbols. resolveReference hands out exactly
+// that kind of symbol on its common path (ctx.Refs.Resolve), but falls back
+// to the checker for symbols the binder can't see from this file (ambient
+// globals, cross-file/merged declarations) — those checker symbols can
+// compare unequal to what the binder's own scope walk would return for the
+// same declaration (for example a namespace merged with a value). A
+// declaration keeps its own unmerged symbol, so requiring decl.Symbol() ==
+// sym on every declaration (and that it lives in this file, since ctx.Refs is
+// per-file) is an exact identity test; failing it falls back to the checker
+// instead of risking a wrong answer.
 //
 // ctx.Refs also excludes declaration-name identifiers (they declare the
 // symbol rather than reference it), but ESLint's scope manager — and
@@ -382,7 +407,7 @@ func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
 // catch parameters. Those names are merged back into the result in source
 // order so isSafeCore keeps seeing them.
 func (s *RunState) binderReferences(sym *ast.Symbol) ([]*ast.Node, bool) {
-	if s.Ctx.Refs == nil || sym == nil || len(sym.Declarations) == 0 {
+	if sym == nil || len(sym.Declarations) == 0 {
 		return nil, false
 	}
 	declNames := make([]*ast.Node, 0, len(sym.Declarations))
@@ -491,15 +516,8 @@ func (s *RunState) checkForLoopsCore(node *ast.Node) {
 // NoLoopFuncRule disallows function declarations that contain unsafe
 // references to variable(s) inside loop statements.
 var NoLoopFuncRule = rule.Rule{
-	Name:             "no-loop-func",
-	RequiresTypeInfo: true,
+	Name: "no-loop-func",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
-			return rule.RuleListeners{}
-		}
 		s := &RunState{
 			Ctx:          ctx,
 			SkippedIIFEs: map[*ast.Node]bool{},
