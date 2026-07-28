@@ -2,6 +2,7 @@ package no_useless_backreference
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -14,15 +15,25 @@ import (
 var NoUselessBackreferenceRule = rule.Rule{
 	Name: "no-useless-backreference",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		// Every pattern this rule can report contains a backslash. Constructor
+		// patterns folded by StaticStringEvaluator also get that character from
+		// a literal in this source file, so files without one need no listeners.
+		if ctx.SourceFile != nil && !strings.Contains(ctx.SourceFile.Text(), `\`) {
+			return nil
+		}
+
 		mayUseRegExp := sourceMayUseRegExp(ctx)
 		var calleeCache *regExpCalleeCache
 		listeners := rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				if mayUseRegExp && isRegexLiteralHandledByConstructor(ctx, node, calleeCache) {
-					return
-				}
 				pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
 				if pattern == "" && flags == "" {
+					return
+				}
+				if !mayContainBackreference(pattern) {
+					return
+				}
+				if mayUseRegExp && isRegexLiteralHandledByConstructor(ctx, node, calleeCache) {
 					return
 				}
 				rxFlags := utils.ParseRegexFlags(flags)
@@ -218,16 +229,13 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node, ca
 	default:
 		return false
 	}
-	if !isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee), calleeCache) {
-		return false
-	}
 	if args == nil || len(args.Nodes) == 0 {
 		return false
 	}
 	if first := ast.SkipParentheses(args.Nodes[0]); first != node {
 		return false
 	}
-	return true
+	return isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee), calleeCache)
 }
 
 type regExpCalleeCache struct {
