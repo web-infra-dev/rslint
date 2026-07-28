@@ -81,9 +81,6 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 		analyzer := NewOperandAnalyzer(ctx, opts)
 		chainAnalyzer := NewChainAnalyzer(ctx, opts)
 
-		// Track visited binary expressions to avoid duplicate reports
-		visited := make(map[*ast.Node]struct{})
-
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				bin := node.AsBinaryExpression()
@@ -107,12 +104,6 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 						return
 					}
 				}
-
-				// Skip if already visited
-				if _, ok := visited[node]; ok {
-					return
-				}
-				visited[node] = struct{}{}
 
 				// Gather and classify operands
 				operands, chainOp := analyzer.GatherLogicalOperands(node)

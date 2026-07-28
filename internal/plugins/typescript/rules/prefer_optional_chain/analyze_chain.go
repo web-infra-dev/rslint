@@ -12,8 +12,10 @@ import (
 )
 
 type ChainAnalyzer struct {
-	ctx  rule.RuleContext
-	opts PreferOptionalChainOptions
+	ctx        rule.RuleContext
+	opts       PreferOptionalChainOptions
+	chainParts []chainPart
+	partFlags  []uint8
 }
 
 func NewChainAnalyzer(ctx rule.RuleContext, opts PreferOptionalChainOptions) *ChainAnalyzer {
@@ -23,17 +25,66 @@ func NewChainAnalyzer(ctx rule.RuleContext, opts PreferOptionalChainOptions) *Ch
 	}
 }
 
-// reportRangeWithFixesOrSuggestions reports a diagnostic at the given range,
-// using either fixes (auto-fix) or suggestions based on the useFix flag.
-func reportRangeWithFixesOrSuggestions(ctx rule.RuleContext, textRange core.TextRange, fix bool, msg rule.RuleMessage, suggestionMsg rule.RuleMessage, fixes ...rule.RuleFix) {
-	if fix {
-		ctx.ReportRangeWithFixes(textRange, msg, fixes...)
-	} else {
-		ctx.ReportRangeWithSuggestions(textRange, msg, rule.RuleSuggestion{
-			Message:  suggestionMsg,
-			FixesArr: fixes,
-		})
+// reportRangeWithDeferredFixesOrSuggestions reports a diagnostic immediately,
+// but only decides its edit category and builds replacement text when the
+// diagnostic consumer requests edits.
+func reportRangeWithDeferredFixesOrSuggestions(
+	ctx rule.RuleContext,
+	textRange core.TextRange,
+	msg rule.RuleMessage,
+	suggestionMsg rule.RuleMessage,
+	shouldUseFix func() bool,
+	buildFixes func() []rule.RuleFix,
+) {
+	var (
+		decisionReady bool
+		useFix        bool
+		fixesReady    bool
+		fixes         []rule.RuleFix
+	)
+
+	getUseFix := func() bool {
+		if !decisionReady {
+			useFix = shouldUseFix()
+			decisionReady = true
+		}
+		return useFix
 	}
+	getFixes := func() []rule.RuleFix {
+		if !fixesReady {
+			fixes = buildFixes()
+			fixesReady = true
+		}
+		return fixes
+	}
+
+	ctx.ReportRangeWithDeferredFixesAndSuggestions(
+		textRange,
+		msg,
+		func() []rule.RuleFix {
+			if !getUseFix() {
+				return nil
+			}
+			return getFixes()
+		},
+		func() []rule.RuleSuggestion {
+			if getUseFix() {
+				return nil
+			}
+			builtFixes := getFixes()
+			if len(builtFixes) == 0 {
+				return nil
+			}
+			return []rule.RuleSuggestion{{
+				Message:  suggestionMsg,
+				FixesArr: builtFixes,
+			}}
+		},
+	)
+}
+
+func trimNodeRangeWithEnd(sourceFile *ast.SourceFile, node *ast.Node, end int) core.TextRange {
+	return core.NewTextRange(scanner.SkipTrivia(sourceFile.Text(), node.Pos()), end)
 }
 
 func (ca *ChainAnalyzer) AnalyzeChain(
@@ -58,21 +109,6 @@ func (ca *ChainAnalyzer) AnalyzeChain(
 			continue
 		}
 
-		// Pre-compute which operands are "paired" strict checks.
-		// Paired means: two consecutive operands with Equal ComparedNodes and
-		// complementary strict checks (e.g., !== undefined + !== null).
-		// Paired operands together cover both nullish values.
-		pairedOperands := make(map[int]bool)
-		for j := range len(operands) - 1 {
-			a, b := operands[j], operands[j+1]
-			if a.ComparedNode != nil && b.ComparedNode != nil &&
-				compareNodesUncached(a.ComparedNode, b.ComparedNode) == NodeComparisonEqual &&
-				isComplementaryGuard(a, b) {
-				pairedOperands[j] = true
-				pairedOperands[j+1] = true
-			}
-		}
-
 		// Try to extend the chain
 		chainEnd := i + 1
 		for chainEnd < len(operands) {
@@ -90,7 +126,7 @@ func (ca *ChainAnalyzer) AnalyzeChain(
 			// Check if the current guard is sufficient for optional chaining.
 			// Strict equality (!== null, !== undefined) only covers one nullish value.
 			// Skip the check if this operand is part of a complementary pair.
-			if !pairedOperands[chainEnd-1] && !ca.isGuardSufficientForChain(curr) {
+			if !isPairedOperand(operands, chainEnd-1) && !ca.isGuardSufficientForChain(curr) {
 				break
 			}
 
@@ -102,7 +138,7 @@ func (ca *ChainAnalyzer) AnalyzeChain(
 			// When extending to a deeper property (Subset), verify the next guard
 			// is sufficient (or paired). Prevents extending through a lone strict
 			// check (e.g., !== undefined after != null).
-			if cmp == NodeComparisonSubset && !pairedOperands[chainEnd] && !ca.isGuardSufficientForChain(next) {
+			if cmp == NodeComparisonSubset && !isPairedOperand(operands, chainEnd) && !ca.isGuardSufficientForChain(next) {
 				break
 			}
 
@@ -285,16 +321,6 @@ func (ca *ChainAnalyzer) reportChain(
 		return
 	}
 
-	// Build the optional chain expression
-	fixCode := ca.buildOptionalChainCode(operands, operator)
-	if fixCode == "" {
-		return
-	}
-
-	// Wrap the chain code based on the last operand's comparison type
-	lastOperand := operands[len(operands)-1]
-	fixCode = wrapChainCode(fixCode, lastOperand)
-
 	// Find the binary expression that encompasses all operands, covering any
 	// enclosing parentheses (e.g., `a && (a.b && a.b.c)` → the outer `&&`).
 	firstNode := operands[0].Node
@@ -315,19 +341,28 @@ func (ca *ChainAnalyzer) reportChain(
 		}
 		n = n.Parent
 	}
-	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(reportNode.End())
-
-	// Determine if we should use fix or suggestion
-	useFix := ca.shouldUseFix(operands)
+	reportRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, reportNode.End())
 
 	msg := buildPreferOptionalChainMessage()
 	sugMsg := buildOptionalChainSuggestMessage()
 
-	fixes := []rule.RuleFix{
-		rule.RuleFixReplaceRange(reportRange, fixCode),
-	}
-
-	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, useFix, msg, sugMsg, fixes...)
+	reportRangeWithDeferredFixesOrSuggestions(
+		ca.ctx,
+		reportRange,
+		msg,
+		sugMsg,
+		func() bool {
+			return ca.shouldUseFix(operands)
+		},
+		func() []rule.RuleFix {
+			fixCode := ca.buildOptionalChainCode(operands, operator)
+			if fixCode == "" {
+				return nil
+			}
+			fixCode = wrapChainCode(fixCode, operands[len(operands)-1])
+			return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, fixCode)}
+		},
+	)
 }
 
 // reportChainCoveringMerged reports a chain where the last operand was merged
@@ -351,13 +386,6 @@ func (ca *ChainAnalyzer) reportChainCoveringMerged(
 		return
 	}
 
-	fixCode := ca.buildOptionalChainCode(operands, operator)
-	if fixCode == "" {
-		return
-	}
-	lastOperand := operands[len(operands)-1]
-	fixCode = wrapChainCode(fixCode, lastOperand)
-
 	firstNode := operands[0].Node
 	// The report/fix range must cover up to the merged operand's end.
 	reportNode := findBinaryExpressionCovering(parentNode, firstNode, mergedOp.Node)
@@ -373,16 +401,29 @@ func (ca *ChainAnalyzer) reportChainCoveringMerged(
 		}
 		n = n.Parent
 	}
-	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(reportNode.End())
+	reportRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, reportNode.End())
 
 	// Complementary-pair merges always produce a suggestion, not an auto-fix,
 	// because the output changes the comparison operator (!== to !=).
 	msg := buildPreferOptionalChainMessage()
 	sugMsg := buildOptionalChainSuggestMessage()
-	fixes := []rule.RuleFix{
-		rule.RuleFixReplaceRange(reportRange, fixCode),
-	}
-	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, false, msg, sugMsg, fixes...)
+	reportRangeWithDeferredFixesOrSuggestions(
+		ca.ctx,
+		reportRange,
+		msg,
+		sugMsg,
+		func() bool {
+			return false
+		},
+		func() []rule.RuleFix {
+			fixCode := ca.buildOptionalChainCode(operands, operator)
+			if fixCode == "" {
+				return nil
+			}
+			fixCode = wrapChainCode(fixCode, operands[len(operands)-1])
+			return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, fixCode)}
+		},
+	)
 }
 
 // reportChainWithTail reports a chain where the fix only covers the truncated
@@ -412,12 +453,6 @@ func (ca *ChainAnalyzer) reportChainWithTail(
 		return
 	}
 
-	fixCode := ca.buildOptionalChainCode(chainOps, operator)
-	if fixCode == "" {
-		return
-	}
-	fixCode = wrapChainCode(fixCode, chainOps[len(chainOps)-1])
-
 	// Report range covers the full expression (chain + tail) for display purposes,
 	// but fix range only covers the truncated chain — tail source text stays as-is.
 	firstNode := chainOps[0].Node
@@ -437,24 +472,32 @@ func (ca *ChainAnalyzer) reportChainWithTail(
 		n = n.Parent
 	}
 	// Fix range: from start to the last chain operand's end (tail preserved as-is).
-	fixRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(lastChainNode.End())
+	fixRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, lastChainNode.End())
 	// Report range: from start to the end of the full expression (chain + tail).
-	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(reportNode.End())
-
-	// For truncated chains, force suggestion for && chains (matches TS-ESLint).
-	useFix := ca.shouldUseFix(chainOps)
-	if operator == ast.KindAmpersandAmpersandToken {
-		useFix = false
-	}
+	reportRange := fixRange.WithEnd(reportNode.End())
 
 	msg := buildPreferOptionalChainMessage()
 	sugMsg := buildOptionalChainSuggestMessage()
 
-	fixes := []rule.RuleFix{
-		rule.RuleFixReplaceRange(fixRange, fixCode),
-	}
-
-	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, useFix, msg, sugMsg, fixes...)
+	reportRangeWithDeferredFixesOrSuggestions(
+		ca.ctx,
+		reportRange,
+		msg,
+		sugMsg,
+		func() bool {
+			// For truncated chains, force suggestion for && chains
+			// (matches TS-ESLint).
+			return operator != ast.KindAmpersandAmpersandToken && ca.shouldUseFix(chainOps)
+		},
+		func() []rule.RuleFix {
+			fixCode := ca.buildOptionalChainCode(chainOps, operator)
+			if fixCode == "" {
+				return nil
+			}
+			fixCode = wrapChainCode(fixCode, chainOps[len(chainOps)-1])
+			return []rule.RuleFix{rule.RuleFixReplaceRange(fixRange, fixCode)}
+		},
+	)
 }
 
 func (ca *ChainAnalyzer) shouldUseFix(operands []Operand) bool {
@@ -577,6 +620,18 @@ func isComplementaryGuard(a, b Operand) bool {
 		(coversUndefined(a.ComparisonType) && coversNull(b.ComparisonType))
 }
 
+func isPairedOperand(operands []Operand, index int) bool {
+	return index > 0 && operandsFormComplementaryPair(operands[index-1], operands[index]) ||
+		index+1 < len(operands) && operandsFormComplementaryPair(operands[index], operands[index+1])
+}
+
+func operandsFormComplementaryPair(a, b Operand) bool {
+	return a.ComparedNode != nil &&
+		b.ComparedNode != nil &&
+		isComplementaryGuard(a, b) &&
+		compareNodesUncached(a.ComparedNode, b.ComparedNode) == NodeComparisonEqual
+}
+
 func (ca *ChainAnalyzer) isGuardSufficientForChain(guard Operand) bool {
 	switch guard.ComparisonType {
 	case ComparisonBoolean, ComparisonNotBoolean:
@@ -690,7 +745,6 @@ func wouldChangeTruthiness(operands []Operand, operator ast.Kind) bool {
 	return false
 }
 
-
 func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast.Kind) string {
 	if len(operands) < 2 {
 		return ""
@@ -703,17 +757,26 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 	}
 
 	// Flatten the last operand's node into a chain of accesses
-	parts := flattenChainExpression(lastOperand.ComparedNode)
+	parts := ca.flattenChainExpression(lastOperand.ComparedNode)
 	if len(parts) == 0 {
 		return ca.getNodeText(lastOperand.ComparedNode)
 	}
 
-	// Determine which part indices need ?. insertion
-	// A guard matching at part[j] means: the access at part[j+1] should use ?.
-	optionalIndices := make(map[int]bool)
+	// A guard matching at part[j] means the access at part[j+1] should use ?.
+	// Keep all per-part output state in one compact slice.
+	var partFlags []uint8
+	if cap(ca.partFlags) < len(parts) {
+		ca.partFlags = make([]uint8, len(parts))
+		partFlags = ca.partFlags
+	} else {
+		ca.partFlags = ca.partFlags[:len(parts)]
+		clear(ca.partFlags)
+		partFlags = ca.partFlags
+	}
+	hasOptionalIndex := false
 
-	// Track the deepest guard match so we can use its parts for output
-	var deepestGuardParts []chainPart
+	// Track the deepest guard match so we can use its base for output.
+	var deepestGuardNode *ast.Node
 	deepestGuardPartIdx := -1
 
 	for i := range len(operands) - 1 {
@@ -722,36 +785,35 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 			continue
 		}
 
-		for j, part := range parts {
-			cmp := compareNodesUncached(guard.ComparedNode, part.node)
-			if cmp == NodeComparisonEqual {
-				// Guard matches this part exactly, so the NEXT access needs ?.
-				if j+1 < len(parts) {
-					optionalIndices[j+1] = true
-				}
-				// Track the deepest guard for output generation
-				if j > deepestGuardPartIdx {
-					deepestGuardPartIdx = j
-					deepestGuardParts = flattenChainExpression(guard.ComparedNode)
-				}
-				break
+		// Equal chain expressions have the same access depth, so only the
+		// corresponding part can match. Avoid comparing the guard against
+		// every shallower prefix.
+		j := chainDepth(guard.ComparedNode)
+		if j < len(parts) &&
+			compareNodesUncached(guard.ComparedNode, parts[j].node) == NodeComparisonEqual {
+			if j+1 < len(parts) {
+				partFlags[j+1] |= chainPartFlagInsertedOptional
+				hasOptionalIndex = true
+			}
+			// Track the deepest guard for output generation
+			if j > deepestGuardPartIdx {
+				deepestGuardPartIdx = j
+				deepestGuardNode = guard.ComparedNode
 			}
 		}
 	}
 
 	// If no optional indices were found, try a simpler approach:
 	// the first guard is a prefix of the last operand
-	if len(optionalIndices) == 0 {
+	if !hasOptionalIndex {
 		firstGuard := operands[0]
 		if firstGuard.ComparedNode != nil {
-			for j, part := range parts {
-				cmp := compareNodesUncached(firstGuard.ComparedNode, part.node)
-				if cmp == NodeComparisonEqual && j+1 < len(parts) {
-					optionalIndices[j+1] = true
-					deepestGuardPartIdx = j
-					deepestGuardParts = flattenChainExpression(firstGuard.ComparedNode)
-					break
-				}
+			j := chainDepth(firstGuard.ComparedNode)
+			if j+1 < len(parts) &&
+				compareNodesUncached(firstGuard.ComparedNode, parts[j].node) == NodeComparisonEqual {
+				partFlags[j+1] |= chainPartFlagInsertedOptional
+				deepestGuardPartIdx = j
+				deepestGuardNode = firstGuard.ComparedNode
 			}
 		}
 	}
@@ -763,8 +825,6 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 	// tsgo's AST QuestionDotToken flags may be on the wrong operand's nodes,
 	// so we scan the guard's source text (via GetSourceTextOfNodeFromSourceFile)
 	// to determine the correct ?. positions.
-	guardOptionals := make(map[int]bool)
-	guardNonNulls := make(map[int]bool)
 	if deepestGuardPartIdx >= 0 {
 		// Scan each guard's source text for ?. positions
 		for gi := range len(operands) - 1 {
@@ -777,22 +837,24 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 			for ci := 0; ci < len(guardText); ci++ {
 				if ci+1 < len(guardText) && guardText[ci] == '?' && guardText[ci+1] == '.' {
 					depth++
-					guardOptionals[depth] = true
+					if depth < len(partFlags) {
+						partFlags[depth] |= chainPartFlagPreservedOptional
+					}
 					ci++ // skip the '.'
 				} else if guardText[ci] == '.' {
 					depth++
 				}
 			}
 		}
-		guardNonNulls = collectNonNullPositions(operands[0 : len(operands)-1])
+		collectNonNullPositions(operands[0:len(operands)-1], partFlags)
 		// Align base node NonNull with the guard:
 		// - If guard has NonNull base and target doesn't: use guard's base
 		// - If target has NonNull base but guard doesn't: strip it (use inner expression)
-		if len(deepestGuardParts) > 0 {
-			gp := deepestGuardParts[0]
-			if ast.IsNonNullExpression(gp.node) && !ast.IsNonNullExpression(parts[0].node) {
-				parts[0].node = gp.node
-			} else if !ast.IsNonNullExpression(gp.node) && ast.IsNonNullExpression(parts[0].node) {
+		if deepestGuardNode != nil {
+			guardBase := chainBase(deepestGuardNode)
+			if ast.IsNonNullExpression(guardBase) && !ast.IsNonNullExpression(parts[0].node) {
+				parts[0].node = guardBase
+			} else if !ast.IsNonNullExpression(guardBase) && ast.IsNonNullExpression(parts[0].node) {
 				// Guard has no NonNull but target does — strip it
 				parts[0].node = ast.SkipParentheses(parts[0].node.Expression())
 			}
@@ -815,14 +877,15 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 
 	// Write each accessor, inserting ?. where needed
 	for i := 1; i < len(parts); i++ {
-		// Use ?. from optionalIndices (new insertions) OR from guard source text
+		// Use ?. from new insertions or from guard source text
 		// (preserving existing ?. from the original code)
-		useOptional := optionalIndices[i] || (i <= deepestGuardPartIdx && guardOptionals[i])
+		useOptional := partFlags[i]&chainPartFlagInsertedOptional != 0 ||
+			i <= deepestGuardPartIdx && partFlags[i]&chainPartFlagPreservedOptional != 0
 
 		// Check NonNull from guard (skip position 0 if base is already NonNull)
 		hasNonNull := false
 		if i-1 < deepestGuardPartIdx && (i-1 != 0 || !ast.IsNonNullExpression(parts[0].node)) {
-			hasNonNull = guardNonNulls[i-1]
+			hasNonNull = partFlags[i-1]&chainPartFlagPreservedNonNull != 0
 		}
 
 		ca.writeChainPart(&sb, parts[i], useOptional, hasNonNull)
@@ -839,6 +902,12 @@ const (
 	accessKindCall
 )
 
+const (
+	chainPartFlagInsertedOptional uint8 = 1 << iota
+	chainPartFlagPreservedOptional
+	chainPartFlagPreservedNonNull
+)
+
 type chainPart struct {
 	node              *ast.Node
 	accessKind        accessKind
@@ -850,11 +919,40 @@ type chainPart struct {
 	hasNonNullAfter   bool // the chain result up to this part is wrapped in NonNullExpression (!)
 }
 
-func flattenChainExpression(node *ast.Node) []chainPart {
+func (ca *ChainAnalyzer) flattenChainExpression(node *ast.Node) []chainPart {
 	n := ast.SkipParentheses(node)
-	var parts []chainPart
-	flattenChainExpressionRec(n, &parts)
-	return parts
+	partCount := chainDepth(n) + 1
+	if cap(ca.chainParts) < partCount {
+		ca.chainParts = make([]chainPart, 0, partCount)
+	} else {
+		ca.chainParts = ca.chainParts[:0]
+	}
+	flattenChainExpressionRec(n, &ca.chainParts)
+	return ca.chainParts
+}
+
+func chainBase(node *ast.Node) *ast.Node {
+	n := ast.SkipParentheses(node)
+	for {
+		switch n.Kind {
+		case ast.KindNonNullExpression:
+			inner := ast.SkipParentheses(n.Expression())
+			if inner.Kind != ast.KindPropertyAccessExpression &&
+				inner.Kind != ast.KindElementAccessExpression &&
+				inner.Kind != ast.KindCallExpression {
+				return n
+			}
+			n = inner
+		case ast.KindPropertyAccessExpression:
+			n = ast.SkipParentheses(n.AsPropertyAccessExpression().Expression)
+		case ast.KindElementAccessExpression:
+			n = ast.SkipParentheses(n.AsElementAccessExpression().Expression)
+		case ast.KindCallExpression:
+			n = ast.SkipParentheses(n.AsCallExpression().Expression)
+		default:
+			return n
+		}
+	}
 }
 
 func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
@@ -983,33 +1081,33 @@ func (ca *ChainAnalyzer) writeChainPart(sb *strings.Builder, part chainPart, nee
 
 // collectNonNullPositions walks the guard operands' ASTs to determine at which
 // chain depths a NonNullExpression (!) wraps the chain result.
-func collectNonNullPositions(guards []Operand) map[int]bool {
-	result := make(map[int]bool)
+func collectNonNullPositions(guards []Operand, partFlags []uint8) {
 	for _, guard := range guards {
 		if guard.ComparedNode == nil {
 			continue
 		}
-		collectNonNullRec(ast.SkipParentheses(guard.ComparedNode), result)
+		collectNonNullRec(ast.SkipParentheses(guard.ComparedNode), partFlags)
 	}
-	return result
 }
 
-func collectNonNullRec(node *ast.Node, result map[int]bool) {
+func collectNonNullRec(node *ast.Node, partFlags []uint8) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		prop := node.AsPropertyAccessExpression()
-		collectNonNullRec(ast.SkipParentheses(prop.Expression), result)
+		collectNonNullRec(ast.SkipParentheses(prop.Expression), partFlags)
 	case ast.KindElementAccessExpression:
 		elem := node.AsElementAccessExpression()
-		collectNonNullRec(ast.SkipParentheses(elem.Expression), result)
+		collectNonNullRec(ast.SkipParentheses(elem.Expression), partFlags)
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		collectNonNullRec(ast.SkipParentheses(call.Expression), result)
+		collectNonNullRec(ast.SkipParentheses(call.Expression), partFlags)
 	case ast.KindNonNullExpression:
 		inner := ast.SkipParentheses(node.Expression())
 		depth := chainDepth(inner)
-		result[depth] = true
-		collectNonNullRec(inner, result)
+		if depth < len(partFlags) {
+			partFlags[depth] |= chainPartFlagPreservedNonNull
+		}
+		collectNonNullRec(inner, partFlags)
 	}
 }
 
@@ -1163,35 +1261,36 @@ func (ca *ChainAnalyzer) AnalyzeOrEmptyObjectPattern(node *ast.Node) {
 		return
 	}
 
-	// Build the fix
-	leftText := ca.getNodeText(bin.Left)
-
-	// Check if left needs parens when used as the LHS of ?.
-	// Skip if the source already has parens around the left expression.
-	leftNode := ast.SkipParentheses(bin.Left)
-	if needsParensForOptionalBase(leftNode) && !ast.IsParenthesizedExpression(bin.Left) {
-		leftText = "(" + leftText + ")"
-	}
-
-	var fixCode string
-	if isElementAccess {
-		argText := ca.getNodeText(accessArgument)
-		fixCode = leftText + "?.[" + argText + "]"
-	} else {
-		fixCode = leftText + "?." + accessName
-	}
-
-	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, node).WithEnd(node.End())
-
 	msg := buildPreferOptionalChainMessage()
 	sugMsg := buildOptionalChainSuggestMessage()
-
-	fixes := []rule.RuleFix{
-		rule.RuleFixReplaceRange(reportRange, fixCode),
-	}
+	reportRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, node, node.End())
 
 	// (foo || {}).bar is always a suggestion, not a fix
-	rule.ReportNodeWithFixesOrSuggestions(ca.ctx, node, false, msg, sugMsg, fixes...)
+	ca.ctx.ReportRangeWithDeferredSuggestions(reportRange, msg, func() []rule.RuleSuggestion {
+		leftText := ca.getNodeText(bin.Left)
+
+		// Check if left needs parens when used as the LHS of ?.
+		// Skip if the source already has parens around the left expression.
+		leftNode := ast.SkipParentheses(bin.Left)
+		if needsParensForOptionalBase(leftNode) && !ast.IsParenthesizedExpression(bin.Left) {
+			leftText = "(" + leftText + ")"
+		}
+
+		var fixCode string
+		if isElementAccess {
+			argText := ca.getNodeText(accessArgument)
+			fixCode = leftText + "?.[" + argText + "]"
+		} else {
+			fixCode = leftText + "?." + accessName
+		}
+
+		return []rule.RuleSuggestion{{
+			Message: sugMsg,
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(reportRange, fixCode),
+			},
+		}}
+	})
 }
 
 // wrapChainCode wraps the generated optional chain code with the last operand's

@@ -38,8 +38,9 @@ type Operand struct {
 }
 
 type OperandAnalyzer struct {
-	ctx  rule.RuleContext
-	opts PreferOptionalChainOptions
+	ctx      rule.RuleContext
+	opts     PreferOptionalChainOptions
+	operands []Operand
 }
 
 func NewOperandAnalyzer(ctx rule.RuleContext, opts PreferOptionalChainOptions) *OperandAnalyzer {
@@ -54,8 +55,14 @@ func (a *OperandAnalyzer) GatherLogicalOperands(node *ast.Node) ([]Operand, ast.
 		return nil, operator
 	}
 
-	operands := make([]Operand, 0, 4)
-	a.flattenLogicalOperands(node, operator, &operands)
+	operandCount := countLogicalOperands(node, operator)
+	if cap(a.operands) < operandCount {
+		a.operands = make([]Operand, 0, operandCount)
+	} else {
+		a.operands = a.operands[:0]
+	}
+	a.flattenLogicalOperands(node, operator, &a.operands)
+	operands := a.operands
 
 	// The last operand in the chain is not used as a guard — it's the
 	// chain target. Re-classify it without the falsy-literal restriction
@@ -87,6 +94,17 @@ func (a *OperandAnalyzer) GatherLogicalOperands(node *ast.Node) ([]Operand, ast.
 	}
 
 	return operands, operator
+}
+
+func countLogicalOperands(node *ast.Node, operator ast.Kind) int {
+	unwrapped := ast.SkipParentheses(node)
+	if ast.IsBinaryExpression(unwrapped) {
+		bin := unwrapped.AsBinaryExpression()
+		if bin.OperatorToken.Kind == operator {
+			return countLogicalOperands(bin.Left, operator) + countLogicalOperands(bin.Right, operator)
+		}
+	}
+	return 1
 }
 
 func (a *OperandAnalyzer) flattenLogicalOperands(node *ast.Node, operator ast.Kind, operands *[]Operand) {
@@ -486,4 +504,3 @@ func isFalsyLiteralType(t *checker.Type) bool {
 
 	return false
 }
-
