@@ -400,18 +400,16 @@ hand-roll a "try `ctx.Refs`, fall back to the checker" wrapper of your own —
 `Resolve` already is that wrapper. Building your own copy repeats the
 checker round-trip logic for no benefit.
 
-### Gotcha: `Resolve(node) != nil` no longer means "declared in this file"
+### `Resolve(node) != nil` does not mean "declared in this file"
 
-Before, `Resolve` was binder-only, so `nil` doubled as "not declared in this
-file" — useful for distinguishing a shadowing local declaration from an
-untouched global. That's no longer true whenever a TypeChecker is available:
-`Resolve` can now return a non-nil symbol for a standard-library global
-(`RegExp`, `window`, `console`, …), an ambient `.d.ts` declaration, or a
-cross-file symbol, exactly the same as for a same-file local.
+`Resolve` returns a non-nil symbol for a standard-library global (`RegExp`,
+`window`, `console`, …), an ambient `.d.ts` declaration, or a cross-file
+symbol, exactly the same as it does for a same-file local — nil vs. non-nil
+alone does not distinguish them.
 
-If a rule genuinely needs "is this identifier shadowed by a local
-declaration" rather than "what does it resolve to," check where the returned
-symbol is actually declared, not just whether it resolved:
+If a rule needs "is this identifier shadowed by a local declaration" rather
+than "what does it resolve to," check where the returned symbol is actually
+declared:
 
 ```go
 sym := ctx.Refs.Resolve(node)
@@ -419,11 +417,6 @@ if sym != nil && utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
     // shadowed by a real local binding
 }
 ```
-
-Skipping that check is a known way to break a rule silently: a rule that
-distinguished the real global `RegExp`/`window` from a locally shadowed
-variable by testing `Resolve(id) != nil` alone stopped firing once `Resolve`
-started resolving those globals through the checker.
 
 ### Collecting references to a symbol
 
