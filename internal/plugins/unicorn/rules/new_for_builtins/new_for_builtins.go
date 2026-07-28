@@ -24,7 +24,8 @@ const (
 )
 
 var NewForBuiltinsRule = rule.Rule{
-	Name: "unicorn/new-for-builtins",
+	Name:   "unicorn/new-for-builtins",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceHasPotentialReference(ctx.SourceFile) {
 			return nil

@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkInfinity": {
+          "type": "boolean",
+          "description": "Whether to check usage of the global `Infinity`."
+        },
+        "checkNaN": {
+          "type": "boolean",
+          "description": "Whether to check usage of the global `NaN`."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

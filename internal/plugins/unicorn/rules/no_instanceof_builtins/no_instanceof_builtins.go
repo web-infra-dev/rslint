@@ -1,6 +1,7 @@
 package no_instanceof_builtins
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_instanceof_builtins.schema.json
+var schemaJSON []byte
 
 const (
 	messageIDNoInstanceofBuiltins = "no-instanceof-builtins"
@@ -77,9 +81,9 @@ type options struct {
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/no-instanceof-builtins.md
 var NoInstanceofBuiltinsRule = rule.Rule{
-	Name: "unicorn/no-instanceof-builtins",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "unicorn/no-instanceof-builtins",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
@@ -140,7 +144,7 @@ func checkBinaryExpression(ctx rule.RuleContext, node *ast.Node, opts options) {
 	}
 }
 
-func parseOptions(rawOptions any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{
 		useErrorIsError: false,
 		strategy:        "loose",
