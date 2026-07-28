@@ -175,6 +175,11 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 					if leftNode == current {
 						return true
 					}
+					// current sits on the right-hand side of `=`, e.g. the
+					// default value `{x}` in `y = {x}`. That's a plain
+					// expression, not a pattern element, so stop walking
+					// instead of climbing past it into the outer pattern.
+					return false
 				}
 			}
 			// Check if this is a destructuring target in for-in/for-of
@@ -182,6 +187,18 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 				stmt := parent.AsForInOrOfStatement()
 				if stmt != nil && stmt.Initializer == current {
 					return true
+				}
+			}
+
+			// current is the default value of a shorthand property, e.g.
+			// `{x}` in `{y = {x}}`. Shorthand defaults are stored as their
+			// own field rather than a BinaryExpression, but they're still
+			// just a value expression — not a pattern element — so stop
+			// walking instead of climbing into the outer pattern.
+			if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
+				shorthand := parent.AsShorthandPropertyAssignment()
+				if shorthand != nil && shorthand.ObjectAssignmentInitializer == current {
+					return false
 				}
 			}
 

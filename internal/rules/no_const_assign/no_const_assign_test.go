@@ -89,6 +89,21 @@ func TestNoConstAssignRule(t *testing.T) {
 
 			// Nested block scopes
 			{Code: `const x = 0; { { let x; x = 1; } }`},
+
+			// Const read inside a nested object literal used as a
+			// destructuring default value — the default value is a plain
+			// expression, not a pattern, so the shorthand read must not be
+			// mistaken for a write to the destructuring target.
+			{Code: `const x = 0; let y; ({a: y = {x}} = {});`},
+
+			// Same case with array destructuring default value
+			{Code: `const x = 0; let y; ([y = [x]] = []);`},
+
+			// Const read inside a shorthand-property default value
+			{Code: `const x = 0; let y; ({y = {x}} = {});`},
+
+			// Const read as a plain (non-object) default value
+			{Code: `const x = 0; let y; ({y = x} = {});`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -356,6 +371,15 @@ func TestNoConstAssignRule(t *testing.T) {
 				Code: `const x = 1; { { x = 2; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "const", Line: 1, Column: 18},
+				},
+			},
+
+			// Const is the actual write target behind a default value —
+			// distinct from `{a: y = {x}}`, where `x` is only read.
+			{
+				Code: `const x = 0; ({a: x = 1} = {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 19},
 				},
 			},
 		},
