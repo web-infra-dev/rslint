@@ -209,8 +209,7 @@ var pureMathMethods = []string{
 	"tan", "tanh", "trunc",
 }
 
-// Calls to these members are side-effect-free. Argument evaluation remains
-// represented separately in RSLIM's IR.
+// Calls to these members are side-effect-free.
 var pureGlobalMethodGroups = []knownGlobalMemberGroup{
 	{Global: "Array", Members: []string{"isArray", "of"}},
 	{Global: "ArrayBuffer", Members: []string{"isView"}},
