@@ -90,7 +90,7 @@ catalog:
   dagre: ^0.8.5
   input-otp: ^1.4.2
   lucide-react: ^0.577.0
-  monaco-editor: ^0.56.0
+  monaco-editor: 0.55.1
   react: ^19.2.8
   react-dom: ^19.2.8
   rsbuild-plugin-google-analytics: ^1.0.6
