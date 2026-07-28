@@ -761,9 +761,6 @@ type ProjectInfoTelemetryEvent = lsproto.ProjectInfoTelemetryEvent
 type ProjectInfoTelemetryMeasurements = lsproto.ProjectInfoTelemetryMeasurements
 type PublishDiagnosticsClientCapabilities = lsproto.PublishDiagnosticsClientCapabilities
 type PublishDiagnosticsParams = lsproto.PublishDiagnosticsParams
-func UnmarshalParams[T any](req *lsproto.RequestMessage) (T, error) {
-	return lsproto.UnmarshalParams[T](req)
-}
 type Range = lsproto.Range
 type RangeOrEditRangeWithInsertReplace = lsproto.RangeOrEditRangeWithInsertReplace
 type RangeOrPrepareRenamePlaceholderOrPrepareRenameDefaultBehaviorOrNull = lsproto.RangeOrPrepareRenamePlaceholderOrPrepareRenameDefaultBehaviorOrNull
@@ -1163,6 +1160,9 @@ const UniquenessLevelGlobal = lsproto.UniquenessLevelGlobal
 const UniquenessLevelGroup = lsproto.UniquenessLevelGroup
 const UniquenessLevelProject = lsproto.UniquenessLevelProject
 const UniquenessLevelScheme = lsproto.UniquenessLevelScheme
+func UnmarshalParams[T any](req *lsproto.RequestMessage) (T, error) {
+	return lsproto.UnmarshalParams[T](req)
+}
 type Unregistration = lsproto.Unregistration
 type UnregistrationParams = lsproto.UnregistrationParams
 type UnregistrationResponse = lsproto.UnregistrationResponse

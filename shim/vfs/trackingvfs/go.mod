@@ -1,0 +1,7 @@
+module github.com/microsoft/typescript-go/shim/vfs/trackingvfs
+
+go 1.26
+
+require github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c
+
+require github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68 // indirect
