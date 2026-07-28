@@ -15,11 +15,11 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@10.34.5",
   "devDependencies": {
-    "@rslib/core": "0.23.0",
-    "@types/node": "25.9.4",
-    "@typescript/native-preview": "7.0.0-dev.20260427.1"
+    "@rslib/core": "0.23.2",
+    "@types/node": "25.9.5",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2"
   },
   "publishConfig": {
     "access": "public"
