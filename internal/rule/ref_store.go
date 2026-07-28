@@ -149,10 +149,10 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 // "is this identifier declared in this file" (nil vs. non-nil) just as
 // well, at no TypeChecker cost.
 func (s *RefStore) ResolveWithChecker(node *ast.Node) *ast.Symbol {
-	if s == nil {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return nil
 	}
-	if sym := s.Resolve(node); sym != nil {
+	if sym := s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/); sym != nil {
 		return sym
 	}
 	if s.tc == nil {

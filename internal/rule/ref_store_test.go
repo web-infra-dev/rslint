@@ -392,6 +392,29 @@ func TestRefStoreResolveWithChecker(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolveWithCheckerExcludedPositions(t *testing.T) {
+	// A TypeChecker resolves a property key's own declaration name to the
+	// property's symbol (its only declaration is that very key), not to
+	// anything the identifier "references". ResolveWithChecker must still
+	// treat it as a non-reference position and return nil, the same as
+	// Resolve does without a checker — the TypeChecker fallback is only for
+	// reference positions the binder scope walk can't place, not a way to
+	// resolve declaration names into their own symbol.
+	sourceFile, refs, done := newCheckedRefStore(t,
+		"export {}; function f() { var obj = { foo: 2 }; return obj.foo; }")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of foo, got %d", len(occurrences))
+	}
+	propertyKey := occurrences[0]
+
+	if got := refs.ResolveWithChecker(propertyKey); got != nil {
+		t.Fatalf("ResolveWithChecker(property key) = %v, want nil", got)
+	}
+}
+
 func TestRefStoreResolveWithCheckerNoChecker(t *testing.T) {
 	// Without a TypeChecker, ResolveWithChecker degrades to plain Resolve: an
 	// identifier the binder can't resolve stays unresolved.
