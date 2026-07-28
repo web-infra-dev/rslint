@@ -125,6 +125,29 @@ func customMessageFor(cfg bannedTypeConfig) string {
 	return " " + cfg.Message
 }
 
+func buildReplacementSuggestions(
+	sourceFile *ast.SourceFile,
+	typeNode *ast.Node,
+	name string,
+	replacements []string,
+) []rule.RuleSuggestion {
+	suggestions := make([]rule.RuleSuggestion, 0, len(replacements))
+	for _, replacement := range replacements {
+		suggestions = append(suggestions, rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "bannedTypeReplacement",
+				Description: fmt.Sprintf("Replace `%s` with `%s`.", name, replacement),
+				Data: map[string]string{
+					"name":        name,
+					"replacement": replacement,
+				},
+			},
+			FixesArr: []rule.RuleFix{rule.RuleFixReplace(sourceFile, typeNode, replacement)},
+		})
+	}
+	return suggestions
+}
+
 var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
 	Name: "no-restricted-types",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
@@ -164,33 +187,32 @@ var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
 				},
 			}
 
-			var fixes []rule.RuleFix
-			if cfg.Kind == "object" && cfg.HasFix {
-				fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, typeNode, cfg.FixWith)}
-			}
-
-			var suggestions []rule.RuleSuggestion
-			for _, replacement := range cfg.Suggest {
-				suggestions = append(suggestions, rule.RuleSuggestion{
-					Message: rule.RuleMessage{
-						Id:          "bannedTypeReplacement",
-						Description: fmt.Sprintf("Replace `%s` with `%s`.", name, replacement),
-						Data: map[string]string{
-							"name":        name,
-							"replacement": replacement,
-						},
-					},
-					FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, typeNode, replacement)},
-				})
-			}
-
+			hasFix := cfg.Kind == "object" && cfg.HasFix
+			hasSuggestions := len(cfg.Suggest) > 0
 			switch {
-			case len(fixes) > 0 && len(suggestions) > 0:
-				ctx.ReportNodeWithFixesAndSuggestions(typeNode, msg, fixes, suggestions)
-			case len(fixes) > 0:
-				ctx.ReportNodeWithFixes(typeNode, msg, fixes...)
-			case len(suggestions) > 0:
-				ctx.ReportNodeWithSuggestions(typeNode, msg, suggestions...)
+			case hasFix && hasSuggestions:
+				fixWith := cfg.FixWith
+				replacements := cfg.Suggest
+				ctx.ReportNodeWithDeferredFixesAndSuggestions(
+					typeNode,
+					msg,
+					func() []rule.RuleFix {
+						return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, typeNode, fixWith)}
+					},
+					func() []rule.RuleSuggestion {
+						return buildReplacementSuggestions(ctx.SourceFile, typeNode, name, replacements)
+					},
+				)
+			case hasFix:
+				fixWith := cfg.FixWith
+				ctx.ReportNodeWithDeferredFixes(typeNode, msg, func() []rule.RuleFix {
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, typeNode, fixWith)}
+				})
+			case hasSuggestions:
+				replacements := cfg.Suggest
+				ctx.ReportNodeWithDeferredSuggestions(typeNode, msg, func() []rule.RuleSuggestion {
+					return buildReplacementSuggestions(ctx.SourceFile, typeNode, name, replacements)
+				})
 			default:
 				ctx.ReportNode(typeNode, msg)
 			}

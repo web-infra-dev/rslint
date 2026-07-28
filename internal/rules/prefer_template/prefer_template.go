@@ -42,15 +42,16 @@ var PreferTemplateRule = rule.Rule{
 				Description: "Unexpected string concatenation.",
 			}
 
-			// Octal / non-octal-decimal escape sequences can't be represented
-			// in a template literal, so skip the autofix in that case.
-			if hasOctalOrNonOctalDecimalEscape(ctx.SourceFile, top) {
-				ctx.ReportNode(top, msg)
-				return
-			}
+			ctx.ReportNodeWithDeferredFixes(top, msg, func() []rule.RuleFix {
+				// Octal / non-octal-decimal escape sequences can't be represented
+				// in a template literal, so skip the autofix in that case.
+				if hasOctalOrNonOctalDecimalEscape(ctx.SourceFile, top) {
+					return nil
+				}
 
-			fixed := toTemplateLiteral(ctx.SourceFile, top, "", "")
-			ctx.ReportNodeWithFixes(top, msg, rule.RuleFixReplace(ctx.SourceFile, top, fixed))
+				fixed := toTemplateLiteral(ctx.SourceFile, top, "", "")
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, top, fixed)}
+			})
 		}
 
 		return rule.RuleListeners{

@@ -12,6 +12,7 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
 } from './pool-isolation/harness.js';
 
 /**
@@ -37,7 +38,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const pool = new WorkerPool({
         configs: localConfigs,
         workerCount: 2,
-        taskTimeoutMs: 10_000,
         onLog: (rec) => logs.push(rec),
       });
 
@@ -163,13 +163,16 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     // inbound shutdown message, so shutdown must escalate to a forced
     // terminate() after the 5s grace. Terminating an oxc-napi worker can
     // native-abort below the JS layer on Windows — run it isolated (see
-    // ./pool-isolation/runner.mjs). PASS = clean terminate; TOLERATED-PASS =
-    // pool reached terminate then the subprocess aborted; FAIL = hang, failed
-    // in-child assertion, or a crash before the terminate point.
-    test('shutdown drains a sync-wedged worker via terminate fallback within grace', async () => {
-      const r = await runPoolScenario('hang-shutdown');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    // ./pool-isolation/runner.mjs). Only a clean child exit is success; a
+    // native abort remains visible in the audit but fails this test.
+    test(
+      'shutdown drains a sync-wedged worker via terminate fallback',
+      async () => {
+        const r = await runPoolScenario('hang-shutdown');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     // U12: a single WorkerPool instance must support N lintBatch calls
     // in sequence (the CLI's fix-loop and the LSP's continuous edit
@@ -219,7 +222,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       expect(workers[0].ready).toBe(true);
 
       await pool.shutdown();
-    }, 30_000);
+    });
 
     // U11: a plugin with a refed top-level `setInterval` keeps the worker event
     // loop alive, so `pool.shutdown()` can't drain it cooperatively and must
@@ -229,14 +232,15 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     // runs in an isolated subprocess (see ./pool-isolation/runner.mjs): a native
     // abort is confined there, and the pool's outcome comes back via milestones.
     //
-    //   PASS           = clean terminate (mac/linux): shutdown bounded + drained
-    //   TOLERATED-PASS = pool reached terminate, then the subprocess aborted
-    //                    (Windows napi teardown) — the pool still did its job
-    //   FAIL           = hang, failed in-child assertion, or a crash BEFORE the
-    //                    terminate point — a real regression
-    test('U11: plugin with a top-level setInterval — shutdown still terminates the worker', async () => {
-      const r = await runPoolScenario('u11');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    // PASS requires exact terminate evidence, pool drain, and a clean child
+    // exit. Native aborts remain diagnostic-only and cannot make CI green.
+    test(
+      'U11: plugin with a top-level setInterval — shutdown still terminates the worker',
+      async () => {
+        const r = await runPoolScenario('u11');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
   },
 );

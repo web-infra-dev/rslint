@@ -1,4 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
+import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { IpcClient, encodeFrame, decodeFrame } from '../src/ipc/client.js';
 import type { IpcMessage, MessageKind } from '../src/ipc/protocol.js';
@@ -14,6 +15,10 @@ import type { IpcMessage, MessageKind } from '../src/ipc/protocol.js';
 function pairClients(): {
   a: IpcClient;
   b: IpcClient;
+  streams: {
+    aToB: PassThrough;
+    bToA: PassThrough;
+  };
   cleanup: () => void;
 } {
   // A.write → A→B → B.read
@@ -28,6 +33,7 @@ function pairClients(): {
   return {
     a,
     b,
+    streams: { aToB, bToA },
     cleanup: () => {
       a.close();
       b.close();
@@ -128,33 +134,37 @@ describe('encode/decode round-trip', () => {
 // loop is exercised by them. These cases feed deliberately split / fused
 // chunks and assert every frame decodes correctly and IN ORDER.
 describe('IpcClient streaming reassembly across chunk boundaries', () => {
-  // Wait until `arr` reaches `n` entries (or a short deadline). Used to
-  // synchronize on async 'data' delivery without a fixed sleep.
-  async function waitForCount(arr: unknown[], n: number): Promise<void> {
-    const deadline = Date.now() + 1000;
-    while (arr.length < n && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 2));
-    }
-  }
-
   // Single reader fed via notification frames (id=0, no reply needed) so
   // we can observe decoded frames in arrival order without a peer.
   function makeReader(): {
     input: PassThrough;
     received: number[];
+    waitForCount: (count: number) => Promise<void>;
     cleanup: () => void;
   } {
     const input = new PassThrough();
     const output = new PassThrough();
     const client = new IpcClient(input, output);
     const received: number[] = [];
+    const waiters = new Set<{ count: number; resolve: () => void }>();
     client.registerNotification('log', (msg) => {
       received.push((msg.data as { n: number }).n);
+      for (const waiter of waiters) {
+        if (received.length < waiter.count) continue;
+        waiters.delete(waiter);
+        waiter.resolve();
+      }
     });
     client.start();
     return {
       input,
       received,
+      waitForCount(count) {
+        if (received.length >= count) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          waiters.add({ count, resolve });
+        });
+      },
       cleanup: () => {
         client.close();
         input.end();
@@ -167,13 +177,23 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
     return encodeFrame({ kind: 'log', id: 0, data: { n } });
   }
 
+  function writeChunk(stream: PassThrough, chunk: Buffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      stream.write(chunk, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
   test('(ii) two complete frames in ONE chunk both decode, in order (while loop)', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       // Both frames concatenated into a single 'data' event. A
       // `while`→`if` regression would decode frame 1 and drop frame 2.
+      const delivered = waitForCount(2);
       input.write(Buffer.concat([logFrame(1), logFrame(2)]));
-      await waitForCount(received, 2);
+      await delivered;
       expect(received).toEqual([1, 2]);
     } finally {
       cleanup();
@@ -181,17 +201,17 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   });
 
   test('(i) a frame whose 4-byte header is split across two chunks decodes', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       const frame = logFrame(42);
       // First 2 bytes of the length header only — buf.length (2) <
       // HEADER_BYTES (4), so the while loop must NOT consume anything.
-      input.write(frame.subarray(0, 2));
-      await waitForCount(received, 1); // deadline elapses; nothing yet
+      await writeChunk(input, frame.subarray(0, 2));
       expect(received).toEqual([]);
       // Remainder (rest of header + full body) completes the frame.
+      const delivered = waitForCount(1);
       input.write(frame.subarray(2));
-      await waitForCount(received, 1);
+      await delivered;
       expect(received).toEqual([42]);
     } finally {
       cleanup();
@@ -199,16 +219,16 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   });
 
   test('(iii) a partial frame (header + part of body) then its remainder decodes', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       const frame = logFrame(7);
       // Header complete but body truncated: buf.length <
       // HEADER_BYTES + len, so the `break` arm holds the frame.
-      input.write(frame.subarray(0, 6));
-      await waitForCount(received, 1); // deadline elapses; nothing yet
+      await writeChunk(input, frame.subarray(0, 6));
       expect(received).toEqual([]);
+      const delivered = waitForCount(1);
       input.write(frame.subarray(6));
-      await waitForCount(received, 1);
+      await delivered;
       expect(received).toEqual([7]);
     } finally {
       cleanup();
@@ -216,19 +236,21 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   });
 
   test('mixed: a fused pair followed by a byte-by-byte dribbled frame, all in order', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       // Two frames fused, then a third delivered one byte at a time —
       // stresses both the while loop and repeated partial accumulation.
+      const firstPair = waitForCount(2);
       input.write(Buffer.concat([logFrame(10), logFrame(20)]));
-      await waitForCount(received, 2);
+      await firstPair;
       expect(received).toEqual([10, 20]);
 
       const f3 = logFrame(30);
+      const third = waitForCount(3);
       for (let i = 0; i < f3.length; i++) {
         input.write(f3.subarray(i, i + 1));
       }
-      await waitForCount(received, 3);
+      await third;
       expect(received).toEqual([10, 20, 30]);
     } finally {
       cleanup();
@@ -244,9 +266,10 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   // a body spanning many chunks must coalesce in order.
 
   test('many frames each fully dribbled byte-by-byte decode in order', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       const ns = [1, 2, 3, 4, 5, 6, 7, 8];
+      const delivered = waitForCount(ns.length);
       // Every byte of every frame — INCLUDING each frame's 4-byte length
       // header — arrives as its own 'data' event. A regression that read
       // the header via `chunks[0].readUInt32LE(0)` (instead of the
@@ -257,7 +280,7 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
           input.write(f.subarray(i, i + 1));
         }
       }
-      await waitForCount(received, ns.length);
+      await delivered;
       expect(received).toEqual(ns);
     } finally {
       cleanup();
@@ -265,7 +288,7 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   });
 
   test('frame split into many small chunks with mid-chunk frame boundaries decodes in order', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       // Fuse three frames into one buffer, then re-slice that buffer into
       // fixed 3-byte chunks. The frame boundaries fall in the MIDDLE of
@@ -277,10 +300,11 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
         logFrame(300),
       ]);
       const STEP = 3;
+      const delivered = waitForCount(3);
       for (let i = 0; i < fused.length; i += STEP) {
         input.write(fused.subarray(i, Math.min(i + STEP, fused.length)));
       }
-      await waitForCount(received, 3);
+      await delivered;
       expect(received).toEqual([100, 200, 300]);
     } finally {
       cleanup();
@@ -288,18 +312,18 @@ describe('IpcClient streaming reassembly across chunk boundaries', () => {
   });
 
   test('cross-chunk split header (1+1+2 bytes) before body decodes', async () => {
-    const { input, received, cleanup } = makeReader();
+    const { input, received, waitForCount, cleanup } = makeReader();
     try {
       const frame = logFrame(77);
       // Header delivered as 1 byte, then 1 byte, then 2 bytes — none of
       // these prefixes alone satisfies readUInt32LE(0). Then the body.
       input.write(frame.subarray(0, 1));
       input.write(frame.subarray(1, 2));
-      input.write(frame.subarray(2, 4));
-      await waitForCount(received, 1); // deadline elapses; header incomplete-then-complete but body missing
+      await writeChunk(input, frame.subarray(2, 4));
       expect(received).toEqual([]);
+      const delivered = waitForCount(1);
       input.write(frame.subarray(4));
-      await waitForCount(received, 1);
+      await delivered;
       expect(received).toEqual([77]);
     } finally {
       cleanup();
@@ -386,18 +410,19 @@ describe('IpcClient request/response', () => {
     const { a, b, cleanup } = pairClients();
     try {
       let received: string | null = null;
+      let markReceived!: () => void;
+      const notificationReceived = new Promise<void>((resolve) => {
+        markReceived = resolve;
+      });
       b.registerNotification('log', (msg) => {
         received = (msg.data as { text: string }).text;
+        markReceived();
       });
       a.start();
       b.start();
       a.sendNotification('log', { text: 'hello-log' });
 
-      // Poll for delivery
-      const deadline = Date.now() + 1000;
-      while (received === null && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 5));
-      }
+      await notificationReceived;
       expect(received).toBe('hello-log');
     } finally {
       cleanup();
@@ -445,8 +470,9 @@ describe('IpcClient request/response', () => {
       a.start();
       b.start();
       const pending = a.sendRequest('lint', {});
-      // Give it a tick to enqueue
-      await new Promise((r) => setTimeout(r, 20));
+      // sendRequest registers the pending resolver before writing the frame.
+      // Closing immediately therefore exercises the real pending-request path
+      // without relying on a scheduler turn.
       a.close();
       await expect(pending).rejects.toThrow();
     } finally {
@@ -455,27 +481,18 @@ describe('IpcClient request/response', () => {
   });
 
   test('start() is idempotent — no double listener install', async () => {
-    const { a, b, cleanup } = pairClients();
+    const { a, b, streams, cleanup } = pairClients();
     try {
       a.start();
       a.start(); // must be a no-op, NOT install a second 'data' listener
+      expect(streams.bToA.listenerCount('data')).toBe(1);
       b.setInboundHandler(async () => ({ ok: true }));
       b.start();
 
-      // If start() doubly installed listeners on the input stream,
-      // each frame would be parsed twice → two responses → the second
-      // would either reject with "no pending request" or resolve to a
-      // duplicate. Send one request and confirm exactly one reply.
-      let replyCount = 0;
-      const reply = a.sendRequest('lint', {}).then((r) => {
-        replyCount++;
-        return r;
-      });
-      const got = await reply;
+      // Keep a real round-trip control so the listener-count assertion cannot
+      // pass on a client that installed no functional reader at all.
+      const got = await a.sendRequest('lint', {});
       expect((got.data as { ok?: boolean }).ok).toBe(true);
-      // Settle the microtask queue — a duplicate reply would arrive here.
-      await new Promise((r) => setTimeout(r, 30));
-      expect(replyCount).toBe(1);
     } finally {
       cleanup();
     }
@@ -550,10 +567,9 @@ describe('Schema parity with Go (smoke)', () => {
   // + "stream desync") reaches stderr — that wording is emitted ONLY by
   // the guard, so a deleted guard leaves stderr empty — and (2) the
   // pending request rejects via the real teardown path, won by the
-  // actual rejection rather than a watchdog. The 250ms race rejects with
-  // a sentinel that does NOT match the teardown regex, so if the guard
-  // is dead the watchdog wins and the message assertion fails fast
-  // instead of passing on a loose alternation.
+  // actual rejection rather than a watchdog. The rejection is observed
+  // through a fixed microtask barrier after the synchronous guard transition,
+  // so a missing rejection fails without parking under the stderr patch.
   test('cap guard fires synchronously on an oversized frame-length header and seals the client', async () => {
     const aToB = new PassThrough();
     const bToA = new PassThrough();
@@ -561,7 +577,7 @@ describe('Schema parity with Go (smoke)', () => {
     a.start();
 
     // Capture the cap-specific diagnostic the guard writes to stderr.
-    const originalStderrWrite = process.stderr.write.bind(process.stderr);
+    const originalStderrWrite = process.stderr.write;
     let stderr = '';
     (process.stderr as { write: unknown }).write = (
       chunk: string | Uint8Array,
@@ -570,39 +586,28 @@ describe('Schema parity with Go (smoke)', () => {
       return true;
     };
 
-    let rejected = false;
-    let rejectedMessage = '';
+    const pending = a.sendRequest('lint', { test: 1 });
     try {
-      const pending = a.sendRequest('lint', { test: 1 });
-
       // Header declaring a body 1 MiB above the 256 MiB cap, then no body.
       const header = Buffer.alloc(4);
       header.writeUInt32LE(257 * 1024 * 1024, 0);
       bToA.write(header);
 
-      // Race the real rejection against a SHORT watchdog whose message is
-      // a sentinel the teardown regex below cannot match. If the guard is
-      // dead, `pending` never settles and the watchdog wins → the regex
-      // assertion fails fast (no 1500ms loose-match escape hatch).
-      try {
-        await Promise.race([
-          pending,
-          new Promise<never>((_, rej) =>
-            setTimeout(() => rej(new Error('WATCHDOG_NO_REJECTION')), 250),
-          ),
-        ]);
-      } catch (e) {
-        rejected = true;
-        rejectedMessage = (e as Error).message;
-      }
+      // The guard runs in the input data handler. Assert its synchronous state
+      // transition before awaiting the pending rejection so a deleted guard
+      // fails immediately instead of parking until the outer test watchdog.
+      expect(
+        (a as unknown as { closed: boolean }).closed,
+        'oversized frame must seal the client',
+      ).toBe(true);
     } finally {
       (process.stderr as { write: unknown }).write = originalStderrWrite;
     }
 
-    // The rejection must be the genuine teardown, NOT the watchdog.
-    expect(rejected).toBe(true);
-    expect(rejectedMessage).not.toBe('WATCHDOG_NO_REJECTION');
-    expect(rejectedMessage).toMatch(/peer closed input stream/);
+    // Await the actual teardown outcome. The suite's finite outer bound is the
+    // deadlock sentinel if a mutation seals the client but forgets to reject
+    // pending requests; no promise-layer count is part of this contract.
+    await expect(pending).rejects.toThrow(/peer closed input stream/);
 
     // The cap-specific diagnostic — emitted ONLY by the guard — must be
     // present. A deleted/disabled guard leaves stderr empty here.
@@ -630,22 +635,18 @@ describe('Schema parity with Go (smoke)', () => {
     // Destroy the output stream WITH an error. This drives the
     // 'error' event on the Writable side that `a` writes to.
     const err = new Error('simulated EPIPE');
+    const outputErrored = once(aToB, 'error');
     aToB.destroy(err);
+    await outputErrored;
 
-    // The fix: pending requests must reject quickly (within ~100 ms
-    // is generous; the rejection is synchronous on the 'error' event).
+    expect(
+      (a as unknown as { closed: boolean }).closed,
+      'output error must seal the client',
+    ).toBe(true);
     let rejected = false;
     let rejectedMessage = '';
     try {
-      await Promise.race([
-        pending,
-        new Promise<never>((_, rej) =>
-          setTimeout(
-            () => rej(new Error('TIMEOUT: pending request not rejected')),
-            1_500,
-          ),
-        ),
-      ]);
+      await pending;
     } catch (e) {
       rejected = true;
       rejectedMessage = (e as Error).message;
@@ -673,23 +674,19 @@ describe('Schema parity with Go (smoke)', () => {
     a.start();
 
     // Peer closes its write side — we see EOF on input (bToA).
+    const inputEnded = once(bToA, 'end');
     bToA.end();
-    await new Promise<void>((r) => setImmediate(r));
+    await inputEnded;
+    expect(
+      (a as unknown as { closed: boolean }).closed,
+      'peer input end must seal the client',
+    ).toBe(true);
 
     // sendRequest must throw / reject immediately, not park.
     let rejected = false;
     let msg = '';
     try {
-      const p = a.sendRequest('lint', {});
-      await Promise.race([
-        p,
-        new Promise<never>((_, rej) =>
-          setTimeout(
-            () => rej(new Error('TIMEOUT: sendRequest did not reject')),
-            1_500,
-          ),
-        ),
-      ]);
+      await a.sendRequest('lint', {});
     } catch (e) {
       rejected = true;
       msg = (e as Error).message;
@@ -705,9 +702,9 @@ describe('Schema parity with Go (smoke)', () => {
     const a = new IpcClient(bToA, aToB);
     a.start();
 
+    const outputErrored = once(aToB, 'error');
     aToB.destroy(new Error('simulated EPIPE'));
-    // Allow the error event to fire on the next microtask.
-    await new Promise<void>((r) => setImmediate(r));
+    await outputErrored;
 
     // sendRequest after the client has been sealed by onOutputError
     // must throw rather than enqueueing into pending. The throw goes
@@ -750,8 +747,9 @@ describe('IpcClient rejects pending on clean output close (no hang)', () => {
     const output = new PassThrough();
     const client = new IpcClient(input, output);
     client.start();
+    const outputClosed = once(output, 'close');
     output.destroy();
-    await new Promise((r) => setTimeout(r, 10)); // let 'close' fire
+    await outputClosed;
     // `sendRequest` is async, so its top-level closed-guard throw
     // surfaces as a rejected promise, not a synchronous throw.
     await expect(client.sendRequest('init', {})).rejects.toThrow(/closed/);

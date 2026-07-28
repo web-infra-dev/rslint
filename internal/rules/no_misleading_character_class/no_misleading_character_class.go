@@ -32,21 +32,57 @@ var NoMisleadingCharacterClassRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
-		return rule.RuleListeners{
+		var callTracker *regexpCallTracker
+		if sourceMayUseRegExp(ctx.SourceFile) {
+			callTracker = newRegExpCallTracker(ctx)
+		}
+		listeners := rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				handleRegexLiteral(ctx, node, opts)
-			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				handleRegExpConstructor(ctx, node, call.Expression, call.Arguments, opts, eval)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				newExpr := node.AsNewExpression()
-				handleRegExpConstructor(ctx, node, newExpr.Expression, newExpr.Arguments, opts, eval)
+				handleRegexLiteral(ctx, node, opts, callTracker)
 			},
 		}
+		if callTracker == nil {
+			return listeners
+		}
+		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		listeners[ast.KindCallExpression] = func(node *ast.Node) {
+			call := node.AsCallExpression()
+			if !callTracker.isRegExpCall(node, call.Expression) {
+				return
+			}
+			handleRegExpConstructor(ctx, node, call.Arguments, opts, eval)
+		}
+		listeners[ast.KindNewExpression] = func(node *ast.Node) {
+			newExpr := node.AsNewExpression()
+			if !callTracker.isRegExpCall(node, newExpr.Expression) {
+				return
+			}
+			handleRegExpConstructor(ctx, node, newExpr.Arguments, opts, eval)
+		}
+		return listeners
 	},
+}
+
+var regexpGlobalObjectNames = [...]string{
+	"global",
+	"globalThis",
+	"self",
+	"window",
+}
+
+func sourceMayUseRegExp(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	if _, ok := sourceFile.Identifiers["RegExp"]; ok {
+		return true
+	}
+	for _, name := range regexpGlobalObjectNames {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 type ruleOptions struct {
@@ -89,11 +125,11 @@ type foundMatch struct {
 // Listeners
 // ---------------------------------------------------------------------------
 
-func handleRegexLiteral(ctx rule.RuleContext, node *ast.Node, opts ruleOptions) {
+func handleRegexLiteral(ctx rule.RuleContext, node *ast.Node, opts ruleOptions, callTracker *regexpCallTracker) {
 	// Skip the regex literal if its immediate context is a RegExp(...)/new RegExp(...)
 	// call with an explicit flags argument — in that case, the constructor
 	// listener will handle it (using the override flags).
-	if isRegexLiteralHandledByConstructor(ctx, node) {
+	if isRegexLiteralHandledByConstructor(node, callTracker) {
 		return
 	}
 	text := node.Text()
@@ -118,11 +154,7 @@ func handleRegexLiteral(ctx rule.RuleContext, node *ast.Node, opts ruleOptions) 
 	}
 }
 
-func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, opts ruleOptions, eval *utils.StaticStringEvaluator) {
-	callee = ast.SkipParentheses(callee)
-	if !isBuiltinRegExpCallee(ctx, callee) {
-		return
-	}
+func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, args *ast.NodeList, opts ruleOptions, eval *utils.StaticStringEvaluator) {
 	if args == nil || len(args.Nodes) == 0 {
 		return
 	}
@@ -225,7 +257,10 @@ func scanStringValueForMatches(ctx rule.RuleContext, reportNode *ast.Node, value
 // defers so we don't double-report. This mirrors ESLint's `checkedPatternNodes`
 // which routes inline regex-literal args through the Program handler so the
 // flag-string-level autofix (inserting `u` into the flags arg) can apply.
-func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bool {
+func isRegexLiteralHandledByConstructor(node *ast.Node, callTracker *regexpCallTracker) bool {
+	if callTracker == nil {
+		return false
+	}
 	parent := node.Parent
 	// Walk through parenthesized expressions upward.
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
@@ -248,7 +283,7 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bo
 	default:
 		return false
 	}
-	if !isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee)) {
+	if !callTracker.isRegExpCall(parent, callee) {
 		return false
 	}
 	if args == nil || len(args.Nodes) < 2 {
@@ -300,42 +335,590 @@ func resolveBindingInitializer(ident *ast.Node, eval *utils.StaticStringEvaluato
 	return nil
 }
 
-// isBuiltinRegExpCallee reports whether `callee` refers to the built-in
-// global `RegExp` constructor. Uses TypeChecker when available — which
-// covers `RegExp`, `globalThis.RegExp`, `window.RegExp`, destructured
-// aliases like `const {RegExp: A} = globalThis; new A()`, and imports of
-// the global. Falls back to a syntactic check (identifier / member access)
-// when no type info is available.
-func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
+// RegExp constructor calls are found from the global roots instead of asking
+// the TypeChecker about every call expression in the file. This is the same
+// direction used by ESLint's ReferenceTracker: trace reads of the global
+// RegExp value (and the RegExp property of global objects) through aliases,
+// destructuring, and value-preserving expressions until they reach a call or
+// construct operation.
+//
+// Besides avoiding the flow-sensitive GetTypeAtLocation hot path, root-driven
+// tracing is important for correctness: a shadowed or overwritten RegExp must
+// not be treated as the global merely because its spelling matches.
+type regexpTraceValue uint8
+
+const (
+	regexpTraceConstructor regexpTraceValue = iota
+	regexpTraceGlobalObject
+)
+
+type regexpTraceVariable struct {
+	symbol *ast.Symbol
+	value  regexpTraceValue
+}
+
+type regexpTraceGlobal struct {
+	name  string
+	value regexpTraceValue
+}
+
+type regexpCallTracker struct {
+	ctx rule.RuleContext
+
+	// Root names are indexed eagerly. Other names are collected only when a
+	// configured global is used as an assignment alias.
+	identifiersByName map[string][]*ast.Node
+	indexedNames      map[string]bool
+	allNamesIndexed   bool
+
+	propertyEvaluator   *utils.StaticStringEvaluator
+	potentiallyShadowed map[string]bool
+	disabledRoots       map[string]bool
+	tracedVariables     map[regexpTraceVariable]struct{}
+	tracedGlobals       map[regexpTraceGlobal]struct{}
+	calls               map[*ast.Node]struct{}
+}
+
+func newRegExpCallTracker(ctx rule.RuleContext) *regexpCallTracker {
+	tracker := &regexpCallTracker{
+		ctx:               ctx,
+		identifiersByName: make(map[string][]*ast.Node, len(regexpGlobalObjectNames)+1),
+		indexedNames:      make(map[string]bool, len(regexpGlobalObjectNames)+1),
+	}
+	tracker.collectRootIdentifiers()
+	tracker.trackGlobalRoot("RegExp", regexpTraceConstructor)
+	for _, name := range regexpGlobalObjectNames {
+		tracker.trackGlobalRoot(name, regexpTraceGlobalObject)
+	}
+	return tracker
+}
+
+func (tracker *regexpCallTracker) collectRootIdentifiers() {
+	if tracker.ctx.SourceFile == nil {
+		return
+	}
+	tracker.indexedNames["RegExp"] = true
+	for _, name := range regexpGlobalObjectNames {
+		tracker.indexedNames[name] = true
+	}
+
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier {
+			name := node.AsIdentifier().Text
+			if !tracker.indexedNames[name] {
+				node.ForEachChild(visit)
+				return false
+			}
+			if utils.IsNonReferenceIdentifier(node) {
+				if regexpBindingSymbol(node) != nil {
+					if tracker.potentiallyShadowed == nil {
+						tracker.potentiallyShadowed = make(map[string]bool)
+					}
+					tracker.potentiallyShadowed[name] = true
+				}
+				node.ForEachChild(visit)
+				return false
+			}
+
+			isWrite := utils.IsWriteReference(node)
+			if !isWrite && name != "RegExp" && !tracker.globalObjectRootCanReachRegExp(node) {
+				node.ForEachChild(visit)
+				return false
+			}
+			value := regexpTraceGlobalObject
+			if name == "RegExp" {
+				value = regexpTraceConstructor
+			}
+			if isWrite || !tracker.isDirectRootCall(node, value) {
+				tracker.identifiersByName[name] = append(tracker.identifiersByName[name], node)
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	tracker.ctx.SourceFile.AsNode().ForEachChild(visit)
+}
+
+func (tracker *regexpCallTracker) isDirectRootCall(node *ast.Node, value regexpTraceValue) bool {
+	if value == regexpTraceGlobalObject {
+		parent := node.Parent
+		if parent == nil || parent.Kind != ast.KindPropertyAccessExpression ||
+			parent.AsPropertyAccessExpression().Expression != node {
+			return false
+		}
+		name := parent.AsPropertyAccessExpression().Name()
+		if name == nil || name.Text() != "RegExp" {
+			return false
+		}
+		node = parent
+	}
+	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+		node = node.Parent
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindCallExpression:
+		return parent.AsCallExpression().Expression == node
+	case ast.KindNewExpression:
+		return parent.AsNewExpression().Expression == node
+	}
+	return false
+}
+
+func (tracker *regexpCallTracker) globalObjectRootCanReachRegExp(node *ast.Node) bool {
+	for node.Parent != nil && regexpValuePassesThrough(node, node.Parent) {
+		node = node.Parent
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	if ast.IsAccessExpression(parent) && utils.AccessExpressionObject(parent) == node {
+		name, ok := tracker.accessExpressionStaticName(parent)
+		return ok && name == "RegExp"
+	}
+	switch parent.Kind {
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		return binary != nil && binary.Right == node &&
+			binary.OperatorToken != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
+	case ast.KindVariableDeclaration:
+		return parent.AsVariableDeclaration().Initializer == node
+	case ast.KindParameter:
+		return parent.AsParameterDeclaration().Initializer == node
+	case ast.KindBindingElement:
+		return parent.AsBindingElement().Initializer == node
+	case ast.KindShorthandPropertyAssignment:
+		return parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node
+	}
+	return false
+}
+
+func (tracker *regexpCallTracker) trackGlobalRoot(name string, value regexpTraceValue) {
+	if tracker.isGlobalOff(name) {
+		tracker.disableRoot(name)
+		return
+	}
+	identifiers := tracker.identifiersByName[name]
+	for _, identifier := range identifiers {
+		if tracker.isGlobalReference(identifier, name) && utils.IsWriteReference(identifier) {
+			// ReferenceTracker drops a global root when that binding is
+			// modified anywhere in the file.
+			tracker.disableRoot(name)
+			return
+		}
+	}
+	for _, identifier := range identifiers {
+		if tracker.isGlobalReference(identifier, name) {
+			tracker.trackExpression(identifier, value)
+		}
+	}
+}
+
+func (tracker *regexpCallTracker) disableRoot(name string) {
+	if tracker.disabledRoots == nil {
+		tracker.disabledRoots = make(map[string]bool)
+	}
+	tracker.disabledRoots[name] = true
+}
+
+func (tracker *regexpCallTracker) isGlobalOff(name string) bool {
+	declared, ok := tracker.ctx.Globals[name]
+	return ok && !declared
+}
+
+func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {
+	if identifier == nil || identifier.Kind != ast.KindIdentifier ||
+		utils.IsNonReferenceIdentifier(identifier) {
+		return false
+	}
+	if tracker.ctx.Refs != nil {
+		// RefStore uses the binder's own scope walk and is authoritative for
+		// ordinary value bindings in a normal linter run.
+		if tracker.ctx.Refs.Resolve(identifier) != nil {
+			return false
+		}
+		// Namespace-only bindings are outside RefStore's value lookup. Only
+		// pay for the broader syntactic scope check when this file actually
+		// declared a watched root; doing it for every ordinary `window.*`
+		// read would make large files quadratic.
+		if !tracker.potentiallyShadowed[name] {
+			return true
+		}
+	}
+	// Keep the syntactic fallback for namespace-only bindings and direct/unit
+	// callers without a Program.
+	return !utils.IsShadowed(identifier, name)
+}
+
+func (tracker *regexpCallTracker) isRegExpCall(node *ast.Node, callee *ast.Node) bool {
+	callee = ast.SkipParentheses(callee)
 	if callee == nil {
 		return false
 	}
-	if ctx.TypeChecker != nil && ctx.Program != nil {
-		t := ctx.TypeChecker.GetTypeAtLocation(callee)
-		if t != nil && utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor") {
-			return true
+
+	var root *ast.Node
+	var rootName string
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		if callee.AsIdentifier().Text != "RegExp" {
+			break
 		}
-		// IsBuiltinSymbolLike can return false for direct `RegExp` reference
-		// depending on how the checker models the global — fall through to
-		// the syntactic fast-path below so we never under-detect the
-		// canonical forms.
-	}
-	// Fallback: recognize only the bare identifier and direct global member
-	// access. This path is used when type info is unavailable (JS-only
-	// files) and still covers the most common syntactic forms.
-	if callee.Kind == ast.KindIdentifier {
-		return callee.AsIdentifier().Text == "RegExp"
-	}
-	if callee.Kind == ast.KindPropertyAccessExpression {
-		pae := callee.AsPropertyAccessExpression()
-		if pae.Name() != nil && pae.Name().Kind == ast.KindIdentifier && pae.Name().AsIdentifier().Text == "RegExp" {
-			if pae.Expression != nil && pae.Expression.Kind == ast.KindIdentifier {
-				name := pae.Expression.AsIdentifier().Text
-				return name == "globalThis" || name == "window" || name == "self" || name == "global"
+		root = callee
+		rootName = "RegExp"
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if access.Name() == nil || access.Name().Text() != "RegExp" ||
+			access.Expression == nil || access.Expression.Kind != ast.KindIdentifier {
+			break
+		}
+		name := access.Expression.AsIdentifier().Text
+		for _, globalObjectName := range regexpGlobalObjectNames {
+			if name == globalObjectName {
+				root = access.Expression
+				rootName = name
+				break
 			}
 		}
 	}
+	if root != nil && !tracker.disabledRoots[rootName] {
+		if !tracker.potentiallyShadowed[rootName] || tracker.isGlobalReference(root, rootName) {
+			return true
+		}
+	}
+	_, ok := tracker.calls[node]
+	return ok
+}
+
+func (tracker *regexpCallTracker) trackExpression(node *ast.Node, value regexpTraceValue) {
+	if node == nil {
+		return
+	}
+
+	for node.Parent != nil && regexpValuePassesThrough(node, node.Parent) {
+		node = node.Parent
+	}
+
+	parent := node.Parent
+	if parent == nil {
+		return
+	}
+
+	if ast.IsAccessExpression(parent) && utils.AccessExpressionObject(parent) == node {
+		if value != regexpTraceGlobalObject {
+			return
+		}
+		name, ok := tracker.accessExpressionStaticName(parent)
+		if ok && name == "RegExp" {
+			tracker.trackExpression(parent, regexpTraceConstructor)
+		}
+		return
+	}
+
+	switch parent.Kind {
+	case ast.KindCallExpression:
+		if parent.AsCallExpression().Expression == node && value == regexpTraceConstructor {
+			tracker.addCall(parent)
+		}
+
+	case ast.KindNewExpression:
+		if parent.AsNewExpression().Expression == node && value == regexpTraceConstructor {
+			tracker.addCall(parent)
+		}
+
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		if binary != nil && binary.Right == node &&
+			binary.OperatorToken != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			tracker.trackAssignmentTarget(binary.Left, value)
+			// An assignment expression evaluates to its assigned value.
+			tracker.trackExpression(parent, value)
+		}
+
+	case ast.KindVariableDeclaration:
+		declaration := parent.AsVariableDeclaration()
+		if declaration != nil && declaration.Initializer == node {
+			tracker.trackAssignmentTarget(declaration.Name(), value)
+		}
+
+	case ast.KindParameter:
+		parameter := parent.AsParameterDeclaration()
+		if parameter != nil && parameter.Initializer == node {
+			tracker.trackAssignmentTarget(parameter.Name(), value)
+		}
+
+	case ast.KindBindingElement:
+		element := parent.AsBindingElement()
+		if element != nil && element.Initializer == node {
+			tracker.trackAssignmentTarget(element.Name(), value)
+		}
+
+	case ast.KindShorthandPropertyAssignment:
+		property := parent.AsShorthandPropertyAssignment()
+		if property != nil && property.ObjectAssignmentInitializer == node {
+			tracker.trackAssignmentTarget(property.Name(), value)
+		}
+	}
+}
+
+func (tracker *regexpCallTracker) addCall(node *ast.Node) {
+	if tracker.calls == nil {
+		tracker.calls = make(map[*ast.Node]struct{})
+	}
+	tracker.calls[node] = struct{}{}
+}
+
+func (tracker *regexpCallTracker) accessExpressionStaticName(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == ast.KindElementAccessExpression {
+		access := node.AsElementAccessExpression()
+		if access == nil || access.ArgumentExpression == nil {
+			return "", false
+		}
+		if tracker.propertyEvaluator == nil {
+			// ReferenceTracker evaluates property syntax without a scope:
+			// literals can fold, but identifier bindings cannot.
+			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithSourceFile(nil, tracker.ctx.SourceFile)
+		}
+		return tracker.propertyEvaluator.Eval(access.ArgumentExpression)
+	}
+	return utils.AccessExpressionStaticName(node)
+}
+
+func (tracker *regexpCallTracker) staticPropertyName(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == ast.KindComputedPropertyName {
+		computed := node.AsComputedPropertyName()
+		if computed == nil || computed.Expression == nil {
+			return "", false
+		}
+		if tracker.propertyEvaluator == nil {
+			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithSourceFile(nil, tracker.ctx.SourceFile)
+		}
+		return tracker.propertyEvaluator.Eval(computed.Expression)
+	}
+	return utils.GetStaticPropertyName(node)
+}
+
+func regexpValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
+	switch parent.Kind {
+	case ast.KindParenthesizedExpression:
+		return parent.AsParenthesizedExpression().Expression == node
+	case ast.KindAsExpression:
+		return parent.AsAsExpression().Expression == node
+	case ast.KindSatisfiesExpression:
+		return parent.AsSatisfiesExpression().Expression == node
+	case ast.KindTypeAssertionExpression:
+		return parent.AsTypeAssertion().Expression == node
+	case ast.KindNonNullExpression:
+		return parent.AsNonNullExpression().Expression == node
+	case ast.KindPartiallyEmittedExpression:
+		return parent.Expression() == node
+	case ast.KindExpressionWithTypeArguments:
+		return parent.AsExpressionWithTypeArguments().Expression == node
+	case ast.KindConditionalExpression:
+		conditional := parent.AsConditionalExpression()
+		return conditional.WhenTrue == node || conditional.WhenFalse == node
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil {
+			return false
+		}
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+			return binary.Left == node || binary.Right == node
+		case ast.KindCommaToken:
+			return binary.Right == node
+		}
+	}
 	return false
+}
+
+func (tracker *regexpCallTracker) trackAssignmentTarget(node *ast.Node, value regexpTraceValue) {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return
+	}
+
+	switch node.Kind {
+	case ast.KindIdentifier:
+		tracker.trackIdentifierVariable(node, value)
+
+	case ast.KindObjectBindingPattern:
+		if value != regexpTraceGlobalObject {
+			return
+		}
+		pattern := node.AsBindingPattern()
+		if pattern == nil || pattern.Elements == nil {
+			return
+		}
+		for _, elementNode := range pattern.Elements.Nodes {
+			element := elementNode.AsBindingElement()
+			if element == nil || element.DotDotDotToken != nil || element.Name() == nil {
+				continue
+			}
+			propertyName := element.PropertyName
+			if propertyName == nil {
+				propertyName = element.Name()
+			}
+			name, ok := tracker.staticPropertyName(propertyName)
+			if ok && name == "RegExp" {
+				tracker.trackAssignmentTarget(element.Name(), regexpTraceConstructor)
+			}
+		}
+
+	case ast.KindObjectLiteralExpression:
+		if value != regexpTraceGlobalObject {
+			return
+		}
+		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
+			switch propertyNode.Kind {
+			case ast.KindPropertyAssignment:
+				property := propertyNode.AsPropertyAssignment()
+				name, ok := tracker.staticPropertyName(property.Name())
+				if ok && name == "RegExp" {
+					tracker.trackAssignmentTarget(property.Initializer, regexpTraceConstructor)
+				}
+			case ast.KindShorthandPropertyAssignment:
+				property := propertyNode.AsShorthandPropertyAssignment()
+				name, ok := tracker.staticPropertyName(property.Name())
+				if ok && name == "RegExp" {
+					tracker.trackAssignmentTarget(property.Name(), regexpTraceConstructor)
+				}
+			}
+		}
+
+	case ast.KindBinaryExpression:
+		// Assignment-pattern defaults retain the value on their left side.
+		binary := node.AsBinaryExpression()
+		if binary != nil && binary.OperatorToken != nil &&
+			binary.OperatorToken.Kind == ast.KindEqualsToken {
+			tracker.trackAssignmentTarget(binary.Left, value)
+		}
+	}
+}
+
+func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, value regexpTraceValue) {
+	if symbol := regexpBindingSymbol(identifier); symbol != nil {
+		tracker.trackVariable(symbol, value)
+		return
+	}
+	if tracker.ctx.Refs != nil {
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil {
+			tracker.trackVariable(symbol, value)
+			return
+		}
+	}
+
+	name := identifier.AsIdentifier().Text
+	if declared, ok := tracker.ctx.Globals[name]; ok && declared {
+		// The initial index contains only built-in roots. Indexing this
+		// configured-global name also records namespace-only declarations
+		// before deciding whether the assignment target is truly global.
+		tracker.identifiersForName(name)
+		if tracker.isGlobalReference(identifier, name) {
+			tracker.trackConfiguredGlobal(name, value)
+		}
+	}
+}
+
+func regexpBindingSymbol(identifier *ast.Node) *ast.Symbol {
+	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.Parent == nil {
+		return nil
+	}
+	declaration := identifier.Parent
+	if declaration.Name() != identifier {
+		return nil
+	}
+	symbol := declaration.Symbol()
+	if symbol == nil {
+		return nil
+	}
+	const flags = ast.SymbolFlagsVariable |
+		ast.SymbolFlagsFunction |
+		ast.SymbolFlagsClass |
+		ast.SymbolFlagsEnum |
+		ast.SymbolFlagsModule |
+		ast.SymbolFlagsAlias
+	if symbol.Flags&flags == 0 {
+		return nil
+	}
+	return symbol
+}
+
+func (tracker *regexpCallTracker) trackVariable(symbol *ast.Symbol, value regexpTraceValue) {
+	if tracker.ctx.Refs == nil || symbol == nil {
+		return
+	}
+	key := regexpTraceVariable{symbol: symbol, value: value}
+	if _, ok := tracker.tracedVariables[key]; ok {
+		return
+	}
+	if tracker.tracedVariables == nil {
+		tracker.tracedVariables = make(map[regexpTraceVariable]struct{})
+	}
+	tracker.tracedVariables[key] = struct{}{}
+
+	for _, reference := range tracker.ctx.Refs.References(symbol) {
+		if ast.IsWriteOnlyAccess(reference) {
+			continue
+		}
+		tracker.trackExpression(reference, value)
+	}
+}
+
+func (tracker *regexpCallTracker) trackConfiguredGlobal(name string, value regexpTraceValue) {
+	key := regexpTraceGlobal{name: name, value: value}
+	if _, ok := tracker.tracedGlobals[key]; ok {
+		return
+	}
+	if tracker.tracedGlobals == nil {
+		tracker.tracedGlobals = make(map[regexpTraceGlobal]struct{})
+	}
+	tracker.tracedGlobals[key] = struct{}{}
+
+	for _, identifier := range tracker.identifiersForName(name) {
+		if ast.IsWriteOnlyAccess(identifier) || !tracker.isGlobalReference(identifier, name) {
+			continue
+		}
+		tracker.trackExpression(identifier, value)
+	}
+}
+
+func (tracker *regexpCallTracker) identifiersForName(name string) []*ast.Node {
+	if tracker.indexedNames[name] || tracker.allNamesIndexed || tracker.ctx.SourceFile == nil {
+		return tracker.identifiersByName[name]
+	}
+
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier {
+			identifierName := node.AsIdentifier().Text
+			if utils.IsNonReferenceIdentifier(node) {
+				if regexpBindingSymbol(node) != nil {
+					if tracker.potentiallyShadowed == nil {
+						tracker.potentiallyShadowed = make(map[string]bool)
+					}
+					tracker.potentiallyShadowed[identifierName] = true
+				}
+			} else if !tracker.indexedNames[identifierName] {
+				tracker.identifiersByName[identifierName] = append(tracker.identifiersByName[identifierName], node)
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	tracker.ctx.SourceFile.AsNode().ForEachChild(visit)
+	tracker.allNamesIndexed = true
+	return tracker.identifiersByName[name]
 }
 
 func readFlagsArg(args *ast.NodeList, eval *utils.StaticStringEvaluator) (flags string, hasFlags bool, known bool) {
@@ -373,7 +956,7 @@ const (
 func scanPatternForMatches(pattern string, flags utils.RegexFlags, opts ruleOptions, srcOffset int) []foundMatch {
 	var matches []foundMatch
 	utils.IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
-		els, _, ok := utils.ParseRegexCharacterClass(pattern, start, flags)
+		els, _, ok := utils.ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
 		if !ok {
 			return
 		}
@@ -443,7 +1026,7 @@ func scanLiteralUnitsForMatches(units []utils.StringCodeUnit, nodeText string, f
 
 	var matches []foundMatch
 	utils.IterateRegexCharacterClasses(resolved, flags, func(start, end int) {
-		els, _, ok := utils.ParseRegexCharacterClass(resolved, start, flags)
+		els, _, ok := utils.ParseRegexCharacterClassWithEnd(resolved, start, end, flags)
 		if !ok {
 			return
 		}
@@ -464,7 +1047,7 @@ func scanLiteralUnitsForMatches(units []utils.StringCodeUnit, nodeText string, f
 // surrogate-pair regexChars (one element → two units) so the detectors see
 // what the JS regex engine sees.
 func runDetectorsOnElements(els []utils.RegexCharElement, flags utils.RegexFlags, opts ruleOptions, srcOffset int, pattern string) []foundMatch {
-	transformed := make([]regexChar, 0, len(els)*2)
+	transformed := make([]regexChar, 0, transformedElementCapacity(els, !flags.UV()))
 	for _, e := range els {
 		if e.Kind == utils.RegexCharBreaker {
 			transformed = append(transformed, regexChar{
@@ -502,7 +1085,7 @@ func runDetectorsOnElements(els []utils.RegexCharElement, flags utils.RegexFlags
 			}
 		}
 	}
-	return runDetectorsOnSequences(splitOnBreaker(transformed), flags, opts)
+	return runDetectorsOnChars(transformed, flags, opts)
 }
 
 func makeRegexChar(value uint32, isUBrace bool, srcStart, srcEnd int, raw string) regexChar {
@@ -522,7 +1105,7 @@ func splitSurrogatePair(cp uint32) (hi, lo uint32) {
 // values via the units table. We also recover the raw source text for each
 // element (so allowEscape can compare it to the cooked value).
 func runDetectorsOnLiteralElements(els []utils.RegexCharElement, units []utils.StringCodeUnit, byteToUnit []int, nodeText string, flags utils.RegexFlags, opts ruleOptions, nodeStart int) []foundMatch {
-	transformed := make([]regexChar, 0, len(els)*2)
+	transformed := make([]regexChar, 0, transformedElementCapacity(els, false))
 	for _, e := range els {
 		if e.Kind == utils.RegexCharBreaker {
 			s, en := litElementSourceSpan(e, units, byteToUnit, nodeStart)
@@ -569,14 +1152,26 @@ func runDetectorsOnLiteralElements(els []utils.RegexCharElement, units []utils.S
 	if flags.UV() {
 		transformed = collapseSurrogatePairs(transformed)
 	}
-	return runDetectorsOnSequences(splitOnBreaker(transformed), flags, opts)
+	return runDetectorsOnChars(transformed, flags, opts)
+}
+
+func transformedElementCapacity(els []utils.RegexCharElement, splitAstral bool) int {
+	capacity := len(els)
+	for _, element := range els {
+		if element.Kind == utils.RegexCharRange {
+			capacity += 2 // min, boundary, max replace one input element
+		} else if splitAstral && element.Kind == utils.RegexCharSingle && element.Value > 0xFFFF {
+			capacity++ // one astral input expands to a surrogate pair
+		}
+	}
+	return capacity
 }
 
 // collapseSurrogatePairs combines two consecutive non-`\u{}` surrogate-pair
 // regexChars into one astral entry, matching what regexpp does under the
 // u/v flag.
 func collapseSurrogatePairs(chars []regexChar) []regexChar {
-	out := make([]regexChar, 0, len(chars))
+	out := chars[:0]
 	for i := 0; i < len(chars); i++ {
 		c := chars[i]
 		if i+1 < len(chars) {
@@ -615,59 +1210,30 @@ func elementUnitRange(e utils.RegexCharElement, byteToUnit []int) (int, int) {
 }
 
 // rangeBoundaryMarker returns a sentinel regexChar that splits sequences but
-// otherwise is invisible to detectors (because nil pointer in the slice
-// signals "skip" which is what we want — but using a marker here is simpler
-// than mutating the slice afterwards).
+// otherwise is invisible to detectors.
 func rangeBoundaryMarker() regexChar {
 	return regexChar{value: sentinelRangeBoundary}
 }
 
-// splitOnBreaker takes a flat regexChar slice and produces sequences split
-// on breaker and range-boundary sentinels — mirroring ESLint's
-// iterateCharacterSequence: a range splits the sequence (prev sub-sequence
-// ends with `min`, next starts with `max`); CharacterSet / nested class /
-// set-op elements simply break the sequence.
-func splitOnBreaker(chars []regexChar) [][]*regexChar {
-	var out [][]*regexChar
-	var seq []*regexChar
-	flush := func() {
-		if len(seq) > 0 {
-			out = append(out, seq)
-			seq = nil
-		}
-	}
-	for i := range chars {
-		c := chars[i]
-		switch c.value {
-		case sentinelBreaker, sentinelRangeBoundary:
-			flush()
-		default:
-			cc := c
-			seq = append(seq, &cc)
-		}
-	}
-	flush()
-	return out
-}
-
-func runDetectorsOnSequences(sequences [][]*regexChar, flags utils.RegexFlags, opts ruleOptions) []foundMatch {
+// runDetectorsOnChars splits a flat character stream at breaker and
+// range-boundary sentinels without materializing per-sequence slices or one
+// heap pointer per character.
+func runDetectorsOnChars(chars []regexChar, flags utils.RegexFlags, opts ruleOptions) []foundMatch {
 	var matches []foundMatch
-	for _, seq := range sequences {
-		if len(seq) == 0 {
-			continue
-		}
-		active := seq
-		if opts.allowEscape {
-			active = make([]*regexChar, len(seq))
-			for k, c := range seq {
-				if c != nil && isAcceptableEscape(c) {
-					active[k] = nil
-				} else {
-					active[k] = c
-				}
+	sequenceStart := 0
+	for i := 0; i <= len(chars); i++ {
+		atEnd := i == len(chars)
+		if !atEnd {
+			switch chars[i].value {
+			case sentinelBreaker, sentinelRangeBoundary:
+			default:
+				continue
 			}
 		}
-		matches = appendDetectorMatches(matches, active, seq, flags)
+		if sequenceStart < i {
+			matches = appendDetectorMatches(matches, chars[sequenceStart:i], flags, opts.allowEscape)
+		}
+		sequenceStart = i + 1
 	}
 	return matches
 }
@@ -676,14 +1242,14 @@ func runDetectorsOnSequences(sequences [][]*regexChar, flags utils.RegexFlags, o
 // Detectors
 // ---------------------------------------------------------------------------
 
-func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar, flags utils.RegexFlags) []foundMatch {
+func appendDetectorMatches(matches []foundMatch, chars []regexChar, flags utils.RegexFlags, allowEscape bool) []foundMatch {
 	uvMode := flags.UV()
 
 	// 1. surrogatePairWithoutUFlag (non-uv only)
 	if !uvMode {
 		for i := 1; i < len(chars); i++ {
-			prev, cur := chars[i-1], chars[i]
-			if prev == nil || cur == nil {
+			prev, cur := &chars[i-1], &chars[i]
+			if !detectorCharActive(prev, allowEscape) || !detectorCharActive(cur, allowEscape) {
 				continue
 			}
 			if isSurrogatePair(prev.value, cur.value) && !prev.isUBrace && !cur.isUBrace {
@@ -694,8 +1260,8 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 	// 2. surrogatePair (uv only, with at least one \u{...})
 	if uvMode {
 		for i := 1; i < len(chars); i++ {
-			prev, cur := chars[i-1], chars[i]
-			if prev == nil || cur == nil {
+			prev, cur := &chars[i-1], &chars[i]
+			if !detectorCharActive(prev, allowEscape) || !detectorCharActive(cur, allowEscape) {
 				continue
 			}
 			if isSurrogatePair(prev.value, cur.value) && (prev.isUBrace || cur.isUBrace) {
@@ -706,12 +1272,8 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 	// 3. combiningClass — combining char preceded by a non-combining char.
 	//    Use unfiltered for the previous-char check (allowEscape semantics).
 	for i := 1; i < len(chars); i++ {
-		cur := chars[i]
-		var prev *regexChar
-		if i-1 < len(unfiltered) {
-			prev = unfiltered[i-1]
-		}
-		if prev == nil || cur == nil {
+		prev, cur := &chars[i-1], &chars[i]
+		if !detectorCharActive(cur, allowEscape) {
 			continue
 		}
 		if isCombiningCharacter(cur.value) && !isCombiningCharacter(prev.value) {
@@ -720,8 +1282,8 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 	}
 	// 4. emojiModifier
 	for i := 1; i < len(chars); i++ {
-		prev, cur := chars[i-1], chars[i]
-		if prev == nil || cur == nil {
+		prev, cur := &chars[i-1], &chars[i]
+		if !detectorCharActive(prev, allowEscape) || !detectorCharActive(cur, allowEscape) {
 			continue
 		}
 		if isEmojiModifier(cur.value) && !isEmojiModifier(prev.value) {
@@ -730,8 +1292,8 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 	}
 	// 5. regionalIndicatorSymbol — both adjacent chars are RIS.
 	for i := 1; i < len(chars); i++ {
-		prev, cur := chars[i-1], chars[i]
-		if prev == nil || cur == nil {
+		prev, cur := &chars[i-1], &chars[i]
+		if !detectorCharActive(prev, allowEscape) || !detectorCharActive(cur, allowEscape) {
 			continue
 		}
 		if isRegionalIndicatorSymbol(cur.value) && isRegionalIndicatorSymbol(prev.value) {
@@ -741,8 +1303,10 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 	// 6. zwj — character sequence joined by U+200D, possibly chained.
 	seqStart, seqEnd := -1, -1
 	for i := 1; i < len(chars)-1; i++ {
-		prev, cur, next := chars[i-1], chars[i], chars[i+1]
-		if prev == nil || cur == nil || next == nil {
+		prev, cur, next := &chars[i-1], &chars[i], &chars[i+1]
+		if !detectorCharActive(prev, allowEscape) ||
+			!detectorCharActive(cur, allowEscape) ||
+			!detectorCharActive(next, allowEscape) {
 			continue
 		}
 		if cur.value == 0x200D && prev.value != 0x200D && next.value != 0x200D {
@@ -761,6 +1325,10 @@ func appendDetectorMatches(matches []foundMatch, chars, unfiltered []*regexChar,
 		matches = append(matches, foundMatch{kind: "zwj", srcStart: seqStart, srcEnd: seqEnd})
 	}
 	return matches
+}
+
+func detectorCharActive(char *regexChar, allowEscape bool) bool {
+	return !allowEscape || !isAcceptableEscape(char)
 }
 
 // ---------------------------------------------------------------------------
@@ -832,17 +1400,23 @@ func isIdentityEscapeForm(raw string) bool {
 func emitMatch(ctx rule.RuleContext, m foundMatch, pattern string, makeFixes func() []rule.RuleFix) {
 	msg := rule.RuleMessage{Id: m.kind, Description: messageDescriptionFor(m.kind)}
 	r := core.NewTextRange(m.srcStart, m.srcEnd)
-	if m.kind == "surrogatePairWithoutUFlag" && patternValidWithUFlag(pattern) {
-		fixes := makeFixes()
-		if fixes != nil {
-			ctx.ReportRangeWithSuggestions(r, msg, rule.RuleSuggestion{
-				Message:  rule.RuleMessage{Id: "suggestUnicodeFlag", Description: "Add unicode 'u' flag to regex."},
-				FixesArr: fixes,
-			})
-			return
-		}
+	if m.kind != "surrogatePairWithoutUFlag" {
+		ctx.ReportRange(r, msg)
+		return
 	}
-	ctx.ReportRange(r, msg)
+	ctx.ReportRangeWithDeferredSuggestions(r, msg, func() []rule.RuleSuggestion {
+		if !patternValidWithUFlag(pattern) {
+			return nil
+		}
+		fixes := makeFixes()
+		if fixes == nil {
+			return nil
+		}
+		return []rule.RuleSuggestion{{
+			Message:  rule.RuleMessage{Id: "suggestUnicodeFlag", Description: "Add unicode 'u' flag to regex."},
+			FixesArr: fixes,
+		}}
+	})
 }
 
 func messageDescriptionFor(kind string) string {

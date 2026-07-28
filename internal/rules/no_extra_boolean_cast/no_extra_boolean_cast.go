@@ -379,11 +379,9 @@ var NoExtraBooleanCastRule = rule.Rule{
 				if !isInFlaggedContext(node, opts) {
 					return
 				}
-				if fixes := buildNegationFix(ctx, node); fixes != nil {
-					ctx.ReportNodeWithFixes(node, negationMsg, fixes...)
-				} else {
-					ctx.ReportNode(node, negationMsg)
-				}
+				ctx.ReportNodeWithDeferredFixes(node, negationMsg, func() []rule.RuleFix {
+					return buildNegationFix(ctx, node)
+				})
 			},
 
 			// Detect Boolean(expr) in a flagged context.
@@ -402,11 +400,9 @@ var NoExtraBooleanCastRule = rule.Rule{
 				if !isInFlaggedContext(node, opts) {
 					return
 				}
-				if fixes := buildCallFix(ctx, node); fixes != nil {
-					ctx.ReportNodeWithFixes(node, callMsg, fixes...)
-				} else {
-					ctx.ReportNode(node, callMsg)
-				}
+				ctx.ReportNodeWithDeferredFixes(node, callMsg, func() []rule.RuleFix {
+					return buildCallFix(ctx, node)
+				})
 			},
 		}
 	},

@@ -2,9 +2,11 @@ package linter
 
 import (
 	"context"
+	"errors"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -83,7 +85,9 @@ type runProgramOptions struct {
 	// Rules that require type information are filtered for every other file,
 	// and remaining rules receive a nil TypeChecker. nil = no gap distinction.
 	TypeInfoFiles map[string]struct{}
-	OnDiagnostic  DiagnosticHandler
+	// Timing, when non-nil, receives per-rule execution timings. nil disables
+	// instrumentation entirely (listeners are registered unwrapped).
+	Timing *TimingCollector
 }
 
 type programLintResult struct {
@@ -138,11 +142,10 @@ func (r *listenerRegistry) reset() {
 //
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
-// concern handled by RunLinter directly.
-func runLintRulesInProgram(opts runProgramOptions) programLintResult {
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
-	}
+// concern handled by RunLinter directly. consumer is passed separately because
+// edit demand belongs to the reporting pass, not to runProgramOptions or the
+// Program itself.
+func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsumer) programLintResult {
 	getRulesForFile := opts.GetRulesForFile
 	if getRulesForFile == nil {
 		return programLintResult{}
@@ -168,6 +171,16 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 	// reset clears all captured per-file state before the next serial file.
 	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
 
+		// Per-rule durations for this file, parallel to rules. Listeners are
+		// wrapped at registration time, so when timing is off the traversal
+		// hot path pays nothing. All rules share one AST traversal; timing
+		// each listener invocation is what attributes traversal time to the
+		// rule that registered the listener.
+		var ruleDurations []time.Duration
+		if opts.Timing != nil {
+			ruleDurations = make([]time.Duration, len(rules))
+		}
+
 		// One lazy store is shared by directives, inline globals, and every
 		// comment-aware rule in this file. Most files never materialize it.
 		comments := rule.NewCommentStore(file)
@@ -178,6 +191,13 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 		// A cheap source-text check inside ParseInlineGlobals avoids asking
 		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
+
+		// One lazy reference index shared by every rule in this file; most
+		// files never materialize it.
+		var refs *rule.RefStore
+		if opts.Program != nil {
+			refs = rule.NewRefStore(file, opts.Program.Options())
+		}
 		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
@@ -185,7 +205,7 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 			}
 		}
 
-		for _, r := range rules {
+		for ruleIndex, r := range rules {
 			ctx := rule.RuleContext{
 				SourceFile:     file,
 				Program:        opts.Program,
@@ -194,11 +214,33 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				Comments:       comments,
+				Refs:           refs,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
-			}.WithReporter(r.Name, r.Severity, opts.OnDiagnostic)
+			}.WithDiagnosticConsumer(
+				r.Name,
+				r.Severity,
+				consumer,
+			)
 
-			for kind, listener := range r.Run(ctx) {
+			var runStart time.Time
+			if ruleDurations != nil {
+				runStart = time.Now()
+			}
+			ruleListeners := r.Run(ctx)
+			if ruleDurations != nil {
+				ruleDurations[ruleIndex] += time.Since(runStart)
+			}
+
+			for kind, listener := range ruleListeners {
+				if ruleDurations != nil {
+					inner := listener
+					listener = func(node *ast.Node) {
+						start := time.Now()
+						inner(node)
+						ruleDurations[ruleIndex] += time.Since(start)
+					}
+				}
 				registeredListeners.add(kind, listener)
 			}
 		}
@@ -275,6 +317,9 @@ func runLintRulesInProgram(opts runProgramOptions) programLintResult {
 			return false
 		}
 		file.Node.ForEachChild(childVisitor)
+		if opts.Timing != nil {
+			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
+		}
 		registeredListeners.reset()
 	}
 
@@ -427,9 +472,10 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
+	if !opts.Consumer.Demand.IsValid() {
+		return nil, errors.New("linter: invalid native edit demand")
 	}
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
@@ -466,12 +512,12 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				SyntaxErrorFiles:     opts.SyntaxErrorFiles,
 				SingleThreaded:       opts.SingleThreaded,
 				TypeInfoFiles:        opts.TypeInfoFiles,
-				OnDiagnostic:         opts.OnDiagnostic,
+				Timing:               opts.Timing,
 			}
 			programIndex := i
 			programOptions := programOpts
 			wg.Queue(func() {
-				programResults[programIndex] = runLintRulesInProgram(programOptions)
+				programResults[programIndex] = runLintRulesInProgram(programOptions, consumer)
 			})
 		}
 		wg.RunAndWait()
@@ -489,7 +535,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			Programs:       opts.Programs,
 			Skip:           opts.SkipTypeCheckPrograms,
 			SingleThreaded: opts.SingleThreaded,
-			OnDiagnostic:   opts.OnDiagnostic,
+			OnDiagnostic:   consumer.Report,
 		})
 	}
 
@@ -690,9 +736,10 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
-	if opts.OnDiagnostic == nil {
-		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
+	if !opts.Consumer.Demand.IsValid() {
+		panic("linter: invalid native edit demand")
 	}
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
 	getRulesForFile := opts.GetRulesForFile
 	if !opts.HasTypeInfo && getRulesForFile != nil {
 		base := getRulesForFile
@@ -710,9 +757,18 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.
 		SingleThreaded: true,
-		OnDiagnostic:   opts.OnDiagnostic,
-	})
+	}, consumer)
 }
+
+func normalizeDiagnosticConsumer(consumer rule.DiagnosticConsumer) rule.DiagnosticConsumer {
+	if consumer.Report == nil {
+		consumer.Demand = rule.EditDemandNone
+		consumer.Report = discardDiagnostic
+	}
+	return consumer
+}
+
+func discardDiagnostic(rule.RuleDiagnostic) {}
 
 // composeOwnedFilter combines a caller-supplied filter with the program's
 // owned-file restriction. Either component may be nil.

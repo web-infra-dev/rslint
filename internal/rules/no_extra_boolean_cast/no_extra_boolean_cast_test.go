@@ -1,9 +1,13 @@
 package no_extra_boolean_cast
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -335,4 +339,93 @@ func TestNoExtraBooleanCastRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoExtraBooleanCastEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		"if (!!first) {}\nif (Boolean(second)) {}",
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     NoExtraBooleanCastRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return NoExtraBooleanCastRule.Run(ctx, nil)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 2 {
+			t.Fatalf("demand %d: diagnostics = %d, want 2", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index := range allEdits {
+		for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+			rule.EditDemandNone:       diagnosticsOnly,
+			rule.EditDemandAutofix:    autofixOnly,
+			rule.EditDemandSuggestion: suggestionOnly,
+		} {
+			if got, want := withoutEdits(diagnostics[index]), withoutEdits(allEdits[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("demand %d changed diagnostic %d:\ngot  %#v\nwant %#v", demand, index, got, want)
+			}
+		}
+		if diagnosticsOnly[index].FixesPtr != nil || suggestionOnly[index].FixesPtr != nil {
+			t.Fatalf("diagnostic %d: non-autofix demand materialized fixes", index)
+		}
+		if autofixOnly[index].FixesPtr == nil ||
+			!reflect.DeepEqual(autofixOnly[index].FixesPtr, allEdits[index].FixesPtr) {
+			t.Fatalf("diagnostic %d: autofix and all-edits demands produced different fixes", index)
+		}
+		if fixes := *allEdits[index].FixesPtr; len(fixes) == 0 {
+			t.Fatalf("diagnostic %d: all-edits demand produced no fixes", index)
+		}
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{
+		diagnosticsOnly,
+		autofixOnly,
+		suggestionOnly,
+		allEdits,
+	} {
+		for index, diagnostic := range diagnostics {
+			if diagnostic.Suggestions != nil {
+				t.Fatalf("diagnostic %d: autofix-only rule materialized suggestions", index)
+			}
+		}
+	}
 }

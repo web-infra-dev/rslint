@@ -1,9 +1,14 @@
 package prefer_regex_literals
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -293,4 +298,72 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestPreferRegexLiteralsEditDemand(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `RegExp("item-(a|b)+", "giu");`, core.ScriptKindTS)
+	statement := sourceFile.Statements.Nodes[0].AsExpressionStatement()
+	callNode := statement.Expression
+	args := callNode.AsCallExpression().Arguments.Nodes
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			DisableManager: rule.NewDisableManager(sourceFile, rule.NewCommentStore(sourceFile)),
+		}.WithDiagnosticConsumer(PreferRegexLiteralsRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+		reportStaticStringRegExp(ctx, callNode, args)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.Suggestions != nil || autofixOnly.Suggestions != nil {
+		t.Fatal("non-suggestion demand materialized suggestions")
+	}
+	if diagnosticsOnly.FixesPtr != nil || autofixOnly.FixesPtr != nil ||
+		suggestionOnly.FixesPtr != nil || allEdits.FixesPtr != nil {
+		t.Fatal("suggestion-only rule materialized autofixes")
+	}
+	if suggestionOnly.Suggestions == nil ||
+		!reflect.DeepEqual(suggestionOnly.Suggestions, allEdits.Suggestions) {
+		t.Fatalf("suggestions differ between suggestion-only and all demand")
+	}
+	if suggestions := *allEdits.Suggestions; len(suggestions) != 1 ||
+		suggestions[0].Message.Id != "replaceWithLiteral" ||
+		len(suggestions[0].Fixes()) != 1 {
+		t.Fatalf("unexpected suggestions: %#v", suggestions)
+	}
 }

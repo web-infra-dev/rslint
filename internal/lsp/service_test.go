@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -766,15 +768,14 @@ func TestDebounce_CloseRace(t *testing.T) {
 		t.Fatal("URI should be removed from pendingLintURIs after close")
 	}
 
-	// Step 3: wait for the timer to fire
-	time.Sleep(300 * time.Millisecond)
-
-	// debounceCh should have a signal (timer still fires)
+	// Step 3: wait for the timer to fire. Waiting on the signal synchronizes
+	// with the timer callback without assuming it will be scheduled within a
+	// fixed amount of time.
 	select {
 	case <-s.debounceCh:
 		// good — signal received
-	default:
-		t.Fatal("timer should still fire even after close")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timer did not fire after close")
 	}
 
 	// Step 4: simulate what the dispatch loop does — iterate pending URIs
@@ -1498,8 +1499,11 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)
 			},
-			OnDiagnostic: func(d rule.RuleDiagnostic) {
-				diags = append(diags, d)
+			Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAll,
+				Report: func(d rule.RuleDiagnostic) {
+					diags = append(diags, d)
+				},
 			},
 		})
 		return diags
@@ -1662,7 +1666,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 
 	sourceURI := toURI(sourcePath)
-	program, hasTypeInfo, err := selectLintProgram(
+	program, _, hasTypeInfo, err := selectLintProgram(
 		sourceURI,
 		s.session,
 		ctx,
@@ -1704,7 +1708,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 
 	gapURI := toURI(gapPath)
-	gapProgram, gapHasTypeInfo, err := selectLintProgram(
+	gapProgram, _, gapHasTypeInfo, err := selectLintProgram(
 		gapURI,
 		s.session,
 		ctx,
@@ -1720,6 +1724,77 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 	if gapProgram.GetSourceFile(tspath.NormalizePath(gapPath)) == nil {
 		t.Fatal("gap fallback program must contain the open file")
+	}
+}
+
+func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const content = "export const value = 1;\n"
+	if err := os.WriteFile(sourcePath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(dir, "tsconfig.json")
+	if err := os.WriteFile(
+		configPath,
+		[]byte(`{"compilerOptions":{"noLib":true},"include":["src/**/*.ts"]}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	s := NewServer(&ServerOptions{
+		Cwd:                dir,
+		FS:                 fsys,
+		DefaultLibraryPath: bundled.LibPath(),
+	})
+	s.backgroundCtx = ctx
+	s.initializeParams = &lsproto.InitializeParams{}
+	if err := s.handleInitialized(ctx, &lsproto.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	defer s.session.Close()
+
+	uri := documentURIFromPath(sourcePath)
+	if err := s.handleDidOpen(ctx, &lsproto.DidOpenTextDocumentParams{
+		TextDocument: &lsproto.TextDocumentItem{
+			Uri:        uri,
+			LanguageId: lsproto.LanguageKindTypeScript,
+			Version:    1,
+			Text:       content,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	loaderCalls := 0
+	program, sourceFile, hasTypeInfo, err := selectLintProgram(
+		uri,
+		s.session,
+		ctx,
+		[]string{configPath},
+		fsys,
+		func(string) (*compiler.Program, *ast.SourceFile, error) {
+			loaderCalls++
+			return nil, nil, errors.New("standalone loader must not run")
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaderCalls != 0 {
+		t.Fatalf("standalone loader called %d times for a Session-owned project", loaderCalls)
+	}
+	if !hasTypeInfo || sourceFile == nil {
+		t.Fatal("Session-owned configured source lost type information")
+	}
+	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(configPath, fsys) {
+		t.Fatalf("selected Program config = %q, want %q", program.Options().ConfigFilePath, configPath)
 	}
 }
 

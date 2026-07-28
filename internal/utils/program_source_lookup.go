@@ -8,8 +8,8 @@ import (
 )
 
 // ProgramSourceLookup resolves a filesystem target to the exact source file in
-// one Program. Its canonical source index is built lazily and lives only for
-// the lookup's owning lint operation.
+// one Program. Its canonical source index is built lazily and lives for the
+// owning Program generation.
 type ProgramSourceLookup struct {
 	program             *compiler.Program
 	fs                  vfs.FS

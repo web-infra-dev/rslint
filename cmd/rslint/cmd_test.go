@@ -1248,8 +1248,11 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
 			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(activeConfig, sf.FileName(), dir, false, typeInfoFiles)
 		},
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			diagnostics = append(diagnostics, d)
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
+			},
 		},
 	})
 	if err != nil {
@@ -1647,5 +1650,35 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), directoryPath) {
 		t.Fatalf("write error must identify the target path, got %v", err)
+	}
+}
+
+func TestParseLintFlagsTiming(t *testing.T) {
+	cases := []struct {
+		name         string
+		argv         []string
+		wantExitCode int
+		wantEnabled  bool
+		wantLimit    int
+	}{
+		{name: "absent", argv: []string{}},
+		{name: "--timing all", argv: []string{"--timing", "all"}, wantEnabled: true},
+		{name: "--timing ALL", argv: []string{"--timing", "ALL"}, wantEnabled: true},
+		{name: "--timing N", argv: []string{"--timing", "10"}, wantEnabled: true, wantLimit: 10},
+		{name: "zero is rejected", argv: []string{"--timing", "0"}, wantExitCode: 2},
+		{name: "negative is rejected", argv: []string{"--timing", "-3"}, wantExitCode: 2},
+		{name: "non-numeric is rejected", argv: []string{"--timing", "ten"}, wantExitCode: 2},
+		{name: "missing value is rejected", argv: []string{"--timing"}, wantExitCode: 2},
+	}
+	for _, c := range cases {
+		args, _, exitCode := parseLintFlags(c.argv)
+		if exitCode != c.wantExitCode {
+			t.Errorf("%s: parseLintFlags(%v) exit code = %d, want %d", c.name, c.argv, exitCode, c.wantExitCode)
+			continue
+		}
+		if exitCode == 0 && (args.Timing != c.wantEnabled || args.TimingLimit != c.wantLimit) {
+			t.Errorf("%s: parseLintFlags(%v) = timing %v limit %d, want timing %v limit %d",
+				c.name, c.argv, args.Timing, args.TimingLimit, c.wantEnabled, c.wantLimit)
+		}
 	}
 }

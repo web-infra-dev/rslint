@@ -27,4 +27,5 @@ if (results.length !== 1 || results[0].messages.length !== 1) {
   );
   process.exit(2);
 }
+console.log('FIXTURE_OK:no-close');
 // Intentionally NO rslint.close(): unref() must let the process exit anyway.

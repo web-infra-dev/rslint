@@ -306,3 +306,142 @@ export function Input() {
 		},
 	)
 }
+
+// TestNoUnassignedVarsRefStoreEdges targets the semantic boundaries that can
+// regress when reference lookup moves from checker searches to ctx.Refs.
+func TestNoUnassignedVarsRefStoreEdges(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnassignedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// Repeated var declarations share a symbol; a write on either
+			// declaration assigns both.
+			{Code: `var value; var value = 1; consume(value);`},
+			{Code: `var value; for (var value of values) {} consume(value);`},
+			{Code: `var value; if (condition) { var value = 1; } consume(value);`},
+			{Code: `export var value; var value = 1; consume(value);`},
+			{Code: `export var value; for (var value of values) {} consume(value);`},
+
+			// Export modifiers do not themselves read a declaration.
+			{Code: `export let value;`},
+			{Code: `export let value; value = 1; consume(value);`},
+
+			// Type-only and source-bearing exports do not read the local.
+			{Code: `let value; export { type value };`},
+			{Code: `let value; export * as value from "mod";`},
+
+			// Binder identity must keep shadow writes and reads isolated.
+			{Code: `let value; { let value = 1; consume(value); }`},
+			{Code: `let value; function f() { let value; value = 1; consume(value); }`},
+
+			// RefStore omits declaration names, so loop declaration writes
+			// must be recognized directly.
+			{Code: `for (let item of items) consume(item);`},
+			{Code: `for (var key in object) consume(key);`},
+
+			// Runtime-free type queries do not count as reads.
+			{Code: `let value; type Alias = typeof value;`},
+
+			// Same-spelled syntactic names are not variable references.
+			{Code: `let value; const object = { value: 1 }; value: for (;;) { break value; }`},
+			{Code: `let component; const element = <component />;`, Tsx: true},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `var value; var value; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+					unassignedError("value", 1, 16, 1, 21),
+				},
+			},
+			{
+				Code: `export let value; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 12, 1, 17),
+				},
+			},
+			{
+				Code: `export var value; var value; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 12, 1, 17),
+					unassignedError("value", 1, 23, 1, 28),
+				},
+			},
+			{
+				Code: `let value; export { value as default };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `let value; export { value as "public" };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `for (let value;;) consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 10, 1, 15),
+				},
+			},
+			{
+				Code: `consume(value); var value;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 21, 1, 26),
+				},
+			},
+			{
+				Code: `let name; console.log(name);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("name", 1, 5, 1, 9),
+				},
+			},
+			{
+				Code: `let value; { let value; value = 1; } consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `var value; function f() { var value = 1; } consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `var value, other = 1; consume(value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `let value; export = value;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `let value; consume(typeof value);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 5, 1, 10),
+				},
+			},
+			{
+				Code: `let Component; const element = <Component />;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("Component", 1, 5, 1, 14),
+				},
+			},
+			{
+				Code: `namespace Runtime { let value; export { value as alias }; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unassignedError("value", 1, 25, 1, 30),
+				},
+			},
+		},
+	)
+}

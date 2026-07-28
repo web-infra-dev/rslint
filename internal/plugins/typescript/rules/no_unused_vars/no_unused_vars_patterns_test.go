@@ -94,7 +94,8 @@ console.log(rest);
 		{Code: `using resource = {} as any;`, Options: map[string]interface{}{"ignoreUsingDeclarations": true}},
 		{Code: `await using resource = {} as any;`, Options: map[string]interface{}{"ignoreUsingDeclarations": true}},
 
-		// --- reportUsedIgnorePattern: used var that matches pattern → reported elsewhere, valid here means no standard error ---
+		// --- reportUsedIgnorePattern: used name that does not match remains valid ---
+		{Code: `const value = 1; console.log(value);`, Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true}},
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
@@ -110,6 +111,12 @@ console.log(rest);
 			Code:    `const _foo = 1; console.log(_foo);`,
 			Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 7}},
+		},
+		// Exported bindings still report when their used name matches.
+		{
+			Code:    `export const _foo = 1; console.log(_foo);`,
+			Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 14}},
 		},
 		// reportUsedIgnorePattern applies to argsIgnorePattern too
 		{

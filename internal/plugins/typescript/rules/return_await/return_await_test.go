@@ -8,6 +8,110 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func TestParseReturnAwaitOption(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		options []any
+		want    ReturnAwaitOption
+	}{
+		{
+			name: "default",
+			want: ReturnAwaitOptionInTryCatch,
+		},
+		{
+			name:    "always from JS config",
+			options: []any{"always"},
+			want:    ReturnAwaitOptionAlways,
+		},
+		{
+			name:    "error handling correctness only from JS config",
+			options: []any{"error-handling-correctness-only"},
+			want:    ReturnAwaitOptionErrorHandlingCorrectnessOnly,
+		},
+		{
+			name:    "in try catch from JS config",
+			options: []any{"in-try-catch"},
+			want:    ReturnAwaitOptionInTryCatch,
+		},
+		{
+			name:    "never from JS config",
+			options: []any{"never"},
+			want:    ReturnAwaitOptionNever,
+		},
+		{
+			name:    "legacy structured option",
+			options: []any{ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)}},
+			want:    ReturnAwaitOptionAlways,
+		},
+		{
+			name:    "unknown value falls back to default",
+			options: []any{"unknown"},
+			want:    ReturnAwaitOptionInTryCatch,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			if got := parseReturnAwaitOption(testCase.options); got != testCase.want {
+				t.Fatalf("parseReturnAwaitOption() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestReturnAwaitRuleJSOptionsAndSyncArrows(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ReturnAwaitRule, []rule_tester.ValidTestCase{
+		{
+			Code:    "const test = () => Promise.resolve(1);",
+			Options: "always",
+		},
+		{
+			Code: `
+async function outer() {
+  const inner = () => Promise.resolve(1);
+  return await Promise.resolve(inner);
+}
+`,
+			Options: "always",
+		},
+		{
+			Code: `
+const test = async (condition: boolean) =>
+  condition
+    ? await Promise.resolve(1)
+    : await Promise.resolve(2);
+`,
+			Options: "always",
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "const test = async () => Promise.resolve(1);",
+			Options: "always",
+			Output:  []string{"const test = async () => await Promise.resolve(1);"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "requiredPromiseAwait",
+					Line:      1,
+				},
+			},
+		},
+		{
+			Code:    "const test = async () => await Promise.resolve(1);",
+			Options: "never",
+			Output:  []string{"const test = async () =>  Promise.resolve(1);"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "disallowedPromiseAwait",
+					Line:      1,
+				},
+			},
+		},
+	})
+}
+
 func TestReturnAwaitRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ReturnAwaitRule, []rule_tester.ValidTestCase{
 		{Code: "return;"},

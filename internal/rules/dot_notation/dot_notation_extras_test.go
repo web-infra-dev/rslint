@@ -6,9 +6,13 @@
 package dot_notation
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -234,5 +238,100 @@ func TestDotNotationAllowPatternSchema(t *testing.T) {
 	valid := []any{map[string]any{"allowPattern": "(?<=a)b"}}
 	if err := DotNotationRule.Schema.Validate(valid); err != nil {
 		t.Errorf("expected a valid allowPattern regex to pass schema validation, got: %v", err)
+	}
+}
+
+func TestDotNotationEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		`const first = object["property"];
+const second = object.while;
+const third = object[(/* keep */ "property")];
+const fourth = object. /* keep */ while;`,
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := []any{map[string]any{"allowKeywords": false}}
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     DotNotationRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return DotNotationRule.Run(ctx, options)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 4 {
+			t.Fatalf("demand %d: diagnostics = %d, want 4", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index := range allEdits {
+		want := withoutEdits(allEdits[index])
+		for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+			rule.EditDemandNone:       diagnosticsOnly,
+			rule.EditDemandAutofix:    autofixOnly,
+			rule.EditDemandSuggestion: suggestionOnly,
+		} {
+			if got := withoutEdits(diagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("demand %d diagnostic %d changed:\ngot  %#v\nwant %#v", demand, index, got, want)
+			}
+		}
+	}
+
+	wantFixes := []bool{true, true, false, false}
+	for index, wantFix := range wantFixes {
+		if got := autofixOnly[index].FixesPtr != nil; got != wantFix {
+			t.Errorf("autofix diagnostic %d fix presence = %t, want %t", index, got, wantFix)
+		}
+		if !reflect.DeepEqual(autofixOnly[index].FixesPtr, allEdits[index].FixesPtr) {
+			t.Errorf("autofix and all-edits diagnostic %d produced different fixes", index)
+		}
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{diagnosticsOnly, suggestionOnly} {
+		for index, diagnostic := range diagnostics {
+			if diagnostic.FixesPtr != nil {
+				t.Errorf("non-autofix diagnostic %d materialized fixes", index)
+			}
+		}
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{diagnosticsOnly, autofixOnly, suggestionOnly, allEdits} {
+		for index, diagnostic := range diagnostics {
+			if diagnostic.Suggestions != nil {
+				t.Errorf("autofix-only diagnostic %d materialized suggestions", index)
+			}
+		}
 	}
 }

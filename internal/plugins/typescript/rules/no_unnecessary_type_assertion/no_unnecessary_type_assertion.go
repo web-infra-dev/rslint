@@ -7,10 +7,25 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+const nullableTypeFlags = checker.TypeFlagsAny |
+	checker.TypeFlagsUnknown |
+	checker.TypeFlagsNull |
+	checker.TypeFlagsUndefined |
+	checker.TypeFlagsVoid
+
+func getUnionTypeFlags(t *checker.Type) checker.TypeFlags {
+	var flags checker.TypeFlags
+	for _, part := range utils.UnionTypeParts(t) {
+		flags |= checker.Type_flags(part)
+	}
+	return flags
+}
 
 func buildContextuallyUnnecessaryMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -54,6 +69,21 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			opts.TypesToIgnore = []string{}
 		}
 
+		sourceText := ctx.SourceFile.Text()
+		var fixScanner *scanner.Scanner
+		getTokenRange := func(pos int) core.TextRange {
+			if fixScanner == nil {
+				fixScanner = scanner.NewScanner()
+			} else {
+				fixScanner.Reset()
+			}
+			fixScanner.SetText(sourceText)
+			fixScanner.SetLanguageVariant(ctx.SourceFile.LanguageVariant)
+			fixScanner.ResetPos(pos)
+			fixScanner.Scan()
+			return fixScanner.TokenRange()
+		}
+
 		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
@@ -63,8 +93,11 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 		/**
 		 * Returns true if there's a chance the variable has been used before a value has been assigned to it
 		 */
-		isPossiblyUsedBeforeAssigned := func(node *ast.Node) bool {
-			declaration := utils.GetDeclaration(ctx.TypeChecker, node)
+		isPossiblyUsedBeforeAssigned := func(
+			node *ast.Node,
+			declaration *ast.Declaration,
+			constrainedType *checker.Type,
+		) bool {
 			if declaration == nil {
 				// don't know what the declaration is for some reason, so just assume the worst
 				return true
@@ -118,8 +151,10 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				decl.Type != nil {
 				// check if the defined variable type has changed since assignment
 				declarationType := checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, declaration.Type())
-				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-				if declarationType == t &&
+				if constrainedType == nil {
+					constrainedType = utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
+				}
+				if declarationType == constrainedType &&
 					// `declare`s are never narrowed, so never skip them
 					(!ast.IsVariableDeclarationList(declaration.Parent) || !ast.IsVariableStatement(declaration.Parent.Parent) || !utils.IncludesModifier(declaration.Parent.Parent.AsVariableStatement(), ast.KindDeclareKeyword)) {
 					// possibly used before assigned, so just skip it
@@ -133,6 +168,38 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 			return false
 		}
+
+		type identifierInfo struct {
+			declaration     *ast.Declaration
+			constrainedType *checker.Type
+			typeFlags       checker.TypeFlags
+		}
+		identifierInfoCache := make(map[*ast.Symbol]identifierInfo)
+		getIdentifierInfo := func(node *ast.Node) (identifierInfo, bool) {
+			symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+			if symbol == nil {
+				return identifierInfo{}, false
+			}
+			if info, ok := identifierInfoCache[symbol]; ok {
+				return info, true
+			}
+
+			info := identifierInfo{}
+			if len(symbol.Declarations) > 0 {
+				info.declaration = symbol.Declarations[0]
+			}
+			declaredType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, nil)
+			if declaredType != nil {
+				info.constrainedType = declaredType
+				if constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, declaredType); constraint != nil {
+					info.constrainedType = constraint
+				}
+				info.typeFlags = getUnionTypeFlags(info.constrainedType)
+			}
+			identifierInfoCache[symbol] = info
+			return info, true
+		}
+
 		isConstAssertion := func(node *ast.Node) bool {
 			if !ast.IsTypeReferenceNode(node) {
 				return false
@@ -206,29 +273,24 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(ctx.SourceFile.Text()[typeNode.Pos():typeNode.End()])) {
+			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(sourceText[typeNode.Pos():typeNode.End()])) {
+				return
+			}
+
+			typeAnnotationIsConstAssertion := isConstAssertion(typeNode)
+			if typeAnnotationIsConstAssertion && !opts.CheckLiteralConstAssertions {
 				return
 			}
 
 			castType := ctx.TypeChecker.GetTypeAtLocation(node)
 
-			if !utils.IsTypeFlagSet(castType, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) {
-				// Skip const assertions unless checkLiteralConstAssertions is enabled
-				if isConstAssertion(typeNode) && !opts.CheckLiteralConstAssertions {
-					return
-				}
-			} else {
-				// For literal types with const assertions, skip unless checkLiteralConstAssertions is enabled
-				if isConstAssertion(typeNode) && !opts.CheckLiteralConstAssertions {
-					return
-				}
+			if utils.IsTypeFlagSet(castType, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) {
 				// For literal types, only check if it's an implicitly narrowed declaration
 				// (e.g., const variable or readonly property)
 				// OR if checkLiteralConstAssertions is enabled for explicit const assertions
-				if !isImplicitlyNarrowedLiteralDeclaration(node) {
-					if !opts.CheckLiteralConstAssertions || !isConstAssertion(typeNode) {
-						return
-					}
+				if !isImplicitlyNarrowedLiteralDeclaration(node) &&
+					(!opts.CheckLiteralConstAssertions || !typeAnnotationIsConstAssertion) {
+					return
 				}
 			}
 
@@ -241,10 +303,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			msg := buildUnnecessaryAssertionMessage()
 
 			if node.Kind == ast.KindAsExpression {
-				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
-				asKeywordRange := s.TokenRange()
+				asKeywordRange := getTokenRange(expression.End())
 
-				sourceText := ctx.SourceFile.Text()
 				startPos := asKeywordRange.Pos()
 
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
@@ -256,8 +316,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				fixRange := asKeywordRange.WithPos(startPos).WithEnd(typeNode.End())
 				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(fixRange))
 			} else {
-				s := scanner.GetScannerForSourceFile(ctx.SourceFile, node.Pos())
-				openingAngleBracket := s.TokenRange()
+				openingAngleBracket := getTokenRange(node.Pos())
 
 				fixRange := openingAngleBracket.WithEnd(expression.Pos())
 				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(fixRange))
@@ -273,8 +332,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				expression := node.Expression()
 
 				buildRemoveExclamationFix := func() rule.RuleFix {
-					s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
-					return rule.RuleFixRemoveRange(s.TokenRange())
+					return rule.RuleFixRemoveRange(getTokenRange(expression.End()))
 				}
 
 				if ast.IsAssignmentExpression(node.Parent, true) {
@@ -288,19 +346,40 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
-
-				var tFlags checker.TypeFlags
-				for _, part := range utils.UnionTypeParts(t) {
-					tFlags |= checker.Type_flags(part)
+				var (
+					expressionIdentifierInfo identifierInfo
+					hasIdentifierInfo        bool
+				)
+				if ast.IsIdentifier(expression) {
+					expressionIdentifierInfo, hasIdentifierInfo = getIdentifierInfo(expression)
+					// The checker assumes an identifier below a non-null expression is
+					// initialized, and flow analysis can only preserve or narrow its
+					// declared constrained type. A declared non-nullish type therefore
+					// cannot become nullish at this location.
+					if hasIdentifierInfo &&
+						expressionIdentifierInfo.declaration != nil &&
+						expressionIdentifierInfo.constrainedType != nil &&
+						expressionIdentifierInfo.typeFlags&nullableTypeFlags == 0 {
+						if isPossiblyUsedBeforeAssigned(expression, expressionIdentifierInfo.declaration, nil) {
+							return
+						}
+						ctx.ReportNodeWithFixes(node, buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix())
+						return
+					}
 				}
 
-				if tFlags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown|
-					checker.TypeFlagsNull|
-					checker.TypeFlagsUndefined|
-					checker.TypeFlagsVoid) == 0 {
-					if ast.IsIdentifier(expression) && isPossiblyUsedBeforeAssigned(expression) {
-						return
+				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
+				tFlags := getUnionTypeFlags(t)
+
+				if tFlags&nullableTypeFlags == 0 {
+					if ast.IsIdentifier(expression) {
+						declaration := expressionIdentifierInfo.declaration
+						if !hasIdentifierInfo {
+							declaration = utils.GetDeclaration(ctx.TypeChecker, expression)
+						}
+						if isPossiblyUsedBeforeAssigned(expression, declaration, t) {
+							return
+						}
 					}
 					ctx.ReportNodeWithFixes(node, buildUnnecessaryAssertionMessage(), buildRemoveExclamationFix())
 				} else {
@@ -308,10 +387,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					// so figure out if the variable is used in a place that accepts nullable types
 					contextualType := utils.GetContextualType(ctx.TypeChecker, node)
 					if contextualType != nil {
-						var contextualFlags checker.TypeFlags
-						for _, part := range utils.UnionTypeParts(contextualType) {
-							contextualFlags |= checker.Type_flags(part)
-						}
+						contextualFlags := getUnionTypeFlags(contextualType)
 
 						if tFlags&checker.TypeFlagsUnknown != 0 && contextualFlags&checker.TypeFlagsUnknown == 0 {
 							return

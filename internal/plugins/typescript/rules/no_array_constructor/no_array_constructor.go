@@ -2,6 +2,7 @@ package no_array_constructor
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -13,70 +14,38 @@ func useLiteralMessage() rule.RuleMessage {
 	}
 }
 
+func buildArrayConstructorFixes(
+	sourceText string,
+	node *ast.Node,
+	args *ast.NodeList,
+	reportRange core.TextRange,
+) []rule.RuleFix {
+	if args == nil {
+		return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, "[]")}
+	}
+
+	closeParenPos := node.End() - 1
+	if args.Pos() < reportRange.Pos() ||
+		closeParenPos < args.Pos() ||
+		closeParenPos >= len(sourceText) ||
+		sourceText[closeParenPos] != ')' {
+		// Keep malformed/recovery ASTs safe and preserve the rule's previous
+		// fallback for a missing closing parenthesis.
+		return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, "[]")}
+	}
+
+	// Replace only the call boundaries. The argument text, including comments,
+	// whitespace, and trailing commas, stays in place without another scan or a
+	// copy into a replacement string.
+	return []rule.RuleFix{
+		rule.RuleFixReplaceRange(core.NewTextRange(reportRange.Pos(), args.Pos()), "["),
+		rule.RuleFixReplaceRange(core.NewTextRange(closeParenPos, node.End()), "]"),
+	}
+}
+
 var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 	Name: "no-array-constructor",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// getArgumentsText extracts the text between opening and closing parentheses
-		// Returns empty string if no parentheses found (e.g., "new Array;")
-		getArgumentsText := func(node *ast.Node) string {
-			text := ctx.SourceFile.Text()
-
-			// Get callee end position to start scanning from
-			var callee *ast.Node
-			var typeArgs *ast.NodeList
-			switch node.Kind {
-			case ast.KindCallExpression:
-				callExpr := node.AsCallExpression()
-				callee = callExpr.Expression
-				typeArgs = callExpr.TypeArguments
-			case ast.KindNewExpression:
-				newExpr := node.AsNewExpression()
-				callee = newExpr.Expression
-				typeArgs = newExpr.TypeArguments
-			default:
-				return ""
-			}
-
-			// Start scanning from after callee or after type arguments if present
-			scanStart := callee.End()
-			if typeArgs != nil && len(typeArgs.Nodes) > 0 {
-				scanStart = typeArgs.End()
-			}
-
-			// Use scanner to find the opening and closing parens
-			// Track paren depth to handle nested parens like Array((x), y) or Array(foo(), bar())
-			s := scanner.GetScannerForSourceFile(ctx.SourceFile, scanStart)
-			openParenEnd := -1
-			closeParenStart := -1
-			parenDepth := 0
-
-			for s.TokenStart() < node.End() {
-				if s.Token() == ast.KindOpenParenToken {
-					if openParenEnd == -1 {
-						// Only capture the first open paren position
-						openParenEnd = s.TokenEnd()
-					}
-					parenDepth++
-				} else if s.Token() == ast.KindCloseParenToken {
-					parenDepth--
-					if parenDepth == 0 {
-						// This is the matching close paren for the first open paren
-						closeParenStart = s.TokenStart()
-						break
-					}
-				}
-				s.Scan()
-			}
-
-			// No parentheses found (e.g., "new Array;")
-			if openParenEnd == -1 || closeParenStart == -1 {
-				return ""
-			}
-
-			// Return the text between open and close parens
-			return text[openParenEnd:closeParenStart]
-		}
-
 		check := func(node *ast.Node) {
 			var callee *ast.Node
 			var args *ast.NodeList
@@ -97,8 +66,16 @@ var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
+			// ESTree does not expose grouping parentheses around a callee. Match
+			// that behavior without unwrapping TypeScript-only outer expressions
+			// such as non-null or `as` expressions.
+			if callee == nil {
+				return
+			}
+			callee = ast.SkipParentheses(callee)
+
 			// Check if callee is an Identifier named "Array"
-			if callee == nil || callee.Kind != ast.KindIdentifier {
+			if callee.Kind != ast.KindIdentifier {
 				return
 			}
 			identifier := callee.AsIdentifier()
@@ -120,15 +97,11 @@ var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// Report with fix
-			argsText := getArgumentsText(node)
-			replacement := "[" + argsText + "]"
-
-			ctx.ReportNodeWithFixes(
-				node,
-				useLiteralMessage(),
-				rule.RuleFixReplace(ctx.SourceFile, node, replacement),
-			)
+			sourceText := ctx.SourceFile.Text()
+			reportRange := core.NewTextRange(scanner.SkipTrivia(sourceText, node.Pos()), node.End())
+			ctx.ReportRangeWithDeferredFixes(reportRange, useLiteralMessage(), func() []rule.RuleFix {
+				return buildArrayConstructorFixes(sourceText, node, args, reportRange)
+			})
 		}
 
 		return rule.RuleListeners{

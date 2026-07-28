@@ -11,6 +11,7 @@
  * engines, so the emitted `ruleId` is identical across the comparison.
  */
 import { createRequire } from 'node:module';
+import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -18,8 +19,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
+import { validateConformanceStderrContract } from './stderr-contract.js';
 
 const require = createRequire(import.meta.url);
+// A finite test cannot prove that work will never complete. Normal completion
+// is driven by ESLint's promise and rslint's process close; this deliberately
+// long sentinel exists only to release CI after a genuine deadlock.
+const CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS = 30 * 60_000;
 
 /** One differential case: a minimal trigger for `<alias>/<rule>`. */
 export interface DiffCase {
@@ -35,6 +41,13 @@ export interface DiffCase {
   filename?: string;
   /** Force JSX parsing (otherwise auto-detected from `code`). */
   jsx?: boolean;
+  /**
+   * One exact stderr warning this case permits and requires at batch level.
+   * Plugin warning de-duplication is worker/scheduling dependent, so each
+   * distinct expected line must appear at least once and no more often than
+   * the number of annotated cases. Unrelated stderr remains forbidden.
+   */
+  expectedStderr?: string;
 }
 
 /** Normalized diagnostic shape compared across the two engines. */
@@ -230,15 +243,25 @@ export async function runEslintV10(
  * only zero out its own chunk, not the whole suite, and so no single config /
  * IPC payload grows unbounded. Returns Map<globalIndex, NormDiag[]>.
  */
-export function runRslintBatch(cases: DiffCase[]): Map<number, NormDiag[]> {
+export function runRslintBatch(
+  cases: DiffCase[],
+  deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS,
+): Map<number, NormDiag[]> {
   const CHUNK = 60;
   const byIndex = new Map<number, NormDiag[]>(cases.map((_, i) => [i, []]));
   for (let start = 0; start < cases.length; start += CHUNK) {
+    const remainingMs = deadline - performance.now();
+    if (remainingMs <= 0) {
+      throw new Error(
+        `rslint conformance exceeded its ${CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS}ms batch deadlock sentinel`,
+      );
+    }
     runRslintChunk(
       cases,
       start,
       Math.min(start + CHUNK, cases.length),
       byIndex,
+      remainingMs,
     );
   }
   for (const [i, arr] of byIndex) byIndex.set(i, sortDiags(arr));
@@ -252,6 +275,7 @@ function runRslintChunk(
   start: number,
   end: number,
   byIndex: Map<number, NormDiag[]>,
+  timeoutMs: number,
 ): void {
   const rslintBin = require.resolve('@rslint/core/bin');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-v10-diff-'));
@@ -301,36 +325,103 @@ function runRslintChunk(
       }),
     );
 
+    const {
+      GITHUB_ACTIONS: _githubActions,
+      FORCE_COLOR: _forceColor,
+      ...env
+    } = process.env;
     const res = spawnSync(
       process.execPath,
       [rslintBin, '--format', 'jsonline'],
-      { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } },
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        env: { ...env, NO_COLOR: '1' },
+        timeout: Math.max(1, Math.floor(timeoutMs)),
+        killSignal: 'SIGKILL',
+        maxBuffer: 16 * 1024 * 1024,
+      },
     );
 
-    if (
-      /invalid config|Cannot find|failed to load/i.test(res.stderr) &&
-      !res.stdout.trim()
-    ) {
-      throw new Error(`rslint failed:\n${res.stderr.slice(0, 2000)}`);
+    if (res.error) {
+      throw new Error(`rslint process failed: ${res.error.message}`);
+    }
+    if (res.signal !== null || (res.status !== 0 && res.status !== 1)) {
+      throw new Error(
+        `rslint closed abnormally (status=${String(res.status)}, signal=${String(res.signal)}):\n${res.stderr.slice(0, 2000)}`,
+      );
+    }
+    const actualStderrLines = res.stderr
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const expectedStderrLines = cases
+      .slice(start, end)
+      .flatMap((c) => (c.expectedStderr ? [c.expectedStderr] : []));
+    const stderrViolation = validateConformanceStderrContract(
+      actualStderrLines,
+      expectedStderrLines,
+    );
+    if (stderrViolation) {
+      throw new Error(
+        `rslint stderr contract mismatch:\n${stderrViolation}\nraw:\n${res.stderr.slice(0, 2000)}`,
+      );
     }
 
-    for (const line of res.stdout.split('\n')) {
+    let parsedDiagnosticCount = 0;
+    for (const [lineIndex, line] of res.stdout.split('\n').entries()) {
       const t = line.trim();
-      if (!t.startsWith('{')) continue;
-      const d = JSON.parse(t) as RslintDiag;
+      if (t === '') continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(t);
+      } catch (error) {
+        throw new Error(
+          `rslint emitted non-JSON output at line ${lineIndex + 1}: ${String(error)}\n${t.slice(0, 1000)}`,
+        );
+      }
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        typeof (parsed as Partial<RslintDiag>).filePath !== 'string' ||
+        typeof (parsed as Partial<RslintDiag>).ruleName !== 'string' ||
+        typeof (parsed as Partial<RslintDiag>).message !== 'string'
+      ) {
+        throw new Error(
+          `rslint emitted an invalid diagnostic at line ${lineIndex + 1}: ${t.slice(0, 1000)}`,
+        );
+      }
+      const d = parsed as RslintDiag;
       const idx = fileToIndex.get(d.filePath);
-      if (idx === undefined) continue;
-      // Compare only the community-plugin rule under test for this fixture.
-      // Native rslint infrastructure diagnostics indicate a bad harness setup;
-      // unrelated rule diagnostics from the same file are ignored for this case.
+      if (idx === undefined) {
+        throw new Error(
+          `rslint emitted a diagnostic for unknown fixture ${d.filePath}: ${d.ruleName}: ${d.message}`,
+        );
+      }
+      parsedDiagnosticCount++;
       if (d.ruleName.startsWith('rslint/')) {
         throw new Error(
           `rslint infrastructure diagnostic for ${d.filePath}: ${d.ruleName}: ${d.message}`,
         );
       }
       const c = cases[idx];
-      if (d.ruleName !== `${aliasFor(c.pkg)}/${c.rule}`) continue;
+      const expectedRule = `${aliasFor(c.pkg)}/${c.rule}`;
+      if (d.ruleName !== expectedRule) {
+        throw new Error(
+          `rslint emitted unexpected rule ${d.ruleName} for ${d.filePath}; expected ${expectedRule}: ${d.message}`,
+        );
+      }
       byIndex.get(idx)!.push(normRslint(d));
+    }
+    if (res.status === 1 && parsedDiagnosticCount === 0) {
+      throw new Error(
+        `rslint exited 1 without a fixture diagnostic:\n${res.stderr.slice(0, 2000)}`,
+      );
+    }
+    if (res.status === 0 && parsedDiagnosticCount > 0) {
+      throw new Error(
+        `rslint exited 0 despite ${parsedDiagnosticCount} fixture diagnostics`,
+      );
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -342,8 +433,9 @@ function runRslintChunk(
  * `match` = identical normalized diag sets, `empty` = neither engine reported.
  */
 export async function compareCases(cases: DiffCase[]): Promise<Verdict[]> {
+  const deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS;
   const es = await runEslintV10(cases);
-  const rs = runRslintBatch(cases);
+  const rs = runRslintBatch(cases, deadline);
   return cases.map((c, i) => {
     const eslint = es.get(i) ?? [];
     const rslint = rs.get(i) ?? [];

@@ -1,38 +1,17 @@
 import { describe, test, expect } from '@rstest/core';
-import { spawn } from 'child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
 
-interface CliTestResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
-
-async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
-      cwd: cwd || process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout?.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    child.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code) => {
-      resolve({ exitCode: code || 0, stdout, stderr });
-    });
+async function runRslint(
+  args: string[],
+  cwd?: string,
+): Promise<CliProcessResult> {
+  return runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+    cwd: cwd || process.cwd(),
   });
 }
 

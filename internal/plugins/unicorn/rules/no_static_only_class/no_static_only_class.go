@@ -530,12 +530,9 @@ var NoStaticOnlyClassRule = rule.Rule{
 			}
 			headRange := classHeadRange(node, ctx.SourceFile)
 
-			fixes := buildFix(node, ctx.SourceFile)
-			if len(fixes) == 0 {
-				ctx.ReportRange(headRange, msg)
-				return
-			}
-			ctx.ReportRangeWithFixes(headRange, msg, fixes...)
+			ctx.ReportRangeWithDeferredFixes(headRange, msg, func() []rule.RuleFix {
+				return buildFix(node, ctx.SourceFile)
+			})
 		}
 
 		return rule.RuleListeners{

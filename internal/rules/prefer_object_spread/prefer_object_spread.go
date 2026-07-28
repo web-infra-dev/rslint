@@ -764,7 +764,9 @@ var PreferObjectSpreadRule = rule.Rule{
 					msg = buildUseLiteralMessage()
 				}
 
-				ctx.ReportNodeWithFixes(node, msg, buildFixes(ctx, node, args)...)
+				ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+					return buildFixes(ctx, node, args)
+				})
 			},
 		}
 	},

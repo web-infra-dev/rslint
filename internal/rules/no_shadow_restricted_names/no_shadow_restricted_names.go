@@ -49,28 +49,65 @@ func isForInOrOfLoopVariable(varDecl *ast.Node) bool {
 	return stmt != nil && stmt.Initializer == list
 }
 
-// collectWrittenUndefinedSymbols walks the source file and collects symbols of
-// every identifier named "undefined" that is written to (assignment target).
-// Symbol-level declaration analysis (init, parameter/class/function/catch/import
-// defs, for-in/of loop) is handled separately via `symbol.Declarations`.
-func collectWrittenUndefinedSymbols(ctx rule.RuleContext) map[*ast.Symbol]bool {
-	written := map[*ast.Symbol]bool{}
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil {
-		return written
+// undefinedAnalysis is the one-time, whole-file pass whose results back
+// isSymbolSafelyShadowingUndefined and hasSameScopeNonVarUndefinedDeclaration,
+// so that every "is this bare `undefined` declaration safe to shadow" check
+// below is an O(1) map lookup instead of its own fresh scoped walk.
+type undefinedAnalysis struct {
+	// written holds the symbol of every identifier named "undefined" that is
+	// written to (assignment target) anywhere in the file.
+	written map[*ast.Symbol]bool
+	// scopesWithFnOrClass holds every var-scope (function-like / module-block /
+	// source-file / static block) that contains — anywhere inside it, not
+	// crossing into a nested scope — a FunctionDeclaration or ClassDeclaration
+	// named "undefined".
+	scopesWithFnOrClass map[*ast.Node]bool
+}
+
+// analyzeUndefinedDeclarations walks the source file once, collecting both
+// write-referenced "undefined" symbols and the scopes of any sibling
+// function/class named "undefined". A single top-down walk suffices for the
+// latter even though it isn't scope-bounded: utils.FindEnclosingScope always
+// starts from the declaration's own parent chain, so it attributes each
+// FunctionDeclaration/ClassDeclaration to its own immediate enclosing scope
+// correctly regardless of how deeply the walk has descended to reach it.
+//
+// This is a manual, cheaply-filtered walk (only nodes whose text is literally
+// "undefined", or whose kind is a function/class declaration) rather than a
+// ctx.Refs.References query: the latter would need RefStore to index every
+// identifier in the file by name, which costs more than this rule's own
+// narrow scan.
+func analyzeUndefinedDeclarations(ctx rule.RuleContext) undefinedAnalysis {
+	result := undefinedAnalysis{
+		written:             map[*ast.Symbol]bool{},
+		scopesWithFnOrClass: map[*ast.Node]bool{},
 	}
-	tc := ctx.TypeChecker
+	if ctx.Refs == nil || ctx.SourceFile == nil {
+		return result
+	}
 
 	var walk func(n *ast.Node)
 	walk = func(n *ast.Node) {
 		if n == nil {
 			return
 		}
-		if ast.IsIdentifier(n) && n.AsIdentifier().Text == "undefined" && utils.IsWriteReference(n) {
-			// GetReferenceSymbol resolves the value-binding symbol for
-			// shorthand destructuring assignments, instead of the property
-			// symbol that GetSymbolAtLocation would otherwise return.
-			if sym := utils.GetReferenceSymbol(n, tc); sym != nil {
-				written[sym] = true
+		switch n.Kind {
+		case ast.KindIdentifier:
+			if n.AsIdentifier().Text == "undefined" && utils.IsWriteReference(n) {
+				// Resolve is a single binder scope-walk with no whole-file
+				// indexing, and (like GetReferenceSymbol before it) resolves
+				// the value-binding symbol for shorthand destructuring
+				// assignments rather than the property symbol a TypeChecker
+				// lookup would otherwise return.
+				if sym := ctx.Refs.Resolve(n); sym != nil {
+					result.written[sym] = true
+				}
+			}
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+			if name := n.Name(); name != nil && ast.IsIdentifier(name) && name.AsIdentifier().Text == "undefined" {
+				if scope := utils.FindEnclosingScope(n); scope != nil {
+					result.scopesWithFnOrClass[scope] = true
+				}
 			}
 		}
 		n.ForEachChild(func(c *ast.Node) bool {
@@ -80,7 +117,7 @@ func collectWrittenUndefinedSymbols(ctx rule.RuleContext) map[*ast.Symbol]bool {
 	}
 
 	walk(ctx.SourceFile.AsNode())
-	return written
+	return result
 }
 
 // isSymbolSafelyShadowingUndefined matches ESLint's safelyShadowsUndefined:
@@ -117,42 +154,9 @@ func isSymbolSafelyShadowingUndefined(sym *ast.Symbol, writtenSymbols map[*ast.S
 // tsgo's TypeChecker does not always replicate (for example, TypeScript keeps
 // `function undefined() {}` and `var undefined;` in the same scope as distinct
 // symbols).
-func hasSameScopeNonVarUndefinedDeclaration(identNode *ast.Node) bool {
+func hasSameScopeNonVarUndefinedDeclaration(identNode *ast.Node, scopesWithFnOrClass map[*ast.Node]bool) bool {
 	scope := utils.FindEnclosingScope(identNode)
-	if scope == nil {
-		return false
-	}
-
-	found := false
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || found {
-			return
-		}
-		// Check this node's name BEFORE deciding whether to descend — the FD /
-		// class declaration's name belongs to the outer scope.
-		switch n.Kind {
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
-			if name := n.Name(); name != nil && ast.IsIdentifier(name) && name.AsIdentifier().Text == "undefined" {
-				found = true
-				return
-			}
-		}
-		// Don't descend past nested scope boundaries; their bodies belong to
-		// a different var scope.
-		if n != scope && (ast.IsFunctionLikeOrClassStaticBlockDeclaration(n) || n.Kind == ast.KindModuleBlock) {
-			return
-		}
-		n.ForEachChild(func(c *ast.Node) bool {
-			walk(c)
-			return false
-		})
-	}
-	scope.ForEachChild(func(c *ast.Node) bool {
-		walk(c)
-		return false
-	})
-	return found
+	return scope != nil && scopesWithFnOrClass[scope]
 }
 
 var NoShadowRestrictedNamesRule = rule.Rule{
@@ -171,14 +175,14 @@ var NoShadowRestrictedNamesRule = rule.Rule{
 			restricted["globalThis"] = true
 		}
 
-		var writtenUndefinedSymbols map[*ast.Symbol]bool
+		var analysis undefinedAnalysis
 		undefinedComputed := false
 		ensureUndefinedAnalysis := func() {
 			if undefinedComputed {
 				return
 			}
 			undefinedComputed = true
-			writtenUndefinedSymbols = collectWrittenUndefinedSymbols(ctx)
+			analysis = analyzeUndefinedDeclarations(ctx)
 		}
 
 		reported := map[*ast.Node]bool{}
@@ -198,15 +202,21 @@ var NoShadowRestrictedNamesRule = rule.Rule{
 				return
 			}
 			if name == "undefined" && allowSafeUndefined {
-				if ctx.TypeChecker == nil {
-					// No type information: be permissive, matching ESLint's
+				if ctx.Refs == nil {
+					// No reference info: be permissive, matching ESLint's
 					// safelyShadowsUndefined when the declaration has no initializer.
 					return
 				}
 				ensureUndefinedAnalysis()
-				sym := ctx.TypeChecker.GetSymbolAtLocation(ident)
-				if isSymbolSafelyShadowingUndefined(sym, writtenUndefinedSymbols) &&
-					!hasSameScopeNonVarUndefinedDeclaration(ident) {
+				// ident is a declaration name, not a reference position, so it
+				// resolves through the binder-attached symbol on its own
+				// declaring node rather than ctx.Refs.Resolve.
+				var sym *ast.Symbol
+				if decl := ident.Parent; decl != nil && decl.Name() == ident {
+					sym = decl.Symbol()
+				}
+				if isSymbolSafelyShadowingUndefined(sym, analysis.written) &&
+					!hasSameScopeNonVarUndefinedDeclaration(ident, analysis.scopesWithFnOrClass) {
 					return
 				}
 			}

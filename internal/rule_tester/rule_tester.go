@@ -162,11 +162,14 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					},
 				}
 			},
-			OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
-				diagnosticsMu.Lock()
-				defer diagnosticsMu.Unlock()
+			Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAll,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnosticsMu.Lock()
+					defer diagnosticsMu.Unlock()
 
-				diagnostics = append(diagnostics, diagnostic)
+					diagnostics = append(diagnostics, diagnostic)
+				},
 			},
 		})
 

@@ -42,111 +42,8 @@ function lexTokens(src: string) {
   );
 }
 
-// ────────────────────────────────────────────────────────────────────
-// WorkerPool: respawn rejection must drain pendingQueue
-// ────────────────────────────────────────────────────────────────────
-
 const HANG_CONFIG_PATH = path.resolve(__dirname, 'fixtures', 'hang.config.mjs');
 const HANG_CONFIG_DIR = path.dirname(HANG_CONFIG_PATH);
-
-describe('WorkerPool respawn rejection drains pendingQueue', () => {
-  test('queued task after respawn-reject does not hang lintBatch', async () => {
-    const pool = new WorkerPool({
-      configs: [
-        { configPath: HANG_CONFIG_PATH, configDirectory: HANG_CONFIG_DIR },
-      ],
-      workerCount: 1,
-      retryCap: 3,
-      // Long enough that the in-flight hang task doesn't auto-time-out
-      // before the manual terminate below — we want the failure path
-      // to be "explicit terminate + respawn reject", not "task_timeout".
-      taskTimeoutMs: 30_000,
-    });
-    await pool.init();
-
-    // 1. In-flight hang task occupies the only worker.
-    const hangPromise = pool.lintBatch([
-      {
-        filePath: 'hang.ts',
-        text: 'const x = 1;\n',
-        rules: { 'hang/hang': { options: [] } },
-        collectFixes: false,
-        suggestionsMode: 'off',
-        configKey: HANG_CONFIG_DIR,
-      },
-    ]);
-
-    // Give the worker time to receive + start the hang task.
-    await new Promise((r) => setTimeout(r, 200));
-
-    // 2. Sibling task — separate lintBatch call. Worker is busy, so
-    //    kickQueue can't dispatch it; it sits in pendingQueue.
-    const siblingPromise = pool.lintBatch([
-      {
-        filePath: 'sib.ts',
-        text: 'const TRIGGER = 1;\n',
-        rules: { 'hang/noop': { options: [] } },
-        collectFixes: false,
-        suggestionsMode: 'off',
-        configKey: HANG_CONFIG_DIR,
-      },
-    ]);
-
-    // Give the sibling enqueue + kickQueue a tick to land.
-    await new Promise((r) => setTimeout(r, 50));
-
-    // Sanity: sibling actually queued (worker really was busy).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internals = pool as any;
-    expect(internals.pendingQueue.length).toBe(1);
-
-    // 3. Monkey-patch spawnWorker so the upcoming respawn rejects
-    //    rather than producing a fresh worker.
-    internals.spawnWorker = () =>
-      Promise.reject(new Error('simulated respawn failure'));
-
-    // 4. Crash the worker. Exit handler:
-    //      - rejects hangTask via inflight cleanup (worker_crashed)
-    //      - calls spawnWorker → patched reject → ONLY LOGS pre-fix.
-    //    Pre-fix: pendingQueue stays full forever.
-    //    Post-fix: drainQueueIfAllSlotsDegraded() in the reject
-    //              callback resolves siblings with pool_degraded.
-    await internals.workers[0].worker.terminate();
-
-    // 5. Race sibling against a generous-but-bounded timeout. Pre-fix
-    //    the race resolves with 'timeout'; post-fix sibling settles
-    //    in well under the cap.
-    const TIMEOUT_MS = 3000;
-    type Outcome =
-      { tag: 'sibling'; parseError: string | undefined } | { tag: 'timeout' };
-
-    const outcome: Outcome = await Promise.race([
-      siblingPromise.then((r): Outcome => ({
-        tag: 'sibling',
-        parseError: r[0].parseError,
-      })),
-      new Promise<Outcome>((r) =>
-        setTimeout(() => r({ tag: 'timeout' }), TIMEOUT_MS),
-      ),
-    ]);
-
-    expect(outcome.tag).toBe('sibling');
-    if (outcome.tag === 'sibling') {
-      // Post-fix contract: drain marks every stranded task with the
-      // pool_degraded sentinel so callers can distinguish from a
-      // regular per-task crash.
-      expect(outcome.parseError).toBe('pool_degraded');
-    }
-
-    // Hang batch should also have settled by now — the inflight task
-    // gets a worker_crashed result via the exit handler.
-    const hangOutcome = await Promise.race([
-      hangPromise.then((r) => r[0].parseError),
-      new Promise<undefined>((r) => setTimeout(() => r(undefined), 1000)),
-    ]);
-    expect(hangOutcome).toMatch(/worker_crashed/);
-  }, 30_000);
-});
 
 // ────────────────────────────────────────────────────────────────────
 // SourceCode scope-factory throw must propagate to every caller
@@ -1160,42 +1057,6 @@ describe('.mts / .cts + ecmaFeatures.jsx parse as tsx', () => {
 });
 
 // ────────────────────────────────────────────────────────────────────
-// WorkerPool.shutdown skips already-exited slots
-// ────────────────────────────────────────────────────────────────────
-
-describe('WorkerPool shutdown does not wait for already-exited workers', () => {
-  test('shutdown after a worker.terminate() returns promptly', async () => {
-    const HANG_PATH = path.resolve(__dirname, 'fixtures', 'hang.config.mjs');
-    const HANG_DIR = path.dirname(HANG_PATH);
-    const pool = new WorkerPool({
-      configs: [{ configPath: HANG_PATH, configDirectory: HANG_DIR }],
-      workerCount: 2,
-      retryCap: 0, // prevent respawn so terminated slot stays dead
-      taskTimeoutMs: 10_000,
-    });
-    await pool.init();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internals = pool as any;
-    // Terminate worker[0]; its 'exit' event fires now. With retryCap=0
-    // the slot is NOT respawned — it stays in this.workers as dead.
-    await internals.workers[0].worker.terminate();
-    // Drain pendingQueue cascade.
-    await new Promise((r) => setTimeout(r, 100));
-
-    const start = Date.now();
-    await pool.shutdown();
-    const elapsed = Date.now() - start;
-
-    // Pre-fix: shutdown registers `once('exit')` on the dead slot;
-    // 'exit' already fired so the listener never runs → 5_000ms
-    // terminate fallback wins. Post-fix: dead slot skipped, shutdown
-    // returns in well under 5s.
-    expect(elapsed).toBeLessThan(2_000);
-  }, 15_000);
-});
-
-// ────────────────────────────────────────────────────────────────────
 // listener-merge: unified specificity sort + raw dedup
 // ────────────────────────────────────────────────────────────────────
 
@@ -1711,9 +1572,9 @@ describe('WorkerPool init treats any rejection as fatal (no undefined sentinel)'
     }
     expect(rejected).toBe(true);
     expect(calls).toBe(2);
-    // Just in case pool resolved (pre-fix bug) — make sure we don't
-    // leak workers in the assertions above.
-    await pool.shutdown().catch(() => {});
+    expect(internals.closed).toBe(true);
+    expect(internals.workers).toEqual([]);
+    await pool.shutdown();
   });
 });
 
@@ -1833,123 +1694,6 @@ describe('line-comment eslint-disable / eslint-enable are NOT directives', () =>
     );
     expect(result.diagnostics).toHaveLength(0);
   });
-});
-
-// worker-pool.ts:793 — drainQueueIfAllSlotsDegraded mis-fires
-//        during multi-worker mid-respawn (treats a transient
-//        ready=false slot as permanently dead).
-describe('drainQueueIfAllSlotsDegraded does not fire during mid-respawn', () => {
-  test('mid-respawn worker prevents drain when another slot just terminally failed', async () => {
-    const pool = new WorkerPool({
-      configs: [
-        { configPath: HANG_CONFIG_PATH, configDirectory: HANG_CONFIG_DIR },
-      ],
-      workerCount: 2,
-      retryCap: 1, // worker A's first respawn-fail is terminal
-      taskTimeoutMs: 30_000,
-    });
-    await pool.init();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internals = pool as any;
-
-    // Hang task occupies BOTH workers? No — workerCount=2, single task
-    // → only worker 0 gets it. Wedge BOTH with one task each by
-    // dispatching 2 hangs first.
-    const hangA = pool.lintBatch([
-      {
-        filePath: 'hangA.ts',
-        text: 'const x = 1;\n',
-        rules: { 'hang/hang': { options: [] } },
-        collectFixes: false,
-        suggestionsMode: 'off',
-        configKey: HANG_CONFIG_DIR,
-      },
-    ]);
-    const hangB = pool.lintBatch([
-      {
-        filePath: 'hangB.ts',
-        text: 'const x = 1;\n',
-        rules: { 'hang/hang': { options: [] } },
-        collectFixes: false,
-        suggestionsMode: 'off',
-        configKey: HANG_CONFIG_DIR,
-      },
-    ]);
-    await new Promise((r) => setTimeout(r, 200));
-
-    // Queue the sibling — both workers busy → goes to pendingQueue.
-    const sibling = pool.lintBatch([
-      {
-        filePath: 'sib.ts',
-        text: 'const TRIGGER = 1;\n',
-        rules: { 'hang/noop': { options: [] } },
-        collectFixes: false,
-        suggestionsMode: 'off',
-        configKey: HANG_CONFIG_DIR,
-      },
-    ]);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(internals.pendingQueue.length).toBe(1);
-
-    // Worker B's respawn will succeed (real spawn). Worker A's respawn
-    // is mocked to reject — terminal. So after the dust settles:
-    //   - workers[0] dead (crashCount===retryCap, exited=true)
-    //   - workers[1] alive (respawned successfully)
-    // Pre-fix: when A's respawn rejects, drainQueueIfAllSlotsDegraded
-    //   runs while B is mid-respawn (B.ready === false transiently);
-    //   sibling gets `pool_degraded` even though B is about to come
-    //   back. Post-fix: drain waits for B to settle and skips when B
-    //   is alive.
-    const originalSpawn = internals.spawnWorker.bind(internals);
-    let spawnCallNum = 0;
-    internals.spawnWorker = (id: number) => {
-      spawnCallNum++;
-      // Worker A (id=0): fail on respawn. Worker B (id=1): succeed.
-      if (id === 0) {
-        return Promise.reject(new Error('A respawn failed'));
-      }
-      return originalSpawn(id);
-    };
-
-    // Terminate both nearly simultaneously to trigger respawn race.
-    await Promise.all([
-      internals.workers[0].worker.terminate(),
-      internals.workers[1].worker.terminate(),
-    ]);
-    void spawnCallNum;
-
-    // Wait for sibling outcome.
-    const TIMEOUT_MS = 8000;
-    type Outcome =
-      { tag: 'sibling'; parseError: string | undefined } | { tag: 'timeout' };
-
-    const outcome: Outcome = await Promise.race([
-      sibling.then((r): Outcome => ({
-        tag: 'sibling',
-        parseError: r[0].parseError,
-      })),
-      new Promise<Outcome>((r) =>
-        setTimeout(() => r({ tag: 'timeout' }), TIMEOUT_MS),
-      ),
-    ]);
-
-    expect(outcome.tag).toBe('sibling');
-    // Post-fix contract: sibling completes normally (B respawned in
-    // time and picked it up). Pre-fix: parseError === 'pool_degraded'.
-    if (outcome.tag === 'sibling') {
-      expect(outcome.parseError).toBeUndefined();
-    }
-
-    await Promise.race([hangA, new Promise((r) => setTimeout(r, 1000))]).catch(
-      () => {},
-    );
-    await Promise.race([hangB, new Promise((r) => setTimeout(r, 1000))]).catch(
-      () => {},
-    );
-
-    await pool.shutdown().catch(() => {});
-  }, 30_000);
 });
 
 // diagnostic-builder.ts:412 — iterable branch of materializeFixes
@@ -2509,85 +2253,6 @@ describe('sourceCode.getScope() with no node throws TypeError', () => {
 });
 
 // ────────────────────────────────────────────────────────────────────
-// WorkerPool init race: worker crashing mid-init is not orphaned
-// ────────────────────────────────────────────────────────────────────
-
-describe('WorkerPool: worker crashing mid-init is correctly respawned', () => {
-  test('crash before all spawns settle → respawn finds original slot → pool ends up at workerCount', async () => {
-    const pool = new WorkerPool({
-      configs: [
-        { configPath: HANG_CONFIG_PATH, configDirectory: HANG_CONFIG_DIR },
-      ],
-      workerCount: 2,
-      retryCap: 3,
-      taskTimeoutMs: 5_000,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internals = pool as any;
-    const originalSpawn = internals.spawnWorker.bind(internals);
-    let firstSlot: {
-      worker: { terminate(): Promise<number> };
-      id: number;
-    } | null = null;
-    let callIdx = 0;
-    let releaseSecond!: () => void;
-    const block = new Promise<void>((r) => {
-      releaseSecond = r;
-    });
-
-    internals.spawnWorker = async (id: number) => {
-      const slot = await originalSpawn(id);
-      const myIdx = callIdx++;
-      if (myIdx === 0) {
-        firstSlot = slot;
-      } else {
-        // Second worker holds back so the first worker can crash mid-init,
-        // exercising the race window between spawn-resolve and the OLD
-        // `this.workers = fulfilled` assignment.
-        await block;
-      }
-      return slot;
-    };
-
-    const initPromise = pool.init();
-
-    // Wait for the first worker to settle into this.workers.
-    let waited = 0;
-    while ((internals.workers.length < 1 || !firstSlot) && waited < 5000) {
-      await new Promise((r) => setTimeout(r, 50));
-      waited += 50;
-    }
-    expect(firstSlot).not.toBeNull();
-
-    // Terminate slot 0 BEFORE the second spawn resolves. This triggers
-    // the exit handler's respawn path while `this.workers` only has
-    // slot 0 in it. Pre-fix `this.workers` was empty until the final
-    // assignment, so the respawn's findIndex returned -1 and the
-    // replacement got terminated as an orphan.
-    await firstSlot!.worker.terminate();
-
-    // Give the respawn a moment to complete.
-    await new Promise((r) => setTimeout(r, 500));
-
-    // Now let the second worker resolve so init() finishes.
-    releaseSecond();
-    await initPromise;
-
-    // Post-fix: both slots end up alive. Pre-fix: slot 0's respawn
-    // got orphaned, so only slot 1 is ready (readyCount === 1).
-    const readyCount = (internals.workers as Array<{ ready: boolean }>).filter(
-      (w) => w.ready,
-    ).length;
-    expect(readyCount).toBe(2);
-
-    await pool.shutdown().catch(() => {
-      /* best-effort cleanup */
-    });
-  }, 30_000);
-});
-
-// ────────────────────────────────────────────────────────────────────
 // WorkerPool empty-configs fast path (matches `configs` JSDoc contract)
 // ────────────────────────────────────────────────────────────────────
 
@@ -2658,15 +2323,6 @@ describe('WorkerPool: empty configs is a no-worker fast path', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(((pool as any).workers as unknown[]).length).toBe(0);
     await pool.shutdown();
-  });
-
-  test('shutdown on empty pool is a clean no-op', async () => {
-    const pool = new WorkerPool({ configs: [] });
-    await pool.init();
-    // Should resolve immediately without waiting on any worker exit.
-    const start = Date.now();
-    await pool.shutdown();
-    expect(Date.now() - start).toBeLessThan(1000);
   });
 });
 
@@ -2944,7 +2600,7 @@ describe('applyOptionDefaults: schema property defaults fill existing object slo
 // ────────────────────────────────────────────────────────────────────
 
 describe('WorkerPool: worker hard-exit during init rejects (not 60s hang)', () => {
-  test('config that process.exit()s at import → init() rejects fast', async () => {
+  test('config that process.exit()s at import → init() rejects from the exit event', async () => {
     const exitPath = path.resolve(
       __dirname,
       'fixtures',
@@ -2954,75 +2610,71 @@ describe('WorkerPool: worker hard-exit during init rejects (not 60s hang)', () =
     const pool = new WorkerPool({
       configs: [{ configPath: exitPath, configDirectory: exitDir }],
       workerCount: 1,
-      // Long init timeout — the test asserts we DON'T wait for it.
-      workerInitTimeoutMs: 30_000,
+      workerInitTimeoutMs: 60_000,
     });
 
-    const start = Date.now();
-    let err: Error | undefined;
+    // Preserve and observe the configured product timeout, but defer its real
+    // callback far beyond the outer deadlock sentinel. The returned handle is
+    // real and unref'ed, so production can clear it after this synchronous
+    // global patch is restored and a broken exit listener cannot leak a ref.
+    const originalSetTimeout = globalThis.setTimeout;
+    let capturedInitTimers = 0;
+    let capturedInitTimer: NodeJS.Timeout | undefined;
+    globalThis.setTimeout = ((
+      callback: (...args: any[]) => void,
+      delay?: number,
+      ...args: any[]
+    ) => {
+      if (delay !== 60_000) {
+        return originalSetTimeout(callback, delay, ...args);
+      }
+      capturedInitTimers++;
+      const nonFiringDelayMs = 24 * 60 * 60 * 1_000;
+      const handle = originalSetTimeout(callback, nonFiringDelayMs, ...args);
+      handle.unref();
+      capturedInitTimer = handle;
+      return handle;
+    }) as typeof setTimeout;
+    let initPromise: Promise<void>;
     try {
-      await pool.init();
-    } catch (e) {
-      err = e as Error;
+      initPromise = pool.init();
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
     }
-    const elapsed = Date.now() - start;
-
-    // Rejected (not hung) and well under the 30s init timeout.
-    expect(err).toBeDefined();
-    expect(elapsed).toBeLessThan(10_000);
-    // Message names the exit path, not a misleading "init timed out".
-    expect(err!.message).toMatch(/exited during init|init failed/);
-    expect(err!.message).not.toMatch(/timed out/);
-
-    await pool.shutdown().catch(() => {});
-  }, 35_000);
-});
-
-// ────────────────────────────────────────────────────────────────────
-// WorkerPool: shutdown awaits an in-flight respawn (no orphan thread)
-// ────────────────────────────────────────────────────────────────────
-
-describe('WorkerPool: shutdown awaits in-flight respawn', () => {
-  test('crash → respawn-in-flight → shutdown waits for the new worker teardown', async () => {
-    const pool = new WorkerPool({
-      configs: [
-        { configPath: HANG_CONFIG_PATH, configDirectory: HANG_CONFIG_DIR },
-      ],
-      workerCount: 1,
-      retryCap: 3,
-      taskTimeoutMs: 30_000,
+    void initPromise!.catch(() => {
+      // The rejection is asserted below; this branch prevents an unhandled
+      // rejection if the synchronous timer-capture assertion itself fails.
     });
-    await pool.init();
+    expect(capturedInitTimers).toBe(1);
+    try {
+      let err: Error | undefined;
+      try {
+        await initPromise!;
+      } catch (e) {
+        err = e as Error;
+      }
+      // The error source proves the worker exit event, rather than any timeout,
+      // settled init. The outer test timeout remains only a deadlock sentinel.
+      expect(err).toBeDefined();
+      // Message names the exit path, not a misleading "init timed out".
+      expect(err!.message).toMatch(/exited during init|init failed/);
+      expect(err!.message).not.toMatch(/timed out/);
+      expect(
+        (
+          capturedInitTimer as unknown as {
+            _destroyed?: boolean;
+          }
+        )._destroyed,
+      ).toBe(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internals = pool as any;
-
-    // Make the respawn observably slow so the shutdown clearly has to
-    // wait for it. Wrap spawnWorker to delay before delegating.
-    const originalSpawn = internals.spawnWorker.bind(internals);
-    let respawnStarted = false;
-    internals.spawnWorker = async (id: number) => {
-      respawnStarted = true;
-      await new Promise((r) => setTimeout(r, 300));
-      return originalSpawn(id);
-    };
-
-    // Crash the only worker → exit handler kicks off the (slow) respawn.
-    await internals.workers[0].worker.terminate();
-    // Give the exit handler a tick to enter the respawn branch.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(respawnStarted).toBe(true);
-    // Respawn is registered as in-flight.
-    expect(internals.respawns.size).toBeGreaterThan(0);
-
-    // Shutdown now — must await the in-flight respawn's teardown.
-    await pool.shutdown();
-
-    // After shutdown returns, no respawn is still in-flight (it was
-    // awaited, and the closed-branch terminated the new worker).
-    expect(internals.respawns.size).toBe(0);
-    expect((internals.workers as unknown[]).length).toBe(0);
-  }, 30_000);
+      // init() owns cleanup on failure; a no-op shutdown must also remain clean.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((pool as any).workers).toEqual([]);
+    } finally {
+      if (capturedInitTimer) clearTimeout(capturedInitTimer);
+      await pool.shutdown();
+    }
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════

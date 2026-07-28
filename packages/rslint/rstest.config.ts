@@ -5,12 +5,12 @@ export default defineConfig({
   globals: true,
   // Each eslint-plugin test process can spawn up to eight Worker threads.
   // Run Windows test files serially so Rstest's CPU-count process pool cannot
-  // multiply that inner concurrency and starve Worker startup/shutdown. Keep
-  // the existing per-test timeouts as real hang sentinels.
+  // multiply that inner concurrency and starve Worker startup/shutdown.
   pool: process.platform === 'win32' ? { maxWorkers: 1 } : undefined,
-  // The self-hosted Windows runner can stall under concurrent main CI. Keep
-  // ordinary async tests from tripping Rstest's 5s default.
-  testTimeout: 30_000,
+  // Normal completion is event-driven. This is only the final in-process
+  // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
+  // The same semantic boundary applies on every platform.
+  testTimeout: 35 * 60_000,
   // The eslint-plugin worker tests spawn the built `dist/eslint-plugin/
   // lint-worker.js` (worker_threads can't run TS); this setup file points the
   // pool at it via setWorkerEntryForTests(). Run `pnpm build` once before testing.

@@ -13,9 +13,14 @@
 package no_unnecessary_type_conversion
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1136,4 +1141,131 @@ t satisfies string;
 			},
 		},
 	)
+}
+
+func TestNoUnnecessaryTypeConversionEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		"String('value');\n"+
+			"'value'.toString();\n"+
+			"'value' + '';\n"+
+			"'' + 'value';\n"+
+			"let value = 'value';\n"+
+			"value += '';\n"+
+			"+1;\n"+
+			"!!true;\n"+
+			"~~1;",
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:             NoUnnecessaryTypeConversionRule.Name,
+					Severity:         rule.SeverityError,
+					RequiresTypeInfo: NoUnnecessaryTypeConversionRule.RequiresTypeInfo,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return NoUnnecessaryTypeConversionRule.Run(ctx, nil)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 8 {
+			t.Fatalf("demand %d: diagnostics = %d, want 8", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnostics := map[rule.EditDemand][]rule.RuleDiagnostic{
+		rule.EditDemandNone:       run(rule.EditDemandNone),
+		rule.EditDemandAutofix:    run(rule.EditDemandAutofix),
+		rule.EditDemandSuggestion: run(rule.EditDemandSuggestion),
+		rule.EditDemandAll:        run(rule.EditDemandAll),
+	}
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+
+	for index := range diagnostics[rule.EditDemandAll] {
+		want := withoutEdits(diagnostics[rule.EditDemandAll][index])
+		for demand, demandDiagnostics := range diagnostics {
+			if got := withoutEdits(demandDiagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("diagnostic %d changed for demand %d:\ngot:  %#v\nwant: %#v", index, demand, got, want)
+			}
+			if demandDiagnostics[index].FixesPtr != nil {
+				t.Errorf("diagnostic %d demand %d unexpectedly has autofixes", index, demand)
+			}
+		}
+	}
+
+	wantTexts := [][2]string{
+		{"'value'", "'value' satisfies string"},
+		{"'value'", "'value' satisfies string"},
+		{"'value'", "'value' satisfies string"},
+		{"'value'", "'value' satisfies string"},
+		{"", "value satisfies string"},
+		{"1", "1 satisfies number"},
+		{"true", "true satisfies boolean"},
+		{"1", "1 satisfies number"},
+	}
+	for index, texts := range wantTexts {
+		suggestionOnly := diagnostics[rule.EditDemandSuggestion][index].Suggestions
+		allEdits := diagnostics[rule.EditDemandAll][index].Suggestions
+		if suggestionOnly == nil || !reflect.DeepEqual(suggestionOnly, allEdits) {
+			t.Fatalf("diagnostic %d suggestions differ between suggestion and all-edits demand", index)
+		}
+		if len(*suggestionOnly) != 2 {
+			t.Fatalf("diagnostic %d suggestions = %#v, want 2", index, *suggestionOnly)
+		}
+		for suggestionIndex, suggestion := range *suggestionOnly {
+			wantMessageID := "suggestRemove"
+			if suggestionIndex == 1 {
+				wantMessageID = "suggestSatisfies"
+			}
+			if suggestion.Message.Id != wantMessageID {
+				t.Errorf(
+					"diagnostic %d suggestion %d message = %q, want %q",
+					index,
+					suggestionIndex,
+					suggestion.Message.Id,
+					wantMessageID,
+				)
+			}
+			if len(suggestion.FixesArr) != 1 || suggestion.FixesArr[0].Text != texts[suggestionIndex] {
+				t.Errorf(
+					"diagnostic %d suggestion %d fixes = %#v, want replacement %q",
+					index,
+					suggestionIndex,
+					suggestion.FixesArr,
+					texts[suggestionIndex],
+				)
+			}
+		}
+		if diagnostics[rule.EditDemandNone][index].Suggestions != nil ||
+			diagnostics[rule.EditDemandAutofix][index].Suggestions != nil {
+			t.Errorf("diagnostic %d attached suggestions without suggestion demand", index)
+		}
+	}
 }

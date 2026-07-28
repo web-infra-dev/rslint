@@ -88,10 +88,12 @@ func TestBoundary_DefaultLibsCleanAcrossPrograms(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				diags = append(diags, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					diags = append(diags, d)
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -289,13 +291,15 @@ func TestBoundary_DiagnosticsStableUnderParallelism(t *testing.T) {
 			SingleThreaded:  false,
 			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 			TypeCheck:       true,
-			OnDiagnostic: func(d rule.RuleDiagnostic) {
-				if !strings.HasPrefix(d.RuleName, "TypeScript(") {
-					return
-				}
-				mu.Lock()
-				diags = append(diags, d)
-				mu.Unlock()
+			Consumer: rule.DiagnosticConsumer{
+				Report: func(d rule.RuleDiagnostic) {
+					if !strings.HasPrefix(d.RuleName, "TypeScript(") {
+						return
+					}
+					mu.Lock()
+					diags = append(diags, d)
+					mu.Unlock()
+				},
 			},
 		})
 		if err != nil {
@@ -377,8 +381,10 @@ func TestBoundary_NoSourceLocationDiagnosticsDropped(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			got = append(got, d)
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				got = append(got, d)
+			},
 		},
 	})
 	if err != nil {

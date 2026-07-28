@@ -3,8 +3,6 @@ package rule
 import (
 	"reflect"
 	"testing"
-
-	"github.com/microsoft/typescript-go/shim/core"
 )
 
 func TestNormalizeOptions(t *testing.T) {
@@ -46,37 +44,5 @@ func TestNormalizeOptions(t *testing.T) {
 	nested := NormalizeOptions([]interface{}{[]interface{}{"a", "b"}})
 	if len(nested) != 1 || !reflect.DeepEqual(nested[0], []interface{}{"a", "b"}) {
 		t.Errorf("lone array option → [[a,b]], got %v", nested)
-	}
-}
-
-func TestRuleContextReportWithoutReporterPanics(t *testing.T) {
-	textRange := core.NewTextRange(0, 0)
-	message := RuleMessage{Description: "must not be dropped silently"}
-	tests := []struct {
-		name   string
-		report func(*RuleContext)
-	}{
-		{name: "range", report: func(ctx *RuleContext) { ctx.ReportRange(textRange, message) }},
-		{name: "range fixes", report: func(ctx *RuleContext) { ctx.ReportRangeWithFixes(textRange, message) }},
-		{name: "range suggestions", report: func(ctx *RuleContext) { ctx.ReportRangeWithSuggestions(textRange, message) }},
-		{name: "range combined", report: func(ctx *RuleContext) { ctx.ReportRangeWithFixesAndSuggestions(textRange, message, nil, nil) }},
-		{name: "node", report: func(ctx *RuleContext) { ctx.ReportNode(nil, message) }},
-		{name: "node fixes", report: func(ctx *RuleContext) { ctx.ReportNodeWithFixes(nil, message) }},
-		{name: "node suggestions", report: func(ctx *RuleContext) { ctx.ReportNodeWithSuggestions(nil, message) }},
-		{name: "node combined", report: func(ctx *RuleContext) { ctx.ReportNodeWithFixesAndSuggestions(nil, message, nil, nil) }},
-	}
-
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			defer func() {
-				got := recover()
-				if got != "rule: uninitialized RuleContext reporter" {
-					t.Fatalf("panic = %v, want uninitialized reporter failure", got)
-				}
-			}()
-
-			var ctx RuleContext
-			testCase.report(&ctx)
-		})
 	}
 }

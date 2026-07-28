@@ -173,10 +173,14 @@ func reportObject(
 ) {
 	message := preferDestructuringMessage("object")
 	if canFix && shouldFix(leftNode, rightNode) {
-		if fix, ok := objectDestructuringFix(ctx, rightNode, reportNode); ok {
-			ctx.ReportNodeWithFixes(reportNode, message, fix)
-			return
-		}
+		ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
+			fix, ok := objectDestructuringFix(ctx, rightNode, reportNode)
+			if !ok {
+				return nil
+			}
+			return []rule.RuleFix{fix}
+		})
+		return
 	}
 	ctx.ReportNode(reportNode, message)
 }

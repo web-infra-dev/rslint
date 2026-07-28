@@ -79,6 +79,51 @@ func TestMarkCLIInterruptedUsesCanceledDiscoveryContext(t *testing.T) {
 	}
 }
 
+func TestShutdownPeerWaitsForAcknowledgement(t *testing.T) {
+	cli, peer := newCLIChannelPair(t)
+	requestSeen := make(chan struct{})
+	releaseResponse := make(chan struct{})
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		if msg.Kind != kindShutdown {
+			return nil, fmt.Errorf("request kind = %q, want %q", msg.Kind, kindShutdown)
+		}
+		var payload struct{}
+		if err := msg.Decode(&payload); err != nil {
+			return nil, fmt.Errorf("decode shutdown payload: %w", err)
+		}
+		close(requestSeen)
+		<-releaseResponse
+		return map[string]any{"ok": true}, nil
+	})
+	cli.Start()
+	peer.Start()
+
+	shutdownDone := make(chan bool, 1)
+	go func() {
+		shutdownDone <- shutdownPeer(cli, &runCLIState{})
+	}()
+
+	select {
+	case <-requestSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("peer did not receive shutdown request")
+	}
+	select {
+	case <-shutdownDone:
+		t.Fatal("shutdownPeer returned before the peer acknowledged")
+	default:
+	}
+	close(releaseResponse)
+	select {
+	case acknowledged := <-shutdownDone:
+		if !acknowledged {
+			t.Fatal("shutdownPeer did not report the acknowledgement")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("shutdownPeer did not return after the acknowledgement")
+	}
+}
+
 // TestDrainStdoutToIPC_DiscardsOnClosedPeer pins #4: once the channel is
 // closed (peer gone) the drain stops forwarding but keeps reading r — so the
 // lint pipeline never blocks on a full stdout pipe — and exits cleanly on EOF.
@@ -384,6 +429,10 @@ func serveCLITestPeer(fromCLI io.Reader, toCLI io.Writer) cliTestPeerResult {
 				recordError(errors.New("received duplicate shutdown request"))
 			}
 			shutdownSeen = true
+			var payload struct{}
+			if err := msg.Decode(&payload); err != nil {
+				recordError(fmt.Errorf("decode shutdown payload: %w", err))
+			}
 			response, err := ipc.NewMessage(ipc.KindResponse, msg.ID, map[string]any{"ok": true})
 			if err != nil {
 				recordError(fmt.Errorf("build shutdown response: %w", err))

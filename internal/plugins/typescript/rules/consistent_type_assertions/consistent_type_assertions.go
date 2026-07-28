@@ -30,6 +30,186 @@ type ConsistentTypeAssertionsOptions struct {
 	ArrayLiteralTypeAssertions  LiteralAssertion `json:"arrayLiteralTypeAssertions"`
 }
 
+const (
+	objectAnnotationSuggestionID       = "replaceObjectTypeAssertionWithAnnotation"
+	objectAnnotationSuggestionTemplate = "Use const x: {{cast}} = { ... } instead."
+	objectSatisfiesSuggestionID        = "replaceObjectTypeAssertionWithSatisfies"
+	objectSatisfiesSuggestionTemplate  = "Use const x = { ... } satisfies {{cast}} instead."
+	arrayAnnotationSuggestionID        = "replaceArrayTypeAssertionWithAnnotation"
+	arrayAnnotationSuggestionTemplate  = "Use const x: {{cast}} = [ ... ] instead."
+	arraySatisfiesSuggestionID         = "replaceArrayTypeAssertionWithSatisfies"
+	arraySatisfiesSuggestionTemplate   = "Use const x = [ ... ] satisfies {{cast}} instead."
+)
+
+var asExpressionPrecedence = ast.GetOperatorPrecedence(
+	ast.KindAsExpression,
+	ast.KindUnknown,
+	ast.OperatorPrecedenceFlagsNone,
+)
+
+type consistentTypeAssertionsEdits struct {
+	sourceFile *ast.SourceFile
+}
+
+// skipParensUp returns the first non-parenthesis ancestor of node. ESTree has
+// no parenthesis nodes, so upstream's node.parent is exactly this.
+func skipParensUp(node *ast.Node) *ast.Node {
+	parent := node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	return parent
+}
+
+func substituteCast(template, cast string) string {
+	return strings.ReplaceAll(template, "{{cast}}", cast)
+}
+
+func wrappedCode(text string, nodePrecedence, parentPrecedence ast.OperatorPrecedence) string {
+	if nodePrecedence > parentPrecedence {
+		return text
+	}
+	return "(" + text + ")"
+}
+
+func (e consistentTypeAssertionsEdits) text(node *ast.Node) string {
+	return utils.TrimmedNodeText(e.sourceFile, node)
+}
+
+// textWithParentheses mirrors upstream getTextWithParentheses: the text of the
+// paren-stripped expression, wrapped in one pair of parentheses when it was
+// parenthesized in source.
+func (e consistentTypeAssertionsEdits) textWithParentheses(expression *ast.Node) string {
+	inner := ast.SkipParentheses(expression)
+	text := e.text(inner)
+	if inner != expression {
+		return "(" + text + ")"
+	}
+	return text
+}
+
+func (e consistentTypeAssertionsEdits) literalSuggestions(
+	node *ast.Node,
+	expression *ast.Node,
+	typeNode *ast.Node,
+	annotationID string,
+	annotationTemplate string,
+	satisfiesID string,
+	satisfiesTemplate string,
+) []rule.RuleSuggestion {
+	typeText := e.text(typeNode)
+	expressionText := e.textWithParentheses(expression)
+	suggestions := make([]rule.RuleSuggestion, 0, 2)
+	if effectiveParent := skipParensUp(node); effectiveParent != nil && effectiveParent.Kind == ast.KindVariableDeclaration {
+		if declaration := effectiveParent.AsVariableDeclaration(); declaration.Type == nil {
+			if name := declaration.Name(); name != nil {
+				suggestions = append(suggestions, rule.RuleSuggestion{
+					Message: rule.RuleMessage{
+						Id:          annotationID,
+						Description: substituteCast(annotationTemplate, typeText),
+						Data:        map[string]string{"cast": typeText},
+					},
+					FixesArr: []rule.RuleFix{
+						rule.RuleFixInsertAfter(name, ": "+typeText),
+						rule.RuleFixReplace(e.sourceFile, node, expressionText),
+					},
+				})
+			}
+		}
+	}
+	suggestions = append(suggestions, rule.RuleSuggestion{
+		Message: rule.RuleMessage{
+			Id:          satisfiesID,
+			Description: substituteCast(satisfiesTemplate, typeText),
+			Data:        map[string]string{"cast": typeText},
+		},
+		FixesArr: []rule.RuleFix{
+			rule.RuleFixReplace(e.sourceFile, node, expressionText),
+			rule.RuleFixInsertAfter(node, " satisfies "+typeText),
+		},
+	})
+	return suggestions
+}
+
+func (e consistentTypeAssertionsEdits) objectLiteralSuggestions(
+	node *ast.Node,
+	expression *ast.Node,
+	typeNode *ast.Node,
+) []rule.RuleSuggestion {
+	return e.literalSuggestions(
+		node,
+		expression,
+		typeNode,
+		objectAnnotationSuggestionID,
+		objectAnnotationSuggestionTemplate,
+		objectSatisfiesSuggestionID,
+		objectSatisfiesSuggestionTemplate,
+	)
+}
+
+func (e consistentTypeAssertionsEdits) arrayLiteralSuggestions(
+	node *ast.Node,
+	expression *ast.Node,
+	typeNode *ast.Node,
+) []rule.RuleSuggestion {
+	return e.literalSuggestions(
+		node,
+		expression,
+		typeNode,
+		arrayAnnotationSuggestionID,
+		arrayAnnotationSuggestionTemplate,
+		arraySatisfiesSuggestionID,
+		arraySatisfiesSuggestionTemplate,
+	)
+}
+
+// angleToAsFix converts an angle-bracket assertion into an as assertion,
+// preserving the same precedence wrapping as the upstream fixer.
+func (e consistentTypeAssertionsEdits) angleToAsFix(
+	node *ast.Node,
+	expression *ast.Node,
+	typeText string,
+) []rule.RuleFix {
+	innerExpression := ast.SkipParentheses(expression)
+	expressionText := wrappedCode(
+		e.text(innerExpression),
+		ast.GetExpressionPrecedence(innerExpression),
+		asExpressionPrecedence,
+	)
+	text := expressionText + " as " + typeText
+
+	parent := node.Parent
+	if parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		return []rule.RuleFix{rule.RuleFixReplace(e.sourceFile, node, text)}
+	}
+
+	parentKind := ast.KindUnknown
+	operatorKind := ast.KindUnknown
+	flags := ast.OperatorPrecedenceFlagsNone
+	if parent != nil {
+		parentKind = parent.Kind
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			if operator := parent.AsBinaryExpression().OperatorToken; operator != nil {
+				operatorKind = operator.Kind
+			}
+		case ast.KindNewExpression:
+			newExpression := parent.AsNewExpression()
+			if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) == 0 {
+				flags = ast.OperatorPrecedenceFlagsNewWithoutArguments
+			}
+		}
+	}
+	parentPrecedence := ast.GetOperatorPrecedence(parentKind, operatorKind, flags)
+	return []rule.RuleFix{
+		rule.RuleFixReplace(
+			e.sourceFile,
+			node,
+			wrappedCode(text, asExpressionPrecedence, parentPrecedence),
+		),
+	}
+}
+
 // ConsistentTypeAssertionsRule is the rslint port of upstream
 // `@typescript-eslint/consistent-type-assertions`. It mirrors upstream v8
 // observably: the same diagnostics (message ids + texts), the same
@@ -64,10 +244,7 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 	}
 
-	src := ctx.SourceFile
-	getText := func(n *ast.Node) string {
-		return utils.TrimmedNodeText(src, n)
-	}
+	edits := consistentTypeAssertionsEdits{sourceFile: ctx.SourceFile}
 
 	// isConst reports whether the assertion target is `const` (the `as const` /
 	// `<const>` assertion). Mirrors upstream `isConst`.
@@ -97,16 +274,6 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 	}
 
-	// skipParensUp returns the first non-parenthesis ancestor of `node`. ESTree
-	// has no parenthesis nodes, so upstream's `node.parent` is exactly this.
-	skipParensUp := func(node *ast.Node) *ast.Node {
-		p := node.Parent
-		for p != nil && p.Kind == ast.KindParenthesizedExpression {
-			p = p.Parent
-		}
-		return p
-	}
-
 	// isAsParameter mirrors upstream `isAsParameter`: the assertion is in a
 	// position where an object/array literal is "passed" rather than assigned to
 	// a typeable binding (call / new / throw arguments, JSX expression
@@ -133,76 +300,6 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		return false
 	}
 
-	// asPrecedence is the precedence of an `x as T` expression — the pivot the
-	// angle-bracket→as autofix uses to decide where wrapping parens are needed.
-	asPrecedence := ast.GetOperatorPrecedence(ast.KindAsExpression, ast.KindUnknown, ast.OperatorPrecedenceFlagsNone)
-
-	// getWrappedCode mirrors upstream's helper of the same name: wrap `text` in
-	// parens unless its precedence is strictly higher than the surrounding
-	// context's.
-	getWrappedCode := func(text string, nodePrec, parentPrec ast.OperatorPrecedence) string {
-		if nodePrec > parentPrec {
-			return text
-		}
-		return "(" + text + ")"
-	}
-
-	subst := func(tmpl, cast string) string {
-		return strings.ReplaceAll(tmpl, "{{cast}}", cast)
-	}
-
-	// textWithParentheses mirrors upstream `getTextWithParentheses`: the text of
-	// the (paren-stripped) expression, wrapped in a single pair of parens when
-	// it was parenthesized in source. ESTree exposes only the inner node, so the
-	// wrapping is always exactly one level regardless of nesting depth.
-	textWithParentheses := func(exprRaw *ast.Node) string {
-		inner := ast.SkipParentheses(exprRaw)
-		t := getText(inner)
-		if inner != exprRaw {
-			return "(" + t + ")"
-		}
-		return t
-	}
-
-	// buildSuggestions mirrors upstream `getSuggestions`: an annotation
-	// suggestion (only when the assertion initializes a variable with no type
-	// annotation) plus a `satisfies` suggestion (always). `exprRaw` is the raw
-	// expression (parens preserved) — upstream uses `getTextWithParentheses`.
-	buildSuggestions := func(node, exprRaw, typeNode *ast.Node, annID, annTmpl, satID, satTmpl string) []rule.RuleSuggestion {
-		typeText := getText(typeNode)
-		exprText := textWithParentheses(exprRaw)
-		suggestions := make([]rule.RuleSuggestion, 0, 2)
-		if eff := skipParensUp(node); eff != nil && eff.Kind == ast.KindVariableDeclaration {
-			if vd := eff.AsVariableDeclaration(); vd.Type == nil {
-				if name := vd.Name(); name != nil {
-					suggestions = append(suggestions, rule.RuleSuggestion{
-						Message: rule.RuleMessage{
-							Id:          annID,
-							Description: subst(annTmpl, typeText),
-							Data:        map[string]string{"cast": typeText},
-						},
-						FixesArr: []rule.RuleFix{
-							rule.RuleFixInsertAfter(name, ": "+typeText),
-							rule.RuleFixReplace(src, node, exprText),
-						},
-					})
-				}
-			}
-		}
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message: rule.RuleMessage{
-				Id:          satID,
-				Description: subst(satTmpl, typeText),
-				Data:        map[string]string{"cast": typeText},
-			},
-			FixesArr: []rule.RuleFix{
-				rule.RuleFixReplace(src, node, exprText),
-				rule.RuleFixInsertAfter(node, " satisfies "+typeText),
-			},
-		})
-		return suggestions
-	}
-
 	// checkObject / checkArray mirror upstream's checkExpressionForObjectAssertion
 	// / checkExpressionForArrayAssertion. `exprRaw` is the assertion's raw
 	// expression; the literal check uses the paren-stripped form.
@@ -217,12 +314,12 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 			return
 		}
 		if checkType(typeNode) {
-			ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{
+			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 				Id:          "unexpectedObjectTypeAssertion",
 				Description: "Always prefer const x: T = { ... }.",
-			}, buildSuggestions(node, exprRaw, typeNode,
-				"replaceObjectTypeAssertionWithAnnotation", "Use const x: {{cast}} = { ... } instead.",
-				"replaceObjectTypeAssertionWithSatisfies", "Use const x = { ... } satisfies {{cast}} instead.")...)
+			}, func() []rule.RuleSuggestion {
+				return edits.objectLiteralSuggestions(node, exprRaw, typeNode)
+			})
 		}
 	}
 
@@ -237,48 +334,13 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 			return
 		}
 		if checkType(typeNode) {
-			ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{
+			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 				Id:          "unexpectedArrayTypeAssertion",
 				Description: "Always prefer const x: T[] = [ ... ].",
-			}, buildSuggestions(node, exprRaw, typeNode,
-				"replaceArrayTypeAssertionWithAnnotation", "Use const x: {{cast}} = [ ... ] instead.",
-				"replaceArrayTypeAssertionWithSatisfies", "Use const x = [ ... ] satisfies {{cast}} instead.")...)
+			}, func() []rule.RuleSuggestion {
+				return edits.arrayLiteralSuggestions(node, exprRaw, typeNode)
+			})
 		}
-	}
-
-	// buildAngleToAsFix converts an angle-bracket assertion `<T>expr` into
-	// `expr as T`, wrapping the expression and/or the whole assertion in parens
-	// exactly where precedence requires. Mirrors upstream's `as` fixer.
-	buildAngleToAsFix := func(node, exprRaw, typeNode *ast.Node) rule.RuleFix {
-		skipExpr := ast.SkipParentheses(exprRaw)
-		exprText := getWrappedCode(getText(skipExpr), ast.GetExpressionPrecedence(skipExpr), asPrecedence)
-		text := exprText + " as " + getText(typeNode)
-
-		parent := node.Parent
-		if parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-			// Already parenthesized in source — the existing parens suffice.
-			return rule.RuleFixReplace(src, node, text)
-		}
-
-		parentKind := ast.KindUnknown
-		operatorKind := ast.KindUnknown
-		flags := ast.OperatorPrecedenceFlagsNone
-		if parent != nil {
-			parentKind = parent.Kind
-			switch parent.Kind {
-			case ast.KindBinaryExpression:
-				if op := parent.AsBinaryExpression().OperatorToken; op != nil {
-					operatorKind = op.Kind
-				}
-			case ast.KindNewExpression:
-				ne := parent.AsNewExpression()
-				if ne.Arguments == nil || len(ne.Arguments.Nodes) == 0 {
-					flags = ast.OperatorPrecedenceFlagsNewWithoutArguments
-				}
-			}
-		}
-		parentPrec := ast.GetOperatorPrecedence(parentKind, operatorKind, flags)
-		return rule.RuleFixReplace(src, node, getWrappedCode(text, asPrecedence, parentPrec))
 	}
 
 	// reportIncorrectAssertionType handles the assertion-style mismatch reports
@@ -292,17 +354,19 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		}
 		switch style {
 		case AssertionStyleAs:
-			cast := getText(typeNode)
-			ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+			cast := edits.text(typeNode)
+			ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
 				Id:          "as",
-				Description: subst("Use 'as {{cast}}' instead of '<{{cast}}>'.", cast),
+				Description: substituteCast("Use 'as {{cast}}' instead of '<{{cast}}>'.", cast),
 				Data:        map[string]string{"cast": cast},
-			}, buildAngleToAsFix(node, exprRaw, typeNode))
+			}, func() []rule.RuleFix {
+				return edits.angleToAsFix(node, exprRaw, cast)
+			})
 		case AssertionStyleAngleBracket:
-			cast := getText(typeNode)
+			cast := edits.text(typeNode)
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "angle-bracket",
-				Description: subst("Use '<{{cast}}>' instead of 'as {{cast}}'.", cast),
+				Description: substituteCast("Use '<{{cast}}>' instead of 'as {{cast}}'.", cast),
 				Data:        map[string]string{"cast": cast},
 			})
 		case AssertionStyleNever:

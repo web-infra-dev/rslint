@@ -525,11 +525,9 @@ var PreferArrowCallbackRule = rule.Rule{
 				}
 
 				msg := preferArrowCallbackMessage()
-				if fixes := buildFixes(ctx, node, scope, info); len(fixes) > 0 {
-					ctx.ReportNodeWithFixes(node, msg, fixes...)
-				} else {
-					ctx.ReportNode(node, msg)
-				}
+				ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+					return buildFixes(ctx, node, scope, info)
+				})
 			},
 		}
 	},

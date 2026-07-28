@@ -54,6 +54,212 @@ func containsThisType(node *ast.Node) bool {
 	return found
 }
 
+type methodSignatureFixer struct {
+	sourceFile *ast.SourceFile
+	sourceText string
+}
+
+// safeSlice returns sourceText[start:end] with bounds clamping.
+func (f *methodSignatureFixer) safeSlice(start, end int) string {
+	if start < 0 {
+		start = 0
+	}
+	if end > len(f.sourceText) {
+		end = len(f.sourceText)
+	}
+	return f.sourceText[start:end]
+}
+
+// getMethodKey returns the key text for a method or property signature,
+// including optional marker and readonly prefix.
+func (f *methodSignatureFixer) getMethodKey(node *ast.Node) string {
+	var nameNode *ast.Node
+	switch node.Kind {
+	case ast.KindMethodSignature:
+		nameNode = node.AsMethodSignatureDeclaration().Name()
+	case ast.KindPropertySignature:
+		nameNode = node.AsPropertySignatureDeclaration().Name()
+	default:
+		return ""
+	}
+
+	// TrimmedNodeText handles computed property names correctly —
+	// ComputedPropertyName nodes already include the surrounding brackets.
+	key := utils.TrimmedNodeText(f.sourceFile, nameNode)
+
+	if ast.HasQuestionToken(node) {
+		key += "?"
+	}
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
+		key = "readonly " + key
+	}
+	return key
+}
+
+// getMethodParams returns the type parameters + parameters text.
+// E.g. "<T>(a: T, b: T)" or "()" for no params.
+func (f *methodSignatureFixer) getMethodParams(node *ast.Node) string {
+	var params *ast.NodeList
+	var typeParams *ast.NodeList
+
+	switch node.Kind {
+	case ast.KindMethodSignature:
+		sig := node.AsMethodSignatureDeclaration()
+		params = sig.Parameters
+		typeParams = sig.TypeParameters
+	case ast.KindFunctionType:
+		ft := node.AsFunctionTypeNode()
+		params = ft.Parameters
+		typeParams = ft.TypeParameters
+	default:
+		return "()"
+	}
+
+	paramsText := "()"
+	if params != nil && len(params.Nodes) > 0 {
+		firstRange := utils.TrimNodeTextRange(f.sourceFile, params.Nodes[0])
+		lastRange := utils.TrimNodeTextRange(f.sourceFile, params.Nodes[len(params.Nodes)-1])
+		// Scan backward to find '(' before first param
+		openParen := firstRange.Pos() - 1
+		for openParen > 0 && f.sourceText[openParen] != '(' {
+			openParen--
+		}
+		// Scan forward to find ')' after last param
+		closeParen := lastRange.End()
+		for closeParen < len(f.sourceText) && f.sourceText[closeParen] != ')' {
+			closeParen++
+		}
+		paramsText = f.safeSlice(openParen, closeParen+1)
+	}
+
+	if typeParams != nil && len(typeParams.Nodes) > 0 {
+		firstRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[0])
+		lastRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[len(typeParams.Nodes)-1])
+		// Scan backward/forward to find '<'/'>' (comments may sit between the bracket and the first/last param)
+		start := firstRange.Pos() - 1
+		for start > 0 && f.sourceText[start] != '<' {
+			start--
+		}
+		end := lastRange.End()
+		for end < len(f.sourceText) && f.sourceText[end] != '>' {
+			end++
+		}
+		paramsText = f.safeSlice(start, end+1) + paramsText
+	}
+
+	return paramsText
+}
+
+// getMethodReturnType returns the return type text, or "any" if omitted.
+func (f *methodSignatureFixer) getMethodReturnType(node *ast.Node) string {
+	var typeNode *ast.Node
+	switch node.Kind {
+	case ast.KindMethodSignature:
+		typeNode = node.AsMethodSignatureDeclaration().Type
+	case ast.KindFunctionType:
+		typeNode = node.AsFunctionTypeNode().Type
+	}
+	if typeNode == nil {
+		return "any"
+	}
+	return utils.TrimmedNodeText(f.sourceFile, typeNode)
+}
+
+// getDelimiter returns the trailing ';' or ',' of a member node, or "".
+func (f *methodSignatureFixer) getDelimiter(node *ast.Node) string {
+	end := utils.TrimNodeTextRange(f.sourceFile, node).End()
+	if end > 0 && end <= len(f.sourceText) {
+		if ch := f.sourceText[end-1]; ch == ';' || ch == ',' {
+			return string(ch)
+		}
+	}
+	return ""
+}
+
+func (f *methodSignatureFixer) buildMethodFixes(node *ast.Node) []rule.RuleFix {
+	signature := node.AsMethodSignatureDeclaration()
+	if containsThisType(signature.Type) ||
+		ast.FindAncestorKind(node, ast.KindModuleDeclaration) != nil {
+		return nil
+	}
+
+	thisKey := f.getMethodKey(node)
+	members := node.Parent.Members()
+
+	// Find overloaded method signatures with the same key.
+	var duplicates []*ast.Node
+	for _, member := range members {
+		if member.Kind == ast.KindMethodSignature && member != node && f.getMethodKey(member) == thisKey {
+			duplicates = append(duplicates, member)
+		}
+	}
+
+	if len(duplicates) > 0 {
+		// Sort all overloads by position; only the first provides the fix.
+		allNodes := append([]*ast.Node{node}, duplicates...)
+		sort.Slice(allNodes, func(i, j int) bool {
+			return allNodes[i].Pos() < allNodes[j].Pos()
+		})
+		if allNodes[0] != node {
+			return nil
+		}
+
+		// Merge overloads into an intersection of function types.
+		typeParts := make([]string, 0, len(allNodes))
+		for _, overload := range allNodes {
+			typeParts = append(
+				typeParts,
+				"("+f.getMethodParams(overload)+" => "+f.getMethodReturnType(overload)+")",
+			)
+		}
+		typeString := strings.Join(typeParts, " & ")
+		replacement := f.getMethodKey(node) + ": " + typeString + f.getDelimiter(node)
+
+		fixes := make([]rule.RuleFix, 0, len(duplicates)+1)
+		fixes = append(fixes, rule.RuleFixReplace(f.sourceFile, node, replacement))
+
+		// Remove each duplicate and its preceding whitespace.
+		for _, duplicate := range duplicates {
+			duplicateRange := utils.TrimNodeTextRange(f.sourceFile, duplicate)
+			start := duplicateRange.Pos()
+			// Consume leading whitespace/newlines back to the previous member's delimiter.
+			for start > 0 &&
+				(f.sourceText[start-1] == ' ' ||
+					f.sourceText[start-1] == '\t' ||
+					f.sourceText[start-1] == '\n' ||
+					f.sourceText[start-1] == '\r') {
+				start--
+			}
+			fixes = append(
+				fixes,
+				rule.RuleFixRemoveRange(duplicateRange.WithPos(start).WithEnd(duplicateRange.End())),
+			)
+		}
+
+		return fixes
+	}
+
+	replacement := f.getMethodKey(node) +
+		": " +
+		f.getMethodParams(node) +
+		" => " +
+		f.getMethodReturnType(node) +
+		f.getDelimiter(node)
+	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
+}
+
+func (f *methodSignatureFixer) buildPropertyFixes(
+	node *ast.Node,
+	functionType *ast.Node,
+) []rule.RuleFix {
+	replacement := f.getMethodKey(node) +
+		f.getMethodParams(functionType) +
+		": " +
+		f.getMethodReturnType(functionType) +
+		f.getDelimiter(node)
+	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
+}
+
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 	options := rule.LegacyUnwrapOptions(_options)
 	opt := mode(utils.GetOptionsString(options))
@@ -61,194 +267,19 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		opt = modeProperty
 	}
 
-	sourceText := ctx.SourceFile.Text()
-
-	// safeSlice returns sourceText[start:end] with bounds clamping.
-	safeSlice := func(start, end int) string {
-		if start < 0 {
-			start = 0
-		}
-		if end > len(sourceText) {
-			end = len(sourceText)
-		}
-		return sourceText[start:end]
+	fixer := methodSignatureFixer{
+		sourceFile: ctx.SourceFile,
+		sourceText: ctx.SourceFile.Text(),
 	}
-
-	// getMethodKey returns the key text for a method or property signature,
-	// including optional marker and readonly prefix.
-	getMethodKey := func(node *ast.Node) string {
-		var nameNode *ast.Node
-		switch node.Kind {
-		case ast.KindMethodSignature:
-			nameNode = node.AsMethodSignatureDeclaration().Name()
-		case ast.KindPropertySignature:
-			nameNode = node.AsPropertySignatureDeclaration().Name()
-		default:
-			return ""
-		}
-
-		// TrimmedNodeText handles computed property names correctly —
-		// ComputedPropertyName nodes already include the surrounding brackets.
-		key := utils.TrimmedNodeText(ctx.SourceFile, nameNode)
-
-		if ast.HasQuestionToken(node) {
-			key += "?"
-		}
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
-			key = "readonly " + key
-		}
-		return key
-	}
-
-	// getMethodParams returns the type parameters + parameters text.
-	// E.g. "<T>(a: T, b: T)" or "()" for no params.
-	getMethodParams := func(node *ast.Node) string {
-		var params *ast.NodeList
-		var typeParams *ast.NodeList
-
-		switch node.Kind {
-		case ast.KindMethodSignature:
-			sig := node.AsMethodSignatureDeclaration()
-			params = sig.Parameters
-			typeParams = sig.TypeParameters
-		case ast.KindFunctionType:
-			ft := node.AsFunctionTypeNode()
-			params = ft.Parameters
-			typeParams = ft.TypeParameters
-		default:
-			return "()"
-		}
-
-		paramsText := "()"
-		if params != nil && len(params.Nodes) > 0 {
-			firstRange := utils.TrimNodeTextRange(ctx.SourceFile, params.Nodes[0])
-			lastRange := utils.TrimNodeTextRange(ctx.SourceFile, params.Nodes[len(params.Nodes)-1])
-			// Scan backward to find '(' before first param
-			openParen := firstRange.Pos() - 1
-			for openParen > 0 && sourceText[openParen] != '(' {
-				openParen--
-			}
-			// Scan forward to find ')' after last param
-			closeParen := lastRange.End()
-			for closeParen < len(sourceText) && sourceText[closeParen] != ')' {
-				closeParen++
-			}
-			paramsText = safeSlice(openParen, closeParen+1)
-		}
-
-		if typeParams != nil && len(typeParams.Nodes) > 0 {
-			firstRange := utils.TrimNodeTextRange(ctx.SourceFile, typeParams.Nodes[0])
-			lastRange := utils.TrimNodeTextRange(ctx.SourceFile, typeParams.Nodes[len(typeParams.Nodes)-1])
-			// Scan backward/forward to find '<'/'>' (comments may sit between the bracket and the first/last param)
-			start := firstRange.Pos() - 1
-			for start > 0 && sourceText[start] != '<' {
-				start--
-			}
-			end := lastRange.End()
-			for end < len(sourceText) && sourceText[end] != '>' {
-				end++
-			}
-			paramsText = safeSlice(start, end+1) + paramsText
-		}
-
-		return paramsText
-	}
-
-	// getMethodReturnType returns the return type text, or "any" if omitted.
-	getMethodReturnType := func(node *ast.Node) string {
-		var typeNode *ast.Node
-		switch node.Kind {
-		case ast.KindMethodSignature:
-			typeNode = node.AsMethodSignatureDeclaration().Type
-		case ast.KindFunctionType:
-			typeNode = node.AsFunctionTypeNode().Type
-		}
-		if typeNode == nil {
-			return "any"
-		}
-		return utils.TrimmedNodeText(ctx.SourceFile, typeNode)
-	}
-
-	// getDelimiter returns the trailing ';' or ',' of a member node, or "".
-	getDelimiter := func(node *ast.Node) string {
-		end := utils.TrimNodeTextRange(ctx.SourceFile, node).End()
-		if end > 0 && end <= len(sourceText) {
-			if ch := sourceText[end-1]; ch == ';' || ch == ',' {
-				return string(ch)
-			}
-		}
-		return ""
-	}
-
 	listeners := rule.RuleListeners{}
 
 	if opt == modeProperty {
 		listeners[ast.KindMethodSignature] = func(node *ast.Node) {
 			// In typescript-go AST, get/set accessors use KindGetAccessor/KindSetAccessor,
 			// so KindMethodSignature always represents an actual method — no kind check needed.
-
-			skipFix := containsThisType(node.AsMethodSignatureDeclaration().Type)
-			isParentModule := ast.FindAncestorKind(node, ast.KindModuleDeclaration) != nil
-			thisKey := getMethodKey(node)
-			members := node.Parent.Members()
-
-			// Find overloaded method signatures with the same key
-			var duplicates []*ast.Node
-			for _, member := range members {
-				if member.Kind == ast.KindMethodSignature && member != node && getMethodKey(member) == thisKey {
-					duplicates = append(duplicates, member)
-				}
-			}
-
-			if len(duplicates) > 0 {
-				if isParentModule || skipFix {
-					ctx.ReportNode(node, messageErrorMethod())
-					return
-				}
-
-				// Sort all overloads by position; only the first provides the fix
-				allNodes := append([]*ast.Node{node}, duplicates...)
-				sort.Slice(allNodes, func(i, j int) bool {
-					return allNodes[i].Pos() < allNodes[j].Pos()
-				})
-				if allNodes[0] != node {
-					ctx.ReportNode(node, messageErrorMethod())
-					return
-				}
-
-				// Merge overloads into an intersection of function types
-				var typeParts []string
-				for _, n := range allNodes {
-					typeParts = append(typeParts, "("+getMethodParams(n)+" => "+getMethodReturnType(n)+")")
-				}
-				typeString := strings.Join(typeParts, " & ")
-				replacement := getMethodKey(node) + ": " + typeString + getDelimiter(node)
-
-				var fixes []rule.RuleFix
-				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, node, replacement))
-
-				// Remove each duplicate and its preceding whitespace
-				for _, dup := range duplicates {
-					dupRange := utils.TrimNodeTextRange(ctx.SourceFile, dup)
-					start := dupRange.Pos()
-					// Consume leading whitespace/newlines back to the previous member's delimiter
-					for start > 0 && (sourceText[start-1] == ' ' || sourceText[start-1] == '\t' || sourceText[start-1] == '\n' || sourceText[start-1] == '\r') {
-						start--
-					}
-					fixes = append(fixes, rule.RuleFixRemoveRange(dupRange.WithPos(start).WithEnd(dupRange.End())))
-				}
-
-				ctx.ReportNodeWithFixes(node, messageErrorMethod(), fixes...)
-				return
-			}
-
-			// Single method signature (no overloads)
-			if isParentModule || skipFix {
-				ctx.ReportNode(node, messageErrorMethod())
-			} else {
-				replacement := getMethodKey(node) + ": " + getMethodParams(node) + " => " + getMethodReturnType(node) + getDelimiter(node)
-				ctx.ReportNodeWithFixes(node, messageErrorMethod(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
-			}
+			ctx.ReportNodeWithDeferredFixes(node, messageErrorMethod(), func() []rule.RuleFix {
+				return fixer.buildMethodFixes(node)
+			})
 		}
 	}
 
@@ -259,8 +290,9 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 				return
 			}
 
-			replacement := getMethodKey(node) + getMethodParams(propSig.Type) + ": " + getMethodReturnType(propSig.Type) + getDelimiter(node)
-			ctx.ReportNodeWithFixes(node, messageErrorProperty(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+			ctx.ReportNodeWithDeferredFixes(node, messageErrorProperty(), func() []rule.RuleFix {
+				return fixer.buildPropertyFixes(node, propSig.Type)
+			})
 		}
 	}
 

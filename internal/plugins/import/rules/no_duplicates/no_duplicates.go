@@ -317,14 +317,10 @@ func checkImports(ctx rule.RuleContext, importMap map[string][]*ast.Node, text s
 		first := g.nodes[0]
 		rest := g.nodes[1:]
 
-		fixes := getFix(ctx, first, rest, text, opts)
-
 		firstSource := first.AsImportDeclaration().ModuleSpecifier
-		if fixes != nil {
-			ctx.ReportNodeWithFixes(firstSource, msg, fixes...)
-		} else {
-			ctx.ReportNode(firstSource, msg)
-		}
+		ctx.ReportNodeWithDeferredFixes(firstSource, msg, func() []rule.RuleFix {
+			return getFix(ctx, first, rest, text, opts)
+		})
 
 		for _, node := range rest {
 			ctx.ReportNode(node.AsImportDeclaration().ModuleSpecifier, msg)

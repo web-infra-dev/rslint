@@ -113,89 +113,82 @@ func isUnnecessarilyWrappedRegexLiteral(ctx rule.RuleContext, args []*ast.Node) 
 }
 
 func reportStaticStringRegExp(ctx rule.RuleContext, node *ast.Node, args []*ast.Node) {
-	pattern, _ := staticStringValue(ctx, args[0])
-	flags := ""
-	if len(args) == 2 {
-		flags, _ = staticStringValue(ctx, args[1])
-	}
-
 	msg := rule.RuleMessage{
 		Id:          "unexpectedRegExp",
 		Description: "Use a regular expression literal instead of the 'RegExp' constructor.",
 	}
 
-	suggestions := []rule.RuleSuggestion{}
-	if literal, ok := buildLiteralReplacement(pattern, flags); ok && canFixTo(ctx, node, literal) {
-		suggestions = append(suggestions, buildSuggestion(ctx, node, "replaceWithLiteral", "Replace with an equivalent regular expression literal.", literal, nil))
-	}
-	reportWithSuggestions(ctx, node, msg, suggestions)
+	ctx.ReportNodeWithDeferredSuggestions(node, msg, func() []rule.RuleSuggestion {
+		pattern, _ := staticStringValue(ctx, args[0])
+		flags := ""
+		if len(args) == 2 {
+			flags, _ = staticStringValue(ctx, args[1])
+		}
+		if literal, ok := buildLiteralReplacement(pattern, flags); ok && canFixTo(ctx, node, literal) {
+			return []rule.RuleSuggestion{buildSuggestion(ctx, node, "replaceWithLiteral", "Replace with an equivalent regular expression literal.", literal, nil)}
+		}
+		return nil
+	})
 }
 
 func reportRedundantRegExp(ctx rule.RuleContext, node *ast.Node, args []*ast.Node) {
 	regexNode := utils.SkipAssertionsAndParens(args[0])
-	pattern, literalFlags, _ := regexLiteralPatternAndFlags(regexNode)
 
 	if len(args) == 2 {
-		argFlags, _ := staticStringValue(ctx, args[1])
-		suggestions := []rule.RuleSuggestion{}
-
-		replacement := "/" + pattern + "/" + argFlags
-		if canFixTo(ctx, node, replacement) {
-			suggestions = append(suggestions, buildSuggestion(
-				ctx,
-				node,
-				"replaceWithLiteralAndFlags",
-				fmt.Sprintf("Replace with an equivalent regular expression literal with flags '%s'.", argFlags),
-				replacement,
-				map[string]string{"flags": argFlags},
-			))
-		}
-
-		mergedFlags := mergeRegexFlags(literalFlags, argFlags)
-		mergedReplacement := "/" + pattern + "/" + mergedFlags
-		if !areFlagsEqual(mergedFlags, argFlags) && canFixTo(ctx, node, mergedReplacement) {
-			suggestions = append(suggestions, buildSuggestion(
-				ctx,
-				node,
-				"replaceWithIntendedLiteralAndFlags",
-				fmt.Sprintf("Replace with a regular expression literal with flags '%s'.", mergedFlags),
-				mergedReplacement,
-				map[string]string{"flags": mergedFlags},
-			))
-		}
-
-		reportWithSuggestions(ctx, node, rule.RuleMessage{
+		ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 			Id:          "unexpectedRedundantRegExpWithFlags",
 			Description: "Use regular expression literal with flags instead of the 'RegExp' constructor.",
-		}, suggestions)
+		}, func() []rule.RuleSuggestion {
+			pattern, literalFlags, _ := regexLiteralPatternAndFlags(regexNode)
+			argFlags, _ := staticStringValue(ctx, args[1])
+			suggestions := []rule.RuleSuggestion{}
+
+			replacement := "/" + pattern + "/" + argFlags
+			if canFixTo(ctx, node, replacement) {
+				suggestions = append(suggestions, buildSuggestion(
+					ctx,
+					node,
+					"replaceWithLiteralAndFlags",
+					fmt.Sprintf("Replace with an equivalent regular expression literal with flags '%s'.", argFlags),
+					replacement,
+					map[string]string{"flags": argFlags},
+				))
+			}
+
+			mergedFlags := mergeRegexFlags(literalFlags, argFlags)
+			mergedReplacement := "/" + pattern + "/" + mergedFlags
+			if !areFlagsEqual(mergedFlags, argFlags) && canFixTo(ctx, node, mergedReplacement) {
+				suggestions = append(suggestions, buildSuggestion(
+					ctx,
+					node,
+					"replaceWithIntendedLiteralAndFlags",
+					fmt.Sprintf("Replace with a regular expression literal with flags '%s'.", mergedFlags),
+					mergedReplacement,
+					map[string]string{"flags": mergedFlags},
+				))
+			}
+			return suggestions
+		})
 		return
 	}
 
-	suggestions := []rule.RuleSuggestion{}
-	literal := utils.TrimmedNodeText(ctx.SourceFile, regexNode)
-	if canFixTo(ctx, node, literal) {
-		suggestions = append(suggestions, buildSuggestion(
-			ctx,
-			node,
-			"replaceWithLiteral",
-			"Replace with an equivalent regular expression literal.",
-			literal,
-			nil,
-		))
-	}
-
-	reportWithSuggestions(ctx, node, rule.RuleMessage{
+	ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 		Id:          "unexpectedRedundantRegExp",
 		Description: "Regular expression literal is unnecessarily wrapped within a 'RegExp' constructor.",
-	}, suggestions)
-}
-
-func reportWithSuggestions(ctx rule.RuleContext, node *ast.Node, msg rule.RuleMessage, suggestions []rule.RuleSuggestion) {
-	if len(suggestions) == 0 {
-		ctx.ReportNode(node, msg)
-		return
-	}
-	ctx.ReportNodeWithSuggestions(node, msg, suggestions...)
+	}, func() []rule.RuleSuggestion {
+		literal := utils.TrimmedNodeText(ctx.SourceFile, regexNode)
+		if canFixTo(ctx, node, literal) {
+			return []rule.RuleSuggestion{buildSuggestion(
+				ctx,
+				node,
+				"replaceWithLiteral",
+				"Replace with an equivalent regular expression literal.",
+				literal,
+				nil,
+			)}
+		}
+		return nil
+	})
 }
 
 func buildSuggestion(ctx rule.RuleContext, node *ast.Node, messageID string, description string, replacement string, data map[string]string) rule.RuleSuggestion {

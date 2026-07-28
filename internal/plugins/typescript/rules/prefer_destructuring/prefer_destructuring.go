@@ -336,8 +336,19 @@ func shouldFix(leftNode *ast.Node, rightNode *ast.Node) bool {
 	return left.Text() == pae.Name().Text()
 }
 
-// reportWithFix reports the diagnostic with an autofix.
+// reportWithFix reports the diagnostic and defers optional autofix planning.
 func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node, reportNode *ast.Node) {
+	ctx.ReportNodeWithDeferredFixes(reportNode, buildPreferDestructuringMessage("object"), func() []rule.RuleFix {
+		return buildObjectDestructuringFix(ctx, leftNode, rightNode, reportNode)
+	})
+}
+
+func buildObjectDestructuringFix(
+	ctx rule.RuleContext,
+	leftNode *ast.Node,
+	rightNode *ast.Node,
+	reportNode *ast.Node,
+) []rule.RuleFix {
 	pae := rightNode.AsPropertyAccessExpression()
 	propName := pae.Name().Text()
 	objectExpr := pae.Expression
@@ -355,8 +366,7 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 
 	if utils.HasCommentInSpan(comments, idRange.End(), objRange.Pos()) ||
 		utils.HasCommentInSpan(comments, objRange.End(), nodeRange.End()) {
-		ctx.ReportNode(reportNode, buildPreferDestructuringMessage("object"))
-		return
+		return nil
 	}
 
 	// Get the inner expression text, stripping outer ParenthesizedExpression.
@@ -369,8 +379,7 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 	// If stripping parens would lose a comment (e.g., `(/* c */ obj)`), suppress fix.
 	if utils.HasCommentInSpan(comments, objRange.Pos(), innerRange.Pos()) ||
 		utils.HasCommentInSpan(comments, innerRange.End(), objRange.End()) {
-		ctx.ReportNode(reportNode, buildPreferDestructuringMessage("object"))
-		return
+		return nil
 	}
 
 	objectText := text[innerRange.Pos():innerRange.End()]
@@ -386,7 +395,5 @@ func reportWithFix(ctx rule.RuleContext, leftNode *ast.Node, rightNode *ast.Node
 	replacement := "{" + propName + "} = " + objectText
 	fixRange := core.NewTextRange(idRange.Pos(), nodeRange.End())
 
-	ctx.ReportNodeWithFixes(reportNode, buildPreferDestructuringMessage("object"),
-		rule.RuleFixReplaceRange(fixRange, replacement),
-	)
+	return []rule.RuleFix{rule.RuleFixReplaceRange(fixRange, replacement)}
 }

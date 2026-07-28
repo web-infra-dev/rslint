@@ -140,6 +140,12 @@ func TestDefaultCaseLastRule(t *testing.T) {
 					{MessageId: "notLast", Line: 1, Column: 16},
 				},
 			},
+			{
+				Code: `switch (foo) { default: break; default: break; case 1: break; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notLast", Line: 1, Column: 16},
+				},
+			},
 
 			// nested switch — outer default not last, inner valid (only outer reports)
 			{
