@@ -172,10 +172,7 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 							break
 						}
 					}
-					if leftNode == current {
-						return true
-					}
-					return false
+					return leftNode == current
 				}
 			}
 			// Check if this is a destructuring target in for-in/for-of
