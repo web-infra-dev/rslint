@@ -60,13 +60,12 @@ func TestNoClassAssignRule(t *testing.T) {
 			},
 
 			// Destructuring assignment with class name
-			// TODO: This test case is not working yet - needs investigation of AST structure
-			// {
-			// 	Code: `class A { } ({A} = 0);`,
-			// 	Errors: []rule_tester.InvalidTestCaseError{
-			// 		{MessageId: "classReassignment", Line: 1, Column: 15},
-			// 	},
-			// },
+			{
+				Code: `class A { } ({A} = 0);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "classReassignment", Line: 1, Column: 15},
+				},
+			},
 
 			// Destructuring assignment with default value
 			{
@@ -258,6 +257,17 @@ func TestNoClassAssignRule(t *testing.T) {
 				Code: `class A { } (A as any) = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "classReassignment", Line: 1, Column: 14},
+				},
+			},
+
+			// Default-exported class reassigned at module level: the export
+			// symbol is named "default", but the reported name must be the
+			// source declaration name.
+			{
+				Code: `export default class A {}
+A = 0;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 2, Column: 1},
 				},
 			},
 		},

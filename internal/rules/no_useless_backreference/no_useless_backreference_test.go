@@ -1,6 +1,8 @@
 package no_useless_backreference
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -34,6 +36,16 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 			{Code: `RegExp('\\1(a)' + suffix)`},
 			{Code: "new RegExp(`${prefix}\\\\1(a)`)"},
 			{Code: "{ const String = { raw: () => '\\\\1(a)' }; new RegExp(String.raw`\\1(a)`); }"},
+			{Code: `RegExp(1); RegExp(1n); RegExp(true); RegExp(false); RegExp(null);`},
+			{Code: `
+declare function unknownPattern(): unknown;
+RegExp({});
+RegExp([]);
+RegExp(() => '\\1(a)');
+RegExp(function () { return '\\1(a)'; });
+RegExp(class {});
+RegExp(unknownPattern());
+RegExp(new String('\\1(a)'));`},
 
 			// ---- not the global RegExp ----
 			{Code: `let RegExp; new RegExp('\\1(a)');`},
@@ -329,6 +341,24 @@ func TestNoUselessBackreferenceRule(t *testing.T) {
 				},
 			},
 			{
+				Code: `const pattern = '\\1(a)'; RegExp((((pattern as string) satisfies unknown)!));`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: `const slash = "\u005c"; const pattern = slash + "1(a)"; RegExp(pattern);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
+				Code: "new RegExp(String.raw`\\1${\"(a)\"}`);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
 				Code: `const r = RegExp; r('\\1(a)'); { const r = (value: string) => value; r('\\1(a)'); } r('\\1(a)');`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward"},
@@ -574,6 +604,170 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	)
 	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
 		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
+	}
+}
+
+func TestMayEvaluateToRegexPatternAdversarial(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "file.ts")
+
+	var code strings.Builder
+	code.WriteString(`
+declare function makePattern(): unknown;
+const stablePattern = "\\1(a)";
+let counter = 0;
+enum Pattern {
+	Value = "\\1(a)",
+}
+`)
+
+	baseExpressions := []string{
+		`"\\1(a)"`,
+		"`\\\\1(a)`",
+		"`\\\\1${\"(a)\"}`",
+		"String.raw`\\1(a)`",
+		`stablePattern`,
+		`Pattern.Value`,
+		`Pattern["Value"]`,
+		`"\\1" + "(a)"`,
+		`true ? "\\1(a)" : "(a)"`,
+		`String("\\1(a)")`,
+		`String()`,
+		`"" || "\\1(a)"`,
+		`null ?? "\\1(a)"`,
+		`makePattern()`,
+		`new String("\\1(a)")`,
+		`typeof stablePattern`,
+	}
+	wrappers := []string{
+		`%s`,
+		`(%s)`,
+		`(%s as string)`,
+		`(%s satisfies unknown)`,
+		`(%s)!`,
+		`true ? %s : "(a)"`,
+		`String(%s)`,
+	}
+	candidateCount := 0
+	frontier := baseExpressions
+	for depth := range 2 {
+		next := make([]string, 0, len(frontier)*len(wrappers))
+		for expressionIndex, expression := range frontier {
+			for wrapperIndex, wrapper := range wrappers {
+				wrapped := fmt.Sprintf(wrapper, expression)
+				fmt.Fprintf(
+					&code,
+					"const candidate_%d_%d_%d = %s;\n",
+					depth,
+					expressionIndex,
+					wrapperIndex,
+					wrapped,
+				)
+				next = append(next, wrapped)
+				candidateCount++
+			}
+		}
+		frontier = next
+	}
+
+	rejectedExpressions := []string{
+		`1`,
+		`1n`,
+		`true`,
+		`false`,
+		`null`,
+		`{ value: "\\1(a)" }`,
+		`["\\1(a)"]`,
+		`() => "\\1(a)"`,
+		`function () { return "\\1(a)"; }`,
+		`class {}`,
+		`-1`,
+		`counter++`,
+		`delete ({ value: 1 }).value`,
+		`void stablePattern`,
+	}
+	for index, expression := range rejectedExpressions {
+		fmt.Fprintf(&code, "const rejected_%d = %s;\n", index, expression)
+	}
+
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		filePath: code.String(),
+	})
+	host := utils.CreateCompilerHost(rootDir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatalf("%s was not loaded", filePath)
+		return
+	}
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+	evaluator := utils.NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+
+	seenCandidates := 0
+	seenRejected := 0
+	evaluatedStrings := 0
+	evaluatedCandidateStrings := 0
+	var nonEvaluatedCandidates []string
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindVariableDeclaration {
+			declaration := node.AsVariableDeclaration()
+			if declaration != nil &&
+				declaration.Name() != nil &&
+				declaration.Name().Kind == ast.KindIdentifier &&
+				declaration.Initializer != nil {
+				name := declaration.Name().AsIdentifier().Text
+				mayEvaluate := mayEvaluateToRegexPattern(declaration.Initializer)
+				if strings.HasPrefix(name, "candidate_") {
+					seenCandidates++
+					if !mayEvaluate {
+						t.Errorf("%s: candidate expression was rejected", name)
+					}
+				}
+				if strings.HasPrefix(name, "rejected_") {
+					seenRejected++
+					if mayEvaluate {
+						t.Errorf("%s: known non-string expression passed the filter", name)
+					}
+				}
+				if _, ok := evaluator.Eval(declaration.Initializer); ok {
+					evaluatedStrings++
+					if strings.HasPrefix(name, "candidate_") {
+						evaluatedCandidateStrings++
+					}
+					if !mayEvaluate {
+						t.Errorf("%s: StaticStringEvaluator produced a string rejected by the filter", name)
+					}
+				} else if strings.HasPrefix(name, "candidate_") {
+					nonEvaluatedCandidates = append(nonEvaluatedCandidates, name)
+				}
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+
+	if seenCandidates != candidateCount {
+		t.Fatalf("visited %d candidate expressions, want %d", seenCandidates, candidateCount)
+	}
+	if seenRejected != len(rejectedExpressions) {
+		t.Fatalf("visited %d rejected expressions, want %d", seenRejected, len(rejectedExpressions))
+	}
+	const evaluableBaseExpressionCount = 11
+	minimumEvaluatedCandidates := evaluableBaseExpressionCount *
+		(len(wrappers) + len(wrappers)*len(wrappers))
+	if evaluatedCandidateStrings < minimumEvaluatedCandidates {
+		t.Fatalf(
+			"only evaluated %d of %d adversarial candidates to strings; all strings=%d, misses: %v",
+			evaluatedCandidateStrings,
+			candidateCount,
+			evaluatedStrings,
+			nonEvaluatedCandidates,
+		)
 	}
 }
 

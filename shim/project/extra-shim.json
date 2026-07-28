@@ -1,0 +1,7 @@
+{
+  "ExtraFunctions": [
+    "createResolutionLookupGlobMapper",
+    "fileSystemWatcherGlobString",
+    "NewWatchedFiles"
+  ]
+}

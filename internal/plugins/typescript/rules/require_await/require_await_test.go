@@ -1,10 +1,18 @@
 package require_await
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestRequireAwaitRule(t *testing.T) {
@@ -1092,4 +1100,293 @@ for await (let num of asyncIterable) {
 			},
 		},
 	})
+}
+
+func TestRequireAwaitDeferredTypeChecks(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RequireAwaitRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare function consume(value: number): number;
+async function returnsAwait() {
+  return consume(await Promise.resolve(1));
+}
+      `},
+			{Code: `
+declare function consume(value: number): number;
+const arrow = async () => consume(await Promise.resolve(1));
+      `},
+			{Code: `
+declare function consume(value: number): number;
+async function* yieldsAwait() {
+  yield consume(await Promise.resolve(1));
+}
+      `},
+			{Code: `
+async function* awaitsBeforeYield() {
+  await Promise.resolve();
+  yield Promise.resolve(1);
+}
+      `},
+			{Code: `
+interface StructuralThenable {
+  then(onfulfilled: (value: number) => unknown): unknown;
+}
+declare const value: StructuralThenable;
+async function returnsThenable() {
+  return value;
+}
+      `},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+interface FakeThenable {
+  then(value: number): unknown;
+}
+declare const value: FakeThenable;
+async function returnsFakeThenable() {
+  return value;
+}
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+			{
+				Code: `
+interface FakeThenable {
+  then(value: number): unknown;
+}
+declare const value: FakeThenable;
+const returnsFakeThenable = async () => value;
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+			{
+				Code: `
+interface FakeThenable {
+  then(value: number): unknown;
+}
+declare const value: FakeThenable;
+async function* yieldsFakeThenable() {
+  yield value;
+}
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+			{
+				Code: `
+async function outer() {
+  function* syncGenerator() {
+    yield Promise.resolve(1);
+  }
+}
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+			{
+				Code: `
+async function outer() {
+  return async () => await Promise.resolve(1);
+}
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+			{
+				Code: `
+async function* outer() {
+  yield async () => await Promise.resolve(1);
+}
+        `,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingAwait"}},
+			},
+		},
+	)
+}
+
+func TestRequireAwaitDeepScopeStack(t *testing.T) {
+	const depth = 40
+	var source strings.Builder
+	for i := range depth {
+		source.WriteString("async function f")
+		source.WriteString(strconv.Itoa(i))
+		source.WriteString("() {\n")
+	}
+	source.WriteString("await Promise.resolve();\n")
+	for range depth {
+		source.WriteString("}\n")
+	}
+
+	errors := make([]rule_tester.InvalidTestCaseError, depth-1)
+	for i := range errors {
+		errors[i].MessageId = "missingAwait"
+	}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RequireAwaitRule,
+		nil,
+		[]rule_tester.InvalidTestCase{{
+			Code:   source.String(),
+			Errors: errors,
+		}},
+	)
+}
+
+func TestRequireAwaitThenableFastPathParity(t *testing.T) {
+	const source = `
+interface GoodThenable {
+  then(onfulfilled: (value: number) => unknown): unknown;
+}
+interface RestThenable {
+  then(...callbacks: Array<(value: number) => unknown>): unknown;
+}
+interface UnionCallbackThenable {
+  then(onfulfilled: ((value: number) => unknown) | { tag: string }): unknown;
+}
+interface BadThenable {
+  then(value: number): unknown;
+}
+interface NoArgThenable {
+  then(): unknown;
+}
+declare const good: GoodThenable;
+declare const rest: RestThenable;
+declare const unionCallback: UnionCallbackThenable;
+declare const bad: BadThenable;
+declare const noArg: NoArgThenable;
+
+const caseNumber = 1;
+const casePromise = Promise.resolve(1);
+const caseGood = good;
+const caseRest = rest;
+const caseUnionCallback = unionCallback;
+const caseBad = bad;
+const caseNoArg = noArg;
+const caseGoodUnion = null as number | GoodThenable;
+const caseBadUnion = null as number | BadThenable;
+const caseIntersection = null as GoodThenable & { tag: string };
+`
+	expected := map[string]bool{
+		"caseNumber":        false,
+		"casePromise":       true,
+		"caseGood":          true,
+		"caseRest":          true,
+		"caseUnionCallback": true,
+		"caseBad":           false,
+		"caseNoArg":         false,
+		"caseGoodUnion":     true,
+		"caseBadUnion":      false,
+		"caseIntersection":  true,
+	}
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(source, "require-await-thenable-parity.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+
+	seen := make(map[string]bool, len(expected))
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if ast.IsExpressionNode(node) {
+			typ := typeChecker.GetTypeAtLocation(node)
+			got := isThenableType(typeChecker, node, typ)
+			shared := utils.IsThenableType(typeChecker, node, typ)
+			if got != shared {
+				t.Errorf(
+					"expression kind %v at [%d,%d): fast path = %t, shared helper = %t",
+					node.Kind,
+					node.Pos(),
+					node.End(),
+					got,
+					shared,
+				)
+			}
+		}
+		if node.Kind == ast.KindVariableDeclaration {
+			name := node.Name()
+			initializer := node.Initializer()
+			if name != nil && initializer != nil {
+				if want, ok := expected[name.Text()]; ok {
+					typ := typeChecker.GetTypeAtLocation(initializer)
+					got := isThenableType(typeChecker, initializer, typ)
+					shared := utils.IsThenableType(typeChecker, initializer, typ)
+					if got != shared {
+						t.Errorf("%s: fast path = %t, shared helper = %t", name.Text(), got, shared)
+					}
+					if got != want {
+						t.Errorf("%s: isThenableType = %t, want %t", name.Text(), got, want)
+					}
+					seen[name.Text()] = true
+				}
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+
+	for name := range expected {
+		if !seen[name] {
+			t.Errorf("test case %s was not visited", name)
+		}
+	}
+}
+
+func TestRequireAwaitRecoveryAST(t *testing.T) {
+	for index, source := range []string{
+		`async function value() {`,
+		`const value = async () => {`,
+		`async function* value() {`,
+		`async function outer() { function inner() {`,
+		`class Value { async method() {`,
+		`async function outer() { const inner = async () => {`,
+	} {
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			fileName := "/require-await-recovery-" + strconv.Itoa(index) + ".ts"
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: fileName,
+				Path:     tspath.Path(fileName),
+			}, source, core.ScriptKindTS)
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				DisableManager: rule.NewDisableManager(sourceFile, rule.NewCommentStore(sourceFile)),
+			}.WithReporter(
+				RequireAwaitRule.Name,
+				rule.SeverityError,
+				func(diagnostic rule.RuleDiagnostic) {
+					if diagnostic.Range.Pos() < 0 ||
+						diagnostic.Range.End() < diagnostic.Range.Pos() ||
+						diagnostic.Range.End() > len(source) {
+						t.Errorf(
+							"out-of-bounds diagnostic range [%d,%d) for source length %d",
+							diagnostic.Range.Pos(),
+							diagnostic.Range.End(),
+							len(source),
+						)
+					}
+				},
+			)
+			listeners := RequireAwaitRule.Run(ctx, nil)
+
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if listener := listeners[node.Kind]; listener != nil {
+					listener(node)
+				}
+				node.ForEachChild(visit)
+				if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+					listener(node)
+				}
+				return false
+			}
+			sourceFile.AsNode().ForEachChild(visit)
+		})
+	}
 }

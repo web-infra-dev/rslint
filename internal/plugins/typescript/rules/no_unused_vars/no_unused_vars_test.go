@@ -17,6 +17,7 @@ func TestNoUnusedVarsCore(t *testing.T) {
 		{Code: `function foo(bar) { console.log(bar); } foo(1);`},
 		{Code: `try {} catch (e) { console.log(e); }`},
 		{Code: `export const foo = 1;`},
+		{Code: `export const { foo } = { foo: 1 };`},
 		// type-annotated variable that IS used
 		{Code: `const bar: number = 1; console.log(bar);`},
 
@@ -183,7 +184,7 @@ export function qux(a: number, b: string, c: boolean) {
 		},
 		// after-used: all unused → report all
 		{
-			Code:   `export function bar(a: number, b: string, c: boolean) {}`,
+			Code: `export function bar(a: number, b: string, c: boolean) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unusedVar", Line: 1, Column: 21},
 				{MessageId: "unusedVar", Line: 1, Column: 32},

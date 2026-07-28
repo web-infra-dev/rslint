@@ -1,4 +1,4 @@
 {
   "compilerOptions": { "strict": true, "noEmit": true },
-  "include": ["src/session.ts"]
+  "include": ["src/**/*.ts"]
 }

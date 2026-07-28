@@ -2,6 +2,7 @@ package no_useless_backreference
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -14,15 +15,25 @@ import (
 var NoUselessBackreferenceRule = rule.Rule{
 	Name: "no-useless-backreference",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		// Every pattern this rule can report contains a backslash. Constructor
+		// patterns folded by StaticStringEvaluator also get that character from
+		// a literal in this source file, so files without one need no listeners.
+		if ctx.SourceFile != nil && !strings.Contains(ctx.SourceFile.Text(), `\`) {
+			return nil
+		}
+
 		mayUseRegExp := sourceMayUseRegExp(ctx)
 		var calleeCache *regExpCalleeCache
 		listeners := rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				if mayUseRegExp && isRegexLiteralHandledByConstructor(ctx, node, calleeCache) {
-					return
-				}
 				pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
 				if pattern == "" && flags == "" {
+					return
+				}
+				if !mayContainBackreference(pattern) {
+					return
+				}
+				if mayUseRegExp && isRegexLiteralHandledByConstructor(ctx, node, calleeCache) {
 					return
 				}
 				rxFlags := utils.ParseRegexFlags(flags)
@@ -93,11 +104,6 @@ func handleRegExpConstructor(
 	if args == nil || len(args.Nodes) == 0 {
 		return
 	}
-	callee = ast.SkipParentheses(callee)
-	if !isBuiltinRegExpCallee(ctx, callee, calleeCache) {
-		return
-	}
-
 	patternNode := ast.SkipParentheses(args.Nodes[0])
 	if patternNode == nil {
 		return
@@ -105,6 +111,7 @@ func handleRegExpConstructor(
 
 	flags := ""
 	var pattern string
+	patternReady := true
 	switch patternNode.Kind {
 	case ast.KindRegularExpressionLiteral:
 		pattern, flags = utils.ExtractRegexPatternAndFlags(patternNode.Text())
@@ -113,6 +120,24 @@ func handleRegExpConstructor(
 	case ast.KindNoSubstitutionTemplateLiteral:
 		pattern = patternNode.AsNoSubstitutionTemplateLiteral().Text
 	default:
+		if !mayEvaluateToRegexPattern(patternNode) {
+			return
+		}
+		patternReady = false
+	}
+
+	// Most calls with literal arguments are unrelated to RegExp. Reject them
+	// before asking the checker for the callee's flow-sensitive type.
+	if patternReady && !mayContainBackreference(pattern) {
+		return
+	}
+
+	callee = ast.SkipParentheses(callee)
+	if !isBuiltinRegExpCallee(ctx, callee, calleeCache) {
+		return
+	}
+
+	if !patternReady {
 		var patternOk bool
 		pattern, patternOk = getEval().Eval(patternNode)
 		if !patternOk {
@@ -135,6 +160,37 @@ func handleRegExpConstructor(
 
 	rxFlags := utils.ParseRegexFlags(flags)
 	checkRegex(ctx, callNode, pattern, rxFlags)
+}
+
+// mayEvaluateToRegexPattern is a conservative negative syntactic filter for
+// StaticStringEvaluator.Eval. Only expression forms whose values are
+// intrinsically non-string are rejected. Unknown and future syntax stays on the
+// normal checker/evaluator path so extending StaticStringEvaluator cannot turn
+// this optimization into a false negative.
+func mayEvaluateToRegexPattern(node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
+		ast.KindObjectLiteralExpression,
+		ast.KindArrayLiteralExpression,
+		ast.KindArrowFunction,
+		ast.KindFunctionExpression,
+		ast.KindClassExpression,
+		ast.KindPrefixUnaryExpression,
+		ast.KindPostfixUnaryExpression,
+		ast.KindDeleteExpression,
+		ast.KindVoidExpression:
+		return false
+	default:
+		return true
+	}
 }
 
 func literalStringValue(node *ast.Node) (string, bool) {
@@ -173,16 +229,13 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node, ca
 	default:
 		return false
 	}
-	if !isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee), calleeCache) {
-		return false
-	}
 	if args == nil || len(args.Nodes) == 0 {
 		return false
 	}
 	if first := ast.SkipParentheses(args.Nodes[0]); first != node {
 		return false
 	}
-	return true
+	return isBuiltinRegExpCallee(ctx, ast.SkipParentheses(callee), calleeCache)
 }
 
 type regExpCalleeCache struct {

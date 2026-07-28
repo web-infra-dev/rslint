@@ -1,8 +1,6 @@
 package no_use_before_define
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -235,8 +233,8 @@ func getEnclosingFunctionScope(node *ast.Node) *ast.Node {
 
 // isFromSeparateExecutionContext returns true when reference and declaration
 // live in different function-level scopes.
-func isFromSeparateExecutionContext(refNode *ast.Node, declNode *ast.Node) bool {
-	return getEnclosingFunctionScope(refNode) != getEnclosingFunctionScope(declNode)
+func isFromSeparateExecutionContext(refScope *ast.Node, declNode *ast.Node) bool {
+	return refScope != getEnclosingFunctionScope(declNode)
 }
 
 // isInRange checks if a source position falls within [node.Pos(), node.End()].
@@ -317,8 +315,8 @@ func isSentinelKind(kind ast.Kind) bool {
 // check class body evaluation (extends clause, computed property keys, etc.).
 // It relies purely on source-position comparison for class declarations.
 // See: https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-use-before-define.ts
-func isEvaluatedDuringInitialization(refNode *ast.Node, decl *ast.Node) bool {
-	if isFromSeparateExecutionContext(refNode, decl) {
+func isEvaluatedDuringInitialization(refNode *ast.Node, decl *ast.Node, refScope *ast.Node) bool {
+	if isFromSeparateExecutionContext(refScope, decl) {
 		return false
 	}
 
@@ -377,77 +375,106 @@ func isEvaluatedDuringInitialization(refNode *ast.Node, decl *ast.Node) bool {
 // Rule definition
 // ---------------------------------------------------------------------------
 
+type definitionInfo struct {
+	declaration *ast.Node
+	name        *ast.Node
+	defType     definitionType
+}
+
 var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 	Name:             "no-use-before-define",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		if ctx.TypeChecker == nil || ctx.Refs == nil {
+			return rule.RuleListeners{}
+		}
+
 		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
-		return rule.RuleListeners{
+		var executionScopes []*ast.Node
+		currentExecutionScope := func() *ast.Node {
+			if len(executionScopes) == 0 {
+				return nil
+			}
+			return executionScopes[len(executionScopes)-1]
+		}
+		pushExecutionScope := func(node *ast.Node) {
+			executionScopes = append(executionScopes, node)
+		}
+		popExecutionScope := func(*ast.Node) {
+			executionScopes = executionScopes[:len(executionScopes)-1]
+		}
+
+		listeners := rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if !utils.IsDeclarationIdentifier(node) {
-					checkIdentifier(ctx, opts, node)
+					checkIdentifier(ctx, opts, node, currentExecutionScope())
 				}
 			},
 		}
+
+		for _, kind := range []ast.Kind{
+			ast.KindFunctionDeclaration,
+			ast.KindFunctionExpression,
+			ast.KindArrowFunction,
+			ast.KindMethodDeclaration,
+			ast.KindConstructor,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+		} {
+			listeners[kind] = pushExecutionScope
+			listeners[rule.ListenerOnExit(kind)] = popExecutionScope
+		}
+		listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
+			if !ast.HasStaticModifier(node) || node.AsPropertyDeclaration().Initializer == nil {
+				pushExecutionScope(node)
+			}
+		}
+		listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)] = func(node *ast.Node) {
+			if !ast.HasStaticModifier(node) || node.AsPropertyDeclaration().Initializer == nil {
+				popExecutionScope(node)
+			}
+		}
+		return listeners
 	},
 })
 
-func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node) {
-	if ctx.TypeChecker == nil {
-		return
-	}
-
+func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node, refScope *ast.Node) {
 	// The renamed export name in `export { a as b }` is not a reference.
 	if isExportedAliasName(node) {
 		return
 	}
 
-	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+	// Export specifiers are deliberately excluded from RefStore because most
+	// rules treat them as binding syntax rather than references. This rule is
+	// the exception: named exports have their own option and must be checked.
+	if isNamedExport(node) {
+		checkNamedExport(ctx, opts, node)
+		return
+	}
+
+	sym := ctx.Refs.Resolve(node)
+	checkerResolved := false
+	if sym == nil && needsCheckerFallback(opts, node) {
+		sym = ctx.TypeChecker.GetSymbolAtLocation(node)
+		checkerResolved = sym != nil
+	}
 	if sym == nil {
 		return
 	}
 
-	// For alias symbols (import/export specifiers), resolve through the alias
-	// to find the actual local declaration. Also include the alias's own
-	// declarations (import specifiers) so that imports serve as the "definition
-	// point" even when module augmentation adds later declarations.
 	declarations := sym.Declarations
-	if sym.Flags&ast.SymbolFlagsAlias != 0 {
+	if checkerResolved && sym.Flags&ast.SymbolFlagsAlias != 0 {
 		if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != nil && len(resolved.Declarations) > 0 {
 			declarations = append(append([]*ast.Node(nil), resolved.Declarations...), sym.Declarations...)
 		}
 	}
-	if len(declarations) == 0 {
+	info := getDefinitionInfo(ctx.SourceFile, declarations)
+	if info.declaration == nil {
 		return
 	}
-
-	// Find the earliest declaration in this source file, skipping export
-	// specifiers (they are the reference site, not a definition) and module
-	// augmentation declarations (they appear after the real definition).
-	var firstDecl *ast.Node
-	for _, decl := range declarations {
-		if decl.Kind == ast.KindExportSpecifier {
-			continue
-		}
-		if isInsideModuleAugmentation(decl) {
-			continue
-		}
-		if ast.GetSourceFileOfNode(decl) == ctx.SourceFile {
-			if firstDecl == nil || decl.Pos() < firstDecl.Pos() {
-				firstDecl = decl
-			}
-		}
-	}
-	if firstDecl == nil {
-		return
-	}
-
-	defType := getDefinitionType(firstDecl)
-	declName := utils.GetDeclarationIdentifier(firstDecl)
-	if declName == nil {
-		return
-	}
+	firstDecl := info.declaration
+	declName := info.name
 
 	// In a QualifiedName chain (A.B.C), only the leftmost name is a real reference.
 	if node.Parent != nil && node.Parent.Kind == ast.KindQualifiedName {
@@ -468,33 +495,14 @@ func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node) {
 		}
 	}
 
-	// Named exports: always check (ignoring other options) unless allowNamedExports.
-	// For `export { X }`, we need the earliest local binding of X (the import
-	// site or variable declaration), not a resolved alias target that might
-	// include module augmentation declarations appearing later in the file.
-	if isNamedExport(node) {
-		if opts.allowNamedExports {
-			return
-		}
-		localDeclName := findLocalBindingName(ctx, sym)
-		if localDeclName != nil && isDefinedBeforeUse(localDeclName, node) {
-			return
-		}
-		if localDeclName == nil && isDefinedBeforeUse(declName, node) {
-			return
-		}
-		reportNode(ctx, node)
-		return
-	}
-
 	// Defined before use — no violation, unless evaluated during its own initialization.
 	if isDefinedBeforeUse(declName, node) &&
-		(!isEvaluatedDuringInitialization(node, firstDecl) || node.Parent.Kind == ast.KindTypeReference) {
+		(!isEvaluatedDuringInitialization(node, firstDecl, refScope) || node.Parent.Kind == ast.KindTypeReference) {
 		return
 	}
 
 	// Option-based filtering.
-	if !isForbidden(opts, defType, node, firstDecl) {
+	if !isForbidden(opts, info.defType, node, firstDecl, refScope) {
 		return
 	}
 
@@ -506,6 +514,101 @@ func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node) {
 		return
 	}
 
+	reportNode(ctx, node)
+}
+
+// needsCheckerFallback covers the small set of reference forms that the
+// binder-only RefStore intentionally cannot resolve:
+//   - type-only references to namespaces with no value declaration;
+//   - qualified heritage members (`B` in `extends ns.B`), which occupy a
+//     property-name position rather than a normal binder reference position.
+//   - parameter properties referenced through `this.name`.
+//
+// The first category can only produce a diagnostic when type references are
+// enabled. Keeping this gate narrow avoids falling back to the checker for
+// ordinary property names and unresolved globals.
+func needsCheckerFallback(opts options, node *ast.Node) bool {
+	if !opts.ignoreTypeReferences && isTypeReference(node) {
+		return true
+	}
+
+	current := node.Parent
+	if current == nil || current.Kind != ast.KindPropertyAccessExpression ||
+		current.AsPropertyAccessExpression().Name() != node {
+		return false
+	}
+	if current.AsPropertyAccessExpression().Expression.Kind == ast.KindThisKeyword {
+		// Parameter properties are surfaced as `this.name` property symbols by
+		// the checker, while RefStore correctly excludes ordinary property
+		// names. They still matter here because class field initializers run
+		// before the constructor assigns the parameter property.
+		return true
+	}
+	for current.Parent != nil && current.Parent.Kind == ast.KindPropertyAccessExpression {
+		current = current.Parent
+	}
+	return current.Parent != nil && ast.IsExpressionWithTypeArguments(current.Parent)
+}
+
+func getDefinitionInfo(sourceFile *ast.SourceFile, declarations []*ast.Node) definitionInfo {
+	// Find the earliest declaration in this source file, skipping export
+	// specifiers (they are reference sites, not definitions) and module
+	// augmentation declarations (they appear after the real definition).
+	var firstDecl *ast.Node
+	for _, decl := range declarations {
+		if decl.Kind == ast.KindExportSpecifier || isInsideModuleAugmentation(decl) {
+			continue
+		}
+		if ast.GetSourceFileOfNode(decl) == sourceFile &&
+			(firstDecl == nil || decl.Pos() < firstDecl.Pos()) {
+			firstDecl = decl
+		}
+	}
+	if firstDecl == nil {
+		return definitionInfo{}
+	}
+	declName := utils.GetDeclarationIdentifier(firstDecl)
+	if declName == nil {
+		return definitionInfo{}
+	}
+	return definitionInfo{
+		declaration: firstDecl,
+		name:        declName,
+		defType:     getDefinitionType(firstDecl),
+	}
+}
+
+func checkNamedExport(ctx rule.RuleContext, opts options, node *ast.Node) {
+	if opts.allowNamedExports {
+		return
+	}
+
+	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if sym == nil {
+		return
+	}
+
+	// Checker symbols for imported exports may point at the remote target.
+	// Keep the local alias declarations as candidates so the import remains
+	// the definition point.
+	declarations := sym.Declarations
+	if sym.Flags&ast.SymbolFlagsAlias != 0 {
+		if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != nil && len(resolved.Declarations) > 0 {
+			declarations = append(append([]*ast.Node(nil), resolved.Declarations...), sym.Declarations...)
+		}
+	}
+	info := getDefinitionInfo(ctx.SourceFile, declarations)
+	if info.declaration == nil {
+		return
+	}
+
+	localDeclName := findLocalBindingName(ctx, sym)
+	if localDeclName != nil && isDefinedBeforeUse(localDeclName, node) {
+		return
+	}
+	if localDeclName == nil && isDefinedBeforeUse(info.name, node) {
+		return
+	}
 	reportNode(ctx, node)
 }
 
@@ -554,7 +657,7 @@ func isDefinedBeforeUse(declName *ast.Node, refNode *ast.Node) bool {
 // For classes, variables and enums the option only suppresses cross-scope
 // references (different function scope). Same-scope TDZ violations are always
 // reported regardless of the option value.
-func isForbidden(opts options, defType definitionType, refNode *ast.Node, declNode *ast.Node) bool {
+func isForbidden(opts options, defType definitionType, refNode *ast.Node, declNode *ast.Node, refScope *ast.Node) bool {
 	if opts.ignoreTypeReferences && isTypeReference(refNode) {
 		return false
 	}
@@ -563,17 +666,17 @@ func isForbidden(opts options, defType definitionType, refNode *ast.Node, declNo
 	case defFunctionName:
 		return opts.functions
 	case defClassName:
-		if isFromSeparateExecutionContext(refNode, declNode) {
+		if isFromSeparateExecutionContext(refScope, declNode) {
 			return opts.classes
 		}
 		return true // same scope — always report (TDZ)
 	case defVariable:
-		if isFromSeparateExecutionContext(refNode, declNode) {
+		if isFromSeparateExecutionContext(refScope, declNode) {
 			return opts.variables
 		}
 		return true
 	case defEnumName:
-		if isFromSeparateExecutionContext(refNode, declNode) {
+		if isFromSeparateExecutionContext(refScope, declNode) {
 			return opts.enums
 		}
 		return true
@@ -591,6 +694,6 @@ func reportNode(ctx rule.RuleContext, node *ast.Node) {
 	}
 	ctx.ReportNode(node, rule.RuleMessage{
 		Id:          "noUseBeforeDefine",
-		Description: fmt.Sprintf("'%s' was used before it was defined.", name),
+		Description: "'" + name + "' was used before it was defined.",
 	})
 }

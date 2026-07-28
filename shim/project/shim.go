@@ -4,9 +4,11 @@
 package project
 
 import "github.com/microsoft/typescript-go/internal/ast"
+import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/ls/autoimport"
 import "github.com/microsoft/typescript-go/internal/ls/lsutil"
+import "github.com/microsoft/typescript-go/internal/lsp/lsproto"
 import "github.com/microsoft/typescript-go/internal/project"
 import "github.com/microsoft/typescript-go/internal/project/logging"
 import "github.com/microsoft/typescript-go/internal/tspath"
@@ -55,6 +57,9 @@ func NewProject(configFileName string, kind project.Kind, currentDirectory strin
 func NewSession(init *project.SessionInit) *project.Session
 //go:linkname NewSnapshot github.com/microsoft/typescript-go/internal/project.NewSnapshot
 func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, userPreferences lsutil.UserPreferences, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
+func NewWatchedFiles[T any](name string, watchKind lsproto.WatchKind, hasRelativePatternCapability bool, computeGlobPatterns func(input T) project.PatternsAndIgnored) *project.WatchedFiles[T] {
+	return project.NewWatchedFiles[T](name, watchKind, hasRelativePatternCapability, computeGlobPatterns)
+}
 type Overlay = project.Overlay
 type OwnerCache[K comparable, V, LoadArgs any] = project.OwnerCache[K,V,LoadArgs]
 type ParseCache = project.ParseCache
@@ -99,3 +104,7 @@ const UpdateReasonUnknown = project.UpdateReasonUnknown
 type WatchedFiles[T any] = project.WatchedFiles[T]
 type WatcherID = project.WatcherID
 type Watchers = project.Watchers
+//go:linkname CreateResolutionLookupGlobMapper github.com/microsoft/typescript-go/internal/project.createResolutionLookupGlobMapper
+func CreateResolutionLookupGlobMapper(workspaceDirectory string, libDirectory string, currentDirectory string, useCaseSensitiveFileNames bool) func(data *collections.SyncSet[tspath.Path]) project.PatternsAndIgnored
+//go:linkname FileSystemWatcherGlobString github.com/microsoft/typescript-go/internal/project.fileSystemWatcherGlobString
+func FileSystemWatcherGlobString(w *lsproto.FileSystemWatcher) string
