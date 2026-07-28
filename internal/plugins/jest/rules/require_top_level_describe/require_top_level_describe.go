@@ -11,6 +11,9 @@ import (
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed require_top_level_describe.schema.json
+var schemaJSON []byte
+
 type options struct {
 	MaxNumberOfTopLevelDescribes int
 }
@@ -56,7 +59,8 @@ var (
 )
 
 var RequireTopLevelDescribeRule = rule.Rule{
-	Name: "jest/require-top-level-describe",
+	Name:   "jest/require-top-level-describe",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		opts := parseOptions(rule.LegacyUnwrapOptions(_options))
 		numberOfDescribeBlocks := 0
