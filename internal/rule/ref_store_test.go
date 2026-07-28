@@ -159,6 +159,75 @@ func TestRefStoreImportAttributeNameExcluded(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolve(t *testing.T) {
+	// Resolve is the forward counterpart to References: given a reference
+	// identifier, find its declaring symbol.
+	sourceFile, refs := newBoundRefStore(t, "/resolve.ts", core.ScriptKindTS,
+		"export {}; function f() { var x = 1; return x; }")
+
+	occurrences := identifiers(sourceFile.AsNode(), "x")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of x, got %d", len(occurrences))
+	}
+	declIdent, useIdent := occurrences[0], occurrences[1]
+	wantSym := declIdent.Parent.Symbol()
+	if wantSym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(useIdent); got != wantSym {
+		t.Fatalf("Resolve(use) = %v, want %v", got, wantSym)
+	}
+	// Resolving the declaration name itself is meaningless the same way
+	// References excludes it — declaration names aren't reference positions.
+	if got := refs.Resolve(declIdent); got != nil {
+		t.Fatalf("Resolve(decl) = %v, want nil", got)
+	}
+}
+
+func TestRefStoreResolveShorthandPropertyWrite(t *testing.T) {
+	// Resolve must handle shorthand destructuring writes the same way
+	// References does: the shorthand name is a reference position even
+	// though IsDeclarationName also treats it as one.
+	sourceFile, refs := newBoundRefStore(t, "/resolve-shorthand.ts", core.ScriptKindTS,
+		"export {}; function f() { var x; ({ x } = { y: 1 }); return x; }")
+
+	occurrences := identifiers(sourceFile.AsNode(), "x")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of x, got %d", len(occurrences))
+	}
+	declIdent, writeIdent := occurrences[0], occurrences[1]
+	wantSym := declIdent.Parent.Symbol()
+	if wantSym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(writeIdent); got != wantSym {
+		t.Fatalf("Resolve(shorthand write) = %v, want %v", got, wantSym)
+	}
+}
+
+func TestRefStoreResolveExcludedPositions(t *testing.T) {
+	// Property names, import bindings, and other non-reference positions
+	// must resolve to nil, matching isReferencePosition's exclusions.
+	sourceFile, refs := newBoundRefStore(t, "/resolve-excluded.ts", core.ScriptKindTS,
+		"export {}; function f() { var x = 1; return { x: x }.x; }")
+
+	occurrences := identifiers(sourceFile.AsNode(), "x")
+	if len(occurrences) != 4 {
+		t.Fatalf("expected 4 occurrences of x, got %d", len(occurrences))
+	}
+	// occurrences: [0] var x decl, [1] property key `x:`, [2] value `x`, [3] `.x` property access
+	propertyKey, propertyAccess := occurrences[1], occurrences[3]
+
+	if got := refs.Resolve(propertyKey); got != nil {
+		t.Fatalf("Resolve(property key) = %v, want nil", got)
+	}
+	if got := refs.Resolve(propertyAccess); got != nil {
+		t.Fatalf("Resolve(property access name) = %v, want nil", got)
+	}
+}
+
 func TestRefStoreJsxNamespacedNameExcluded(t *testing.T) {
 	// `bar` in the namespaced JSX tag name `<bar:qux />` is syntactic, not a
 	// reference to a same-named variable.
@@ -203,5 +272,54 @@ func TestRefStoreExportAssignmentResolvesTypeOnlySymbol(t *testing.T) {
 	got := refs.References(sym)
 	if len(got) != 1 || got[0] != exportIdent {
 		t.Fatalf("References = %v, want [%v] (the `export = Foo` reference)", got, exportIdent)
+	}
+}
+
+func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
+	// A named default export is bound to an export symbol named "default", so
+	// looking its candidates up by symbol name finds nothing: the references
+	// are bucketed under the name they are written with.
+	sourceFile, refs := newBoundRefStore(t, "/export-default.ts", core.ScriptKindTS,
+		"export default function foo() { foo = 1; }\nfoo = 2;\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, innerIdent, outerIdent := occurrences[0], occurrences[1], occurrences[2]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+	if sym.Name != ast.InternalSymbolNameDefault {
+		t.Fatalf("declaration symbol name = %q, want %q", sym.Name, ast.InternalSymbolNameDefault)
+	}
+
+	got := refs.References(sym)
+	if len(got) != 2 || got[0] != innerIdent || got[1] != outerIdent {
+		t.Fatalf("References = %v, want [%v %v] (both assignments to foo)", got, innerIdent, outerIdent)
+	}
+}
+
+func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
+	// A non-default export is bound to an export symbol too; the local symbol
+	// left in the file's locals carries only the ExportValue marker, so
+	// references must still resolve to the queried export symbol.
+	sourceFile, refs := newBoundRefStore(t, "/export-named.ts", core.ScriptKindTS,
+		"export function foo() {}\nfoo = 1;\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, useIdent := occurrences[0], occurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != useIdent {
+		t.Fatalf("References = %v, want [%v] (the `foo = 1` assignment)", got, useIdent)
 	}
 }
