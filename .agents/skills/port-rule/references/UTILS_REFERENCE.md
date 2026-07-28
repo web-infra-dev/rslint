@@ -416,7 +416,6 @@ refs := ctx.Refs.References(decl.Symbol()) // []*ast.Node, source order, read-on
 - Declaration names are excluded; reads and writes are both included.
 - Property names, import/export bindings, labels, and lowercase JSX tags are pre-filtered out; shadowing and type-vs-value positions resolve correctly.
 - `References` always searches this file only — cross-file references (uses in _other_ files) still need the checker — but the symbol it's queried with can be declared anywhere: pass a `Resolve` result obtained through its checker fallback to find in-file references to a global or ambient declaration too.
-- `Resolve(node) != nil` doesn't mean "declared in this file" (it also resolves globals/`.d.ts`/cross-file symbols) — use `utils.IsSymbolDeclaredInFile` if a rule needs that distinction.
 - Never hand-roll any of this with an AST walk + `GetSymbolAtLocation` per identifier, and never hand-roll your own "try ctx.Refs, then fall back to the checker" wrapper — `Resolve` already is that wrapper.
 
 See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for the full semantics and worked examples.

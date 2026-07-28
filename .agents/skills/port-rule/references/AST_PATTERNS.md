@@ -398,9 +398,7 @@ Do **NOT** hand-roll any of this by walking the AST and calling
 `ctx.TypeChecker.GetSymbolAtLocation` on every identifier, and do **NOT**
 hand-roll a "try `ctx.Refs`, fall back to the checker" wrapper of your own —
 `Resolve` already is that wrapper. Building your own copy repeats the
-checker round-trip logic for no benefit. Non-nil doesn't mean "declared in
-this file" — use `utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)` if a
-rule needs that distinction (e.g. real global vs. local shadow).
+checker round-trip logic for no benefit.
 
 ### Collecting references to a symbol
 
