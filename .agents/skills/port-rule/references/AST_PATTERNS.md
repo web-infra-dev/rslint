@@ -398,25 +398,9 @@ Do **NOT** hand-roll any of this by walking the AST and calling
 `ctx.TypeChecker.GetSymbolAtLocation` on every identifier, and do **NOT**
 hand-roll a "try `ctx.Refs`, fall back to the checker" wrapper of your own —
 `Resolve` already is that wrapper. Building your own copy repeats the
-checker round-trip logic for no benefit.
-
-### `Resolve(node) != nil` does not mean "declared in this file"
-
-`Resolve` returns a non-nil symbol for a standard-library global (`RegExp`,
-`window`, `console`, …), an ambient `.d.ts` declaration, or a cross-file
-symbol, exactly the same as it does for a same-file local — nil vs. non-nil
-alone does not distinguish them.
-
-If a rule needs "is this identifier shadowed by a local declaration" rather
-than "what does it resolve to," check where the returned symbol is actually
-declared:
-
-```go
-sym := ctx.Refs.Resolve(node)
-if sym != nil && utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
-    // shadowed by a real local binding
-}
-```
+checker round-trip logic for no benefit. Non-nil doesn't mean "declared in
+this file" — use `utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)` if a
+rule needs that distinction (e.g. real global vs. local shadow).
 
 ### Collecting references to a symbol
 

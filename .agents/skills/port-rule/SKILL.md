@@ -147,9 +147,6 @@ that the rule framework already shares or can skip:
   global/`.d.ts`/cross-file symbols when a TypeChecker is available — never
   walk the file and call `GetSymbolAtLocation` once per identifier, and never
   hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper.
-  `Resolve(node) != nil` does not imply "declared in this file" — use
-  `utils.IsSymbolDeclaredInFile` if a rule specifically needs that
-  distinction (e.g. real global vs. local shadow).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
 
