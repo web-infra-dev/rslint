@@ -17,14 +17,18 @@ func buildClassReassignmentMessage(className string) rule.RuleMessage {
 // checkClassReassignments reports every write-reference to classNode's own
 // symbol. RefStore resolution is scope-correct by construction, so a local
 // binding that shadows the class name is never returned as a reference here.
-func checkClassReassignments(classNode *ast.Node, ctx *rule.RuleContext) {
+//
+// name comes from the declaration's name node rather than the symbol: a
+// default-exported class is bound to an export symbol named "default",
+// while the reported name must be the one written in the source.
+func checkClassReassignments(classNode *ast.Node, name string, ctx *rule.RuleContext) {
 	sym := classNode.Symbol()
 	if sym == nil {
 		return
 	}
 	for _, ref := range ctx.Refs.References(sym) {
 		if utils.IsWriteReference(ref) {
-			ctx.ReportNode(ref, buildClassReassignmentMessage(sym.Name))
+			ctx.ReportNode(ref, buildClassReassignmentMessage(name))
 		}
 	}
 }
@@ -36,20 +40,22 @@ var NoClassAssignRule = rule.Rule{
 		return rule.RuleListeners{
 			// Check class declarations
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				if node.AsClassDeclaration().Name() == nil {
+				nameNode := node.AsClassDeclaration().Name()
+				if nameNode == nil {
 					return
 				}
-				checkClassReassignments(node, &ctx)
+				checkClassReassignments(node, nameNode.Text(), &ctx)
 			},
 
 			// Check named class expressions. The name is only visible inside
 			// the class body, which RefStore's scope-aware resolution
 			// enforces on its own.
 			ast.KindClassExpression: func(node *ast.Node) {
-				if node.AsClassExpression().Name() == nil {
+				nameNode := node.AsClassExpression().Name()
+				if nameNode == nil {
 					return
 				}
-				checkClassReassignments(node, &ctx)
+				checkClassReassignments(node, nameNode.Text(), &ctx)
 			},
 		}
 	},

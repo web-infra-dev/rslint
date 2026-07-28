@@ -259,6 +259,17 @@ func TestNoClassAssignRule(t *testing.T) {
 					{MessageId: "classReassignment", Line: 1, Column: 14},
 				},
 			},
+
+			// Default-exported class reassigned at module level: the export
+			// symbol is named "default", but the reported name must be the
+			// source declaration name.
+			{
+				Code: `export default class A {}
+A = 0;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 2, Column: 1},
+				},
+			},
 		},
 	)
 }
