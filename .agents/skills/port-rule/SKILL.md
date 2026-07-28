@@ -142,11 +142,14 @@ that the rule framework already shares or can skip:
   the builder. A builder may return nil when the diagnostic is not fixable.
 - **Declared-symbol references**: translate ESLint `variable.references` to
   `ctx.Refs.References(decl.Symbol())`. For the reverse direction (identifier →
-  symbol), use `ctx.Refs.Resolve(node)` when you only need same-file symbols,
-  or `ctx.Refs.ResolveWithChecker(node)` when the identifier might name a
-  global/`.d.ts`/cross-file symbol — never walk the file and call
-  `GetSymbolAtLocation` once per identifier, and never hand-roll your own
-  "try `ctx.Refs`, fall back to the checker" wrapper.
+  symbol), use `ctx.Refs.Resolve(node)` — it resolves same-file symbols from
+  the binder alone, and falls back to the checker automatically for
+  global/`.d.ts`/cross-file symbols when a TypeChecker is available — never
+  walk the file and call `GetSymbolAtLocation` once per identifier, and never
+  hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper.
+  `Resolve(node) != nil` no longer implies "declared in this file" once a
+  checker is available — use `utils.IsSymbolDeclaredInFile` if a rule
+  specifically needs that distinction (e.g. real global vs. local shadow).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
 
@@ -258,8 +261,7 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | ------------------------------------------- | ------------------------------------------------------ |
 | Autofixes or suggestions                    | `ReportNodeWithDeferred*` / `ReportRangeWithDeferred*` |
 | References to a declared symbol             | `ctx.Refs.References(decl.Symbol())`                   |
-| Identifier → symbol (same-file only)        | `ctx.Refs.Resolve(node)`                               |
-| Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.ResolveWithChecker(node)`                    |
+| Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
 | Every comment in the file                   | `ctx.Comments.All()`                                   |
 
 **Directory Structure**:

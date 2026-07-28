@@ -400,7 +400,7 @@ enumTypes := utils.GetEnumTypes(typeChecker, t)
 
 ## `internal/rule/ref_store.go` - Reference Index (ctx.Refs)
 
-The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Three methods: `Resolve(node)` (identifier → symbol, same-file only, never touches the checker), `ResolveWithChecker(node)` (same, plus a checker fallback for symbols declared outside this file), and `References(sym)` (symbol → every referencing identifier in this file).
+The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Two methods: `Resolve(node)` (identifier → symbol, binder scope walk first, falling back to the checker for symbols declared outside this file when a TypeChecker is available) and `References(sym)` (symbol → every referencing identifier in this file, same fallback trigger).
 
 ```go
 // Guard first: ctx.Refs is nil when no program is available (JS-only runs).
@@ -415,9 +415,9 @@ refs := ctx.Refs.References(decl.Symbol()) // []*ast.Node, source order, read-on
 
 - Declaration names are excluded; reads and writes are both included.
 - Property names, import/export bindings, labels, and lowercase JSX tags are pre-filtered out; shadowing and type-vs-value positions resolve correctly.
-- `References` always searches this file only — cross-file references (uses in _other_ files) still need the checker — but the symbol it's queried with can be declared anywhere: pass a `ResolveWithChecker` result to find in-file references to a global or ambient declaration too.
-- Prefer `Resolve` over `ResolveWithChecker` unless you specifically need the resolved symbol for an identifier that might be declared outside this file — `ResolveWithChecker`'s fallback is a real checker round-trip per identifier the binder can't place, while `Resolve` costs nothing either way and already answers "is this declared in this file" via nil/non-nil.
-- Never hand-roll any of this with an AST walk + `GetSymbolAtLocation` per identifier, and never hand-roll your own "try ctx.Refs, then fall back to the checker" wrapper — `ResolveWithChecker` already is that wrapper, and building your own copy is a known source of bugs (conflating "not found" with "not local").
+- `References` always searches this file only — cross-file references (uses in _other_ files) still need the checker — but the symbol it's queried with can be declared anywhere: pass a `Resolve` result obtained through its checker fallback to find in-file references to a global or ambient declaration too.
+- **`Resolve(node) != nil` no longer means "declared in this file."** With a TypeChecker available, `Resolve` also resolves standard-library globals, `.d.ts` declarations, and cross-file symbols — the same nil/non-nil result you'd get for a same-file local. A rule that needs "is this a local shadow" specifically must check `utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)` on the result, not just whether it resolved.
+- Never hand-roll any of this with an AST walk + `GetSymbolAtLocation` per identifier, and never hand-roll your own "try ctx.Refs, then fall back to the checker" wrapper — `Resolve` already is that wrapper.
 
 See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for the full semantics and worked examples.
 
