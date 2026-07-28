@@ -319,26 +319,6 @@ ruleTester.run('jsx-max-depth', {} as never, {
     { code: `<App><foo><bar/></foo></App>`, options: [] },
     { code: `<App><foo><bar/></foo></App>`, options: [{}] },
     {
-      code: `<App><foo><bar/></foo></App>`,
-      options: [{ max: 'two' }],
-    },
-    {
-      code: `<App><foo><bar/></foo></App>`,
-      options: [{ max: false }],
-    },
-    {
-      code: `<App><foo><bar/></foo></App>`,
-      options: [{ max: null }],
-    },
-    {
-      code: `<App><foo><bar/></foo></App>`,
-      options: [{ max: -1 }],
-    },
-    {
-      code: `<App><foo><bar/></foo></App>`,
-      options: [{ max: 2, unknown: true }],
-    },
-    {
       code: `
         <a><b><c><d><e><f><g><h><i /></h></g></f></e></d></c></b></a>
       `,

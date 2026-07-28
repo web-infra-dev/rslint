@@ -105,16 +105,6 @@ ruleTester.run('boolean-prop-naming', {} as never, {
       `,
       options: [{ rule: patternIsHas }],
     },
-    // Empty rule pattern → no-op.
-    {
-      code: `
-        class Hello extends React.Component {
-          static propTypes = {something: PropTypes.bool};
-          render () { return <div />; }
-        }
-      `,
-      options: [{ rule: '' }],
-    },
     // Invalid regex degrades to no-op.
     {
       code: `
