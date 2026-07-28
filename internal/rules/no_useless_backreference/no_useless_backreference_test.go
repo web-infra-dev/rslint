@@ -347,6 +347,12 @@ RegExp(new String('\\1(a)'));`},
 				},
 			},
 			{
+				Code: `const slash = "\u005c"; const pattern = slash + "1(a)"; RegExp(pattern);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward"},
+				},
+			},
+			{
 				Code: "new RegExp(String.raw`\\1${\"(a)\"}`);",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward"},
