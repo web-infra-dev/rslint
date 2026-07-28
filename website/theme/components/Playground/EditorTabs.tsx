@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useImperativeHandle, Ref } from 'react';
 import * as monaco from 'monaco-editor';
+import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
 import { type Diagnostic } from '@rslint/wasm';
 import { Button } from '@components/ui/button';
 // Monaco-specific styles only (ast-node-highlight)
@@ -9,22 +10,16 @@ window.MonacoEnvironment = {
   getWorker: function (_moduleId, label) {
     if (label === 'typescript' || label === 'javascript') {
       return new Worker(
-        new URL(
-          'monaco-editor/esm/vs/language/typescript/ts.worker',
-          import.meta.url,
-        ),
+        new URL('monaco-editor/language/typescript/ts.worker', import.meta.url),
       );
     }
     if (label === 'json') {
       return new Worker(
-        new URL(
-          'monaco-editor/esm/vs/language/json/json.worker',
-          import.meta.url,
-        ),
+        new URL('monaco-editor/language/json/json.worker', import.meta.url),
       );
     }
     return new Worker(
-      new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url),
+      new URL('monaco-editor/editor/editor.worker', import.meta.url),
     );
   },
 };
@@ -369,16 +364,12 @@ export const EditorTabs = ({
 
   // Configure Monaco JSON to allow comments and trailing commas (JSONC)
   useEffect(() => {
-    // Use type assertion to access jsonDefaults which may be typed as deprecated
-    const jsonLang = monaco.languages.json as any;
-    if (jsonLang.jsonDefaults?.setDiagnosticsOptions) {
-      jsonLang.jsonDefaults.setDiagnosticsOptions({
-        validate: true,
-        allowComments: true,
-        trailingCommas: 'ignore',
-        schemaValidation: 'ignore',
-      });
-    }
+    jsonDefaults.setDiagnosticsOptions({
+      validate: true,
+      allowComments: true,
+      trailingCommas: 'ignore',
+      schemaValidation: 'ignore',
+    });
   }, []);
 
   // Create rslint.json editor
