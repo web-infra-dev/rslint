@@ -274,3 +274,52 @@ func TestRefStoreExportAssignmentResolvesTypeOnlySymbol(t *testing.T) {
 		t.Fatalf("References = %v, want [%v] (the `export = Foo` reference)", got, exportIdent)
 	}
 }
+
+func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
+	// A named default export is bound to an export symbol named "default", so
+	// looking its candidates up by symbol name finds nothing: the references
+	// are bucketed under the name they are written with.
+	sourceFile, refs := newBoundRefStore(t, "/export-default.ts", core.ScriptKindTS,
+		"export default function foo() { foo = 1; }\nfoo = 2;\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, innerIdent, outerIdent := occurrences[0], occurrences[1], occurrences[2]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+	if sym.Name != ast.InternalSymbolNameDefault {
+		t.Fatalf("declaration symbol name = %q, want %q", sym.Name, ast.InternalSymbolNameDefault)
+	}
+
+	got := refs.References(sym)
+	if len(got) != 2 || got[0] != innerIdent || got[1] != outerIdent {
+		t.Fatalf("References = %v, want [%v %v] (both assignments to foo)", got, innerIdent, outerIdent)
+	}
+}
+
+func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
+	// A non-default export is bound to an export symbol too; the local symbol
+	// left in the file's locals carries only the ExportValue marker, so
+	// references must still resolve to the queried export symbol.
+	sourceFile, refs := newBoundRefStore(t, "/export-named.ts", core.ScriptKindTS,
+		"export function foo() {}\nfoo = 1;\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, useIdent := occurrences[0], occurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != useIdent {
+		t.Fatalf("References = %v, want [%v] (the `foo = 1` assignment)", got, useIdent)
+	}
+}
