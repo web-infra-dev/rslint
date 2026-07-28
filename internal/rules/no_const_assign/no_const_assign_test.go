@@ -104,6 +104,23 @@ func TestNoConstAssignRule(t *testing.T) {
 
 			// Const read as a plain (non-object) default value
 			{Code: `const x = 0; let y; ({y = x} = {});`},
+
+			// Const read inside a nested object literal wrapped in a call
+			// expression that's used as a destructuring default value
+			{Code: `const x = 0; let y; ({a: y = foo({x})} = {});`},
+
+			// Const read inside a nested object literal wrapped in a
+			// conditional expression used as a destructuring default value
+			{Code: `const x = 0; let y; ({a: y = true ? {x} : {}} = {});`},
+
+			// Const read inside a computed property key of a destructuring
+			// pattern — the key is evaluated as a value, not a pattern
+			// element, so the shorthand read must not be mistaken for a
+			// write to the destructuring target.
+			{Code: `const x = 0; let y; ({[{x}]: y} = {});`},
+
+			// Same case with the key wrapped in a call expression
+			{Code: `const x = 0; let y; ({[foo({x})]: y} = {});`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{

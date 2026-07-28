@@ -153,13 +153,13 @@ func IsBindingPatternInAssignment(node *ast.Node) bool {
 func IsInDestructuringAssignment(node *ast.Node) bool {
 	current := node
 	for current != nil {
+		parent := current.Parent
+
+		for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+			parent = parent.Parent
+		}
+
 		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			parent := current.Parent
-
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
 			if parent != nil && parent.Kind == ast.KindBinaryExpression {
 				binary := parent.AsBinaryExpression()
 				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
@@ -175,10 +175,6 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 					if leftNode == current {
 						return true
 					}
-					// current sits on the right-hand side of `=`, e.g. the
-					// default value `{x}` in `y = {x}`. That's a plain
-					// expression, not a pattern element, so stop walking
-					// instead of climbing past it into the outer pattern.
 					return false
 				}
 			}
@@ -189,22 +185,40 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 					return true
 				}
 			}
-
-			// current is the default value of a shorthand property, e.g.
-			// `{x}` in `{y = {x}}`. Shorthand defaults are stored as their
-			// own field rather than a BinaryExpression, but they're still
-			// just a value expression — not a pattern element — so stop
-			// walking instead of climbing into the outer pattern.
-			if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				shorthand := parent.AsShorthandPropertyAssignment()
-				if shorthand != nil && shorthand.ObjectAssignmentInitializer == current {
-					return false
-				}
-			}
-
 			// Continue walking up — this array/object might be nested inside
 			// another destructuring pattern (e.g. [{a}] = [...]).
 		}
+
+		// A default value's expression can wrap the eventual object/array
+		// literal arbitrarily deep in plain expressions (calls,
+		// conditionals, etc.) before we reach it, e.g. the `{x}` in
+		// `y = foo({x})` or `y = cond ? {x} : {}`. As soon as the walk
+		// crosses onto the right-hand side of `=` or into a shorthand
+		// property's default — whether current is the literal itself or one
+		// of its wrapping expressions — it has left the pattern for good,
+		// so stop instead of climbing back into the enclosing pattern
+		// through it.
+		if parent != nil && parent.Kind == ast.KindBinaryExpression {
+			binary := parent.AsBinaryExpression()
+			if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Right == current {
+				return false
+			}
+		}
+		if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
+			shorthand := parent.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.ObjectAssignmentInitializer == current {
+				return false
+			}
+		}
+
+		// A computed property key, e.g. the `{x}` in `{[foo({x})]: y}`, is
+		// always evaluated as a value — it's never a pattern element, no
+		// matter how deeply the walk is nested inside it or how the outer
+		// property is used.
+		if parent != nil && parent.Kind == ast.KindComputedPropertyName {
+			return false
+		}
+
 		current = current.Parent
 	}
 	return false
