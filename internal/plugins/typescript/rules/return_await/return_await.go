@@ -51,10 +51,35 @@ type ReturnAwaitOptions struct {
 	Option *ReturnAwaitOption
 }
 
+func parseReturnAwaitOption(options []any) ReturnAwaitOption {
+	switch opts := rule.LegacyUnwrapOptions(options).(type) {
+	case ReturnAwaitOptions:
+		if opts.Option != nil {
+			return *opts.Option
+		}
+	case *ReturnAwaitOptions:
+		if opts != nil && opts.Option != nil {
+			return *opts.Option
+		}
+	case string:
+		switch opts {
+		case "always":
+			return ReturnAwaitOptionAlways
+		case "error-handling-correctness-only":
+			return ReturnAwaitOptionErrorHandlingCorrectnessOnly
+		case "in-try-catch":
+			return ReturnAwaitOptionInTryCatch
+		case "never":
+			return ReturnAwaitOptionNever
+		}
+	}
+
+	return ReturnAwaitOptionInTryCatch
+}
+
 type scopeInfo struct {
 	hasAsync   bool
 	owningFunc *ast.Node
-	parent     *scopeInfo
 }
 
 type containingTryStatementBlock uint8
@@ -94,34 +119,67 @@ func getWhetherToAwait(affectsErrorHandling bool, option ReturnAwaitOption) whet
 	}
 }
 
+func buildRemoveAwaitFix(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
+	return []rule.RuleFix{
+		rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos())),
+	}
+}
+
+func buildInsertAwaitFix(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
+	if utils.IsHigherPrecedenceThanAwait(node) {
+		return []rule.RuleFix{
+			rule.RuleFixInsertBefore(sourceFile, node, "await "),
+		}
+	}
+	return []rule.RuleFix{
+		rule.RuleFixInsertBefore(sourceFile, node, "await ("),
+		rule.RuleFixInsertAfter(node, ")"),
+	}
+}
+
+func reportNodeWithDeferredFixesOrSuggestions(
+	ctx *rule.RuleContext,
+	node *ast.Node,
+	fix bool,
+	msg rule.RuleMessage,
+	suggestionMsg rule.RuleMessage,
+	buildFixes func() []rule.RuleFix,
+) {
+	if fix {
+		ctx.ReportNodeWithDeferredFixes(node, msg, buildFixes)
+		return
+	}
+
+	ctx.ReportNodeWithDeferredSuggestions(node, msg, func() []rule.RuleSuggestion {
+		return []rule.RuleSuggestion{{
+			Message:  suggestionMsg,
+			FixesArr: buildFixes(),
+		}}
+	})
+}
+
 var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "return-await",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(ReturnAwaitOptions)
-		if !ok {
-			opts = ReturnAwaitOptions{}
-		}
-		if opts.Option == nil {
-			opts.Option = utils.Ref(ReturnAwaitOptionInTryCatch)
-		}
+		option := parseReturnAwaitOption(_options)
+		sourceFile := ctx.SourceFile
 
-		var scope *scopeInfo
+		var scopes []scopeInfo
 
 		enterFunction := func(node *ast.Node) {
-			scope = &scopeInfo{
+			scopes = append(scopes, scopeInfo{
 				hasAsync:   ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync),
 				owningFunc: node,
-				parent:     scope,
-			}
+			})
 		}
-		exitFunction := func(node *ast.Node) {
-			scope = scope.parent
+		exitFunction := func(_ *ast.Node) {
+			scopes = scopes[:len(scopes)-1]
 		}
 
 		affectsExplicitResourceManagement := func(node *ast.Node) bool {
-			if !ast.IsBlock(scope.owningFunc.Body()) {
+			currentScope := scopes[len(scopes)-1]
+			if !ast.IsBlock(currentScope.owningFunc.Body()) {
 				return false
 			}
 
@@ -137,7 +195,7 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				if scope.owningFunc == declarationScope {
+				if currentScope.owningFunc == declarationScope {
 					break
 				}
 			}
@@ -217,31 +275,31 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
-		removeAwaitFix := func(node *ast.Node) rule.RuleFix {
-			return rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()))
-		}
-		insertAwaitFix := func(node *ast.Node, isHighPrecedence bool) []rule.RuleFix {
-			if isHighPrecedence {
-				return []rule.RuleFix{
-					rule.RuleFixInsertBefore(ctx.SourceFile, node, "await "),
-				}
-			}
-			return []rule.RuleFix{
-				rule.RuleFixInsertBefore(ctx.SourceFile, node, "await ("),
-				rule.RuleFixInsertAfter(node, ")"),
-			}
-		}
-
 		test := func(node *ast.Node) {
-			var child *ast.Node
 			isAwait := ast.IsAwaitExpression(node)
 
-			if isAwait {
-				child = node.Expression()
-			} else {
-				child = node
+			var affectsErrorHandling bool
+			affectsErrorHandlingKnown := false
+			if !isAwait {
+				// A non-awaited expression can only be reported when this
+				// context requires awaiting. Avoid asking the type checker when
+				// the current option/context already makes the return valid.
+				switch option {
+				case ReturnAwaitOptionNever:
+					return
+				case ReturnAwaitOptionErrorHandlingCorrectnessOnly, ReturnAwaitOptionInTryCatch:
+					affectsErrorHandling = affectsExplicitErrorHandling(node) || affectsExplicitResourceManagement(node)
+					affectsErrorHandlingKnown = true
+					if !affectsErrorHandling {
+						return
+					}
+				}
 			}
 
+			child := node
+			if isAwait {
+				child = node.Expression()
+			}
 			t := ctx.TypeChecker.GetTypeAtLocation(child)
 			certainty := utils.NeedsToBeAwaited(ctx.TypeChecker, node, t)
 
@@ -251,30 +309,52 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					ctx.ReportNodeWithFixes(node, buildNonPromiseAwaitMessage(), removeAwaitFix(node))
+					ctx.ReportNodeWithDeferredFixes(node, buildNonPromiseAwaitMessage(), func() []rule.RuleFix {
+						return buildRemoveAwaitFix(sourceFile, node)
+					})
 				}
 				return
 			}
 
 			// At this point it's definitely a thenable.
-			affectsErrorHandling := affectsExplicitErrorHandling(node) || affectsExplicitResourceManagement(node)
+			if !affectsErrorHandlingKnown {
+				affectsErrorHandling = affectsExplicitErrorHandling(node) || affectsExplicitResourceManagement(node)
+			}
 			useAutoFix := !affectsErrorHandling
 
-			shouldAwaitInCurrentContext := getWhetherToAwait(affectsErrorHandling, *opts.Option)
+			shouldAwaitInCurrentContext := getWhetherToAwait(affectsErrorHandling, option)
 
 			switch shouldAwaitInCurrentContext {
 			case whetherToAwaitAwait:
 				if isAwait {
 					break
 				}
-				rule.ReportNodeWithFixesOrSuggestions(ctx, node, useAutoFix, buildRequiredPromiseAwaitMessage(), buildRequiredPromiseAwaitSuggestionMessage(), insertAwaitFix(node, utils.IsHigherPrecedenceThanAwait(node))...)
+				reportNodeWithDeferredFixesOrSuggestions(
+					&ctx,
+					node,
+					useAutoFix,
+					buildRequiredPromiseAwaitMessage(),
+					buildRequiredPromiseAwaitSuggestionMessage(),
+					func() []rule.RuleFix {
+						return buildInsertAwaitFix(sourceFile, node)
+					},
+				)
 			case whetherToAwaitDontCare:
 				break
 			case whetherToAwaitNoAwait:
 				if !isAwait {
 					break
 				}
-				rule.ReportNodeWithFixesOrSuggestions(ctx, node, useAutoFix, buildDisallowedPromiseAwaitMessage(), buildDisallowedPromiseAwaitSuggestionMessage(), removeAwaitFix(node))
+				reportNodeWithDeferredFixesOrSuggestions(
+					&ctx,
+					node,
+					useAutoFix,
+					buildDisallowedPromiseAwaitMessage(),
+					buildDisallowedPromiseAwaitSuggestionMessage(),
+					func() []rule.RuleFix {
+						return buildRemoveAwaitFix(sourceFile, node)
+					},
+				)
 			}
 		}
 
@@ -301,7 +381,9 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 
 			rule.ListenerOnExit(ast.KindArrowFunction): func(node *ast.Node) {
 				body := node.Body()
-				if !ast.IsBlock(body) {
+				// Expression-bodied arrows have no ReturnStatement listener to
+				// apply the async-function guard for us.
+				if scopes[len(scopes)-1].hasAsync && !ast.IsBlock(body) {
 					testEachPossiblyReturnedNode(body)
 				}
 
@@ -316,7 +398,7 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 
 			ast.KindReturnStatement: func(node *ast.Node) {
 				expr := node.AsReturnStatement().Expression
-				if scope == nil || !scope.hasAsync || expr == nil {
+				if len(scopes) == 0 || !scopes[len(scopes)-1].hasAsync || expr == nil {
 					return
 				}
 

@@ -151,6 +151,9 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		Logger:     logging.NewLogger(io.Discard),
 		ParseCache: s.parseCache,
 	})
+	if s.watchEnabled && s.outgoingQueue != nil {
+		s.lintPrograms = newLintProgramStore(s)
+	}
 
 	// Populate the global rule registry once per process; the LSP request path
 	// resolves rule names against it after config merging.
@@ -238,8 +241,8 @@ func fileURIFromPath(filePath string) lsproto.URI {
 }
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
-// The LSP reuses projects already loaded by project service and builds an
-// isolated overlay Program on demand for a declared custom project. Resolving
+// The LSP reuses projects already loaded by project service and builds a
+// standalone Program for a declared custom project. Resolving
 // project paths here preserves declaration order and ensures type-aware rules
 // run only when the governing config's first containing project supplies type
 // information.
@@ -279,13 +282,17 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 
-	// Forward all file change events to Session so it can detect tsconfig
-	// changes, update its internal project state, and trigger
-	// RefreshDiagnostics via its background queue.
+	if s.lintPrograms != nil &&
+		s.lintPrograms.DidChangeWatchedFiles(params.Changes) {
+		s.invalidateOpenDocumentDiagnostics()
+		_ = s.RefreshDiagnostics(ctx)
+	}
+
+	// Preserve Session's original watched-file input. It owns configured
+	// project identity and may need a disk event while an overlay is open.
 	if s.session != nil {
 		s.session.DidChangeWatchedFiles(ctx, params.Changes)
 	}
-
 	// Check for config file changes that affect rslint.
 	needsConfigReload := false
 	needsTypeInfoRebuild := false
@@ -527,8 +534,12 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
+	if s.lintPrograms != nil {
+		existedOnDisk := s.fs != nil && s.fs.FileExists(uriToPath(uri))
+		s.lintPrograms.DidOpen(uri, content, existedOnDisk)
+	}
 
-	// Notify session about the opened file so it creates the overlay
+	// Notify session about the opened file so it creates the overlay.
 	if s.session != nil {
 		s.session.DidOpenFile(ctx, uri, params.TextDocument.Version, content, params.TextDocument.LanguageId)
 		s.pushDiagnostics(uri)
@@ -544,6 +555,9 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 	// For full document sync, we expect one change with the full text
 	if len(params.ContentChanges) > 0 {
 		s.documents[uri] = params.ContentChanges[0].WholeDocument.Text
+	}
+	if s.lintPrograms != nil {
+		s.lintPrograms.DidChange(uri, s.documents[uri])
 	}
 
 	// A content version change supersedes plugin work immediately, not when the
@@ -581,7 +595,11 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 	// will lint it immediately, so the debounce would be redundant.
 	delete(s.pendingLintURIs, uri)
 
-	// Notify session about the save event
+	if s.lintPrograms != nil && forwardSave {
+		s.lintPrograms.DidSave(uri, open)
+	}
+
+	// Notify session about the save event.
 	if s.session != nil {
 		if forwardSave {
 			s.session.DidSaveFile(ctx, uri)
@@ -613,6 +631,9 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 	// Cancel an in-flight plugin dispatch for the closed doc so its Node worker
 	// stops instead of running to completion — no superseding keystroke will.
 	s.cancelInflightPluginDispatch(uri)
+	if s.lintPrograms != nil {
+		s.lintPrograms.DidClose(uri)
+	}
 
 	if s.session != nil {
 		// Push empty diagnostics to clear the client's display before closing
@@ -938,7 +959,9 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-type lintProgramLoader func(tsConfigPath string) (*compiler.Program, error)
+type lintProgramLoader func(
+	tsConfigPath string,
+) (*compiler.Program, *ast.SourceFile, error)
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, enforcePlugins, tsConfigPaths, fs, nil)
@@ -969,23 +992,37 @@ func runLintWithProgramLoader(
 	}
 	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, configCwd, enforcePlugins)
 
-	program, hasTypeInfo, err := selectLintProgram(uri, session, ctx, tsConfigPaths, fs, loadProgram)
+	program, sourceFile, hasTypeInfo, err := selectLintProgram(
+		uri,
+		session,
+		ctx,
+		tsConfigPaths,
+		fs,
+		loadProgram,
+	)
 	if err != nil {
 		return lintPassResult{}, err
 	}
-	return lintSingleFile(program, filename, configFilePath, hasTypeInfo, fileConfigResolver, ctx, fs), nil
+	return lintSingleFile(
+		program,
+		sourceFile,
+		configFilePath,
+		hasTypeInfo,
+		fileConfigResolver,
+		rule.EditDemandAll,
+		ctx,
+	), nil
 }
 
 func lintSingleFile(
 	program *compiler.Program,
-	filename string,
+	sourceFile *ast.SourceFile,
 	configFilePath string,
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
+	editDemand rule.EditDemand,
 	ctx context.Context,
-	fs vfs.FS,
 ) lintPassResult {
-	sourceFile := sourceFileForPath(program, filename, fs)
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
@@ -1024,7 +1061,10 @@ func lintSingleFile(
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
 		},
-		OnDiagnostic: diagnosticCollector,
+		Consumer: rule.DiagnosticConsumer{
+			Demand: editDemand,
+			Report: diagnosticCollector,
+		},
 	})
 
 	if diagnostics == nil {
@@ -1040,7 +1080,7 @@ func selectLintProgram(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
-) (*compiler.Program, bool, error) {
+) (*compiler.Program, *ast.SourceFile, bool, error) {
 	filename := uriToPath(uri)
 	// Flush pending document changes and collect every already-loaded project
 	// containing the file. The default language service remains the
@@ -1048,15 +1088,14 @@ func selectLintProgram(
 	// contains the file.
 	_, languageService, loadedProjects, err := session.GetLanguageServiceAndProjectsForFile(ctx, uri)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get language service: %w", err)
+		return nil, nil, false, fmt.Errorf("failed to get language service: %w", err)
 	}
 	program := languageService.GetProgram()
 
 	// Type information follows parserOptions.project declaration order, not the
 	// TypeScript session's default-project heuristic. Prefer an already-loaded
-	// containing project. Custom config names that the project service has not
-	// loaded are supplied by an isolated standalone Program; this avoids
-	// mutating the Session's permanent API-open project set.
+	// containing project. Custom config names that the main project service has
+	// not loaded are supplied by rslint-owned standalone Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
@@ -1067,24 +1106,20 @@ func selectLintProgram(
 	for _, tsConfigPath := range tsConfigPaths {
 		configID := lspFilesystemPathID(tsConfigPath, fs)
 		if loadedProgram := loadedByConfig[configID]; loadedProgram != nil {
-			return loadedProgram, true, nil
+			return loadedProgram, sourceFileForPath(loadedProgram, filename, fs), true, nil
 		}
 		if loadProgram == nil {
 			continue
 		}
-		candidate, loadErr := loadProgram(tsConfigPath)
+		candidate, sourceFile, loadErr := loadProgram(tsConfigPath)
 		if loadErr != nil {
-			return nil, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, loadErr)
+			return nil, nil, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, loadErr)
 		}
-		if programContainsFile(candidate, filename, fs) {
-			return candidate, true, nil
+		if sourceFile != nil {
+			return candidate, sourceFile, true, nil
 		}
 	}
-	return program, false, nil
-}
-
-func programContainsFile(program *compiler.Program, filename string, fs vfs.FS) bool {
-	return sourceFileForPath(program, filename, fs) != nil
+	return program, sourceFileForPath(program, filename, fs), false, nil
 }
 
 func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *ast.SourceFile {
@@ -1095,40 +1130,79 @@ func (s *Server) currentEditorOverlayFS(preferred ...lsproto.DocumentUri) vfs.FS
 	return utils.NewOverlayVFS(s.fs, s.currentEditorOverlayFiles(preferred...))
 }
 
+func (s *Server) currentEditorOverlayFSWithConflicts(
+	preferred ...lsproto.DocumentUri,
+) (vfs.FS, bool) {
+	files, aliasesConflict := s.currentEditorOverlayFilesWithConflicts(preferred...)
+	return utils.NewOverlayVFS(s.fs, files), aliasesConflict
+}
+
 func (s *Server) currentEditorOverlayFiles(preferred ...lsproto.DocumentUri) map[string]string {
+	files, _ := s.currentEditorOverlayFilesWithConflicts(preferred...)
+	return files
+}
+
+func (s *Server) currentEditorOverlayFilesWithConflicts(
+	preferred ...lsproto.DocumentUri,
+) (map[string]string, bool) {
 	files := make(map[string]string, len(s.documents)*2)
+	contentByPhysicalPath := make(map[string]string, len(s.documents))
+	aliasesConflict := false
+	add := func(uri lsproto.DocumentUri, content string) {
+		physicalPath := s.addEditorOverlayFile(files, uriToPath(uri), content)
+		if previous, exists := contentByPhysicalPath[physicalPath]; exists &&
+			previous != content {
+			aliasesConflict = true
+		}
+		contentByPhysicalPath[physicalPath] = content
+	}
 	for uri, content := range s.documents {
 		if len(preferred) > 0 && uri == preferred[0] {
 			continue
 		}
-		s.addEditorOverlayFile(files, uriToPath(uri), content)
+		add(uri, content)
 	}
 	if len(preferred) > 0 {
 		if content, ok := s.documents[preferred[0]]; ok {
-			s.addEditorOverlayFile(files, uriToPath(preferred[0]), content)
+			add(preferred[0], content)
 		}
 	}
-	return files
+	return files, aliasesConflict
 }
 
-func (s *Server) addEditorOverlayFile(files map[string]string, filePath string, content string) {
+func (s *Server) addEditorOverlayFile(
+	files map[string]string,
+	filePath string,
+	content string,
+) string {
 	filePath = tspath.NormalizePath(filePath)
 	files[filePath] = content
+	caseSensitive := true
+	if s.fs != nil {
+		caseSensitive = s.fs.UseCaseSensitiveFileNames()
+	}
 	if s.fs == nil {
-		return
+		return string(tspath.ToPath(filePath, "", caseSensitive))
 	}
 	if realPath := s.fs.Realpath(filePath); realPath != "" {
-		files[tspath.NormalizePath(realPath)] = content
+		realPath = tspath.NormalizePath(realPath)
+		files[realPath] = content
+		return string(tspath.ToPath(realPath, "", caseSensitive))
 	}
+	return string(tspath.ToPath(filePath, "", caseSensitive))
 }
 
 func (s *Server) newStandaloneLintProgramLoader(uri lsproto.DocumentUri) lintProgramLoader {
 	var overlayFS vfs.FS
-	return func(tsConfigPath string) (*compiler.Program, error) {
+	return func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
 		if overlayFS == nil {
 			overlayFS = s.currentEditorOverlayFS(uri)
 		}
-		return createStandaloneLintProgram(tsConfigPath, overlayFS)
+		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
+		if err != nil {
+			return nil, nil, err
+		}
+		return program, sourceFileForPath(program, uriToPath(uri), overlayFS), nil
 	}
 }
 
@@ -1158,6 +1232,12 @@ func (s *Server) runConfiguredLint(
 	enforcePlugins bool,
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
+	loadProgram := s.newStandaloneLintProgramLoader(uri)
+	finalize := func() {}
+	if s.lintPrograms != nil && s.lintPrograms.Usable() {
+		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
+	}
+	defer finalize()
 	return runLintWithProgramLoader(
 		uri,
 		s.session,
@@ -1167,7 +1247,7 @@ func (s *Server) runConfiguredLint(
 		enforcePlugins,
 		tsConfigPaths,
 		s.fs,
-		s.newStandaloneLintProgramLoader(uri),
+		loadProgram,
 	)
 }
 
@@ -1204,8 +1284,16 @@ func (s *Server) runConfiguredLintForContent(
 		if err != nil {
 			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
 		}
-		if programContainsFile(program, filename, overlayFS) {
-			return lintSingleFile(program, filename, configFilePath, true, resolver, ctx, overlayFS), nil
+		if sourceFile := sourceFileForPath(program, filename, overlayFS); sourceFile != nil {
+			return lintSingleFile(
+				program,
+				sourceFile,
+				configFilePath,
+				true,
+				resolver,
+				rule.EditDemandAutofix,
+				ctx,
+			), nil
 		}
 	}
 
@@ -1213,17 +1301,27 @@ func (s *Server) runConfiguredLintForContent(
 	if err != nil {
 		return lintPassResult{}, fmt.Errorf("create fallback lint program: %w", err)
 	}
-	return lintSingleFile(program, filename, configFilePath, false, resolver, ctx, overlayFS), nil
+	return lintSingleFile(
+		program,
+		sourceFileForPath(program, filename, overlayFS),
+		configFilePath,
+		false,
+		resolver,
+		rule.EditDemandAutofix,
+		ctx,
+	), nil
 }
 
 func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
+	caseSensitive := true
 	if fs != nil {
+		caseSensitive = fs.UseCaseSensitiveFileNames()
 		if realPath := fs.Realpath(filePath); realPath != "" {
 			filePath = tspath.NormalizePath(realPath)
 		}
 	}
-	return string(tspath.ToPath(filePath, "", true))
+	return lspLexicalPathID(filePath, caseSensitive)
 }
 
 func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {

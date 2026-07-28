@@ -41,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_been_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_todo"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_hook"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_title"
@@ -89,6 +90,7 @@ func GetAllRules() []rule.Rule {
 		prefer_to_have_been_called.PreferToHaveBeenCalledRule,
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,
+		require_hook.RequireHookRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,
 		valid_title.ValidTitleRule,

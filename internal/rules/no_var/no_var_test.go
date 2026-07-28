@@ -87,6 +87,14 @@ func TestNoVarRule(t *testing.T) {
 					{MessageId: "unexpectedVar"},
 				},
 			},
+			// Import attribute keys are syntax names, not variable references.
+			{
+				Code:   `import data from "pkg" with { type: "json" }; var type = 1;`,
+				Output: []string{`import data from "pkg" with { type: "json" }; let type = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
 			// Multiple var statements, both fixable
 			{
 				Code:   `export {}; var foo = 1; var bar = 2;`,

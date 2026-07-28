@@ -4,10 +4,11 @@ export default [
     languageOptions: {
       parserOptions: {
         projectService: false,
-        project: ['./packages/core/tsconfig.json'],
+        project: ['./packages/core/tsconfig.lint.json'],
       },
     },
     rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/require-await': 'error',
       'no-console': 'error',
     },

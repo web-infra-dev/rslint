@@ -5,29 +5,36 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+var unexpectedMessage = rule.RuleMessage{
+	Id:          "unexpected",
+	Description: "Unexpected lexical declaration in case clause.",
+}
+
 // https://eslint.org/docs/latest/rules/no-case-declarations
 var NoCaseDeclarationsRule = rule.Rule{
 	Name: "no-case-declarations",
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		checkClause := func(node *ast.Node) {
-			clause := node.AsCaseOrDefaultClause()
-			if clause == nil || clause.Statements == nil {
-				return
-			}
-
-			for _, stmt := range clause.Statements.Nodes {
-				if isLexicalDeclaration(stmt) {
-					ctx.ReportNode(stmt, rule.RuleMessage{
-						Id:          "unexpected",
-						Description: "Unexpected lexical declaration in case clause.",
-					})
-				}
-			}
-		}
-
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
-			ast.KindCaseClause:    checkClause,
-			ast.KindDefaultClause: checkClause,
+			ast.KindCaseBlock: func(node *ast.Node) {
+				caseBlock := node.AsCaseBlock()
+				if caseBlock == nil || caseBlock.Clauses == nil {
+					return
+				}
+
+				// Scan a switch in one callback instead of dispatching one listener
+				// for every case/default clause.
+				for _, clauseNode := range caseBlock.Clauses.Nodes {
+					clause := clauseNode.AsCaseOrDefaultClause()
+					if clause == nil || clause.Statements == nil {
+						continue
+					}
+					for _, statement := range clause.Statements.Nodes {
+						if isLexicalDeclaration(statement) {
+							ctx.ReportNode(statement, unexpectedMessage)
+						}
+					}
+				}
+			},
 		}
 	},
 }
@@ -41,12 +48,9 @@ func isLexicalDeclaration(node *ast.Node) bool {
 	case ast.KindVariableStatement:
 		varStmt := node.AsVariableStatement()
 		if varStmt != nil && varStmt.DeclarationList != nil {
-			flags := varStmt.DeclarationList.Flags
 			// NOTE: We also check `using` (TC39 Stage 3) since it has the same block-scoping
 			// semantics as let/const. ESLint does not check `using` yet.
-			if flags&ast.NodeFlagsLet != 0 || flags&ast.NodeFlagsConst != 0 || flags&ast.NodeFlagsUsing != 0 {
-				return true
-			}
+			return varStmt.DeclarationList.Flags&ast.NodeFlagsBlockScoped != 0
 		}
 	}
 	return false

@@ -1877,6 +1877,17 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Output: []string{"declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.()?.baz?.buzz === undefined;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
+
+		// Reused analyzer buffers must be fully overwritten between chains,
+		// including when a deep || chain is followed by a shorter && chain.
+		{
+			Code:   "declare const foo: {a?: {b?: {c: number}}} | undefined;\n!foo || !foo.a || !foo.a.b || !foo.a.b.c;\nfoo && foo.a;",
+			Output: []string{"declare const foo: {a?: {b?: {c: number}}} | undefined;\n!foo?.a?.b?.c;\nfoo?.a;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferOptionalChain"},
+				{MessageId: "preferOptionalChain"},
+			},
+		},
 	}
 
 	// Combine generated and hand-written cases

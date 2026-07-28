@@ -70,22 +70,79 @@ func wrappedInnerText(sourceFile *ast.SourceFile, innerNode *ast.Node) string {
 	return text
 }
 
-// buildWrappingFix produces the replacement text for `outerNode` constructed
-// from `innerNode`'s text. When `wrap` is nil the inner text replaces the
-// outer node directly; when `wrap` is provided the result is additionally
-// wrapped in parens if the surrounding context could rebind precedence.
-func buildWrappingFix(sourceFile *ast.SourceFile, outerNode *ast.Node, innerNode *ast.Node, wrap func(string) string) rule.RuleFix {
-	innerCode := wrappedInnerText(sourceFile, innerNode)
-	var code string
-	if wrap == nil {
-		code = innerCode
-	} else {
-		code = wrap(innerCode)
-		if typescriptutil.IsWeakPrecedenceParent(outerNode) {
-			code = "(" + code + ")"
-		}
+type conversionSuggestionBuilder struct {
+	sourceFile *ast.SourceFile
+}
+
+func (b *conversionSuggestionBuilder) buildRemoveFix(
+	outerRange core.TextRange,
+	innerCode string,
+	removeNode *ast.Node,
+) rule.RuleFix {
+	removeFix := rule.RuleFixReplaceRange(outerRange, innerCode)
+	if removeNode != nil {
+		removeFix = rule.RuleFixRemoveRange(utils.TrimNodeTextRange(b.sourceFile, removeNode))
 	}
-	return rule.RuleFixReplace(sourceFile, outerNode, code)
+	return removeFix
+}
+
+// build constructs the two suggestions shared by every report in this rule.
+// removeNode is non-nil only for a standalone `value += ”` expression, where
+// the remove suggestion deletes the entire statement instead of replacing the
+// conversion expression with its inner value.
+func (b *conversionSuggestionBuilder) build(
+	outerNode *ast.Node,
+	innerNode *ast.Node,
+	typeName string,
+	removeNode *ast.Node,
+) []rule.RuleSuggestion {
+	innerCode := wrappedInnerText(b.sourceFile, innerNode)
+	outerRange := utils.TrimNodeTextRange(b.sourceFile, outerNode)
+	satisfiesCode := innerCode + " satisfies " + typeName
+	if typescriptutil.IsWeakPrecedenceParent(outerNode) {
+		satisfiesCode = "(" + satisfiesCode + ")"
+	}
+
+	return []rule.RuleSuggestion{
+		{
+			Message: buildSuggestRemoveMessage(),
+			FixesArr: []rule.RuleFix{
+				b.buildRemoveFix(outerRange, innerCode, removeNode),
+			},
+		},
+		{
+			Message: buildSuggestSatisfiesMessage(typeName),
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(outerRange, satisfiesCode),
+			},
+		},
+	}
+}
+
+func (b *conversionSuggestionBuilder) buildString(
+	outerNode *ast.Node,
+	innerNode *ast.Node,
+	removeNode *ast.Node,
+) []rule.RuleSuggestion {
+	innerCode := wrappedInnerText(b.sourceFile, innerNode)
+	outerRange := utils.TrimNodeTextRange(b.sourceFile, outerNode)
+	satisfiesCode := innerCode + " satisfies string"
+	if typescriptutil.IsWeakPrecedenceParent(outerNode) {
+		satisfiesCode = "(" + satisfiesCode + ")"
+	}
+
+	return []rule.RuleSuggestion{
+		{
+			Message: buildSuggestRemoveMessage(),
+			FixesArr: []rule.RuleFix{
+				b.buildRemoveFix(outerRange, innerCode, removeNode),
+			},
+		},
+		{
+			Message:  buildSuggestSatisfiesMessage("string"),
+			FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(outerRange, satisfiesCode)},
+		},
+	}
 }
 
 // argumentSkippingParens unwraps any ParenthesizedExpression chain so that the
@@ -335,6 +392,7 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
+		suggestions := conversionSuggestionBuilder{sourceFile: sourceFile}
 
 		// reportUnaryConversion reports unary-operator-style conversions (`+x`,
 		// `!!x`, `~~x`). `outerNode` is the report anchor (the full `!!` /
@@ -344,17 +402,11 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 			outerRange := utils.TrimNodeTextRange(sourceFile, outerNode)
 			opStart := utils.TrimNodeTextRange(sourceFile, opStartNode).Pos()
 			reportRange := core.NewTextRange(outerRange.Pos(), opStart+1)
-			ctx.ReportRangeWithSuggestions(reportRange,
+			ctx.ReportRangeWithDeferredSuggestions(
+				reportRange,
 				buildUnnecessaryTypeConversionMessage(violation, typeName),
-				rule.RuleSuggestion{
-					Message:  buildSuggestRemoveMessage(),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, outerNode, innerArgument, nil)},
-				},
-				rule.RuleSuggestion{
-					Message: buildSuggestSatisfiesMessage(typeName),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, outerNode, innerArgument, func(code string) string {
-						return code + " satisfies " + typeName
-					})},
+				func() []rule.RuleSuggestion {
+					return suggestions.build(outerNode, innerArgument, typeName, nil)
 				},
 			)
 		}
@@ -363,17 +415,11 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 			typeName := strings.ToLower(fnName)
 			violation := "Passing a " + typeName + " to " + fnName + "()"
 			calleeRange := utils.TrimNodeTextRange(sourceFile, calleeIdentifier)
-			ctx.ReportRangeWithSuggestions(calleeRange,
+			ctx.ReportRangeWithDeferredSuggestions(
+				calleeRange,
 				buildUnnecessaryTypeConversionMessage(violation, typeName),
-				rule.RuleSuggestion{
-					Message:  buildSuggestRemoveMessage(),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, callNode, innerArg, nil)},
-				},
-				rule.RuleSuggestion{
-					Message: buildSuggestSatisfiesMessage(typeName),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, callNode, innerArg, func(code string) string {
-						return code + " satisfies " + typeName
-					})},
+				func() []rule.RuleSuggestion {
+					return suggestions.build(callNode, innerArg, typeName, nil)
 				},
 			)
 		}
@@ -382,17 +428,11 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 			propertyRange := utils.TrimNodeTextRange(sourceFile, propertyIdent)
 			callRange := utils.TrimNodeTextRange(sourceFile, callNode)
 			reportRange := core.NewTextRange(propertyRange.Pos(), callRange.End())
-			ctx.ReportRangeWithSuggestions(reportRange,
+			ctx.ReportRangeWithDeferredSuggestions(
+				reportRange,
 				buildUnnecessaryTypeConversionMessage("Calling a string's .toString() method", "string"),
-				rule.RuleSuggestion{
-					Message:  buildSuggestRemoveMessage(),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, callNode, innerObject, nil)},
-				},
-				rule.RuleSuggestion{
-					Message: buildSuggestSatisfiesMessage("string"),
-					FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, callNode, innerObject, func(code string) string {
-						return code + " satisfies string"
-					})},
+				func() []rule.RuleSuggestion {
+					return suggestions.buildString(callNode, innerObject, nil)
 				},
 			)
 		}
@@ -423,22 +463,16 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 				}
 
 				inner := argumentSkippingParens(left)
-				removeFix := buildWrappingFix(sourceFile, node, inner, nil)
+				var removeNode *ast.Node
 				if node.Parent != nil && node.Parent.Kind == ast.KindExpressionStatement {
-					removeFix = rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, node.Parent))
+					removeNode = node.Parent
 				}
 
-				ctx.ReportNodeWithSuggestions(node,
+				ctx.ReportNodeWithDeferredSuggestions(
+					node,
 					buildUnnecessaryTypeConversionMessage("Concatenating a string with ''", "string"),
-					rule.RuleSuggestion{
-						Message:  buildSuggestRemoveMessage(),
-						FixesArr: []rule.RuleFix{removeFix},
-					},
-					rule.RuleSuggestion{
-						Message: buildSuggestSatisfiesMessage("string"),
-						FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, node, inner, func(code string) string {
-							return code + " satisfies string"
-						})},
+					func() []rule.RuleSuggestion {
+						return suggestions.buildString(node, inner, removeNode)
 					},
 				)
 
@@ -458,17 +492,11 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 					nodeRange := utils.TrimNodeTextRange(sourceFile, node)
 					reportRange := core.NewTextRange(innerRange.End(), nodeRange.End())
 
-					ctx.ReportRangeWithSuggestions(reportRange,
+					ctx.ReportRangeWithDeferredSuggestions(
+						reportRange,
 						buildUnnecessaryTypeConversionMessage("Concatenating a string with ''", "string"),
-						rule.RuleSuggestion{
-							Message:  buildSuggestRemoveMessage(),
-							FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, node, inner, nil)},
-						},
-						rule.RuleSuggestion{
-							Message: buildSuggestSatisfiesMessage("string"),
-							FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, node, inner, func(code string) string {
-								return code + " satisfies string"
-							})},
+						func() []rule.RuleSuggestion {
+							return suggestions.buildString(node, inner, nil)
 						},
 					)
 					return
@@ -487,17 +515,11 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 					innerRange := utils.TrimNodeTextRange(sourceFile, inner)
 					reportRange := core.NewTextRange(nodeRange.Pos(), innerRange.Pos())
 
-					ctx.ReportRangeWithSuggestions(reportRange,
+					ctx.ReportRangeWithDeferredSuggestions(
+						reportRange,
 						buildUnnecessaryTypeConversionMessage("Concatenating '' with a string", "string"),
-						rule.RuleSuggestion{
-							Message:  buildSuggestRemoveMessage(),
-							FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, node, inner, nil)},
-						},
-						rule.RuleSuggestion{
-							Message: buildSuggestSatisfiesMessage("string"),
-							FixesArr: []rule.RuleFix{buildWrappingFix(sourceFile, node, inner, func(code string) string {
-								return code + " satisfies string"
-							})},
+						func() []rule.RuleSuggestion {
+							return suggestions.buildString(node, inner, nil)
 						},
 					)
 				}

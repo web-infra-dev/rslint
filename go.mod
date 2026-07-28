@@ -6,6 +6,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/api => ./shim/api
 	github.com/microsoft/typescript-go/shim/api/encoder => ./shim/api/encoder
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
+	github.com/microsoft/typescript-go/shim/binder => ./shim/binder
 	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
 	github.com/microsoft/typescript-go/shim/collections => ./shim/collections
@@ -25,6 +26,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
 	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
+	github.com/microsoft/typescript-go/shim/vfs/trackingvfs => ./shim/vfs/trackingvfs
 	github.com/microsoft/typescript-go/shim/vfs/vfsmatch => ./shim/vfs/vfsmatch
 )
 
@@ -33,6 +35,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
+	github.com/microsoft/typescript-go/shim/binder v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
 	github.com/microsoft/typescript-go/shim/collections v0.0.0
@@ -51,6 +54,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	github.com/microsoft/typescript-go/shim/vfs/trackingvfs v0.0.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a

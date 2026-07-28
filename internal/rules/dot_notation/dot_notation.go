@@ -142,6 +142,127 @@ func literalKey(n *ast.Node) (value string, formatted string, ok bool) {
 	return "", "", false
 }
 
+// buildUseDotFix constructs the bracket-to-dot replacement after the rule has
+// already decided to report. Keeping token and comment inspection here lets
+// diagnostics-only consumers skip every fix-specific source operation.
+func buildUseDotFix(
+	sourceFile *ast.SourceFile,
+	sourceComments []*ast.CommentRange,
+	node *ast.Node,
+	elem *ast.ElementAccessExpression,
+	value string,
+) []rule.RuleFix {
+	text := sourceFile.Text()
+	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	exprRange := utils.TrimNodeTextRange(sourceFile, elem.Expression)
+
+	// Locate the opening `[` via the real token stream (skipping
+	// comments/whitespace, and the "?." operator node when present)
+	// rather than scanning raw bytes for a literal '[' - a byte scan
+	// stops at a '[' that happens to appear inside an intervening
+	// comment, e.g. `foo /* [ */ ['bar']`.
+	hasQuestionDot := elem.QuestionDotToken != nil
+	operatorEnd := exprRange.End()
+	if hasQuestionDot {
+		operatorEnd = utils.TrimNodeTextRange(sourceFile, elem.QuestionDotToken).End()
+	}
+	bracketStart := operatorEnd
+	if bracketTok, ok := utils.TokenAtOrAfter(sourceFile, operatorEnd); ok {
+		bracketStart = bracketTok.Start
+	}
+	bracketEnd := nodeRange.End() - 1
+	for bracketEnd > bracketStart && text[bracketEnd] != ']' {
+		bracketEnd--
+	}
+
+	if utils.HasCommentInSpan(sourceComments, bracketStart+1, bracketEnd) {
+		// A comment lives inside the brackets (anywhere, including inside
+		// nested parens around the key), so replacing the bracket span would
+		// drop it.
+		return nil
+	}
+
+	// Replace only the bracket part `['key']` itself, mirroring upstream's
+	// fixer range [leftBracket, rightBracket]. Everything before `[` (object,
+	// `?.` operator, whitespace, comments) stays untouched, so fixes on nested
+	// accesses like `a['b']['c']` don't overlap and can apply in one pass.
+	var replacement string
+	if hasQuestionDot {
+		// The untouched `?.` operator already supplies the dot:
+		// `a?.['b']` -> `a?.b`.
+		replacement = value
+	} else {
+		sep := "."
+		if isDecimalIntegerLiteral(sourceFile, elem.Expression) {
+			sep = " ."
+		}
+		replacement = sep + value
+	}
+
+	// Guard against the replacement identifier fusing with whatever token
+	// immediately follows the closing bracket, e.g.
+	// `foo['bar']instanceof baz`.
+	nextCharIdx := bracketEnd + 1
+	if nextCharIdx < len(text) && identContinueRE.MatchString(string(text[nextCharIdx])) {
+		replacement += " "
+	}
+
+	return []rule.RuleFix{rule.RuleFixReplaceRange(
+		core.NewTextRange(bracketStart, bracketEnd+1),
+		replacement,
+	)}
+}
+
+// buildUseBracketsFix constructs the dot-to-bracket replacement after the
+// keyword access has been detected. Its inputs are fix-specific, making the
+// reporting path independent of token and comment materialization.
+func buildUseBracketsFix(
+	sourceFile *ast.SourceFile,
+	sourceComments []*ast.CommentRange,
+	pae *ast.PropertyAccessExpression,
+	name string,
+	isOptional bool,
+) []rule.RuleFix {
+	nameRange := utils.TrimNodeTextRange(sourceFile, pae.Name())
+	objRange := utils.TrimNodeTextRange(sourceFile, pae.Expression)
+
+	// Locate the access operator (either `?.` or `.`) via the real token
+	// stream rather than scanning raw bytes for a literal '?' or '.' - a byte
+	// scan stops inside an intervening comment, e.g. `foo /* ? */ .while`.
+	accessStart := objRange.End()
+	opLen := 1
+	if isOptional {
+		qRange := utils.TrimNodeTextRange(sourceFile, pae.QuestionDotToken)
+		accessStart = qRange.Pos()
+		opLen = qRange.End() - qRange.Pos()
+	} else if opTok, ok := utils.TokenAtOrAfter(sourceFile, objRange.End()); ok {
+		accessStart = opTok.Start
+		opLen = opTok.End - opTok.Start
+	}
+	gapStart := accessStart + opLen
+	if gapStart > nameRange.Pos() {
+		gapStart = nameRange.Pos()
+	}
+	if utils.HasCommentInSpan(sourceComments, gapStart, nameRange.Pos()) {
+		// A comment lives between the operator and property name, so replacing
+		// that span would drop it.
+		return nil
+	}
+
+	// Replace only the operator + property name (`.while` / `?.while`),
+	// mirroring upstream's fixer range [dotToken, property]. The object and
+	// trivia before the operator stay untouched, so fixes on nested keyword
+	// accesses like `a.if.while` don't overlap and can apply in one pass.
+	replacement := "[\"" + name + "\"]"
+	if isOptional {
+		replacement = "?.[\"" + name + "\"]"
+	}
+	return []rule.RuleFix{rule.RuleFixReplaceRange(
+		core.NewTextRange(accessStart, nameRange.End()),
+		replacement,
+	)}
+}
+
 // DotNotationRule enforces dot notation whenever possible, matching ESLint
 // core's `dot-notation` rule (eslint/lib/rules/dot-notation.js) 1:1. This is
 // the plain, non-type-aware port; the TypeScript-enhanced variant with
@@ -193,63 +314,9 @@ var DotNotationRule = rule.Rule{
 				}
 			}
 
-			text := sourceFile.Text()
-			nodeRange := utils.TrimNodeTextRange(sourceFile, node)
-			exprRange := utils.TrimNodeTextRange(sourceFile, elem.Expression)
-
-			// Locate the opening `[` via the real token stream (skipping
-			// comments/whitespace, and the "?." operator node when present)
-			// rather than scanning raw bytes for a literal '[' - a byte scan
-			// stops at a '[' that happens to appear inside an intervening
-			// comment, e.g. `foo /* [ */ ['bar']`.
-			hasQuestionDot := elem.QuestionDotToken != nil
-			operatorEnd := exprRange.End()
-			if hasQuestionDot {
-				operatorEnd = utils.TrimNodeTextRange(sourceFile, elem.QuestionDotToken).End()
-			}
-			bracketStart := operatorEnd
-			if bracketTok, ok := utils.TokenAtOrAfter(sourceFile, operatorEnd); ok {
-				bracketStart = bracketTok.Start
-			}
-			bracketEnd := nodeRange.End() - 1
-			for bracketEnd > bracketStart && text[bracketEnd] != ']' {
-				bracketEnd--
-			}
-
-			if utils.HasCommentInSpan(ctx.Comments.All(), bracketStart+1, bracketEnd) {
-				// Report but don't fix: a comment lives inside the brackets
-				// (anywhere, including inside nested parens around the key).
-				ctx.ReportNode(keyNode, buildUseDotMessage(formattedKey))
-				return
-			}
-
-			// Replace only the bracket part `['key']` itself, mirroring
-			// upstream's fixer range [leftBracket, rightBracket]. Everything
-			// before `[` (object, `?.` operator, whitespace, comments) stays
-			// untouched, so fixes on nested accesses like `a['b']['c']` don't
-			// overlap and can both apply in a single pass.
-			var replacement string
-			if hasQuestionDot {
-				// The untouched `?.` operator already supplies the dot:
-				// `a?.['b']` -> `a?.b`.
-				replacement = value
-			} else {
-				sep := "."
-				if isDecimalIntegerLiteral(sourceFile, elem.Expression) {
-					sep = " ."
-				}
-				replacement = sep + value
-			}
-
-			// Guard against the replacement identifier fusing with whatever
-			// token immediately follows the closing bracket (no existing
-			// whitespace between them), e.g. `foo['bar']instanceof baz`.
-			nextCharIdx := bracketEnd + 1
-			if nextCharIdx < len(text) && identContinueRE.MatchString(string(text[nextCharIdx])) {
-				replacement += " "
-			}
-
-			ctx.ReportNodeWithFixes(keyNode, buildUseDotMessage(formattedKey), rule.RuleFixReplaceRange(core.NewTextRange(bracketStart, bracketEnd+1), replacement))
+			ctx.ReportNodeWithDeferredFixes(keyNode, buildUseDotMessage(formattedKey), func() []rule.RuleFix {
+				return buildUseDotFix(sourceFile, ctx.Comments.All(), node, elem, value)
+			})
 		}
 
 		listeners := rule.RuleListeners{}
@@ -300,47 +367,9 @@ var DotNotationRule = rule.Rule{
 				return
 			}
 
-			nameRange := utils.TrimNodeTextRange(sourceFile, pae.Name())
-			objRange := utils.TrimNodeTextRange(sourceFile, pae.Expression)
-
-			// Locate the access operator (either `?.` or `.`) via the real
-			// token stream rather than scanning raw bytes for a literal '?'
-			// or '.' - a byte scan stops at one of those characters if it
-			// happens to appear inside an intervening comment, e.g.
-			// `foo /* ? */ .while`.
-			accessStart := objRange.End()
-			opLen := 1
-			if isOptional {
-				qRange := utils.TrimNodeTextRange(sourceFile, pae.QuestionDotToken)
-				accessStart = qRange.Pos()
-				opLen = qRange.End() - qRange.Pos()
-			} else if opTok, ok := utils.TokenAtOrAfter(sourceFile, objRange.End()); ok {
-				accessStart = opTok.Start
-				opLen = opTok.End - opTok.Start
-			}
-			gapStart := accessStart + opLen
-			if gapStart > nameRange.Pos() {
-				gapStart = nameRange.Pos()
-			}
-			if utils.HasCommentInSpan(ctx.Comments.All(), gapStart, nameRange.Pos()) {
-				// Report but don't fix: a comment lives between the operator
-				// and the property name.
-				ctx.ReportNode(pae.Name(), buildUseBracketsMessage(name))
-				return
-			}
-
-			// Replace only the operator + property name (`.while` / `?.while`),
-			// mirroring upstream's fixer range [dotToken, property]. The object
-			// and any whitespace/comments before the operator stay untouched,
-			// so fixes on nested keyword accesses like `a.if.while` don't
-			// overlap and can both apply in a single pass.
-			var replacement string
-			if isOptional {
-				replacement = "?.[\"" + name + "\"]"
-			} else {
-				replacement = "[\"" + name + "\"]"
-			}
-			ctx.ReportNodeWithFixes(pae.Name(), buildUseBracketsMessage(name), rule.RuleFixReplaceRange(core.NewTextRange(accessStart, nameRange.End()), replacement))
+			ctx.ReportNodeWithDeferredFixes(pae.Name(), buildUseBracketsMessage(name), func() []rule.RuleFix {
+				return buildUseBracketsFix(sourceFile, ctx.Comments.All(), pae, name, isOptional)
+			})
 		}
 
 		return listeners

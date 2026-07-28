@@ -26,15 +26,24 @@ const (
 var NewForBuiltinsRule = rule.Rule{
 	Name: "unicorn/new-for-builtins",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		if !sourceHasPotentialReference(ctx.SourceFile) {
+			return nil
+		}
+
 		state := newRuleState(ctx)
+		collectNamedLocalRoot := state.collectNamedLocalRoot
 
 		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				state.checkCallExpression(node)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				state.checkNewExpression(node)
-			},
+			ast.KindCallExpression:                 state.collectCallExpression,
+			ast.KindNewExpression:                  state.collectNewExpression,
+			ast.KindVariableDeclaration:            state.collectAliasDeclaration,
+			ast.KindClassExpression:                collectNamedLocalRoot,
+			ast.KindClassDeclaration:               collectNamedLocalRoot,
+			ast.KindFunctionExpression:             collectNamedLocalRoot,
+			ast.KindFunctionDeclaration:            collectNamedLocalRoot,
+			ast.KindEnumDeclaration:                collectNamedLocalRoot,
+			ast.KindModuleDeclaration:              collectNamedLocalRoot,
+			rule.ListenerOnExit(ast.KindEndOfFile): state.finish,
 		}
 	},
 }
@@ -130,10 +139,71 @@ var globalObjectNames = map[string]bool{
 	"window":     true,
 }
 
+// potentialReferenceRoots is the cheap listener-side gate. Only these global
+// roots, plus names registered in aliasesByID, can ever produce a watched
+// builtin path.
+var potentialReferenceRoots = func() map[string]bool {
+	roots := make(map[string]bool)
+	add := func(names map[string]bool) {
+		for name := range names {
+			root, _, _ := strings.Cut(name, ".")
+			roots[root] = true
+		}
+	}
+	add(enforceNewBuiltins)
+	add(disallowNewBuiltins)
+	add(disallowCallOrNewBuiltins)
+	add(globalObjectNames)
+	return roots
+}()
+
+// watchedNamespaces lets member calls reject non-constructor paths before
+// joining them into a lookup key.
+var watchedNamespaces = func() map[string]bool {
+	namespaces := make(map[string]bool)
+	add := func(names map[string]bool) {
+		for name := range names {
+			for index := strings.LastIndexByte(name, '.'); index >= 0; index = strings.LastIndexByte(name[:index], '.') {
+				namespaces[name[:index]] = true
+			}
+		}
+	}
+	add(enforceNewBuiltins)
+	add(disallowNewBuiltins)
+	add(disallowCallOrNewBuiltins)
+	return namespaces
+}()
+
+// Descriptions are immutable and depend only on the builtin name. Keep the
+// per-diagnostic Data map independent, but avoid repeating fmt work for every
+// matching call in large/generated files.
+var (
+	enforceMessageDescriptions = buildMessageDescriptions(enforceNewBuiltins, func(name string) string {
+		return fmt.Sprintf("Use `new %s()` instead of `%s()`.", name, name)
+	})
+	disallowMessageDescriptions = buildMessageDescriptions(disallowNewBuiltins, func(name string) string {
+		return fmt.Sprintf("Use `%s()` instead of `new %s()`.", name, name)
+	})
+	disallowCallOrNewMessageDescriptions = buildMessageDescriptions(disallowCallOrNewBuiltins, func(name string) string {
+		return fmt.Sprintf("`%s` is not a function or constructor.", name)
+	})
+)
+
 type ruleState struct {
-	ctx         rule.RuleContext
-	aliases     map[*ast.Node]aliasInfo
-	aliasesByID map[string][]aliasInfo
+	ctx               rule.RuleContext
+	aliases           map[*ast.Node]aliasInfo
+	aliasesByID       map[string][]aliasInfo
+	collectingAliases bool
+
+	// Alias declarations and possibly aliased calls are collected by the
+	// linter's existing traversal, then resolved in source order at EOF.
+	aliasDeclarations         []*ast.Node
+	pendingExpressions        []*ast.Node
+	deferRemainingExpressions bool
+
+	// localRootNames is a cheap file-wide "may be shadowed" gate. Exact
+	// binding identity still comes from ctx.Refs at the call site.
+	localRootNames map[string]bool
 }
 
 type aliasInfo struct {
@@ -144,7 +214,6 @@ type aliasInfo struct {
 
 type reference struct {
 	name string
-	path []string
 }
 
 type referenceSource uint8
@@ -162,12 +231,85 @@ type globalReference struct {
 
 func newRuleState(ctx rule.RuleContext) *ruleState {
 	state := &ruleState{
-		ctx:         ctx,
-		aliases:     map[*ast.Node]aliasInfo{},
-		aliasesByID: map[string][]aliasInfo{},
+		ctx:               ctx,
+		collectingAliases: true,
 	}
-	state.collectAliases()
+	state.collectLocalRootNames()
 	return state
+}
+
+func (state *ruleState) collectLocalRootNames() {
+	if state.ctx.SourceFile == nil {
+		return
+	}
+	// The binder links lexical containers in declaration order. Walking their
+	// symbol-table names is much cheaper than walking every AST node.
+	collect := func(symbols ast.SymbolTable) {
+		for name := range symbols {
+			if potentialReferenceRoots[name] {
+				if state.localRootNames == nil {
+					state.localRootNames = map[string]bool{}
+				}
+				state.localRootNames[name] = true
+			}
+		}
+	}
+	for container := state.ctx.SourceFile.AsNode(); container != nil; {
+		collect(container.Locals())
+		if symbol := container.Symbol(); symbol != nil {
+			collect(symbol.Exports)
+		}
+		if name := container.Name(); name != nil && name.Kind == ast.KindIdentifier &&
+			potentialReferenceRoots[name.Text()] {
+			if state.localRootNames == nil {
+				state.localRootNames = map[string]bool{}
+			}
+			state.localRootNames[name.Text()] = true
+		}
+		data := container.LocalsContainerData()
+		if data == nil {
+			break
+		}
+		container = data.NextContainer
+	}
+}
+
+func (state *ruleState) collectCallExpression(node *ast.Node) {
+	call := node.AsCallExpression()
+	if call == nil {
+		return
+	}
+	if state.deferRemainingExpressions || state.shouldDeferExpression(call.Expression) {
+		state.deferRemainingExpressions = true
+		state.pendingExpressions = append(state.pendingExpressions, node)
+		return
+	}
+	state.checkCallExpression(node)
+}
+
+func (state *ruleState) collectNewExpression(node *ast.Node) {
+	newExpression := node.AsNewExpression()
+	if newExpression == nil {
+		return
+	}
+	if state.deferRemainingExpressions || state.shouldDeferExpression(newExpression.Expression) {
+		state.deferRemainingExpressions = true
+		state.pendingExpressions = append(state.pendingExpressions, node)
+		return
+	}
+	state.checkNewExpression(node)
+}
+
+func (state *ruleState) shouldDeferExpression(node *ast.Node) bool {
+	root := expressionRootIdentifier(node)
+	if root == nil {
+		return false
+	}
+	name := root.AsIdentifier().Text
+	// A known global root with no local declaration cannot become an alias or
+	// shadow, so keep its original immediate reporting order. Everything else
+	// waits until alias collection is complete.
+	return !potentialReferenceRoots[name] || state.ctx.Refs == nil || state.localRootNames[name]
 }
 
 func (state *ruleState) checkCallExpression(node *ast.Node) {
@@ -205,7 +347,9 @@ func (state *ruleState) checkCallExpression(node *ast.Node) {
 		return
 	}
 
-	state.ctx.ReportNodeWithFixes(node, messageEnforce(ref.name), state.enforceNewFix(node))
+	state.ctx.ReportNodeWithDeferredFixes(node, messageEnforce(ref.name), func() []rule.RuleFix {
+		return []rule.RuleFix{state.enforceNewFix(node)}
+	})
 }
 
 func (state *ruleState) checkNewExpression(node *ast.Node) {
@@ -234,28 +378,35 @@ func (state *ruleState) checkNewExpression(node *ast.Node) {
 		return
 	}
 
-	fixes := state.newToCallFixes(node, newExpression)
-	if len(fixes) == 0 {
-		state.ctx.ReportNode(node, message)
-		return
-	}
-	state.ctx.ReportNodeWithFixes(node, message, fixes...)
+	state.ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+		return state.newToCallFixes(node, newExpression)
+	})
 }
 
 func (state *ruleState) reportDateCall(node *ast.Node, call *ast.CallExpression) {
 	message := rule.RuleMessage{Id: messageIDErrorDate, Description: messageDateDescription}
-	fix := rule.RuleFixReplaceRange(utils.TrimNodeTextRange(state.ctx.SourceFile, node), state.dateReplacement(node))
 
 	hasArguments := call.Arguments != nil && len(call.Arguments.Nodes) > 0
 	if !hasArguments && !utils.HasCommentInsideNode(state.ctx.SourceFile, node) {
-		state.ctx.ReportNodeWithFixes(node, message, fix)
+		state.ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+			return []rule.RuleFix{state.dateFix(node)}
+		})
 		return
 	}
 
-	state.ctx.ReportNodeWithSuggestions(node, message, rule.RuleSuggestion{
-		Message:  rule.RuleMessage{Id: messageIDSuggestionDate, Description: messageDateSuggestion},
-		FixesArr: []rule.RuleFix{fix},
+	state.ctx.ReportNodeWithDeferredSuggestions(node, message, func() []rule.RuleSuggestion {
+		return []rule.RuleSuggestion{{
+			Message:  rule.RuleMessage{Id: messageIDSuggestionDate, Description: messageDateSuggestion},
+			FixesArr: []rule.RuleFix{state.dateFix(node)},
+		}}
 	})
+}
+
+func (state *ruleState) dateFix(node *ast.Node) rule.RuleFix {
+	return rule.RuleFixReplaceRange(
+		utils.TrimNodeTextRange(state.ctx.SourceFile, node),
+		state.dateReplacement(node),
+	)
 }
 
 func (state *ruleState) newToCallFixes(node *ast.Node, newExpression *ast.NewExpression) []rule.RuleFix {
@@ -355,35 +506,100 @@ func (state *ruleState) dateReplacement(node *ast.Node) string {
 }
 
 func (state *ruleState) referenceFromExpression(node *ast.Node) (reference, bool) {
-	path, ok := state.globalReferencePath(node)
+	path, root, ok := state.expressionPath(node)
 	if !ok || len(path) == 0 {
 		return reference{}, false
 	}
-	name := pathKey(path)
-	if !isWatchedBuiltin(name) {
+	rootName := root.AsIdentifier().Text
+	hasAliases := len(state.aliasesByID[rootName]) > 0
+	if !potentialReferenceRoots[rootName] && !hasAliases {
 		return reference{}, false
 	}
-	return reference{name: name, path: path}, true
+
+	// Without a same-named alias, the syntactic path is already enough to
+	// reject member calls such as Promise.resolve() before any scope lookup.
+	if !hasAliases {
+		directPath := path
+		if globalObjectNames[rootName] {
+			directPath = path[1:]
+		}
+		if _, ok := watchedBuiltinName(directPath); !ok {
+			return reference{}, false
+		}
+	}
+
+	global, ok := state.globalReferenceInfoFromPath(path, root)
+	if !ok {
+		return reference{}, false
+	}
+	name, ok := watchedBuiltinName(global.path)
+	if !ok {
+		return reference{}, false
+	}
+	return reference{name: name}, true
 }
 
-func (state *ruleState) collectAliases() {
-	if state.ctx.SourceFile == nil || state.ctx.SourceFile.AsNode() == nil {
+func expressionRootIdentifier(node *ast.Node) *ast.Node {
+	node = utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsAccessExpression(node) {
+		node = utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	}
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return nil
+	}
+	return node
+}
+
+func (state *ruleState) collectAliasDeclaration(node *ast.Node) {
+	declaration := node.AsVariableDeclaration()
+	if declaration == nil || declaration.Name() == nil || declaration.Initializer == nil {
 		return
 	}
-	var walk func(*ast.Node)
-	walk = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node.Kind == ast.KindVariableDeclaration {
-			state.collectVariableAlias(node)
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
+	name := declaration.Name()
+	if name.Kind != ast.KindIdentifier && name.Kind != ast.KindObjectBindingPattern {
+		return
 	}
-	walk(state.ctx.SourceFile.AsNode())
+	if expressionRootIdentifier(declaration.Initializer) == nil {
+		return
+	}
+	state.aliasDeclarations = append(state.aliasDeclarations, node)
+}
+
+func (state *ruleState) collectNamedLocalRoot(node *ast.Node) {
+	name := node.Name()
+	if name == nil || name.Kind != ast.KindIdentifier || !potentialReferenceRoots[name.Text()] {
+		return
+	}
+	if state.localRootNames == nil {
+		state.localRootNames = map[string]bool{}
+	}
+	state.localRootNames[name.Text()] = true
+}
+
+func (state *ruleState) finishAliasCollection() {
+	if !state.collectingAliases {
+		return
+	}
+	for _, declaration := range state.aliasDeclarations {
+		state.collectVariableAlias(declaration)
+	}
+	state.aliasDeclarations = nil
+	state.collectingAliases = false
+}
+
+func (state *ruleState) finish(node *ast.Node) {
+	_ = node
+	state.finishAliasCollection()
+	pendingExpressions := state.pendingExpressions
+	state.pendingExpressions = nil
+	for _, node := range pendingExpressions {
+		switch node.Kind {
+		case ast.KindCallExpression:
+			state.checkCallExpression(node)
+		case ast.KindNewExpression:
+			state.checkNewExpression(node)
+		}
+	}
 }
 
 func (state *ruleState) collectVariableAlias(node *ast.Node) {
@@ -463,6 +679,10 @@ func (state *ruleState) registerAlias(binding *ast.Node, path []string, declarat
 	if binding == nil || binding.Kind != ast.KindIdentifier {
 		return
 	}
+	if state.aliases == nil {
+		state.aliases = map[*ast.Node]aliasInfo{}
+		state.aliasesByID = map[string][]aliasInfo{}
+	}
 
 	info := aliasInfo{
 		binding: binding,
@@ -479,18 +699,20 @@ func (state *ruleState) registerAlias(binding *ast.Node, path []string, declarat
 	state.aliasesByID[binding.AsIdentifier().Text] = append(state.aliasesByID[binding.AsIdentifier().Text], info)
 }
 
-func (state *ruleState) globalReferencePath(node *ast.Node) ([]string, bool) {
-	reference, ok := state.globalReferenceInfo(node)
-	if !ok {
-		return nil, false
-	}
-	return reference.path, true
-}
-
 func (state *ruleState) globalReferenceInfo(node *ast.Node) (globalReference, bool) {
 	path, root, ok := state.expressionPath(node)
 	if !ok || len(path) == 0 {
 		return globalReference{}, false
+	}
+	return state.globalReferenceInfoFromPath(path, root)
+}
+
+func (state *ruleState) globalReferenceInfoFromPath(path []string, root *ast.Node) (globalReference, bool) {
+	// A tracked local alias wins even if it reuses one of the conventional
+	// global-object names (for example, `{Array: window}`). ReferenceTracker
+	// follows the binding identity, not its spelling.
+	if aliasPath, ok := state.aliasPathForIdentifier(root); ok {
+		return globalReference{path: appendPath(aliasPath, path[1:]...), source: referenceSourceAlias}, true
 	}
 
 	if globalObjectNames[path[0]] {
@@ -500,8 +722,10 @@ func (state *ruleState) globalReferenceInfo(node *ast.Node) (globalReference, bo
 		return globalReference{path: slices.Clone(path[1:]), source: referenceSourceGlobalObject}, true
 	}
 
-	if aliasPath, ok := state.aliasPathForIdentifier(root); ok {
-		return globalReference{path: appendPath(aliasPath, path[1:]...), source: referenceSourceAlias}, true
+	// A non-global, non-alias root cannot become a watched builtin. This also
+	// keeps alias collection from doing shadow work for ordinary initializers.
+	if !potentialReferenceRoots[path[0]] {
+		return globalReference{}, false
 	}
 
 	if state.isLocalNonAliasIdentifier(root) {
@@ -530,7 +754,7 @@ func (state *ruleState) expressionPath(node *ast.Node) ([]string, *ast.Node, boo
 		if !ok {
 			return nil, nil, false
 		}
-		return appendPath(path, name), root, true
+		return append(path, name), root, true
 	}
 
 	return nil, nil, false
@@ -554,6 +778,22 @@ func (state *ruleState) aliasPathForIdentifier(node *ast.Node) ([]string, bool) 
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return nil, false
 	}
+	name := node.AsIdentifier().Text
+	infos := state.aliasesByID[name]
+	if len(infos) == 0 {
+		return nil, false
+	}
+
+	if !state.collectingAliases && state.ctx.Refs != nil {
+		if symbol := state.ctx.Refs.Resolve(node); symbol != nil {
+			info, ok := state.aliasInfoForBinderSymbol(symbol)
+			if !ok {
+				return nil, false
+			}
+			return slices.Clone(info.path), true
+		}
+	}
+
 	if state.ctx.TypeChecker != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
 		if symbol != nil {
@@ -564,13 +804,40 @@ func (state *ruleState) aliasPathForIdentifier(node *ast.Node) ([]string, bool) 
 			}
 		}
 	}
-	infos := state.aliasesByID[node.AsIdentifier().Text]
 	for i := len(infos) - 1; i >= 0; i-- {
 		if state.aliasInfoApplies(node, infos[i]) {
 			return slices.Clone(infos[i].path), true
 		}
 	}
 	return nil, false
+}
+
+func aliasBindingSymbol(binding *ast.Node) *ast.Symbol {
+	if binding == nil || binding.Kind != ast.KindIdentifier {
+		return nil
+	}
+	declaration := binding.Parent
+	if declaration == nil || declaration.Name() != binding {
+		return nil
+	}
+	return declaration.Symbol()
+}
+
+func (state *ruleState) aliasInfoForBinderSymbol(symbol *ast.Symbol) (aliasInfo, bool) {
+	if symbol == nil {
+		return aliasInfo{}, false
+	}
+	for _, declaration := range symbol.Declarations {
+		if info, ok := state.aliases[declaration]; ok {
+			return info, true
+		}
+	}
+	for _, info := range state.aliasesByID[symbol.Name] {
+		if aliasBindingSymbol(info.binding) == symbol {
+			return info, true
+		}
+	}
+	return aliasInfo{}, false
 }
 
 func (state *ruleState) aliasInfoApplies(node *ast.Node, info aliasInfo) bool {
@@ -708,6 +975,15 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 	}
 
 	name := node.AsIdentifier().Text
+	if state.ctx.Refs != nil {
+		if !state.localRootNames[name] {
+			return false
+		}
+		// Callee roots are reference-position identifiers, so Resolve's nil
+		// result means the value is global; a binder symbol means it is local.
+		return state.ctx.Refs.Resolve(node) != nil
+	}
+
 	if state.ctx.TypeChecker != nil && state.ctx.SourceFile != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
 		if utils.IsSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
@@ -767,7 +1043,7 @@ func isStrictObjectComparison(node *ast.Node) bool {
 func messageEnforce(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          messageIDEnforce,
-		Description: fmt.Sprintf("Use `new %s()` instead of `%s()`.", name, name),
+		Description: enforceMessageDescriptions[name],
 		Data:        map[string]string{"name": name},
 	}
 }
@@ -775,7 +1051,7 @@ func messageEnforce(name string) rule.RuleMessage {
 func messageDisallow(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          messageIDDisallow,
-		Description: fmt.Sprintf("Use `%s()` instead of `new %s()`.", name, name),
+		Description: disallowMessageDescriptions[name],
 		Data:        map[string]string{"name": name},
 	}
 }
@@ -783,9 +1059,17 @@ func messageDisallow(name string) rule.RuleMessage {
 func messageDisallowCallOrNew(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          messageIDDisallowCallOrNew,
-		Description: fmt.Sprintf("`%s` is not a function or constructor.", name),
+		Description: disallowCallOrNewMessageDescriptions[name],
 		Data:        map[string]string{"name": name},
 	}
+}
+
+func buildMessageDescriptions(names map[string]bool, build func(string) string) map[string]string {
+	descriptions := make(map[string]string, len(names))
+	for name := range names {
+		descriptions[name] = build(name)
+	}
+	return descriptions
 }
 
 func isWatchedBuiltin(name string) bool {
@@ -793,14 +1077,26 @@ func isWatchedBuiltin(name string) bool {
 }
 
 func isWatchedNamespace(name string) bool {
-	prefix := name + "."
-	for builtin := range enforceNewBuiltins {
-		if strings.HasPrefix(builtin, prefix) {
-			return true
-		}
+	return watchedNamespaces[name]
+}
+
+func watchedBuiltinName(path []string) (string, bool) {
+	if len(path) == 0 {
+		return "", false
 	}
-	for builtin := range disallowCallOrNewBuiltins {
-		if strings.HasPrefix(builtin, prefix) {
+	if len(path) > 1 && !watchedNamespaces[path[0]] {
+		return "", false
+	}
+	name := pathKey(path)
+	return name, isWatchedBuiltin(name)
+}
+
+func sourceHasPotentialReference(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	for root := range potentialReferenceRoots {
+		if _, ok := sourceFile.Identifiers[root]; ok {
 			return true
 		}
 	}

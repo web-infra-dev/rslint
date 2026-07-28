@@ -635,6 +635,72 @@ bar + 1;
 		},
 		{
 			Code: `
+let value: string | undefined;
+value!;
+value = '';
+value!;
+      `,
+			Output: []string{`
+let value: string | undefined;
+value!;
+value = '';
+value;
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unnecessaryAssertion",
+					Line:      5,
+				},
+			},
+		},
+		{
+			Code: `
+let value: string;
+value!;
+if (value === 'narrowed') {
+  value!;
+}
+      `,
+			Output: []string{`
+let value: string;
+value!;
+if (value === 'narrowed') {
+  value;
+}
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unnecessaryAssertion",
+					Line:      5,
+				},
+			},
+		},
+		{
+			Code: `
+const first = '🧪';
+let second: string = 'ok';
+first /* keep one */ !;
+const cast = second /* keep two */ as string;
+const angle = <string /* remove with type */>second;
+      `,
+			Output: []string{`
+const first = '🧪';
+let second: string = 'ok';
+first /* keep one */ ;
+const cast = second /* keep two */;
+const angle = second;
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unnecessaryAssertion", Line: 4},
+				{MessageId: "unnecessaryAssertion", Line: 5},
+				{MessageId: "unnecessaryAssertion", Line: 6},
+			},
+		},
+		{
+			Code: `
         declare const y: number;
         console.log(y!);
       `,

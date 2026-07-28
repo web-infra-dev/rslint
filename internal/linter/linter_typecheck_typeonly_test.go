@@ -65,7 +65,9 @@ func TestTypeCheckOnly_NoLintDiagnostics(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil, // <-- type-check-only path
 		TypeCheck:       true,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -89,7 +91,9 @@ func TestTypeCheckOnly_StillReportsTSErrors(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
 		TypeCheck:       true,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -123,7 +127,9 @@ func TestTypeCheckOnly_LintedFileCountIsZero(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
 		TypeCheck:       true,
-		OnDiagnostic:    func(rule.RuleDiagnostic) {},
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(rule.RuleDiagnostic) {},
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -144,7 +150,9 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
 		TypeCheck:       true,
-		OnDiagnostic:    func(rule.RuleDiagnostic) {},
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(rule.RuleDiagnostic) {},
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -172,7 +180,9 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return triggerOnIdentifierRule() },
 		TypeCheck:       false,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -203,7 +213,9 @@ func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
 		PerProgramFilter: []FileFilter{rejectAll},
 		GetRulesForFile:  nil,
 		TypeCheck:        true,
-		OnDiagnostic:     func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -230,7 +242,9 @@ func TestTypeCheckOnly_RespectsSkipMask(t *testing.T) {
 		GetRulesForFile:       nil,
 		TypeCheck:             true,
 		SkipTypeCheckPrograms: []bool{true}, // skip the only program
-		OnDiagnostic:          func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)
@@ -256,7 +270,9 @@ func TestTypeCheckOnly_TypeCheckFalseProducesNothing(t *testing.T) {
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
 		TypeCheck:       false,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter returned error: %v", err)

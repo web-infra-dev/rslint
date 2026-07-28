@@ -47,6 +47,7 @@ func canBeExported(t types.Signature) bool {
 func main() {
 	packagesToShim := []string{
 		"ast",
+		"binder",
 		"bundled",
 		"checker",
 		"compiler",
@@ -62,6 +63,7 @@ func main() {
 		"vfs",
 		"vfs/cachedvfs",
 		"vfs/osvfs",
+		"vfs/trackingvfs",
 		"vfs/vfsmatch",
 		"collections",
 		"lsp/lsproto",
@@ -169,6 +171,51 @@ func main() {
 			shimBuilder.Write(tempBuffer.Bytes())
 			tempBuffer.Reset()
 			shimBuilder.WriteString("\n")
+			return true
+		}
+
+		emitGenericWrapper := func(fn *types.Func) bool {
+			signature := fn.Signature()
+			if signature.TypeParams() == nil {
+				return false
+			}
+			for param := range signature.Params().Variables() {
+				if param.Name() == "" {
+					return false
+				}
+			}
+
+			importPackage(pkg.Types.Path(), true)
+			shimBuilder.WriteString("func ")
+			shimBuilder.WriteString(fn.Name())
+			types.WriteSignature(&tempBuffer, signature, qualifierOnlyPackageName)
+			shimBuilder.Write(tempBuffer.Bytes())
+			tempBuffer.Reset()
+			shimBuilder.WriteString(" {\n\t")
+			if signature.Results().Len() > 0 {
+				shimBuilder.WriteString("return ")
+			}
+			shimBuilder.WriteString(pkg.Name)
+			shimBuilder.WriteByte('.')
+			shimBuilder.WriteString(fn.Name())
+			shimBuilder.WriteByte('[')
+			for index := range signature.TypeParams().Len() {
+				if index > 0 {
+					shimBuilder.WriteString(", ")
+				}
+				shimBuilder.WriteString(signature.TypeParams().At(index).Obj().Name())
+			}
+			shimBuilder.WriteString("](")
+			for index := range signature.Params().Len() {
+				if index > 0 {
+					shimBuilder.WriteString(", ")
+				}
+				shimBuilder.WriteString(signature.Params().At(index).Name())
+				if signature.Variadic() && index == signature.Params().Len()-1 {
+					shimBuilder.WriteString("...")
+				}
+			}
+			shimBuilder.WriteString(")\n}\n")
 			return true
 		}
 
@@ -382,7 +429,13 @@ func main() {
 				printReexport("var")
 			case *types.Func:
 				if !slices.Contains(extraShim.IgnoreFunctions, name) {
-					emitLinkedFunction(object)
+					if object.Signature().TypeParams() != nil {
+						if _, exists := matchedExtraFunctions[name]; exists {
+							matchedExtraFunctions[name] = emitGenericWrapper(object)
+						}
+					} else {
+						emitLinkedFunction(object)
+					}
 				}
 			}
 		}

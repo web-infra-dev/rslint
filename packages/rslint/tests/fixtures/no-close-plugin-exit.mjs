@@ -22,4 +22,5 @@ if (
   console.error('unexpected plugin result: ' + JSON.stringify(result ?? null));
   process.exit(2);
 }
+console.log('FIXTURE_OK:no-close-plugin');
 // Intentionally no rslint.close().

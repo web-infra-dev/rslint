@@ -3,10 +3,13 @@ import { defineConfig } from '@rstest/core';
 export default defineConfig({
   testEnvironment: 'node',
   globals: true,
-  testTimeout: 600000,
+  // Normal completion is event-driven. This is only the final in-process
+  // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
+  testTimeout: 35 * 60_000,
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/spawn-cli.test.ts',
     './tests/cli/color-matrix.test.ts',
     './tests/cli/file-args.test.ts',
     './tests/cli/disable-comments.test.ts',
@@ -531,6 +534,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-to-have-been-called.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
+    './tests/eslint-plugin-jest/rules/require-hook.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',

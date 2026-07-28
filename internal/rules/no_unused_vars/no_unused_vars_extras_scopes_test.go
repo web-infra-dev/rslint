@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -758,5 +759,108 @@ consume(data);`,
 				t.Fatalf("unused names = %v, want %v", names, test.wantNames)
 			}
 		})
+	}
+}
+
+func TestNoUnusedVarsEditDemand(t *testing.T) {
+	t.Parallel()
+
+	const code = `const removable = 1;
+let assigned: number;
+assigned = 2;
+`
+	tmpDir := t.TempDir()
+	filePath := tspath.NormalizePath(filepath.Join(tmpDir, "edit-demand.ts"))
+	if err := os.WriteFile(filePath, []byte(code), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	host := utils.CreateCompilerHost(tmpDir, fs)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		SkipLibCheck: core.TSTrue,
+		Target:       core.ScriptTargetESNext,
+	}, []string{filePath}, host)
+	if err != nil {
+		t.Fatalf("create program: %v", err)
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:     program,
+			File:        filePath,
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     NoUnusedVarsRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return NoUnusedVarsRule.Run(ctx, nil)
+					},
+				}}
+			},
+			ExcludePaths: []string{},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		return diagnostics
+	}
+
+	diagnostics := map[rule.EditDemand][]rule.RuleDiagnostic{}
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		diagnostics[demand] = run(demand)
+		if got := len(diagnostics[demand]); got != 2 {
+			t.Fatalf("demand %d: diagnostics = %d, want 2", demand, got)
+		}
+	}
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index := range diagnostics[rule.EditDemandAll] {
+		want := withoutEdits(diagnostics[rule.EditDemandAll][index])
+		for demand, demandDiagnostics := range diagnostics {
+			if got := withoutEdits(demandDiagnostics[index]); !reflect.DeepEqual(got, want) {
+				t.Errorf("demand %d: diagnostic %d changed:\ngot  %#v\nwant %#v", demand, index, got, want)
+			}
+			if demandDiagnostics[index].FixesPtr != nil {
+				t.Errorf("demand %d: diagnostic %d unexpectedly has autofixes", demand, index)
+			}
+		}
+	}
+
+	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix} {
+		for index, diagnostic := range diagnostics[demand] {
+			if diagnostic.Suggestions != nil {
+				t.Errorf("demand %d: diagnostic %d unexpectedly has suggestions", demand, index)
+			}
+		}
+	}
+
+	suggestionOnly := diagnostics[rule.EditDemandSuggestion]
+	allEdits := diagnostics[rule.EditDemandAll]
+	if suggestionOnly[0].Suggestions == nil ||
+		!reflect.DeepEqual(suggestionOnly[0].Suggestions, allEdits[0].Suggestions) {
+		t.Fatalf("remove suggestions differ between suggestion-only and all demand")
+	}
+	if got := *allEdits[0].Suggestions; len(got) != 1 || got[0].Message.Id != "removeVar" || len(got[0].Fixes()) != 1 {
+		t.Fatalf("unexpected remove suggestions: %#v", got)
+	}
+	if suggestionOnly[1].Suggestions != nil || allEdits[1].Suggestions != nil {
+		t.Fatalf("write-only diagnostic unexpectedly has remove suggestions")
 	}
 }

@@ -202,6 +202,7 @@ var NoUnneededTernaryRule = rule.Rule{
 			Id:          "unnecessaryConditionalAssignment",
 			Description: "Unnecessary use of conditional expression for default assignment.",
 		}
+		sourceFile := ctx.SourceFile
 
 		return rule.RuleListeners{
 			ast.KindConditionalExpression: func(node *ast.Node) {
@@ -213,16 +214,21 @@ var NoUnneededTernaryRule = rule.Rule{
 				consVal, consOk := boolKind(cond.WhenTrue)
 				altVal, altOk := boolKind(cond.WhenFalse)
 				if consOk && altOk {
-					if fixes := buildBooleanLiteralFix(ctx.SourceFile, cond, consVal, altVal); fixes != nil {
-						ctx.ReportNodeWithFixes(node, condExprMsg, fixes...)
-					} else {
+					if consVal == altVal &&
+						ast.SkipParentheses(cond.Condition).Kind != ast.KindIdentifier {
 						ctx.ReportNode(node, condExprMsg)
+						return
 					}
+					ctx.ReportNodeWithDeferredFixes(node, condExprMsg, func() []rule.RuleFix {
+						return buildBooleanLiteralFix(sourceFile, cond, consVal, altVal)
+					})
 					return
 				}
 
 				if !opts.defaultAssignment && matchesDefaultAssignment(cond.Condition, cond.WhenTrue) {
-					ctx.ReportNodeWithFixes(node, condAssignMsg, buildDefaultAssignmentFix(ctx.SourceFile, cond)...)
+					ctx.ReportNodeWithDeferredFixes(node, condAssignMsg, func() []rule.RuleFix {
+						return buildDefaultAssignmentFix(sourceFile, cond)
+					})
 				}
 			},
 		}

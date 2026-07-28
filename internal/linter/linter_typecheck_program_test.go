@@ -69,7 +69,9 @@ const v: number = bad;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
@@ -111,7 +113,9 @@ export const x: T = {} as T;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
@@ -150,7 +154,9 @@ export const x: T = {} as T;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic:    func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
@@ -203,10 +209,12 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if d.RuleName == "TypeScript(TS2322)" {
-				ts2322++
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if d.RuleName == "TypeScript(TS2322)" {
+					ts2322++
+				}
+			},
 		},
 	})
 	if err != nil {
@@ -235,7 +243,9 @@ func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
 		GetRulesForFile:       func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:             true,
 		SkipTypeCheckPrograms: []bool{true},
-		OnDiagnostic:          func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+		},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
@@ -268,10 +278,12 @@ const x: number = 1;
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if d.RuleName == "TypeScript(TS2578)" {
-				found = true
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if d.RuleName == "TypeScript(TS2578)" {
+					found = true
+				}
+			},
 		},
 	})
 	if err != nil {

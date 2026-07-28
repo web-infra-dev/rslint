@@ -126,6 +126,42 @@ describe('parseArgs positionals', () => {
     expect(result.positionals).toEqual(['--not-a-flag']);
   });
 
+  test('bare --timing is forwarded with the default "all"', () => {
+    const result = parseArgs(['--timing', 'src/a.ts']);
+    expect(result.rest).toEqual(['--timing', 'all', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('--timing N consumes the count', () => {
+    const result = parseArgs(['--timing', '20', 'src/a.ts']);
+    expect(result.rest).toEqual(['--timing', '20', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('--timing all consumes the value', () => {
+    const result = parseArgs(['--timing', 'all', 'src/a.ts']);
+    expect(result.rest).toEqual(['--timing', 'all', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('--timing N after a positional is reordered together', () => {
+    const result = parseArgs(['src/a.ts', '--timing', '20']);
+    expect(result.rest).toEqual(['--timing', '20', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('bare --timing as the last argument gets "all"', () => {
+    const result = parseArgs(['src/a.ts', '--timing']);
+    expect(result.rest).toEqual(['--timing', 'all', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('--timing does not look past the -- terminator', () => {
+    const result = parseArgs(['--timing', '--', '10']);
+    expect(result.rest).toEqual(['--timing', 'all', '--', '10']);
+    expect(result.positionals).toEqual(['10']);
+  });
+
   test('--singleThreaded is detected and still forwarded to Go', () => {
     const result = parseArgs(['--singleThreaded', 'src/a.ts']);
     expect(result.singleThreaded).toBe(true);

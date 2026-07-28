@@ -130,6 +130,25 @@ Determine the mode based on the number of rules:
 - **1 rule** → Single Rule Mode
 - **2+ rules** → Batch Mode
 
+### Framework Performance Defaults
+
+Apply these defaults during every implementation phase. Do not rebuild work
+that the rule framework already shares or can skip:
+
+- **Autofixes and suggestions**: report them with the matching
+  `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method. Keep
+  diagnostic detection, message, and report range eager, but move all
+  edit-only source-text, range, string, slice, and suggestion construction into
+  the builder. A builder may return nil when the diagnostic is not fixable.
+- **Declared-symbol references**: translate ESLint `variable.references` to
+  `ctx.Refs.References(decl.Symbol())`. Never walk the file and call
+  `GetSymbolAtLocation` once per identifier.
+- **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
+  `ctx.SourceFile.AsNode()` once per rule.
+
+See [AST_PATTERNS.md](references/AST_PATTERNS.md) for the APIs, boundaries, and
+worked examples.
+
 ### Single Rule Mode
 
 Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
@@ -228,6 +247,14 @@ Do NOT include AI-related information in PR title or body. If any rules were ski
 The workflow is complete ONLY when all tasks created during Planning are marked as `completed` (or explicitly skipped due to failure). Do NOT stop or wait for user instructions while there are still pending tasks. If the conversation context was compressed or the session was resumed, call `TaskList` first to check remaining work before continuing.
 
 ## Quick Reference
+
+**Framework defaults**:
+
+| Need                            | Use                                                    |
+| ------------------------------- | ------------------------------------------------------ |
+| Autofixes or suggestions        | `ReportNodeWithDeferred*` / `ReportRangeWithDeferred*` |
+| References to a declared symbol | `ctx.Refs.References(decl.Symbol())`                   |
+| Every comment in the file       | `ctx.Comments.All()`                                   |
 
 **Directory Structure**:
 

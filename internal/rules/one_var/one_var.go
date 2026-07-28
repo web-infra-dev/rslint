@@ -1,7 +1,7 @@
 package one_var
 
 import (
-	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -207,37 +207,38 @@ func isRequireDecl(decl *ast.Node) bool {
 	return callee.AsIdentifier().Text == "require"
 }
 
-func countDeclarations(decls []*ast.Node) (initialized, uninitialized int) {
+type declarationStats struct {
+	initialized   int
+	uninitialized int
+	requires      int
+	total         int
+}
+
+func collectDeclarationStats(decls []*ast.Node, inspectRequires bool) declarationStats {
+	stats := declarationStats{total: len(decls)}
 	for _, d := range decls {
 		vd := d.AsVariableDeclaration()
 		if vd == nil {
 			continue
 		}
 		if vd.Initializer == nil {
-			uninitialized++
+			stats.uninitialized++
 		} else {
-			initialized++
+			stats.initialized++
+		}
+		if inspectRequires && isRequireDecl(d) {
+			stats.requires++
 		}
 	}
-	return
+	return stats
 }
 
-func someRequire(decls []*ast.Node) bool {
-	for _, d := range decls {
-		if isRequireDecl(d) {
-			return true
-		}
-	}
-	return false
+func (s declarationStats) hasRequire() bool {
+	return s.requires > 0
 }
 
-func everyRequire(decls []*ast.Node) bool {
-	for _, d := range decls {
-		if !isRequireDecl(d) {
-			return false
-		}
-	}
-	return true
+func (s declarationStats) allRequire() bool {
+	return s.requires == s.total
 }
 
 // getStatementListSiblings returns the parent's statement list IF the parent
@@ -279,12 +280,29 @@ func findPreviousSibling(stmtNode *ast.Node) *ast.Node {
 	if siblings == nil {
 		return nil
 	}
-	for i, sib := range siblings {
-		if sib == stmtNode {
-			if i > 0 {
-				return siblings[i-1]
+
+	targetPos := stmtNode.Pos()
+	index := sort.Search(len(siblings), func(i int) bool {
+		return siblings[i].Pos() >= targetPos
+	})
+	for i := index; i < len(siblings) && siblings[i].Pos() == targetPos; i++ {
+		if siblings[i] == stmtNode {
+			if i == 0 {
+				return nil
 			}
-			return nil
+			return siblings[i-1]
+		}
+	}
+
+	// Parser-owned statement lists are source ordered, so the binary-search
+	// path above is the normal case. Retain a linear fallback for synthetic or
+	// recovery ASTs whose node positions do not preserve that invariant.
+	for i, sibling := range siblings {
+		if sibling == stmtNode {
+			if i == 0 {
+				return nil
+			}
+			return siblings[i-1]
 		}
 	}
 	return nil
@@ -331,24 +349,18 @@ func isInStatementListPosition(parent *ast.Node) bool {
 //   - reportEnd:         last byte of the VariableDeclaration. Includes the
 //     trailing `;` for top-level forms; matches the
 //     VariableDeclarationList's end for for-init.
-//   - keywordRange:      range of the kind keyword (`var`/`let`/`const`/
-//     `using` or `await` for `await using`). Used for
-//     autofix to remove the keyword on the merged side.
 type eslintVarDeclView struct {
 	hasExportWrapper bool
 	hasOtherModifier bool
 	reportStart      int
 	reportEnd        int
-	keywordRange     core.TextRange
 }
 
 // makeView builds an eslintVarDeclView for either a top-level VariableStatement
 // (parent of declList) or a for-init VariableDeclarationList (when there is no
 // wrapping VariableStatement).
 func makeView(declList *ast.Node, sf *ast.SourceFile) eslintVarDeclView {
-	view := eslintVarDeclView{
-		keywordRange: utils.GetVarKeywordRange(asKeywordHost(declList), sf),
-	}
+	view := eslintVarDeclView{}
 	parent := declList.Parent
 	if parent != nil && parent.Kind == ast.KindVariableStatement {
 		stmtNode := parent
@@ -387,6 +399,21 @@ func makeView(declList *ast.Node, sf *ast.SourceFile) eslintVarDeclView {
 		view.reportEnd = declList.End()
 	}
 	return view
+}
+
+type eslintVarDeclViewCache struct {
+	declList *ast.Node
+	sf       *ast.SourceFile
+	view     eslintVarDeclView
+	ready    bool
+}
+
+func (c *eslintVarDeclViewCache) get() eslintVarDeclView {
+	if !c.ready {
+		c.view = makeView(c.declList, c.sf)
+		c.ready = true
+	}
+	return c.view
 }
 
 // asKeywordHost picks the right node to feed into utils.GetVarKeywordRange:
@@ -439,7 +466,10 @@ func fixCombine(view eslintVarDeclView, currentDeclList *ast.Node, kind string, 
 		return nil
 	}
 
-	keywordRange := view.keywordRange
+	// Keyword scanning is needed only when autofixes are requested. All
+	// diagnostics use deferred fix builders, so keep this work off the normal
+	// diagnostics-only path.
+	keywordRange := utils.GetVarKeywordRange(asKeywordHost(currentDeclList), sf)
 
 	var fixes []rule.RuleFix
 
@@ -542,22 +572,31 @@ func fixSplit(view eslintVarDeclView, declList *ast.Node, kind string, sf *ast.S
 }
 
 func msg(id, kind string) rule.RuleMessage {
-	descriptions := map[string]string{
-		"combineUninitialized": "Combine this with the previous '%s' statement with uninitialized variables.",
-		"combineInitialized":   "Combine this with the previous '%s' statement with initialized variables.",
-		"splitUninitialized":   "Split uninitialized '%s' declarations into multiple statements.",
-		"splitInitialized":     "Split initialized '%s' declarations into multiple statements.",
-		"splitRequires":        "Split requires to be separated into a single block.",
-		"combine":              "Combine this with the previous '%s' statement.",
-		"split":                "Split '%s' declarations into multiple statements.",
-	}
-	tmpl := descriptions[id]
 	if id == "splitRequires" {
-		return rule.RuleMessage{Id: id, Description: tmpl}
+		return rule.RuleMessage{
+			Id:          id,
+			Description: "Split requires to be separated into a single block.",
+		}
+	}
+
+	var description string
+	switch id {
+	case "combineUninitialized":
+		description = "Combine this with the previous '" + kind + "' statement with uninitialized variables."
+	case "combineInitialized":
+		description = "Combine this with the previous '" + kind + "' statement with initialized variables."
+	case "splitUninitialized":
+		description = "Split uninitialized '" + kind + "' declarations into multiple statements."
+	case "splitInitialized":
+		description = "Split initialized '" + kind + "' declarations into multiple statements."
+	case "combine":
+		description = "Combine this with the previous '" + kind + "' statement."
+	case "split":
+		description = "Split '" + kind + "' declarations into multiple statements."
 	}
 	return rule.RuleMessage{
 		Id:          id,
-		Description: fmt.Sprintf(tmpl, kind),
+		Description: description,
 		Data:        map[string]string{"type": kind},
 	}
 }
@@ -565,24 +604,20 @@ func msg(id, kind string) rule.RuleMessage {
 // recordTypes flips scope flags for declarators that match the option's
 // MODE_ALWAYS, including the `required` flag for separateRequires-tracked
 // requires. Mirrors ESLint's `recordTypes`.
-func recordTypes(scope *funcScope, opts typeOpts, decls []*ast.Node, separateRequires bool) {
-	for _, decl := range decls {
-		vd := decl.AsVariableDeclaration()
-		if vd == nil {
-			continue
-		}
-		if vd.Initializer == nil {
-			if opts.uninitialized == modeAlways {
-				scope.uninitialized = true
+func recordTypes(scope *funcScope, opts typeOpts, stats declarationStats, separateRequires bool) {
+	if opts.uninitialized == modeAlways && stats.uninitialized > 0 {
+		scope.uninitialized = true
+	}
+	if opts.initialized == modeAlways && stats.initialized > 0 {
+		if separateRequires {
+			if stats.requires > 0 {
+				scope.required = true
+			}
+			if stats.initialized > stats.requires {
+				scope.initialized = true
 			}
 		} else {
-			if opts.initialized == modeAlways {
-				if separateRequires && isRequireDecl(decl) {
-					scope.required = true
-				} else {
-					scope.initialized = true
-				}
-			}
+			scope.initialized = true
 		}
 	}
 }
@@ -592,9 +627,8 @@ func recordTypes(scope *funcScope, opts typeOpts, decls []*ast.Node, separateReq
 // in the scope. Returns false (without recording) on conflict — matches
 // ESLint's `hasOnlyOneStatement` precisely, including the `hasRequires` /
 // `currentScope.required` carve-outs for separateRequires.
-func hasOnlyOneStatement(scope *funcScope, opts typeOpts, decls []*ast.Node, separateRequires bool) bool {
-	initCount, uninitCount := countDeclarations(decls)
-	hasReq := someRequire(decls)
+func hasOnlyOneStatement(scope *funcScope, opts typeOpts, stats declarationStats, separateRequires bool) bool {
+	hasReq := stats.hasRequire()
 
 	if opts.uninitialized == modeAlways && opts.initialized == modeAlways {
 		if scope.uninitialized || scope.initialized {
@@ -603,12 +637,12 @@ func hasOnlyOneStatement(scope *funcScope, opts typeOpts, decls []*ast.Node, sep
 			}
 		}
 	}
-	if uninitCount > 0 {
+	if stats.uninitialized > 0 {
 		if opts.uninitialized == modeAlways && scope.uninitialized {
 			return false
 		}
 	}
-	if initCount > 0 {
+	if stats.initialized > 0 {
 		if opts.initialized == modeAlways && scope.initialized {
 			if !hasReq {
 				return false
@@ -618,8 +652,25 @@ func hasOnlyOneStatement(scope *funcScope, opts typeOpts, decls []*ast.Node, sep
 	if scope.required && hasReq {
 		return false
 	}
-	recordTypes(scope, opts, decls, separateRequires)
+	recordTypes(scope, opts, stats, separateRequires)
 	return true
+}
+
+func hasMode(opts typeOpts, mode string) bool {
+	return opts.initialized == mode || opts.uninitialized == mode
+}
+
+func currentScope(key string, funcStack []funcScope, blockStack []blockScope) *funcScope {
+	if key == "var" {
+		if len(funcStack) == 0 {
+			return nil
+		}
+		return &funcStack[len(funcStack)-1]
+	}
+	if len(blockStack) == 0 {
+		return nil
+	}
+	return blockStack[len(blockStack)-1].get(key)
 }
 
 var OneVarRule = rule.Rule{
@@ -627,33 +678,19 @@ var OneVarRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-		funcStack := []*funcScope{{}}
-		blockStack := []*blockScope{{}}
+		needsVarScope := hasMode(opts.var_, modeAlways)
+		needsBlockScope := hasMode(opts.let_, modeAlways) ||
+			hasMode(opts.const_, modeAlways) ||
+			hasMode(opts.using_, modeAlways) ||
+			hasMode(opts.awaitUsing, modeAlways)
 
-		startBlock := func(*ast.Node) {
-			blockStack = append(blockStack, &blockScope{})
+		var funcStack []funcScope
+		if needsVarScope {
+			funcStack = []funcScope{{}}
 		}
-		endBlock := func(*ast.Node) {
-			if len(blockStack) > 0 {
-				blockStack = blockStack[:len(blockStack)-1]
-			}
-		}
-		startFunction := func(node *ast.Node) {
-			funcStack = append(funcStack, &funcScope{})
-			startBlock(node)
-		}
-		endFunction := func(node *ast.Node) {
-			if len(funcStack) > 0 {
-				funcStack = funcStack[:len(funcStack)-1]
-			}
-			endBlock(node)
-		}
-
-		getCurrentScope := func(key string) *funcScope {
-			if key == "var" {
-				return funcStack[len(funcStack)-1]
-			}
-			return blockStack[len(blockStack)-1].get(key)
+		var blockStack []blockScope
+		if needsBlockScope {
+			blockStack = []blockScope{{}}
 		}
 
 		checkDeclList := func(node *ast.Node) {
@@ -682,13 +719,6 @@ var OneVarRule = rule.Rule{
 				return
 			}
 
-			// Centralized AST-shape view: encapsulates every divergence between
-			// tsgo (export/declare on VariableStatement.Modifiers) and ESLint
-			// (export → ExportNamedDeclaration wrapper, declare → VariableDeclaration
-			// modifier). The rest of the function reasons in ESLint terms.
-			view := makeView(node, ctx.SourceFile)
-			reportRange := view.reportRange()
-
 			kind := utils.GetVarDeclListKind(node)
 			if kind == "" {
 				return
@@ -699,13 +729,21 @@ var OneVarRule = rule.Rule{
 				return
 			}
 
+			usesAlways := hasMode(typeOpts, modeAlways)
+			usesConsecutive := hasMode(typeOpts, modeConsecutive)
+			usesNever := hasMode(typeOpts, modeNever)
 			declarations := declList.Declarations.Nodes
-			initCount, uninitCount := countDeclarations(declarations)
+			stats := collectDeclarationStats(declarations, usesAlways || usesConsecutive)
+			viewCache := eslintVarDeclViewCache{
+				declList: node,
+				sf:       ctx.SourceFile,
+			}
 
 			// 1. splitRequires: separateRequires + mixed requires/non-requires.
 			if typeOpts.initialized == modeAlways && opts.separateRequires {
-				if someRequire(declarations) && !everyRequire(declarations) {
-					ctx.ReportRange(reportRange, msg("splitRequires", kind))
+				if stats.hasRequire() && !stats.allRequire() {
+					view := viewCache.get()
+					ctx.ReportRange(view.reportRange(), msg("splitRequires", kind))
 				}
 			}
 
@@ -715,26 +753,36 @@ var OneVarRule = rule.Rule{
 			// `export`-wrapped declarations are inside ExportNamedDeclaration
 			// (no `.body` array), so consecutive never fires on either side
 			// of an export wrapper. Honor both guards via the view abstraction.
-			if !isForInit && !isForInOfInit && stmtNode.Kind == ast.KindVariableStatement && !view.hasExportWrapper {
-				if prev := findPreviousSibling(stmtNode); prev != nil && prev.Kind == ast.KindVariableStatement {
-					prevDeclList := prev.AsVariableStatement().DeclarationList
-					if prevDeclList != nil && utils.GetVarDeclListKind(prevDeclList) == kind {
-						prevView := makeView(prevDeclList, ctx.SourceFile)
-						if !prevView.hasExportWrapper {
-							prevDecls := prevDeclList.AsVariableDeclarationList().Declarations.Nodes
-							combinedAllRequire := everyRequire(declarations) && everyRequire(prevDecls)
-							combinedAnyRequire := someRequire(declarations) || someRequire(prevDecls)
-							mixedRequires := combinedAnyRequire && !combinedAllRequire
+			if usesConsecutive && !isForInit && !isForInOfInit && stmtNode.Kind == ast.KindVariableStatement {
+				view := viewCache.get()
+				if !view.hasExportWrapper {
+					if prev := findPreviousSibling(stmtNode); prev != nil && prev.Kind == ast.KindVariableStatement {
+						prevDeclList := prev.AsVariableStatement().DeclarationList
+						if prevDeclList != nil && utils.GetVarDeclListKind(prevDeclList) == kind {
+							prevView := makeView(prevDeclList, ctx.SourceFile)
+							if !prevView.hasExportWrapper {
+								prevDecls := prevDeclList.AsVariableDeclarationList().Declarations.Nodes
+								prevStats := collectDeclarationStats(prevDecls, true)
+								combinedAllRequire := stats.allRequire() && prevStats.allRequire()
+								combinedAnyRequire := stats.hasRequire() || prevStats.hasRequire()
+								mixedRequires := combinedAnyRequire && !combinedAllRequire
 
-							if !mixedRequires {
-								prevInitCount, prevUninitCount := countDeclarations(prevDecls)
-								switch {
-								case typeOpts.initialized == modeConsecutive && typeOpts.uninitialized == modeConsecutive:
-									reportRangeWithFixes(ctx, reportRange, msg("combine", kind), fixCombine(view, node, kind, ctx.SourceFile))
-								case typeOpts.initialized == modeConsecutive && initCount > 0 && prevInitCount > 0:
-									reportRangeWithFixes(ctx, reportRange, msg("combineInitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
-								case typeOpts.uninitialized == modeConsecutive && uninitCount > 0 && prevUninitCount > 0:
-									reportRangeWithFixes(ctx, reportRange, msg("combineUninitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+								if !mixedRequires {
+									reportRange := view.reportRange()
+									switch {
+									case typeOpts.initialized == modeConsecutive && typeOpts.uninitialized == modeConsecutive:
+										ctx.ReportRangeWithDeferredFixes(reportRange, msg("combine", kind), func() []rule.RuleFix {
+											return fixCombine(view, node, kind, ctx.SourceFile)
+										})
+									case typeOpts.initialized == modeConsecutive && stats.initialized > 0 && prevStats.initialized > 0:
+										ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineInitialized", kind), func() []rule.RuleFix {
+											return fixCombine(view, node, kind, ctx.SourceFile)
+										})
+									case typeOpts.uninitialized == modeConsecutive && stats.uninitialized > 0 && prevStats.uninitialized > 0:
+										ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineUninitialized", kind), func() []rule.RuleFix {
+											return fixCombine(view, node, kind, ctx.SourceFile)
+										})
+									}
 								}
 							}
 						}
@@ -743,37 +791,86 @@ var OneVarRule = rule.Rule{
 			}
 
 			// 3. always: scope already saw a same-kind statement.
-			currentScope := getCurrentScope(key)
-			if currentScope != nil && !hasOnlyOneStatement(currentScope, typeOpts, declarations, opts.separateRequires) {
-				if typeOpts.initialized == modeAlways && typeOpts.uninitialized == modeAlways {
-					reportRangeWithFixes(ctx, reportRange, msg("combine", kind), fixCombine(view, node, kind, ctx.SourceFile))
-				} else {
-					if typeOpts.initialized == modeAlways && initCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("combineInitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
-					}
-					if typeOpts.uninitialized == modeAlways && uninitCount > 0 {
-						// for-in/for-of left side: skip combineUninitialized
-						// (mirrors ESLint's `parent.left === node` early return).
-						if !isForInOfInit {
-							reportRangeWithFixes(ctx, reportRange, msg("combineUninitialized", kind), fixCombine(view, node, kind, ctx.SourceFile))
+			if usesAlways {
+				scope := currentScope(key, funcStack, blockStack)
+				if scope != nil && !hasOnlyOneStatement(scope, typeOpts, stats, opts.separateRequires) {
+					view := viewCache.get()
+					reportRange := view.reportRange()
+					if typeOpts.initialized == modeAlways && typeOpts.uninitialized == modeAlways {
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("combine", kind), func() []rule.RuleFix {
+							return fixCombine(view, node, kind, ctx.SourceFile)
+						})
+					} else {
+						if typeOpts.initialized == modeAlways && stats.initialized > 0 {
+							ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineInitialized", kind), func() []rule.RuleFix {
+								return fixCombine(view, node, kind, ctx.SourceFile)
+							})
+						}
+						if typeOpts.uninitialized == modeAlways && stats.uninitialized > 0 {
+							// for-in/for-of left side: skip combineUninitialized
+							// (mirrors ESLint's `parent.left === node` early return).
+							if !isForInOfInit {
+								ctx.ReportRangeWithDeferredFixes(reportRange, msg("combineUninitialized", kind), func() []rule.RuleFix {
+									return fixCombine(view, node, kind, ctx.SourceFile)
+								})
+							}
 						}
 					}
 				}
 			}
 
 			// 4. never: multiple declarators in a single statement (skip ForStatement init).
-			if !isForInit {
-				totalDecls := initCount + uninitCount
+			if usesNever && !isForInit {
+				totalDecls := stats.initialized + stats.uninitialized
 				if totalDecls > 1 {
+					view := viewCache.get()
+					reportRange := view.reportRange()
 					if typeOpts.initialized == modeNever && typeOpts.uninitialized == modeNever {
-						reportRangeWithFixes(ctx, reportRange, msg("split", kind), fixSplit(view, node, kind, ctx.SourceFile))
-					} else if typeOpts.initialized == modeNever && initCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("splitInitialized", kind), fixSplit(view, node, kind, ctx.SourceFile))
-					} else if typeOpts.uninitialized == modeNever && uninitCount > 0 {
-						reportRangeWithFixes(ctx, reportRange, msg("splitUninitialized", kind), fixSplit(view, node, kind, ctx.SourceFile))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("split", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
+					} else if typeOpts.initialized == modeNever && stats.initialized > 0 {
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("splitInitialized", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
+					} else if typeOpts.uninitialized == modeNever && stats.uninitialized > 0 {
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg("splitUninitialized", kind), func() []rule.RuleFix {
+							return fixSplit(view, node, kind, ctx.SourceFile)
+						})
 					}
 				}
 			}
+		}
+
+		// "never" and "consecutive" are statement-local and do not need any
+		// function or block boundary bookkeeping.
+		if !needsVarScope && !needsBlockScope {
+			return rule.RuleListeners{
+				ast.KindVariableDeclarationList: checkDeclList,
+			}
+		}
+
+		startBlock := func(*ast.Node) {
+			if needsBlockScope {
+				blockStack = append(blockStack, blockScope{})
+			}
+		}
+		endBlock := func(*ast.Node) {
+			if needsBlockScope && len(blockStack) > 0 {
+				blockStack = blockStack[:len(blockStack)-1]
+			}
+		}
+		startFunction := func(*ast.Node) {
+			if needsVarScope {
+				funcStack = append(funcStack, funcScope{})
+			}
+			startBlock(nil)
+		}
+		endFunction := func(*ast.Node) {
+			if needsVarScope && len(funcStack) > 0 {
+				funcStack = funcStack[:len(funcStack)-1]
+			}
+			endBlock(nil)
 		}
 
 		return rule.RuleListeners{
@@ -814,12 +911,4 @@ var OneVarRule = rule.Rule{
 			ast.KindVariableDeclarationList: checkDeclList,
 		}
 	},
-}
-
-func reportRangeWithFixes(ctx rule.RuleContext, r core.TextRange, m rule.RuleMessage, fixes []rule.RuleFix) {
-	if len(fixes) > 0 {
-		ctx.ReportRangeWithFixes(r, m, fixes...)
-	} else {
-		ctx.ReportRange(r, m)
-	}
 }

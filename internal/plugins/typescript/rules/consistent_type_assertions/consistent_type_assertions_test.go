@@ -1,9 +1,13 @@
 package consistent_type_assertions
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -419,4 +423,122 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			}},
 		},
 	})
+}
+
+func TestConsistentTypeAssertionsEditDemand(t *testing.T) {
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		`const angle = <Shape<number>>source;
+const object = ({ value: source }) as Shape<number>;
+const array = ([source]) as Array<number>;`,
+		"edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := []any{map[string]interface{}{
+		"assertionStyle":              "as",
+		"objectLiteralTypeAssertions": "never",
+		"arrayLiteralTypeAssertions":  "never",
+	}}
+	wantMessageIDs := []string{
+		"as",
+		"unexpectedObjectTypeAssertion",
+		"unexpectedArrayTypeAssertion",
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     ConsistentTypeAssertionsRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return ConsistentTypeAssertionsRule.Run(ctx, options)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != len(wantMessageIDs) {
+			t.Fatalf("demand %d: diagnostics = %d, want %d", demand, len(diagnostics), len(wantMessageIDs))
+		}
+		for index, messageID := range wantMessageIDs {
+			if diagnostics[index].Message.Id != messageID {
+				t.Fatalf(
+					"demand %d diagnostic %d: message id = %q, want %q",
+					demand,
+					index,
+					diagnostics[index].Message.Id,
+					messageID,
+				)
+			}
+		}
+		return diagnostics
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index, allEditsDiagnostic := range allEdits {
+		for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+			rule.EditDemandNone:       diagnosticsOnly[index],
+			rule.EditDemandAutofix:    autofixOnly[index],
+			rule.EditDemandSuggestion: suggestionOnly[index],
+		} {
+			if got, want := withoutEdits(diagnostic), withoutEdits(allEditsDiagnostic); !reflect.DeepEqual(got, want) {
+				t.Errorf(
+					"diagnostic %d demand %d changed identity:\ngot  %#v\nwant %#v",
+					index,
+					demand,
+					got,
+					want,
+				)
+			}
+		}
+
+		if diagnosticsOnly[index].FixesPtr != nil || diagnosticsOnly[index].Suggestions != nil {
+			t.Errorf("diagnostic %d: diagnostics-only demand materialized edits", index)
+		}
+		if autofixOnly[index].Suggestions != nil || suggestionOnly[index].FixesPtr != nil {
+			t.Errorf("diagnostic %d: demand materialized the wrong edit category", index)
+		}
+	}
+
+	if autofixOnly[0].FixesPtr == nil || !reflect.DeepEqual(autofixOnly[0].FixesPtr, allEdits[0].FixesPtr) {
+		t.Error("angle-bracket autofix differs between autofix and all-edits demands")
+	}
+	if suggestionOnly[0].Suggestions != nil || allEdits[0].Suggestions != nil {
+		t.Error("angle-bracket diagnostic unexpectedly materialized suggestions")
+	}
+
+	for index := 1; index < len(allEdits); index++ {
+		if autofixOnly[index].FixesPtr != nil || allEdits[index].FixesPtr != nil {
+			t.Errorf("literal diagnostic %d unexpectedly materialized autofixes", index)
+		}
+		if suggestionOnly[index].Suggestions == nil ||
+			!reflect.DeepEqual(suggestionOnly[index].Suggestions, allEdits[index].Suggestions) {
+			t.Errorf("literal diagnostic %d differs between suggestion and all-edits demands", index)
+		}
+	}
 }

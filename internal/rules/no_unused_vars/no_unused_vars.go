@@ -55,45 +55,69 @@ type analysisContext struct {
 	tokens             []utils.SourceToken
 }
 
+func (ac *analysisContext) ensureTokens(sourceFile *ast.SourceFile) {
+	if ac.tokens != nil {
+		return
+	}
+	ac.tokens = utils.TokensOfNode(sourceFile, sourceFile.AsNode())
+}
+
+// coreRemoveSuggestionCandidate is the immutable input needed to construct
+// one optional removal suggestion. Pending diagnostics retain this data rather
+// than a closure so deferring reports does not add per-diagnostic allocations.
+type coreRemoveSuggestionCandidate struct {
+	nameNode   *ast.Node
+	definition *ast.Node
+	symbol     *ast.Symbol
+}
+
 type pendingDiagnostic struct {
-	node        *ast.Node
-	textRange   core.TextRange
-	usesRange   bool
-	message     rule.RuleMessage
-	suggestions []rule.RuleSuggestion
+	node                 *ast.Node
+	textRange            core.TextRange
+	usesRange            bool
+	message              rule.RuleMessage
+	coreRemoveSuggestion coreRemoveSuggestionCandidate
 }
 
 type diagnosticReporter struct {
-	ctx          rule.RuleContext
-	deferReports bool
-	pending      []pendingDiagnostic
+	ctx     rule.RuleContext
+	pending []pendingDiagnostic
 }
 
 func (r *diagnosticReporter) reportNode(node *ast.Node, message rule.RuleMessage) {
-	if !r.deferReports {
-		r.ctx.ReportNode(node, message)
-		return
-	}
 	r.pending = append(r.pending, pendingDiagnostic{node: node, message: message})
 }
 
-func (r *diagnosticReporter) reportNodeWithSuggestions(node *ast.Node, message rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-	if !r.deferReports {
-		r.ctx.ReportNodeWithSuggestions(node, message, suggestions...)
-		return
+func (r *diagnosticReporter) buildCoreRemoveSuggestions(
+	candidate coreRemoveSuggestionCandidate,
+	analysis *analysisContext,
+) []rule.RuleSuggestion {
+	suggestion, ok := getCoreRemoveSuggestion(
+		r.ctx,
+		candidate.nameNode,
+		candidate.definition,
+		candidate.symbol,
+		analysis,
+	)
+	if !ok {
+		return nil
 	}
+	return []rule.RuleSuggestion{suggestion}
+}
+
+func (r *diagnosticReporter) reportNodeWithDeferredCoreRemoveSuggestion(
+	node *ast.Node,
+	message rule.RuleMessage,
+	candidate coreRemoveSuggestionCandidate,
+) {
 	r.pending = append(r.pending, pendingDiagnostic{
-		node:        node,
-		message:     message,
-		suggestions: suggestions,
+		node:                 node,
+		message:              message,
+		coreRemoveSuggestion: candidate,
 	})
 }
 
 func (r *diagnosticReporter) reportRange(textRange core.TextRange, message rule.RuleMessage) {
-	if !r.deferReports {
-		r.ctx.ReportRange(textRange, message)
-		return
-	}
 	r.pending = append(r.pending, pendingDiagnostic{
 		textRange: textRange,
 		usesRange: true,
@@ -101,32 +125,39 @@ func (r *diagnosticReporter) reportRange(textRange core.TextRange, message rule.
 	})
 }
 
-func (r *diagnosticReporter) reportRangeWithSuggestions(textRange core.TextRange, message rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-	if !r.deferReports {
-		r.ctx.ReportRangeWithSuggestions(textRange, message, suggestions...)
-		return
-	}
+func (r *diagnosticReporter) reportRangeWithDeferredCoreRemoveSuggestion(
+	textRange core.TextRange,
+	message rule.RuleMessage,
+	candidate coreRemoveSuggestionCandidate,
+) {
 	r.pending = append(r.pending, pendingDiagnostic{
-		textRange:   textRange,
-		usesRange:   true,
-		message:     message,
-		suggestions: suggestions,
+		textRange:            textRange,
+		usesRange:            true,
+		message:              message,
+		coreRemoveSuggestion: candidate,
 	})
 }
 
-func (r *diagnosticReporter) flush() {
+func (r *diagnosticReporter) flush(analysis *analysisContext) {
 	sort.SliceStable(r.pending, func(i, j int) bool {
 		return r.position(r.pending[i]) < r.position(r.pending[j])
 	})
-	for _, diagnostic := range r.pending {
+	for index := range r.pending {
+		diagnostic := &r.pending[index]
 		if diagnostic.usesRange {
-			if len(diagnostic.suggestions) > 0 {
-				r.ctx.ReportRangeWithSuggestions(diagnostic.textRange, diagnostic.message, diagnostic.suggestions...)
+			if diagnostic.coreRemoveSuggestion.nameNode != nil {
+				candidate := diagnostic.coreRemoveSuggestion
+				r.ctx.ReportRangeWithDeferredSuggestions(diagnostic.textRange, diagnostic.message, func() []rule.RuleSuggestion {
+					return r.buildCoreRemoveSuggestions(candidate, analysis)
+				})
 			} else {
 				r.ctx.ReportRange(diagnostic.textRange, diagnostic.message)
 			}
-		} else if len(diagnostic.suggestions) > 0 {
-			r.ctx.ReportNodeWithSuggestions(diagnostic.node, diagnostic.message, diagnostic.suggestions...)
+		} else if diagnostic.coreRemoveSuggestion.nameNode != nil {
+			candidate := diagnostic.coreRemoveSuggestion
+			r.ctx.ReportNodeWithDeferredSuggestions(diagnostic.node, diagnostic.message, func() []rule.RuleSuggestion {
+				return r.buildCoreRemoveSuggestions(candidate, analysis)
+			})
 		} else {
 			r.ctx.ReportNode(diagnostic.node, diagnostic.message)
 		}
@@ -187,19 +218,27 @@ func eslintCoreDefinitionNameRange(sourceFile *ast.SourceFile, nameNode *ast.Nod
 	return core.NewTextRange(nameRange.Pos(), end), true
 }
 
-func reportVariableDiagnostic(ctx rule.RuleContext, reporter *diagnosticReporter, nameNode *ast.Node, reportNode *ast.Node, definition *ast.Node, message rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+func reportVariableDiagnostic(
+	ctx rule.RuleContext,
+	reporter *diagnosticReporter,
+	nameNode *ast.Node,
+	reportNode *ast.Node,
+	definition *ast.Node,
+	message rule.RuleMessage,
+	suggestionCandidate *coreRemoveSuggestionCandidate,
+) {
 	if reportNode == nameNode {
 		if textRange, extended := eslintCoreDefinitionNameRange(ctx.SourceFile, nameNode, definition); extended {
-			if len(suggestions) > 0 {
-				reporter.reportRangeWithSuggestions(textRange, message, suggestions...)
+			if suggestionCandidate != nil {
+				reporter.reportRangeWithDeferredCoreRemoveSuggestion(textRange, message, *suggestionCandidate)
 			} else {
 				reporter.reportRange(textRange, message)
 			}
 			return
 		}
 	}
-	if len(suggestions) > 0 {
-		reporter.reportNodeWithSuggestions(reportNode, message, suggestions...)
+	if suggestionCandidate != nil {
+		reporter.reportNodeWithDeferredCoreRemoveSuggestion(reportNode, message, *suggestionCandidate)
 	} else {
 		reporter.reportNode(reportNode, message)
 	}
@@ -1467,8 +1506,10 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 	)
 	switch definition.Kind {
 	case ast.KindVariableDeclaration:
+		ac.ensureTokens(ctx.SourceFile)
 		fix, ok = fixVariableDeclaration(ctx, definition, ac)
 	case ast.KindBindingElement:
+		ac.ensureTokens(ctx.SourceFile)
 		fix, ok = fixBindingElement(ctx, definition, ac)
 	case ast.KindParameter:
 		if ast.HasSyntacticModifier(definition, ast.ModifierFlagsParameterPropertyModifier) {
@@ -1478,6 +1519,7 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 			fixRange, _ := eslintCoreDefinitionNameRange(ctx.SourceFile, nameNode, definition)
 			fix, ok = rule.RuleFixRemoveRange(fixRange), true
 		} else {
+			ac.ensureTokens(ctx.SourceFile)
 			fix, ok = fixFunctionParameter(ctx, definition, ac)
 		}
 	case ast.KindFunctionDeclaration:
@@ -1491,10 +1533,12 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 	case ast.KindClassDeclaration:
 		fix, ok = removeNodeRange(ctx.SourceFile, definition), true
 	case ast.KindTypeParameter, ast.KindEnumMember:
+		ac.ensureTokens(ctx.SourceFile)
 		fix, ok = fixCommaSeparatedName(ctx, nameNode, ac), true
 	case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindModuleDeclaration, ast.KindEnumDeclaration:
 		fix, ok = removeNodeRange(ctx.SourceFile, nameNode), true
 	case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport:
+		ac.ensureTokens(ctx.SourceFile)
 		fix, ok = fixImportBinding(ctx, definition, ac)
 	}
 	if !ok {
@@ -1963,7 +2007,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 				}
 			}
 			additional := ignorePatternAdditional(matchedType, opts, true)
-			reportVariableDiagnostic(ctx, ac.reporter, nameNode, reportNode, definition, buildUsedIgnoredVarMessage(name, additional))
+			reportVariableDiagnostic(ctx, ac.reporter, nameNode, reportNode, definition, buildUsedIgnoredVarMessage(name, additional), nil)
 		}
 		return
 	}
@@ -2009,14 +2053,23 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	usedIgnoredAdditional := ignorePatternAdditional(matchedType, opts, true)
 
 	if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
-		reportVariableDiagnostic(ctx, ac.reporter, nameNode, varInfo.Variable, definition, buildUsedIgnoredVarMessage(name, usedIgnoredAdditional))
+		reportVariableDiagnostic(ctx, ac.reporter, nameNode, varInfo.Variable, definition, buildUsedIgnoredVarMessage(name, usedIgnoredAdditional), nil)
 	} else if !varInfo.Used {
 		message := buildUnusedVarMessage(name, assigned, unusedAdditional)
-		if suggestion, ok := getCoreRemoveSuggestion(ctx, nameNode, definition, sym, ac); ok {
-			reportVariableDiagnostic(ctx, ac.reporter, nameNode, reportNode, definition, message, suggestion)
-			return
+		suggestionCandidate := coreRemoveSuggestionCandidate{
+			nameNode:   nameNode,
+			definition: definition,
+			symbol:     sym,
 		}
-		reportVariableDiagnostic(ctx, ac.reporter, nameNode, reportNode, definition, message)
+		reportVariableDiagnostic(
+			ctx,
+			ac.reporter,
+			nameNode,
+			reportNode,
+			definition,
+			message,
+			&suggestionCandidate,
+		)
 	}
 }
 
@@ -2032,11 +2085,7 @@ func newRule() rule.Rule {
 				return rule.RuleListeners{}
 			}
 			opts := parseOptions(options)
-			reporter := &diagnosticReporter{
-				ctx:          ctx,
-				deferReports: true,
-			}
-			tokens := utils.TokensOfNode(ctx.SourceFile, ctx.SourceFile.AsNode())
+			reporter := &diagnosticReporter{ctx: ctx}
 
 			ac := &analysisContext{
 				allUsages:          make(map[*ast.Symbol][]*ast.Node),
@@ -2049,7 +2098,6 @@ func newRule() rule.Rule {
 				refIndex:          utils.NewReferenceIndex(ctx.SourceFile, nil),
 				seenMergedSymbols: make(map[*ast.Symbol]bool),
 				reporter:          reporter,
-				tokens:            tokens,
 			}
 			collected := false
 
@@ -2393,12 +2441,12 @@ func newRule() rule.Rule {
 
 			statements := ctx.SourceFile.Statements
 			if statements == nil || len(statements.Nodes) == 0 {
-				reporter.flush()
+				reporter.flush(ac)
 			} else {
 				lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
 				listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
 					if node == lastTopLevelNode {
-						reporter.flush()
+						reporter.flush(ac)
 					}
 				}
 			}

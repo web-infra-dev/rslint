@@ -11,7 +11,11 @@ import type {
   TokenCountOpts,
   TokenSkipOpts,
 } from './source-code.js';
-import type { Token } from './token-builder.js';
+import {
+  spanIndexStartingAtOrAfter,
+  spanIndexEndingAtOrBefore,
+  type Token,
+} from './token-builder.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Line-start offset lookup — shared safe accessor for `lso[line - 1]`
@@ -190,11 +194,11 @@ export function normalizeFilterOpts(
  * this is intentionally NOT passed the comment-merged stream.
  *
  * `getFirstIndex` / `getLastIndex` resolve, for a real boundary loc, to
- * the first/last token fully inside `[startLoc, endLoc]`. The linear
- * scans below compute the same first/last index; when the range
- * contains no token (`firstIdx > lastIdx`) the unpadded slice is empty
- * and padding inflates symmetrically around that gap — matching the
- * cursor's index arithmetic.
+ * the first/last token fully inside `[startLoc, endLoc]`; both are
+ * binary searches over the sorted, non-overlapping token array. When the
+ * range contains no token (`firstIdx > lastIdx`) the unpadded slice is
+ * empty and padding inflates symmetrically around that gap — matching
+ * the cursor's index arithmetic.
  */
 export function paddedTokenSlice(
   tokens: readonly Token[],
@@ -205,22 +209,13 @@ export function paddedTokenSlice(
 ): Token[] {
   const len = tokens.length;
   if (len === 0) return [];
-  // getFirstIndex: first token whose start is at/after startLoc.
-  let firstIdx = len;
-  for (let i = 0; i < len; i++) {
-    if (tokens[i].range[0] >= startLoc) {
-      firstIdx = i;
-      break;
-    }
-  }
-  // getLastIndex: last token whose end is at/before endLoc.
-  let lastIdx = -1;
-  for (let i = len - 1; i >= 0; i--) {
-    if (tokens[i].range[1] <= endLoc) {
-      lastIdx = i;
-      break;
-    }
-  }
+  // getFirstIndex: first token whose start is at/after startLoc. `-1`
+  // (no such token) means the range opens past EOF — keep the `len`
+  // sentinel the padding arithmetic below expects.
+  const firstAtOrAfter = spanIndexStartingAtOrAfter(tokens, startLoc);
+  const firstIdx = firstAtOrAfter < 0 ? len : firstAtOrAfter;
+  // getLastIndex: last token whose end is at/before endLoc (-1 if none).
+  const lastIdx = spanIndexEndingAtOrBefore(tokens, endLoc);
   const start = Math.max(0, firstIdx - beforeCount);
   const end = Math.min(len - 1, lastIdx + afterCount);
   if (start > end) return [];

@@ -69,8 +69,10 @@ func collectProgramTypeDiagnostics(
 		TypeCheck:             true,
 		SkipTypeCheckPrograms: skip,
 		TypeInfoFiles:         typeInfoFiles,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			diags = append(diags, d)
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				diags = append(diags, d)
+			},
 		},
 	})
 	if err != nil {

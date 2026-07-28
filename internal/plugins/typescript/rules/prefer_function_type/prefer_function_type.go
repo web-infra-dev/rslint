@@ -89,9 +89,157 @@ func collectCommentsForward(text string, start, limit int) []core.TextRange {
 	return result
 }
 
+type preferFunctionTypeFixer struct {
+	sourceFile *ast.SourceFile
+	sourceText string
+	lineStarts []core.TextPos
+}
+
+func shouldWrapFunctionTypeSuggestion(parent *ast.Node) bool {
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindUnionType, ast.KindIntersectionType, ast.KindArrayType:
+		return true
+	}
+	return false
+}
+
+// interfaceHeader returns the verbatim Name<TypeParams> text used to prefix
+// the rewritten type alias. Constraints, defaults, and variance markers are
+// preserved by slicing the source.
+func (f preferFunctionTypeFixer) interfaceHeader(
+	declaration *ast.InterfaceDeclaration,
+) string {
+	nameText := utils.TrimmedNodeText(f.sourceFile, declaration.Name())
+	if declaration.TypeParameters == nil || len(declaration.TypeParameters.Nodes) == 0 {
+		return nameText
+	}
+	parameters := declaration.TypeParameters.Nodes
+	lastParameter := parameters[len(parameters)-1]
+	lastParameterEnd := utils.TrimNodeTextRange(f.sourceFile, lastParameter).End()
+	greaterThanPosition := lastParameterEnd
+	for greaterThanPosition < len(f.sourceText) && f.sourceText[greaterThanPosition] != '>' {
+		greaterThanPosition++
+	}
+	if greaterThanPosition < len(f.sourceText) {
+		greaterThanPosition++
+	}
+	nameStart := utils.TrimNodeTextRange(f.sourceFile, declaration.Name()).Pos()
+	return f.sourceText[nameStart:greaterThanPosition]
+}
+
+func (f preferFunctionTypeFixer) fixes(member *ast.Node, node *ast.Node) []rule.RuleFix {
+	var returnType *ast.Node
+	switch member.Kind {
+	case ast.KindCallSignature:
+		returnType = member.AsCallSignatureDeclaration().Type
+	case ast.KindConstructSignature:
+		returnType = member.AsConstructSignatureDeclaration().Type
+	}
+	if returnType == nil {
+		return nil
+	}
+
+	isInterface := node.Kind == ast.KindInterfaceDeclaration
+	hasExport := isInterface && ast.HasSyntacticModifier(node, ast.ModifierFlagsExport)
+
+	memberRange := utils.TrimNodeTextRange(f.sourceFile, member)
+	memberStart := memberRange.Pos()
+	memberEnd := memberRange.End()
+	text := f.sourceText[memberStart:memberEnd]
+
+	returnTypeStart := utils.TrimNodeTextRange(f.sourceFile, returnType).Pos()
+	colonPosition := returnTypeStart - 1
+	for colonPosition >= memberStart && f.sourceText[colonPosition] != ':' {
+		colonPosition--
+	}
+	if colonPosition < memberStart {
+		return nil
+	}
+	colonOffset := colonPosition - memberStart
+
+	suggestion := text[:colonOffset] + " =>" + text[colonOffset+1:]
+	lastCharacter := ""
+	if strings.HasSuffix(suggestion, ";") {
+		lastCharacter = ";"
+		suggestion = suggestion[:len(suggestion)-1]
+	}
+
+	if shouldWrapFunctionTypeSuggestion(node.Parent) {
+		suggestion = "(" + suggestion + ")"
+	}
+
+	if isInterface {
+		declaration := node.AsInterfaceDeclaration()
+		suggestion = "type " + f.interfaceHeader(declaration) + " = " + suggestion + lastCharacter
+	}
+
+	nodeRange := utils.TrimNodeTextRange(f.sourceFile, node)
+	comments := append(
+		collectCommentsForward(f.sourceText, member.Pos(), memberStart),
+		collectCommentsForward(f.sourceText, memberEnd, nodeRange.End())...,
+	)
+	memberLine := scanner.ComputeLineOfPosition(f.lineStarts, memberStart)
+
+	var fixes []rule.RuleFix
+	if isInterface && hasExport {
+		var commentsText strings.Builder
+		for _, comment := range comments {
+			commentsText.WriteString(f.sourceText[comment.Pos():comment.End()])
+			commentsText.WriteByte('\n')
+		}
+		if commentsText.Len() > 0 {
+			fixes = append(fixes, rule.RuleFix{
+				Text:  commentsText.String(),
+				Range: core.NewTextRange(nodeRange.Pos(), nodeRange.Pos()),
+			})
+		}
+	} else {
+		for _, comment := range comments {
+			commentText := f.sourceText[comment.Pos():comment.End()]
+			if scanner.ComputeLineOfPosition(f.lineStarts, comment.Pos()) == memberLine {
+				commentText += " "
+			} else {
+				commentText += "\n"
+			}
+			suggestion = commentText + suggestion
+		}
+	}
+
+	replaceStart := nodeRange.Pos()
+	if isInterface {
+		modifiers := node.AsInterfaceDeclaration().Modifiers()
+		var scanFrom int
+		if modifiers != nil && len(modifiers.Nodes) > 0 {
+			scanFrom = modifiers.Nodes[len(modifiers.Nodes)-1].End()
+		} else {
+			scanFrom = nodeRange.Pos()
+		}
+		sourceScanner := scanner.GetScannerForSourceFile(f.sourceFile, scanFrom)
+		for sourceScanner.TokenStart() < nodeRange.End() {
+			if sourceScanner.Token() == ast.KindInterfaceKeyword {
+				replaceStart = sourceScanner.TokenStart()
+				break
+			}
+			sourceScanner.Scan()
+		}
+	}
+
+	fixes = append(fixes, rule.RuleFix{
+		Text:  suggestion,
+		Range: core.NewTextRange(replaceStart, nodeRange.End()),
+	})
+	return fixes
+}
+
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
-	sourceText := ctx.SourceFile.Text()
-	lineStarts := ctx.SourceFile.ECMALineMap()
+	fixer := preferFunctionTypeFixer{
+		sourceFile: ctx.SourceFile,
+		sourceText: ctx.SourceFile.Text(),
+		lineStarts: ctx.SourceFile.ECMALineMap(),
+	}
 
 	// hasOneNonFunctionSupertype mirrors upstream's hasOneSupertype(): an
 	// interface with `extends X[, Y, ...]` is skipped unless the only supertype
@@ -116,17 +264,6 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		}
 		expr := extends[0].AsExpressionWithTypeArguments().Expression
 		if expr == nil || expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "Function" {
-			return true
-		}
-		return false
-	}
-
-	shouldWrapSuggestion := func(parent *ast.Node) bool {
-		if parent == nil {
-			return false
-		}
-		switch parent.Kind {
-		case ast.KindUnionType, ast.KindIntersectionType, ast.KindArrayType:
 			return true
 		}
 		return false
@@ -167,29 +304,6 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return result
 	}
 
-	// buildInterfaceHeader returns the verbatim `Name<TypeParams>` text used to
-	// prefix the rewritten type alias. Includes the angle brackets when type
-	// parameters exist; constraints / defaults / variance markers are picked up
-	// for free because we slice raw source.
-	buildInterfaceHeader := func(iface *ast.InterfaceDeclaration) string {
-		nameText := utils.TrimmedNodeText(ctx.SourceFile, iface.Name())
-		if iface.TypeParameters == nil || len(iface.TypeParameters.Nodes) == 0 {
-			return nameText
-		}
-		params := iface.TypeParameters.Nodes
-		lastParam := params[len(params)-1]
-		lastParamEnd := utils.TrimNodeTextRange(ctx.SourceFile, lastParam).End()
-		gtPos := lastParamEnd
-		for gtPos < len(sourceText) && sourceText[gtPos] != '>' {
-			gtPos++
-		}
-		if gtPos < len(sourceText) {
-			gtPos++
-		}
-		nameStart := utils.TrimNodeTextRange(ctx.SourceFile, iface.Name()).Pos()
-		return sourceText[nameStart:gtPos]
-	}
-
 	checkMember := func(member *ast.Node, node *ast.Node, tsThisTypes []*ast.Node) {
 		var returnType *ast.Node
 		switch member.Kind {
@@ -225,114 +339,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			return
 		}
 
-		memberRange := utils.TrimNodeTextRange(ctx.SourceFile, member)
-		memberStart := memberRange.Pos()
-		memberEnd := memberRange.End()
-		text := sourceText[memberStart:memberEnd]
-
-		// Find the ':' before the return type. The return type node starts at
-		// the type token itself (whitespace skipped); the ':' immediately
-		// precedes it (modulo whitespace).
-		returnTypeStart := utils.TrimNodeTextRange(ctx.SourceFile, returnType).Pos()
-		colonPos := returnTypeStart - 1
-		for colonPos >= memberStart && sourceText[colonPos] != ':' {
-			colonPos--
-		}
-		if colonPos < memberStart {
-			ctx.ReportNode(member, msg)
-			return
-		}
-		colonOffset := colonPos - memberStart
-
-		suggestion := text[:colonOffset] + " =>" + text[colonOffset+1:]
-		lastChar := ""
-		if strings.HasSuffix(suggestion, ";") {
-			lastChar = ";"
-			suggestion = suggestion[:len(suggestion)-1]
-		}
-
-		if shouldWrapSuggestion(node.Parent) {
-			suggestion = "(" + suggestion + ")"
-		}
-
-		if isInterface {
-			suggestion = "type " + buildInterfaceHeader(node.AsInterfaceDeclaration()) + " = " + suggestion + lastChar
-		}
-
-		nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-
-		// Collect leading and trailing comments by scanning the trivia regions
-		// directly. tsgo's scanner.GetLeadingCommentRanges only collects line-
-		// boundary-adjacent comments, so it misses same-line inline blocks like
-		// `{ /* c */ (): void }` that the upstream rule needs to relocate.
-		// Trailing scan is capped at the containing node's end so comments
-		// outside the type-literal / interface body never leak in.
-		comments := append(
-			collectCommentsForward(sourceText, member.Pos(), memberStart),
-			collectCommentsForward(sourceText, memberEnd, nodeRange.End())...,
-		)
-
-		memberLine := scanner.ComputeLineOfPosition(lineStarts, memberStart)
-
-		var fixes []rule.RuleFix
-
-		// `export interface Foo` has comments moved before `export` so they
-		// don't end up between `export` and the resulting `type` declaration.
-		if isInterface && hasExport && !hasDefault {
-			var commentsText strings.Builder
-			for _, c := range comments {
-				commentsText.WriteString(sourceText[c.Pos():c.End()])
-				commentsText.WriteByte('\n')
-			}
-			if commentsText.Len() > 0 {
-				fixes = append(fixes, rule.RuleFix{
-					Text:  commentsText.String(),
-					Range: core.NewTextRange(nodeRange.Pos(), nodeRange.Pos()),
-				})
-			}
-		} else {
-			for _, c := range comments {
-				cText := sourceText[c.Pos():c.End()]
-				if scanner.ComputeLineOfPosition(lineStarts, c.Pos()) == memberLine {
-					cText += " "
-				} else {
-					cText += "\n"
-				}
-				suggestion = cText + suggestion
-			}
-		}
-
-		// For interfaces, only replace from the `interface` keyword onwards.
-		// Preserving the modifier prefix verbatim avoids dropping any trivia
-		// (e.g. comments) that lives between modifiers, exactly matching
-		// upstream's `replaceTextRange([declaration.range[0], ...])` semantics
-		// — ESTree's `declaration.range[0]` is the `interface` keyword, not
-		// the first modifier.
-		replaceStart := nodeRange.Pos()
-		if isInterface {
-			modifiers := node.AsInterfaceDeclaration().Modifiers()
-			var scanFrom int
-			if modifiers != nil && len(modifiers.Nodes) > 0 {
-				scanFrom = modifiers.Nodes[len(modifiers.Nodes)-1].End()
-			} else {
-				scanFrom = nodeRange.Pos()
-			}
-			s := scanner.GetScannerForSourceFile(ctx.SourceFile, scanFrom)
-			for s.TokenStart() < nodeRange.End() {
-				if s.Token() == ast.KindInterfaceKeyword {
-					replaceStart = s.TokenStart()
-					break
-				}
-				s.Scan()
-			}
-		}
-
-		fixes = append(fixes, rule.RuleFix{
-			Text:  suggestion,
-			Range: core.NewTextRange(replaceStart, nodeRange.End()),
+		ctx.ReportNodeWithDeferredFixes(member, msg, func() []rule.RuleFix {
+			return fixer.fixes(member, node)
 		})
-
-		ctx.ReportNodeWithFixes(member, msg, fixes...)
 	}
 
 	return rule.RuleListeners{

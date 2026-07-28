@@ -139,10 +139,10 @@ func TestParseRegexCharacterClass_MultipleRangesAndSets(t *testing.T) {
 	// `[\dA-Z\sa-z]` — alternating sets and ranges.
 	els := parseClass(t, `[\dA-Z\sa-z]`, RegexFlags{})
 	wantKinds := []RegexCharElementKind{
-		RegexCharBreaker,            // \d
-		RegexCharRange,              // A-Z
-		RegexCharBreaker,            // \s
-		RegexCharRange,              // a-z
+		RegexCharBreaker, // \d
+		RegexCharRange,   // A-Z
+		RegexCharBreaker, // \s
+		RegexCharRange,   // a-z
 	}
 	if len(els) != len(wantKinds) {
 		t.Fatalf("len=%d, want %d (got %+v)", len(els), len(wantKinds), els)
@@ -479,6 +479,102 @@ func TestParseRegexCharacterClass_Position(t *testing.T) {
 	if els[1].Start != 5 || els[1].End != 6 {
 		t.Errorf("[1] span = %d..%d, want 5..6", els[1].Start, els[1].End)
 	}
+}
+
+func TestParseRegexCharacterClassWithEnd(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		pattern string
+		flags   RegexFlags
+	}{
+		{name: "prefixed class", pattern: "before[ab\\u0043]after"},
+		{name: "empty", pattern: "[]"},
+		{name: "negated empty", pattern: "[^]", flags: RegexFlags{Unicode: true}},
+		{name: "negated", pattern: "[^a-z\\d]"},
+		{name: "escaped bracket", pattern: `[a\]b]`},
+		{name: "raw astral", pattern: "[A👍B]"},
+		{name: "unicode code point", pattern: `[\u{1F44D}A]`, flags: RegexFlags{Unicode: true}},
+		{name: "unicode property", pattern: `[\p{Letter}A]`, flags: RegexFlags{Unicode: true}},
+		{name: "unicode sets nested", pattern: `[[a-z]--[\q{x|y}]]`, flags: RegexFlags{UnicodeSets: true}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			assertKnownEndParserParity(t, testCase.pattern, testCase.flags)
+		})
+	}
+
+	pattern := "[a]x]"
+	if _, _, ok := ParseRegexCharacterClassWithEnd(pattern, -1, 3, RegexFlags{}); ok {
+		t.Fatal("negative start unexpectedly succeeded")
+	}
+	if _, _, ok := ParseRegexCharacterClassWithEnd(pattern, 0, len(pattern)+1, RegexFlags{}); ok {
+		t.Fatal("out-of-range end unexpectedly succeeded")
+	}
+	if _, _, ok := ParseRegexCharacterClassWithEnd(pattern, 0, 2, RegexFlags{}); ok {
+		t.Fatal("end before closing bracket unexpectedly succeeded")
+	}
+	if _, _, ok := ParseRegexCharacterClassWithEnd(pattern, 0, len(pattern), RegexFlags{}); ok {
+		t.Fatal("a later unrelated closing bracket unexpectedly matched")
+	}
+}
+
+func FuzzParseRegexCharacterClassWithEndParity(f *testing.F) {
+	for _, seed := range []string{
+		"",
+		"[]",
+		"[^]",
+		"before[abc]after",
+		`[\]\-\u0041]`,
+		`[\uD83D\uDC4D]`,
+		`[[a-z]--[\q{x|y}]]`,
+		`[0-[]]`,
+		`[unterminated`,
+		string([]byte{'[', 0xff, ']'}),
+	} {
+		for mode := range uint8(3) {
+			f.Add(seed, mode)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, pattern string, mode uint8) {
+		if len(pattern) > 4<<10 {
+			t.Skip()
+		}
+		var flags RegexFlags
+		switch mode % 3 {
+		case 1:
+			flags.Unicode = true
+		case 2:
+			flags.UnicodeSets = true
+		}
+		assertKnownEndParserParity(t, pattern, flags)
+	})
+}
+
+func assertKnownEndParserParity(t *testing.T, pattern string, flags RegexFlags) {
+	t.Helper()
+	IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
+		got, gotEnd, gotOK := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
+		want, wantEnd, wantOK := ParseRegexCharacterClass(pattern, start, flags)
+		// The old entry point can accept a prefix ending at an inner `]`
+		// even though the boundary scanner correctly found a later matching
+		// bracket (for example `[0-[]]` in v mode). The known-end entry point
+		// intentionally rejects that inconsistent parse.
+		if wantOK && wantEnd != end {
+			if gotOK {
+				t.Fatalf(
+					"known-end parse accepted mismatched end for pattern %q, flags %+v, range [%d,%d): got (%+v, %d)",
+					pattern, flags, start, end, got, gotEnd,
+				)
+			}
+			return
+		}
+		if gotOK != wantOK || gotEnd != wantEnd || !reflect.DeepEqual(got, want) {
+			t.Fatalf(
+				"known-end parse mismatch for pattern %q, flags %+v, range [%d,%d): got (%+v, %d, %v), want (%+v, %d, %v)",
+				pattern, flags, start, end, got, gotEnd, gotOK, want, wantEnd, wantOK,
+			)
+		}
+	})
 }
 
 func TestParseRegexCharacterClass_RangeWithDashChain(t *testing.T) {

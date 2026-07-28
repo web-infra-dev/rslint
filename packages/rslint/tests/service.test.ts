@@ -12,6 +12,10 @@ class ReverseLintBackend implements RslintServiceInterface {
   inbound: InboundRequestHandler | null = null;
   lintPayloads: unknown[] = [];
 
+  protected beforeReverseLint(): Promise<void> {
+    return Promise.resolve();
+  }
+
   setInboundHandler(handler: InboundRequestHandler | null): void {
     this.inbound = handler;
   }
@@ -27,9 +31,7 @@ class ReverseLintBackend implements RslintServiceInterface {
     if (kind !== 'lint') throw new Error(`unexpected kind ${kind}`);
 
     this.lintPayloads.push(data);
-    // Yield before dispatching the reverse request. Without service-level
-    // serialization, a concurrent lint could replace the active handler here.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await this.beforeReverseLint();
     if (!this.inbound) throw new Error('missing inbound handler');
     return this.inbound({
       id: 100,
@@ -43,14 +45,56 @@ class ReverseLintBackend implements RslintServiceInterface {
   }
 }
 
+class GatedReverseLintBackend extends ReverseLintBackend {
+  readonly firstLintStarted: Promise<void>;
+  private markFirstLintStarted!: () => void;
+  private readonly firstLintGate: Promise<void>;
+  private releaseFirstLintGate!: () => void;
+  private lintCount = 0;
+
+  constructor() {
+    super();
+    this.firstLintStarted = new Promise((resolve) => {
+      this.markFirstLintStarted = resolve;
+    });
+    this.firstLintGate = new Promise((resolve) => {
+      this.releaseFirstLintGate = resolve;
+    });
+  }
+
+  releaseFirstLint(): void {
+    this.releaseFirstLintGate();
+  }
+
+  protected override async beforeReverseLint(): Promise<void> {
+    this.lintCount++;
+    if (this.lintCount !== 1) return;
+    this.markFirstLintStarted();
+    await this.firstLintGate;
+  }
+}
+
 class HangingExitBackend extends ReverseLintBackend {
   terminated = false;
+  exitRequests = 0;
+  readonly exitRequested: Promise<void>;
+  private markExitRequested!: () => void;
+
+  constructor() {
+    super();
+    this.exitRequested = new Promise((resolve) => {
+      this.markExitRequested = resolve;
+    });
+  }
 
   override async sendMessage(kind: string, data: any): Promise<any> {
-    if (kind === 'exit')
+    if (kind === 'exit') {
+      this.exitRequests++;
+      this.markExitRequested();
       return new Promise(() => {
         // Deliberately unresolved to exercise forced shutdown.
       });
+    }
     return super.sendMessage(kind, data);
   }
 
@@ -88,6 +132,64 @@ class HangingLintBackend extends ReverseLintBackend {
 
   override terminate(): void {
     this.terminated = true;
+  }
+}
+
+interface CapturedTimer {
+  delay: number;
+  fired: boolean;
+  readonly cleared: boolean;
+  fire: () => void;
+}
+
+const NON_FIRING_TIMER_DELAY_MS = 24 * 60 * 60 * 1_000;
+
+function captureServiceCloseTimer(service: RSLintService): {
+  close: Promise<void>;
+  timers: CapturedTimer[];
+} {
+  const originalSetTimeout = globalThis.setTimeout;
+  const timers: CapturedTimer[] = [];
+
+  globalThis.setTimeout = ((
+    callback: (...args: any[]) => void,
+    delay?: number,
+    ...args: any[]
+  ) => {
+    if (delay !== 1_000) {
+      return originalSetTimeout(callback, delay, ...args);
+    }
+    // Return a real (unref'ed) handle so production can clear it through the
+    // original global after this synchronous capture window is restored.
+    const handle = originalSetTimeout(
+      () => undefined,
+      NON_FIRING_TIMER_DELAY_MS,
+    );
+    handle.unref();
+    const timer: CapturedTimer = {
+      delay,
+      fired: false,
+      get cleared() {
+        return (
+          (handle as unknown as { _destroyed?: boolean })._destroyed === true
+        );
+      },
+      fire() {
+        if (timer.fired || timer.cleared) return;
+        timer.fired = true;
+        callback(...args);
+      },
+    };
+    timers.push(timer);
+    return handle;
+  }) as typeof setTimeout;
+  try {
+    return { close: service.close(), timers };
+  } finally {
+    // close() installs its timeout before returning its Promise. Never retain
+    // a global patch across an await: Rstest timeouts do not cancel a stuck
+    // test body, so async restoration would leak into later tests.
+    globalThis.setTimeout = originalSetTimeout;
   }
 }
 
@@ -156,17 +258,29 @@ describe('RSLintService reverse lint request scoping', () => {
   });
 
   test('serializes concurrent lint frames so handlers cannot overwrite each other', async () => {
-    const backend = new ReverseLintBackend();
+    const backend = new GatedReverseLintBackend();
     const service = new RSLintService(backend);
 
-    const [a, b] = await Promise.all([
-      service.lint({ files: ['a.ts'] }, { pluginLint: () => ({ host: 'a' }) }),
-      service.lint({ files: ['b.ts'] }, { pluginLint: () => ({ host: 'b' }) }),
-    ]);
+    const first = service.lint(
+      { files: ['a.ts'] },
+      { pluginLint: () => ({ host: 'a' }) },
+    );
+    await backend.firstLintStarted;
+    const second = service.lint(
+      { files: ['b.ts'] },
+      { pluginLint: () => ({ host: 'b' }) },
+    );
 
-    expect(a).toEqual({ host: 'a' });
-    expect(b).toEqual({ host: 'b' });
-    await service.close();
+    try {
+      expect(backend.lintPayloads).toHaveLength(1);
+      backend.releaseFirstLint();
+      await expect(first).resolves.toEqual({ host: 'a' });
+      await expect(second).resolves.toEqual({ host: 'b' });
+      expect(backend.lintPayloads).toHaveLength(2);
+    } finally {
+      backend.releaseFirstLint();
+      await service.close();
+    }
   });
 
   test('rejects an incompatible backend protocol before linting', async () => {
@@ -262,10 +376,20 @@ describe('RSLintService reverse lint request scoping', () => {
   test('bounds graceful shutdown when the peer never acknowledges exit', async () => {
     const backend = new HangingExitBackend();
     const service = new RSLintService(backend);
-    const started = Date.now();
-    await service.close();
+    const captured = captureServiceCloseTimer(service);
+    expect(captured.timers).toHaveLength(1);
+    expect(captured.timers[0]?.delay).toBe(1_000);
+    // Observe the actual exit request rather than assuming how many promise
+    // layers the idle queue needs before dispatching it.
+    await backend.exitRequested;
+    expect(backend.exitRequests).toBe(1);
+    captured.timers[0]?.fire();
+    await captured.close;
+    expect(captured.timers).toHaveLength(1);
     expect(backend.terminated).toBe(true);
-    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(backend.exitRequests).toBe(1);
+    expect(captured.timers[0]?.fired).toBe(true);
+    expect(captured.timers[0]?.cleared).toBe(true);
   });
 
   test('starts the shutdown bound while an active request is hung', async () => {
@@ -274,11 +398,16 @@ describe('RSLintService reverse lint request scoping', () => {
     void service.lint({ files: ['hung.ts'] });
     await backend.lintStarted;
 
-    const started = Date.now();
-    await service.close();
-
-    expect(Date.now() - started).toBeLessThan(2_000);
+    const captured = captureServiceCloseTimer(service);
+    expect(captured.timers).toHaveLength(1);
+    expect(captured.timers[0]?.delay).toBe(1_000);
+    expect(backend.exitRequests).toBe(0);
+    captured.timers[0]?.fire();
+    await captured.close;
+    expect(captured.timers).toHaveLength(1);
     expect(backend.terminated).toBe(true);
     expect(backend.exitRequests).toBe(0);
+    expect(captured.timers[0]?.fired).toBe(true);
+    expect(captured.timers[0]?.cleared).toBe(true);
   });
 });

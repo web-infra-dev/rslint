@@ -78,6 +78,42 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 			)),
 			// ---- Dimension 4: local global-object names shadow the real globals ----
 			jsValid("const globalThis = {Array() {}}; globalThis.Array();"),
+			// ---- Adversarial: hoisted declarations shadow calls before their declaration ----
+			jsValid(lines(
+				"function run() {",
+				"\tArray();",
+				"\tvar Array = function() {};",
+				"}",
+			)),
+			// ---- Adversarial: catch and loop bindings are exact lexical shadows ----
+			jsValid("try {} catch (Array) { Array(); }"),
+			jsValid("for (const Map of values) { Map(); }"),
+			// ---- Adversarial: declaration symbols beyond variables shadow builtins ----
+			jsValid("function Array() {} Array();"),
+			jsValid("class Map {} Map();"),
+			jsValid("const holder = function Set() { return Set(); };"),
+			jsValid("const Holder = class WeakMap { method() { return WeakMap(); } };"),
+			// ---- Adversarial: imports using the builtin's exact name are local ----
+			jsValid("import Array from 'array-package'; Array();"),
+			jsValid("import * as Intl from 'intl-package'; Intl.DateTimeFormat();"),
+			// ---- Adversarial: a later local globalThis declaration is still in scope ----
+			jsValid(lines(
+				"function run() {",
+				"\tglobalThis.Array();",
+				"\tconst globalThis = {Array() {}};",
+				"}",
+			)),
+			jsValid(lines(
+				"function run() {",
+				"\tconst {Array: A} = globalThis;",
+				"\tconst globalThis = {Array() {}};",
+				"\tA();",
+				"}",
+			)),
+			tsValid(lines(
+				"namespace Intl { export const local = 1; }",
+				"Intl.DateTimeFormat();",
+			)),
 			// ---- Dimension 4: bare WebAssembly namespace aliases are not tracked by upstream ----
 			jsValid(lines(
 				"const WA = WebAssembly;",
@@ -177,6 +213,18 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 				"const B = A;",
 				"B();",
 			), "B()", "Array"),
+			// ---- Adversarial: an alias may reuse another builtin's name ----
+			enforceInvalid(lines(
+				"const {Map: Array} = globalThis;",
+				"Array();",
+			), "Array()", "Map"),
+			// ---- Adversarial: alias identity wins over a global-object spelling ----
+			enforceInvalid(lines(
+				"const {Array: window} = globalThis;",
+				"window();",
+			), "window()", "Array"),
+			aliasWithInnerShadowInvalid(),
+			disjointAliasPathsInvalid(),
 			// ---- Dimension 4: alias declarations after a use still match upstream scope tracing ----
 			enforceInvalid(lines(
 				"A();",
@@ -242,6 +290,24 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 				"}",
 				"A();",
 			), "A()", "Array"),
+			// ---- Adversarial: type-space declarations do not shadow runtime builtins ----
+			tsEnforceInvalid(lines(
+				"type Array = () => void;",
+				"Array();",
+			), "Array()", "Array"),
+			tsEnforceInvalid(lines(
+				"interface Map {}",
+				"Map();",
+			), "Map()", "Map"),
+			tsEnforceInvalid(lines(
+				"const A = Array;",
+				"interface Array {}",
+				"A();",
+			), "A()", "Array"),
+			tsEnforceInvalid(lines(
+				"namespace Intl { export interface Local {} }",
+				"Intl.DateTimeFormat();",
+			), "Intl.DateTimeFormat()", "Intl.DateTimeFormat"),
 
 			// ---- Real-user: #901 new String('test') reports but has no autofix ----
 			disallowNoFixInvalid("const str = new String('test');", "new String('test')", "String"),
@@ -283,4 +349,67 @@ func tsEnforceInvalid(code string, target string, name string) rule_tester.Inval
 	testCase := enforceInvalid(code, target, name)
 	testCase.FileName = "file.ts"
 	return testCase
+}
+
+func tsValid(code string) rule_tester.ValidTestCase {
+	testCase := jsValid(code)
+	testCase.FileName = "file.ts"
+	return testCase
+}
+
+func aliasWithInnerShadowInvalid() rule_tester.InvalidTestCase {
+	code := lines(
+		"const {Array: A} = globalThis;",
+		"{",
+		"\tconst A = function() {};",
+		"\tA();",
+		"}",
+		"A();",
+	)
+	return rule_tester.InvalidTestCase{
+		Code:     code,
+		FileName: "file.js",
+		Output: []string{lines(
+			"const {Array: A} = globalThis;",
+			"{",
+			"\tconst A = function() {};",
+			"\tA();",
+			"}",
+			"new A();",
+		)},
+		Errors: []rule_tester.InvalidTestCaseError{
+			expectedErrorAfter(code, "}\n", "A()", messageIDEnforce, enforceMessage("Array")),
+		},
+	}
+}
+
+func disjointAliasPathsInvalid() rule_tester.InvalidTestCase {
+	code := lines(
+		"{",
+		"\tconst {Array: A} = globalThis;",
+		"\tA();",
+		"}",
+		"{",
+		"\tconst {Map: A} = globalThis;",
+		"\tA();",
+		"}",
+	)
+	return rule_tester.InvalidTestCase{
+		Code:     code,
+		FileName: "file.js",
+		Output: []string{lines(
+			"{",
+			"\tconst {Array: A} = globalThis;",
+			"\tnew A();",
+			"}",
+			"{",
+			"\tconst {Map: A} = globalThis;",
+			"\tnew A();",
+			"}",
+		)},
+		Errors: []rule_tester.InvalidTestCaseError{
+			expectedError(code, "A()", messageIDEnforce, enforceMessage("Array")),
+			expectedErrorAfter(code, "const {Map: A}", "A()", messageIDEnforce, enforceMessage("Map")),
+		},
+	}
 }

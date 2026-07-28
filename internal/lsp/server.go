@@ -157,7 +157,8 @@ type Server struct {
 	watchEnabled     bool
 	watchers         collections.SyncSet[project.WatcherID]
 
-	session *project.Session
+	session      *project.Session
+	lintPrograms *lintProgramStore
 
 	// enables tests to share a cache of parsed source files
 	parseCache *project.ParseCache

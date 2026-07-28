@@ -1,9 +1,14 @@
 package prefer_template
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -798,4 +803,83 @@ func TestPreferTemplate(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestPreferTemplateEditDemand(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `const text = "item-" + value + "-done";`, core.ScriptKindTS)
+	var stringNode *ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindStringLiteral {
+			stringNode = node
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	if stringNode == nil {
+		t.Fatal("fixture has no string literal")
+	}
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(PreferTemplateRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+		listener := PreferTemplateRule.Run(ctx, nil)[ast.KindStringLiteral]
+		listener(stringNode)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.FixesPtr != nil || suggestionOnly.FixesPtr != nil {
+		t.Fatal("non-autofix demand materialized fixes")
+	}
+	if autofixOnly.FixesPtr == nil || !reflect.DeepEqual(autofixOnly.FixesPtr, allEdits.FixesPtr) {
+		t.Fatal("autofix and all-edits demands produced different fixes")
+	}
+	if fixes := *allEdits.FixesPtr; len(fixes) != 1 {
+		t.Fatalf("fixes = %d, want 1", len(fixes))
+	}
+	for _, diagnostic := range []rule.RuleDiagnostic{diagnosticsOnly, autofixOnly, suggestionOnly, allEdits} {
+		if diagnostic.Suggestions != nil {
+			t.Fatal("autofix-only rule materialized suggestions")
+		}
+	}
 }

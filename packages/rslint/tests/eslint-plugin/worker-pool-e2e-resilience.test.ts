@@ -12,6 +12,7 @@ import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
+  POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
 } from './pool-isolation/harness.js';
 
 /**
@@ -35,7 +36,6 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       const pool = new WorkerPool({
         configs: localConfigs,
         workerCount: 1,
-        taskTimeoutMs: 5_000,
       });
       await pool.init();
 
@@ -117,25 +117,33 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       expect(ok[0].diagnostics).toHaveLength(1);
 
       await pool.shutdown();
-    }, 30_000);
+    });
 
     // Directly terminating one worker of a 2-worker pool then shutting down
     // exercises the respawn-during-shutdown race. The terminate of an oxc-napi
     // worker can native-abort on Windows — run it isolated (see
-    // ./pool-isolation). Verdict != FAIL means the pool drained without leaking
-    // the respawn (or reached terminate then the subprocess aborted on Windows).
-    test('worker exit racing shutdown does not leak the respawn', async () => {
-      const r = await runPoolScenario('worker-exit-race');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 20_000);
+    // ./pool-isolation). The isolated child must exit cleanly after proving the
+    // pool drained without leaking the respawn.
+    test(
+      'worker exit racing shutdown does not leak the respawn',
+      async () => {
+        const r = await runPoolScenario('worker-exit-race');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
 
     // A hung listener trips the per-task timeout, which terminates the worker
     // and respawns it; the next batch must succeed on the replacement. The
     // timeout-driven terminate of an oxc-napi worker can native-abort on
     // Windows — run it isolated (see ./pool-isolation).
-    test('hung listener → task_timeout → respawn → next batch succeeds', async () => {
-      const r = await runPoolScenario('task-timeout');
-      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
-    }, 30_000);
+    test(
+      'hung listener → task_timeout → respawn → next batch succeeds',
+      async () => {
+        const r = await runPoolScenario('task-timeout');
+        expect(r.verdict, formatScenarioFailure(r)).toBe('PASS');
+      },
+      POOL_SCENARIO_OUTER_DEADLOCK_SENTINEL_MS,
+    );
   },
 );

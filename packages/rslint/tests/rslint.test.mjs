@@ -1,6 +1,7 @@
 import { Rslint } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from '@rstest/core';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -19,6 +20,81 @@ const eslintPluginFixturesDir = path.resolve(
   import.meta.dirname,
   'eslint-plugin/fixtures',
 );
+// These fixtures prove that the public API lets Node exit. Success is the
+// validated close event; this only releases a process still alive after 30m.
+const EXIT_FIXTURE_DEAD_PROCESS_WATCHDOG_MS = 30 * 60_000;
+const EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS = 35 * 60_000;
+const EXIT_FIXTURE_OUTPUT_LIMIT_BYTES = 1024 * 1024;
+
+async function runExitFixture(scriptName, successMarker) {
+  const script = path.resolve(import.meta.dirname, 'fixtures', scriptName);
+  const child = spawn(process.execPath, [script], {
+    cwd: path.resolve(import.meta.dirname, '..'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const stdoutChunks = [];
+  const stderrChunks = [];
+  let spawnError;
+  let timedOut = false;
+  let outputBytes = 0;
+  let outputOverflow = false;
+
+  child.stdout.on('data', (chunk) => {
+    outputBytes += chunk.length;
+    if (outputBytes > EXIT_FIXTURE_OUTPUT_LIMIT_BYTES) {
+      outputOverflow = true;
+      child.kill('SIGKILL');
+      return;
+    }
+    stdoutChunks.push(chunk);
+  });
+  child.stderr.on('data', (chunk) => {
+    outputBytes += chunk.length;
+    if (outputBytes > EXIT_FIXTURE_OUTPUT_LIMIT_BYTES) {
+      outputOverflow = true;
+      child.kill('SIGKILL');
+      return;
+    }
+    stderrChunks.push(chunk);
+  });
+  child.on('error', (error) => {
+    spawnError = error;
+  });
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill('SIGKILL');
+  }, EXIT_FIXTURE_DEAD_PROCESS_WATCHDOG_MS);
+  timer.unref();
+
+  const { code, signal } = await new Promise((resolve) => {
+    child.on('close', (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
+  clearTimeout(timer);
+  const stdout = Buffer.concat(stdoutChunks).toString('utf8');
+  const stderr = Buffer.concat(stderrChunks).toString('utf8');
+
+  const details =
+    `fixture=${scriptName}, code=${String(code)}, signal=${String(signal)}, ` +
+    `timedOut=${String(timedOut)}, outputOverflow=${String(outputOverflow)}, ` +
+    `spawnError=${String(spawnError)}\n` +
+    `stdout:\n${stdout}\nstderr:\n${stderr}`;
+  expect(timedOut, details).toBe(false);
+  expect(outputOverflow, details).toBe(false);
+  expect(spawnError, details).toBeUndefined();
+  expect(signal, details).toBeNull();
+  expect(code, details).toBe(0);
+  expect(stdout.trim(), details).toBe(successMarker);
+  expect(stderr.trim(), details).toBe('');
+  expect(
+    `${stdout}\n${stderr}`,
+    `fixture emitted an abnormal worker marker\n${details}`,
+  ).not.toMatch(
+    /CLOSE_GATE_LEAKED|task_timeout|worker_crashed|timed out after|EXPECTED-NATIVE-ABORT/,
+  );
+}
 
 // A self-contained config (overrideConfigFile:true → no discovery, only
 // overrideConfig). array-type is non-type-aware so it runs even on a gap file.
@@ -2022,103 +2098,46 @@ module.exports = config;`
   // Regression for the unref() fix: a script that lints and never calls close()
   // must still let the Node process exit. Without unref the resident `--api`
   // child + its stdio pipes keep the event loop alive and the process hangs.
-  test('lintText without close() lets the process exit on its own (no hang)', async () => {
-    const { spawn } = await import('node:child_process');
-    const script = path.resolve(
-      import.meta.dirname,
-      'fixtures',
-      'no-close-exit.mjs',
-    );
-    const child = spawn(process.execPath, [script], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      stdio: 'inherit',
-    });
-    const code = await new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        resolve('TIMEOUT-HANG');
-      }, 20000);
-      child.on('exit', (c) => {
-        clearTimeout(timer);
-        resolve(c);
-      });
-    });
-    // 0 = the fixture linted (it asserts exactly 1 message) AND the process
-    // exited without close(); 'TIMEOUT-HANG' = unref regressed.
-    expect(code).toBe(0);
-  });
+  test(
+    'lintText without close() lets the process exit on its own (no hang)',
+    async () => {
+      await runExitFixture('no-close-exit.mjs', 'FIXTURE_OK:no-close');
+    },
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
+  );
 
-  test('community plugin host initializes and shuts down before lintText returns', async () => {
-    const { spawn } = await import('node:child_process');
-    const script = path.resolve(
-      import.meta.dirname,
-      'fixtures',
-      'no-close-plugin-exit.mjs',
-    );
-    const child = spawn(process.execPath, [script], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      stdio: 'inherit',
-    });
-    const code = await new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        resolve('TIMEOUT-HANG');
-      }, 30000);
-      child.on('exit', (exitCode) => {
-        clearTimeout(timer);
-        resolve(exitCode);
-      });
-    });
-    expect(code).toBe(0);
-  });
+  test(
+    'community plugin host initializes and shuts down before lintText returns',
+    async () => {
+      await runExitFixture(
+        'no-close-plugin-exit.mjs',
+        'FIXTURE_OK:no-close-plugin',
+      );
+    },
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
+  );
 
-  test('community plugin host shuts down when the Go lint request fails', async () => {
-    const { spawn } = await import('node:child_process');
-    const script = path.resolve(
-      import.meta.dirname,
-      'fixtures',
-      'no-close-plugin-error-exit.mjs',
-    );
-    const child = spawn(process.execPath, [script], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      stdio: 'inherit',
-    });
-    const code = await new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        resolve('TIMEOUT-HANG');
-      }, 30000);
-      child.on('exit', (exitCode) => {
-        clearTimeout(timer);
-        resolve(exitCode);
-      });
-    });
-    expect(code).toBe(0);
-  });
+  test(
+    'community plugin host shuts down when the Go lint request fails',
+    async () => {
+      await runExitFixture(
+        'no-close-plugin-error-exit.mjs',
+        'FIXTURE_OK:no-close-plugin-error',
+      );
+    },
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
+  );
 
-  test('close shuts down an active community plugin host', async () => {
-    const { spawn } = await import('node:child_process');
-    const script = path.resolve(
-      import.meta.dirname,
-      'fixtures',
-      'close-active-plugin-exit.mjs',
-    );
-    const child = spawn(process.execPath, [script], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      stdio: 'inherit',
-    });
-    const code = await new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        resolve('TIMEOUT-HANG');
-      }, 20000);
-      child.on('exit', (exitCode) => {
-        clearTimeout(timer);
-        resolve(exitCode);
-      });
-    });
-    expect(code).toBe(0);
-  });
+  test(
+    'close shuts down an active community plugin host',
+    async () => {
+      await runExitFixture(
+        'close-active-plugin-exit.mjs',
+        'FIXTURE_OK:close-active-plugin',
+      );
+    },
+    EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
+  );
 
   // Fully in-memory (issue #1106): config object + in-memory tsconfig via
   // `virtualFiles`, type-aware rule, ZERO disk. Empty temp dir as cwd + path.join

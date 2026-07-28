@@ -38,10 +38,11 @@ func programHasFileWithSuffix(program *compiler.Program, suffix string) bool {
 // === A real-world node_modules d.ts === //
 //
 // Layout under tmpDir:
-//   ./node_modules/foo/package.json   {"types": "index.d.ts"}
-//   ./node_modules/foo/index.d.ts     declares an error (TS2307 missing module)
-//   ./entry.ts                        imports 'foo'
-//   ./tsconfig.json                   moduleResolution: "node"
+//
+//	./node_modules/foo/package.json   {"types": "index.d.ts"}
+//	./node_modules/foo/index.d.ts     declares an error (TS2307 missing module)
+//	./entry.ts                        imports 'foo'
+//	./tsconfig.json                   moduleResolution: "node"
 //
 // Under skipLibCheck:false the d.ts inside node_modules MUST produce its
 // TS2307 (typescript-go's SkipTypeChecking does NOT special-case
@@ -125,18 +126,20 @@ func TestFixture_NodeModulesDts_SkipLibCheckUnspecified_ReportsError(t *testing.
 // === Project references === //
 //
 // Layout:
-//   /a/tsconfig.json   composite, includes a.ts, references ../b
-//   /a/a.ts            imports from '../b/b'
-//   /b/tsconfig.json   composite, includes b.ts, declaration outputs in dist/
-//   /b/b.ts            real type error (TS2322 on `broken`)
-//   /b/dist/b.d.ts     pre-built declaration so A can resolve to B's outputs
-//   /b/dist/b.d.ts.map sourcemap so source positions line up
+//
+//	/a/tsconfig.json   composite, includes a.ts, references ../b
+//	/a/a.ts            imports from '../b/b'
+//	/b/tsconfig.json   composite, includes b.ts, declaration outputs in dist/
+//	/b/b.ts            real type error (TS2322 on `broken`)
+//	/b/dist/b.d.ts     pre-built declaration so A can resolve to B's outputs
+//	/b/dist/b.d.ts.map sourcemap so source positions line up
 //
 // When both A and B programs are passed to RunLinter:
 //   - typescript-go marks B's b.ts as IsSourceFromProjectReference inside
 //     program A's view, so A skips reporting it.
 //   - Program B owns b.ts and reports TS2322.
 //   - Cross-program dedup is the secondary safety net.
+//
 // Assert the TS2322 appears exactly once. There may be additional
 // scaffolding diagnostics (e.g. TS6305 if outputs go stale); we pin the
 // b.ts:TS2322 anchor and the count of TS2322 specifically.
@@ -160,8 +163,8 @@ func TestFixture_ProjectReferences_FileReportedExactlyOnce(t *testing.T) {
 }`,
 		"b.ts": "export const broken: number = 'oops';\n",
 		// Pre-built declaration so A resolves '../b/b' against B's outputs.
-		"dist/b.d.ts":          "export declare const broken: number;\n",
-		"dist/b.d.ts.map":      `{"version":3,"file":"b.d.ts","sourceRoot":"","sources":["../b.ts"],"names":[],"mappings":""}`,
+		"dist/b.d.ts":               "export declare const broken: number;\n",
+		"dist/b.d.ts.map":           `{"version":3,"file":"b.d.ts","sourceRoot":"","sources":["../b.ts"],"names":[],"mappings":""}`,
 		"dist/tsconfig.tsbuildinfo": `{"version":"5.6.0"}`,
 	})
 
@@ -199,10 +202,12 @@ func TestFixture_ProjectReferences_FileReportedExactlyOnce(t *testing.T) {
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
-		OnDiagnostic: func(d rule.RuleDiagnostic) {
-			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				diags = append(diags, d)
-			}
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					diags = append(diags, d)
+				}
+			},
 		},
 	})
 	if err != nil {

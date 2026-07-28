@@ -11,6 +11,8 @@
  * up task on the newly respawned worker. Its presence verifies the
  * pool isn't permanently broken after the timeout.
  */
+import fs from 'node:fs';
+
 export default {
   meta: { name: 'hang-plugin', version: '0.0.0' },
   rules: {
@@ -19,6 +21,13 @@ export default {
       create() {
         return {
           Program() {
+            // Process-isolated tests use this explicit cross-thread barrier to
+            // prove the listener entered before they trigger timeout/shutdown.
+            // Ordinary tests leave the env variable unset.
+            const enteredFile = process.env.RSLINT_HANG_ENTERED_FILE;
+            if (enteredFile) {
+              fs.writeFileSync(enteredFile, 'entered');
+            }
             // Spin forever. Worker can only exit via terminate().
             // eslint-disable-next-line no-constant-condition
             while (true) {
