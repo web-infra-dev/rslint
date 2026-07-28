@@ -63,7 +63,8 @@ func bracketStyleCalleeReplacement(replacement string) string {
 }
 
 var NoDeprecatedFunctionsRule = rule.Rule{
-	Name: "jest/no-deprecated-functions",
+	Name:   "jest/no-deprecated-functions",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		depMap := deprecatedFunctions(utils.JestVersionMajor(utils.GetJestVersion(ctx)))
 		if len(depMap) == 0 {

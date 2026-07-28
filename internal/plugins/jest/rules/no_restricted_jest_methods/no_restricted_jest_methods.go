@@ -1,10 +1,15 @@
 package no_restricted_jest_methods
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_restricted_jest_methods.schema.json
+var schemaJSON []byte
 
 type restrictedMethod struct {
 	Message string
@@ -32,13 +37,12 @@ func buildRestrictedJestMethodWithMessage(method string, message string) rule.Ru
 	}
 }
 
-func parseOptions(options any) map[string]restrictedMethod {
-	normalized := rule.NormalizeOptions(options)
-	if len(normalized) == 0 {
+func parseOptions(options []any) map[string]restrictedMethod {
+	if len(options) == 0 {
 		return nil
 	}
 
-	raw, ok := normalized[0].(map[string]interface{})
+	raw, ok := options[0].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -89,9 +93,10 @@ func isNestedJestFnCall(node *ast.Node) bool {
 }
 
 var NoRestrictedJestMethodsRule = rule.Rule{
-	Name: "jest/no-restricted-jest-methods",
-	Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
-		restrictedMethods := parseOptions(rule.LegacyUnwrapOptions(newOptions))
+	Name:   "jest/no-restricted-jest-methods",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		restrictedMethods := parseOptions(options)
 		if len(restrictedMethods) == 0 {
 			return rule.RuleListeners{}
 		}

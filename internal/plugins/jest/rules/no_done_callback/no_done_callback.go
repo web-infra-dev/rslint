@@ -58,7 +58,8 @@ func findCallbackArgument(callExpr *ast.CallExpression, jestFnCall *utils.Parsed
 }
 
 var NoDoneCallbackRule = rule.Rule{
-	Name: "jest/no-done-callback",
+	Name:   "jest/no-done-callback",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

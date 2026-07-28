@@ -61,10 +61,9 @@ func hasExportModifier(node *ast.Node) bool {
 }
 
 var NoExportRule = rule.Rule{
-	Name: "jest/no-export",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		_ = options
+	Name:   "jest/no-export",
+	Schema: rule.EmptyArraySchema,
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		exportNodes := make([]*ast.Node, 0)
 		hasJestBlock := false
 

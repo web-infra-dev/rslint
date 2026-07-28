@@ -493,6 +493,25 @@ func CoerceInt(v any) (int, bool) {
 	return 0, false
 }
 
+// CoerceIntegral is [CoerceInt] for options declared as a JSON Schema
+// "integer": a fractional number is rejected rather than truncated, the way
+// ajv rejects it during config validation, so a rule reached through an entry
+// point that does not validate options (the Go rule tester, the library API)
+// falls back to its default instead of silently rounding.
+func CoerceIntegral(v any) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		if n != math.Trunc(n) {
+			return 0, false
+		}
+	case float32:
+		if float64(n) != math.Trunc(float64(n)) {
+			return 0, false
+		}
+	}
+	return CoerceInt(v)
+}
+
 // GetOptionsString extracts a string option from the weakly-typed options parameter.
 // It handles both direct string format ("value") and array format (["value"]).
 func GetOptionsString(opts any) string {

@@ -1,10 +1,15 @@
 package no_conditional_in
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_conditional_in_test.schema.json
+var schemaJSON []byte
 
 type options struct {
 	allowOptionalChaining bool
@@ -12,16 +17,11 @@ type options struct {
 
 func parseOptions(rawOptions []any) options {
 	opts := options{allowOptionalChaining: true}
-	raw := rule.LegacyUnwrapOptions(rawOptions)
-	optionArray := rule.NormalizeOptions(raw)
-	if len(optionArray) == 0 {
+	if len(rawOptions) == 0 {
 		return opts
 	}
 
-	optionMap, ok := optionArray[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
+	optionMap, _ := rawOptions[0].(map[string]interface{})
 	if allow, ok := optionMap["allowOptionalChaining"].(bool); ok {
 		opts.allowOptionalChaining = allow
 	}
@@ -58,7 +58,8 @@ func isOutermostOptionalChain(node *ast.Node) bool {
 }
 
 var NoConditionalInTestRule = rule.Rule{
-	Name: "jest/no-conditional-in-test",
+	Name:   "jest/no-conditional-in-test",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		inTestCase := false
