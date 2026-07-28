@@ -49,7 +49,7 @@ func isForInOrOfLoopVariable(varDecl *ast.Node) bool {
 	return stmt != nil && stmt.Initializer == list
 }
 
-// undefinedAnalysis is the one-time, whole-file precomputation that backs
+// undefinedAnalysis is the one-time, whole-file pass whose results back
 // isSymbolSafelyShadowingUndefined and hasSameScopeNonVarUndefinedDeclaration,
 // so that every "is this bare `undefined` declaration safe to shadow" check
 // below is an O(1) map lookup instead of its own fresh scoped walk.
