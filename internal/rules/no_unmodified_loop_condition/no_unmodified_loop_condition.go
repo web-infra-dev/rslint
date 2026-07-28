@@ -153,45 +153,21 @@ func isWrittenInRange(refs *rule.RefStore, sym *ast.Symbol, rangeNode *ast.Node)
 }
 
 // isReferencedInRange reports whether any symbol in funcSymbols has a
-// reference positioned inside rangeNode.
-//
-// This resolves each identifier directly via refs.Resolve rather than going
-// through RefStore.References(funcSym)'s name-keyed cache: RefStore.Resolve
-// maps a same-file self-reference to a default-exported function's name
-// (`inc` in `export default function inc() {} ...  inc();`) to the export
-// symbol, but that export symbol's own .Name is "default" (its slot in the
-// module's export table), not "inc". Resolve() special-cases that name
-// mismatch internally, but querying RefStore.References(exportSymbol)
-// buckets by exportSymbol.Name = "default" and so never finds the "inc"
-// identifiers. A direct per-identifier Resolve() walk sidesteps that
-// name/symbol split instead of relying on the cache bucketing correctly.
+// reference positioned inside rangeNode, using the same whole-file reference
+// lists as isWrittenInRange instead of walking rangeNode per query.
 func isReferencedInRange(refs *rule.RefStore, funcSymbols []*ast.Symbol, rangeNode *ast.Node) bool {
 	if rangeNode == nil {
 		return false
 	}
-	found := false
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil || found {
-			return
-		}
-		if n.Kind == ast.KindIdentifier {
-			if sym := refs.Resolve(n); sym != nil {
-				for _, s := range funcSymbols {
-					if sym == s {
-						found = true
-						return
-					}
-				}
+	lo, hi := rangeNode.Pos(), rangeNode.End()
+	for _, funcSym := range funcSymbols {
+		for _, ref := range refs.References(funcSym) {
+			if ref.Pos() >= lo && ref.End() <= hi {
+				return true
 			}
 		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
 	}
-	walk(rangeNode)
-	return found
+	return false
 }
 
 // isModifiedByCalledFunction checks if the symbol is modified inside a
