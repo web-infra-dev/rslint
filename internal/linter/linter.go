@@ -192,17 +192,20 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 
-		// One lazy reference index shared by every rule in this file; most
-		// files never materialize it.
-		var refs *rule.RefStore
-		if opts.Program != nil {
-			refs = rule.NewRefStore(file, opts.Program.Options())
-		}
 		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
 				fileChecker = nil
 			}
+		}
+
+		// One lazy reference index shared by every rule in this file; most
+		// files never materialize it. fileChecker is passed as a fallback for
+		// identifiers the binder scope walk can't resolve (declared outside
+		// this file); nil there just disables the fallback.
+		var refs *rule.RefStore
+		if opts.Program != nil {
+			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker)
 		}
 
 		for ruleIndex, r := range rules {

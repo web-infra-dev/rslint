@@ -8,6 +8,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // newBoundRefStore parses source as fileName, binds it (populating symbols
@@ -21,7 +23,32 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{})
+	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil)
+}
+
+// newCheckedRefStore builds a real Program (via the shared fixtures
+// tsconfig, which includes the DOM lib) for source and returns its parsed
+// source file, a type-aware RefStore, and a cleanup func the caller must
+// defer. Unlike newBoundRefStore, this exercises the TypeChecker fallback:
+// the source file is one among the fixtures project's files, so identifiers
+// naming a lib/ambient global genuinely can't be resolved by the binder scope
+// walk alone.
+func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore, func()) {
+	t.Helper()
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "ref-store-tc-fallback.ts")
+	fs := utils.NewOverlayVFSForFile(filePath, source)
+
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", utils.CreateCompilerHost(rootDir, fs))
+	if err != nil {
+		t.Fatalf("CreateProgram: %v", err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatalf("GetSourceFile(%q) = nil", filePath)
+	}
+	tc, done := program.GetTypeChecker(t.Context())
+	return sourceFile, NewRefStore(sourceFile, program.Options(), tc), done
 }
 
 // identifiers returns every Identifier node under root with the given text,
@@ -321,5 +348,61 @@ func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	got := refs.References(sym)
 	if len(got) != 1 || got[0] != useIdent {
 		t.Fatalf("References = %v, want [%v] (the `foo = 1` assignment)", got, useIdent)
+	}
+}
+
+func TestRefStoreResolveWithChecker(t *testing.T) {
+	// window is declared in lib.dom.d.ts, not this file — the binder scope
+	// walk structurally can't resolve it, so this only succeeds through
+	// ResolveWithChecker's TypeChecker fallback.
+	sourceFile, refs, done := newCheckedRefStore(t, "export {}; function f() { window; window = 1 as any; }")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "window")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of window, got %d", len(occurrences))
+	}
+	readIdent, writeIdent := occurrences[0], occurrences[1]
+
+	// Plain Resolve stays binder-only even when the RefStore has a
+	// TypeChecker available — the fallback is opt-in per call, not automatic
+	// once a checker exists.
+	if got := refs.Resolve(readIdent); got != nil {
+		t.Fatalf("Resolve(window) = %v, want nil (window isn't declared in this file)", got)
+	}
+
+	sym := refs.ResolveWithChecker(readIdent)
+	if sym == nil {
+		t.Fatal("ResolveWithChecker(window) = nil, want the lib.dom.d.ts global symbol")
+	}
+	// Two different reference sites for the same external declaration must
+	// resolve to the identical symbol object — References keys on this.
+	if got := refs.ResolveWithChecker(writeIdent); got != sym {
+		t.Fatalf("ResolveWithChecker(second window reference) = %v, want %v (same symbol object)", got, sym)
+	}
+
+	// The fallback must also make References work for this symbol, not just
+	// ResolveWithChecker: resolvePending has to drain the "window" candidate
+	// bucket through the TypeChecker too, or these references would stay
+	// pending forever and every rule asking "was this written" would
+	// silently see nothing.
+	got := refs.References(sym)
+	if len(got) != 2 || got[0] != readIdent || got[1] != writeIdent {
+		t.Fatalf("References = %v, want [%v %v] (both window references)", got, readIdent, writeIdent)
+	}
+}
+
+func TestRefStoreResolveWithCheckerNoChecker(t *testing.T) {
+	// Without a TypeChecker, ResolveWithChecker degrades to plain Resolve: an
+	// identifier the binder can't resolve stays unresolved.
+	sourceFile, refs := newBoundRefStore(t, "/no-fallback.ts", core.ScriptKindTS,
+		"export {}; function f() { window; }")
+
+	occurrences := identifiers(sourceFile.AsNode(), "window")
+	if len(occurrences) != 1 {
+		t.Fatalf("expected 1 occurrence of window, got %d", len(occurrences))
+	}
+	if got := refs.ResolveWithChecker(occurrences[0]); got != nil {
+		t.Fatalf("ResolveWithChecker(window) = %v, want nil (no TypeChecker supplied)", got)
 	}
 }
