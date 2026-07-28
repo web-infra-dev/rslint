@@ -2,6 +2,7 @@ package new_for_builtins
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -496,6 +497,12 @@ func (state *ruleState) collectPotentialLocalRootSymbol(node *ast.Node) {
 		return
 	}
 	symbol := declaration.Symbol()
+	fmt.Fprintf(os.Stderr, "DEBUG localRoot: name=%q declKind=%v symbol=%p flags=%v\n", name, declaration.Kind, symbol, func() any {
+		if symbol == nil {
+			return nil
+		}
+		return symbol.Flags
+	}())
 	if symbol == nil {
 		if state.incompleteLocalRootNames == nil {
 			state.incompleteLocalRootNames = map[string]bool{}
@@ -979,6 +986,7 @@ func (state *ruleState) indexedLocalRootReference(node *ast.Node, name string) (
 	}
 
 	_, local = state.localRootReferences[node]
+	fmt.Fprintf(os.Stderr, "DEBUG indexedLocalRootReference: name=%q pos=%d local=%v symbols=%v\n", name, node.Pos(), local, symbols)
 	return local, true
 }
 
