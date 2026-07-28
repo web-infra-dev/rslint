@@ -1,7 +1,6 @@
 package no_unused_vars
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -860,6 +859,42 @@ func isTopLevelDeclaration(node *ast.Node) bool {
 	return false
 }
 
+// isDirectlyExported reports declarations that carry their own export modifier
+// or belong to an exported variable statement. Parameters and type parameters
+// inside an exported declaration are intentionally excluded: they remain
+// independently subject to unused-variable analysis.
+func isDirectlyExported(definition *ast.Node) bool {
+	if definition == nil {
+		return false
+	}
+	switch definition.Kind {
+	case ast.KindFunctionDeclaration,
+		ast.KindClassDeclaration,
+		ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
+		return ast.GetCombinedModifierFlags(definition)&ast.ModifierFlagsExport != 0
+	case ast.KindVariableDeclaration:
+		parent := definition.Parent
+		if parent != nil && parent.Kind == ast.KindVariableDeclarationList {
+			parent = parent.Parent
+		}
+		return parent != nil && parent.Kind == ast.KindVariableStatement &&
+			ast.GetCombinedModifierFlags(parent)&ast.ModifierFlagsExport != 0
+	case ast.KindBindingElement:
+		for current := definition.Parent; current != nil; current = current.Parent {
+			switch current.Kind {
+			case ast.KindVariableDeclaration:
+				return isDirectlyExported(current)
+			case ast.KindParameter:
+				return false
+			}
+		}
+	}
+	return false
+}
+
 func isParameterNode(node *ast.Node) bool {
 	return ast.FindAncestorKind(node, ast.KindParameter) != nil
 }
@@ -906,7 +941,7 @@ func isDestructuredArrayElement(node *ast.Node) bool {
 // ignore pattern, and whether the match should result in ignoring or
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
 // Returns: (shouldIgnore bool, matchesPattern bool)
-func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, writeRefs []*ast.Node) (bool, bool) {
+func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs []*ast.Node) (bool, bool) {
 	var re *regexp.Regexp
 
 	if isParameterNode(varInfo.Definition) {
@@ -1067,9 +1102,9 @@ doneParentWalk:
 }
 
 func buildUnusedVarMessage(varName string, hasAssignment bool) rule.RuleMessage {
-	desc := fmt.Sprintf("'%s' is defined but never used.", varName)
+	desc := "'" + varName + "' is defined but never used."
 	if hasAssignment {
-		desc = fmt.Sprintf("'%s' is assigned a value but never used.", varName)
+		desc = "'" + varName + "' is assigned a value but never used."
 	}
 	return rule.RuleMessage{
 		Id:          "unusedVar",
@@ -1078,9 +1113,9 @@ func buildUnusedVarMessage(varName string, hasAssignment bool) rule.RuleMessage 
 }
 
 func buildUsedOnlyAsTypeMessage(varName string, hasAssignment bool) rule.RuleMessage {
-	desc := fmt.Sprintf("'%s' is defined but only used as a type.", varName)
+	desc := "'" + varName + "' is defined but only used as a type."
 	if hasAssignment {
-		desc = fmt.Sprintf("'%s' is assigned a value but only used as a type.", varName)
+		desc = "'" + varName + "' is assigned a value but only used as a type."
 	}
 	return rule.RuleMessage{
 		Id:          "usedOnlyAsType",
@@ -1091,7 +1126,7 @@ func buildUsedOnlyAsTypeMessage(varName string, hasAssignment bool) rule.RuleMes
 func buildUsedIgnoredVarMessage(varName string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "usedIgnoredVar",
-		Description: fmt.Sprintf("'%s' is marked as ignored but is used.", varName),
+		Description: "'" + varName + "' is marked as ignored but is used.",
 	}
 }
 
@@ -1105,7 +1140,7 @@ func buildRemoveUnusedImportMessage() rule.RuleMessage {
 func buildRemoveUnusedVarMessage(varName string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "removeUnusedVar",
-		Description: fmt.Sprintf("Remove unused variable \"%s\".", varName),
+		Description: "Remove unused variable \"" + varName + "\".",
 	}
 }
 
@@ -1775,12 +1810,17 @@ func implicitJSXReference(
 //  5. Skip exported symbols (except for reportUsedIgnorePattern)
 //  6. Apply "after-used" logic for parameters
 //  7. Report at the last write-reference position (or declaration name as fallback)
-func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts Config, ac *analysisContext) {
+func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts *Config, ac *analysisContext) {
+	// Direct exports cannot be unused. Skip symbol/reference analysis entirely
+	// unless used ignored names must still be reported.
+	if !opts.ReportUsedIgnorePattern && isDirectlyExported(definition) {
+		return
+	}
+
 	varInfo := &VariableInfo{
 		Variable:       nameNode,
 		Used:           false,
 		OnlyUsedAsType: false,
-		References:     []*ast.Node{},
 		Definition:     definition,
 	}
 
@@ -1859,11 +1899,21 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		varInfo.OnlyUsedAsType = false
 	}
 
+	// A used variable cannot produce a diagnostic unless the caller asks to
+	// report names that match an ignore pattern. Avoid the remaining category,
+	// export, and assignment analysis on the overwhelmingly common hot path.
+	if varInfo.Used && !opts.ReportUsedIgnorePattern {
+		return
+	}
+
 	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
 	// If the variable matches its category's pattern and is unused → ignore silently.
 	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
 	shouldIgnore, matchedPattern := matchesIgnorePattern(name, varInfo, opts, info.writeRefs)
 	if shouldIgnore {
+		return
+	}
+	if varInfo.Used && !matchedPattern {
 		return
 	}
 
@@ -1958,7 +2008,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(definition)
-				processVariable(ctx, nameNode, identifier.Text, definition, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, definition, &opts, ac)
 			} else if nameNode.Kind == ast.KindObjectBindingPattern || nameNode.Kind == ast.KindArrayBindingPattern {
 				hasRestSibling := false
 				if opts.IgnoreRestSiblings {
@@ -2046,7 +2096,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindModuleDeclaration: func(node *ast.Node) {
@@ -2105,7 +2155,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				}
 
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindClassDeclaration: func(node *ast.Node) {
@@ -2125,7 +2175,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
@@ -2142,7 +2192,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindTypeAliasDeclaration: func(node *ast.Node) {
@@ -2159,7 +2209,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindEnumDeclaration: func(node *ast.Node) {
@@ -2176,7 +2226,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindParameter: func(node *ast.Node) {
@@ -2225,7 +2275,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindImportClause: func(node *ast.Node) {
@@ -2243,7 +2293,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindNamespaceImport: func(node *ast.Node) {
@@ -2261,7 +2311,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindImportEqualsDeclaration: func(node *ast.Node) {
@@ -2279,7 +2329,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 
 			ast.KindTypeParameter: func(node *ast.Node) {
@@ -2309,7 +2359,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ensureCollected(node)
-				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+				processVariable(ctx, nameNode, identifier.Text, node, &opts, ac)
 			},
 		}
 	},
