@@ -1,6 +1,7 @@
 package require_top_level_describe
 
 import (
+	_ "embed"
 	"fmt"
 	"math"
 	"strconv"
