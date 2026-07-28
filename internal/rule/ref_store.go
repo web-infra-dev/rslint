@@ -13,25 +13,22 @@ import (
 // references it, in source order.
 //
 // References are resolved with the binder's NameResolver — the same scope walk
-// the checker performs for identifiers. Resolve uses only this scope walk, so
-// it never touches the TypeChecker and never triggers lazy type computation;
-// it returns nil for a symbol declared outside this file (cross-file, .d.ts,
-// and standard-library globals), the same as if the identifier didn't resolve
-// at all. ResolveWithChecker is the opt-in escape hatch for callers that
-// specifically need those symbols too, at the cost of a TypeChecker
-// round-trip for every identifier the binder can't place — callers that only
-// care whether an identifier is declared in this file (the common case)
-// should keep using Resolve, which costs nothing for it either way.
+// the checker performs for identifiers. Resolve tries this scope walk first;
+// when it can't place an identifier (a symbol declared outside this file —
+// cross-file, .d.ts, and standard-library globals) and a TypeChecker was
+// supplied to NewRefStore, it falls back to the checker for that identifier.
+// Without a checker, that fallback is a no-op and Resolve returns nil for
+// those identifiers, the same as if they didn't resolve at all.
 //
 // References resolves symbols the same way internally, so it can return
-// identifiers referencing a symbol obtained from ResolveWithChecker too; for
+// identifiers referencing a symbol obtained from the checker fallback too; for
 // a symbol declared in this file it costs nothing extra, since the binder
 // scope walk already answers for every identifier sharing its name.
 //
 // The store deals in raw binder symbols: query it with the symbol attached to
 // a declaration node (node.Symbol()), not with checker.GetSymbolAtLocation
 // results, which may be checker-merged and compare unequal — except for
-// symbols obtained from ResolveWithChecker itself.
+// symbols Resolve obtained through the checker fallback itself.
 //
 // Collection is lazy twice over: the single AST walk that gathers candidate
 // identifiers runs on first use, and name resolution runs once per queried
@@ -51,11 +48,11 @@ type RefStore struct {
 
 // NewRefStore creates the reference index for one source file. options must
 // be the file's program options (the resolver consults script target and
-// module settings during scope walks). tc is the file's TypeChecker, used
-// only by ResolveWithChecker and by References when asked about a symbol
-// ResolveWithChecker produced; nil disables both (References then behaves as
-// if every such symbol were never queried, and ResolveWithChecker becomes
-// equivalent to Resolve).
+// module settings during scope walks). tc is the file's TypeChecker, used as
+// a fallback by Resolve for identifiers the binder scope walk can't place,
+// and by References when asked about a symbol that fallback produced; nil
+// disables both (Resolve then never falls back, and References behaves as if
+// every such symbol were never queried).
 func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
@@ -123,32 +120,16 @@ func (s *RefStore) resolvePending(name string) {
 // Resolve returns the symbol that a reference-position identifier resolves
 // to — the forward counterpart to References, for rules that need "what
 // declaration does this identifier refer to" rather than "what identifiers
-// refer to this declaration." It uses the binder's scope walk, so it never
-// touches the TypeChecker.
+// refer to this declaration." It uses the binder's scope walk first; when
+// that can't place the identifier — a symbol declared outside this file
+// (cross-file, .d.ts, and standard-library globals) — and a TypeChecker was
+// supplied to NewRefStore, it falls back to the checker. That fallback is a
+// real TypeChecker round-trip, unlike the binder-only common path.
 //
 // Returns nil for identifiers that aren't reference positions (declaration
 // names, property keys, import/export bindings, labels, intrinsic JSX tags —
-// see isReferencePosition) and for names that don't resolve to a symbol
-// bound in this file. That nil is also the right answer for "is this
-// identifier declared in this file" (e.g. distinguishing a locally shadowed
-// name from an untouched global) — use ResolveWithChecker only when the
-// caller specifically needs the external symbol itself.
+// see isReferencePosition) and for names that don't resolve to any symbol.
 func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
-		return nil
-	}
-	return s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/)
-}
-
-// ResolveWithChecker is Resolve, extended to fall back to the TypeChecker for
-// identifiers the binder scope walk can't place — symbols declared outside
-// this file (cross-file, .d.ts, and standard-library globals). That fallback
-// is a real TypeChecker round-trip per call, unlike the binder-only common
-// path, so prefer Resolve unless the caller specifically needs the resolved
-// symbol for one of those external declarations; Resolve already answers
-// "is this identifier declared in this file" (nil vs. non-nil) just as
-// well, at no TypeChecker cost.
-func (s *RefStore) ResolveWithChecker(node *ast.Node) *ast.Symbol {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return nil
 	}

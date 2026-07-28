@@ -351,10 +351,10 @@ func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	}
 }
 
-func TestRefStoreResolveWithChecker(t *testing.T) {
+func TestRefStoreResolveCheckerFallback(t *testing.T) {
 	// window is declared in lib.dom.d.ts, not this file — the binder scope
 	// walk structurally can't resolve it, so this only succeeds through
-	// ResolveWithChecker's TypeChecker fallback.
+	// Resolve's TypeChecker fallback.
 	sourceFile, refs, done := newCheckedRefStore(t, "export {}; function f() { window; window = 1 as any; }")
 	defer done()
 
@@ -364,42 +364,35 @@ func TestRefStoreResolveWithChecker(t *testing.T) {
 	}
 	readIdent, writeIdent := occurrences[0], occurrences[1]
 
-	// Plain Resolve stays binder-only even when the RefStore has a
-	// TypeChecker available — the fallback is opt-in per call, not automatic
-	// once a checker exists.
-	if got := refs.Resolve(readIdent); got != nil {
-		t.Fatalf("Resolve(window) = %v, want nil (window isn't declared in this file)", got)
-	}
-
-	sym := refs.ResolveWithChecker(readIdent)
+	sym := refs.Resolve(readIdent)
 	if sym == nil {
-		t.Fatal("ResolveWithChecker(window) = nil, want the lib.dom.d.ts global symbol")
+		t.Fatal("Resolve(window) = nil, want the lib.dom.d.ts global symbol")
 	}
 	// Two different reference sites for the same external declaration must
 	// resolve to the identical symbol object — References keys on this.
-	if got := refs.ResolveWithChecker(writeIdent); got != sym {
-		t.Fatalf("ResolveWithChecker(second window reference) = %v, want %v (same symbol object)", got, sym)
+	if got := refs.Resolve(writeIdent); got != sym {
+		t.Fatalf("Resolve(second window reference) = %v, want %v (same symbol object)", got, sym)
 	}
 
 	// The fallback must also make References work for this symbol, not just
-	// ResolveWithChecker: resolvePending has to drain the "window" candidate
-	// bucket through the TypeChecker too, or these references would stay
-	// pending forever and every rule asking "was this written" would
-	// silently see nothing.
+	// Resolve: resolvePending has to drain the "window" candidate bucket
+	// through the TypeChecker too, or these references would stay pending
+	// forever and every rule asking "was this written" would silently see
+	// nothing.
 	got := refs.References(sym)
 	if len(got) != 2 || got[0] != readIdent || got[1] != writeIdent {
 		t.Fatalf("References = %v, want [%v %v] (both window references)", got, readIdent, writeIdent)
 	}
 }
 
-func TestRefStoreResolveWithCheckerExcludedPositions(t *testing.T) {
+func TestRefStoreResolveCheckerFallbackExcludedPositions(t *testing.T) {
 	// A TypeChecker resolves a property key's own declaration name to the
 	// property's symbol (its only declaration is that very key), not to
-	// anything the identifier "references". ResolveWithChecker must still
-	// treat it as a non-reference position and return nil, the same as
-	// Resolve does without a checker — the TypeChecker fallback is only for
-	// reference positions the binder scope walk can't place, not a way to
-	// resolve declaration names into their own symbol.
+	// anything the identifier "references". Resolve must still treat it as a
+	// non-reference position and return nil, the same as without a checker —
+	// the TypeChecker fallback is only for reference positions the binder
+	// scope walk can't place, not a way to resolve declaration names into
+	// their own symbol.
 	sourceFile, refs, done := newCheckedRefStore(t,
 		"export {}; function f() { var obj = { foo: 2 }; return obj.foo; }")
 	defer done()
@@ -410,14 +403,14 @@ func TestRefStoreResolveWithCheckerExcludedPositions(t *testing.T) {
 	}
 	propertyKey := occurrences[0]
 
-	if got := refs.ResolveWithChecker(propertyKey); got != nil {
-		t.Fatalf("ResolveWithChecker(property key) = %v, want nil", got)
+	if got := refs.Resolve(propertyKey); got != nil {
+		t.Fatalf("Resolve(property key) = %v, want nil", got)
 	}
 }
 
-func TestRefStoreResolveWithCheckerNoChecker(t *testing.T) {
-	// Without a TypeChecker, ResolveWithChecker degrades to plain Resolve: an
-	// identifier the binder can't resolve stays unresolved.
+func TestRefStoreResolveNoCheckerFallback(t *testing.T) {
+	// Without a TypeChecker, Resolve stays binder-only: an identifier the
+	// binder can't resolve stays unresolved.
 	sourceFile, refs := newBoundRefStore(t, "/no-fallback.ts", core.ScriptKindTS,
 		"export {}; function f() { window; }")
 
@@ -425,7 +418,7 @@ func TestRefStoreResolveWithCheckerNoChecker(t *testing.T) {
 	if len(occurrences) != 1 {
 		t.Fatalf("expected 1 occurrence of window, got %d", len(occurrences))
 	}
-	if got := refs.ResolveWithChecker(occurrences[0]); got != nil {
-		t.Fatalf("ResolveWithChecker(window) = %v, want nil (no TypeChecker supplied)", got)
+	if got := refs.Resolve(occurrences[0]); got != nil {
+		t.Fatalf("Resolve(window) = %v, want nil (no TypeChecker supplied)", got)
 	}
 }
