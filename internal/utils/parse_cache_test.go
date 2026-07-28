@@ -363,6 +363,7 @@ func TestCachingHost_ExactAliasesAreNotMerged(t *testing.T) {
 	canonical := host.GetSourceFile(testParseOpts(canonicalPath, ast.ExternalModuleIndicatorOptions{}))
 	if alias == nil || canonical == nil {
 		t.Fatal("both aliases must produce a SourceFile")
+		return
 	}
 	if alias.Text() == canonical.Text() || alias == canonical {
 		t.Fatal("paths with the same realpath but distinct overlay text must not be merged")
@@ -409,6 +410,7 @@ func TestCachingHost_OverlaySymlinkAliasesWithSharedPathAreNotMerged(t *testing.
 	alias := host.GetSourceFile(aliasOpts)
 	if canonical == nil || alias == nil {
 		t.Fatal("both overlay aliases must produce a SourceFile")
+		return
 	}
 	if canonical == alias || canonical.Text() == alias.Text() {
 		t.Fatal("exact FileName overlays must remain distinct even when Path and realpath match")
@@ -671,6 +673,7 @@ func TestCachingHost_ConcurrentMissesUseOneWinningSnapshot(t *testing.T) {
 	winner := results[0]
 	if winner == nil {
 		t.Fatal("concurrent source lookup returned nil")
+		return
 	}
 	for i, result := range results[1:] {
 		if result != winner {
@@ -874,6 +877,7 @@ func TestNewParseCache_EnabledInitializesSourceGeneration(t *testing.T) {
 	cache := NewParseCache()
 	if cache == nil {
 		t.Fatal("enabled parse cache must be constructed")
+		return
 	}
 	initial := cache.sourceGeneration.Load()
 	if initial == nil {

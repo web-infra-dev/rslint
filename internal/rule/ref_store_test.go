@@ -290,6 +290,7 @@ func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
 	sym := declIdent.Parent.Symbol()
 	if sym == nil {
 		t.Fatal("declaration identifier has no bound symbol")
+		return
 	}
 	if sym.Name != ast.InternalSymbolNameDefault {
 		t.Fatalf("declaration symbol name = %q, want %q", sym.Name, ast.InternalSymbolNameDefault)

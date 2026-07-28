@@ -171,6 +171,7 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	}
 	if result.LintedFileCount != 1 || captured == nil {
 		t.Fatalf("captured context = %v, linted files = %d; want one", captured != nil, result.LintedFileCount)
+		return
 	}
 
 	if !reflect.DeepEqual(captured.ConfigGlobals, configGlobals) {
@@ -430,6 +431,7 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 	sourceFile := program.GetSourceFile(paths["reporter.ts"])
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("reporter fixture did not parse into two statements")
+		return
 	}
 
 	blockedNode := sourceFile.Statements.Nodes[0]

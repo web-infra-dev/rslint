@@ -1529,6 +1529,7 @@ func TestNoUnnecessaryTypeConstraintSuggestionEdges(t *testing.T) {
 			}
 			if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
 				t.Fatalf("suggestions = %#v, want exactly one", diagnostic.Suggestions)
+				return
 			}
 
 			suggestion := (*diagnostic.Suggestions)[0]
@@ -1602,6 +1603,7 @@ func TestNoUnnecessaryTypeConstraintEditDemand(t *testing.T) {
 	all := diagnostics[rule.EditDemandAll].Suggestions
 	if suggestionOnly == nil || all == nil || !reflect.DeepEqual(*suggestionOnly, *all) {
 		t.Fatalf("suggestion artifacts differ between suggestion-only and all demand")
+		return
 	}
 	if len(*suggestionOnly) != 1 {
 		t.Fatalf("suggestions = %#v, want exactly one", *suggestionOnly)
@@ -1665,6 +1667,7 @@ func TestNoUnnecessaryTypeConstraintMalformedASTWithholdsSuggestion(t *testing.T
 	sourceFile.AsNode().ForEachChild(visit)
 	if typeParameter == nil {
 		t.Fatal("test setup did not find a type parameter")
+		return
 	}
 
 	declaration := typeParameter.AsTypeParameterDeclaration()

@@ -245,6 +245,7 @@ func TestGetConfigForFile_SplitEntry_ProjectFromNativeEntrySurvives(t *testing.T
 	}
 	if merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
 		t.Fatal("merged languageOptions/parserOptions must survive from the native entry")
+		return
 	}
 	if len(merged.LanguageOptions.ParserOptions.Project) != 1 ||
 		merged.LanguageOptions.ParserOptions.Project[0] != "./tsconfig.json" {

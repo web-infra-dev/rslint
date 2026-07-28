@@ -23,6 +23,7 @@ func parseStatements(t *testing.T, code string) []*ast.Node {
 	sf := program.GetSourceFile(fileName)
 	if sf == nil || sf.Statements == nil {
 		t.Fatal("source file has no statements")
+		return nil
 	}
 	return sf.Statements.Nodes
 }

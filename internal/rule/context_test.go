@@ -333,6 +333,7 @@ func TestNodeDeferredFixesAndSuggestionsSkipsSuppressedBuilders(t *testing.T) {
 	}, "const visible = 1;\n// rslint-disable-next-line test\nconst blocked = 2;\n", core.ScriptKindTS)
 	if sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("suppression fixture did not parse into two statements")
+		return
 	}
 
 	fixBuilderCalls := 0

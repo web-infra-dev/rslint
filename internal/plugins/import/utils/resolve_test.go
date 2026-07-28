@@ -19,6 +19,7 @@ func TestResolveSourceFileFromSourceFile(t *testing.T) {
 	}
 	if target == nil {
 		t.Fatal("ResolveSourceFileFromSourceFile() returned nil target")
+		return
 	}
 	if got := tspath.NormalizeSlashes(resolvedPath); !strings.HasSuffix(got, "/bar.ts") {
 		t.Fatalf("resolvedPath = %q, want suffix /bar.ts", resolvedPath)

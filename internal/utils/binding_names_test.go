@@ -18,6 +18,7 @@ func TestForEachVariableDeclarationBinding(t *testing.T) {
 	statement := sourceFile.Statements.Nodes[0].AsVariableStatement()
 	if statement == nil || statement.DeclarationList == nil {
 		t.Fatal("test source did not produce a variable declaration list")
+		return
 	}
 
 	type binding struct {

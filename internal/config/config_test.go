@@ -142,6 +142,7 @@ func TestParserOptionsProjectServicePtr(t *testing.T) {
 			} else {
 				if opts.ProjectService == nil {
 					t.Fatalf("Expected ProjectService to be non-nil")
+					return
 				}
 				if *opts.ProjectService != tt.expectedValue {
 					t.Errorf("Expected ProjectService to be %v, got %v", tt.expectedValue, *opts.ProjectService)
