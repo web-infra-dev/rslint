@@ -2,10 +2,136 @@ package no_irregular_whitespace
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func referenceIrregularWhitespace(ch rune) bool {
+	switch ch {
+	case '\u000B', '\u000C', '\u0085', '\u00A0', '\u1680', '\u180E',
+		'\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005',
+		'\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u200B',
+		'\u2028', '\u2029', '\u202F', '\u205F', '\u3000', '\uFEFF':
+		return true
+	}
+	return false
+}
+
+func referenceFindIrregularWhitespace(text string) []errorInfo {
+	var errors []errorInfo
+	i := 0
+	if len(text) >= 3 && text[0] == 0xEF && text[1] == 0xBB && text[2] == 0xBF {
+		i = 3
+	}
+	for i < len(text) {
+		r, size := utf8.DecodeRuneInString(text[i:])
+		if r == utf8.RuneError && size == 1 {
+			i++
+			continue
+		}
+		if referenceIrregularWhitespace(r) {
+			if r == '\u2028' || r == '\u2029' {
+				errors = append(errors, errorInfo{pos: i, end: i + size})
+			} else {
+				start := i
+				end := i + size
+				for end < len(text) {
+					nextR, nextSize := utf8.DecodeRuneInString(text[end:])
+					if !referenceIrregularWhitespace(nextR) || nextR == '\u2028' || nextR == '\u2029' {
+						break
+					}
+					end += nextSize
+				}
+				errors = append(errors, errorInfo{pos: start, end: end})
+				i = end
+				continue
+			}
+		}
+		i += size
+	}
+	return errors
+}
+
+func TestIrregularWhitespaceSizeAtMatchesRuneReference(t *testing.T) {
+	check := func(encoded string) {
+		r, wantSize := utf8.DecodeRuneInString(encoded)
+		wantMatch := (r != utf8.RuneError || wantSize != 1) && referenceIrregularWhitespace(r)
+		gotSize, gotLineTerminator := irregularWhitespaceSizeAt(encoded, 0)
+		if !wantMatch {
+			wantSize = 0
+		}
+		if gotSize != wantSize {
+			t.Fatalf("irregularWhitespaceSizeAt(% x) size = %d, want %d (decoded %U)", encoded, gotSize, wantSize, r)
+		}
+		wantLineTerminator := wantMatch && (r == '\u2028' || r == '\u2029')
+		if gotLineTerminator != wantLineTerminator {
+			t.Fatalf(
+				"irregularWhitespaceSizeAt(% x) lineTerminator = %v, want %v (decoded %U)",
+				encoded,
+				gotLineTerminator,
+				wantLineTerminator,
+				r,
+			)
+		}
+	}
+
+	for r := rune(0); r <= utf8.MaxRune; r++ {
+		if utf8.ValidRune(r) {
+			check(string(r))
+		}
+	}
+
+	// Attack every possible tail after a lead byte accepted by the fast path.
+	// This covers malformed UTF-8 and near misses sharing an irregular
+	// whitespace prefix, not only valid Unicode scalar values.
+	for _, lead := range []byte{0xC2, 0xE1, 0xE2, 0xE3, 0xEF} {
+		for second := range 256 {
+			for third := range 256 {
+				check(string([]byte{lead, byte(second), byte(third)}))
+			}
+		}
+	}
+}
+
+func TestFindIrregularWhitespaceMatchesRuneReference(t *testing.T) {
+	irregular := []string{
+		"\u000B", "\u000C", "\u0085", "\u00A0", "\u1680", "\u180E",
+		"\u2000", "\u2001", "\u2002", "\u2003", "\u2004", "\u2005",
+		"\u2006", "\u2007", "\u2008", "\u2009", "\u200A", "\u200B",
+		"\u2028", "\u2029", "\u202F", "\u205F", "\u3000", "\uFEFF",
+	}
+
+	state := uint64(0x9E3779B97F4A7C15)
+	next := func() uint64 {
+		state = state*6364136223846793005 + 1442695040888963407
+		return state
+	}
+	for caseIndex := range 20_000 {
+		data := make([]byte, int(next()%128))
+		for i := range data {
+			data[i] = byte(next())
+		}
+		if len(data) > 0 && caseIndex%2 == 0 {
+			value := irregular[int(next()%uint64(len(irregular)))]
+			offset := int(next() % uint64(len(data)))
+			copy(data[offset:], value)
+		}
+
+		text := string(data)
+		want := referenceFindIrregularWhitespace(text)
+		got := findIrregularWhitespace(text)
+		if len(got) != len(want) {
+			t.Fatalf("findIrregularWhitespace(% x) = %+v, want %+v", data, got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("findIrregularWhitespace(% x)[%d] = %+v, want %+v", data, i, got[i], want[i])
+			}
+		}
+	}
+}
 
 func TestNoIrregularWhitespace(t *testing.T) {
 	rule_tester.RunRuleTester(

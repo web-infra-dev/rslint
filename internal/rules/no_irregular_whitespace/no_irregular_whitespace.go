@@ -2,7 +2,7 @@ package no_irregular_whitespace
 
 import (
 	"sort"
-	"unicode/utf8"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -63,38 +63,54 @@ func parseOptions(options any) irregularWhitespaceOptions {
 	return opts
 }
 
-// isIrregularWhitespace returns true if the rune is an irregular whitespace character
-// (not a normal space or tab, but also not a standard line terminator \n, \r).
-func isIrregularWhitespace(ch rune) bool {
-	switch ch {
-	case
-		'\u000B', // verticalTab
-		'\u000C', // formFeed
-		'\u0085', // nextLine
-		'\u00A0', // nonBreakingSpace
-		'\u1680', // ogham
-		'\u180E', // mongolianVowelSeparator
-		'\u2000', // enQuad
-		'\u2001', // emQuad
-		'\u2002', // enSpace
-		'\u2003', // emSpace
-		'\u2004', // threePerEmSpace
-		'\u2005', // fourPerEmSpace
-		'\u2006', // sixPerEmSpace
-		'\u2007', // figureSpace
-		'\u2008', // punctuationSpace
-		'\u2009', // thinSpace
-		'\u200A', // hairSpace
-		'\u200B', // zeroWidthSpace
-		'\u202F', // narrowNoBreakSpace
-		'\u205F', // mediumMathematicalSpace
-		'\u3000', // ideographicSpace
-		'\uFEFF', // byteOrderMark
-		'\u2028', // lineSeparator
-		'\u2029': // paragraphSeparator
-		return true
+// irregularWhitespaceSizeAt recognizes the UTF-8 encodings used by ESLint's
+// IRREGULAR_WHITESPACE regex. Scanning bytes directly avoids decoding every
+// ordinary source character into a rune. The second result distinguishes the
+// two line terminators, which ESLint reports separately instead of grouping.
+func irregularWhitespaceSizeAt(text string, pos int) (size int, lineTerminator bool) {
+	switch text[pos] {
+	case '\u000B', '\u000C':
+		return 1, false
+	case 0xC2:
+		if pos+1 < len(text) && (text[pos+1] == 0x85 || text[pos+1] == 0xA0) {
+			return 2, false
+		}
+	case 0xE1:
+		if pos+2 < len(text) &&
+			(text[pos+1] == 0x9A && text[pos+2] == 0x80 || // U+1680
+				text[pos+1] == 0xA0 && text[pos+2] == 0x8E) { // U+180E
+			return 3, false
+		}
+	case 0xE2:
+		if pos+2 >= len(text) {
+			return 0, false
+		}
+		switch text[pos+1] {
+		case 0x80:
+			last := text[pos+2]
+			switch {
+			case last >= 0x80 && last <= 0x8B:
+				return 3, false // U+2000..U+200B
+			case last == 0xA8 || last == 0xA9:
+				return 3, true // U+2028, U+2029
+			case last == 0xAF:
+				return 3, false // U+202F
+			}
+		case 0x81:
+			if text[pos+2] == 0x9F {
+				return 3, false // U+205F
+			}
+		}
+	case 0xE3:
+		if pos+2 < len(text) && text[pos+1] == 0x80 && text[pos+2] == 0x80 {
+			return 3, false // U+3000
+		}
+	case 0xEF:
+		if pos+2 < len(text) && text[pos+1] == 0xBB && text[pos+2] == 0xBF {
+			return 3, false // U+FEFF
+		}
 	}
-	return false
+	return 0, false
 }
 
 type errorInfo struct {
@@ -102,13 +118,34 @@ type errorInfo struct {
 	end int
 }
 
-func checkNoIrregularWhitespace(ctx rule.RuleContext, opts irregularWhitespaceOptions) {
-	text := ctx.SourceFile.Text()
-	if len(text) == 0 {
-		return
+var irregularWhitespaceFirstBytes = [256]bool{
+	'\u000B': true,
+	'\u000C': true,
+	0xC2:     true,
+	0xE1:     true,
+	0xE2:     true,
+	0xE3:     true,
+	0xEF:     true,
+}
+
+func mayContainIrregularWhitespace(text string) bool {
+	// IndexByte uses the standard library's optimized byte search. Most files
+	// contain none of these possible UTF-8 lead bytes, so avoid even the cheap
+	// byte-by-byte classifier below on the overwhelmingly common clean path.
+	return strings.IndexByte(text, 0xE2) >= 0 ||
+		strings.IndexByte(text, 0xEF) >= 0 ||
+		strings.IndexByte(text, 0xC2) >= 0 ||
+		strings.IndexByte(text, 0xE3) >= 0 ||
+		strings.IndexByte(text, 0xE1) >= 0 ||
+		strings.IndexByte(text, '\u000B') >= 0 ||
+		strings.IndexByte(text, '\u000C') >= 0
+}
+
+func findIrregularWhitespace(text string) []errorInfo {
+	if len(text) == 0 || !mayContainIrregularWhitespace(text) {
+		return nil
 	}
 
-	// Collect all irregular whitespace positions.
 	var errors []errorInfo
 	i := 0
 
@@ -120,50 +157,56 @@ func checkNoIrregularWhitespace(ctx rule.RuleContext, opts irregularWhitespaceOp
 	}
 
 	for i < len(text) {
-		r, size := utf8.DecodeRuneInString(text[i:])
-		if r == utf8.RuneError && size == 1 {
+		if !irregularWhitespaceFirstBytes[text[i]] {
+			i++
+			continue
+		}
+		size, lineTerminator := irregularWhitespaceSizeAt(text, i)
+		if size == 0 {
 			i++
 			continue
 		}
 
-		if isIrregularWhitespace(r) {
-			// Group consecutive irregular whitespace (non-line-terminator) into one error,
-			// matching ESLint's IRREGULAR_WHITESPACE regex which matches runs of chars.
-			// But line terminators (\u2028, \u2029) are always reported individually.
-			if r == '\u2028' || r == '\u2029' {
-				errors = append(errors, errorInfo{pos: i, end: i + size})
-			} else {
-				start := i
-				end := i + size
-				for end < len(text) {
-					nextR, nextSize := utf8.DecodeRuneInString(text[end:])
-					if isIrregularWhitespace(nextR) && nextR != '\u2028' && nextR != '\u2029' {
-						end += nextSize
-					} else {
-						break
-					}
-				}
-				errors = append(errors, errorInfo{pos: start, end: end})
-				i = end
-				continue
-			}
+		// Group consecutive irregular whitespace (non-line-terminator) into one
+		// error, matching ESLint's regex. U+2028 and U+2029 are always reported
+		// individually.
+		if lineTerminator {
+			errors = append(errors, errorInfo{pos: i, end: i + size})
+			i += size
+			continue
 		}
 
-		i += size
+		start := i
+		end := i + size
+		for end < len(text) {
+			nextSize, nextLineTerminator := irregularWhitespaceSizeAt(text, end)
+			if nextSize == 0 || nextLineTerminator {
+				break
+			}
+			end += nextSize
+		}
+		errors = append(errors, errorInfo{pos: start, end: end})
+		i = end
 	}
+	return errors
+}
 
+func checkNoIrregularWhitespace(ctx rule.RuleContext, opts irregularWhitespaceOptions) {
+	errors := findIrregularWhitespace(ctx.SourceFile.Text())
 	if len(errors) == 0 {
 		return
 	}
 
 	// Collect exempt ranges based on options.
 	var exemptRanges []errorInfo
-	collectExemptRanges(ctx, opts, &exemptRanges)
+	collectExemptRanges(ctx, opts, errors, &exemptRanges)
 
 	// Sort exempt ranges by position for efficient filtering.
-	sort.Slice(exemptRanges, func(i, j int) bool {
-		return exemptRanges[i].pos < exemptRanges[j].pos
-	})
+	if len(exemptRanges) > 1 {
+		sort.Slice(exemptRanges, func(i, j int) bool {
+			return exemptRanges[i].pos < exemptRanges[j].pos
+		})
+	}
 
 	// Filter errors: remove those that fall entirely inside an exempt range.
 	msg := rule.RuleMessage{
@@ -197,7 +240,14 @@ func isInsideExemptRange(err errorInfo, exemptRanges []errorInfo) bool {
 	return false
 }
 
-func collectExemptRanges(ctx rule.RuleContext, opts irregularWhitespaceOptions, ranges *[]errorInfo) {
+func rangeContainsError(start int, end int, errors []errorInfo) bool {
+	idx := sort.Search(len(errors), func(i int) bool {
+		return errors[i].end > start
+	})
+	return idx < len(errors) && errors[idx].pos < end
+}
+
+func collectExemptRanges(ctx rule.RuleContext, opts irregularWhitespaceOptions, errors []errorInfo, ranges *[]errorInfo) {
 	sf := ctx.SourceFile
 
 	// trimmedPos returns the start of the actual token, skipping leading trivia.
@@ -211,6 +261,14 @@ func collectExemptRanges(ctx rule.RuleContext, opts irregularWhitespaceOptions, 
 	if opts.skipStrings || opts.skipRegExps || opts.skipTemplates || opts.skipJSXText {
 		var walk func(node *ast.Node) bool
 		walk = func(node *ast.Node) bool {
+			// Errors are sorted and normally sparse. Prune every subtree that
+			// cannot contain one instead of walking and allocating ranges for
+			// every string/template/regexp in the file.
+			start, end := node.Pos(), node.End()
+			if start >= 0 && end >= start && !rangeContainsError(start, end, errors) {
+				return false
+			}
+
 			switch node.Kind {
 			case ast.KindStringLiteral:
 				if opts.skipStrings {
@@ -241,14 +299,10 @@ func collectExemptRanges(ctx rule.RuleContext, opts irregularWhitespaceOptions, 
 
 	// Collect comment ranges.
 	if opts.skipComments {
-		nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
-		text := sf.Text()
 		for _, comment := range ctx.Comments.All() {
-			*ranges = append(*ranges, errorInfo{pos: comment.Pos(), end: comment.End()})
-		}
-		// Also check for leading comments at position 0 which ForEachComment may miss.
-		for comment := range scanner.GetLeadingCommentRanges(nodeFactory, text, 0) {
-			*ranges = append(*ranges, errorInfo{pos: comment.Pos(), end: comment.End()})
+			if rangeContainsError(comment.Pos(), comment.End(), errors) {
+				*ranges = append(*ranges, errorInfo{pos: comment.Pos(), end: comment.End()})
+			}
 		}
 	}
 }
