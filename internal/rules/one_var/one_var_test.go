@@ -2852,3 +2852,35 @@ func TestOneVarEditDemand(t *testing.T) {
 		})
 	}
 }
+
+func TestOneVarStatementLocalModesOnlyRegisterDeclarationListener(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name    string
+		options []any
+	}{
+		{name: "never", options: []any{modeNever}},
+		{name: "consecutive", options: []any{modeConsecutive}},
+		{
+			name: "mixed statement-local modes",
+			options: []any{map[string]interface{}{
+				"const": modeConsecutive,
+				"let":   modeNever,
+				"var":   modeConsecutive,
+			}},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			listeners := OneVarRule.Run(rule.RuleContext{}, testCase.options)
+			if len(listeners) != 1 {
+				t.Fatalf("listeners = %d, want only VariableDeclarationList", len(listeners))
+			}
+			if listeners[ast.KindVariableDeclarationList] == nil {
+				t.Fatal("VariableDeclarationList listener is missing")
+			}
+		})
+	}
+}
