@@ -944,7 +944,7 @@ export class WorkerPool {
       this.opts.onLog?.({
         level: 'error',
         source: 'runner',
-        text: `worker ${slot.id} error: ${err.message}`,
+        text: `worker ${slot.id} error: ${err instanceof Error ? err.message : String(err)}`,
       });
     });
 
