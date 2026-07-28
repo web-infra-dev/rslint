@@ -542,7 +542,7 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 		// TypeChecker for symbols declared outside this file (cross-file,
 		// .d.ts, standard-library globals); a symbol resolved that way is
 		// still the real global, not a shadowing local binding.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && symbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			return false
 		}
 		// Namespace-only bindings are outside RefStore's value lookup. Only
@@ -556,21 +556,6 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 	// Keep the syntactic fallback for namespace-only bindings and direct/unit
 	// callers without a Program.
 	return !utils.IsShadowed(identifier, name)
-}
-
-// symbolDeclaredInFile reports whether symbol has a declaration physically in
-// sourceFile, as opposed to one Resolve's TypeChecker fallback reached in a
-// lib/ambient/other file.
-func symbolDeclaredInFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
-	if symbol == nil || sourceFile == nil {
-		return false
-	}
-	for _, decl := range symbol.Declarations {
-		if ast.GetSourceFileOfNode(decl) == sourceFile {
-			return true
-		}
-	}
-	return false
 }
 
 func (tracker *regexpCallTracker) isRegExpCall(node *ast.Node, callee *ast.Node) bool {
@@ -835,7 +820,7 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 		// lib/ambient symbol declared elsewhere (e.g. assigning to a bare
 		// `window`), which belongs to the configured-global path below, not
 		// trackVariable's per-declaration tracking.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && symbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
