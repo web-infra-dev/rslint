@@ -1,88 +1,99 @@
 package no_namespace
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// build the message for no-namespace rule
-func buildNoNamespaceMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "moduleSyntaxIsPreferred",
-		Description: "Namespace is not allowed.",
-	}
+var noNamespaceMessage = rule.RuleMessage{
+	Id:          "moduleSyntaxIsPreferred",
+	Description: "ES2015 module syntax is preferred over namespaces.",
 }
 
-// rule options
 type NoNamespaceOptions struct {
-	AllowDeclarations    *bool `json:"allowDeclarations"`
-	AllowDefinitionFiles *bool `json:"allowDefinitionFiles"`
+	AllowDeclarations    bool `json:"allowDeclarations"`
+	AllowDefinitionFiles bool `json:"allowDefinitionFiles"`
 }
 
-// default options
 var defaultNoNamespaceOptions = NoNamespaceOptions{
-	AllowDeclarations:    utils.Ref(false),
-	AllowDefinitionFiles: utils.Ref(true),
+	AllowDeclarations:    false,
+	AllowDefinitionFiles: true,
 }
 
-// rule instance
-// check if the namespace is used
+func parseNoNamespaceOptions(options []any) NoNamespaceOptions {
+	opts := defaultNoNamespaceOptions
+	if len(options) == 0 {
+		return opts
+	}
+
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
+	}
+	if allowDeclarations, ok := optsMap["allowDeclarations"].(bool); ok {
+		opts.AllowDeclarations = allowDeclarations
+	}
+	if allowDefinitionFiles, ok := optsMap["allowDefinitionFiles"].(bool); ok {
+		opts.AllowDefinitionFiles = allowDefinitionFiles
+	}
+	return opts
+}
+
+// isDeclaredNamespace mirrors typescript-eslint's recursive `declare` check.
+// In ordinary source files the parser propagates the ambient context flag to
+// every descendant, which makes the common path constant-time. Declaration
+// files are implicitly ambient, so when allowDefinitionFiles is disabled we
+// must instead look for an explicit `declare` modifier on the namespace or one
+// of its containing module declarations.
+func isDeclaredNamespace(node *ast.Node, isDefinitionFile bool) bool {
+	if !isDefinitionFile && node.Flags&ast.NodeFlagsAmbient != 0 {
+		return true
+	}
+	for current := node; current != nil; current = current.Parent {
+		if current.Kind == ast.KindModuleDeclaration &&
+			ast.HasSyntacticModifier(current, ast.ModifierFlagsAmbient) {
+			return true
+		}
+	}
+	return false
+}
+
 var NoNamespaceRule = rule.CreateRule(rule.Rule{
 	Name: "no-namespace",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := defaultNoNamespaceOptions
-
-		// Parse options with dual-format support (handles both array and object formats)
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			// Handle array format: [{ option: value }]
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				// Handle direct object format: { option: value }
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if allowDeclarations, ok := optsMap["allowDeclarations"].(bool); ok {
-					opts.AllowDeclarations = utils.Ref(allowDeclarations)
-				}
-				if allowDefinitionFiles, ok := optsMap["allowDefinitionFiles"].(bool); ok {
-					opts.AllowDefinitionFiles = utils.Ref(allowDefinitionFiles)
-				}
-			}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseNoNamespaceOptions(options)
+		if opts.AllowDefinitionFiles && ctx.SourceFile.IsDeclarationFile {
+			return nil
 		}
 
 		return rule.RuleListeners{
 			ast.KindModuleDeclaration: func(node *ast.Node) {
 				moduleDecl := node.AsModuleDeclaration()
-				if moduleDecl == nil {
+				name := moduleDecl.Name()
+				if name == nil ||
+					name.Kind == ast.KindStringLiteral ||
+					ast.IsGlobalScopeAugmentation(node) {
 					return
 				}
 
-				// Check if this is a namespace declaration (keyword is KindNamespaceKeyword)
-				if moduleDecl.Keyword != ast.KindNamespaceKeyword {
+				// TypeScript represents `namespace A.B {}` as nested module
+				// declarations. TSESTree exposes it as one declaration, so only
+				// the outer node corresponds to an upstream listener event.
+				if node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
 					return
 				}
 
-				// Check if we're in a .d.ts file and allowDefinitionFiles is true
-				if opts.AllowDefinitionFiles != nil && *opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+				if opts.AllowDeclarations && isDeclaredNamespace(node, ctx.SourceFile.IsDeclarationFile) {
 					return
 				}
 
-				// Check if this is a declare namespace and allowDeclarations is true
-				if opts.AllowDeclarations != nil && *opts.AllowDeclarations && utils.IncludesModifier(node, ast.KindDeclareKeyword) {
-					return
-				}
-
-				// Report the namespace usage
-				ctx.ReportNode(moduleDecl.Name(), buildNoNamespaceMessage())
+				// ReportRange avoids ReportNode's scanner allocation while
+				// preserving its trivia-trimmed, whole-declaration range.
+				ctx.ReportRange(
+					node.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), node.Pos())),
+					noNamespaceMessage,
+				)
 			},
 		}
 	},

@@ -3,8 +3,13 @@ package no_namespace
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoNamespaceRule(t *testing.T) {
@@ -29,6 +34,7 @@ declare module "bar" {
   export const baz: number;
 }
     `},
+		{Code: `module "foo" {}`},
 		{
 			Code: `
 // Declare namespace (allowed when allowDeclarations is true)
@@ -71,6 +77,36 @@ declare namespace Test {
 				},
 			},
 		},
+		{
+			Code: `
+declare namespace Outer {
+  namespace Inner {}
+}
+      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+		},
+		{
+			Code: `
+declare global {
+  namespace Test {}
+}
+      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+		},
+		{
+			Code: `
+declare module Test {
+  namespace Inner {}
+}
+      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+		},
 		// Test empty options object
 		{
 			Code: `
@@ -96,6 +132,61 @@ namespace Test {
 }
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
+			},
+		},
+		{
+			Code: `namespace Test {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+					Message:   "ES2015 module syntax is preferred over namespaces.",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 18,
+				},
+			},
+		},
+		{
+			Code: `module Test {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
+			},
+		},
+		{
+			Code: `module Test {}`,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
+			},
+		},
+		{
+			Code: `namespace Foo.Bar {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
+			},
+		},
+		{
+			Code: `
+namespace Foo.Bar {
+  namespace Baz.Bas {}
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
 				{
 					MessageId: "moduleSyntaxIsPreferred",
 				},
@@ -297,6 +388,23 @@ declare global {
 				},
 			},
 		},
+		{
+			Code: `
+namespace Outer {
+  declare namespace Inner {
+    namespace Nested {}
+  }
+}
+      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "moduleSyntaxIsPreferred",
+				},
+			},
+		},
 		// Test deeply nested namespaces
 		{
 			Code: `
@@ -373,25 +481,155 @@ namespace Test {
 	})
 }
 
+func TestNoNamespaceDefinitionFileOptions(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileName string
+		source   string
+		options  []any
+		want     int
+	}{
+		{name: "d.ts default", fileName: "/file.d.ts", source: `namespace Test {}`},
+		{name: "d.mts default", fileName: "/file.d.mts", source: `namespace Test {}`},
+		{name: "d.cts default", fileName: "/file.d.cts", source: `namespace Test {}`},
+		{
+			name:     "definition files disabled",
+			fileName: "/file.d.ts",
+			source:   `namespace Test {}`,
+			options:  []any{map[string]interface{}{"allowDefinitionFiles": false}},
+			want:     1,
+		},
+		{
+			name:     "implicit ambient is not explicit declare",
+			fileName: "/file.d.ts",
+			source:   `namespace Test {}`,
+			options: []any{map[string]interface{}{
+				"allowDeclarations":    true,
+				"allowDefinitionFiles": false,
+			}},
+			want: 1,
+		},
+		{
+			name:     "explicit declare remains allowed",
+			fileName: "/file.d.ts",
+			source:   `declare namespace Test {}`,
+			options: []any{map[string]interface{}{
+				"allowDeclarations":    true,
+				"allowDefinitionFiles": false,
+			}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := len(runNoNamespaceRule(test.fileName, test.source, test.options)); got != test.want {
+				t.Fatalf("got %d diagnostics, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestNoNamespaceReportRangeMatchesTrimmedNode(t *testing.T) {
+	sources := []string{
+		`namespace Test {}`,
+		"\n// leading comment\nexport namespace Test {}\n",
+		"\ufeff/* leading block */\nmodule Test {}",
+		"/** namespace docs */\nnamespace Outer.Inner {}",
+	}
+
+	for _, source := range sources {
+		diagnostics := runNoNamespaceRule("/file.ts", source, nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("source %q: got %d diagnostics, want 1", source, len(diagnostics))
+		}
+
+		sourceFile, ok := diagnostics[0].SourceFile.(*ast.SourceFile)
+		if !ok {
+			t.Fatalf("source %q: unexpected source file type %T", source, diagnostics[0].SourceFile)
+		}
+		var declaration *ast.Node
+		sourceFile.AsNode().ForEachChild(func(node *ast.Node) bool {
+			if node.Kind == ast.KindModuleDeclaration {
+				declaration = node
+				return true
+			}
+			return false
+		})
+		if declaration == nil {
+			t.Fatalf("source %q: module declaration not found", source)
+		}
+
+		got := diagnostics[0].Range
+		want := utils.TrimNodeTextRange(sourceFile, declaration)
+		if got.Pos() != want.Pos() || got.End() != want.End() {
+			t.Fatalf(
+				"source %q: report range [%d,%d), want trimmed node range [%d,%d)",
+				source,
+				got.Pos(),
+				got.End(),
+				want.Pos(),
+				want.End(),
+			)
+		}
+	}
+}
+
+func TestNoNamespaceDisableDirective(t *testing.T) {
+	source := "// rslint-disable-next-line test\nnamespace Test {}"
+	if diagnostics := runNoNamespaceRule("/file.ts", source, nil); len(diagnostics) != 0 {
+		t.Fatalf("disabled namespace produced %d diagnostics", len(diagnostics))
+	}
+}
+
+func runNoNamespaceRule(fileName string, source string, options []any) []rule.RuleDiagnostic {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: fileName,
+	}, source, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	var diagnostics []rule.RuleDiagnostic
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithReporter("test", rule.SeverityError, func(diagnostic rule.RuleDiagnostic) {
+		diagnostics = append(diagnostics, diagnostic)
+	})
+
+	listener := NoNamespaceRule.Run(ctx, options)[ast.KindModuleDeclaration]
+	if listener == nil {
+		return diagnostics
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindModuleDeclaration {
+			listener(node)
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	visit(sourceFile.AsNode())
+	return diagnostics
+}
+
 // Test options parsing logic
 func TestNoNamespaceOptionsParsing(t *testing.T) {
 	// Test default options
 	opts := defaultNoNamespaceOptions
-	if *opts.AllowDeclarations != false {
-		t.Errorf("Expected default AllowDeclarations to be false, got %v", *opts.AllowDeclarations)
+	if opts.AllowDeclarations {
+		t.Errorf("Expected default AllowDeclarations to be false, got %v", opts.AllowDeclarations)
 	}
-	if *opts.AllowDefinitionFiles != true {
-		t.Errorf("Expected default AllowDefinitionFiles to be true, got %v", *opts.AllowDefinitionFiles)
+	if !opts.AllowDefinitionFiles {
+		t.Errorf("Expected default AllowDefinitionFiles to be true, got %v", opts.AllowDefinitionFiles)
 	}
 }
 
 // Test message building
 func TestNoNamespaceMessage(t *testing.T) {
-	message := buildNoNamespaceMessage()
+	message := noNamespaceMessage
 	if message.Id != "moduleSyntaxIsPreferred" {
 		t.Errorf("Expected message ID to be 'moduleSyntaxIsPreferred', got %s", message.Id)
 	}
-	if message.Description != "Namespace is not allowed." {
-		t.Errorf("Expected message description to be 'Namespace is not allowed.', got %s", message.Description)
+	if message.Description != "ES2015 module syntax is preferred over namespaces." {
+		t.Errorf("Expected upstream message, got %s", message.Description)
 	}
 }
