@@ -105,7 +105,7 @@ func collectIdentifierSymbols(node *ast.Node, refs *rule.RefStore, tc *checker.C
 		if n.Kind == ast.KindIdentifier {
 			sym := refs.Resolve(n)
 			viaChecker := false
-			if sym == nil {
+			if sym == nil && tc != nil {
 				sym = tc.GetSymbolAtLocation(n)
 				viaChecker = true
 			}
@@ -406,16 +406,8 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 
 // NoUnmodifiedLoopConditionRule disallows variables in loop conditions that are not modified in the loop
 var NoUnmodifiedLoopConditionRule = rule.Rule{
-	Name:             "no-unmodified-loop-condition",
-	RequiresTypeInfo: true,
+	Name: "no-unmodified-loop-condition",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
-			return rule.RuleListeners{}
-		}
-
 		return rule.RuleListeners{
 			ast.KindWhileStatement: func(node *ast.Node) {
 				whileStmt := node.AsWhileStatement()
