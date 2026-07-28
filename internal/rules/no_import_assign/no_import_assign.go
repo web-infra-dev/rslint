@@ -13,6 +13,7 @@ import (
 type importedBinding struct {
 	name        string
 	isNamespace bool
+	nameNode    *ast.Node
 	symbol      *ast.Symbol
 }
 
@@ -30,6 +31,16 @@ type importedBindingViolation struct {
 	kind    importedBindingViolationKind
 }
 
+type importedBindingGroup struct {
+	bindings   []importedBinding
+	violations []importedBindingViolation
+}
+
+type importedBindingTarget struct {
+	groupIndex   int
+	bindingIndex int
+}
+
 type noImportAssignRefStoreMode uint8
 
 const (
@@ -42,6 +53,7 @@ func makeImportedBinding(nameNode *ast.Node, isNamespace bool, symbol *ast.Symbo
 	return importedBinding{
 		name:        nameNode.Text(),
 		isNamespace: isNamespace,
+		nameNode:    nameNode,
 		symbol:      symbol,
 	}
 }
@@ -431,10 +443,94 @@ func reportImportedBindingGroup(ctx *rule.RuleContext, bindings []importedBindin
 	}
 }
 
-// walkImportedBindingReferences preserves the pre-RefStore implementation for
-// single-binding files, direct RuleContext callers without a Program/Refs, and
-// imports without binder symbols.
-func walkImportedBindingReferences(ctx *rule.RuleContext, bindings []importedBinding) {
+// walkImportedBindingGroups scans the source once against all imported bindings
+// collected by the normal listener traversal. It indexes only import names, so
+// unrelated identifiers never enter a per-file reference map. Violations are
+// bucketed by declaration to retain the rule's historical declaration-grouped
+// diagnostic order.
+func walkImportedBindingGroups(
+	ctx *rule.RuleContext,
+	groups []importedBindingGroup,
+	resolveReferenceSymbol func(*ast.Node) *ast.Symbol,
+) {
+	if ctx.SourceFile == nil {
+		return
+	}
+
+	bindingCount := 0
+	for _, group := range groups {
+		bindingCount += len(group.bindings)
+	}
+
+	targetsByName := make(map[string][]importedBindingTarget, bindingCount)
+	for groupIndex := range groups {
+		for bindingIndex, binding := range groups[groupIndex].bindings {
+			targetsByName[binding.name] = append(
+				targetsByName[binding.name],
+				importedBindingTarget{
+					groupIndex:   groupIndex,
+					bindingIndex: bindingIndex,
+				},
+			)
+		}
+	}
+
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+
+		if node.Kind == ast.KindIdentifier {
+			targets := targetsByName[node.Text()]
+			if len(targets) != 0 && !isImportBindingName(node) {
+				var referenceSymbol *ast.Symbol
+				if resolveReferenceSymbol != nil {
+					referenceSymbol = resolveReferenceSymbol(node)
+				}
+				for _, target := range targets {
+					binding := groups[target.groupIndex].bindings[target.bindingIndex]
+					if binding.symbol != nil && resolveReferenceSymbol != nil &&
+						referenceSymbol != binding.symbol {
+						continue
+					}
+
+					kind := classifyImportedBindingViolation(node, binding, ctx)
+					if kind != importedBindingViolationNone {
+						groups[target.groupIndex].violations = append(
+							groups[target.groupIndex].violations,
+							importedBindingViolation{
+								node:    node,
+								binding: binding,
+								kind:    kind,
+							},
+						)
+					}
+				}
+			}
+		}
+
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(ctx.SourceFile.AsNode())
+
+	for _, group := range groups {
+		for _, violation := range group.violations {
+			reportImportedBindingViolation(ctx, violation)
+		}
+	}
+}
+
+// walkImportedBindingReferences preserves the single-declaration compatibility
+// path used by forced strategy tests and avoids a name index for one binding.
+func walkImportedBindingReferences(
+	ctx *rule.RuleContext,
+	bindings []importedBinding,
+	resolveReferenceSymbol func(*ast.Node) *ast.Symbol,
+) {
 	if ctx.SourceFile == nil {
 		return
 	}
@@ -451,9 +547,8 @@ func walkImportedBindingReferences(ctx *rule.RuleContext, bindings []importedBin
 					continue
 				}
 
-				// Verify symbol identity when the type checker is available.
-				if binding.symbol != nil && ctx.TypeChecker != nil &&
-					utils.GetReferenceSymbol(node, ctx.TypeChecker) != binding.symbol {
+				if binding.symbol != nil && resolveReferenceSymbol != nil &&
+					resolveReferenceSymbol(node) != binding.symbol {
 					continue
 				}
 
@@ -485,44 +580,125 @@ func allBindingsHaveSymbols(bindings []importedBinding) bool {
 	return true
 }
 
+func allBindingGroupsHaveSymbols(groups []importedBindingGroup) bool {
+	for _, group := range groups {
+		if !allBindingsHaveSymbols(group.bindings) {
+			return false
+		}
+	}
+	return true
+}
+
 func noImportAssignListeners(
 	ctx rule.RuleContext,
 	refStoreMode noImportAssignRefStoreMode,
 ) rule.RuleListeners {
-	refStoreModeResolved := refStoreMode != noImportAssignRefStoreAuto
-	useRefStore := refStoreMode == noImportAssignRefStoreEnabled && ctx.Refs != nil
+	var checkerReferenceSymbol func(*ast.Node) *ast.Symbol
+	if ctx.TypeChecker != nil {
+		checkerReferenceSymbol = func(node *ast.Node) *ast.Symbol {
+			return utils.GetReferenceSymbol(node, ctx.TypeChecker)
+		}
+	}
 
+	// Keep the original one-listener compatibility path for the common
+	// single-binding case. It avoids every aggregation closure/allocation and
+	// is already optimal for one source walk.
+	if refStoreMode == noImportAssignRefStoreAuto &&
+		ctx.TypeChecker != nil &&
+		!hasMultipleTopLevelImportedBindings(ctx.SourceFile) {
+		refStoreMode = noImportAssignRefStoreDisabled
+	}
+
+	if refStoreMode != noImportAssignRefStoreAuto {
+		useRefStore := refStoreMode == noImportAssignRefStoreEnabled && ctx.Refs != nil
+		return rule.RuleListeners{
+			ast.KindImportDeclaration: func(node *ast.Node) {
+				if useRefStore {
+					bindings := collectImportedBindings(node, importBindingSymbol)
+					if len(bindings) == 0 {
+						return
+					}
+					if allBindingsHaveSymbols(bindings) {
+						reportImportedBindingGroup(&ctx, bindings)
+						return
+					}
+				}
+
+				bindings := collectImportedBindings(node, func(nameNode *ast.Node) *ast.Symbol {
+					return checkerImportBindingSymbol(nameNode, &ctx)
+				})
+				if len(bindings) != 0 {
+					walkImportedBindingReferences(&ctx, bindings, checkerReferenceSymbol)
+				}
+			},
+		}
+	}
+
+	resolveBindingSymbol := func(*ast.Node) *ast.Symbol { return nil }
+	resolveReferenceSymbol := checkerReferenceSymbol
+	if ctx.Refs != nil {
+		resolveBindingSymbol = importBindingSymbol
+		resolveReferenceSymbol = ctx.Refs.Resolve
+	} else if ctx.TypeChecker != nil {
+		resolveBindingSymbol = func(nameNode *ast.Node) *ast.Symbol {
+			return checkerImportBindingSymbol(nameNode, &ctx)
+		}
+	}
+
+	var firstGroup importedBindingGroup
+	var remainingGroups []importedBindingGroup
+	bindingCount := 0
 	return rule.RuleListeners{
 		ast.KindImportDeclaration: func(node *ast.Node) {
-			if !refStoreModeResolved {
-				// One imported binding needs only one compatibility walk, which
-				// avoids materializing RefStore buckets for every unrelated
-				// identifier. At two bindings the shared index already wins,
-				// and its advantage grows with the number of imports. Without a
-				// checker, RefStore is also required for exact shadow resolution.
-				useRefStore = ctx.Refs != nil &&
-					(ctx.TypeChecker == nil ||
-						hasMultipleTopLevelImportedBindings(ctx.SourceFile))
-				refStoreModeResolved = true
-			}
-
-			if useRefStore {
-				bindings := collectImportedBindings(node, importBindingSymbol)
-				if len(bindings) == 0 {
-					return
-				}
-				if allBindingsHaveSymbols(bindings) {
-					reportImportedBindingGroup(&ctx, bindings)
-					return
-				}
-			}
-
-			bindings := collectImportedBindings(node, func(nameNode *ast.Node) *ast.Symbol {
-				return checkerImportBindingSymbol(nameNode, &ctx)
-			})
+			bindings := collectImportedBindings(node, resolveBindingSymbol)
 			if len(bindings) != 0 {
-				walkImportedBindingReferences(&ctx, bindings)
+				group := importedBindingGroup{bindings: bindings}
+				if firstGroup.bindings == nil {
+					firstGroup = group
+				} else {
+					remainingGroups = append(remainingGroups, group)
+				}
+				bindingCount += len(bindings)
 			}
+		},
+		ast.KindEndOfFile: func(*ast.Node) {
+			if bindingCount == 0 {
+				return
+			}
+
+			// Without a checker, RefStore.Resolve keeps the one-binding path
+			// exact without materializing the reverse-reference index.
+			if bindingCount == 1 {
+				walkImportedBindingReferences(
+					&ctx,
+					firstGroup.bindings,
+					resolveReferenceSymbol,
+				)
+				return
+			}
+
+			groups := make([]importedBindingGroup, 1, 1+len(remainingGroups))
+			groups[0] = firstGroup
+			groups = append(groups, remainingGroups...)
+
+			// Recovered syntax can leave an import name without a binder symbol.
+			// In that case, keep the old checker fallback rather than mixing
+			// symbol domains or degrading that binding to text-only matching.
+			if ctx.Refs != nil && ctx.TypeChecker != nil &&
+				!allBindingGroupsHaveSymbols(groups) {
+				for groupIndex := range groups {
+					for bindingIndex := range groups[groupIndex].bindings {
+						binding := &groups[groupIndex].bindings[bindingIndex]
+						binding.symbol = checkerImportBindingSymbol(binding.nameNode, &ctx)
+					}
+				}
+				resolveReferenceSymbol = checkerReferenceSymbol
+			}
+
+			// A single selective scan avoids both repeated walks and RefStore's
+			// unrelated-name buckets. RefStore.Resolve provides binder identity
+			// without materializing the full reverse-reference index.
+			walkImportedBindingGroups(&ctx, groups, resolveReferenceSymbol)
 		},
 	}
 }

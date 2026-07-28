@@ -493,6 +493,11 @@ func TestNoImportAssignRuleWithoutRefStore(t *testing.T) {
 		&fallbackRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `import { value } from "mod"; { let value = 0; value = 1; }`},
+			{
+				Code: `import { first, second } from "mod";
+					{ let first = 0; first = 1; }
+					{ let second = {}; second.member = 1; }`,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -513,6 +518,15 @@ func TestNoImportAssignRuleWithoutRefStore(t *testing.T) {
 					{MessageId: "readonly", Message: "'value' is read-only.", Line: 1, Column: 33},
 				},
 			},
+			{
+				Code: `import { first, second } from "mod";
+					second = 1;
+					first = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'second' is read-only.", Line: 2},
+					{MessageId: "readonly", Message: "'first' is read-only.", Line: 3},
+				},
+			},
 		},
 	)
 }
@@ -531,6 +545,11 @@ func TestNoImportAssignRuleWithRefStoreWithoutTypeChecker(t *testing.T) {
 		&noCheckerRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `import { value } from "mod"; { let value = 0; value = 1; }`},
+			{
+				Code: `import { first, second } from "mod";
+					{ let first = 0; first = 1; }
+					{ let second = {}; second.member = 1; }`,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -539,6 +558,24 @@ func TestNoImportAssignRuleWithRefStoreWithoutTypeChecker(t *testing.T) {
 					value = 2;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "readonly", Message: "'value' is read-only.", Line: 3},
+				},
+			},
+			{
+				Code: `import * as namespace from "namespace";
+					import { value } from "value";
+					namespace.member = 1;
+					value = 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "readonlyMember",
+						Message:   "The members of 'namespace' are read-only.",
+						Line:      3,
+					},
+					{
+						MessageId: "readonly",
+						Message:   "'value' is read-only.",
+						Line:      4,
+					},
 				},
 			},
 		},
@@ -555,7 +592,7 @@ type noImportAssignDiagnosticFingerprint struct {
 func lintNoImportAssignForComparison(
 	t *testing.T,
 	code string,
-	useRefStore bool,
+	mode noImportAssignRefStoreMode,
 ) []noImportAssignDiagnosticFingerprint {
 	t.Helper()
 
@@ -583,11 +620,10 @@ func lintNoImportAssignForComparison(
 				Name:     NoImportAssignRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					if !useRefStore {
+					if mode == noImportAssignRefStoreDisabled {
 						ctx.Refs = nil
-						return noImportAssignListeners(ctx, noImportAssignRefStoreDisabled)
 					}
-					return noImportAssignListeners(ctx, noImportAssignRefStoreEnabled)
+					return noImportAssignListeners(ctx, mode)
 				},
 			}}
 		},
@@ -606,7 +642,7 @@ func lintNoImportAssignForComparison(
 	return diagnostics
 }
 
-func TestNoImportAssignRefStoreMatchesFallback(t *testing.T) {
+func TestNoImportAssignStrategiesMatch(t *testing.T) {
 	testCases := []struct {
 		name string
 		code string
@@ -696,29 +732,63 @@ func TestNoImportAssignRefStoreMatchesFallback(t *testing.T) {
 					nested = 1;
 				}`,
 		},
+		{
+			name: "mixed top-level and nested recovered imports",
+			code: `import { first } from "first";
+				if (condition) {
+					import { nested } from "nested";
+					nested = 1;
+				}
+				import { last } from "last";
+				last = 2;
+				first = 3;`,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fast := lintNoImportAssignForComparison(t, testCase.code, true)
-			fallback := lintNoImportAssignForComparison(t, testCase.code, false)
-			if len(fast) != len(fallback) {
-				t.Fatalf("diagnostic count differs: RefStore=%+v fallback=%+v", fast, fallback)
-			}
-			for i := range fast {
-				if fast[i] != fallback[i] {
-					t.Fatalf("diagnostic %d differs: RefStore=%+v fallback=%+v", i, fast[i], fallback[i])
+			auto := lintNoImportAssignForComparison(
+				t,
+				testCase.code,
+				noImportAssignRefStoreAuto,
+			)
+			for _, strategy := range []struct {
+				name string
+				mode noImportAssignRefStoreMode
+			}{
+				{name: "RefStore", mode: noImportAssignRefStoreEnabled},
+				{name: "fallback", mode: noImportAssignRefStoreDisabled},
+			} {
+				got := lintNoImportAssignForComparison(t, testCase.code, strategy.mode)
+				if len(got) != len(auto) {
+					t.Fatalf(
+						"diagnostic count differs: auto=%+v %s=%+v",
+						auto,
+						strategy.name,
+						got,
+					)
+				}
+				for i := range auto {
+					if got[i] != auto[i] {
+						t.Fatalf(
+							"diagnostic %d differs: auto=%+v %s=%+v",
+							i,
+							auto,
+							strategy.name,
+							got,
+						)
+					}
 				}
 			}
 		})
 	}
 }
 
-func TestNoImportAssignRefStoreHonorsDisableDirectives(t *testing.T) {
+func TestNoImportAssignAutoHonorsDisableDirectives(t *testing.T) {
 	diagnostics := lintNoImportAssignForComparison(t, `import { a, b } from "mod";
 		// eslint-disable-next-line no-import-assign
 		a = 1;
-		b = 2;`, true)
+		b = 2;`, noImportAssignRefStoreAuto)
 
 	if len(diagnostics) != 1 {
 		t.Fatalf("got diagnostics %+v, want one unsuppressed diagnostic", diagnostics)
