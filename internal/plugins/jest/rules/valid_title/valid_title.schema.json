@@ -45,19 +45,39 @@
         },
         {
           "type": "object",
-          "propertyNames": {
-            "enum": ["describe", "test", "it"]
+          "properties": {
+            "describe": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            },
+            "test": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            },
+            "it": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            }
           },
-          "additionalProperties": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/definitions/patternWithMessage"
-              }
-            ]
-          }
+          "additionalProperties": false
         }
       ]
     },
