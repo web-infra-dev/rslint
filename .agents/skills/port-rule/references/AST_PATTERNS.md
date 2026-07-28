@@ -371,26 +371,89 @@ See `typescript-go/_packages/api/src/api.ts` for full API:
 
 ---
 
-## Collecting Variable References (ctx.Refs)
+## Resolving Identifiers and Collecting References (ctx.Refs)
 
-Reference: `internal/rule/ref_store.go`, consumer example: `internal/rules/no_var/no_var.go`
+Reference: `internal/rule/ref_store.go`, consumer examples: `internal/rules/no_var/no_var.go` (References), `internal/rules/prefer_const/prefer_const.go` (Resolve).
 
-For rules that need **"every identifier that references this declared symbol"** (ESLint's `variable.references` from the scope manager), use `ctx.Refs` — a lazily built per-file reference index:
+`ctx.Refs` is a lazily built per-file identifier-reference index — rslint's stand-in for ESLint's scope manager (`variable.references`, `getScope().references`). It has three methods:
+
+| Method                                 | Direction                                                                       | Touches TypeChecker?                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `Resolve(node) *ast.Symbol`            | identifier → its declaring symbol                                               | Never                                                               |
+| `ResolveWithChecker(node) *ast.Symbol` | identifier → its declaring symbol, including symbols declared outside this file | Only as a fallback, when `Resolve` alone can't place the identifier |
+| `References(sym) []*ast.Node`          | symbol → every identifier in this file that references it                       | Only as a fallback, same trigger as above                           |
+
+All three resolve identifiers with the binder's scope walk first — the same
+scope walk the checker performs, but without the checker itself — so the
+common case (same-file locals, which is the overwhelming majority of what
+rules query) never touches the TypeChecker and never triggers lazy type
+computation.
+
+Do **NOT** hand-roll any of this by walking the AST and calling
+`ctx.TypeChecker.GetSymbolAtLocation` on every identifier, and do **NOT**
+hand-roll a "try `ctx.Refs`, fall back to the checker" wrapper of your own —
+`ResolveWithChecker` already is that wrapper. Building your own copy is
+both slower (repeats the checker round-trip logic) and a correctness trap:
+more than one rule has broken by conflating "`Resolve` returned nil" with "the
+checker has nothing to say either," which stopped being equivalent once
+`ResolveWithChecker` existed.
+
+### Resolve vs. ResolveWithChecker
+
+Use **`Resolve`** whenever you only care whether an identifier is declared in
+_this file_ — e.g. distinguishing a shadowing local declaration from an
+untouched global, or looking up the symbol for a `decl.Symbol()`-style query.
+This is the common case and it costs nothing even when nothing resolves:
+
+```go
+sym := ctx.Refs.Resolve(node)
+if sym == nil {
+    return // not declared in this file — could be a global, or unresolvable
+}
+```
+
+Use **`ResolveWithChecker`** only when the rule specifically needs the actual
+symbol for an identifier that might be declared _outside_ this file —
+standard-library globals (`RegExp`, `window`, `console`, …), ambient `.d.ts`
+declarations, or symbols re-exported from another module. Each identifier
+`Resolve` can't place costs a real TypeChecker round-trip here, so don't
+reach for it just to get a slightly more informative nil:
+
+```go
+sym := ctx.Refs.ResolveWithChecker(node)
+if sym == nil {
+    return // genuinely unresolvable, even with the checker's help
+}
+```
+
+If a rule only needs "is this a local shadow," `Resolve() != nil` already
+answers that — don't upgrade to `ResolveWithChecker` and then check
+`utils.IsSymbolDeclaredInFile` to throw the global case away; that pays for
+the fallback and then discards its result.
+
+### Collecting references to a symbol
+
+For **"every identifier that references this declared symbol"** (ESLint's
+`variable.references`):
 
 ```go
 refs := ctx.Refs.References(sym) // []*ast.Node, in source order
 ```
 
-Do **NOT** hand-roll this by walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` on every identifier. That pattern is a known performance killer: `GetSymbolAtLocation` can trigger lazy type-checking of whole expressions, and for a top-level declaration the walk covers the entire file. `ctx.Refs` resolves identifiers with the binder's scope walk instead — it never touches the TypeChecker and never triggers type computation.
+`sym` is usually a local declaration symbol (see below), but it can also be a
+symbol obtained from `ResolveWithChecker` — `References` falls back to the
+checker internally too, so it finds in-file identifiers referencing an
+external symbol (e.g. every unshadowed use of `RegExp` in the file) just as
+well as it finds references to a local variable.
 
 ### Semantics
 
-- **Query key is a binder symbol.** Get it from the declaration node: `decl.Symbol()` (the binder attaches symbols to `VariableDeclaration` / `BindingElement` / etc., not to the name identifier). Do NOT query with `checker.GetSymbolAtLocation` results — the checker may return merged symbols that compare unequal to binder symbols, and the lookup will miss.
+- **Query key is a binder symbol.** For a same-file declaration, get it from the declaration node: `decl.Symbol()` (the binder attaches symbols to `VariableDeclaration` / `BindingElement` / etc., not to the name identifier). Do NOT query with `checker.GetSymbolAtLocation` results for a symbol you expect to be local — the checker may return merged symbols that compare unequal to binder symbols, and the lookup will miss. (A symbol from `ResolveWithChecker` is the one exception: it's already the right key for `References`.)
 - **Declaration names are not references**: the `a` of `var a = 1` is excluded; the `a` of a later `a = 2` is included. Reads and writes are both references — distinguish them positionally in your rule if needed.
 - **Non-reference positions are pre-filtered**: property names (`x.a`), object-literal/destructuring keys, import/export binding names, labels, and lowercase JSX tag names never appear.
 - **Scope- and meaning-aware**: shadowing identifiers in other scopes don't leak in, and type-position vs value-position identifiers resolve to the right symbol (mirrors the checker's meaning selection).
-- **Single-file only**: it answers "who references this symbol _in this file_". Cross-file references (an `export` imported elsewhere) still require the checker.
-- Returned slice is **read-only**. `References(nil)` returns nil; a nil `*RefStore` receiver is also safe.
+- **Always single-file search scope**: `References` only ever looks at identifiers _in this file_, regardless of where the queried symbol is declared. It answers "who references this symbol in this file," not "who references it anywhere in the program" — finding references in _other_ files still requires the checker's own whole-program search.
+- Returned slice is **read-only**. `References(nil)` returns nil; a nil `*RefStore` receiver is also safe for all three methods.
 
 ### Availability
 
@@ -402,7 +465,7 @@ if ctx.Refs == nil {
 }
 ```
 
-For `RequiresTypeInfo: true` rules, a program always exists, so `ctx.Refs` is guaranteed non-nil.
+For `RequiresTypeInfo: true` rules, a program always exists, so `ctx.Refs` is guaranteed non-nil. `ResolveWithChecker`'s fallback additionally needs `ctx.TypeChecker` non-nil; when it's nil, `ResolveWithChecker` is equivalent to `Resolve`.
 
 ### Example (from no-var)
 
@@ -425,7 +488,7 @@ for _, v := range vars {
 
 ### Cost model
 
-The index is lazy twice over: the single AST walk that buckets candidate identifiers runs on the first `References` call in the file, and name resolution runs once per **queried name** — asking about `foo` never pays for resolving unrelated identifiers like `console` or `Promise`. Files where no rule queries the index pay nothing.
+The index is lazy twice over: the single AST walk that buckets candidate identifiers runs on the first `References` call in the file, and name resolution runs once per **queried name** — asking about `foo` never pays for resolving unrelated identifiers like `console` or `Promise`. Files where no rule queries the index pay nothing. `Resolve` and `References` never touch the TypeChecker for a same-file symbol; `ResolveWithChecker` pays one TypeChecker round-trip per identifier the binder can't place, so use it only where the identifier genuinely might name something declared outside this file.
 
 ---
 
