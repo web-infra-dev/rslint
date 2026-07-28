@@ -307,7 +307,7 @@ func buildKnownGlobalSymbols() []knownGlobalSymbol {
 	}
 	for _, group := range pureGlobalMethodGroups {
 		for _, member := range group.Members {
-			add(group.Global+"."+member, false, true)
+			add(group.Global+"."+member, true, true)
 		}
 	}
 	for _, global := range typedArrayConstructors {
