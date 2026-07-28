@@ -416,6 +416,7 @@ func createOutputTestDiagnostic(t *testing.T, severity rule.DiagnosticSeverity) 
 	}
 	if sourceFile == nil {
 		t.Fatal("source file not found")
+		return rule.RuleDiagnostic{}, tspath.ComparePathsOptions{}
 	}
 	start := strings.Index(source, "value")
 	return rule.RuleDiagnostic{

@@ -40,6 +40,7 @@ func parseBinaryOperands(t *testing.T, code string) (*ast.SourceFile, *ast.Node,
 	}
 	if bin == nil {
 		t.Fatalf("no BinaryExpression found in code: %s", code)
+		return nil, nil, nil
 	}
 	b := bin.AsBinaryExpression()
 	return sourceFile, b.Left, b.Right

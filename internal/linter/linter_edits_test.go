@@ -16,6 +16,7 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 	sourceFile := program.GetSourceFile(paths["edits.ts"])
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("edit-demand fixture did not parse into one statement")
+		return
 	}
 
 	reportNode := sourceFile.Statements.Nodes[0]
@@ -163,6 +164,7 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 	sourceFile := program.GetSourceFile(paths["suppressed.ts"])
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 2 {
 		t.Fatal("suppression fixture did not parse into two statements")
+		return
 	}
 
 	builderCalls := 0
@@ -263,6 +265,7 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 	sourceFile := program.GetSourceFile(paths["legacy.ts"])
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) != 1 {
 		t.Fatal("legacy fixture did not parse into one statement")
+		return
 	}
 	node := sourceFile.Statements.Nodes[0]
 	textRange := utils.TrimNodeTextRange(sourceFile, node)

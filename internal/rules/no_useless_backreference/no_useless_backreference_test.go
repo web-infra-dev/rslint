@@ -578,6 +578,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	sourceFile := program.GetSourceFile("file.ts")
 	if sourceFile == nil {
 		t.Fatal("file.ts was not loaded")
+		return
 	}
 
 	var diagnostics []rule.RuleDiagnostic
