@@ -1,11 +1,15 @@
 package jsx_no_bind
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_bind.schema.json
+var schemaJSON []byte
 
 // Violation kinds correspond to ESLint messageIds. The `bindExpression` kind
 // (ES `::` proposal) is omitted because TypeScript does not parse it.
@@ -38,27 +42,17 @@ type options struct {
 	ignoreDOMComponents bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["allowArrowFunctions"].(bool); ok {
-		opts.allowArrowFunctions = v
-	}
-	if v, ok := optsMap["allowBind"].(bool); ok {
-		opts.allowBind = v
-	}
-	if v, ok := optsMap["allowFunctions"].(bool); ok {
-		opts.allowFunctions = v
-	}
-	if v, ok := optsMap["ignoreRefs"].(bool); ok {
-		opts.ignoreRefs = v
-	}
-	if v, ok := optsMap["ignoreDOMComponents"].(bool); ok {
-		opts.ignoreDOMComponents = v
-	}
+	optsMap, _ := raw[0].(map[string]interface{})
+	opts.allowArrowFunctions, _ = optsMap["allowArrowFunctions"].(bool)
+	opts.allowBind, _ = optsMap["allowBind"].(bool)
+	opts.allowFunctions, _ = optsMap["allowFunctions"].(bool)
+	opts.ignoreRefs, _ = optsMap["ignoreRefs"].(bool)
+	opts.ignoreDOMComponents, _ = optsMap["ignoreDOMComponents"].(bool)
 	return opts
 }
 
@@ -76,10 +70,10 @@ func message(id string) rule.RuleMessage {
 }
 
 var JsxNoBindRule = rule.Rule{
-	Name: "react/jsx-no-bind",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-no-bind",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// blockVariableNameSets tracks, per enclosing Block (keyed by node
 		// position), the names of const-bound variables and local function

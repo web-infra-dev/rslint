@@ -1,6 +1,7 @@
 package display_name
 
 import (
+	_ "embed"
 	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed display_name.schema.json
+var schemaJSON []byte
 
 // Options carries the parsed rule options. Mirrors upstream's schema:
 //
@@ -27,16 +31,12 @@ type Options struct {
 	CheckContextObjects  bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["ignoreTranspilerName"].(bool); ok {
-			opts.IgnoreTranspilerName = v
-		}
-		if v, ok := optsMap["checkContextObjects"].(bool); ok {
-			opts.CheckContextObjects = v
-		}
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
+		opts.IgnoreTranspilerName, _ = optsMap["ignoreTranspilerName"].(bool)
+		opts.CheckContextObjects, _ = optsMap["checkContextObjects"].(bool)
 	}
 	return opts
 }
@@ -1321,9 +1321,9 @@ func (w *nodeWalker) isNestedMemo(node *ast.Node) bool {
 // DisplayNameRule is the registered rule. Use the `react/` prefix in
 // registration.
 var DisplayNameRule = rule.Rule{
-	Name: "react/display-name",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/display-name",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

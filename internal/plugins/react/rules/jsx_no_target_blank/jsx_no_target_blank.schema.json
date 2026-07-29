@@ -1,0 +1,30 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowReferrer": {
+          "type": "boolean"
+        },
+        "enforceDynamicLinks": {
+          "enum": ["always", "never"]
+        },
+        "warnOnSpreadAttributes": {
+          "type": "boolean"
+        },
+        "links": {
+          "type": "boolean",
+          "default": true
+        },
+        "forms": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

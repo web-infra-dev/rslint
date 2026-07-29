@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "checkFragmentShorthand": {
+          "type": "boolean",
+          "default": false
+        },
+        "checkKeyMustBeforeSpread": {
+          "type": "boolean",
+          "default": false
+        },
+        "warnOnDuplicates": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

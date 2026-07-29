@@ -1,6 +1,7 @@
 package jsx_curly_brace_presence
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_curly_brace_presence.schema.json
+var schemaJSON []byte
 
 const (
 	optAlways = "always"
@@ -33,25 +37,20 @@ func defaultOptions() curlyBraceOptions {
 	}
 }
 
-func parseOptions(raw any) curlyBraceOptions {
+func parseOptions(options []any) curlyBraceOptions {
 	opts := defaultOptions()
-	if raw == nil {
+	if len(options) == 0 {
 		return opts
 	}
 	// Upstream accepts EITHER an object OR a bare string at options[0].
-	// `utils.GetOptionsMap` only handles the object case, so we route the
-	// string shorthand here first.
-	if s := utils.GetOptionsString(raw); s != "" {
+	if s, ok := options[0].(string); ok {
 		if s == optAlways || s == optNever || s == optIgnore {
 			opts.props = s
 			opts.children = s
 		}
 		return opts
 	}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
-		return opts
-	}
+	m, _ := options[0].(map[string]interface{})
 	if s, ok := m["props"].(string); ok && (s == optAlways || s == optNever || s == optIgnore) {
 		opts.props = s
 	}
@@ -427,15 +426,15 @@ var JsxCurlyBracePresenceRule = BuildRule("react/jsx-curly-brace-presence")
 // original quoting when the inner text holds a double quote.
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
-		Name: name,
-		Run:  makeRun(),
+		Name:   name,
+		Schema: rule.NewSchema(schemaJSON),
+		Run:    makeRun(),
 	}
 }
 
 func makeRun() func(rule.RuleContext, []any) rule.RuleListeners {
-	return func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
-		raw := rule.LegacyUnwrapOptions(_raw)
-		opts := parseOptions(raw)
+	return func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		text := ctx.SourceFile.Text()
 
 		unnecessaryMsg := rule.RuleMessage{

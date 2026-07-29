@@ -5,6 +5,7 @@
 package no_unknown_property
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 
@@ -14,9 +15,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_unknown_property.schema.json
+var schemaJSON []byte
+
 var NoUnknownPropertyRule = rule.Rule{
-	Name: "react/no-unknown-property",
-	Run:  runRule,
+	Name:   "react/no-unknown-property",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    runRule,
 }
 
 // domAttributeNames maps HTML-cased attribute names to the React DOM property
@@ -544,11 +549,11 @@ func isValidHTMLTagInJSX(parent *ast.Node) bool {
 
 // runRule is the rule entrypoint. Registers a single JsxAttribute listener
 // and walks the decision tree from upstream's `JSXAttribute(node)` handler.
-func runRule(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	ignore := map[string]bool{}
 	requireDataLowercase := false
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
 		if raw, ok := optsMap["ignore"].([]interface{}); ok {
 			for _, v := range raw {
 				if s, ok := v.(string); ok {
@@ -556,9 +561,7 @@ func runRule(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 				}
 			}
 		}
-		if v, ok := optsMap["requireDataLowercase"].(bool); ok {
-			requireDataLowercase = v
-		}
+		requireDataLowercase, _ = optsMap["requireDataLowercase"].(bool)
 	}
 	// Precompute the version-dependent DOM property lookup map once per run;
 	// settings are static for the duration of a rule invocation.

@@ -13,7 +13,8 @@ import (
 
 // JsxPropsNoMultiSpacesRule disallows multiple spaces between inline JSX props.
 var JsxPropsNoMultiSpacesRule = rule.Rule{
-	Name: "react/jsx-props-no-multi-spaces",
+	Name:   "react/jsx-props-no-multi-spaces",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		text := ctx.SourceFile.Text()
 		lineStarts := ctx.SourceFile.ECMALineMap()

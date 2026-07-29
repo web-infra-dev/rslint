@@ -10,7 +10,8 @@ import (
 // In rslint with TypeChecker, TypeScript already catches missing React imports
 // via ts(2304) "Cannot find name 'React'", making this rule redundant.
 var ReactInJsxScopeRule = rule.Rule{
-	Name: "react/react-in-jsx-scope",
+	Name:   "react/react-in-jsx-scope",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},

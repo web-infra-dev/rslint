@@ -138,7 +138,8 @@ func isImportSpecifierFromReact(ctx rule.RuleContext, ident *ast.Node) bool {
 }
 
 var NoArrayIndexKeyRule = rule.Rule{
-	Name: "react/no-array-index-key",
+	Name:   "react/no-array-index-key",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 

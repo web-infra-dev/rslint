@@ -105,16 +105,6 @@ ruleTester.run('boolean-prop-naming', {} as never, {
       `,
       options: [{ rule: patternIsHas }],
     },
-    // Empty rule pattern → no-op.
-    {
-      code: `
-        class Hello extends React.Component {
-          static propTypes = {something: PropTypes.bool};
-          render () { return <div />; }
-        }
-      `,
-      options: [{ rule: '' }],
-    },
     // Invalid regex degrades to no-op.
     {
       code: `
@@ -124,16 +114,6 @@ ruleTester.run('boolean-prop-naming', {} as never, {
         }
       `,
       options: [{ rule: '[unclosed' }],
-    },
-    // Empty propTypeNames array → user-cleared list, no PropTypes match.
-    {
-      code: `
-        class Hello extends React.Component {
-          static propTypes = { something: PropTypes.bool };
-          render () { return <div />; }
-        }
-      `,
-      options: [{ rule: patternIs, propTypeNames: [] }],
     },
     // Interface heritage — matching members pass.
     {

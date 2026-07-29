@@ -1,12 +1,17 @@
 package destructuring_assignment
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed destructuring_assignment.schema.json
+var schemaJSON []byte
 
 // sfcParam mirrors upstream's `evalParams` output: one entry per SFC parameter
 // position. Either `destructuring` is true (param is an `ObjectPattern`,
@@ -380,35 +385,20 @@ func buildSFCMatcher(tc *checker.Checker) func(obj *ast.Node, paramSymbol *ast.S
 // can deliver after `internal/config/config.go` unwraps a single-option
 // array. Defaults: `configuration="always"`, `ignoreClassFields=false`,
 // `destructureInSignature="ignore"` — matching upstream.
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
 		configuration:          "always",
 		ignoreClassFields:      false,
 		destructureInSignature: "ignore",
 	}
-	if options == nil {
-		return opts
-	}
-	var arr []interface{}
-	switch v := options.(type) {
-	case []interface{}:
-		arr = v
-	case string:
-		opts.configuration = v
-		return opts
-	default:
-		return opts
-	}
-	if len(arr) > 0 {
-		if s, ok := arr[0].(string); ok {
+	if len(options) > 0 {
+		if s, ok := options[0].(string); ok {
 			opts.configuration = s
 		}
 	}
-	if len(arr) > 1 {
-		if m, ok := arr[1].(map[string]interface{}); ok {
-			if v, ok := m["ignoreClassFields"].(bool); ok {
-				opts.ignoreClassFields = v
-			}
+	if len(options) > 1 {
+		if m, ok := options[1].(map[string]interface{}); ok {
+			opts.ignoreClassFields, _ = m["ignoreClassFields"].(bool)
 			if v, ok := m["destructureInSignature"].(string); ok {
 				opts.destructureInSignature = v
 			}
@@ -418,9 +408,9 @@ func parseOptions(options any) ruleOptions {
 }
 
 var DestructuringAssignmentRule = rule.Rule{
-	Name: "react/destructuring-assignment",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/destructuring-assignment",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

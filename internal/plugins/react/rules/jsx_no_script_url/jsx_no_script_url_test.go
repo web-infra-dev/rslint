@@ -319,8 +319,10 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		{
 			Code: `<Link to="javascript:"></Link>`,
 			Options: []interface{}{
-				map[string]interface{}{"name": "Link", "props": []interface{}{"to"}},
-				map[string]interface{}{"name": "Button", "props": []interface{}{"href"}},
+				[]interface{}{
+					map[string]interface{}{"name": "Link", "props": []interface{}{"to"}},
+					map[string]interface{}{"name": "Button", "props": []interface{}{"href"}},
+				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 7}},
 			Tsx:    true,
@@ -412,8 +414,10 @@ func TestJsxNoScriptUrl(t *testing.T) {
 		{
 			Code: `<Foo to="javascript:"></Foo>`,
 			Options: []interface{}{
-				map[string]interface{}{"name": "Foo", "props": []interface{}{"href"}},
-				map[string]interface{}{"name": "Foo", "props": []interface{}{"to"}},
+				[]interface{}{
+					map[string]interface{}{"name": "Foo", "props": []interface{}{"href"}},
+					map[string]interface{}{"name": "Foo", "props": []interface{}{"to"}},
+				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noScriptURL", Line: 1, Column: 6}},
 			Tsx:    true,

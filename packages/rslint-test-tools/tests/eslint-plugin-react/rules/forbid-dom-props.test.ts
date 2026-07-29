@@ -147,11 +147,6 @@ ruleTester.run('forbid-dom-props', {} as never, {
     { code: `<div {...props} />;`, options: [{ forbid: ['id'] }] },
     // `<Foo.bar>` — member expression, skipped before the lowercase check.
     { code: `<Foo.bar id="x" />;`, options: [{ forbid: ['id'] }] },
-    // Empty-string entries skipped; remaining real entry doesn't include `bar`.
-    {
-      code: `<div bar="x" />;`,
-      options: [{ forbid: ['', 'id'] }],
-    },
     // JSX namespaced ATTRIBUTE name (`xlink:href`) — upstream's
     // `node.name.name` returns a JSXIdentifier object, not a string, so
     // `forbid.get(<obj>)` never matches. The user-supplied `xlink:href`

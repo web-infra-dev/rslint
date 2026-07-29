@@ -19,7 +19,8 @@ import (
 // "mark as used" channel yet), so such an import may still be reported as
 // unused even with this rule enabled.
 var JsxUsesReactRule = rule.Rule{
-	Name: "react/jsx-uses-react",
+	Name:   "react/jsx-uses-react",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},

@@ -1,6 +1,7 @@
 package jsx_indent
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_indent.schema.json
+var schemaJSON []byte
 
 // JsxIndentRule enforces JSX indentation.
 //
@@ -29,9 +33,9 @@ import (
 //     colon") are computed from `SourceFile.Text()`; line numbers from
 //     `ECMALineMap()` + `scanner.ComputeLineOfPosition`.
 var JsxIndentRule = rule.Rule{
-	Name: "react/jsx-indent",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-indent",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		indentType, indentSize, indentChar := parseIndentOption(options)
 		checkAttributes, indentLogicalExpressions := parseSecondOption(options)
 
@@ -548,24 +552,16 @@ var JsxIndentRule = rule.Rule{
 //   - "tab" → ("tab", 1, '\t')
 //   - integer N → ("space", N, ' ')
 //   - default → ("space", 4, ' ')
-func parseIndentOption(options any) (string, int, byte) {
+func parseIndentOption(options []any) (string, int, byte) {
 	indentType := "space"
 	indentSize := 4
 	indentChar := byte(' ')
 
-	var first any
-	if options == nil {
+	if len(options) == 0 {
 		return indentType, indentSize, indentChar
 	}
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			first = arr[0]
-		}
-	} else {
-		first = options
-	}
 
-	switch v := first.(type) {
+	switch v := options[0].(type) {
 	case string:
 		if v == "tab" {
 			indentType = "tab"
@@ -587,24 +583,19 @@ func parseIndentOption(options any) (string, int, byte) {
 // parseSecondOption parses the second-position object:
 //
 //	{ checkAttributes: bool, indentLogicalExpressions: bool }
-func parseSecondOption(options any) (bool, bool) {
+func parseSecondOption(options []any) (bool, bool) {
 	checkAttributes := false
 	indentLogicalExpressions := false
 
-	arr, ok := options.([]interface{})
-	if !ok || len(arr) < 2 {
+	if len(options) < 2 {
 		return checkAttributes, indentLogicalExpressions
 	}
-	m, ok := arr[1].(map[string]interface{})
+	m, ok := options[1].(map[string]interface{})
 	if !ok {
 		return checkAttributes, indentLogicalExpressions
 	}
-	if v, ok := m["checkAttributes"].(bool); ok {
-		checkAttributes = v
-	}
-	if v, ok := m["indentLogicalExpressions"].(bool); ok {
-		indentLogicalExpressions = v
-	}
+	checkAttributes, _ = m["checkAttributes"].(bool)
+	indentLogicalExpressions, _ = m["indentLogicalExpressions"].(bool)
 	return checkAttributes, indentLogicalExpressions
 }
 

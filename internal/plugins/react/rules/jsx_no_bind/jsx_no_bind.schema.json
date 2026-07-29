@@ -1,0 +1,33 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowArrowFunctions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "allowBind": {
+          "default": false,
+          "type": "boolean"
+        },
+        "allowFunctions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "ignoreRefs": {
+          "default": false,
+          "type": "boolean"
+        },
+        "ignoreDOMComponents": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

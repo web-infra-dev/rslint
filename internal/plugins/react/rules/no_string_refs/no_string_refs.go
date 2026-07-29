@@ -1,21 +1,24 @@
 package no_string_refs
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_string_refs.schema.json
+var schemaJSON []byte
+
 var NoStringRefsRule = rule.Rule{
-	Name: "react/no-string-refs",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-string-refs",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		detectTemplateLiterals := false
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-			if v, ok := optsMap["noTemplateLiterals"].(bool); ok {
-				detectTemplateLiterals = v
-			}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			detectTemplateLiterals, _ = optsMap["noTemplateLiterals"].(bool)
 		}
 
 		pragma := reactutil.GetReactPragma(ctx.Settings)

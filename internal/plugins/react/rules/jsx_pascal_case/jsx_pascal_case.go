@@ -1,6 +1,7 @@
 package jsx_pascal_case
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 	"unicode"
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_pascal_case.schema.json
+var schemaJSON []byte
 
 const (
 	msgUsePascalCase        = "Imported JSX component {{name}} must be in PascalCase"
@@ -33,21 +36,15 @@ type compiledPattern struct {
 	re  *regexp.Regexp
 }
 
-func parseOptions(opts any) pascalCaseOptions {
+func parseOptions(opts []any) pascalCaseOptions {
 	cfg := pascalCaseOptions{}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(opts) == 0 {
 		return cfg
 	}
-	if v, ok := optsMap["allowAllCaps"].(bool); ok {
-		cfg.allowAllCaps = v
-	}
-	if v, ok := optsMap["allowLeadingUnderscore"].(bool); ok {
-		cfg.allowLeadingUnderscore = v
-	}
-	if v, ok := optsMap["allowNamespace"].(bool); ok {
-		cfg.allowNamespace = v
-	}
+	optsMap, _ := opts[0].(map[string]interface{})
+	cfg.allowAllCaps, _ = optsMap["allowAllCaps"].(bool)
+	cfg.allowLeadingUnderscore, _ = optsMap["allowLeadingUnderscore"].(bool)
+	cfg.allowNamespace, _ = optsMap["allowNamespace"].(bool)
 	if raw, ok := optsMap["ignore"].([]interface{}); ok {
 		for _, entry := range raw {
 			if s, ok := entry.(string); ok {
@@ -147,9 +144,9 @@ func ignoreCheck(patterns []compiledPattern, name string) bool {
 }
 
 var JsxPascalCaseRule = rule.Rule{
-	Name: "react/jsx-pascal-case",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-pascal-case",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseOptions(options)
 
 		check := func(element *ast.Node) {

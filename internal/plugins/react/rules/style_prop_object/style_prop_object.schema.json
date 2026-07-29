@@ -1,0 +1,20 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "additionalItems": false,
+          "uniqueItems": true
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

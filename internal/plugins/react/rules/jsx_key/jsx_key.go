@@ -1,11 +1,16 @@
 package jsx_key
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_key.schema.json
+var schemaJSON []byte
 
 type options struct {
 	checkFragmentShorthand   bool
@@ -13,29 +18,23 @@ type options struct {
 	warnOnDuplicates         bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
-	if v, ok := m["checkFragmentShorthand"].(bool); ok {
-		opts.checkFragmentShorthand = v
-	}
-	if v, ok := m["checkKeyMustBeforeSpread"].(bool); ok {
-		opts.checkKeyMustBeforeSpread = v
-	}
-	if v, ok := m["warnOnDuplicates"].(bool); ok {
-		opts.warnOnDuplicates = v
-	}
+	m, _ := raw[0].(map[string]interface{})
+	opts.checkFragmentShorthand, _ = m["checkFragmentShorthand"].(bool)
+	opts.checkKeyMustBeforeSpread, _ = m["checkKeyMustBeforeSpread"].(bool)
+	opts.warnOnDuplicates, _ = m["warnOnDuplicates"].(bool)
 	return opts
 }
 
 var JsxKeyRule = rule.Rule{
-	Name: "react/jsx-key",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-key",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		reactPragma := reactutil.GetReactPragma(ctx.Settings)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)
 

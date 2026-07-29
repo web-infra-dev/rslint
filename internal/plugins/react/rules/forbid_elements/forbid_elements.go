@@ -1,6 +1,7 @@
 package forbid_elements
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed forbid_elements.schema.json
+var schemaJSON []byte
 
 // identifierStartRegex mirrors upstream's `/^[A-Z_]/` test against a bare
 // `Identifier` argument: only PascalCase or `_`-prefixed identifiers are
@@ -35,12 +39,12 @@ type forbidEntry struct {
 	message string
 }
 
-func parseOptions(options any) map[string]forbidEntry {
+func parseOptions(options []any) map[string]forbidEntry {
 	indexed := map[string]forbidEntry{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return indexed
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	raw, ok := optsMap["forbid"].([]interface{})
 	if !ok {
 		return indexed
@@ -63,9 +67,7 @@ func parseOptions(options any) map[string]forbidEntry {
 				continue
 			}
 			entry := forbidEntry{element: elem}
-			if msg, ok := v["message"].(string); ok {
-				entry.message = msg
-			}
+			entry.message, _ = v["message"].(string)
 			indexed[elem] = entry
 		}
 	}
@@ -154,9 +156,9 @@ func isCreateElementCall(callee *ast.Node, pragma string, tc *checker.Checker) b
 }
 
 var ForbidElementsRule = rule.Rule{
-	Name: "react/forbid-elements",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/forbid-elements",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		indexed := parseOptions(options)
 		if len(indexed) == 0 {
 			return rule.RuleListeners{}

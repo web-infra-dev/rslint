@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "button": {
+          "default": true,
+          "type": "boolean"
+        },
+        "submit": {
+          "default": true,
+          "type": "boolean"
+        },
+        "reset": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

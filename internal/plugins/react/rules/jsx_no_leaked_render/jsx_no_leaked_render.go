@@ -1,6 +1,7 @@
 package jsx_no_leaked_render
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_leaked_render.schema.json
+var schemaJSON []byte
 
 const noPotentialLeakedRenderMessage = "Potential leaked value that might cause unintentionally rendered values or rendering crashes"
 
@@ -30,15 +34,13 @@ func defaultOptions() ruleOptions {
 	}
 }
 
-func parseOptions(raw any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := defaultOptions()
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	if v, ok := m["ignoreAttributes"].(bool); ok {
-		opts.ignoreAttributes = v
-	}
+	m, _ := options[0].(map[string]interface{})
+	opts.ignoreAttributes, _ = m["ignoreAttributes"].(bool)
 	if v, ok := m["validStrategies"].([]interface{}); ok {
 		var strategies []string
 		seen := map[string]bool{}
@@ -73,10 +75,10 @@ func hasStrategy(list []string, s string) bool {
 }
 
 var JsxNoLeakedRenderRule = rule.Rule{
-	Name: "react/jsx-no-leaked-render",
-	Run: func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
-		raw := rule.LegacyUnwrapOptions(_raw)
-		opts := parseOptions(raw)
+	Name:   "react/jsx-no-leaked-render",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		var fixStrategy string
 		if len(opts.validStrategies) > 0 {
 			fixStrategy = opts.validStrategies[0]

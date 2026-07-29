@@ -1,0 +1,10 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["disallow-in-func"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

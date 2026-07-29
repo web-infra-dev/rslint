@@ -1,6 +1,7 @@
 package self_closing_comp
 
 import (
+	_ "embed"
 	"strings"
 	"unicode"
 
@@ -10,24 +11,23 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed self_closing_comp.schema.json
+var schemaJSON []byte
+
 var SelfClosingCompRule = rule.Rule{
-	Name: "react/self-closing-comp",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/self-closing-comp",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkComponent := true
 		checkHTML := true
 
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if v, ok := optsMap["component"]; ok {
-				if b, ok := v.(bool); ok {
-					checkComponent = b
-				}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			if b, ok := optsMap["component"].(bool); ok {
+				checkComponent = b
 			}
-			if v, ok := optsMap["html"]; ok {
-				if b, ok := v.(bool); ok {
-					checkHTML = b
-				}
+			if b, ok := optsMap["html"].(bool); ok {
+				checkHTML = b
 			}
 		}
 

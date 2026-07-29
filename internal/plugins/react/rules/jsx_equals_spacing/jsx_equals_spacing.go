@@ -18,11 +18,16 @@
 package jsx_equals_spacing
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed jsx_equals_spacing.schema.json
+var schemaJSON []byte
 
 // JsxEqualsSpacingRule is the eslint-plugin-react variant.
 var JsxEqualsSpacingRule = BuildRule("react/jsx-equals-spacing")
@@ -36,21 +41,15 @@ var messages = map[string]string{
 	"needSpaceAfter":  "A space is required after '='",
 }
 
-// parseOption accepts every shape rslint's loader can deliver for upstream's
-// single-string schema (`enum: ['always', 'never']`, default `never`): nil, a
-// bare string (single-option CLI form), or a single-element array (rule-tester
-// form). Any value outside the enum falls back to the default — upstream's
-// JSON schema rejects those before the rule runs, so that branch is only
-// reachable through hand-written rslint configs.
-func parseOption(options any) string {
-	raw := options
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return defaultConfig
-		}
-		raw = arr[0]
+// parseOption reads upstream's single-string option (`enum: ['always',
+// 'never']`, default `never`). Any value outside the enum falls back to the
+// default — the schema rejects those before the rule runs, so that branch is
+// only reachable from callers that bypass validation.
+func parseOption(options []any) string {
+	if len(options) == 0 {
+		return defaultConfig
 	}
-	if s, ok := raw.(string); ok && (s == "always" || s == "never") {
+	if s, ok := options[0].(string); ok && (s == "always" || s == "never") {
 		return s
 	}
 	return defaultConfig
@@ -125,9 +124,9 @@ func analyzeEquals(s *scanner.Scanner, nameEnd int) (equalsInfo, bool) {
 // BuildRule constructs the jsx-equals-spacing rule registered under `name`.
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
-		Name: name,
-		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.LegacyUnwrapOptions(_options)
+		Name:   name,
+		Schema: rule.NewSchema(schemaJSON),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			config := parseOption(options)
 			sf := ctx.SourceFile
 			if sf == nil {

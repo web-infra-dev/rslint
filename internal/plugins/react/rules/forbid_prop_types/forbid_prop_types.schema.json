@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "forbid": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checkContextTypes": {
+          "type": "boolean"
+        },
+        "checkChildContextTypes": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

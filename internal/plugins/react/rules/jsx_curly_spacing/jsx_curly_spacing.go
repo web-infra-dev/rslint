@@ -1,6 +1,7 @@
 package jsx_curly_spacing
 
 import (
+	_ "embed"
 	"regexp"
 	"unicode/utf8"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_curly_spacing.schema.json
+var schemaJSON []byte
 
 const (
 	spacingNever  = "never"
@@ -91,15 +95,15 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideCo
 
 // parseOptions reproduces upstream's option-shape juggling. Inputs that flow
 // in here:
-//   - nil / [] → all defaults
-//   - "never" / "always" → equivalent to [{ when: "<value>" }]
+//   - [] → all defaults
+//   - ["never"] / ["always"] → equivalent to [{ when: "<value>" }]
 //   - ["never", { allowMultiline?, spacing? }] → merge secondary into the
 //     wrapped { when, ... } object
-//   - [ { ... } ] / { ... } → use as-is
+//   - [{ ... }] → use as-is
 //
 // `attributes` defaults to true (i.e. always check attributes); `children`
 // defaults to false (i.e. don't check children unless explicitly enabled).
-func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
+func parseOptions(options []any) (attrs *sideConfig, children *sideConfig) {
 	const (
 		defaultWhen           = spacingNever
 		defaultAllowMultiline = true
@@ -107,24 +111,14 @@ func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
 		defaultChildren       = false
 	)
 
-	var arr []interface{}
-	switch v := options.(type) {
-	case []interface{}:
-		arr = v
-	case map[string]interface{}:
-		arr = []interface{}{v}
-	case string:
-		arr = []interface{}{v}
-	}
-
 	originalConfig := map[string]interface{}{}
-	if len(arr) > 0 {
-		switch first := arr[0].(type) {
+	if len(options) > 0 {
+		switch first := options[0].(type) {
 		case string:
 			if first == spacingAlways || first == spacingNever {
 				originalConfig["when"] = first
-				if len(arr) > 1 {
-					if secondary, ok := arr[1].(map[string]interface{}); ok {
+				if len(options) > 1 {
+					if secondary, ok := options[1].(map[string]interface{}); ok {
 						for k, val := range secondary {
 							originalConfig[k] = val
 						}
@@ -372,9 +366,9 @@ var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing")
 // and `JsxSpreadAttribute` (attribute spread).
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
-		Name: name,
-		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.LegacyUnwrapOptions(_options)
+		Name:   name,
+		Schema: rule.NewSchema(schemaJSON),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			attrsConfig, childrenConfig := parseOptions(options)
 
 			text := ctx.SourceFile.Text()

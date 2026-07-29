@@ -1,6 +1,7 @@
 package jsx_handler_names
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 	"unicode"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_handler_names.schema.json
+var schemaJSON []byte
 
 const (
 	msgBadHandlerName = "Handler function for {{propKey}} prop key must be a camelCase name beginning with '{{handlerPrefix}}' only"
@@ -30,7 +34,7 @@ type options struct {
 	propEventHandlerRegex *regexp.Regexp
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{
 		eventHandlerPrefix:     "handle",
 		eventHandlerPropPrefix: "on",
@@ -38,8 +42,8 @@ func parseOptions(raw any) options {
 	prefixDisabled := false
 	propPrefixDisabled := false
 
-	m := utils.GetOptionsMap(raw)
-	if m != nil {
+	if len(raw) > 0 {
+		m, _ := raw[0].(map[string]interface{})
 		// Mirror upstream's `configuration.eventHandlerPrefix || 'handle'`:
 		// `false` disables the side; any other falsy value (empty string,
 		// missing key) falls back to the default. Only a non-empty string
@@ -68,12 +72,8 @@ func parseOptions(raw any) options {
 				}
 			}
 		}
-		if v, ok := m["checkLocalVariables"].(bool); ok {
-			opts.checkLocalVariables = v
-		}
-		if v, ok := m["checkInlineFunction"].(bool); ok {
-			opts.checkInlineFunction = v
-		}
+		opts.checkLocalVariables, _ = m["checkLocalVariables"].(bool)
+		opts.checkInlineFunction, _ = m["checkInlineFunction"].(bool)
 		if v, ok := m["ignoreComponentNames"].([]interface{}); ok {
 			for _, p := range v {
 				if s, ok := p.(string); ok {
@@ -224,10 +224,10 @@ func isPlainMemberAccess(node *ast.Node) bool {
 }
 
 var JsxHandlerNamesRule = rule.Rule{
-	Name: "react/jsx-handler-names",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "react/jsx-handler-names",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {

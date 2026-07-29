@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "declaration": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "assignment": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "return": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "arrow": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "condition": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "logical": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        },
+        "prop": {
+          "enum": [true, false, "ignore", "parens", "parens-new-line", "never"]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

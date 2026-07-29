@@ -2,6 +2,7 @@
 package jsx_no_literals
 
 import (
+	_ "embed"
 	"html"
 	"math"
 	"regexp"
@@ -12,6 +13,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_no_literals.schema.json
+var schemaJSON []byte
 
 // reOverridableElement mirrors upstream's `^[A-Z][\w.]*$` — overrides apply
 // only to user-component names (capitalized identifiers, optionally
@@ -60,7 +64,7 @@ func (c *ruleConfig) hasElementOverrides() bool {
 	return len(c.elementOverrides) > 0
 }
 
-func parseConfig(options any) ruleConfig {
+func parseConfig(options []any) ruleConfig {
 	cfg := ruleConfig{
 		base: elementConfig{
 			configType:           configTypeElement,
@@ -69,10 +73,10 @@ func parseConfig(options any) ruleConfig {
 		},
 		elementOverrides: map[string]*elementConfig{},
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return cfg
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	populateElementConfig(&cfg.base, optsMap)
 	rawOverrides, _ := optsMap["elementOverrides"].(map[string]interface{})
 	for elementName, raw := range rawOverrides {
@@ -91,9 +95,7 @@ func parseConfig(options any) ruleConfig {
 			applyToNestedElements: true,
 		}
 		populateElementConfig(child, childMap)
-		if v, ok := childMap["allowElement"].(bool); ok {
-			child.allowElement = v
-		}
+		child.allowElement, _ = childMap["allowElement"].(bool)
 		// applyToNestedElements defaults to true; only an explicit falsy
 		// value flips it. Upstream's `typeof v === 'undefined' || !!v`
 		// collapses to: present and JS-falsy → false; otherwise → true.
@@ -106,15 +108,9 @@ func parseConfig(options any) ruleConfig {
 }
 
 func populateElementConfig(c *elementConfig, m map[string]interface{}) {
-	if v, ok := m["noStrings"].(bool); ok {
-		c.noStrings = v
-	}
-	if v, ok := m["ignoreProps"].(bool); ok {
-		c.ignoreProps = v
-	}
-	if v, ok := m["noAttributeStrings"].(bool); ok {
-		c.noAttributeStrings = v
-	}
+	c.noStrings, _ = m["noStrings"].(bool)
+	c.ignoreProps, _ = m["ignoreProps"].(bool)
+	c.noAttributeStrings, _ = m["noAttributeStrings"].(bool)
 	populateStringSetFromMap(m, "allowedStrings", c.allowedStrings)
 	populateStringSetFromMap(m, "restrictedAttributes", c.restrictedAttributes)
 }
@@ -699,9 +695,9 @@ func handleTemplate(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renam
 }
 
 var JsxNoLiteralsRule = rule.Rule{
-	Name: "react/jsx-no-literals",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-no-literals",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseConfig(options)
 		var renamedImports map[string]string
 		if cfg.hasElementOverrides() {

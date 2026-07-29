@@ -70,16 +70,6 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
     },
-    // Defensive: non-array customComponentNames is ignored silently.
-    {
-      code: `<MyComponent dangerouslySetInnerHTML={{ __html: "" }} />;`,
-      options: [{ customComponentNames: 'MyComponent' }],
-    },
-    // Defensive: non-string entries in the array are skipped.
-    {
-      code: `<MyComponent dangerouslySetInnerHTML={{ __html: "" }} />;`,
-      options: [{ customComponentNames: [42, null, false] }],
-    },
   ],
   invalid: [
     // ---- Upstream invalid cases ----

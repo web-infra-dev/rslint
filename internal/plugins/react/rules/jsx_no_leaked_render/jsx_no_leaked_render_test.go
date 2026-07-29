@@ -1272,3 +1272,19 @@ func TestJsxNoLeakedRender(t *testing.T) {
 		},
 	})
 }
+
+// TestJsxNoLeakedRenderSchema locks in `ignoreAttributes`, which this rule
+// implements (see jsx-no-leaked-render.md) but upstream's `meta.schema` does
+// not declare. Since that schema closes the options object with
+// `additionalProperties: false`, copying it verbatim would make a documented
+// option a config error.
+func TestJsxNoLeakedRenderSchema(t *testing.T) {
+	valid := []any{map[string]any{"ignoreAttributes": true, "validStrategies": []any{"coerce"}}}
+	if err := JsxNoLeakedRenderRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected ignoreAttributes to pass schema validation, got: %v", err)
+	}
+	invalid := []any{map[string]any{"ignoreAttribute": true}}
+	if err := JsxNoLeakedRenderRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an unknown option name to fail schema validation")
+	}
+}

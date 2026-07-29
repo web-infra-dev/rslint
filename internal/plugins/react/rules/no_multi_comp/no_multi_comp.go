@@ -1,6 +1,7 @@
 package no_multi_comp
 
 import (
+	_ "embed"
 	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_multi_comp.schema.json
+var schemaJSON []byte
 
 // Options carries the parsed rule options. Mirrors upstream's schema:
 //
@@ -23,13 +27,11 @@ type Options struct {
 	IgnoreStateless bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["ignoreStateless"].(bool); ok {
-			opts.IgnoreStateless = v
-		}
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
+		opts.IgnoreStateless, _ = optsMap["ignoreStateless"].(bool)
 	}
 	return opts
 }
@@ -324,9 +326,9 @@ func isStatelessKindForIgnore(node *ast.Node) bool {
 }
 
 var NoMultiCompRule = rule.Rule{
-	Name: "react/no-multi-comp",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-multi-comp",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

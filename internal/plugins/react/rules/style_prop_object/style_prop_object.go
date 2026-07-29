@@ -1,27 +1,30 @@
 package style_prop_object
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed style_prop_object.schema.json
+var schemaJSON []byte
+
 var StylePropObjectRule = rule.Rule{
-	Name: "react/style-prop-object",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/style-prop-object",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Parse the `allow` option: list of component names to skip
 		var allowedComponents map[string]bool
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if allowList, ok := optsMap["allow"]; ok {
-				if arr, ok := allowList.([]interface{}); ok {
-					allowedComponents = make(map[string]bool)
-					for _, item := range arr {
-						if name, ok := item.(string); ok {
-							allowedComponents[name] = true
-						}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			if arr, ok := optsMap["allow"].([]interface{}); ok {
+				allowedComponents = make(map[string]bool)
+				for _, item := range arr {
+					if name, ok := item.(string); ok {
+						allowedComponents[name] = true
 					}
 				}
 			}

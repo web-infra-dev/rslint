@@ -3,21 +3,25 @@
 package jsx_no_undef
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_no_undef.schema.json
+var schemaJSON []byte
+
 var JsxNoUndefRule = rule.Rule{
-	Name: "react/jsx-no-undef",
+	Name:   "react/jsx-no-undef",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowGlobals := false
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if v, ok := optsMap["allowGlobals"].(bool); ok {
-				allowGlobals = v
-			}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			allowGlobals, _ = optsMap["allowGlobals"].(bool)
 		}
 		// Upstream only consults the outer global scope (config
 		// `languageOptions.globals` / `/* global */` comments) for script

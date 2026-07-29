@@ -1,6 +1,8 @@
 package prefer_es6_class
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -8,21 +10,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+//go:embed prefer_es6_class.schema.json
+var schemaJSON []byte
+
 // parseMode reads the first option, accepting "always" (default) or "never".
 // Any other shape falls back to "always" — matches eslint-plugin-react's
 // `context.options[0] || 'always'`.
-func parseMode(options any) string {
+func parseMode(options []any) string {
 	mode := "always"
-	switch opts := options.(type) {
-	case []interface{}:
-		if len(opts) > 0 {
-			if s, ok := opts[0].(string); ok && s != "" {
-				mode = s
-			}
-		}
-	case string:
-		if opts != "" {
-			mode = opts
+	if len(options) > 0 {
+		if s, ok := options[0].(string); ok && s != "" {
+			mode = s
 		}
 	}
 	if mode != "always" && mode != "never" {
@@ -117,9 +115,9 @@ func containsArg(args *ast.NodeList, target *ast.Node) bool {
 }
 
 var PreferEs6ClassRule = rule.Rule{
-	Name: "react/prefer-es6-class",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/prefer-es6-class",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		mode := parseMode(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

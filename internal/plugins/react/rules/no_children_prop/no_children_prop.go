@@ -1,11 +1,15 @@
 package no_children_prop
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_children_prop.schema.json
+var schemaJSON []byte
 
 const (
 	msgNestChildren       = "Do not pass children as props. Instead, nest children between the opening and closing tags."
@@ -15,14 +19,13 @@ const (
 )
 
 var NoChildrenPropRule = rule.Rule{
-	Name: "react/no-children-prop",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-children-prop",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowFunctions := false
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-			if v, ok := optsMap["allowFunctions"].(bool); ok {
-				allowFunctions = v
-			}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			allowFunctions, _ = optsMap["allowFunctions"].(bool)
 		}
 
 		// Mirrors upstream `isFunction`: the value must be an arrow / non-arrow

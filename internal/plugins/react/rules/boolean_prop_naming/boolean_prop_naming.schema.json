@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "propTypeNames": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "rule": {
+          "default": "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "validateNested": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

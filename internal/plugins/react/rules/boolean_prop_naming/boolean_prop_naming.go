@@ -1,6 +1,7 @@
 package boolean_prop_naming
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 
@@ -10,9 +11,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed boolean_prop_naming.schema.json
+var schemaJSON []byte
+
 var BooleanPropNamingRule = rule.Rule{
-	Name: "react/boolean-prop-naming",
-	Run:  runRule,
+	Name:   "react/boolean-prop-naming",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    runRule,
 }
 
 type ruleOptions struct {
@@ -26,28 +31,31 @@ type ruleOptions struct {
 // parseOptions extracts the rule's options from rslint's weakly-typed input.
 //
 // Mirrors upstream's behavior at the boundary:
-//   - missing / non-object options → all defaults; rule is a no-op (rule is
-//     gated by an explicit `rule` regex below).
+//   - no options at all → `rulePattern` stays empty and the rule is a no-op
+//     (it is gated by an explicit `rule` regex below). An options object,
+//     even `{}`, is different: the schema's `rule` default is filled into it
+//     before the rule runs, the way ajv's `useDefaults` does for ESLint, so
+//     the rule gates on that default pattern instead.
 //   - missing `propTypeNames` → defaults to `["bool"]`.
 //   - empty `propTypeNames` array (`[]`) → user explicitly cleared the
 //     allow-list, so no PropTypes-style identifier counts as a boolean
 //     marker. TS `: boolean` annotations remain checked because they go
-//     through the `tsCheck` path independent of `propTypeNames`. Upstream
-//     would have its loader reject this via `minItems: 1`; rslint can't
-//     refuse the config so we honor user intent over loader behavior.
+//     through the `tsCheck` path independent of `propTypeNames`. A config
+//     never reaches this: the schema's `minItems: 1` rejects it first, the
+//     way upstream's does.
 //   - `rule` is read as a string. An empty string ("") is preserved and
-//     produces a no-op (matching upstream's `config.rule ? ... : null`).
-func parseOptions(input any) ruleOptions {
+//     produces a no-op (matching upstream's `config.rule ? ... : null`), but
+//     the schema's `minLength: 1` rejects an explicit "", so that only
+//     happens when a caller bypasses validation.
+func parseOptions(input []any) ruleOptions {
 	opts := ruleOptions{
 		propTypeNames: map[string]bool{"bool": true},
 	}
-	optsMap := utils.GetOptionsMap(input)
-	if optsMap == nil {
+	if len(input) == 0 {
 		return opts
 	}
-	if pat, ok := optsMap["rule"].(string); ok {
-		opts.rulePattern = pat
-	}
+	optsMap, _ := input[0].(map[string]interface{})
+	opts.rulePattern, _ = optsMap["rule"].(string)
 	if names, ok := optsMap["propTypeNames"].([]interface{}); ok {
 		set := map[string]bool{}
 		for _, n := range names {
@@ -58,12 +66,8 @@ func parseOptions(input any) ruleOptions {
 		// Even when set is empty, swap it in — caller cleared the list.
 		opts.propTypeNames = set
 	}
-	if msg, ok := optsMap["message"].(string); ok {
-		opts.customMessage = msg
-	}
-	if v, ok := optsMap["validateNested"].(bool); ok {
-		opts.validateNested = v
-	}
+	opts.customMessage, _ = optsMap["message"].(string)
+	opts.validateNested, _ = optsMap["validateNested"].(bool)
 	return opts
 }
 
@@ -97,9 +101,8 @@ func renderTemplate(tmpl string, data map[string]string) string {
 // single-level lookup for unresolvable references).
 const resolveDepth = 8
 
-func runRule(ctx rule.RuleContext, _input []any) rule.RuleListeners {
-	input := rule.LegacyUnwrapOptions(_input)
-	opts := parseOptions(input)
+func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 	// Upstream: `const rule = config.rule ? new RegExp(config.rule) : null;`
 	// followed by `if (!rule) return;` in every listener.
 	if opts.rulePattern == "" {

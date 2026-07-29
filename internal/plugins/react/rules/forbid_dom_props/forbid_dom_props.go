@@ -1,14 +1,17 @@
 package forbid_dom_props
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed forbid_dom_props.schema.json
+var schemaJSON []byte
 
 const (
 	msgPropIsForbidden          = `Prop "{{prop}}" is forbidden on DOM Nodes`
@@ -37,14 +40,13 @@ type forbidConfig struct {
 	byProp map[string]*forbidEntry
 }
 
-func parseOptions(options any) *forbidConfig {
+func parseOptions(options []any) *forbidConfig {
 	cfg := &forbidConfig{byProp: map[string]*forbidEntry{}}
 
 	var forbidList []interface{}
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-		if raw, ok := optsMap["forbid"].([]interface{}); ok {
-			forbidList = raw
-		}
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
+		forbidList, _ = optsMap["forbid"].([]interface{})
 	}
 	// Upstream defaults to `DEFAULTS = []` — empty list. With `forbid: []`
 	// (or no options at all) the rule is effectively a no-op; both paths land
@@ -157,9 +159,9 @@ func stringLiteralValue(attr *ast.Node) (string, bool) {
 }
 
 var ForbidDomPropsRule = rule.Rule{
-	Name: "react/forbid-dom-props",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/forbid-dom-props",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseOptions(options)
 		// Empty config short-circuits the whole listener — matches the
 		// no-options / `forbid: []` path where upstream's Map iteration

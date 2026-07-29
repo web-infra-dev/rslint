@@ -1,6 +1,7 @@
 package jsx_closing_tag_location
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,32 +11,25 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_closing_tag_location.schema.json
+var schemaJSON []byte
+
 // JsxClosingTagLocationRule enforces the closing tag location for multiline JSX.
 var JsxClosingTagLocationRule = rule.Rule{
-	Name: "react/jsx-closing-tag-location",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-closing-tag-location",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Default: "tag-aligned"
 		location := "tag-aligned"
 
 		// Parse options
-		if options != nil {
-			if optArray, ok := options.([]interface{}); ok && len(optArray) > 0 {
-				if s, ok := optArray[0].(string); ok {
-					location = s
-				} else if m, ok := optArray[0].(map[string]interface{}); ok {
-					if loc, ok := m["location"].(string); ok {
-						location = loc
-					}
-				}
-			} else if s, ok := options.(string); ok {
-				location = s
-			} else {
-				optsMap := utils.GetOptionsMap(options)
-				if optsMap != nil {
-					if loc, ok := optsMap["location"].(string); ok {
-						location = loc
-					}
+		if len(options) > 0 {
+			switch v := options[0].(type) {
+			case string:
+				location = v
+			case map[string]interface{}:
+				if loc, ok := v["location"].(string); ok {
+					location = loc
 				}
 			}
 		}

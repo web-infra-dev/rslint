@@ -12,7 +12,8 @@ import (
 // tracks all JSX references and correctly marks variables as used, so this
 // rule is unnecessary. It exists only for configuration compatibility.
 var JsxUsesVarsRule = rule.Rule{
-	Name: "react/jsx-uses-vars",
+	Name:   "react/jsx-uses-vars",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},

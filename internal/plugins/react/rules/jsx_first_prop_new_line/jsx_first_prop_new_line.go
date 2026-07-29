@@ -18,6 +18,8 @@
 package jsx_first_prop_new_line
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -25,29 +27,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed jsx_first_prop_new_line.schema.json
+var schemaJSON []byte
+
 // JsxFirstPropNewLineRule is the eslint-plugin-react variant.
 var JsxFirstPropNewLineRule = BuildRule("react/jsx-first-prop-new-line")
 
 // BuildRule constructs the jsx-first-prop-new-line rule registered under name.
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
-		Name: name,
-		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.LegacyUnwrapOptions(_options)
+		Name:   name,
+		Schema: rule.NewSchema(schemaJSON),
+		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			// Default option
 			option := "multiline-multiprop"
 
-			// Parse options. The schema is a single string enum
-			// ('always' | 'never' | 'multiline' | 'multiline-multiprop' |
-			// 'multiprop'), delivered either bare (single-option CLI form) or as
-			// a one-element array (rule-tester form). There is no object form, so
-			// no map handling is needed.
-			if options != nil {
-				if optArray, ok := options.([]interface{}); ok && len(optArray) > 0 {
-					if s, ok := optArray[0].(string); ok {
-						option = s
-					}
-				} else if s, ok := options.(string); ok {
+			// The schema is a single string enum ('always' | 'never' |
+			// 'multiline' | 'multiline-multiprop' | 'multiprop'). There is no
+			// object form, so no map handling is needed.
+			if len(options) > 0 {
+				if s, ok := options[0].(string); ok {
 					option = s
 				}
 			}

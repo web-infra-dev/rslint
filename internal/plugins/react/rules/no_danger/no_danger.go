@@ -1,6 +1,7 @@
 package no_danger
 
 import (
+	_ "embed"
 	"path"
 	"strings"
 
@@ -10,16 +11,20 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_danger.schema.json
+var schemaJSON []byte
+
 var dangerousProps = map[string]bool{
 	"dangerouslySetInnerHTML": true,
 }
 
 var NoDangerRule = rule.Rule{
-	Name: "react/no-danger",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/no-danger",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var customComponentNames []string
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			if arr, ok := optsMap["customComponentNames"].([]interface{}); ok {
 				for _, item := range arr {
 					if name, ok := item.(string); ok {

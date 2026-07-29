@@ -1,6 +1,7 @@
 package jsx_closing_bracket_location
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed jsx_closing_bracket_location.schema.json
+var schemaJSON []byte
 
 const defaultLocation = "tag-aligned"
 
@@ -29,21 +33,13 @@ type bracketOptions struct {
 	selfClosingOff bool
 }
 
-func parseOptions(options any) bracketOptions {
+func parseOptions(options []any) bracketOptions {
 	opts := bracketOptions{nonEmpty: defaultLocation, selfClosing: defaultLocation}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	raw := options
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return opts
-		}
-		raw = arr[0]
-	}
-
-	switch v := raw.(type) {
+	switch v := options[0].(type) {
 	case string:
 		opts.nonEmpty = v
 		opts.selfClosing = v
@@ -113,9 +109,9 @@ func leadingWhitespace(text string, lineStart int) string {
 // JsxClosingBracketLocationRule enforces the closing bracket location for JSX
 // multiline elements.
 var JsxClosingBracketLocationRule = rule.Rule{
-	Name: "react/jsx-closing-bracket-location",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/jsx-closing-bracket-location",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {

@@ -61,8 +61,9 @@ var lifecycleInstance = []string{
 var lifecycleStatic = []string{"getDerivedStateFromProps"}
 
 var NoTyposRule = rule.Rule{
-	Name: "react/no-typos",
-	Run:  runRule,
+	Name:   "react/no-typos",
+	Schema: rule.EmptyArraySchema,
+	Run:    runRule,
 }
 
 func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {

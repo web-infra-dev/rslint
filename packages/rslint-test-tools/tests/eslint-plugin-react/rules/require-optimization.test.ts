@@ -722,15 +722,6 @@ ruleTester.run('require-optimization', {} as never, {
         { messageId: 'noShouldComponentUpdate' },
       ],
     },
-    // ---- Robustness: malformed allowDecorators (non-array) — falls back to defaults ----
-    {
-      code: `
-        @pure
-        class C extends Component {}
-      `,
-      options: [{ allowDecorators: 'pure' as any }],
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
-    },
     // ---- Locks in upstream: ClassExpression PureComponent variants are
     // ALWAYS reported. Upstream's PureComponent/decorator shortcut runs only
     // on ClassDeclaration. ----

@@ -1,11 +1,16 @@
 package button_has_type
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed button_has_type.schema.json
+var schemaJSON []byte
 
 type buttonHasTypeOptions struct {
 	button bool
@@ -13,34 +18,28 @@ type buttonHasTypeOptions struct {
 	reset  bool
 }
 
-func parseOptions(opts any) buttonHasTypeOptions {
+func parseOptions(opts []any) buttonHasTypeOptions {
 	cfg := buttonHasTypeOptions{button: true, submit: true, reset: true}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(opts) == 0 {
 		return cfg
 	}
-	if v, ok := optsMap["button"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.button = b
-		}
+	optsMap, _ := opts[0].(map[string]interface{})
+	if b, ok := optsMap["button"].(bool); ok {
+		cfg.button = b
 	}
-	if v, ok := optsMap["submit"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.submit = b
-		}
+	if b, ok := optsMap["submit"].(bool); ok {
+		cfg.submit = b
 	}
-	if v, ok := optsMap["reset"]; ok {
-		if b, ok := v.(bool); ok {
-			cfg.reset = b
-		}
+	if b, ok := optsMap["reset"].(bool); ok {
+		cfg.reset = b
 	}
 	return cfg
 }
 
 var ButtonHasTypeRule = rule.Rule{
-	Name: "react/button-has-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "react/button-has-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseOptions(options)
 
 		reportMissing := func(node *ast.Node) {

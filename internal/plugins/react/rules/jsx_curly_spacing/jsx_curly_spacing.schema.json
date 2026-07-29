@@ -1,0 +1,78 @@
+{
+  "definitions": {
+    "basicConfig": {
+      "type": "object",
+      "properties": {
+        "when": {
+          "enum": ["always", "never"]
+        },
+        "allowMultiline": {
+          "type": "boolean"
+        },
+        "spacing": {
+          "type": "object",
+          "properties": {
+            "objectLiterals": {
+              "enum": ["always", "never"]
+            }
+          }
+        }
+      }
+    },
+    "basicConfigOrBoolean": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/basicConfig"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    }
+  },
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "attributes": {
+                  "$ref": "#/definitions/basicConfigOrBoolean"
+                },
+                "children": {
+                  "$ref": "#/definitions/basicConfigOrBoolean"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "enum": ["always", "never"]
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "allowMultiline": {
+          "type": "boolean"
+        },
+        "spacing": {
+          "type": "object",
+          "properties": {
+            "objectLiterals": {
+              "enum": ["always", "never"]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

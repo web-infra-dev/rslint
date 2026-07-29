@@ -1,0 +1,16 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": [
+        "always",
+        "never",
+        "multiline",
+        "multiline-multiprop",
+        "multiprop"
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
