@@ -99,7 +99,7 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 ## Composing Presets
 
-A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers declare the plugin, turn off core rules that TypeScript already reports, and enable the TypeScript rules. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
+A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers enable the core ESLint recommended rules, declare the plugin, turn off the core rules TypeScript already reports, and enable the TypeScript rules — which is why it covers a TypeScript project on its own. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
 
 ```ts
 export default defineConfig([
