@@ -97,6 +97,25 @@ export default defineConfig([
 
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
+## Composing Presets
+
+A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers declare the plugin, turn off core rules that TypeScript already reports, and enable the TypeScript rules. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
+
+```ts
+export default defineConfig([
+  ts.configs.recommended, // expands to the preset's entries, in order
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
+]);
+```
+
+Entries can also be passed as separate arguments: `defineConfig(ts.configs.recommended, { rules: { … } })`.
+
+Later entries win over earlier ones for the files they both match, which is what lets the trailing entry above relax a rule the preset enabled. A config that exports the array directly, without `defineConfig`, spreads the preset instead: `[...ts.configs.recommended, { … }]`.
+
 ## Configuration Options
 
 ### files

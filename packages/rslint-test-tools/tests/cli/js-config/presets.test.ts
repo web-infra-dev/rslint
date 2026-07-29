@@ -10,12 +10,28 @@ import {
 } from '@rslint/core';
 
 describe('defineConfig and config presets', () => {
-  test('defineConfig should be importable and return input as-is', () => {
+  test('defineConfig should be importable and return the entry list', () => {
     const input = [
       { files: ['**/*.ts'], rules: { 'no-console': 'error' as const } },
     ];
     const result = defineConfig(input);
-    expect(result).toBe(input);
+    expect(result).toEqual(input);
+  });
+
+  test('defineConfig should flatten nested entries at any depth', () => {
+    const first = { rules: { 'no-var': 'error' as const } };
+    const second = { files: ['a'] };
+    const third = { rules: { 'no-console': 'error' as const } };
+    expect(defineConfig([first, [second, [third]]])).toEqual([
+      first,
+      second,
+      third,
+    ]);
+    expect(defineConfig(first, [second], third)).toEqual([
+      first,
+      second,
+      third,
+    ]);
   });
 
   test('config presets should be importable', () => {
@@ -45,7 +61,7 @@ describe('defineConfig and config presets', () => {
       { rules: { '@typescript-eslint/no-explicit-any': 'off' } },
     ]);
     const normalized = normalizeConfig(config);
-    expect(normalized.length).toBe(2);
+    expect(normalized.length).toBe(ts.configs.recommended.length + 1);
     const lastEntry = normalized[normalized.length - 1];
     expect(lastEntry.rules).toEqual({
       '@typescript-eslint/no-explicit-any': 'off',
@@ -53,9 +69,10 @@ describe('defineConfig and config presets', () => {
   });
 
   test('ts.configs.recommended should declare @typescript-eslint plugin', () => {
-    const rec = ts.configs.recommended;
-    expect(rec.plugins).toBeDefined();
-    expect(rec.plugins).toContain('@typescript-eslint');
+    const plugins = ts.configs.recommended.flatMap((entry) =>
+      Array.isArray(entry.plugins) ? entry.plugins : [],
+    );
+    expect(plugins).toContain('@typescript-eslint');
   });
 
   test('react.configs.recommended should declare react plugin', () => {
