@@ -218,7 +218,7 @@ export interface RslintConfigEntry {
 }
 
 /** Top-level rslint config: an array of entries. */
-export type RslintConfig = RslintConfigEntry[];
+export type RslintConfig = (RslintConfigEntry | RslintConfigEntry[])[];
 
 /**
  * Type-safe config helper. Returns the config array as-is (identity function).
