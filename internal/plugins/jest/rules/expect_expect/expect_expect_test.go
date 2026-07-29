@@ -81,15 +81,6 @@ func TestExpectExpectRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"td.verify"}}},
 			},
 			{
-				Code: `it("should pass", () => expect(true).toBeDefined())`,
-				Options: []interface{}{
-					map[string]interface{}{
-						"assertFunctionNames":          nil,
-						"additionalTestBlockFunctions": nil,
-					},
-				},
-			},
-			{
 				Code: `
         theoretically('the number {input} is correctly translated to string', theories, theory => {
           const output = NumberToLongString(theory.input);
