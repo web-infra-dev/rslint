@@ -64,7 +64,7 @@ func (s *runState) checkVariableDeclarator(node *ast.Node) {
 				hasWrite = true
 				break
 			}
-			if isReadReference(refNode) {
+			if utils.IsReadReference(refNode) {
 				hasRead = true
 			}
 		}
@@ -195,16 +195,6 @@ func (s *runState) shouldSkipDeclarator(node *ast.Node) bool {
 	}
 
 	return false
-}
-
-func isReadReference(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
-		return false
-	}
-	return !utils.IsNonReferenceIdentifier(node)
 }
 
 var NoUnassignedVarsRule = rule.Rule{
