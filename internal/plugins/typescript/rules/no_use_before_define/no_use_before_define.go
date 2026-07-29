@@ -445,9 +445,10 @@ func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node, refScop
 		return
 	}
 
-	// Export specifiers are deliberately excluded from RefStore because most
-	// rules treat them as binding syntax rather than references. This rule is
-	// the exception: named exports have their own option and must be checked.
+	// Named exports have their own `allowNamedExports` option and a simpler
+	// "declared before this line" check (no TDZ/scope-boundary nuance,
+	// matching typescript-eslint's own handling), so they're dispatched to
+	// their own path rather than falling into the general logic below.
 	if isNamedExport(node) {
 		checkNamedExport(ctx, opts, node)
 		return
@@ -589,67 +590,25 @@ func checkNamedExport(ctx rule.RuleContext, opts options, node *ast.Node) {
 		return
 	}
 
-	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+	// ctx.Refs.Resolve walks the binder's own scope chain, so it lands on
+	// the LOCAL symbol directly — for `export { foo }` where foo is an
+	// import, that's the import specifier's own symbol, not the remote
+	// module's. getDefinitionInfo below then finds that local declaration
+	// without any alias-chain walking through the checker.
+	sym := ctx.Refs.Resolve(node)
 	if sym == nil {
 		return
 	}
 
-	// Checker symbols for imported exports may point at the remote target.
-	// Keep the local alias declarations as candidates so the import remains
-	// the definition point.
-	declarations := sym.Declarations
-	if sym.Flags&ast.SymbolFlagsAlias != 0 {
-		if resolved := ctx.TypeChecker.SkipAlias(sym); resolved != nil && len(resolved.Declarations) > 0 {
-			declarations = append(append([]*ast.Node(nil), resolved.Declarations...), sym.Declarations...)
-		}
-	}
-	info := getDefinitionInfo(ctx.SourceFile, declarations)
+	info := getDefinitionInfo(ctx.SourceFile, sym.Declarations)
 	if info.declaration == nil {
 		return
 	}
 
-	localDeclName := findLocalBindingName(ctx, sym)
-	if localDeclName != nil && isDefinedBeforeUse(localDeclName, node) {
-		return
-	}
-	if localDeclName == nil && isDefinedBeforeUse(info.name, node) {
+	if isDefinedBeforeUse(info.name, node) {
 		return
 	}
 	reportNode(ctx, node)
-}
-
-// findLocalBindingName walks the alias chain from sym back through imports
-// to find the earliest local binding (import specifier / namespace import)
-// name node in the current file. Returns nil if no local binding is found.
-func findLocalBindingName(ctx rule.RuleContext, sym *ast.Symbol) *ast.Node {
-	// Walk through the alias chain to find import-site declarations.
-	current := sym
-	for current != nil && current.Flags&ast.SymbolFlagsAlias != 0 {
-		for _, d := range current.Declarations {
-			if ast.GetSourceFileOfNode(d) != ctx.SourceFile {
-				continue
-			}
-			switch d.Kind {
-			case ast.KindImportSpecifier, ast.KindNamespaceImport, ast.KindImportClause, ast.KindImportEqualsDeclaration:
-				return utils.GetDeclarationIdentifier(d)
-			}
-		}
-		resolved := ctx.TypeChecker.SkipAlias(current)
-		if resolved == current || resolved == nil {
-			break
-		}
-		current = resolved
-	}
-	// Fallback: find any local non-augmentation declaration.
-	for _, d := range sym.Declarations {
-		if d.Kind == ast.KindExportSpecifier {
-			continue
-		}
-		if ast.GetSourceFileOfNode(d) == ctx.SourceFile {
-			return utils.GetDeclarationIdentifier(d)
-		}
-	}
-	return nil
 }
 
 // isDefinedBeforeUse compares end positions (matching ESLint behavior).
