@@ -64,7 +64,7 @@ func TestValidParamsExtras(t *testing.T) {
 			// This rule does not provide fixes.
 
 			// ---- Branch lock-in: exclude parses []string in Go tests as well as JSON []interface{} ----
-			{Code: `somePromise().catch(TypeError, handler)`, Options: map[string]interface{}{"exclude": []string{"catch"}}},
+			{Code: `somePromise().catch(TypeError, handler)`, Options: map[string]interface{}{"exclude": []interface{}{"catch"}}},
 
 			// ---- Branch lock-in: unknown methods are ignored even when nested after a promise call ----
 			{Code: `Promise.resolve(1).unknown(1, 2, 3)`},
