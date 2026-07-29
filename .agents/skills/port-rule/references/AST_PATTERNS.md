@@ -400,6 +400,21 @@ hand-roll a "try `ctx.Refs`, fall back to the checker" wrapper of your own —
 `Resolve` already is that wrapper. Building your own copy repeats the
 checker round-trip logic for no benefit.
 
+To check whether an identifier is locally shadowed — resolved to a symbol
+declared in this file, as opposed to a global, ambient, or cross-file one —
+pair `Resolve` with `utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)`:
+
+```go
+symbol := ctx.Refs.Resolve(node)
+isLocal := symbol != nil && utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
+```
+
+See [UTILS_REFERENCE.md — `IsSymbolDeclaredInFile`](./UTILS_REFERENCE.md#internalruleref_storego---reference-index-ctxrefs) for why it also skips
+interfaces, type aliases, and non-instantiated namespaces — a file can
+locally re-open an ambient global's type (`interface Map {}` in a global
+script merges into the same symbol as lib.d.ts's `Map`) without shadowing
+its value.
+
 ### Collecting references to a symbol
 
 For **"every identifier that references this declared symbol"** (ESLint's

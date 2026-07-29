@@ -1330,13 +1330,31 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 }
 
 // IsSymbolDeclaredInFile reports whether the given symbol has at least one
-// declaration in the specified source file. Use this to distinguish locally
-// declared symbols (shadowed) from globals provided by lib.d.ts.
+// value-introducing declaration in the specified source file. Use this to
+// distinguish locally declared symbols (shadowed) from globals provided by
+// lib.d.ts.
+//
+// Declarations that don't introduce a value are skipped: interfaces, type
+// aliases, and namespaces with no instantiated (value-producing) content.
+// A file can locally re-open an ambient global's type this way — for example
+// `interface Map {}` or `namespace Intl { export interface Local {} }` in a
+// global script — and declaration merging attaches that type-only
+// declaration to the same (checker-resolved) symbol as the ambient value.
+// The call site still resolves to the global value, not the file's type-only
+// declaration, so only value-introducing declarations count here.
 func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
+		switch decl.Kind {
+		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
+			continue
+		case ast.KindModuleDeclaration:
+			if !ast.IsInstantiatedModule(decl, false /*preserveConstEnums*/) {
+				continue
+			}
+		}
 		if ast.GetSourceFileOfNode(decl) == sf {
 			return true
 		}

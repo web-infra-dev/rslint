@@ -1,9 +1,6 @@
 package rule
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/binder"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -113,7 +110,6 @@ func (s *RefStore) resolvePending(name string) {
 		target := s.resolver.Resolve(id, name, referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
 		if target == nil && s.tc != nil {
 			target = utils.GetReferenceSymbol(id, s.tc)
-			fmt.Fprintf(os.Stderr, "DEBUG fallback: name=%q pos=%d target=%p\n", name, id.Pos(), target)
 		}
 		if target != nil {
 			s.refs[target] = append(s.refs[target], id)

@@ -146,7 +146,9 @@ that the rule framework already shares or can skip:
   the binder alone, and falls back to the checker automatically for
   global/`.d.ts`/cross-file symbols when a TypeChecker is available — never
   walk the file and call `GetSymbolAtLocation` once per identifier, and never
-  hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper.
+  hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper. To
+  check whether the resolved symbol is declared in this file (locally
+  shadowed), pair it with `utils.IsSymbolDeclaredInFile` (see AST_PATTERNS.md).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
 
