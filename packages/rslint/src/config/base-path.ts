@@ -80,32 +80,28 @@ export function rebasePattern(pattern: string, relativeBase: string): string {
   return (negated ? '!' : '') + joined;
 }
 
-function rebaseFilesSelector(
-  selector: unknown,
-  relativeBase: string,
-): string | string[] {
+function rebaseFilesSelector(selector: unknown, relativeBase: string): unknown {
   if (typeof selector === 'string') {
     return rebasePattern(selector, relativeBase);
   }
   if (Array.isArray(selector)) {
     return selector.map((pattern) =>
-      typeof pattern === 'string' ? rebasePattern(pattern, relativeBase) : pattern,
-    ) as string[];
+      typeof pattern === 'string'
+        ? rebasePattern(pattern, relativeBase)
+        : pattern,
+    );
   }
-  return selector as string | string[];
+  return selector;
 }
 
-function rebaseProjectValue(
-  project: unknown,
-  relativeBase: string,
-): string | string[] | undefined {
+function rebaseProjectValue(project: unknown, relativeBase: string): unknown {
   if (typeof project === 'string') {
     return rebasePattern(project, relativeBase);
   }
   if (Array.isArray(project)) {
     return project.map((item) =>
       typeof item === 'string' ? rebasePattern(item, relativeBase) : item,
-    ) as string[];
+    );
   }
   return undefined;
 }
