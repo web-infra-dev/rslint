@@ -173,8 +173,8 @@ export interface RslintConfigEntry {
    * into ordinary relative patterns before the Go engine sees the config.
    *
    * @example
-   * { basePath: 'packages/foo', files: ['src/**/*.ts'] }
-   * // equivalent to { files: ['packages/foo/src/**/*.ts'] }
+   * { basePath: 'packages/foo', files: ['src/**\/*.ts'] }
+   * // equivalent to { files: ['packages/foo/src/**\/*.ts'] }
    */
   basePath?: string;
   /**
