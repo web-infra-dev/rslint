@@ -172,8 +172,16 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			f.entries = append(f.entries, &vfsDirEntry{name: dir, isDir: true})
 		}
 		for _, file := range accessible.Files {
-			_, isSymlink := accessible.Symlinks[file]
-			f.entries = append(f.entries, &vfsDirEntry{name: file, isSymlink: isSymlink})
+			isSymlink := false
+			needsRealpath := accessible.Symlinks == nil
+			if accessible.Symlinks != nil {
+				_, isSymlink = accessible.Symlinks[file]
+			}
+			f.entries = append(f.entries, &vfsDirEntry{
+				name:          file,
+				isSymlink:     isSymlink,
+				needsRealpath: needsRealpath,
+			})
 		}
 		sort.Slice(f.entries, func(i, j int) bool {
 			return f.entries[i].Name() < f.entries[j].Name()
@@ -207,13 +215,17 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 
 // vfsDirEntry implements fs.DirEntry.
 type vfsDirEntry struct {
-	name      string
-	isDir     bool
-	isSymlink bool
+	name          string
+	isDir         bool
+	isSymlink     bool
+	needsRealpath bool
 }
 
 func (e *vfsDirEntry) Name() string { return e.name }
 func (e *vfsDirEntry) IsDir() bool  { return e.isDir }
+func (e *vfsDirEntry) needsCanonicalRealpath() bool {
+	return e.needsRealpath
+}
 func (e *vfsDirEntry) Type() fs.FileMode {
 	if e.isDir {
 		return fs.ModeDir

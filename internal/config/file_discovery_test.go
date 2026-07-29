@@ -643,6 +643,38 @@ func TestDiscoverLintTargets_FileSymlinkResolvesPhysicalIdentity(t *testing.T) {
 	assert.Assert(t, fsys.callCount(linkPath) > 0)
 }
 
+func TestDiscoverLintTargets_MissingSymlinkMetadataResolvesFileIdentity(t *testing.T) {
+	const configDir = "/repo"
+	const filePath = "/repo/src/a.ts"
+	const physicalPath = "/physical/src/a.ts"
+	fsys := &discoveryMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			configDir: {
+				Directories: []string{"src"},
+				// A nil Symlinks map means identity metadata is unavailable.
+				Symlinks: nil,
+			},
+			"/repo/src": {
+				Files:    []string{"a.ts"},
+				Symlinks: nil,
+			},
+		},
+		resolvedPaths: map[string]string{
+			configDir:   configDir,
+			"/repo/src": "/repo/src",
+			filePath:    physicalPath,
+		},
+	}
+
+	targets := DiscoverLintTargets(nil, configDir, fsys, nil, nil, true)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
+		Path:            filePath,
+		CanonicalPath:   physicalPath,
+		ConfigDirectory: configDir,
+	}})
+}
+
 func TestIsFileInAllowedDirsHonorsCaseSensitivity(t *testing.T) {
 	assert.Assert(t, isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, false))
 	assert.Assert(t, !isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, true))
