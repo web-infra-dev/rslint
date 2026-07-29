@@ -1025,6 +1025,18 @@ func TestPreferConstRule(t *testing.T) {
 			// === Same-scope function param + let in destructuring: not reported ===
 			// (parameters are in the function scope, but findContainingBlock for the
 			// parameter declaration returns the function body block, matching the let)
+
+			// A read inside a destructuring pattern's computed property key
+			// must not be mistaken for a write to the destructuring target,
+			// or the variable it reads never gets flagged.
+			{
+				Code:   `let v = 0; console.log(v); let obj = {}; ({[{v}]: obj.foo} = {});`,
+				Output: []string{`const v = 0; console.log(v); const obj = {}; ({[{v}]: obj.foo} = {});`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+					{MessageId: "useConst", Line: 1, Column: 32},
+				},
+			},
 		},
 	)
 }
