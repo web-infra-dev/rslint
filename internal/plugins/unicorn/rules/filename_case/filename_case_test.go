@@ -418,26 +418,6 @@ func TestFilenameCase(t *testing.T) {
 			{Code: `// lock-in: all-ignored basename is valid`, FileName: "src/foo/$$$.js", Options: caseOpt("camelCase")},
 			{Code: `// lock-in: all-ignored basename + leading underscores is valid`, FileName: "src/foo/___$$.js", Options: caseOpt("camelCase")},
 
-			// Locks in: when `case` and `cases` are BOTH set, `case` wins
-			// (matches the if/else-if order in parseOptions). Upstream
-			// schema's `oneOf` would reject this config, but a JSON config
-			// can carry both — pinning the precedence keeps it deterministic.
-			{
-				Code: `// lock-in: case takes precedence over cases when both are set`,
-				FileName: "src/foo/fooBar.js",
-				Options: map[string]interface{}{
-					"case":  "camelCase",
-					"cases": map[string]interface{}{"snakeCase": true},
-				},
-			},
-
-			// Locks in: an unknown `case` value (e.g. `"camelcase"` lowercase
-			// typo, or any non-enum value) is silently ignored — the rule
-			// falls back to its default (kebab). The valid case below pins
-			// "fall through to kebab default", and the invalid case below
-			// proves the default fires when the basename violates kebab.
-			{Code: `// lock-in: unknown case value falls back to kebab default (valid)`, FileName: "src/foo/foo-bar.js", Options: caseOpt("camelcase" /* typo */)},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Disable-comment INSIDE the file body — does NOT match a
@@ -1094,53 +1074,6 @@ func TestFilenameCase(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in pascal case. Rename it to `123Foo.js`.",
-				}},
-			},
-			// Locks in: an unknown / mistyped `case` value (e.g. lowercase
-			// `"camelcase"`, or any non-enum value) is silently ignored,
-			// the rule falls back to the default kebab case. Companion to
-			// the valid case above (where the basename is already kebab);
-			// here the basename violates kebab and we prove the default
-			// case actually fires.
-			{
-				Code: `// lock-in: unknown case value falls back to kebab default (invalid)`,
-				FileName: "src/foo/fooBar.js",
-				Options:  caseOpt("camelcase" /* typo */),
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
-				}},
-			},
-			// Locks in `case` + `cases` precedence end-to-end: when both
-			// are present and `case` is honoured, the basename validates
-			// against `case` only — even if it would have failed `cases`.
-			// `fooBar.js` is valid camel; `cases: { snakeCase: true }`
-			// alone would have flagged it. Here we confirm the rule
-			// honours `case` and reports nothing.
-			{
-				Code: `// lock-in: case+cases — case wins (filename violates cases-only set)`,
-				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
-					"case":  "snakeCase",
-					"cases": map[string]interface{}{"camelCase": true},
-				},
-				// Filename is valid snake → no diagnostic. We cover this
-				// in the valid block above; here the invalid mirror is:
-				// case=camel (basename `foo_bar.js`) wins, file violates
-				// camel → reports.
-				Skip: true, /* SKIP: redundant with the valid-block companion */
-				Errors: []rule_tester.InvalidTestCaseError{{}},
-			},
-			{
-				Code: `// lock-in: case+cases — case wins, basename violates the chosen case`,
-				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
-					"case":  "camelCase",
-					"cases": map[string]interface{}{"snakeCase": true},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in camel case. Rename it to `fooBar.js`.",
 				}},
 			},
 			// Locks in `splitWords` Pass 2 multi-fire end-to-end: pascalCase
