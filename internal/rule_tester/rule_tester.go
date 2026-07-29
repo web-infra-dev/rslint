@@ -120,7 +120,7 @@ type ESLintTestSuite struct {
 	Invalid []ESLintInvalidTestCase `json:"invalid"`
 }
 
-// resolveTestCaseOptions puts a test case's options through the same step a
+// ResolveTestCaseOptions puts a test case's options through the same step a
 // real config goes through before the rule ever runs: the normalized options
 // array is validated against the rule's declared schema, and schema-declared
 // `default`s are filled in. Options a real config would reject fail the test
@@ -131,42 +131,24 @@ type ESLintTestSuite struct {
 // Rules that declare no schema yet run whatever the test case passes,
 // preserving the pre-schema behavior.
 //
-// The options are deep-copied first because [rule.Schema.Validate] fills
-// defaults in place, the way ajv's `useDefaults` does. Test cases are package
-// level values shared by every case [RunRuleTester] runs, and those run in
-// parallel, so mutating the caller's own maps would be a data race.
-func resolveTestCaseOptions(t *testing.T, r *rule.Rule, rawOptions any) []any {
-	options := rule.NormalizeOptions(cloneOptionsValue(rawOptions))
+// It is exported so test harnesses that call a rule's Run directly instead of
+// going through [RunRuleTester] (e.g. to inspect diagnostics across multiple
+// files, or under different [rule.EditDemand]s) can still exercise the same
+// schema validation an ordinary config would apply.
+//
+// The options are deep-copied before validation because [rule.Schema.Validate]
+// fills defaults in place, the way ajv's `useDefaults` does. Test cases are
+// package level values shared by every case [RunRuleTester] runs, and those
+// run in parallel, so mutating the caller's own maps would be a data race.
+func ResolveTestCaseOptions(t *testing.T, r *rule.Rule, rawOptions any) []any {
 	if r.Schema == nil {
-		return options
+		return rule.NormalizeOptions(rawOptions)
 	}
+	options := rule.NormalizeOptions(rule.DeepCopyJSON(rawOptions))
 	if err := r.Schema.Validate(options); err != nil {
 		t.Fatalf("test case options %#v are rejected by %s's schema: %v", rawOptions, r.Name, err)
 	}
 	return options
-}
-
-// cloneOptionsValue deep-copies the JSON-shaped containers in a test case's
-// options. Leaves are returned as they are: they are immutable scalars, or —
-// for a test case written with a Go-native value such as []string — a value
-// the schema layer would reject anyway.
-func cloneOptionsValue(value any) any {
-	switch typed := value.(type) {
-	case map[string]any:
-		cloned := make(map[string]any, len(typed))
-		for key, item := range typed {
-			cloned[key] = cloneOptionsValue(item)
-		}
-		return cloned
-	case []any:
-		cloned := make([]any, len(typed))
-		for i, item := range typed {
-			cloned[i] = cloneOptionsValue(item)
-		}
-		return cloned
-	default:
-		return value
-	}
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
@@ -176,7 +158,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
 	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, globals map[string]bool, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
-		options := resolveTestCaseOptions(t, r, rawOptions)
+		options := ResolveTestCaseOptions(t, r, rawOptions)
 
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)

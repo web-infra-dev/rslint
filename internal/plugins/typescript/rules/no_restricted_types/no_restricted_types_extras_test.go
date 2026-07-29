@@ -987,7 +987,7 @@ func TestNoRestrictedTypesEditDemand(t *testing.T) {
 				fmt.Sprintf("edit-demand-%d.ts", index),
 				source,
 			)
-			options := rule.NormalizeOptions(map[string]interface{}{
+			options := rule_tester.ResolveTestCaseOptions(t, &NoRestrictedTypesRule, map[string]interface{}{
 				"types": map[string]interface{}{
 					"Banned": config.bannedType,
 				},

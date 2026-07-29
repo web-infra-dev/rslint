@@ -199,7 +199,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 					Name:     "test",
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return NoDeprecatedRule.Run(ctx, rule.NormalizeOptions(options))
+						return NoDeprecatedRule.Run(ctx, rule_tester.ResolveTestCaseOptions(t, &NoDeprecatedRule, options))
 					},
 				},
 			}

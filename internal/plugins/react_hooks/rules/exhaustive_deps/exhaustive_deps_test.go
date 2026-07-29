@@ -516,10 +516,10 @@ func TestExhaustiveDepsEditDemand(t *testing.T) {
 		options   []any
 		dangerous bool
 	}{
-		{name: "suggestions", options: rule.NormalizeOptions(nil)},
+		{name: "suggestions", options: rule_tester.ResolveTestCaseOptions(t, &ExhaustiveDepsRule, nil)},
 		{
 			name: "dangerous autofix",
-			options: rule.NormalizeOptions(map[string]interface{}{
+			options: rule_tester.ResolveTestCaseOptions(t, &ExhaustiveDepsRule, map[string]interface{}{
 				"enableDangerousAutofixThisMayCauseInfiniteLoops": true,
 			}),
 			dangerous: true,

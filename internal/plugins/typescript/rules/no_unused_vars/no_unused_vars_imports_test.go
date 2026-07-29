@@ -299,13 +299,13 @@ console.log(usedValue);
 	}{
 		{
 			name:            "suggestions",
-			options:         rule.NormalizeOptions(nil),
+			options:         rule_tester.ResolveTestCaseOptions(t, &NoUnusedVarsRule, nil),
 			requestedDemand: rule.EditDemandSuggestion,
 			otherDemand:     rule.EditDemandAutofix,
 		},
 		{
 			name: "autofix",
-			options: rule.NormalizeOptions(map[string]interface{}{
+			options: rule_tester.ResolveTestCaseOptions(t, &NoUnusedVarsRule, map[string]interface{}{
 				"enableAutofixRemoval": map[string]interface{}{"imports": true},
 			}),
 			requestedDemand: rule.EditDemandAutofix,
