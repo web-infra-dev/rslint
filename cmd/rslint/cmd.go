@@ -742,6 +742,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// the cwd where rslint was invoked, not the config file's directory.
 			currentDirectory = workingDirectory
 		}
+		// Desugar basePath against the final match root (cwd for --config,
+		// config-file directory for auto-discovered JSON).
+		rslintConfig = rslintconfig.ResolveBasePaths(rslintConfig, currentDirectory)
 
 		var exactTargetFiles []string
 		if len(allowFiles) > 0 && len(allowDirs) == 0 {

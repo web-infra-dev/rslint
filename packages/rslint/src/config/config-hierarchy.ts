@@ -8,7 +8,9 @@ export interface ConfigEntry {
 
 /**
  * Check if a config entry is a "global ignore" entry: an entry with only
- * `ignores` and an optional `name`.
+ * `ignores` and optional meta fields (`name`, and pre-desugar `basePath`).
+ * After normalizeConfig desugars `basePath`, only `ignores` (+ optional
+ * `name`) remain, so the post-desugar shape still matches.
  */
 function isGlobalIgnoreEntry(
   entry: unknown,
@@ -26,7 +28,9 @@ function isGlobalIgnoreEntry(
     return false;
   }
 
-  return Object.keys(entry).every((key) => key === 'ignores' || key === 'name');
+  return Object.keys(entry).every(
+    (key) => key === 'ignores' || key === 'name' || key === 'basePath',
+  );
 }
 
 function getGlobalIgnores(entries: unknown[]): string[] {

@@ -163,16 +163,33 @@ export interface RslintConfigEntry {
   /** Optional human-readable name for this config entry. */
   name?: string;
   /**
+   * Subdirectory this entry is rooted at, matching ESLint flat-config
+   * `basePath`. Relative values resolve from the config match root (config
+   * file directory for auto-discovered configs, cwd for `--config` /
+   * explicit override configs). That entry's `files`, `ignores`, and
+   * `languageOptions.parserOptions.project` are then interpreted relative to
+   * the resolved base. `{ basePath, ignores }` remains a global-ignore entry
+   * scoped under the base. During config normalization `basePath` is desugared
+   * into ordinary relative patterns before the Go engine sees the config.
+   *
+   * @example
+   * { basePath: 'packages/foo', files: ['src/**/*.ts'] }
+   * // equivalent to { files: ['packages/foo/src/**/*.ts'] }
+   */
+  basePath?: string;
+  /**
    * Glob selectors for files this entry applies to. Top-level selectors are
    * ORed; strings inside one nested array are ANDed, matching ESLint flat
-   * config semantics.
+   * config semantics. When `basePath` is set, patterns are relative to that
+   * base rather than the config match root.
    *
    * @example
    * files: ['src/**', 'tests/**']
    */
   files?: Array<string | string[]>;
   /**
-   * Glob patterns excluded from this entry.
+   * Glob patterns excluded from this entry. When `basePath` is set, patterns
+   * are relative to that base.
    *
    * @example
    * ignores: ['node_modules/**', 'dist/**']

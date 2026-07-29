@@ -29,6 +29,14 @@ type RslintConfig []ConfigEntry
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
 	Name string `json:"name,omitempty"`
+	// BasePath is the optional ESLint flat-config subdirectory root for this
+	// entry. Relative values resolve from the config match root (config-file
+	// directory for auto-discovered configs, cwd for --config). JS/TS configs
+	// desugar basePath in Node before the payload reaches Go; JSON/JSONC
+	// configs are desugared in LoadRslintConfig via ResolveBasePaths. The field
+	// is cleared after desugaring so matching always sees ordinary relative
+	// files/ignores/project patterns.
+	BasePath string `json:"basePath,omitempty"`
 	// Files retains the established Go construction API for top-level OR
 	// patterns. FilePatternGroups stores nested arrays, each of which is an AND
 	// group. JSON encoding combines both fields back into one mixed `files`
@@ -186,7 +194,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" {
+			if key != "ignores" && key != "name" && key != "basePath" {
 				hasNonGlobalKey = true
 				break
 			}
@@ -875,9 +883,11 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 	return merged
 }
 
-// isGlobalIgnoreEntry returns true if the entry has only ignores and an
-// optional name. Empty config objects are still present and make ignores local
-// to the entry, matching ESLint flat config semantics.
+// isGlobalIgnoreEntry returns true if the entry has only ignores and optional
+// meta fields (name, basePath). Empty config objects are still present and make
+// ignores local to the entry, matching ESLint flat config semantics. After
+// ResolveBasePaths desugars basePath, BasePath is cleared and only ignores
+// (+ optional name) remain for global-ignore entries.
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return entry.Files == nil &&
 		entry.FilePatternGroups == nil &&

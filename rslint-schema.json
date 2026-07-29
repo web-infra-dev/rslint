@@ -16,6 +16,11 @@
           "type": "string",
           "description": "Optional human-readable name for this configuration entry"
         },
+        "basePath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional subdirectory root for this entry (ESLint flat-config basePath). Relative values resolve from the config match root (config-file directory for auto-discovered configs, cwd for --config). That entry's files, ignores, and languageOptions.parserOptions.project are then interpreted relative to the resolved base. { basePath, ignores } remains a global-ignore entry scoped under the base."
+        },
         "files": {
           "type": "array",
           "description": "Non-empty file selector list. Top-level selectors are ORed; patterns inside a nested array are ANDed. Rslint unions these selectors with its default JavaScript and TypeScript extension baseline.",

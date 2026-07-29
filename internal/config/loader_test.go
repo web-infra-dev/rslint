@@ -82,6 +82,30 @@ func TestLoadRslintConfig_AllowsMissingFiles(t *testing.T) {
 	assert.Assert(t, cfg[0].Files == nil)
 }
 
+func TestLoadRslintConfig_PreservesBasePathUntilResolve(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "rslint.jsonc")
+	if err := os.WriteFile(configPath, []byte(`[
+		{
+			"basePath": "packages/foo",
+			"files": ["src/**/*.ts"],
+			"rules": { "no-console": "error" }
+		}
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	cfg, configDir, err := loader.LoadRslintConfig("rslint.jsonc")
+	assert.NilError(t, err)
+	assert.Equal(t, cfg[0].BasePath, "packages/foo")
+	assert.DeepEqual(t, cfg[0].Files, []string{"src/**/*.ts"})
+
+	cfg = ResolveBasePaths(cfg, configDir)
+	assert.Equal(t, cfg[0].BasePath, "")
+	assert.DeepEqual(t, cfg[0].Files, []string{"packages/foo/src/**/*.ts"})
+}
+
 func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))

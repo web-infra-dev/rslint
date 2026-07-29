@@ -9,8 +9,15 @@ export {
   loadConfigFile,
   loadConfigFileFresh,
   normalizeConfig,
+  type NormalizeConfigOptions,
   type PluginConfigDescriptor,
 } from './config-file-loader.js';
+export {
+  applyBasePathToConfig,
+  applyBasePathToEntry,
+  rebasePattern,
+  resolveRelativeBasePath,
+} from './base-path.js';
 export { ConfigModuleHost } from './config-module-host.js';
 export type {
   ConfigModuleActivationPlan,

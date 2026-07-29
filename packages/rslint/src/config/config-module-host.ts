@@ -564,7 +564,12 @@ export class ConfigModuleHost {
         ? this.#loadFresh(candidate.configPath)
         : this.#loadCached(candidate.configPath));
       failureCode = 'invalid';
-      const normalized = normalizeConfig(rawConfig);
+      // Pass configDirectory so relative basePath values resolve against the
+      // same match root Go already uses for files/ignores/project (config-file
+      // directory for auto-discovered configs, cwd for --config).
+      const normalized = normalizeConfig(rawConfig, {
+        configDirectory: candidate.configDirectory,
+      });
       // This is the cross-process serialization boundary. Keeping the canonical
       // JSON also prevents a caller mutating a response from corrupting session
       // state used later by #summarizeEffectiveConfigs.

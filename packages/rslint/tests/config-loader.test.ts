@@ -353,6 +353,76 @@ describe('normalizeConfig', () => {
       ).toThrow(/must be/);
     }
   });
+
+  test('desugars basePath into files/ignores/project and drops basePath', () => {
+    const [entry] = normalizeConfig(
+      [
+        {
+          basePath: 'packages/foo',
+          files: ['src/**/*.ts', ['**/*.js', '!**/*.test.js']],
+          ignores: ['fixtures/**', '!fixtures/keep.ts'],
+          languageOptions: {
+            parserOptions: { project: ['./tsconfig.json'] },
+          },
+          rules: { 'no-console': 'error' },
+        },
+      ],
+      { configDirectory: '/repo' },
+    );
+    expect(entry).not.toHaveProperty('basePath');
+    expect(entry.files).toEqual([
+      'packages/foo/src/**/*.ts',
+      ['packages/foo/**/*.js', '!packages/foo/**/*.test.js'],
+    ]);
+    expect(entry.ignores).toEqual([
+      'packages/foo/fixtures/**',
+      '!packages/foo/fixtures/keep.ts',
+    ]);
+    expect(
+      (entry.languageOptions as { parserOptions: { project: string[] } })
+        .parserOptions.project,
+    ).toEqual(['packages/foo/tsconfig.json']);
+  });
+
+  test('keeps basePath+ignores as a global ignore after desugar', () => {
+    const [entry] = normalizeConfig(
+      [{ basePath: 'packages/foo', ignores: ['fixtures/**'] }],
+      { configDirectory: '/repo' },
+    );
+    expect(entry).toEqual({ ignores: ['packages/foo/fixtures/**'] });
+    expect(Object.keys(entry).sort()).toEqual(['ignores']);
+  });
+
+  test('injects catch-all files for bare basePath + rules', () => {
+    const [entry] = normalizeConfig(
+      [{ basePath: 'packages/foo', rules: { 'no-console': 'error' } }],
+      { configDirectory: '/repo' },
+    );
+    expect(entry.files).toEqual(['packages/foo/**']);
+    expect(entry).not.toHaveProperty('basePath');
+  });
+
+  test('rejects non-string basePath', () => {
+    expect(() =>
+      normalizeConfig([{ basePath: 1 as unknown as string, rules: {} }]),
+    ).toThrow(/"basePath" must be a string/);
+  });
+
+  test('rejects empty basePath', () => {
+    expect(() => normalizeConfig([{ basePath: '', rules: {} }])).toThrow(
+      /"basePath" must be a non-empty string/,
+    );
+  });
+
+  test('basePath alone does not force a non-global shape marker', () => {
+    // basePath is meta; without other non-global keys this is still only
+    // desugared ignores (or empty). An ignores-less bare basePath is a no-op
+    // entry after desugar.
+    const [entry] = normalizeConfig([{ basePath: 'packages/foo' }], {
+      configDirectory: '/repo',
+    });
+    expect(entry).toEqual({});
+  });
 });
 
 describe('normalizeConfig — community plugins (object-form)', () => {
