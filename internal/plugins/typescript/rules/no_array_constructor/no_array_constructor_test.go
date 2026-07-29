@@ -446,6 +446,7 @@ func TestBuildArrayConstructorFixesRecoveryAST(t *testing.T) {
 	sourceFile.AsNode().ForEachChild(visit)
 	if call == nil {
 		t.Fatal("recovery fixture has no call expression")
+		return
 	}
 
 	reportRange := core.NewTextRange(0, call.End())

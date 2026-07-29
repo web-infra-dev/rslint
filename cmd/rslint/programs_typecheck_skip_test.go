@@ -838,6 +838,7 @@ func TestCreateProgramSetForConfigs_PreservesSymlinkedTsconfigBase(t *testing.T)
 	realProgram := programByConfigPath[exactFilesystemPathID(realConfigPath)]
 	if aliasProgram == nil || realProgram == nil {
 		t.Fatalf("missing lexical tsconfig Programs: %v", programByConfigPath)
+		return
 	}
 	aliasSource := tspath.ResolvePath(aliasDir, "src/alias.ts")
 	realSource := tspath.ResolvePath(realDir, "src/real.ts")
@@ -1009,6 +1010,7 @@ func TestResolveLintTargetPlan_RejectsCanonicalTargetWithDifferentOwners(t *test
 	)
 	if err == nil {
 		t.Fatal("expected aliases governed by different configs to be rejected")
+		return
 	}
 	if !strings.Contains(err.Error(), "resolve to the same file") || !strings.Contains(err.Error(), ownerA) || !strings.Contains(err.Error(), ownerB) {
 		t.Fatalf("unexpected ownership conflict error: %v", err)

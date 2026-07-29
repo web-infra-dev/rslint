@@ -110,6 +110,7 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	sourceFile := updated.GetSourceFile(fixture.sourcePath)
 	if sourceFile == nil {
 		t.Fatal("updated Program does not contain the lint target")
+		return
 	}
 	if sourceFile.Text() != changed {
 		t.Fatalf("updated source text = %q, want %q", sourceFile.Text(), changed)

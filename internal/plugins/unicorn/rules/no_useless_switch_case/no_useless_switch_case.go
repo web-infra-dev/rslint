@@ -14,7 +14,8 @@ const (
 )
 
 var NoUselessSwitchCaseRule = rule.Rule{
-	Name: "unicorn/no-useless-switch-case",
+	Name:   "unicorn/no-useless-switch-case",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {

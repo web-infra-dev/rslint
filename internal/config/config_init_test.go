@@ -72,6 +72,7 @@ func TestInitDefaultConfig_AlreadyExists(t *testing.T) {
 			err := InitDefaultConfig(dir)
 			if err == nil {
 				t.Fatal("expected error when a JS/TS config already exists")
+				return
 			}
 			assertContains(t, err.Error(), "config file already exists")
 		})

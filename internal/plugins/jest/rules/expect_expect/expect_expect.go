@@ -1,6 +1,7 @@
 package expect_expect
 
 import (
+	_ "embed"
 	"regexp"
 	"slices"
 	"strings"
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed expect_expect.schema.json
+var schemaJSON []byte
 
 // Message Builder
 
@@ -20,38 +23,33 @@ func buildErrorNoAssertionsMessage() rule.RuleMessage {
 	}
 }
 
-func parseOptions(options any) ([]string, []string) {
+func parseOptions(options []any) ([]string, []string) {
 	assertNames := []string{"expect"}
 	additional := []string{}
 
-	m := internalUtils.GetOptionsMap(options)
-	if m == nil {
+	if len(options) == 0 {
 		return assertNames, additional
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
-	if raw, ok := m["assertFunctionNames"]; ok && raw != nil {
-		if arr, ok := raw.([]interface{}); ok {
-			out := make([]string, 0, len(arr))
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					out = append(out, s)
-				}
-			}
-			assertNames = out
-		}
+	if arr, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
+		assertNames = stringList(arr)
 	}
-
-	if raw, ok := m["additionalTestBlockFunctions"]; ok && raw != nil {
-		if arr, ok := raw.([]interface{}); ok {
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					additional = append(additional, s)
-				}
-			}
-		}
+	if arr, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
+		additional = stringList(arr)
 	}
 
 	return assertNames, additional
+}
+
+func stringList(raw []interface{}) []string {
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func compileAssertPatterns(patterns []string) []*regexp.Regexp {
@@ -178,9 +176,9 @@ func checkCallExpressionUsed(
 }
 
 var ExpectExpectRule = rule.Rule{
-	Name: "jest/expect-expect",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/expect-expect",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		assertNames, additionalTestBlocks := parseOptions(options)
 		compiled := compileAssertPatterns(assertNames)
 		var unchecked []*ast.Node

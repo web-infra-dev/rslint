@@ -26,7 +26,8 @@ func isZeroLiteral(node *ast.Node) bool {
 }
 
 var PreferToHaveBeenCalledRule = rule.Rule{
-	Name: "jest/prefer-to-have-been-called",
+	Name:   "jest/prefer-to-have-been-called",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

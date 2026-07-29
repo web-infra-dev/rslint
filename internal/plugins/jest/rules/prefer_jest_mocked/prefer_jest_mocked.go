@@ -69,7 +69,8 @@ func checkJestMockAssertion(ctx rule.RuleContext, node *ast.Node, typeNode, expr
 }
 
 var PreferJestMockedRule = rule.Rule{
-	Name: "jest/prefer-jest-mocked",
+	Name:   "jest/prefer-jest-mocked",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindAsExpression: func(node *ast.Node) {

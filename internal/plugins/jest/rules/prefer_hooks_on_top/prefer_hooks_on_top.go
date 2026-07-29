@@ -14,7 +14,8 @@ func buildNoHookOnTopMessage() rule.RuleMessage {
 }
 
 var PreferHooksOnTopRule = rule.Rule{
-	Name: "jest/prefer-hooks-on-top",
+	Name:   "jest/prefer-hooks-on-top",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		hooksContext := []bool{false}
 

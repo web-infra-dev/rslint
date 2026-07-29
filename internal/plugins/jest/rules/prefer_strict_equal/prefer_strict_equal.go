@@ -24,7 +24,8 @@ func buildSuggestReplaceWithStrictEqualErrorMessage() rule.RuleMessage {
 }
 
 var PreferStrictEqualRule = rule.Rule{
-	Name: "jest/prefer-strict-equal",
+	Name:   "jest/prefer-strict-equal",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

@@ -1373,6 +1373,7 @@ class C {
 		allEdits := diagnostics[rule.EditDemandAll][index].Suggestions
 		if suggestionOnly == nil || !reflect.DeepEqual(suggestionOnly, allEdits) {
 			t.Fatalf("diagnostic %d: suggestion and all-edits demands produced different suggestions", index)
+			return
 		}
 		if len(*suggestionOnly) != 1 || len((*suggestionOnly)[0].Fixes()) != 1 {
 			t.Fatalf("diagnostic %d suggestions = %#v, want one suggestion with one fix", index, *suggestionOnly)

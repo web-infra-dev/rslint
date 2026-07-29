@@ -55,7 +55,8 @@ func buildModifierText(jestFnCall *utils.ParsedJestFnCall, addNotModifier bool) 
 }
 
 var PreferEqualityMatcherRule = rule.Rule{
-	Name: "jest/prefer-equality-matcher",
+	Name:   "jest/prefer-equality-matcher",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

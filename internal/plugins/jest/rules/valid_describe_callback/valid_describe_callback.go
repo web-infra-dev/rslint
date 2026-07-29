@@ -54,7 +54,8 @@ func findFirstReturnStatement(nodes []*ast.Node) *ast.Node {
 }
 
 var ValidDescribeCallbackRule = rule.Rule{
-	Name: "jest/valid-describe-callback",
+	Name:   "jest/valid-describe-callback",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

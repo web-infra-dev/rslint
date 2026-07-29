@@ -1105,6 +1105,7 @@ func TestHandleLint_RejectsEmptyFilesArrayConfig(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected an error for empty files array")
+		return
 	}
 	if !strings.Contains(err.Error(), `key "files": expected value to be a non-empty array`) {
 		t.Fatalf("unexpected error: %v", err)

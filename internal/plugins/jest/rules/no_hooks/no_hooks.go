@@ -1,6 +1,7 @@
 package no_hooks
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_hooks.schema.json
+var schemaJSON []byte
 
 // Message builders
 
@@ -44,21 +48,13 @@ func parseAllowList(raw any) []string {
 	return out
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{Allow: []string{}}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	optArray := rule.NormalizeOptions(options)
-	if len(optArray) == 0 {
-		return opts
-	}
-	optsMap, ok := optArray[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
-
+	optsMap, _ := options[0].(map[string]interface{})
 	if raw, ok := optsMap["allow"]; ok {
 		opts.Allow = parseAllowList(raw)
 	}
@@ -66,9 +62,9 @@ func parseOptions(options any) Options {
 }
 
 var NoHooksRule = rule.Rule{
-	Name: "jest/no-hooks",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/no-hooks",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

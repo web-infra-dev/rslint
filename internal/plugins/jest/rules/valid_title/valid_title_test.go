@@ -1079,3 +1079,43 @@ func TestValidTitleRule(t *testing.T) {
 		invalid,
 	)
 }
+
+// TestValidTitleMatcherSchema locks in the shape of the `mustMatch` /
+// `mustNotMatch` options. Upstream's meta.schema reaches them through
+// `patternProperties: {"^must(?:Not)?Match$": ...}`; this schema declares the
+// two names outright, so validating a config never runs a regex, and the two
+// options share one `$ref`'d definition rather than a duplicated branch.
+func TestValidTitleMatcherSchema(t *testing.T) {
+	valid := []any{
+		"^\\d+", // one pattern for every block kind
+		[]any{"^\\d+", "titles must start with a number"},     // pattern with a custom message
+		map[string]any{"describe": "^\\d+", "it": []any{"x"}}, // per-block-kind patterns
+	}
+	for _, matcher := range valid {
+		for _, key := range []string{"mustMatch", "mustNotMatch"} {
+			options := []any{map[string]any{key: matcher}}
+			if err := valid_title.ValidTitleRule.Schema.Validate(options); err != nil {
+				t.Errorf("expected %s: %v to pass schema validation, got: %v", key, matcher, err)
+			}
+		}
+	}
+
+	invalid := []any{
+		42,                             // neither a pattern nor a per-kind map
+		[]any{},                        // a pattern is required
+		[]any{"a", "b", "c"},           // at most a pattern and a message
+		map[string]any{"describe": 42}, // a per-kind value is still a pattern
+	}
+	for _, matcher := range invalid {
+		options := []any{map[string]any{"mustMatch": matcher}}
+		if err := valid_title.ValidTitleRule.Schema.Validate(options); err == nil {
+			t.Errorf("expected mustMatch: %v to fail schema validation", matcher)
+		}
+	}
+
+	// A name the upstream pattern would have rejected too.
+	options := []any{map[string]any{"mustAlsoMatch": "^\\d+"}}
+	if err := valid_title.ValidTitleRule.Schema.Validate(options); err == nil {
+		t.Error("expected an unknown option name to fail schema validation")
+	}
+}

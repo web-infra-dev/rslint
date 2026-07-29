@@ -65,6 +65,54 @@ func TestDeferredReportsPreserveDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDeferredCollectionPreservesBindingTiming(t *testing.T) {
+	tests := []struct {
+		name            string
+		source          string
+		wantDiagnostics int
+	}{
+		{
+			name:   "default class shadows before declaration",
+			source: "Array(); export default class Array {}",
+		},
+		{
+			name:   "default function shadows before declaration",
+			source: "Set(); export default function Set() {}",
+		},
+		{
+			name:            "class expression name does not leak",
+			source:          "WeakMap(); const Holder = class WeakMap {};",
+			wantDiagnostics: 1,
+		},
+		{
+			name:            "function expression name does not leak",
+			source:          "Map(); const holder = function Map() {};",
+			wantDiagnostics: 1,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := runRuleForTest(t, testCase.source, rule.EditDemandNone)
+			if len(diagnostics) != testCase.wantDiagnostics {
+				t.Fatalf("diagnostic count = %d, want %d", len(diagnostics), testCase.wantDiagnostics)
+			}
+		})
+	}
+
+	diagnostics := runRuleForTest(
+		t,
+		"const Alias = Array; Alias(); Map();",
+		rule.EditDemandNone,
+	)
+	if len(diagnostics) != 2 {
+		t.Fatalf("mixed diagnostic count = %d, want 2", len(diagnostics))
+	}
+	if diagnostics[0].Range.Pos() >= diagnostics[1].Range.Pos() {
+		t.Fatal("deferred alias and direct diagnostics must stay in source order")
+	}
+}
+
 func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -74,6 +122,11 @@ func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 		{
 			name:   "global builtin",
 			source: "Array();",
+			want:   []string{"Array"},
+		},
+		{
+			name:   "escaped global builtin",
+			source: `\u0041\u0072\u0072\u0061\u0079();`,
 			want:   []string{"Array"},
 		},
 		{
@@ -159,6 +212,21 @@ func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 			want:   []string{""},
 		},
 		{
+			name:   "default exported class self binding",
+			source: "export default class Array { static run() { Array(); } }",
+			want:   []string{""},
+		},
+		{
+			name:   "default exported function self binding",
+			source: "export default function Set() { Set(); }",
+			want:   []string{""},
+		},
+		{
+			name:   "named class expression self binding",
+			source: "const Holder = class WeakMap { static run() { WeakMap(); } };",
+			want:   []string{""},
+		},
+		{
 			name:   "alias named like global object",
 			source: "const {Array: window} = globalThis; window();",
 			want:   []string{"Array"},
@@ -192,6 +260,64 @@ func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 	}
 }
 
+func TestSourcePotentialReferenceGate(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{
+			name:   "unrelated identifiers",
+			source: "const value = helper(item);",
+		},
+		{
+			name:   "string and comment only",
+			source: `const value = "Array"; // Promise`,
+		},
+		{
+			name:   "direct builtin",
+			source: "Array();",
+			want:   true,
+		},
+		{
+			name:   "escaped builtin",
+			source: `\u0041\u0072\u0072\u0061\u0079();`,
+			want:   true,
+		},
+		{
+			name:   "alias source",
+			source: "const Alias = Array; Alias();",
+			want:   true,
+		},
+		{
+			name:   "global object source",
+			source: `globalThis["Array"]();`,
+			want:   true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/new-for-builtins-gate-test.ts",
+				Path:     tspath.Path("/new-for-builtins-gate-test.ts"),
+			}, testCase.source, core.ScriptKindTS)
+			if got := sourceHasPotentialReference(sourceFile); got != testCase.want {
+				t.Fatalf("sourceHasPotentialReference() = %t, want %t", got, testCase.want)
+			}
+		})
+	}
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/new-for-builtins-gate-fallback-test.ts",
+		Path:     tspath.Path("/new-for-builtins-gate-fallback-test.ts"),
+	}, "helper();", core.ScriptKindTS)
+	sourceFile.Identifiers = nil
+	if !sourceHasPotentialReference(sourceFile) {
+		t.Fatal("sourceHasPotentialReference() must fail open without a parser identifier index")
+	}
+}
+
 func resolveCallReferences(t *testing.T, source string, withRefs bool) []string {
 	t.Helper()
 
@@ -208,20 +334,33 @@ func resolveCallReferences(t *testing.T, source string, withRefs bool) []string 
 	}
 	state := newRuleState(ctx)
 
-	references := make([]string, 0)
+	callExpressions := make([]*ast.Node, 0)
 	var visit ast.Visitor
 	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindCallExpression {
-			call := node.AsCallExpression()
-			if ref, ok := state.referenceFromExpression(call.Expression); ok {
-				references = append(references, ref.name)
-			} else {
-				references = append(references, "")
-			}
+		switch node.Kind {
+		case ast.KindVariableDeclaration:
+			state.collectAliasDeclaration(node)
+		case ast.KindCallExpression:
+			callExpressions = append(callExpressions, node)
+		case ast.KindClassDeclaration, ast.KindClassExpression,
+			ast.KindFunctionDeclaration, ast.KindFunctionExpression,
+			ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+			state.collectNamedLocalRoot(node)
 		}
 		return node.ForEachChild(visit)
 	}
 	sourceFile.AsNode().ForEachChild(visit)
+	state.finishAliasCollection()
+
+	references := make([]string, 0, len(callExpressions))
+	for _, node := range callExpressions {
+		call := node.AsCallExpression()
+		if ref, ok := state.referenceFromExpression(call.Expression); ok {
+			references = append(references, ref.name)
+		} else {
+			references = append(references, "")
+		}
+	}
 	return references
 }
 
@@ -255,7 +394,11 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 		if listener := listeners[node.Kind]; listener != nil {
 			listener(node)
 		}
-		return node.ForEachChild(visit)
+		node.ForEachChild(visit)
+		if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+			listener(node)
+		}
+		return false
 	}
 	sourceFile.AsNode().ForEachChild(visit)
 	return diagnostics

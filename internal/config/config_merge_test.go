@@ -194,6 +194,7 @@ func TestGetConfigForFile_SeverityOnlyRuleOverridePreservesOptions(t *testing.T)
 			merged := config.GetConfigForFile("src/app.ts", "")
 			if merged == nil || merged.Rules["example"] == nil {
 				t.Fatal("expected merged example rule")
+				return
 			}
 			ruleConfig := merged.Rules["example"]
 			if ruleConfig.Level != "warn" {
@@ -216,6 +217,7 @@ func TestGetConfigForFile_NumericRuleSeverities(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("expected merged config")
+		return
 	}
 	for name, want := range map[string]string{"off": "off", "warn": "warn", "error": "error"} {
 		if got := merged.Rules[name]; got == nil || got.Level != want {
@@ -530,6 +532,7 @@ func TestGetConfigForFile_MultipleEntries_LanguageOptionsMerge(t *testing.T) {
 
 	if merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
 		t.Fatal("Expected languageOptions with parserOptions")
+		return
 	}
 	if merged.LanguageOptions.ParserOptions.ProjectService == nil || *merged.LanguageOptions.ParserOptions.ProjectService != false {
 		t.Error("Expected projectService to be overridden to false")

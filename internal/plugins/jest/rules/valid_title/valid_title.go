@@ -1,6 +1,7 @@
 package valid_title
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,6 +14,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed valid_title.schema.json
+var schemaJSON []byte
 
 type matcherEntry struct {
 	re *regexp2.Regexp
@@ -42,15 +46,11 @@ type invalidPattern struct {
 	err        error
 }
 
-func firstOptionMap(options any) map[string]interface{} {
-	if options == nil {
+func firstOptionMap(options []any) map[string]interface{} {
+	if len(options) == 0 {
 		return nil
 	}
-	arr := rule.NormalizeOptions(options)
-	if len(arr) == 0 {
-		return nil
-	}
-	m, ok := arr[0].(map[string]interface{})
+	m, ok := options[0].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -188,7 +188,7 @@ func fillMatcherField(ms *matchersByFn, key string, raw interface{}, optionPath 
 	return invalids
 }
 
-func parseCompiledOptions(options any) compiledOptions {
+func parseCompiledOptions(options []any) compiledOptions {
 	m := firstOptionMap(options)
 	if m == nil {
 		return compiledOptions{}
@@ -379,9 +379,9 @@ func jestEmptyFunctionName(kind jestUtils.JestFnType) string {
 
 // ValidTitleRule enforces ESLint jest/valid-title.
 var ValidTitleRule = rule.Rule{
-	Name: "jest/valid-title",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/valid-title",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		co := parseCompiledOptions(options)
 		if len(co.invalidPatterns) > 0 {
 			for _, bad := range co.invalidPatterns {

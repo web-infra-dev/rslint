@@ -65,7 +65,8 @@ func buildFixes(sf *ast.SourceFile, flatCall dotMethodCall, mapCall dotMethodCal
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-array-flat-map.md
 var PreferArrayFlatMapRule = rule.Rule{
-	Name: "unicorn/prefer-array-flat-map",
+	Name:   "unicorn/prefer-array-flat-map",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

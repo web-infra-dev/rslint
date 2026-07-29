@@ -1,12 +1,16 @@
 package prefer_number_properties
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_number_properties.schema.json
+var schemaJSON []byte
 
 const (
 	messageIDError      = "error"
@@ -43,9 +47,9 @@ var globalObjectNames = map[string]struct{}{
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-number-properties.md
 var PreferNumberPropertiesRule = rule.Rule{
-	Name: "unicorn/prefer-number-properties",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "unicorn/prefer-number-properties",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		report := func(ref globalReference) {
@@ -95,7 +99,7 @@ var PreferNumberPropertiesRule = rule.Rule{
 	},
 }
 
-func parseOptions(options any) preferNumberPropertiesOptions {
+func parseOptions(options []any) preferNumberPropertiesOptions {
 	opts := preferNumberPropertiesOptions{
 		checkInfinity: false,
 		checkNaN:      true,

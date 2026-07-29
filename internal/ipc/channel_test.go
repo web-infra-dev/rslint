@@ -86,6 +86,7 @@ func TestChannel_InboundError(t *testing.T) {
 	_, err := a.SendRequest(ctx, "boom", nil)
 	if err == nil {
 		t.Fatal("expected error from peer handler")
+		return
 	}
 	if got := err.Error(); got == "" || !strings.Contains(got, "peer error") {
 		t.Fatalf("expected peer error, got %q", got)
@@ -283,6 +284,7 @@ func TestReadFrame_CapExceeded(t *testing.T) {
 	_, err := ReadFrame(bufio.NewReader(&buf))
 	if err == nil {
 		t.Fatal("expected frame-cap error")
+		return
 	}
 	if !strings.Contains(err.Error(), "exceeds cap") {
 		t.Fatalf("expected cap error, got %v", err)
@@ -671,6 +673,7 @@ func TestChannel_HandlerErrorPanicRecovered(t *testing.T) {
 		_, err := a.SendRequest(ctx, "x", nil)
 		if err == nil {
 			t.Fatal("expected peer error")
+			return
 		}
 		if !strings.Contains(err.Error(), "inbound handler error panicked: error boom") {
 			t.Fatalf("unexpected peer error: %v", err)
@@ -716,6 +719,7 @@ func TestChannel_HandlerPanicRecovered(t *testing.T) {
 	_, err := a.SendRequest(ctx, "x", nil)
 	if err == nil {
 		t.Fatal("expected error from panicking handler")
+		return
 	}
 	if !strings.Contains(err.Error(), "peer error") {
 		t.Fatalf("expected peer error frame, got %v", err)

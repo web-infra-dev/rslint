@@ -757,6 +757,7 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	}
 	if got.Suggestions == nil || len(*got.Suggestions) != 1 {
 		t.Fatalf("expected exactly 1 rebuilt suggestion, got %v", got.Suggestions)
+		return
 	}
 	sg := (*got.Suggestions)[0]
 	if sg.Message.Id != "sid" || sg.Message.Description != "use z" {

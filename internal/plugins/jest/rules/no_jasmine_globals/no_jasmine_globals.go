@@ -170,7 +170,8 @@ func reportJasmineAssignedProperty(node *ast.Node, ctx rule.RuleContext) {
 }
 
 var NoJasmineGlobalsRule = rule.Rule{
-	Name: "jest/no-jasmine-globals",
+	Name:   "jest/no-jasmine-globals",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

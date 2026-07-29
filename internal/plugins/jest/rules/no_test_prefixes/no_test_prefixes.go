@@ -19,7 +19,8 @@ func buildErrorUsePreferredNameMessage(preferredName string) rule.RuleMessage {
 }
 
 var NoTestPrefixesRule = rule.Rule{
-	Name: "jest/no-test-prefixes",
+	Name:   "jest/no-test-prefixes",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

@@ -26,7 +26,8 @@ func buildPreferCalledWithMessage(matcherName string) rule.RuleMessage {
 }
 
 var PreferCalledWithRule = rule.Rule{
-	Name: "jest/prefer-called-with",
+	Name:   "jest/prefer-called-with",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

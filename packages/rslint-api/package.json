@@ -1,6 +1,6 @@
 {
   "name": "@rslint/api",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -17,9 +17,9 @@
   "license": "MIT",
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
-    "@rslib/core": "0.23.0",
-    "@types/node": "25.9.4",
-    "@typescript/native-preview": "7.0.0-dev.20260427.1"
+    "@rslib/core": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:"
   },
   "publishConfig": {
     "access": "public"

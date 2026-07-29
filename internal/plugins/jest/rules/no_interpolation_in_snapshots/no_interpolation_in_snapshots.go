@@ -14,7 +14,8 @@ func buildNoInterpolationMessage() rule.RuleMessage {
 }
 
 var NoInterpolationInSnapshotsRule = rule.Rule{
-	Name: "jest/no-interpolation-in-snapshots",
+	Name:   "jest/no-interpolation-in-snapshots",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

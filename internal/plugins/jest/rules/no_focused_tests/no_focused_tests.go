@@ -28,7 +28,8 @@ func buildErrorSuggestRemoveFocusMessage() rule.RuleMessage {
 }
 
 var NoFocusedTestsRule = rule.Rule{
-	Name: "jest/no-focused-tests",
+	Name:   "jest/no-focused-tests",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

@@ -70,7 +70,8 @@ func isInGlobalOrModuleScope(node *ast.Node) bool {
 }
 
 var NoConfusingSetTimeoutRule = rule.Rule{
-	Name: "jest/no-confusing-set-timeout",
+	Name:   "jest/no-confusing-set-timeout",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		seenJestTimeout := false
 		shouldEmitOrderSetTimeout := false

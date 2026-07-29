@@ -567,6 +567,7 @@ func TestExhaustiveDepsEditDemand(t *testing.T) {
 					allSuggestions := diagnostics[rule.EditDemandAll].Suggestions
 					if suggestionOnly == nil || allSuggestions == nil || !reflect.DeepEqual(*suggestionOnly, *allSuggestions) {
 						t.Fatalf("suggestion artifacts differ between suggestion-only and all demand")
+						return
 					}
 					if len(*suggestionOnly) != 1 {
 						t.Fatalf("suggestions = %#v, want one suggestion", *suggestionOnly)
@@ -596,6 +597,7 @@ func TestExhaustiveDepsEditDemand(t *testing.T) {
 					allFixes := diagnostics[rule.EditDemandAll].FixesPtr
 					if autofixOnly == nil || allFixes == nil || !reflect.DeepEqual(*autofixOnly, *allFixes) {
 						t.Fatalf("autofix artifacts differ between autofix-only and all demand")
+						return
 					}
 					if len(*autofixOnly) != 1 || !reflect.DeepEqual((*autofixOnly)[0], suggestion.FixesArr[0]) {
 						t.Fatalf("dangerous autofix = %#v, want the first suggestion fix %#v", *autofixOnly, suggestion.FixesArr[0])

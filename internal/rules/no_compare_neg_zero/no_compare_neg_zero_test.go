@@ -42,6 +42,15 @@ func TestNoCompareNegZeroRule(t *testing.T) {
 
 			// Object.is() is the correct way to check for -0
 			{Code: `Object.is(x, -0)`},
+
+			// Only a direct numeric negative zero operand is compared
+			{Code: `x === -0n`},
+			{Code: `x === (-0 as number)`},
+			{Code: `x === (-0 satisfies number)`},
+			{Code: `x === -(-0)`},
+			{Code: `x === +(-0)`},
+			{Code: `x === (-0, y)`},
+			{Code: `x ** -0`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -128,6 +137,61 @@ func TestNoCompareNegZeroRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
+
+			// Inequality operators
+			noCompareNegZeroInvalid(`x != -0`, "!="),
+			noCompareNegZeroInvalid(`-0 != x`, "!="),
+			noCompareNegZeroInvalid(`x !== -0`, "!=="),
+			noCompareNegZeroInvalid(`-0 !== x`, "!=="),
+
+			// Parentheses are transparent in ESTree
+			noCompareNegZeroInvalid(`x === (-0)`, "==="),
+			noCompareNegZeroInvalid(`((-0)) === x`, "==="),
+			noCompareNegZeroInvalid(`x === -(0)`, "==="),
+			noCompareNegZeroInvalid(`x !== (((-(((0))))))`, "!=="),
+			noCompareNegZeroInvalid(`x === (/* before */ - /* after */ (0))`, "==="),
+
+			// All numeric literal spellings whose value is zero are negative zero
+			noCompareNegZeroInvalid(`x === -0.0`, "==="),
+			noCompareNegZeroInvalid(`x === -0e10`, "==="),
+			noCompareNegZeroInvalid(`x === -0x0`, "==="),
+
+			// A comparison with negative zero on both sides reports once
+			noCompareNegZeroInvalid(`-0 === -0`, "==="),
+			noCompareNegZeroInvalid(`((-0)) !== -(((0)))`, "!=="),
+
+			// Each nested comparison is a separate violation
+			{
+				Code: `x === -0 === -0`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 1},
+					{MessageId: "unexpected", Line: 1, Column: 1},
+				},
+			},
+
+			// The complete comparison, not only the -0 operand, is reported
+			{
+				Code: `if (x !== (-0)) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpected",
+					Line:      1,
+					Column:    5,
+					EndLine:   1,
+					EndColumn: 15,
+				}},
+			},
 		},
 	)
+}
+
+func noCompareNegZeroInvalid(code string, operator string) rule_tester.InvalidTestCase {
+	return rule_tester.InvalidTestCase{
+		Code: code,
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "unexpected",
+			Message:   "Do not use the '" + operator + "' operator to compare against -0.",
+			Line:      1,
+			Column:    1,
+		}},
+	}
 }

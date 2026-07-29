@@ -1,6 +1,7 @@
 package no_restricted_matchers
 
 import (
+	_ "embed"
 	"sort"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_restricted_matchers.schema.json
+var schemaJSON []byte
 
 type restrictedMatcher struct {
 	Chain   string
@@ -36,13 +40,12 @@ func buildRestrictedChainWithMessage(chain string, message string) rule.RuleMess
 	}
 }
 
-func parseOptions(options any) []restrictedMatcher {
-	normalized := rule.NormalizeOptions(options)
-	if len(normalized) == 0 {
+func parseOptions(options []any) []restrictedMatcher {
+	if len(options) == 0 {
 		return nil
 	}
 
-	raw, ok := normalized[0].(map[string]interface{})
+	raw, ok := options[0].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -96,9 +99,9 @@ func isChainRestricted(chain string, restriction restrictedMatcher) bool {
 }
 
 var NoRestrictedMatchersRule = rule.Rule{
-	Name: "jest/no-restricted-matchers",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/no-restricted-matchers",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		restrictedMatchers := parseOptions(options)
 		if len(restrictedMatchers) == 0 {
 			return rule.RuleListeners{}

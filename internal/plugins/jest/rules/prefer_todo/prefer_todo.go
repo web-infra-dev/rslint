@@ -126,7 +126,8 @@ func buildTodoCallReplacementUnimplemented(ctx rule.RuleContext, callExpr *ast.C
 }
 
 var PreferTodoRule = rule.Rule{
-	Name: "jest/prefer-todo",
+	Name:   "jest/prefer-todo",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

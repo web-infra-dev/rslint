@@ -1,6 +1,7 @@
 package valid_expect
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 	"strconv"
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed valid_expect.schema.json
+var schemaJSON []byte
 
 type validExpectOptions struct {
 	AlwaysAwait   bool
@@ -113,7 +117,7 @@ func buildAsyncDescriptorMessage(descriptor asyncDescriptor, alwaysAwait bool) r
 	return buildErrorAsyncMustBeAwaitedMessage(alwaysAwait)
 }
 
-func parseOptions(options any) validExpectOptions {
+func parseOptions(options []any) validExpectOptions {
 	out := validExpectOptions{
 		AlwaysAwait:   false,
 		AsyncMatchers: []string{"toReject", "toResolve"},
@@ -121,10 +125,10 @@ func parseOptions(options any) validExpectOptions {
 		MaxArgs:       1,
 	}
 
-	m := internalUtils.GetOptionsMap(options)
-	if m == nil {
+	if len(options) == 0 {
 		return out
 	}
+	m, _ := options[0].(map[string]interface{})
 
 	if raw, ok := m["alwaysAwait"].(bool); ok {
 		out.AlwaysAwait = raw
@@ -406,9 +410,9 @@ func findTopLevelMemberAccess(node *ast.Node) *ast.Node {
 }
 
 var ValidExpectRule = rule.Rule{
-	Name: "jest/valid-expect",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/valid-expect",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		arrayExceptions := map[string]bool{}
 		asyncInserted := map[*ast.Node]bool{}
