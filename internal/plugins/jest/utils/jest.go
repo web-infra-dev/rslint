@@ -11,24 +11,25 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
-type JestFnType string
+type JestFnType = testFramework.FnKind
 
-type JestImportMode string
+type JestImportMode = testFramework.ReferenceMode
 
 const (
-	JEST_GLOBAL_MODE JestImportMode = "global"
-	JEST_IMPORT_MODE JestImportMode = "import"
+	JEST_GLOBAL_MODE = testFramework.ReferenceModeGlobal
+	JEST_IMPORT_MODE = testFramework.ReferenceModeImport
 )
 
 const (
 	JestFnTypeExpect   JestFnType = "expect"
-	JestFnTypeDescribe JestFnType = "describe"
-	JestFnTypeHook     JestFnType = "hook"
+	JestFnTypeDescribe            = testFramework.FnKindDescribe
+	JestFnTypeHook                = testFramework.FnKindHook
 	JestFnTypeJest     JestFnType = "jest"
-	JestFnTypeTest     JestFnType = "test"
-	JestFnTypeUnknown  JestFnType = "unknown"
+	JestFnTypeTest                = testFramework.FnKindTest
+	JestFnTypeUnknown             = testFramework.FnKindUnknown
 )
 
 var JEST_HOOKS_ORDER = []string{"beforeAll", "beforeEach", "afterEach", "afterAll"}
@@ -131,33 +132,18 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 	"xtest.fails":               true,
 }
 
-type ParsedJestFnMemberEntry struct {
-	Name string
-	Node *ast.Node
-	Call *ast.Node
-}
+// ParsedJestFnMemberEntry is the Jest-facing name for a shared member-chain
+// entry.
+type ParsedJestFnMemberEntry = testFramework.MemberEntry
 
 func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
-	if len(entries) == 0 {
-		return ""
-	}
-
-	parts := make([]string, len(entries))
-	for i, e := range entries {
-		parts[i] = e.Name
-	}
-
-	return strings.Join(parts, ".")
+	return testFramework.JoinMemberEntries(entries)
 }
 
 // JestFnMemberEntriesRange returns the source range spanning the first through
 // last member entry nodes in a parsed jest/expect call chain.
 func JestFnMemberEntriesRange(entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
-	if len(entries) == 0 || entries[0].Node == nil || entries[len(entries)-1].Node == nil {
-		return core.TextRange{}, false
-	}
-
-	return core.NewTextRange(entries[0].Node.Pos(), entries[len(entries)-1].Node.End()), true
+	return testFramework.MemberEntriesRange(entries)
 }
 
 func getPropertyName(node *ast.Node) string {
@@ -194,82 +180,14 @@ func JestHookOrderIndex(name string) int {
 }
 
 func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
-	if node == nil {
-		return nil
-	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return nil
-	}
-
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return []ParsedJestFnMemberEntry{{
-			Name: node.AsIdentifier().Text,
-			Node: node,
-		}}
-	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
-		left := GetJestFnMemberEntries(property.Expression)
-		nameNode := property.Name()
-		if name := getPropertyName(nameNode); name != "" {
-			return append(left, ParsedJestFnMemberEntry{
-				Name: name,
-				Node: nameNode,
-			})
-		}
-		return left
-	case ast.KindElementAccessExpression:
-		element := node.AsElementAccessExpression()
-		left := GetJestFnMemberEntries(element.Expression)
-		nameNode := ast.SkipParentheses(element.ArgumentExpression)
-		if name := getElementAccessName(nameNode); name != "" {
-			return append(left, ParsedJestFnMemberEntry{
-				Name: name,
-				Node: nameNode,
-			})
-		}
-		return nil
-	case ast.KindCallExpression:
-		entries := GetJestFnMemberEntries(node.AsCallExpression().Expression)
-		if len(entries) > 0 {
-			entries[len(entries)-1].Call = node
-		}
-		return entries
-	case ast.KindTaggedTemplateExpression:
-		return GetJestFnMemberEntries(node.AsTaggedTemplateExpression().Tag)
-	default:
-		return nil
-	}
-}
-
-func getElementAccessName(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return ""
-	}
-
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return node.AsIdentifier().Text
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
-	default:
-		return ""
-	}
+	return testFramework.GetMemberEntries(node)
 }
 
 // CalleeChainName returns a dotted name for a call callee expression, mirroring
 // eslint-plugin-jest getNodeName for CallExpression callees (used by expect-expect
 // assertFunctionNames matching).
 //
-// It differs from GetJestFnMemberEntries / getElementAccessName: bracket notation
+// It differs from GetJestFnMemberEntries: bracket notation
 // contributes a segment only when the index matches eslint-plugin-jest's
 // supported accessor names (identifier, string literal, or no-substitution
 // template). Unsupported keys break the chain entirely. NewExpression is peeled
