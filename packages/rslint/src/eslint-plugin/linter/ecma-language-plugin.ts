@@ -423,6 +423,7 @@ export function lintFile(
     const ctx = createRuleContext({
       ruleName,
       filePath: req.filePath,
+      configKey: req.configKey,
       userOptions: cfg.options ?? [],
       schema: ruleAny.meta?.schema as never,
       defaultOptions: ruleAny.meta?.defaultOptions,

@@ -30,6 +30,7 @@
 
 import { makeFixer } from './fixer.js';
 import { applyOptionDefaults, type RuleSchema } from './options-defaults.js';
+import { resolveOptionsCached } from './resolved-options-cache.js';
 import {
   type ESTreeNode,
   type SourceCode,
@@ -113,6 +114,15 @@ export interface CreateContextOptions {
    * ESLint's diagnostic set.
    */
   defaultOptions?: readonly unknown[];
+  /**
+   * Identity of the rslint config that owns this file (`req.configKey`
+   * in `ecma-language-plugin.ts`). Scopes `resolveOptionsCached` so the
+   * resolved options are memoized/reused across every file this worker
+   * processes under the same config — see
+   * `resolved-options-cache.ts`. Omit (or pass `''`) to opt out of
+   * caching, e.g. from tests that construct a context directly.
+   */
+  configKey?: string;
   /** Merged flat-config settings. */
   settings: Record<string, unknown>;
   /**
@@ -244,10 +254,12 @@ export function createRuleContext(opts: CreateContextOptions): RuleContext {
   const { ruleName, filePath, settings, text, collectFixes, suggestionsMode } =
     opts;
   const messages = opts.messages ?? {};
-  const finalOptions = applyOptionDefaults(
+  const finalOptions = resolveOptionsCached(
+    opts.configKey ?? '',
+    ruleName,
     opts.userOptions,
-    opts.schema,
-    opts.defaultOptions,
+    () =>
+      applyOptionDefaults(opts.userOptions, opts.schema, opts.defaultOptions),
   );
 
   // lintFile builds one SourceCode per file (carrying the native parser's token/comment
