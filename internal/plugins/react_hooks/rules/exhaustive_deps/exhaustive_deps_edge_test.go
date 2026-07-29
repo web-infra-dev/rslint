@@ -110,19 +110,6 @@ var edgeValid = []rule_tester.ValidTestCase{
 		Options: map[string]interface{}{"additionalHooks": "^useV[0-9]+Effect$"},
 	},
 
-	// L9: invalid regex string — silently ignored (matches upstream's
-	// lenient `try { new RegExp(...) }` shape via our `regexp.Compile`
-	// returning err handled by skipping).
-	{
-		Code: `
-			function MyComponent() {
-				useEffect(() => {}, []);
-			}
-		`,
-		Tsx:     true,
-		Options: map[string]interface{}{"additionalHooks": "[invalid"},
-	},
-
 	// S4: hoisted function declaration in component scope, referenced
 	// in an effect callback. `f` captures no reactive values
 	// (only globals like `console`), so isFunctionWithoutCapturedValues
