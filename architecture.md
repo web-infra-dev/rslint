@@ -471,12 +471,13 @@ Rslint supports two configuration formats following ESLint flat config semantics
 Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`:
 
 ```typescript
-import { defineConfig, ts } from '@rslint/core';
+import { defineConfig, js, ts } from '@rslint/core';
 
 export default defineConfig([
   {
     ignores: ['**/dist/**', '**/fixtures/**'],
   },
+  js.configs.recommended,
   ts.configs.recommended,
   {
     rules: {

@@ -1,4 +1,4 @@
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
 
 export default defineConfig([
   globalIgnores([
@@ -29,6 +29,7 @@ export default defineConfig([
     'packages/rule-tester/src/index.ts',
   ]),
   // Start from recommended preset, then override rules and parserOptions
+  js.configs.recommended,
   ts.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],
