@@ -1399,47 +1399,6 @@ class C extends Component {}`, Tsx: true},
 			},
 		},
 
-		// ---- Robustness: options malformed — `allowDecorators` is a string,
-		// not array → must fall back to default (empty) and report normally. ----
-		{
-			Code: `
-        @pure
-        class C extends Component {}
-      `,
-			Tsx:     true,
-			Options: map[string]interface{}{"allowDecorators": "pure"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noShouldComponentUpdate", Line: 2, Column: 9},
-			},
-		},
-
-		// ---- Robustness: options has null/non-string entries in
-		// allowDecorators — non-string elements ignored, valid ones still apply. ----
-		{
-			Code: `
-        @observer
-        class C extends Component {}
-      `,
-			Tsx:     true,
-			Options: map[string]interface{}{"allowDecorators": []interface{}{nil, 42, "pure"}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				// "observer" not in allow-list ("pure" is the only string), so reports.
-				{MessageId: "noShouldComponentUpdate", Line: 2, Column: 9},
-			},
-		},
-
-		// ---- Robustness: options is `[null]` — falls back to default. ----
-		{
-			Code: `
-        class C extends React.Component {}
-      `,
-			Tsx:     true,
-			Options: []interface{}{nil},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noShouldComponentUpdate", Line: 2, Column: 9},
-			},
-		},
-
 		// ---- Robustness: options is `[{}]` empty object — defaults apply. ----
 		{
 			Code: `

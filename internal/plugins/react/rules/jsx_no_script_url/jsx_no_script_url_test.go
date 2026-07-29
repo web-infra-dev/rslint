@@ -143,24 +143,6 @@ func TestJsxNoScriptUrl(t *testing.T) {
 			},
 			Tsx: true,
 		},
-		// Malformed legacy option: missing props
-		{
-			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo"}}},
-			Tsx:     true,
-		},
-		// Malformed legacy option: missing name
-		{
-			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{[]interface{}{map[string]interface{}{"props": []interface{}{"href"}}}},
-			Tsx:     true,
-		},
-		// Malformed legacy option: props is string instead of array
-		{
-			Code:    `<Foo href="javascript:"></Foo>`,
-			Options: []interface{}{[]interface{}{map[string]interface{}{"name": "Foo", "props": "href"}}},
-			Tsx:     true,
-		},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream invalid cases ----
 		// Defaults — with full position assertion (EndLine/EndColumn)

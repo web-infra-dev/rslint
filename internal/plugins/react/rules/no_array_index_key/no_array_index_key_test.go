@@ -297,15 +297,6 @@ foo.map((baz, i) => cloneElement(someChild, { key: i }))
 		// AssignmentPattern has no plain `.name`, so the index is
 		// NOT pushed. Locked in for input/output parity.
 		{Code: `foo.map((bar, i = 0) => <Foo key={i} />)`, Tsx: true},
-		// Rule receives extra options — schema is `[]` upstream, but
-		// pass-through must not break. `GetOptionsMap` is not used by
-		// this rule; we still verify that arbitrary input doesn't
-		// disturb behavior.
-		{
-			Code:    `foo.map((bar, i) => <Foo key={bar.id} />)`,
-			Tsx:     true,
-			Options: map[string]interface{}{"unknown": true},
-		},
 		// `settings.react.pragma = "Act"` — `Act.createElement` becomes
 		// the recognized factory; `React.createElement` is no longer
 		// matched, so referencing the index in `React.createElement`

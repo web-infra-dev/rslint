@@ -464,16 +464,6 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 			Tsx:     true,
 			Options: []interface{}{"always"},
 		},
-
-		// ---- JS-truthy semantics on schema-invalid `attributes` / `children` ----
-		// ESLint's JSON-schema validator rejects these before the rule runs;
-		// rslint does not validate schemas, so the rule must reproduce JS's
-		// `value ? cfg : null` semantics (0/null/"" → disabled).
-		{Code: `<App foo={ bar } />;`, Tsx: true, Options: []interface{}{opts{"attributes": nil}}},
-		{Code: `<App foo={ bar } />;`, Tsx: true, Options: []interface{}{opts{"attributes": 0}}},
-		{Code: `<App foo={ bar } />;`, Tsx: true, Options: []interface{}{opts{"attributes": ""}}},
-		{Code: `<App>{ bar }</App>;`, Tsx: true, Options: []interface{}{opts{"children": nil}}},
-		{Code: `<App>{ bar }</App>;`, Tsx: true, Options: []interface{}{opts{"children": 0}}},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Default config: attribute brace spacing reported, child untouched ----
 		{

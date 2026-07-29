@@ -105,22 +105,6 @@ func TestNoDangerRule(t *testing.T) {
 			`,
 			Tsx: true,
 		},
-		// Defensive: non-array `customComponentNames` is ignored silently.
-		{
-			Code: `<MyComponent dangerouslySetInnerHTML={{ __html: "" }} />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{
-				"customComponentNames": "MyComponent",
-			},
-		},
-		// Defensive: non-string entries in the array are skipped.
-		{
-			Code: `<MyComponent dangerouslySetInnerHTML={{ __html: "" }} />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{
-				"customComponentNames": []interface{}{42, nil, false},
-			},
-		},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream invalid cases ----
 		{

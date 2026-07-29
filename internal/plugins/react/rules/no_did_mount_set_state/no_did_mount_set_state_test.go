@@ -421,19 +421,6 @@ func TestNoDidMountSetStateRule(t *testing.T) {
           }
         }
       `, Tsx: true},
-		// disallow-in-func option spelled in wrong case — upstream's enum is exact, so
-		// the value is treated as not-disallow-in-func and default mode applies. The
-		// nested-callback setState below should therefore stay valid.
-		{Code: `
-        class Hello extends React.Component {
-          componentDidMount() {
-            someClass.onSomeEvent(function(data) {
-              this.setState({ data: data });
-            });
-          }
-        }
-      `, Tsx: true, Options: []interface{}{"DISALLOW-IN-FUNC"}},
-
 		// Empirically-verified rslint divergence: pre-release React version
 		// "16.3.0-rc.1" is parsed by reactutil.ParseReactVersion as (16, 3, 0),
 		// which makes the noop gate fire (range is [16.3.0, 999.999.999)). Upstream

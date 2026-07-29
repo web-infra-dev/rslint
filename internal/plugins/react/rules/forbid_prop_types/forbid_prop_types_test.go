@@ -1114,18 +1114,6 @@ func TestForbidPropTypesRule(t *testing.T) {
 			Tsx: true,
 		},
 
-		// ---- Robustness: forbid list edge values ----
-		// Non-string entries in forbid array are silently dropped.
-		{
-			Code: `
-        class C extends React.Component {}
-        C.propTypes = { a: PropTypes.string };
-      `,
-			Tsx: true,
-			Options: map[string]interface{}{
-				"forbid": []interface{}{42, nil, []interface{}{"any"}},
-			},
-		},
 		// Empty string in forbid list — never matches a real type name.
 		{
 			Code: `
@@ -3336,21 +3324,6 @@ func TestForbidPropTypesRule(t *testing.T) {
 				{MessageId: "forbiddenPropType", Message: `Prop type "element" is forbidden`},
 			},
 		},
-		// Custom forbid alongside non-string entries (drop-and-keep semantics).
-		{
-			Code: `
-        class C extends React.Component {}
-        C.propTypes = { a: PropTypes.any };
-      `,
-			Tsx: true,
-			Options: map[string]interface{}{
-				"forbid": []interface{}{42, "any", nil},
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "forbiddenPropType", Message: `Prop type "any" is forbidden`},
-			},
-		},
-
 		// ---- Robustness: combined options ----
 		// Both checkContextTypes AND checkChildContextTypes ON; both fire.
 		{

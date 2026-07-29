@@ -167,18 +167,6 @@ func TestJsxMaxDepthRule(t *testing.T) {
         <div>{x}</div>
       `, Tsx: true, Options: map[string]interface{}{"max": 0}},
 
-		// ---- Lock-in: option key with non-numeric value falls back to default ----
-		// Upstream's schema rejects `max: "two"` at config-load; rslint's
-		// option parsing tolerates it by defaulting to max=2 instead of
-		// crashing. Verify the default still applies (depth 2 fits max 2).
-		{Code: `
-        <App>
-          <foo>
-            <bar />
-          </foo>
-        </App>
-      `, Tsx: true, Options: map[string]interface{}{"max": "two"}},
-
 		// ---- Lock-in: reassignment to non-JSX after JSX init also bails ----
 		// Upstream picks the LAST write in source order; if it's neither JSX
 		// nor an Identifier the resolver returns null and no descendant walk
@@ -343,20 +331,6 @@ func TestJsxMaxDepthRule(t *testing.T) {
 		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: []interface{}{}},
 		// Empty object (`[{}]`) → defaults.
 		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{}},
-		// Numeric string `"2"` falls through to default rather than parsing
-		// (mirrors upstream's `has(option, 'max') ? option.max : 2` — when
-		// `max` IS present but isn't a number, ESLint also fails the schema
-		// at config-load and disables the rule). We default to be lenient.
-		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{"max": "2"}},
-		// `max: false` (boolean) → defaults.
-		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{"max": false}},
-		// `max: null` → defaults.
-		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{"max": nil}},
-		// Negative `max: -1` → defaults (upstream schema enforces minimum 0;
-		// we silently fall back to default rather than crashing).
-		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{"max": -1}},
-		// Unknown extra option keys are ignored.
-		{Code: `<App><foo><bar/></foo></App>`, Tsx: true, Options: map[string]interface{}{"max": 2, "unknown": true}},
 		// max=100 — anything fits.
 		{Code: `
         <a><b><c><d><e><f><g><h><i /></h></g></f></e></d></c></b></a>

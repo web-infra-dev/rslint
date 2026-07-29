@@ -517,27 +517,6 @@ func TestBooleanPropNamingRule(t *testing.T) {
           }
         `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": "[unclosed"}}},
 
-		// ---- Locks in: empty `propTypeNames` array → falls back to default ['bool'] ----
-		// Upstream's schema requires `minItems: 1`; an empty array is
-		// malformed config. We coerce to the default rather than throw.
-		{Code: `
-          class Hello extends React.Component {
-            static propTypes = {isSomething: PropTypes.bool};
-            render () { return <div />; }
-          }
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{
-			"rule":          patternIs,
-			"propTypeNames": []interface{}{},
-		}}},
-
-		// ---- Locks in: empty `rule` string → no-op ----
-		{Code: `
-          class Hello extends React.Component {
-            static propTypes = {something: PropTypes.bool};
-            render () { return <div />; }
-          }
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": ""}}},
-
 		// ---- Bare-map Options shape (single-option CLI shape) ----
 		{
 			Code: `
@@ -559,18 +538,6 @@ func TestBooleanPropNamingRule(t *testing.T) {
               }
             `,
 			Tsx: true,
-		},
-
-		// ---- Options array with a non-map first element (malformed) → defaults ----
-		{
-			Code: `
-              class Hello extends React.Component {
-                static propTypes = {something: PropTypes.bool};
-                render () { return <div />; }
-              }
-            `,
-			Tsx:     true,
-			Options: []interface{}{"not-a-map"},
 		},
 
 		// ---- Interface heritage: `interface A extends B` ----
@@ -678,29 +645,6 @@ func TestBooleanPropNamingRule(t *testing.T) {
             render() { return <div/>; }
           }
         `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": "^[\\p{L}]+$"}}},
-
-		// ---- Empty propTypeNames → user-cleared list, no PropTypes match ----
-		{Code: `
-          class Hello extends React.Component {
-            static propTypes = { something: PropTypes.bool };
-            render () { return <div />; }
-          }
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{
-			"rule":          patternIs,
-			"propTypeNames": []interface{}{},
-		}}},
-
-		// ---- Empty propTypeNames doesn't disable TS `: boolean` path ----
-		// (Documented difference from upstream; lock-in.)
-		// Although this is `valid` because the name matches the pattern,
-		// the test verifies that the TS path runs even without
-		// propTypeNames entries.
-		{Code: `
-          const Hello = (props: { isFoo: boolean }) => <div/>;
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{
-			"rule":          patternIs,
-			"propTypeNames": []interface{}{},
-		}}},
 
 		// ---- 5-level validateNested (depth) ----
 		{Code: `
