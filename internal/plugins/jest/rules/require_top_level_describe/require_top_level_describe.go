@@ -33,16 +33,16 @@ func parseOptions(raw any) options {
 	return opts
 }
 
-func buildTooManyDescribesMessage(max int) rule.RuleMessage {
+func buildTooManyDescribesMessage(maxAllowed int) rule.RuleMessage {
 	s := "s"
-	if max == 1 {
+	if maxAllowed == 1 {
 		s = ""
 	}
 	return rule.RuleMessage{
 		Id:          "tooManyDescribes",
-		Description: fmt.Sprintf("There should not be more than %d describe%s at the top level", max, s),
+		Description: fmt.Sprintf("There should not be more than %d describe%s at the top level", maxAllowed, s),
 		Data: map[string]string{
-			"max": strconv.Itoa(max),
+			"max": strconv.Itoa(maxAllowed),
 			"s":   s,
 		},
 	}
