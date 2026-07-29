@@ -19,10 +19,22 @@ boolean-typed prop whose name does not match a configurable regex (default
   (`const Hello: React.FC<Props> = (props) => ...`), including
   intersection / union compositions
 
-The rule is a **no-op** when no `rule` regex is configured. Add a `rule`
-option to turn it on.
+Pass an options object to turn the rule on — `["error", {}]` is enough, and
+`rule` then falls back to its default `^(is|has)[A-Z]([A-Za-z0-9]?)+`. Set
+`rule` explicitly to enforce a different pattern.
 
 Examples of **incorrect** code for this rule:
+
+```json
+{ "react/boolean-prop-naming": ["error", {}] }
+```
+
+```javascript
+class Hello extends React.Component {
+  static propTypes = { something: PropTypes.bool };
+  render() { return <div />; }
+}
+```
 
 ```json
 { "react/boolean-prop-naming": ["error", { "rule": "^is[A-Z]([A-Za-z0-9]?)+" }] }
@@ -79,10 +91,10 @@ const Hello: React.FC<Props> = (props) => <div />;
 }
 ```
 
-- `rule` (string) — regex source the prop name must match. **Required to
-  enable the rule** (omitted / empty → no-op). Default in upstream docs is
-  `^(is|has)[A-Z]([A-Za-z0-9]?)+` but the rule is not turned on unless you
-  pass it explicitly.
+- `rule` (string, default `^(is|has)[A-Z]([A-Za-z0-9]?)+`) — regex source the
+  prop name must match. The default is filled in whenever an options object is
+  present, so `["error", {}]` enforces it. Configuring the rule with a severity
+  alone (`"error"`, no options object) leaves it a no-op.
 - `propTypeNames` (string[]) — names treated as boolean PropTypes. Default
   `["bool"]`. Add custom validators (`["bool", "mutuallyExclusiveTrueProps"]`)
   to recognize them as boolean.

@@ -39,15 +39,6 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 			},
 		},
 		{
-			// maximum as object + when="multiline": single limit from object still applies (maximumIsObject=true, when doesn't clear singleLimit)
-			Code: `var x = <div foo="bar" baz="qux" />`,
-			Tsx:  true,
-			Options: map[string]interface{}{
-				"maximum": map[string]interface{}{"single": float64(2), "multi": float64(1)},
-				"when":    "multiline",
-			},
-		},
-		{
 			// No props at all
 			Code: `var x = <App />`,
 			Tsx:  true,
@@ -242,4 +233,29 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestJsxMaxPropsPerLineSchema locks the two option shapes the schema accepts.
+// `maximum` is either an object with `single`/`multi`, or a number that may be
+// paired with `when` — each branch closes with `additionalProperties: false`,
+// so an object `maximum` alongside `when` matches neither and is a config
+// error, exactly as in upstream's `meta.schema`.
+func TestJsxMaxPropsPerLineSchema(t *testing.T) {
+	for _, options := range []any{
+		map[string]any{"maximum": map[string]any{"single": float64(2), "multi": float64(1)}},
+		map[string]any{"maximum": float64(2), "when": "multiline"},
+		map[string]any{"when": "multiline"},
+	} {
+		if err := JsxMaxPropsPerLineRule.Schema.Validate([]any{options}); err != nil {
+			t.Errorf("expected %v to pass schema validation, got: %v", options, err)
+		}
+	}
+
+	objectMaximumWithWhen := []any{map[string]any{
+		"maximum": map[string]any{"single": float64(2), "multi": float64(1)},
+		"when":    "multiline",
+	}}
+	if err := JsxMaxPropsPerLineRule.Schema.Validate(objectMaximumWithWhen); err == nil {
+		t.Error("expected an object `maximum` combined with `when` to fail schema validation")
+	}
 }
