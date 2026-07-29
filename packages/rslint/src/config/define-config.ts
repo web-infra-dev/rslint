@@ -218,13 +218,14 @@ export interface RslintConfigEntry {
 }
 
 /** Top-level rslint config: an array of entries. */
-export type RslintConfig = (RslintConfigEntry | RslintConfigEntry[])[];
+export type RslintConfig = RslintConfigEntry | RslintConfig[];
 
 /**
  * Type-safe config helper. Returns the config array as-is (identity function).
  */
-export function defineConfig(config: RslintConfig): RslintConfig {
-  return config;
+export function defineConfig(...config: RslintConfig[]): RslintConfigEntry[] {
+  // @ts-expect-error -- infinite recursive
+  return config.flat(Infinity) as RslintConfigEntry[];
 }
 
 /**
