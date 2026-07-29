@@ -536,6 +536,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
     './tests/eslint-plugin-jest/rules/require-hook.test.ts',
     './tests/eslint-plugin-jest/rules/require-to-throw-message.test.ts',
+    './tests/eslint-plugin-jest/rules/require-top-level-describe.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',

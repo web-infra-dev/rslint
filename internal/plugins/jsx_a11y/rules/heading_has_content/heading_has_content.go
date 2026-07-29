@@ -6,13 +6,16 @@
 package heading_has_content
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed heading_has_content.schema.json
+var schemaJSON []byte
 
 const errorMessage = "Headings must have content and the content must be accessible by a screen reader."
 
@@ -29,20 +32,20 @@ type options struct {
 	components []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.components = jsxa11yutil.StringSliceOption(m["components"])
 	return opts
 }
 
 var HeadingHasContentRule = rule.Rule{
-	Name: "jsx-a11y/heading-has-content",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/heading-has-content",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Mirrors upstream `typeCheck = headings.concat(componentOptions)`.

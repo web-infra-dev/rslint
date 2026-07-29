@@ -12,13 +12,16 @@
 package no_distracting_elements
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_distracting_elements.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage(element)` template literal
 // verbatim. The element name is interpolated into the diagnostic so a
@@ -37,12 +40,12 @@ type options struct {
 	elements []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{elements: defaultElements}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	// Upstream: `const elementOptions = options.elements || DEFAULT_ELEMENTS`.
 	// `||` only falls through when the LHS is JS-falsy (undefined / null /
 	// "" / 0 / NaN). An EXPLICITLY empty array is JS-truthy so it replaces
@@ -59,9 +62,9 @@ func parseOptions(raw any) options {
 }
 
 var NoDistractingElementsRule = rule.Rule{
-	Name: "jsx-a11y/no-distracting-elements",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-distracting-elements",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Empty element list — rule is effectively disabled for this run.

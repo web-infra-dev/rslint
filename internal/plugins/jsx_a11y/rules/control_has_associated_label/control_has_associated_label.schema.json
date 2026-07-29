@@ -1,0 +1,40 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "labelAttributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "controlComponents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "ignoreElements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "ignoreRoles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

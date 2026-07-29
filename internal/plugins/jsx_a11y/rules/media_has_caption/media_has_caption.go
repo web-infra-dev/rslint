@@ -9,6 +9,7 @@
 package media_has_caption
 
 import (
+	_ "embed"
 	"slices"
 	"strings"
 
@@ -16,8 +17,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed media_has_caption.schema.json
+var schemaJSON []byte
 
 const errorMessage = "Media elements such as <audio> and <video> must have a <track> for captions."
 
@@ -37,12 +40,12 @@ type options struct {
 	track []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.audio = jsxa11yutil.StringSliceOption(m["audio"])
 	opts.video = jsxa11yutil.StringSliceOption(m["video"])
 	opts.track = jsxa11yutil.StringSliceOption(m["track"])
@@ -50,9 +53,9 @@ func parseOptions(raw any) options {
 }
 
 var MediaHasCaptionRule = rule.Rule{
-	Name: "jsx-a11y/media-has-caption",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/media-has-caption",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// Mirrors upstream's `isMediaType`:

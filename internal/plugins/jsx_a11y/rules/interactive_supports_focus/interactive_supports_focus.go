@@ -42,6 +42,7 @@
 package interactive_supports_focus
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 
@@ -49,8 +50,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed interactive_supports_focus.schema.json
+var schemaJSON []byte
 
 const (
 	// suggestionInsertTabIndexZeroDesc mirrors upstream's `tabIndex=0`
@@ -68,20 +71,20 @@ type options struct {
 	Tabbable []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.Tabbable = jsxa11yutil.StringSliceOption(m["tabbable"])
 	return opts
 }
 
 var InteractiveSupportsFocusRule = rule.Rule{
-	Name: "jsx-a11y/interactive-supports-focus",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/interactive-supports-focus",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		sourceText := ctx.SourceFile.Text()
 

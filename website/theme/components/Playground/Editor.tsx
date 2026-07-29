@@ -7,14 +7,11 @@ window.MonacoEnvironment = {
   getWorker: function (moduleId, label) {
     if (label === 'typescript' || label === 'javascript') {
       return new Worker(
-        new URL(
-          'monaco-editor/esm/vs/language/typescript/ts.worker',
-          import.meta.url,
-        ),
+        new URL('monaco-editor/language/typescript/ts.worker', import.meta.url),
       );
     }
     return new Worker(
-      new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url),
+      new URL('monaco-editor/editor/editor.worker', import.meta.url),
     );
   },
 };

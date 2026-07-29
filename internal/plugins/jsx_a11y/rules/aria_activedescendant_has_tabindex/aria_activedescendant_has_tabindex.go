@@ -36,7 +36,8 @@ import (
 const errorMessage = "An element that manages focus with `aria-activedescendant` must have a tabindex"
 
 var AriaActivedescendantHasTabindexRule = rule.Rule{
-	Name: "jsx-a11y/aria-activedescendant-has-tabindex",
+	Name:   "jsx-a11y/aria-activedescendant-has-tabindex",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		// sourceText is required by GetTabIndexEx for raw-text template
 		// literal extraction (NoSubstitutionTemplate has no RawText field).

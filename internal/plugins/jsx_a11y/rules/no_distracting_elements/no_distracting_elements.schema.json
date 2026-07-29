@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["marquee", "blink"]
+          },
+          "uniqueItems": true,
+          "additionalItems": false
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

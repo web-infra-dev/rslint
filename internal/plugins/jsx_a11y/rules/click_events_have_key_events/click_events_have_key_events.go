@@ -38,7 +38,8 @@ import (
 const errorMessage = "Visible, non-interactive elements with click handlers must have at least one keyboard listener."
 
 var ClickEventsHaveKeyEventsRule = rule.Rule{
-	Name: "jsx-a11y/click-events-have-key-events",
+	Name:   "jsx-a11y/click-events-have-key-events",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		getElementType := func(node *ast.Node) string {
 			return jsxa11yutil.GetElementType(node, ctx.Settings)
