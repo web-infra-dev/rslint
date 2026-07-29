@@ -576,6 +576,25 @@ const a = 1;
 					{MessageId: "noUseBeforeDefine"},
 				},
 			},
+
+			// =========== Local declaration merged with a lib.d.ts global ===========
+			// A file-level declaration binds the name for the whole file, so the
+			// earlier use is reported even though the value itself comes from
+			// lib.d.ts. Matches ESLint, whose scope analysis merges the local
+			// declaration into the same variable as the predefined global.
+
+			{
+				Code: `Map; interface Map<K, V> {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `new Map(); interface Map<K, V> { extra(): void }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 5},
+				},
+			},
 		},
 	)
 }

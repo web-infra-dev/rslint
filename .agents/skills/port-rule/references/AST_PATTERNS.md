@@ -409,11 +409,12 @@ symbol := ctx.Refs.Resolve(node)
 isLocal := symbol != nil && utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 ```
 
-See [UTILS_REFERENCE.md — `IsSymbolDeclaredInFile`](./UTILS_REFERENCE.md#internalruleref_storego---reference-index-ctxrefs) for why it also skips
-interfaces, type aliases, and non-instantiated namespaces — a file can
+When the question is specifically "does a local declaration shadow this
+built-in _value_", use `utils.IsValueSymbolDeclaredInFile` instead: it skips
+interfaces, type aliases, and non-instantiated namespaces, because a file can
 locally re-open an ambient global's type (`interface Map {}` in a global
-script merges into the same symbol as lib.d.ts's `Map`) without shadowing
-its value.
+script merges into the same symbol as lib.d.ts's `Map`) without shadowing its
+value. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#internalruleref_storego---reference-index-ctxrefs).
 
 ### Collecting references to a symbol
 

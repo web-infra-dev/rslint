@@ -148,7 +148,9 @@ that the rule framework already shares or can skip:
   walk the file and call `GetSymbolAtLocation` once per identifier, and never
   hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper. To
   check whether the resolved symbol is declared in this file (locally
-  shadowed), pair it with `utils.IsSymbolDeclaredInFile` (see AST_PATTERNS.md).
+  shadowed), pair it with `utils.IsSymbolDeclaredInFile` — or
+  `utils.IsValueSymbolDeclaredInFile` when only a local _value_ declaration
+  counts (see AST_PATTERNS.md).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
 

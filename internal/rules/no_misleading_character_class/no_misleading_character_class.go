@@ -542,7 +542,7 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 		// TypeChecker for symbols declared outside this file (cross-file,
 		// .d.ts, standard-library globals); a symbol resolved that way is
 		// still the real global, not a shadowing local binding.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			return false
 		}
 		// Namespace-only bindings are outside RefStore's value lookup. Only
@@ -820,7 +820,7 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 		// lib/ambient symbol declared elsewhere (e.g. assigning to a bare
 		// `window`), which belongs to the configured-global path below, not
 		// trackVariable's per-declaration tracking.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}

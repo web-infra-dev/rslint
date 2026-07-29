@@ -1330,9 +1330,24 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 }
 
 // IsSymbolDeclaredInFile reports whether the given symbol has at least one
-// value-introducing declaration in the specified source file. Use this to
-// distinguish locally declared symbols (shadowed) from globals provided by
-// lib.d.ts.
+// declaration in the specified source file. Use this to distinguish locally
+// declared symbols (shadowed) from globals provided by lib.d.ts.
+func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		if ast.GetSourceFileOfNode(decl) == sf {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValueSymbolDeclaredInFile reports whether the given symbol has at least
+// one value-introducing declaration in the specified source file. Use this
+// where a local declaration only counts when it shadows a built-in *value*;
+// use IsSymbolDeclaredInFile when any local declaration counts.
 //
 // Declarations that don't introduce a value are skipped: interfaces, type
 // aliases, and namespaces with no instantiated (value-producing) content.
@@ -1342,7 +1357,7 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 // declaration to the same (checker-resolved) symbol as the ambient value.
 // The call site still resolves to the global value, not the file's type-only
 // declaration, so only value-introducing declarations count here.
-func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}

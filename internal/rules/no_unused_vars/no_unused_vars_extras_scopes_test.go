@@ -336,6 +336,15 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 				},
 			},
 			{
+				// A local type declaration shadows the inline global just as a
+				// value declaration does, so the type reference consumes the
+				// local alias and leaves the inline global unused.
+				Code: `/*global Foo*/ type Foo = {}; export type Alias = Foo;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("Foo", false, 1, 10, 13, ""),
+				},
+			},
+			{
 				Code: `/*global foo:writable*/ foo = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),

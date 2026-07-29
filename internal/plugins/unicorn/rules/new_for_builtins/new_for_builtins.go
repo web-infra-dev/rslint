@@ -985,12 +985,12 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 		// .d.ts), so a non-nil result alone doesn't imply local — it must
 		// additionally be declared in this file.
 		symbol := state.ctx.Refs.Resolve(node)
-		return symbol != nil && utils.IsSymbolDeclaredInFile(symbol, state.ctx.SourceFile)
+		return symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile)
 	}
 
 	if state.ctx.TypeChecker != nil && state.ctx.SourceFile != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
-		if utils.IsSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+		if utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
 			return true
 		}
 	}
