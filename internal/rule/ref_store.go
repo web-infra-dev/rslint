@@ -188,8 +188,9 @@ func sharesDeclaration(a, b *ast.Symbol) bool {
 // real TypeChecker round-trip, unlike the binder-only common path.
 //
 // Returns nil for identifiers that aren't reference positions (declaration
-// names, property keys, import/export bindings, labels, intrinsic JSX tags —
-// see isReferencePosition) and for names that don't resolve to any symbol.
+// names, property keys, import bindings, re-export/alias-label names, labels,
+// intrinsic JSX tags — see isReferencePosition) and for names that don't
+// resolve to any symbol.
 func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return nil
@@ -222,8 +223,9 @@ func (s *RefStore) collectCandidates() {
 
 // isReferencePosition reports whether an identifier can reference a symbol
 // declared elsewhere: not a declaration name, and not a position that names
-// something non-local (property names, import/export bindings, labels,
-// intrinsic JSX tags).
+// something non-local (property names, import bindings, labels, intrinsic JSX
+// tags). The one exception is a local named export's real target — see the
+// ExportSpecifier case below.
 func isReferencePosition(n *ast.Node) bool {
 	p := n.Parent
 	if p != nil && p.Kind == ast.KindShorthandPropertyAssignment && p.AsShorthandPropertyAssignment().Name() == n {
@@ -232,6 +234,26 @@ func isReferencePosition(n *ast.Node) bool {
 		// IsDeclarationName treats this name as a declaration (it also
 		// declares the object's property), which would otherwise discard
 		// both real uses.
+		return true
+	}
+	if p != nil && p.Kind == ast.KindExportSpecifier {
+		// `export { foo }` / `export { foo as bar }` reads its local binding
+		// through PropertyName when present (the rename target, `foo`) or
+		// Name when it isn't (no rename) — ESLint's scope-manager marks this
+		// as a read of that binding. IsDeclarationName treats this node as a
+		// declaration either way (Name() equals the node itself when there's
+		// no PropertyName, and equals the alias label `bar` when there is),
+		// which would otherwise discard the real local reference the same
+		// way it would for a shorthand property name above. A re-export
+		// (`export { foo } from 'mod'`, aliased or not) references the
+		// other module's binding instead, so neither part is a reference
+		// there.
+		if utils.IsReExportSpecifier(p) {
+			return false
+		}
+		if propertyName := p.PropertyName(); propertyName != nil {
+			return propertyName == n
+		}
 		return true
 	}
 	if ast.IsDeclarationName(n) {
@@ -253,10 +275,11 @@ func isReferencePosition(n *ast.Node) bool {
 		// Import attribute keys (`type` in `with { type: "json" }`) are
 		// syntactic names, not references to same-named variables.
 		return p.AsImportAttribute().Name() != n
-	case ast.KindImportSpecifier, ast.KindExportSpecifier, ast.KindNamespaceImport,
+	case ast.KindImportSpecifier, ast.KindNamespaceImport,
 		ast.KindImportClause, ast.KindNamespaceExport:
-		// Import/export bindings resolve through module/alias machinery the
-		// checker owns; the current consumers never treat them as references.
+		// Import bindings and the export half of `export * as NS` resolve
+		// through module/alias machinery the checker owns; the current
+		// consumers never treat them as references.
 		return false
 	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
 		// Labels live in their own namespace and never reference variables.
@@ -299,6 +322,11 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		// declarations such as an interface to be consumed by `export =`.
 		// Mirror the checker's getSymbolOfNameOrPropertyAccessExpression path
 		// instead of treating the identifier as an ordinary value expression.
+		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
+	if p != nil && p.Kind == ast.KindExportSpecifier {
+		// `export { X }` can re-export a value, a type, or a namespace —
+		// same declaration-space breadth as `export =` above.
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	// `import a = b.c` — the right-hand side may name a value, type, or

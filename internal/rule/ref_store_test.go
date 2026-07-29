@@ -329,6 +329,141 @@ func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
 	}
 }
 
+func TestRefStoreLocalExportSpecifierRead(t *testing.T) {
+	// `export { foo }` (no rename) reads the local `foo` — ESLint's
+	// scope-manager marks this as a reference, unlike import/export bindings
+	// in general.
+	sourceFile, refs := newBoundRefStore(t, "/export-specifier-read.ts", core.ScriptKindTS,
+		"var foo = 1;\nexport { foo };\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent := occurrences[0], occurrences[1]
+	if specifierIdent.Parent == nil || specifierIdent.Parent.Kind != ast.KindExportSpecifier {
+		t.Fatalf("expected the second foo to be the ExportSpecifier name, got parent kind %v", specifierIdent.Parent.Kind)
+	}
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(specifierIdent); got != sym {
+		t.Fatalf("Resolve(export specifier name) = %v, want %v", got, sym)
+	}
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != specifierIdent {
+		t.Fatalf("References = %v, want [%v] (the `export { foo }` read)", got, specifierIdent)
+	}
+}
+
+func TestRefStoreLocalExportSpecifierAliasReadsPropertyName(t *testing.T) {
+	// `export { foo as bar }` reads the local `foo` through PropertyName;
+	// `bar` is only the external export label and never a reference to
+	// anything in this file.
+	sourceFile, refs := newBoundRefStore(t, "/export-specifier-alias.ts", core.ScriptKindTS,
+		"var foo = 1;\nexport { foo as bar };\n")
+
+	fooOccurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(fooOccurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of foo, got %d", len(fooOccurrences))
+	}
+	declIdent, propertyNameIdent := fooOccurrences[0], fooOccurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(propertyNameIdent); got != sym {
+		t.Fatalf("Resolve(PropertyName foo) = %v, want %v", got, sym)
+	}
+
+	barOccurrences := identifiers(sourceFile.AsNode(), "bar")
+	if len(barOccurrences) != 1 {
+		t.Fatalf("expected 1 occurrence of bar, got %d", len(barOccurrences))
+	}
+	if got := refs.Resolve(barOccurrences[0]); got != nil {
+		t.Fatalf("Resolve(export label bar) = %v, want nil (it's not a reference to anything)", got)
+	}
+}
+
+func TestRefStoreReExportSpecifierExcluded(t *testing.T) {
+	// `export { foo } from 'mod'` references the other module's binding, not
+	// anything in this file, even though a same-named local exists here.
+	sourceFile, refs := newBoundRefStore(t, "/re-export.ts", core.ScriptKindTS,
+		`var foo = 1;
+export { foo } from "./mod";
+foo;
+`)
+
+	occurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of foo, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent, useIdent := occurrences[0], occurrences[1], occurrences[2]
+	if specifierIdent.Parent == nil || specifierIdent.Parent.Kind != ast.KindExportSpecifier {
+		t.Fatalf("expected the second foo to be the ExportSpecifier name, got parent kind %v", specifierIdent.Parent.Kind)
+	}
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(specifierIdent); got != nil {
+		t.Fatalf("Resolve(re-export specifier name) = %v, want nil", got)
+	}
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != useIdent {
+		t.Fatalf("References = %v, want [%v] (the re-export specifier must be excluded)", got, useIdent)
+	}
+}
+
+func TestRefStoreReExportSpecifierAliasExcluded(t *testing.T) {
+	// `export { foo as bar } from 'mod'` — neither the source name nor the
+	// alias label references anything in this file.
+	sourceFile, refs := newBoundRefStore(t, "/re-export-alias.ts", core.ScriptKindTS,
+		`export { foo as bar } from "./mod";`)
+
+	fooOccurrences := identifiers(sourceFile.AsNode(), "foo")
+	if len(fooOccurrences) != 1 {
+		t.Fatalf("expected 1 occurrence of foo, got %d", len(fooOccurrences))
+	}
+	if got := refs.Resolve(fooOccurrences[0]); got != nil {
+		t.Fatalf("Resolve(re-export PropertyName foo) = %v, want nil", got)
+	}
+
+	barOccurrences := identifiers(sourceFile.AsNode(), "bar")
+	if len(barOccurrences) != 1 {
+		t.Fatalf("expected 1 occurrence of bar, got %d", len(barOccurrences))
+	}
+	if got := refs.Resolve(barOccurrences[0]); got != nil {
+		t.Fatalf("Resolve(re-export label bar) = %v, want nil", got)
+	}
+}
+
+func TestRefStoreExportSpecifierResolvesTypeOnlySymbol(t *testing.T) {
+	// `export { Foo }` can re-export a type-only local; referenceMeaning must
+	// include SymbolFlagsType or this never resolves.
+	sourceFile, refs := newBoundRefStore(t, "/export-specifier-type.ts", core.ScriptKindTS,
+		"type Foo = {};\nexport { Foo };\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "Foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of Foo, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent := occurrences[0], occurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != specifierIdent {
+		t.Fatalf("References = %v, want [%v] (the `export { Foo }` reference to the type alias)", got, specifierIdent)
+	}
+}
+
 func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	// A non-default export is bound to an export symbol too; the local symbol
 	// left in the file's locals carries only the ExportValue marker, so
