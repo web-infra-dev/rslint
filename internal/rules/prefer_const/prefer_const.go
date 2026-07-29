@@ -39,17 +39,9 @@ type candidateInfo struct {
 
 // https://eslint.org/docs/latest/rules/prefer-const
 var PreferConstRule = rule.Rule{
-	Name:             "prefer-const",
-	RequiresTypeInfo: true,
+	Name: "prefer-const",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
-			return rule.RuleListeners{}
-		}
-
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
