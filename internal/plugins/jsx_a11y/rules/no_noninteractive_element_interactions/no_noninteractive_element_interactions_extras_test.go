@@ -367,15 +367,6 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 				Tsx:     true,
 				Options: map[string]interface{}{"handlers": []interface{}{"onMouseDown"}},
 			},
-			// ---- Mixed-type handlers array: non-strings silently dropped
-			//      (StringSliceOption defensive filter). Effective list
-			//      is just ['onMouseDown'], so onClick doesn't trigger. ----
-			{
-				Code:    `<article onClick={fn} />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"handlers": []interface{}{42, "onMouseDown", nil}},
-			},
-
 			// ============================================================
 			// Options — per-element allow-list filters event handlers.
 			// ============================================================

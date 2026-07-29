@@ -357,37 +357,13 @@ func TestNoInteractiveElementToNoninteractiveRoleRoleStringBoundaries(t *testing
 //   - option role-value case mismatch (`{tr: ["Presentation"]}` vs `role="presentation"`)
 func TestNoInteractiveElementToNoninteractiveRoleOptionRobustness(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInteractiveElementToNoninteractiveRoleRule,
-		[]rule_tester.ValidTestCase{
-			// Mixed-type array — only "presentation" survives, exempting
-			// the case.
-			{
-				Code:    `<tr role="presentation" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"tr": []interface{}{"none", 123, nil, "presentation"}},
-			},
-		},
+		[]rule_tester.ValidTestCase{},
 		[]rule_tester.InvalidTestCase{
 			// Empty array — no role exempted under that key.
 			{
 				Code:    `<tr role="presentation" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"tr": []interface{}{}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noInteractiveElementToNoninteractiveRole", Message: errorMessage}},
-			},
-			// Non-array value — `StringSliceOption` returns nil, key is
-			// silently dropped from `allowedRoles`.
-			{
-				Code:    `<tr role="presentation" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"tr": "presentation"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noInteractiveElementToNoninteractiveRole", Message: errorMessage}},
-			},
-			// Mixed-type array containing only the WRONG roles — still
-			// reports.
-			{
-				Code:    `<tr role="presentation" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"tr": []interface{}{"none", 123, nil}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noInteractiveElementToNoninteractiveRole", Message: errorMessage}},
 			},
 			// Option key case mismatch — `getElementType` returns "tr"

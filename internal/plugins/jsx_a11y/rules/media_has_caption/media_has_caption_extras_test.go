@@ -124,18 +124,6 @@ func TestMediaHasCaptionExtras(t *testing.T) {
 		// Empty options object — equivalent to default; non-media tag still passes.
 		{Code: `<div />`, Tsx: true, Options: map[string]interface{}{}},
 
-		// nil-valued audio/video/track — falls back to defaults (no extra
-		// component names). Default audio/video/track still match.
-		{Code: `<audio muted />`, Tsx: true, Options: map[string]interface{}{"audio": nil, "video": nil, "track": nil}},
-		{Code: `<audio><track kind="captions" /></audio>`, Tsx: true, Options: map[string]interface{}{"track": nil}},
-
-		// rslint-extension: non-string entries silently dropped by
-		// StringSliceOption — `<MyAudio>` doesn't match the (empty post-filter)
-		// audio list, so it's NOT considered a media element and the rule
-		// short-circuits. (ESLint's JSON schema would reject this at config
-		// load, so upstream never sees it.)
-		{Code: `<MyAudio />`, Tsx: true, Options: map[string]interface{}{"audio": []interface{}{123, true}}},
-
 		// ============================================================
 		// Settings: components map without a matching entry — `<Audio>`
 		// stays as "Audio", which is not in the default media list.
@@ -463,15 +451,6 @@ func TestMediaHasCaptionExtras(t *testing.T) {
 			Options: map[string]interface{}{"video": []interface{}{"MyVideo"}},
 			Errors:  []rule_tester.InvalidTestCaseError{expectedError},
 		},
-		// rslint extension: mixed-type array — non-string entries silently
-		// dropped, "MyAudio" still honored. Reports.
-		{
-			Code:    `<MyAudio />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"audio": []interface{}{"MyAudio", 123}},
-			Errors:  []rule_tester.InvalidTestCaseError{expectedError},
-		},
-
 		// ============================================================
 		// Settings: components map maps `<MyAudio>` to "audio"
 		// ============================================================

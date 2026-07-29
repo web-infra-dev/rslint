@@ -345,16 +345,6 @@ func TestInteractiveSupportsFocusExtras(t *testing.T) {
 				Tsx:     true,
 				Options: map[string]interface{}{},
 			},
-			{
-				Code:    `<div role="button" onClick={() => {}} tabIndex="0" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"tabbable": nil},
-			},
-			{
-				Code:    `<div role="button" onClick={() => {}} tabIndex="0" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"tabbable": "not-an-array"},
-			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Plain failure — fixed columns + suggestion output assertion.

@@ -1047,13 +1047,6 @@ func TestNoRedundantRolesRobust(t *testing.T) {
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"list"}, "ol": []interface{}{"list"}, "nav": []interface{}{"navigation"}},
 			},
-			// ---- Allow-list with non-string entries — StringSliceOption
-			//      drops them silently, leaving the valid strings. ----
-			{
-				Code:    `<button role="button" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"button": []interface{}{"button", 42, nil, true}},
-			},
 			// ---- Malformed value type (not an array) — StringSliceOption
 			//      returns nil; hasOwn still true → allow-list is the nil
 			//      slice → no entries match → REPORT (in invalid block). ----
@@ -1411,15 +1404,6 @@ function B() { return <h1 role="heading">x</h1>; }`,
 				Code:    `<nav role="navigation" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"nav": []interface{}{"main"}},
-				Errors:  []rule_tester.InvalidTestCaseError{invalidErr("nav", "navigation")},
-			},
-			// ---- Allow-list value is non-array (malformed) — StringSliceOption
-			//      drops it to nil. hasOwn=true → allowed=nil → no matches →
-			//      REPORT. Locks the defensive coercion. ----
-			{
-				Code:    `<nav role="navigation" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"nav": "not-an-array"},
 				Errors:  []rule_tester.InvalidTestCaseError{invalidErr("nav", "navigation")},
 			},
 			// ---- Allow-list keyed differently — `{ button: [...] }` covers

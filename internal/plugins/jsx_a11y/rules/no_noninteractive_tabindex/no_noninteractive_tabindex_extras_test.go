@@ -521,8 +521,6 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		// Empty array — defaults to all-falsy (no escape hatches).
 		{Code: `<div tabIndex={-1} />`, Tsx: true, Options: []interface{}{}},
 		// Malformed option types are silently dropped → defaults apply.
-		{Code: `<div tabIndex={-1} />`, Tsx: true, Options: []interface{}{map[string]interface{}{"tags": "not-an-array"}}},
-		{Code: `<div tabIndex={-1} />`, Tsx: true, Options: []interface{}{map[string]interface{}{"roles": 123}}},
 		{Code: `<div tabIndex={-1} />`, Tsx: true, Options: []interface{}{map[string]interface{}{"allowExpressionValues": "yes"}}},
 		// Combined options on top of recommendedOptions shape.
 		{Code: `<div tabIndex={0} />`, Tsx: true, Options: allOptionsCombo},

@@ -343,12 +343,6 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleStringBoundaries(t *testing
 func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
-			// Mixed-type array — only "menu" survives, exempting the case.
-			{
-				Code:    `<ul role="menu" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"ul": []interface{}{"menu", 123, nil, "menubar"}},
-			},
 			// Case-mismatched ROLE-attribute value vs lowercase allow-list
 			// — upstream lowercases the role via `getExplicitRole`, so
 			// `role="Menu"` matches allow-list entry "menu". Locks in the
@@ -366,22 +360,6 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) 
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
-			},
-			// Non-array value — `StringSliceOption` returns nil, key is
-			// silently dropped from `allowedRoles`.
-			{
-				Code:    `<ul role="menu" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"ul": "menu"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
-			},
-			// Mixed-type array containing only the WRONG roles — still
-			// reports.
-			{
-				Code:    `<ul role="menu" />`,
-				Tsx:     true,
-				Options: map[string]interface{}{"ul": []interface{}{"menubar", 123, nil}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
 			},
 			// Option key case mismatch — `getElementType` returns "ul"

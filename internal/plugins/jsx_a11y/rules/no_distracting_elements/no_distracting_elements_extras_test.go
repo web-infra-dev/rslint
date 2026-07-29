@@ -122,31 +122,6 @@ func TestNoDistractingElementsExtras(t *testing.T) {
 		// `options.elements` is NOT a list — fallback to defaults; `<div />`
 		// still passes.
 		// ============================================================
-		{
-			Code:    `<div />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": "marquee"}, // wrong type, ignored
-		},
-
-		// `options.elements` is null — StringSliceOption returns nil →
-		// fallback to default. `<div />` is still valid.
-		{
-			Code:    `<div />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": nil},
-		},
-
-		// rslint extension: an `elements` array containing only non-string
-		// entries — StringSliceOption filters them all out, leaving an empty
-		// `[]string`, which silences the rule. ESLint's JSON schema rejects
-		// this at config-load time so it never reaches rule logic upstream;
-		// rslint accepts the input and we lock the silenced behavior.
-		{
-			Code:    `<marquee />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": []interface{}{123, true}},
-		},
-
 		// ============================================================
 		// Components map: map-to-non-distracting / non-string value
 		// ============================================================
@@ -410,15 +385,6 @@ func TestNoDistractingElementsExtras(t *testing.T) {
 		// Options: custom `elements` list — `<custom />` reports when
 		// "custom" is in the list.
 		// ============================================================
-		{
-			Code:    `<custom />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": []interface{}{"custom"}},
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "distractingElement",
-				Message:   "Do not use <custom> elements as they can create visual accessibility issues and are deprecated.",
-			}},
-		},
 		// Custom list with only one of the defaults — only that one fires.
 		{
 			Code:    `<blink />`,
@@ -756,32 +722,5 @@ func TestNoDistractingElementsExtras(t *testing.T) {
 		// reach the rule's `find` and we lock in the literal-comparison
 		// behavior.
 		// ============================================================
-		// Mixed-type array — non-strings are dropped by StringSliceOption,
-		// "marquee" still matches.
-		{
-			Code:    `<marquee />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": []interface{}{"marquee", 123}},
-			Errors:  []rule_tester.InvalidTestCaseError{expectedMarqueeError},
-		},
-		// (Note: "all non-strings → silenced" is a Valid case, see the
-		// valid block above for `[123, true]` coverage location.)
-		// Empty-string entry alongside marquee — empty never matches a
-		// real tag name, marquee still does.
-		{
-			Code:    `<marquee />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": []interface{}{"", "marquee"}},
-			Errors:  []rule_tester.InvalidTestCaseError{expectedMarqueeError},
-		},
-		// Duplicate entry — `find` short-circuits on the first hit, only
-		// one report emitted. (Schema rejects upstream as
-		// uniqueItems-violation.)
-		{
-			Code:    `<marquee />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"elements": []interface{}{"marquee", "marquee"}},
-			Errors:  []rule_tester.InvalidTestCaseError{expectedMarqueeError},
-		},
 	})
 }

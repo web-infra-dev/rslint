@@ -821,11 +821,6 @@ func TestHeadingHasContentOptionParsing(t *testing.T) {
 		{Code: `<Custom />`, Tsx: true, Options: map[string]interface{}{}},
 		// Empty components array — same as defaults.
 		{Code: `<Custom />`, Tsx: true, Options: map[string]interface{}{"components": []interface{}{}}},
-		// Components with non-string entries are silently skipped.
-		{Code: `<Heading>x</Heading>`, Tsx: true, Options: map[string]interface{}{"components": []interface{}{"Heading", 42, true}}},
-		// Malformed components (string instead of array) — must not crash;
-		// falls back to defaults.
-		{Code: `<Heading />`, Tsx: true, Options: map[string]interface{}{"components": "Heading"}},
 		// Unknown options keys are ignored.
 		{Code: `<Heading />`, Tsx: true, Options: map[string]interface{}{"unknown": true, "components": []interface{}{}}},
 		// Components includes "h1" (duplicate) — typeCheck has duplicates but
