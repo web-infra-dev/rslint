@@ -3,6 +3,7 @@
 package autocomplete_valid
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed autocomplete_valid.schema.json
+var schemaJSON []byte
 
 // failMessage is the message axe-core's `autocomplete-valid` check emits when
 // the autocomplete attribute fails validation. The upstream ESLint rule reads
@@ -163,20 +167,20 @@ type options struct {
 	inputComponents []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.inputComponents = utils.ToStringSlice(m["inputComponents"])
 	return opts
 }
 
 var AutocompleteValidRule = rule.Rule{
-	Name: "jsx-a11y/autocomplete-valid",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/autocomplete-valid",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// inputTypes is the union of `["input"]` and the user-provided

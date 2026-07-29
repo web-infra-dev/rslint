@@ -178,11 +178,6 @@ new RuleTester().run('control-has-associated-label', null as never, {
       code: '<button data-label="Save" />',
       options: [{ labelAttributes: ['data-label'] }],
     },
-    // labelAttributes — duplicate entry, defensive.
-    {
-      code: '<button title="Save" />',
-      options: [{ labelAttributes: ['title', 'title'] }],
-    },
 
     // ============================================================
     // ignoreRoles vs case-sensitivity / multi-role

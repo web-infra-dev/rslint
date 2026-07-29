@@ -25,12 +25,16 @@
 package no_autofocus
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_autofocus.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
 const errorMessage = "The autoFocus prop should not be enabled, as it can reduce usability and accessibility for users."
@@ -42,12 +46,12 @@ type options struct {
 	IgnoreNonDOM bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	optsMap, _ := raw[0].(map[string]interface{})
 	if v, ok := optsMap["ignoreNonDOM"].(bool); ok {
 		opts.IgnoreNonDOM = v
 	}
@@ -55,9 +59,9 @@ func parseOptions(raw any) options {
 }
 
 var NoAutofocusRule = rule.Rule{
-	Name: "jsx-a11y/no-autofocus",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-autofocus",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

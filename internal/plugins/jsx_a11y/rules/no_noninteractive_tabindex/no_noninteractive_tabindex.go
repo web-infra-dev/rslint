@@ -30,14 +30,17 @@
 package no_noninteractive_tabindex
 
 import (
+	_ "embed"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_noninteractive_tabindex.schema.json
+var schemaJSON []byte
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
 const errorMessage = "`tabIndex` should only be declared on interactive elements."
@@ -53,12 +56,12 @@ type options struct {
 	AllowExpressionValues bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
 	opts.Tags = jsxa11yutil.StringSliceOption(m["tags"])
 	opts.Roles = jsxa11yutil.StringSliceOption(m["roles"])
 	if v, ok := m["allowExpressionValues"].(bool); ok {
@@ -68,9 +71,9 @@ func parseOptions(raw any) options {
 }
 
 var NoNoninteractiveTabindexRule = rule.Rule{
-	Name: "jsx-a11y/no-noninteractive-tabindex",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-noninteractive-tabindex",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		// sourceText is required by GetTabIndexEx for raw-text template
 		// literal extraction (NoSubstitutionTemplate has no RawText field).

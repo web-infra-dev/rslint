@@ -32,14 +32,17 @@
 package no_redundant_roles
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_redundant_roles.schema.json
+var schemaJSON []byte
 
 // Implicit-role lookup (`getImplicitRole`, `getExplicitRole`, and the
 // per-element `implicitRoleFor*` helpers) lives in
@@ -79,8 +82,11 @@ func errorMessage(element, implicitRole string) string {
 // and `options = [{}]` both yield an empty allowedRedundantRoles
 // object, and `hasOwn({}, 'nav')` is `false`, so DEFAULT_ROLE_EXCEPTIONS
 // is consulted in both cases.
-func parseOptions(raw any) map[string][]string {
-	m := utils.GetOptionsMap(raw)
+func parseOptions(raw []any) map[string][]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	m, _ := raw[0].(map[string]interface{})
 	if m == nil {
 		return nil
 	}
@@ -92,9 +98,9 @@ func parseOptions(raw any) map[string][]string {
 }
 
 var NoRedundantRolesRule = rule.Rule{
-	Name: "jsx-a11y/no-redundant-roles",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/no-redundant-roles",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node) {

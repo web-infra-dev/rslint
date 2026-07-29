@@ -1,0 +1,24 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "hoverInHandlers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "hoverOutHandlers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

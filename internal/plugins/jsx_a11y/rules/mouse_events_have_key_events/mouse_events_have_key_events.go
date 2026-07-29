@@ -41,12 +41,16 @@
 package mouse_events_have_key_events
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed mouse_events_have_key_events.schema.json
+var schemaJSON []byte
 
 // defaultHoverInHandlers / defaultHoverOutHandlers mirror upstream's
 // `DEFAULT_HOVER_IN_HANDLERS` / `DEFAULT_HOVER_OUT_HANDLERS`. Used when
@@ -65,15 +69,15 @@ type options struct {
 	HoverOutHandlers []string
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{
 		HoverInHandlers:  defaultHoverInHandlers,
 		HoverOutHandlers: defaultHoverOutHandlers,
 	}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	optsMap, _ := raw[0].(map[string]interface{})
 	// Explicit empty array stays empty; a non-array / missing key falls
 	// back to the upstream defaults via `??`. StringSliceOption returns
 	// nil for non-`[]interface{}` inputs and a non-nil zero-length slice
@@ -139,9 +143,9 @@ func pairAttributeIsMissing(attrs []*ast.Node, pairName string) bool {
 }
 
 var MouseEventsHaveKeyEventsRule = rule.Rule{
-	Name: "jsx-a11y/mouse-events-have-key-events",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "jsx-a11y/mouse-events-have-key-events",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node) {

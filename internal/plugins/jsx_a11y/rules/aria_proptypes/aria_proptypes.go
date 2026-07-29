@@ -211,7 +211,8 @@ func permittedValuesContainsString(values []any, candidate string) bool {
 }
 
 var AriaProptypesRule = rule.Rule{
-	Name: "jsx-a11y/aria-proptypes",
+	Name:   "jsx-a11y/aria-proptypes",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {

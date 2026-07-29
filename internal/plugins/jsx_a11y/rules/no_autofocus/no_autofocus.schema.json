@@ -1,0 +1,16 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignoreNonDOM": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowedInvalidRoles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "ignoreNonDOM": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

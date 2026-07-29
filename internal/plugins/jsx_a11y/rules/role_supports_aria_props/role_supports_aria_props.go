@@ -68,7 +68,8 @@ func errorMessage(attr, role, tag string, isImplicit bool) string {
 }
 
 var RoleSupportsAriaPropsRule = rule.Rule{
-	Name: "jsx-a11y/role-supports-aria-props",
+	Name:   "jsx-a11y/role-supports-aria-props",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			elementType := jsxa11yutil.GetElementType(node, ctx.Settings)

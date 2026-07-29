@@ -278,12 +278,6 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // Empty option object / array.
     { code: '<div tabIndex={-1} />', options: [{}] },
     { code: '<div tabIndex={-1} />', options: [] },
-    // Malformed option types silently default.
-    {
-      code: '<div tabIndex={-1} />',
-      options: [{ tags: 'not-an-array' }],
-    },
-    { code: '<div tabIndex={-1} />', options: [{ roles: 123 }] },
 
     // ============================================================
     // Custom components (skip via dom.has=false)

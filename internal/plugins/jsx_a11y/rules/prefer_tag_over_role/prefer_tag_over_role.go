@@ -166,7 +166,8 @@ func lastSpaceSeparatedToken(s string) string {
 }
 
 var PreferTagOverRoleRule = rule.Rule{
-	Name: "jsx-a11y/prefer-tag-over-role",
+	Name:   "jsx-a11y/prefer-tag-over-role",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)

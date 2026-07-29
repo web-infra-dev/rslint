@@ -1,0 +1,38 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "labelComponents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "labelAttributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "controlComponents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "additionalItems": false
+        },
+        "assert": {
+          "type": "string",
+          "enum": ["htmlFor", "nesting", "both", "either"]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
