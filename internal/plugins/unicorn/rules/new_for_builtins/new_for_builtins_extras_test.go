@@ -114,6 +114,13 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 				"namespace Intl { export const local = 1; }",
 				"Intl.DateTimeFormat();",
 			)),
+			// A namespace shadows regardless of its content: unlike a bare
+			// interface/type alias, upstream's scope analysis treats any
+			// `namespace`/`module` declaration as capable of holding a value.
+			tsValid(lines(
+				"namespace Intl { export interface Local {} }",
+				"Intl.DateTimeFormat();",
+			)),
 			// ---- Dimension 4: bare WebAssembly namespace aliases are not tracked by upstream ----
 			jsValid(lines(
 				"const WA = WebAssembly;",
@@ -304,10 +311,6 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 				"interface Array {}",
 				"A();",
 			), "A()", "Array"),
-			tsEnforceInvalid(lines(
-				"namespace Intl { export interface Local {} }",
-				"Intl.DateTimeFormat();",
-			), "Intl.DateTimeFormat()", "Intl.DateTimeFormat"),
 
 			// ---- Real-user: #901 new String('test') reports but has no autofix ----
 			disallowNoFixInvalid("const str = new String('test');", "new String('test')", "String"),

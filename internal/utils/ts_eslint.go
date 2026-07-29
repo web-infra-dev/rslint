@@ -1349,14 +1349,18 @@ func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 // where a local declaration only counts when it shadows a built-in *value*;
 // use IsSymbolDeclaredInFile when any local declaration counts.
 //
-// Declarations that don't introduce a value are skipped: interfaces, type
-// aliases, and namespaces with no instantiated (value-producing) content.
-// A file can locally re-open an ambient global's type this way — for example
-// `interface Map {}` or `namespace Intl { export interface Local {} }` in a
-// global script — and declaration merging attaches that type-only
-// declaration to the same (checker-resolved) symbol as the ambient value.
-// The call site still resolves to the global value, not the file's type-only
-// declaration, so only value-introducing declarations count here.
+// Only interfaces and type aliases are skipped as never value-introducing. A
+// file can locally re-open an ambient global's type this way — for example
+// `interface Map {}` in a global script — and declaration merging attaches
+// that type-only declaration to the same (checker-resolved) symbol as the
+// ambient value. The call site still resolves to the global value, not the
+// file's type-only declaration, so these don't count here.
+//
+// A namespace declaration counts unconditionally, even one with no
+// instantiated (value-producing) content of its own, matching how
+// typescript-eslint's scope analysis treats it: syntactically, any
+// `namespace`/`module` declaration can hold a value, so it's never treated as
+// type-only regardless of what it happens to contain.
 func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
@@ -1365,10 +1369,6 @@ func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 		switch decl.Kind {
 		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
 			continue
-		case ast.KindModuleDeclaration:
-			if !ast.IsInstantiatedModule(decl, false /*preserveConstEnums*/) {
-				continue
-			}
 		}
 		if ast.GetSourceFileOfNode(decl) == sf {
 			return true
