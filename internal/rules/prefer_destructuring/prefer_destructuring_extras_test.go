@@ -26,10 +26,6 @@ func TestPreferDestructuringExtras(t *testing.T) {
 		t,
 		&PreferDestructuringRule,
 		[]rule_tester.ValidTestCase{
-			// Direct Rule.Run/API fallback: public config validation rejects an
-			// empty first object because it matches both schema oneOf branches.
-			// If validation is bypassed, it safely disables both check kinds.
-			{Code: "const foo = object.foo;", Options: map[string]any{}},
 			// Locks in upstream shouldCheck() arm 2: a missing per-node-type
 			// assignment config disables the check.
 			{Code: "foo = object.foo;", Options: map[string]any{"AssignmentExpression": map[string]any{}}},

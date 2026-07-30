@@ -142,17 +142,6 @@ func TestAriaRoleExtras(t *testing.T) {
 			{Code: `<div role="button" />`, Tsx: true, Options: map[string]interface{}{}},
 
 			// ============================================================
-			// Non-string entries in allowedInvalidRoles are silently
-			// skipped — defensive but mirrors upstream's `new Set(opts...)`
-			// which would include the raw value but `validRoles.has(val)`
-			// type-mismatches on a string-vs-number compare.
-			// ============================================================
-			{
-				Code: `<div role="button" />`, Tsx: true,
-				Options: map[string]interface{}{"allowedInvalidRoles": []interface{}{42, "foo"}},
-			},
-
-			// ============================================================
 			// polymorphicAllowList: only `<Box>` consults polymorphic
 			// prop; `<Foo>` does not. Both with ignoreNonDOM and a custom
 			// role: Foo is not DOM and not on the allow-list, so polymorphic
@@ -231,20 +220,7 @@ func TestAriaRoleExtras(t *testing.T) {
 			// Whole options is nil / wrong type → defaults apply (no
 			// allowed list, ignoreNonDOM = false).
 			{Code: `<div role="button" />`, Tsx: true, Options: nil},
-			{Code: `<div role="button" />`, Tsx: true, Options: "not-a-map"},
-			{Code: `<div role="button" />`, Tsx: true, Options: 42},
 			{Code: `<div role="button" />`, Tsx: true, Options: []interface{}{}},
-
-			// ============================================================
-			// ignoreNonDOM option — non-boolean values.
-			// rslint's `parseOptions` does a type-asserted bool read;
-			// non-bool values (string "true", numeric 1, nil) silently fall
-			// back to the default `false`, so the rule continues to validate
-			// custom components. ESLint would reject these at schema-load
-			// time; we match the runtime behavior on rslint-side.
-			// ============================================================
-			{Code: `<div role="button" />`, Tsx: true, Options: map[string]interface{}{"ignoreNonDOM": "true"}},
-			{Code: `<div role="button" />`, Tsx: true, Options: map[string]interface{}{"ignoreNonDOM": 1}},
 
 			// ============================================================
 			// Settings — missing / malformed.
@@ -580,17 +556,6 @@ func TestAriaRoleExtras(t *testing.T) {
 			// custom component therefore still validates and the invalid
 			// role reports.
 			// ============================================================
-			{
-				Code: `<Foo role="datepicker" />`, Tsx: true,
-				Options: map[string]interface{}{"ignoreNonDOM": "true"},
-				Errors:  []rule_tester.InvalidTestCaseError{invalidRoleError()},
-			},
-			{
-				Code: `<Foo role="datepicker" />`, Tsx: true,
-				Options: map[string]interface{}{"ignoreNonDOM": 1},
-				Errors:  []rule_tester.InvalidTestCaseError{invalidRoleError()},
-			},
-
 			// ============================================================
 			// components map redirects a custom name to a DOM element →
 			// rule runs against the resolved type (no ignoreNonDOM bypass).

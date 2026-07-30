@@ -1350,28 +1350,6 @@ class C {
 			},
 		},
 
-		// forbid object with extra unknown keys — silently ignored, the
-		// `element` and `message` fields still work. Lock-in: extra
-		// keys do not break parsing.
-		{
-			Code: `<button />`,
-			Tsx:  true,
-			Options: optsForbid(map[string]interface{}{
-				"element": "button",
-				"message": "use Button",
-				"extra":   "ignored",
-				"flag":    true,
-			}),
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "forbiddenElement_message",
-					Message:   "<button> is forbidden, use Button",
-					Line:      1,
-					Column:    2,
-				},
-			},
-		},
-
 		// Mixed forbid list — string, object-with-message, object-without
 		// — within one config; each entry tested in one expression.
 		{

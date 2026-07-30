@@ -359,9 +359,6 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 			// labelAttributes with hyphenated prop name.
 			{Code: `<button data-label="Save" />`, Tsx: true,
 				Options: map[string]interface{}{"labelAttributes": []interface{}{"data-label"}}},
-			// labelAttributes with duplicate entries — defensive.
-			{Code: `<button title="Save" />`, Tsx: true,
-				Options: map[string]interface{}{"labelAttributes": []interface{}{"title", "title"}}},
 			// labelAttributes containing a builtin name (alt) — redundant
 			// but harmless.
 			{Code: `<button><img alt="Save" /></button>`, Tsx: true,

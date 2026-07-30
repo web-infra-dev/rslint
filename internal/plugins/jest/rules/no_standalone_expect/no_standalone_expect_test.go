@@ -100,20 +100,6 @@ func TestNoStandaloneExpectRule(t *testing.T) {
 			},
 			{
 				Code: `
-        describe('scenario', () => {
-          const t = Math.random() ? it.only : it;
-          t('testing', () => expect(true).toBe(false));
-        });
-      `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": nil},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedExpect", Line: 4, Column: 30, EndColumn: 54},
-				},
-			},
-			{
-				Code: `
         each([
           [1, 1, 2],
           [1, 2, 3],

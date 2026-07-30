@@ -123,13 +123,6 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      across propsToValidate. ----
 		{Code: `<a href="foo" hrefLeft={null} />`, Tsx: true, Options: specialLinkOption},
 
-		// ---- Empty aspects array: upstream's runtime treats this as "no
-		//      aspects active", so even no-href elements pass. Locks in
-		//      our explicit-aspects-array deactivation logic. ----
-		{Code: `<a />`, Tsx: true, Options: []interface{}{
-			map[string]interface{}{"aspects": []interface{}{}},
-		}},
-
 		// ---- staticEval `||` short-circuit: falsy left → take right ----
 		// Upstream's jsx-ast-utils LogicalExpression extractor evaluates
 		// `getValue(left) || getValue(right)`. Empty string is falsy → use
@@ -230,13 +223,6 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      iteration when a configured prop is absent. ----
 		{Code: `<a href="/foo" />`, Tsx: true, Options: []interface{}{
 			map[string]interface{}{"specialLink": []interface{}{"hrefBottom"}},
-		}},
-
-		// ---- aspects array with an unknown name — silently ignored,
-		//      matching upstream's `aspects.indexOf(aspect) !== -1`
-		//      mechanism. All three known aspects stay false → no report. ----
-		{Code: `<a />`, Tsx: true, Options: []interface{}{
-			map[string]interface{}{"aspects": []interface{}{"madeUpAspect"}},
 		}},
 
 		// ---- aspects with all three names = same as default (all active) ----
@@ -518,12 +504,6 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      Below is a different shape that IS invalid:
 		//      `<a hrefLeft="" />` — explicit empty string, length 0,
 		//      invalid. Already covered in upstream tests.
-
-		// ---- aspects array with both ON and unknown — unknown silently
-		//      ignored, "noHref" still triggers reports. ----
-		{Code: `<a />`, Tsx: true, Options: []interface{}{
-			map[string]interface{}{"aspects": []interface{}{"noHref", "madeUpAspect"}},
-		}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
 
 		// ---- Bare-object options shape (single-option CLI / lint() API
 		//      shape) for the invalid path. Without an array wrap, the

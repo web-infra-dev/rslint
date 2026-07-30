@@ -300,42 +300,6 @@ func TestMaxExpectsRule(t *testing.T) {
       `,
 				Options: []interface{}{map[string]interface{}{"max": 5}},
 			},
-			{
-				Code: `
-        test('schema-invalid max zero falls back to default', () => {
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-        });
-      `,
-				Options: []interface{}{map[string]interface{}{"max": 0}},
-			},
-			{
-				Code: `
-        test('schema-invalid negative max falls back to default', () => {
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-        });
-      `,
-				Options: []interface{}{map[string]interface{}{"max": -1}},
-			},
-			{
-				Code: `
-        test('schema-invalid fractional max falls back to default', () => {
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-          expect(true).toBeDefined();
-        });
-      `,
-				Options: []interface{}{map[string]interface{}{"max": 1.5}},
-			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

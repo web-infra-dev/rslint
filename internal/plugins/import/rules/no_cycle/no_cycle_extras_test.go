@@ -126,20 +126,6 @@ func TestNoCycleExtras(t *testing.T) {
 					cycleError(messageViaTwoOne),
 				},
 			},
-			{
-				Code:    `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`,
-				Options: map[string]interface{}{"maxDepth": "2"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					cycleError(messageViaTwoOne),
-				},
-			},
-			{
-				Code:    `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`,
-				Options: map[string]interface{}{"maxDepth": 2.5},
-				Errors: []rule_tester.InvalidTestCaseError{
-					cycleError(messageViaTwoOne),
-				},
-			},
 
 			// Locks in upstream detectCycle() dynamic arm: allowUnsafeDynamicCyclicDependency only skips the dynamic path, not unrelated static cycles.
 			{

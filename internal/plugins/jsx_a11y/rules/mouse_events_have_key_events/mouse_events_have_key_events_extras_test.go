@@ -335,23 +335,6 @@ func TestMouseEventsHaveKeyEventsExtras(t *testing.T) {
 				Tsx:     true,
 				Options: []interface{}{},
 			},
-			// ---- Malformed options: non-string entries are filtered by
-			//      StringSliceOption. Remaining ["onMouseOver"] becomes
-			//      the effective hoverIn list. ----
-			{
-				Code:    `<div onMouseOver={fn} onFocus={fn} />`,
-				Tsx:     true,
-				Options: []interface{}{map[string]interface{}{"hoverInHandlers": []interface{}{1, true, "onMouseOver"}}},
-			},
-			// ---- Malformed hoverInHandlers — not an array → StringSliceOption
-			//      returns nil → defaults apply → `<div onMouseOver={fn}
-			//      onFocus={fn} />` paired. ----
-			{
-				Code:    `<div onMouseOver={fn} onFocus={fn} />`,
-				Tsx:     true,
-				Options: []interface{}{map[string]interface{}{"hoverInHandlers": "onMouseOver"}},
-			},
-
 			// ============================================================
 			// ShorthandPropertyAssignment in literal spread — `getProp`
 			// walks literal spreads (default spreadStrict: false). The

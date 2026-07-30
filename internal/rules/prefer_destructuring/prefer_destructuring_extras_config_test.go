@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -186,7 +185,7 @@ func preferDestructuringConfigMatrix() []preferDestructuringConfigCase {
 func TestPreferDestructuringParseOptionsMatrix(t *testing.T) {
 	for _, testCase := range preferDestructuringConfigMatrix() {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := parseOptions(rule.NormalizeOptions(testCase.options))
+			got := parseOptions(rule_tester.ResolveTestCaseOptions(t, &PreferDestructuringRule, testCase.options))
 			if got != testCase.want {
 				t.Fatalf("parseOptions() = %#v, want %#v", got, testCase.want)
 			}

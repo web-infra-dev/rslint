@@ -613,13 +613,6 @@ func TestAnchorHasContentOptionParsing(t *testing.T) {
 		{Code: `<Custom />`, Tsx: true, Options: map[string]interface{}{}},
 		// Empty components array — same as defaults.
 		{Code: `<Custom />`, Tsx: true, Options: map[string]interface{}{"components": []interface{}{}}},
-		// Components with non-string entries are silently skipped — locks in
-		// the type-guard inside parseOptions.
-		{Code: `<Anchor>x</Anchor>`, Tsx: true, Options: map[string]interface{}{"components": []interface{}{"Anchor", 42, true}}},
-		// Malformed components (string instead of array) — must not crash;
-		// falls back to defaults. Schema validation would reject this in
-		// real ESLint usage, but the rule must still be defensive.
-		{Code: `<Anchor />`, Tsx: true, Options: map[string]interface{}{"components": "Anchor"}},
 		// Unknown options keys are ignored.
 		{Code: `<Anchor />`, Tsx: true, Options: map[string]interface{}{"unknown": true, "components": []interface{}{}}},
 		// Components includes "a" (duplicate) — typeCheck has duplicates but

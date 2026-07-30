@@ -1,7 +1,6 @@
 package no_cycle_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
@@ -210,13 +209,6 @@ func noCycleUpstreamInvalidCases() []rule_tester.InvalidTestCase {
 			Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				cycleError(messageViaTwoOne),
-			},
-		},
-		{
-			Code:    `import { depthTwo } from "./no-cycle/depth-two"; export const rootValue = depthTwo; export type RootType = string;`,
-			Options: []interface{}{map[string]interface{}{"maxDepth": math.Inf(1)}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				cycleError(messageViaDepthOne),
 			},
 		},
 		{

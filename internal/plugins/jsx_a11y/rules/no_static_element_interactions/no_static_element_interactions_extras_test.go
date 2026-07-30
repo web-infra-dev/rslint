@@ -329,11 +329,6 @@ func TestNoStaticElementInteractionsOptionParsing(t *testing.T) {
 			// stays false; handlers stays as default.
 			{Code: `<TestComponent onClick={() => {}} />`, Tsx: true, Options: map[string]interface{}{}},
 			{Code: `<TestComponent onClick={() => {}} />`, Tsx: true, Options: []interface{}{}},
-			// Malformed handlers value — non-array shape should be treated
-			// as "user provided something" but produce an empty list →
-			// never reports.
-			{Code: `<div onClick={() => {}} />`, Tsx: true, Options: map[string]interface{}{"handlers": "not-an-array"}},
-			{Code: `<div onClick={() => {}} />`, Tsx: true, Options: map[string]interface{}{"handlers": 0}},
 			// Malformed allowExpressionValues value — non-bool ignored →
 			// stays falsy. Rule path falls through (no skip), but onClick on
 			// <button> is exempt via IsInteractiveElement → valid.

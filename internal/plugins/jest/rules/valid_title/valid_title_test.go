@@ -31,12 +31,6 @@ func TestValidTitleRule(t *testing.T) {
 		{
 			Code: `it("correctly sets the value", () => {});`,
 			Options: []interface{}{
-				map[string]interface{}{"disallowedWords": nil},
-			},
-		},
-		{
-			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
 				map[string]interface{}{
 					"mustMatch": map[string]interface{}{},
 				},

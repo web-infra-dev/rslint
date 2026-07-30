@@ -552,15 +552,6 @@ func TestNoAutofocusExtras(t *testing.T) {
 			Options: []interface{}{map[string]interface{}{"ignoreNonDOM": false}},
 			Errors:  []rule_tester.InvalidTestCaseError{expectedError},
 		},
-		// Malformed option (wrong type) is silently ignored → defaults to
-		// ignoreNonDOM=false → custom component still reports.
-		{
-			Code:    `<Foo autoFocus />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"ignoreNonDOM": "yes"},
-			Errors:  []rule_tester.InvalidTestCaseError{expectedError},
-		},
-
 		// ============================================================
 		// Group 16: Real-world component patterns
 		// ============================================================

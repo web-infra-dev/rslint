@@ -35,8 +35,6 @@ func TestNoInstanceofBuiltinsExtras(t *testing.T) {
 		jsValidOptions("foo instanceof Array", map[string]interface{}{"exclude": []interface{}{"Array"}}),
 		// ---- Dimension 4: exclude still wins when strict strategy would otherwise report ----
 		jsValidOptions("foo instanceof Map", []interface{}{map[string]interface{}{"strategy": "strict", "exclude": []interface{}{"Map"}}}),
-		// ---- Dimension 4: malformed include option is ignored rather than widening matches ----
-		jsValidOptions("foo instanceof WebWorker", []interface{}{map[string]interface{}{"include": "WebWorker"}}),
 		// ---- Dimension 4: TS assertion on the right is not transparent to upstream's Identifier gate ----
 		tsValid("foo instanceof (Array as any)"),
 		// ---- Dimension 4: TS non-null on the right is not transparent to upstream's Identifier gate ----

@@ -120,13 +120,46 @@ type ESLintTestSuite struct {
 	Invalid []ESLintInvalidTestCase `json:"invalid"`
 }
 
+// ResolveTestCaseOptions puts a test case's options through the same step a
+// real config goes through before the rule ever runs: the normalized options
+// array is validated against the rule's declared schema, and schema-declared
+// `default`s are filled in. Options a real config would reject fail the test
+// here, so a test case can't lock in a configuration no user can reach; and a
+// rule whose defaults live in its schema sees them in tests too, exactly as it
+// would at runtime.
+//
+// Rules that declare no schema yet run whatever the test case passes,
+// preserving the pre-schema behavior.
+//
+// It is exported so test harnesses that call a rule's Run directly instead of
+// going through [RunRuleTester] (e.g. to inspect diagnostics across multiple
+// files, or under different [rule.EditDemand]s) can still exercise the same
+// schema validation an ordinary config would apply.
+//
+// The options are deep-copied before validation because [rule.Schema.Validate]
+// fills defaults in place, the way ajv's `useDefaults` does. Test cases are
+// package level values shared by every case [RunRuleTester] runs, and those
+// run in parallel, so mutating the caller's own maps would be a data race.
+func ResolveTestCaseOptions(t *testing.T, r *rule.Rule, rawOptions any) []any {
+	if r.Schema == nil {
+		return rule.NormalizeOptions(rawOptions)
+	}
+	options := rule.NormalizeOptions(rule.DeepCopyJSON(rawOptions))
+	if err := r.Schema.Validate(options); err != nil {
+		t.Fatalf("test case options %#v are rejected by %s's schema: %v", rawOptions, r.Name, err)
+	}
+	return options
+}
+
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	t.Parallel()
 
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, settings map[string]interface{}, globals map[string]bool, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, globals map[string]bool, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+		options := ResolveTestCaseOptions(t, r, rawOptions)
+
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
@@ -157,7 +190,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 						Globals:  globals,
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
-							return r.Run(ctx, rule.NormalizeOptions(options))
+							return r.Run(ctx, options)
 						},
 					},
 				}

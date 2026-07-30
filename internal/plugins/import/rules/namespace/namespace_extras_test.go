@@ -123,14 +123,6 @@ func TestNamespaceExtras(t *testing.T) {
 					{MessageId: "computed", Message: computedNames, Line: 1, Column: 61, EndLine: 1, EndColumn: 64},
 				},
 			},
-			// ---- Dimension 4: options, unrelated option object keeps computed reporting enabled ----
-			{
-				Code:    `import * as names from "./named-exports"; console.log(names["a"]);`,
-				Options: map[string]interface{}{"unknown": true},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "computed", Message: computedNames, Line: 1, Column: 61, EndLine: 1, EndColumn: 64},
-				},
-			},
 			// ---- Dimension 4: access/key forms, non-Identifier destructuring key is rejected ----
 			{
 				Code: `import * as names from "./named-exports"; const { "a": a } = names`,

@@ -398,15 +398,6 @@ func TestJsxIndentPropsRule(t *testing.T) {
 			Options: []interface{}{},
 		},
 
-		// Unrecognised string in object form (`indentMode: 'spaces'`)
-		// silently falls through to default 4-space — must not crash
-		// or produce false reports.
-		{
-			Code:    "\n        <App\n            foo\n        />\n      ",
-			Tsx:     true,
-			Options: []interface{}{map[string]interface{}{"indentMode": "spaces"}},
-		},
-
 		// First prop sharing the opening tag's `?`/`:` line: upstream's
 		// getNodeIndent gives useOperator (line starts with the operator)
 		// priority over useBracket (line contains `<`), so the operator state

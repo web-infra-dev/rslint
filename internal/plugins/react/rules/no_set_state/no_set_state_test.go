@@ -1830,26 +1830,6 @@ class Hello {
 			},
 		},
 
-		// ---- Real-world: forward-compat — Options array with future option strings ----
-		// upstream `schema: []` accepts no options. We don't read
-		// `options` either, so passing a future-shape value must be a
-		// no-op (still report the call). Locks future-proofing.
-		{
-			Code: `
-        class Hello extends React.Component {
-          someMethod() {
-            this.setState({});
-          }
-          render() { return <div/>; }
-        }
-      `,
-			Tsx:     true,
-			Options: []interface{}{"some-future-option"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noSetState", Line: 4, Column: 13},
-			},
-		},
-
 		// ---- Real-world: empty Options array — same as default ----
 		{
 			Code: `

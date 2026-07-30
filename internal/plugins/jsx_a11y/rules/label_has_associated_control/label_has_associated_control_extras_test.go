@@ -103,9 +103,6 @@ func TestLabelHasAssociatedControl_LockInExtras(t *testing.T) {
 			// under either mode (htmlFor present), so the unknown-assert
 			// behavior matches.
 			// ============================================================
-			{Code: `<label htmlFor="x">Save</label>`, Tsx: true, Options: []interface{}{map[string]interface{}{"assert": "garbage"}}},
-			// Empty assert string also normalizes to 'either'.
-			{Code: `<label htmlFor="x">Save</label>`, Tsx: true, Options: []interface{}{map[string]interface{}{"assert": ""}}},
 
 			// ============================================================
 			// Spread-attribute opacity: `<label {...props}>Save<input/></label>`
@@ -201,10 +198,6 @@ func TestLabelHasAssociatedControl_LockInExtras(t *testing.T) {
 			// behavior is `either` mode). `<label>Save</label>` has neither
 			// htmlFor nor nested control → reports `either`.
 			// ============================================================
-			{Code: `<label>Save</label>`, Tsx: true, Options: []interface{}{map[string]interface{}{"assert": "garbage"}},
-				Errors: []rule_tester.InvalidTestCaseError{expectedEither}},
-			{Code: `<label>Save</label>`, Tsx: true, Options: []interface{}{map[string]interface{}{"assert": ""}},
-				Errors: []rule_tester.InvalidTestCaseError{expectedEither}},
 
 			// ============================================================
 			// validateHtmlFor: `htmlFor={undefined}` resolves to undefined,
@@ -833,22 +826,6 @@ func TestLabelHasAssociatedControl_DepthBoundaries(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"depth": float64(0), "assert": "both"}},
 				Errors:  []rule_tester.InvalidTestCaseError{expectedBoth}},
 
-			// --------- Negative depth: mayHaveAccessibleLabel's `depth > maxDepth`
-			// bail fires at the ROOT (depth=0 > maxDepth=-1 is true), so even the
-			// root labelling-prop check is skipped → hasAccessibleLabel=false →
-			// accessibleLabel reports BEFORE the assert switch.
-			{Code: `<label htmlFor="x" aria-label="y"><input /></label>`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"depth": float64(-1), "assert": "both"}},
-				Errors:  []rule_tester.InvalidTestCaseError{expectedAccessibleLabel}},
-
-			// --------- Same root-bail for depth=-5: aria-label on root is NOT
-			// inspected — `0 > -5` is true, so mayHaveAccessibleLabel returns
-			// false immediately. Mirrors upstream's `Math.min(depth, 25)` (no
-			// lower-bound clamp) + `depth > maxDepth` bail.
-			{Code: `<label htmlFor="x" aria-label="y" />`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"depth": float64(-5), "assert": "htmlFor"}},
-				Errors:  []rule_tester.InvalidTestCaseError{expectedAccessibleLabel}},
-
 			// --------- depth=2 (default): input at depth 3 not found
 			{Code: `<label htmlFor="x">Save<span><span><input /></span></span></label>`, Tsx: true,
 				Options: []interface{}{map[string]interface{}{"assert": "both"}},
@@ -952,26 +929,6 @@ func TestLabelHasAssociatedControl_RealWorldPatterns(t *testing.T) {
 func TestLabelHasAssociatedControl_DefensiveOptions(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &LabelHasAssociatedControlRule,
 		[]rule_tester.ValidTestCase{
-			// --------- assert: non-string falls back to default 'either'
-			{Code: `<label>Save<input /></label>`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"assert": float64(42)}}},
-
-			// --------- depth: string instead of number → ignored → default 2
-			{Code: `<label>Save<input /></label>`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"depth": "not-a-number", "assert": "nesting"}}},
-
-			// --------- depth: nil → use default
-			{Code: `<label>Save<input /></label>`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"depth": nil, "assert": "nesting"}}},
-
-			// --------- labelComponents: array with mixed types → string entries kept
-			{Code: `<MyLabel htmlFor="x" aria-label="y" />`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"labelComponents": []interface{}{"MyLabel", float64(123), nil, true}, "assert": "htmlFor"}}},
-
-			// --------- labelComponents: not an array → ignored → only builtin 'label'
-			{Code: `<label htmlFor="x" aria-label="y" />`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"labelComponents": "not-array", "assert": "htmlFor"}}},
-
 			// --------- empty labelComponents array — builtin 'label' still applies
 			{Code: `<label htmlFor="x" aria-label="y" />`, Tsx: true,
 				Options: []interface{}{map[string]interface{}{"labelComponents": []interface{}{}, "assert": "htmlFor"}}},
@@ -1007,11 +964,5 @@ func TestLabelHasAssociatedControl_DefensiveOptions(t *testing.T) {
 				Settings: map[string]interface{}{"jsx-a11y": map[string]interface{}{"attributes": map[string]interface{}{"for": []interface{}{}}}},
 				Options:  []interface{}{map[string]interface{}{"assert": "htmlFor"}},
 				Errors:   []rule_tester.InvalidTestCaseError{expectedHtmlFor}},
-
-			// --------- depth: nil with deeply nested input → falls back to
-			// default 2 → input at depth 3 not found → both mode fails.
-			{Code: `<label htmlFor="x">label<span><span><input /></span></span></label>`, Tsx: true,
-				Options: []interface{}{map[string]interface{}{"depth": nil, "assert": "both"}},
-				Errors:  []rule_tester.InvalidTestCaseError{expectedBoth}},
 		})
 }

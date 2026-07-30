@@ -646,36 +646,6 @@ func TestJsxClosingBracketLocationRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"nonEmpty": false, "selfClosing": false},
 		},
-		// Unknown enum string — ESLint schema rejects, but rslint should
-		// degrade gracefully (default behavior; do not panic).
-		{
-			Code:    `<App />`,
-			Tsx:     true,
-			Options: "unknown-location-value",
-		},
-		// Numeric / boolean options — invalid per schema, must not crash.
-		{
-			Code:    `<App />`,
-			Tsx:     true,
-			Options: 42,
-		},
-		{
-			Code:    `<App />`,
-			Tsx:     true,
-			Options: true,
-		},
-		// Map with unknown key — ignored, defaults take effect.
-		{
-			Code:    `<App foo />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"unknownKey": "tag-aligned"},
-		},
-		// nonEmpty / selfClosing as non-string non-false (true) — ignored.
-		{
-			Code:    `<App foo />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"nonEmpty": true, "selfClosing": true},
-		},
 		// ---- CRLF line terminators (Windows) ----
 		// CRLF-terminated source, default tag-aligned — valid.
 		{
@@ -2241,45 +2211,6 @@ func TestJsxClosingBracketLocationRule(t *testing.T) {
 					Message:   "The closing bracket must be aligned with the line containing the opening tag (expected column 3 on the next line)",
 					Line:      3,
 					Column:    9,
-				},
-			},
-		},
-		// ---- Options-error fallback still triggers default behavior ----
-		// Even with non-string non-map options, default tag-aligned applies.
-		{
-			Code: `<App
-  foo
-  />`,
-			Tsx:     true,
-			Options: 42,
-			Output: []string{`<App
-  foo
-/>`},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "bracketLocation",
-					Message:   "The closing bracket must be aligned with the opening tag (expected column 1)",
-					Line:      3,
-					Column:    3,
-				},
-			},
-		},
-		// Map with unknown key — defaults still apply.
-		{
-			Code: `<App
-  foo
-  />`,
-			Tsx:     true,
-			Options: map[string]interface{}{"unknownKey": "props-aligned"},
-			Output: []string{`<App
-  foo
-/>`},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "bracketLocation",
-					Message:   "The closing bracket must be aligned with the opening tag (expected column 1)",
-					Line:      3,
-					Column:    3,
 				},
 			},
 		},

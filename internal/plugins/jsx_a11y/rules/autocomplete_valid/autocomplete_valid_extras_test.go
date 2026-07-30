@@ -157,13 +157,6 @@ func TestAutocompleteValidExtras(t *testing.T) {
 		},
 		// Nil options — defaults to just ["input"].
 		{Code: `<Foo autocomplete="foo" />;`, Tsx: true},
-		// Malformed option (non-array inputComponents) — tolerated by
-		// GetOptionsMap path, falls through to defaults.
-		{
-			Code:    `<Foo autocomplete="foo" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"inputComponents": "MyInput"},
-		},
 		// `<input autocomplete={undefined} />` — getLiteralPropValue returns
 		// undefined; typeof !== string → return early.
 		{Code: `<input autocomplete={undefined} />;`, Tsx: true},

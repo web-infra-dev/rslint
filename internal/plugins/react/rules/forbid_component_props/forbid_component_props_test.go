@@ -366,13 +366,6 @@ func TestForbidComponentPropsRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"forbid": []interface{}{"", "className"}},
 		},
-		// `forbid` not an array (schema-violating): falls back to defaults
-		// `['className', 'style']`. Here `other` isn't in defaults → valid.
-		{
-			Code:    `<Foo other="x" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": "className"},
-		},
 		// Nested Components: outer/inner DOM and outer/inner Components mixed.
 		// `<a>` and `<span>` are DOM — their props aren't checked even if forbidden.
 		{
@@ -397,15 +390,6 @@ func TestForbidComponentPropsRule(t *testing.T) {
 				},
 			}},
 		},
-		// Non-string forbid entries (numbers, nulls, nested arrays) are ignored.
-		// Defaults are NOT re-applied because `forbid` is present (a non-nil
-		// array). Nothing is forbidden.
-		{
-			Code:    `<Foo className="x" style={{}} />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": []interface{}{42, nil, []interface{}{"className"}}},
-		},
-
 		// ---- TS-specific syntax & wrappers (Dimension 1) ----
 		// TS generic on a component tag: `<Foo<T>>` — tagName is still
 		// Identifier "Foo"; type arguments don't affect tag string.
@@ -469,17 +453,6 @@ func TestForbidComponentPropsRule(t *testing.T) {
 				map[string]interface{}{"allowedFor": []interface{}{"X"}},
 			}},
 		},
-		// `allowedFor` non-array (schema-violating) is silently ignored —
-		// fall back to "no allow list, no allow patterns" → defaults forbid
-		// applies. Here `bar` isn't forbidden so still valid.
-		{
-			Code: `<Foo bar="x" />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{"forbid": []interface{}{
-				map[string]interface{}{"propName": "className", "allowedFor": "ReactModal"},
-			}},
-		},
-
 		// ---- Real-world allow patterns (designed for typical app configs) ----
 		// 1) Strict whitelist: only `Theme.*` may use `style`.
 		{

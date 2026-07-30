@@ -255,20 +255,6 @@ func TestForbidDomPropsRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"forbid": []interface{}{"className"}},
 		},
-		// Empty-string entries in the forbid list are skipped; a real entry
-		// alongside still applies — but `bar` is not the real entry.
-		{
-			Code:    `<div bar="x" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": []interface{}{"", "id"}},
-		},
-		// `forbid` not an array (schema-violating): falls back to the empty
-		// default → nothing forbidden.
-		{
-			Code:    `<div id="x" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": "id"},
-		},
 		// Object entry without `propName`/`propNamePattern` — silently
 		// skipped (upstream creates an entry keyed by `undefined`, which
 		// the listener never queries).
@@ -318,14 +304,6 @@ func TestForbidDomPropsRule(t *testing.T) {
 				},
 			}},
 		},
-		// Non-string entries (numbers, nulls, nested arrays) — silently
-		// skipped. The remaining entry restricts only `id`.
-		{
-			Code:    `<div className="x" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": []interface{}{42, nil, []interface{}{"className"}, "id"}},
-		},
-
 		// ---- TS-specific syntax & wrappers (Dimension 1) ----
 		// TS generic on a Component tag — DOM check skips it.
 		{
@@ -632,24 +610,6 @@ func TestForbidDomPropsRule(t *testing.T) {
 			Options: map[string]interface{}{"forbid": []interface{}{
 				map[string]interface{}{"propName": "  "},
 			}},
-		},
-		// `disallowedValues` containing non-string elements (numbers, null) —
-		// upstream JS `[1, null].indexOf(propValue)` for string propValue
-		// returns -1; our `stringSlice` filters non-strings, equivalent
-		// outcome.
-		{
-			Code: `<div id="1" />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{"forbid": []interface{}{
-				map[string]interface{}{"propName": "id", "disallowedValues": []interface{}{1, nil, true}},
-			}},
-		},
-		// `forbid` field literally `null` (vs absent) — JS `configuration.forbid || DEFAULTS`
-		// falls back to `[]` (empty default for forbid-dom-props). No diagnostic.
-		{
-			Code:    `<div id="x" />;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forbid": nil},
 		},
 		// Multiple forbid entries; only one matches the current attr —
 		// confirms unrelated entries don't cause false positives.
@@ -1216,21 +1176,6 @@ func TestForbidDomPropsRule(t *testing.T) {
 				},
 			},
 		},
-		// `disallowedFor` includes the same tag listed multiple times — no
-		// dedupe needed since `slices.Contains` short-circuits on first hit.
-		{
-			Code: `<div id="x" />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{"forbid": []interface{}{
-				map[string]interface{}{
-					"propName":      "id",
-					"disallowedFor": []interface{}{"div", "div", "span"},
-				},
-			}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "propIsForbidden", Line: 1, Column: 6},
-			},
-		},
 		// String entry alongside object entry for the SAME propName —
 		// upstream Map's last-write-wins applies. Object entry with custom
 		// message comes second → its message wins.
@@ -1770,21 +1715,6 @@ func TestForbidDomPropsRule(t *testing.T) {
 				{MessageId: "propIsForbidden", Line: 1, Column: 27},
 			},
 		},
-		// `disallowedValues` with duplicate entries — schema-violation but
-		// `slices.Contains` short-circuits on first hit. Locks in tolerance.
-		{
-			Code: `<div id="x" />;`,
-			Tsx:  true,
-			Options: map[string]interface{}{"forbid": []interface{}{
-				map[string]interface{}{
-					"propName":         "id",
-					"disallowedValues": []interface{}{"x", "x", "x"},
-				},
-			}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "propIsForbiddenWithValue", Line: 1, Column: 6},
-			},
-		},
 		// Self-closing vs paired-element position equivalence: same
 		// attribute on `<div id="x" />` and `<div id="x"></div>` should
 		// report at the same column.
@@ -1870,8 +1800,6 @@ func TestForbidDomPropsOptionParsing(t *testing.T) {
 		{Code: `<div id="x" />;`, Tsx: true, Options: nil},
 		// Empty options array.
 		{Code: `<div id="x" />;`, Tsx: true, Options: []interface{}{}},
-		// Malformed `forbid` (string, not array) — silently ignored, defaults apply.
-		{Code: `<div id="x" />;`, Tsx: true, Options: map[string]interface{}{"forbid": "id"}},
 	}, []rule_tester.InvalidTestCase{
 		// Bare object with a real forbid list.
 		{
