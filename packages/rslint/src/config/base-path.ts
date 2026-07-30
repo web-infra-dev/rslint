@@ -18,12 +18,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** True for absolute POSIX or Windows paths (including drive-letter forms). */
 export function isAbsolutePattern(pattern: string): boolean {
-  if (path.posix.isAbsolute(pattern) || path.win32.isAbsolute(pattern)) {
-    return true;
-  }
-  // path.win32.isAbsolute requires a platform-aware check; also catch
-  // forward-slash drive forms that appear in serialized configs.
-  return /^[a-zA-Z]:[\\/]/.test(pattern);
+  return path.posix.isAbsolute(pattern) || path.win32.isAbsolute(pattern);
 }
 
 /**
