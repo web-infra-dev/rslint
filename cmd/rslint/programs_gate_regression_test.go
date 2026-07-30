@@ -27,8 +27,8 @@ func TestGate_LinterFiltersTypeAwareRuleOnGapFile(t *testing.T) {
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	fs = utils.NewOverlayVFS(fs, map[string]string{gapFile: "let a: any = 10;\na.b = 20;\n"})
 
-	parseCache := utils.NewParseCache()
-	fallback, _ := createFallbackProgram([]string{gapFile}, false, tmpDir, fs, parseCache)
+	buildContext := utils.NewProgramBuildContext(fs)
+	fallback, _ := createFallbackProgram([]string{gapFile}, false, tmpDir, buildContext)
 	if fallback == nil {
 		t.Fatal("could not create fallback Program")
 	}

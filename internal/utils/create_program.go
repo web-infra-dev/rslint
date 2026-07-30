@@ -32,10 +32,14 @@ func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil)
 }
 
+func configNotFoundError(resolvedConfigPath string) error {
+	return fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+}
+
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !fs.FileExists(resolvedConfigPath) {
-		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
 	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
@@ -50,7 +54,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !fs.FileExists(resolvedConfigPath) {
-		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
 	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)

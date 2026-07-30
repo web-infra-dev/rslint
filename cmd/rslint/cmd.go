@@ -665,10 +665,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	}
 
-	// Run-scoped parse cache shared by every Program built in this pipeline
-	// (initial build, gap fallback, --fix rebuilds). It is passed explicitly and
-	// discarded after the invocation; no package-level cache is involved.
-	parseCache := utils.NewParseCache()
+	// Run-scoped Program construction services shared by the initial build,
+	// gap fallbacks, and --fix rebuilds. The context wraps the final VFS view
+	// and is discarded after this invocation; no package-level cache is used.
+	buildContext := utils.NewProgramBuildContext(fs)
+	fs = buildContext.FS()
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
@@ -703,7 +704,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = configDirectories[0]
 			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
 			if buildAllPrograms {
-				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, buildContext)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -721,7 +722,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 
 			if buildAllPrograms {
-				realProgramSet, err = createProgramSetForConfigs(configMap, singleThreaded, fs, parseCache)
+				realProgramSet, err = createProgramSetForConfigs(configMap, singleThreaded, buildContext)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					return 1
@@ -748,10 +749,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			exactTargetFiles = allowFiles
 		}
 		if typeCheckOnly {
-			realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, buildContext)
 		} else if buildAllPrograms {
 			rslintConfig, realProgramSet, err = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, exactTargetFiles, singleThreaded, parseCache,
+				rslintConfig, currentDirectory, exactTargetFiles, singleThreaded, buildContext,
 			)
 		} else {
 			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
@@ -848,17 +849,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if !buildAllPrograms {
 			if configMap != nil {
 				programConfigMap = configsForLintTargetPlan(configMap, targetPlan)
-				realProgramSet, err = createProgramSetForConfigs(programConfigMap, singleThreaded, fs, parseCache)
+				realProgramSet, err = createProgramSetForConfigs(programConfigMap, singleThreaded, buildContext)
 			} else if len(targetPlan.Targets) > 0 {
 				buildSingleConfigPrograms = true
-				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+				realProgramSet, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, buildContext)
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return 1
 			}
 		}
-		binding, err := bindLintTargetPlan(realProgramSet, targetPlan, currentDirectory, fs, parseCache, singleThreaded)
+		binding, err := bindLintTargetPlan(realProgramSet, targetPlan, currentDirectory, buildContext, singleThreaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -873,7 +874,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	// Initial build (including any fallback) is complete. Evict entries for
 	// parsed files that ended up in no Program.
-	parseCache.RetainOnly(programs)
+	buildContext.RetainOnlySourceFiles(programs)
 
 	// Rebuild real Programs and bind the original stable target plan again on
 	// every fix pass. A target can move between a tsconfig Program and fallback
@@ -882,14 +883,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		var rebuilt lintProgramSet
 		var err error
 		if configMap != nil {
-			rebuilt, err = createProgramSetForConfigs(programConfigMap, singleThreaded, fs, parseCache)
+			rebuilt, err = createProgramSetForConfigs(programConfigMap, singleThreaded, buildContext)
 		} else if buildSingleConfigPrograms {
-			rebuilt, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, fs, parseCache)
+			rebuilt, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, buildContext)
 		}
 		if err != nil {
 			return lintTargetBinding{}, err
 		}
-		return bindLintTargetPlan(rebuilt, targetPlan, currentDirectory, fs, parseCache, singleThreaded)
+		return bindLintTargetPlan(rebuilt, targetPlan, currentDirectory, buildContext, singleThreaded)
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -1038,7 +1039,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// before any Program rebuild. os.WriteFile may truncate or partially
 		// mutate a file even when it ultimately returns an error, and whole-
 		// generation invalidation also covers caller/source/symlink aliases.
-		parseCache.InvalidateSourceSnapshots()
+		buildContext.InvalidateSourceSnapshots()
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
 			return 1
@@ -1065,7 +1066,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// the initial ones — the initial slice stays referenced until the
 			// end of this function, so its objects are alive regardless and
 			// keeping their entries costs nothing because RetainOnly only deletes.
-			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
+			buildContext.RetainOnlySourceFiles(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
@@ -1166,7 +1167,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			passFixed, fixErr := applyFixPass(groupDiagsByFile(passDiags))
 			// See the first fix pass above: invalidate before inspecting the
 			// result so a partially successful write can never feed a rebuild.
-			parseCache.InvalidateSourceSnapshots()
+			buildContext.InvalidateSourceSnapshots()
 			if fixErr != nil {
 				fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
 				return 1

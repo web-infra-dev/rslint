@@ -99,14 +99,14 @@ func resolveAndBindTestTargets(
 	fsys vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 ) (lintTargetPlan, lintTargetBinding) {
 	t.Helper()
 	plan, err := resolveLintTargetPlan(nil, cfg, dir, nil, fsys, allowFiles, allowDirs, true)
 	if err != nil {
 		t.Fatalf("resolveLintTargetPlan: %v", err)
 	}
-	binding, err := bindLintTargetPlan(set, plan, dir, fsys, parseCache, true)
+	binding, err := bindLintTargetPlan(set, plan, dir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -121,12 +121,12 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	buildContext := utils.NewProgramBuildContext(fs)
 	programSet, err := createProgramSetForConfig(
 		dir,
 		rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}}},
 		true,
-		fs,
-		utils.NewParseCache(),
+		buildContext,
 	)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
@@ -143,7 +143,7 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 		fs,
 		nil,
 		nil,
-		utils.NewParseCache(),
+		buildContext,
 	)
 	programs := binding.Programs
 	typeInfoFiles := binding.TypeInfoFiles
@@ -200,8 +200,7 @@ export const value: Bad | null = null;
 			},
 		}},
 		true,
-		fs,
-		utils.NewParseCache(),
+		utils.NewProgramBuildContext(fs),
 	)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
@@ -246,7 +245,7 @@ export const value: Bad | null = null;
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fs)
 	cfg := rslintconfig.RslintConfig{{
 		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{
@@ -259,8 +258,7 @@ export const value: Bad | null = null;
 		dir,
 		cfg,
 		true,
-		fs,
-		parseCache,
+		buildContext,
 	)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
@@ -280,7 +278,7 @@ export const value: Bad | null = null;
 		fs,
 		nil,
 		nil,
-		parseCache,
+		buildContext,
 	)
 	programs := binding.Programs
 	typeInfoFiles := binding.TypeInfoFiles
@@ -324,7 +322,7 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fs)
 	cfg := rslintconfig.RslintConfig{{
 		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{
@@ -334,7 +332,7 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 		},
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
-	programSet, err := createProgramSetForConfig(dir, cfg, true, fs, parseCache)
+	programSet, err := createProgramSetForConfig(dir, cfg, true, buildContext)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
@@ -354,7 +352,7 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 		fs,
 		[]string{libPath},
 		nil,
-		parseCache,
+		buildContext,
 	)
 	programs := binding.Programs
 	typeInfoFiles := binding.TypeInfoFiles
@@ -409,7 +407,7 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fs)
 	cfg := rslintconfig.RslintConfig{{
 		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{
@@ -422,7 +420,7 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 
 	linkDir = tspath.NormalizePath(linkDir)
 	realTarget := tspath.NormalizePath(filepath.Join(realDir, "src/a.ts"))
-	programSet, err := createProgramSetForConfig(linkDir, cfg, true, fs, parseCache)
+	programSet, err := createProgramSetForConfig(linkDir, cfg, true, buildContext)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
@@ -453,7 +451,7 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 		fs,
 		[]string{realTarget},
 		nil,
-		parseCache,
+		buildContext,
 	)
 	programs = binding.Programs
 	typeInfoFiles := binding.TypeInfoFiles
@@ -503,12 +501,13 @@ func TestBindLintTargetPlan_UsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *tes
 		}},
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
-	set, err := createProgramSetForConfig(linkDir, cfg, true, fsys, utils.NewParseCache())
+	buildContext := utils.NewProgramBuildContext(fsys)
+	set, err := createProgramSetForConfig(linkDir, cfg, true, buildContext)
 	if err != nil || len(set.Programs) != 1 {
 		t.Fatalf("create Program through symlinked config root: err=%v programs=%d", err, len(set.Programs))
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, linkDir, realTarget)}}
-	binding, err := bindLintTargetPlan(set, plan, linkDir, fsys, utils.NewParseCache(), true)
+	binding, err := bindLintTargetPlan(set, plan, linkDir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -559,12 +558,13 @@ func TestBindLintTargetPlan_ConfigMatchingDoesNotDependOnProgramSourcePath(t *te
 		}},
 		Rules: rslintconfig.Rules{"no-console": "error"},
 	}}
-	set, err := createProgramSetForConfig(rootDir, cfg, true, fsys, utils.NewParseCache())
+	buildContext := utils.NewProgramBuildContext(fsys)
+	set, err := createProgramSetForConfig(rootDir, cfg, true, buildContext)
 	if err != nil || len(set.Programs) != 1 {
 		t.Fatalf("create Program: err=%v programs=%d", err, len(set.Programs))
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, rootDir, linkPath)}}
-	binding, err := bindLintTargetPlan(set, plan, rootDir, fsys, utils.NewParseCache(), true)
+	binding, err := bindLintTargetPlan(set, plan, rootDir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -614,9 +614,9 @@ func TestBindLintTargetPlan_BindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	repoDir = tspath.NormalizePath(repoDir)
 	realTarget = tspath.NormalizePath(realTarget)
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fsys)
 	cfg := projectConfig("./tsconfig.json")
-	set, err := createProgramSetForConfig(repoDir, cfg, true, fsys, parseCache)
+	set, err := createProgramSetForConfig(repoDir, cfg, true, buildContext)
 	if err != nil || len(set.Programs) != 1 {
 		t.Fatalf("expected one Program for file-symlink fixture, err=%v programs=%d", err, len(set.Programs))
 	}
@@ -635,7 +635,7 @@ func TestBindLintTargetPlan_BindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	}
 
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, repoDir, realTarget)}}
-	binding, err := bindLintTargetPlan(set, plan, repoDir, fsys, parseCache, true)
+	binding, err := bindLintTargetPlan(set, plan, repoDir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -682,12 +682,12 @@ func TestBindLintTargetPlan_DoesNotBorrowParentConfigProgram(t *testing.T) {
 	})
 
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fsys)
 	configMap := map[string]rslintconfig.RslintConfig{
 		tspath.NormalizePath(rootDir):  projectConfig("./tsconfig.json"),
 		tspath.NormalizePath(childDir): rslintconfig.RslintConfig{{}},
 	}
-	set, err := createProgramSetForConfigs(configMap, true, fsys, parseCache)
+	set, err := createProgramSetForConfigs(configMap, true, buildContext)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
@@ -697,7 +697,7 @@ func TestBindLintTargetPlan_DoesNotBorrowParentConfigProgram(t *testing.T) {
 
 	targetPath := filepath.Join(childDir, "target.ts")
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, childDir, targetPath)}}
-	binding, err := bindLintTargetPlan(set, plan, rootDir, fsys, parseCache, true)
+	binding, err := bindLintTargetPlan(set, plan, rootDir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -732,14 +732,14 @@ func TestTypeCheckDeduplicatesSyntaxFromGoverningFallbackAndParentProgram(t *tes
 		childDir: rslintconfig.RslintConfig{{}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
-	set, err := createProgramSetForConfigs(configMap, true, fsys, parseCache)
+	buildContext := utils.NewProgramBuildContext(fsys)
+	set, err := createProgramSetForConfigs(configMap, true, buildContext)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
 	targetPath := tspath.NormalizePath(filepath.Join(childDir, "target.ts"))
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, childDir, targetPath)}}
-	binding, err := bindLintTargetPlan(set, plan, rootDir, fsys, parseCache, true)
+	binding, err := bindLintTargetPlan(set, plan, rootDir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -784,7 +784,7 @@ func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t
 	set, err := createProgramSetForConfigs(map[string]rslintconfig.RslintConfig{
 		rootKey:  projectConfig("./tsconfig.json"),
 		childKey: projectConfig("../tsconfig.json"),
-	}, true, fsys, utils.NewParseCache())
+	}, true, utils.NewProgramBuildContext(fsys))
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
@@ -821,7 +821,7 @@ func TestCreateProgramSetForConfigs_PreservesSymlinkedTsconfigBase(t *testing.T)
 	set, err := createProgramSetForConfigs(map[string]rslintconfig.RslintConfig{
 		aliasDir: projectConfig("./tsconfig.json"),
 		realDir:  projectConfig("./tsconfig.json"),
-	}, true, fsys, utils.NewParseCache())
+	}, true, utils.NewProgramBuildContext(fsys))
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
@@ -860,13 +860,12 @@ func TestBindLintTargetPlan_UsesGoverningConfigProjectOrder(t *testing.T) {
 
 	dir = tspath.NormalizePath(dir)
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
+	buildContext := utils.NewProgramBuildContext(fsys)
 	set, err := createProgramSetForConfig(
 		dir,
 		projectConfig("./tsconfig-a.json", "./tsconfig-b.json"),
 		true,
-		fsys,
-		parseCache,
+		buildContext,
 	)
 	if err != nil || len(set.Programs) != 2 {
 		t.Fatalf("expected two ordered Programs, err=%v programs=%d", err, len(set.Programs))
@@ -874,7 +873,7 @@ func TestBindLintTargetPlan_UsesGoverningConfigProjectOrder(t *testing.T) {
 
 	targetPath := filepath.Join(dir, "shared.ts")
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, dir, targetPath)}}
-	binding, err := bindLintTargetPlan(set, plan, dir, fsys, parseCache, true)
+	binding, err := bindLintTargetPlan(set, plan, dir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -894,15 +893,15 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	dir = tspath.NormalizePath(dir)
 	config := projectConfig("./tsconfig.json")
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
-	set, err := createProgramSetForConfig(dir, config, true, fsys, parseCache)
+	buildContext := utils.NewProgramBuildContext(fsys)
+	set, err := createProgramSetForConfig(dir, config, true, buildContext)
 	if err != nil {
 		t.Fatalf("initial createProgramSetForConfig: %v", err)
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{
 		testLintTarget(fsys, dir, filepath.Join(dir, "extra.ts")),
 	}}
-	initial, err := bindLintTargetPlan(set, plan, dir, fsys, parseCache, true)
+	initial, err := bindLintTargetPlan(set, plan, dir, buildContext, true)
 	if err != nil {
 		t.Fatalf("initial bindLintTargetPlan: %v", err)
 	}
@@ -917,12 +916,12 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	// Replacing the source-snapshot generation before rebuilding makes the new
 	// text/hash visible while retaining content-keyed AST entries for unchanged
 	// files.
-	parseCache.InvalidateSourceSnapshots()
-	rebuilt, err := createProgramSetForConfig(dir, config, true, fsys, parseCache)
+	buildContext.InvalidateSourceSnapshots()
+	rebuilt, err := createProgramSetForConfig(dir, config, true, buildContext)
 	if err != nil {
 		t.Fatalf("rebuilt createProgramSetForConfig: %v", err)
 	}
-	afterFix, err := bindLintTargetPlan(rebuilt, plan, dir, fsys, parseCache, true)
+	afterFix, err := bindLintTargetPlan(rebuilt, plan, dir, buildContext, true)
 	if err != nil {
 		t.Fatalf("rebuilt bindLintTargetPlan: %v", err)
 	}
@@ -1062,11 +1061,11 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
 	activeConfigMap := configsForLintTargetPlan(configMap, plan)
-	set, err := createProgramSetForConfigs(activeConfigMap, true, fsys, utils.NewParseCache())
+	set, err := createProgramSetForConfigs(activeConfigMap, true, utils.NewProgramBuildContext(fsys))
 	if err != nil || len(set.Programs) != 1 {
 		t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.Programs), err)
 	}
-	if _, err := createProgramSetForConfigs(configMap, true, fsys, utils.NewParseCache()); err == nil || !strings.Contains(err.Error(), "missing.json") {
+	if _, err := createProgramSetForConfigs(configMap, true, utils.NewProgramBuildContext(fsys)); err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("the all-project type-check scope must still reject the inactive missing project, got %v", err)
 	}
 }
@@ -1178,7 +1177,7 @@ func TestBindLintTargetPlan_RejectsCaseFoldedSourceWithDifferentCanonicalIdentit
 		CanonicalPath:  lower,
 		OwnerConfigDir: configDir,
 	}}}
-	binding, err := bindLintTargetPlan(set, plan, configDir, fsys, utils.NewParseCache(), true)
+	binding, err := bindLintTargetPlan(set, plan, configDir, utils.NewProgramBuildContext(fsys), true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
@@ -1205,7 +1204,7 @@ func TestBindLintTargetPlan_SplitsFallbackProgramsForCaseFoldedPathCollisions(t 
 		{Path: upper, CanonicalPath: upper, OwnerConfigDir: configDir},
 		{Path: lower, CanonicalPath: lower, OwnerConfigDir: configDir},
 	}}
-	binding, err := bindLintTargetPlan(lintProgramSet{}, plan, configDir, fsys, utils.NewParseCache(), true)
+	binding, err := bindLintTargetPlan(lintProgramSet{}, plan, configDir, utils.NewProgramBuildContext(fsys), true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
