@@ -241,6 +241,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
 	}
+	// The Program context must wrap the fully composed request VFS so metadata
+	// snapshots observe overlay contents and canonical aliases exactly as the
+	// rest of this request does. A new context is created for every API call.
+	buildContext := utils.NewProgramBuildContext(fs)
+	fs = buildContext.FS()
 
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
@@ -424,19 +429,18 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// A plain API lint only needs type information when at least one target is
 	// selected. Resolve the target plan before project paths so an ignored or
 	// empty request cannot fail on an inactive project declaration.
-	parseCache := utils.NewParseCache()
 	var programSet lintProgramSet
 	if len(targetPlan.Targets) > 0 {
 		if configMap != nil {
-			programSet, err = createProgramSetForConfigs(configsForLintTargetPlan(configMap, targetPlan), false, fs, parseCache)
+			programSet, err = createProgramSetForConfigs(configsForLintTargetPlan(configMap, targetPlan), false, buildContext)
 		} else {
-			programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
+			programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, buildContext)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, fs, parseCache, false)
+	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, buildContext, false)
 	if err != nil {
 		return nil, err
 	}

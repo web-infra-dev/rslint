@@ -77,12 +77,12 @@ func storeSourcePathMapping(mapping map[string]string, sourcePath string, canoni
 func createProgramSetForConfigs(
 	configMap map[string]rslintconfig.RslintConfig,
 	singleThreaded bool,
-	fsys vfs.FS,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 ) (lintProgramSet, error) {
 	if len(configMap) == 0 {
 		return lintProgramSet{}, nil
 	}
+	fsys := buildContext.FS()
 
 	configDirs := make([]string, 0, len(configMap))
 	for configDir := range configMap {
@@ -115,8 +115,7 @@ func createProgramSetForConfigs(
 			// including when that path is a file symlink. This matches tsc/tsgo;
 			// realpath is only a source-identity fallback during target binding.
 			programCwd := tspath.GetDirectoryPath(tsconfigPath)
-			host := utils.WithParseCache(utils.CreateCompilerHost(programCwd, fsys), parseCache)
-			program, err := utils.CreateProgramLenient(singleThreaded, fsys, programCwd, tsconfigPath, host)
+			program, err := buildContext.CreateProgramLenient(singleThreaded, programCwd, tsconfigPath)
 			if err != nil {
 				return lintProgramSet{}, fmt.Errorf("create TypeScript Program from %q: %w", tsconfigPath, err)
 			}
@@ -134,14 +133,12 @@ func createProgramSetForConfig(
 	configDir string,
 	entries rslintconfig.RslintConfig,
 	singleThreaded bool,
-	fsys vfs.FS,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 ) (lintProgramSet, error) {
 	return createProgramSetForConfigs(
 		map[string]rslintconfig.RslintConfig{configDir: entries},
 		singleThreaded,
-		fsys,
-		parseCache,
+		buildContext,
 	)
 }
 
@@ -162,11 +159,11 @@ func createProgramSetForConfig(
 func parallelGitignoreAndPrograms(
 	rslintConfig rslintconfig.RslintConfig,
 	configDir string,
-	fsys vfs.FS,
 	targetFiles []string,
 	singleThreaded bool,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 ) (rslintconfig.RslintConfig, lintProgramSet, error) {
+	fsys := buildContext.FS()
 	var (
 		configWithIgnores rslintconfig.RslintConfig
 		programs          lintProgramSet
@@ -181,7 +178,7 @@ func parallelGitignoreAndPrograms(
 		configWithIgnores = rslintconfig.ConfigWithGitignore(rslintConfig, configDir, fsys, targetFiles)
 	})
 	wg.Queue(func() {
-		programs, programErr = createProgramSetForConfig(configDir, rslintConfig, singleThreaded, fsys, parseCache)
+		programs, programErr = createProgramSetForConfig(configDir, rslintConfig, singleThreaded, buildContext)
 	})
 	wg.RunAndWait()
 
@@ -198,18 +195,16 @@ func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
 	configDir string,
-	fsys vfs.FS,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 ) (*compiler.Program, error) {
-	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
-	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
+	program, err := buildContext.CreateProgramFromOptionsLenient(singleThreaded, configDir, &core.CompilerOptions{
 		Target:    core.ScriptTargetESNext,
 		Module:    core.ModuleKindESNext,
 		Jsx:       core.JsxEmitPreserve,
 		AllowJs:   core.TSTrue,
 		NoLib:     core.TSTrue,
 		NoResolve: core.TSTrue,
-	}, gapFiles, host)
+	}, gapFiles)
 	if err != nil {
 		return nil, fmt.Errorf("create fallback Program for %d lint target(s): %w", len(gapFiles), err)
 	}
@@ -680,10 +675,10 @@ func bindLintTargetPlan(
 	set lintProgramSet,
 	plan lintTargetPlan,
 	currentDirectory string,
-	fsys vfs.FS,
-	parseCache *utils.ParseCache,
+	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
 ) (lintTargetBinding, error) {
+	fsys := buildContext.FS()
 	binding := lintTargetBinding{
 		Programs:                   append([]*compiler.Program(nil), set.Programs...),
 		TargetsByProgram:           make([][]string, len(set.Programs)),
@@ -740,7 +735,7 @@ func bindLintTargetPlan(
 			for _, gap := range fallbackTargets {
 				fallbackFiles = append(fallbackFiles, gap.Path)
 			}
-			fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, fsys, parseCache)
+			fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, buildContext)
 			if err != nil {
 				return lintTargetBinding{}, err
 			}

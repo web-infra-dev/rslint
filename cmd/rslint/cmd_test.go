@@ -1218,8 +1218,8 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	activeConfig := append(append(rslintconfig.RslintConfig(nil), baseConfig...), *cliEntry)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	parseCache := utils.NewParseCache()
-	programSet, err := createProgramSetForConfig(dir, activeConfig, true, fs, parseCache)
+	buildContext := utils.NewProgramBuildContext(fs)
+	programSet, err := createProgramSetForConfig(dir, activeConfig, true, buildContext)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
@@ -1227,7 +1227,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveLintTargetPlan: %v", err)
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, dir, fs, parseCache, true)
+	binding, err := bindLintTargetPlan(programSet, targetPlan, dir, buildContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
