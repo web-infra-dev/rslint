@@ -4,11 +4,11 @@ import (
 	_ "embed"
 	"fmt"
 	"math/bits"
-	"regexp"
 	"sort"
 	"strings"
 	"unicode"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -280,7 +280,7 @@ func parseTypeModifier(s string) (typeModifierKind, bool) {
 // ---- Normalized config types ----
 
 type matchRegex struct {
-	regex *regexp.Regexp
+	regex *regexp2.Regexp
 	match bool
 }
 
@@ -666,7 +666,7 @@ func parseMatchRegex(val interface{}) *matchRegex {
 	}
 	switch v := val.(type) {
 	case string:
-		re, err := regexp.Compile(v)
+		re, err := utils.CompileRegexp2(v, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return nil
 		}
@@ -677,7 +677,7 @@ func parseMatchRegex(val interface{}) *matchRegex {
 		if m, ok := v["match"].(bool); ok {
 			matchVal = m
 		}
-		re, err := regexp.Compile(regexStr)
+		re, err := utils.CompileRegexp2(regexStr, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return nil
 		}
@@ -879,7 +879,7 @@ func validate(name string, sel normalizedSelector, idMods modifierKind, idSelect
 
 	// 7. Validate custom regex (against processed name, after stripping underscores and affixes)
 	if sel.custom != nil {
-		matches := sel.custom.regex.MatchString(processedName)
+		matches := utils.Regexp2MatchString(sel.custom.regex, processedName)
 		if sel.custom.match != matches {
 			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.String())
 			return validationResult{valid: false, message: &msg}
@@ -2206,7 +2206,7 @@ func validateIdentifier(ctx rule.RuleContext, id identifierInfo, selectors []nor
 		// Check filter match — if filter doesn't match the name, skip this
 		// selector entirely so the next one in specificity order can match.
 		if sel.filter != nil {
-			matches := sel.filter.regex.MatchString(id.name)
+			matches := utils.Regexp2MatchString(sel.filter.regex, id.name)
 			if sel.filter.match != matches {
 				continue
 			}

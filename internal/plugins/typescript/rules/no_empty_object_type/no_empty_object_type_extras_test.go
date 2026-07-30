@@ -1030,3 +1030,35 @@ func TestNoEmptyObjectTypeAllowWithNameSchema(t *testing.T) {
 		t.Errorf("expected a valid allowWithName regex to pass schema validation, got: %v", err)
 	}
 }
+
+// TestNoEmptyObjectTypeAllowWithNameLookbehind locks in that `allowWithName`
+// is matched with the same ECMAScript regex engine the schema validates it
+// against (regexp2), not Go's RE2. RE2 cannot compile lookbehind, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never allow anything.
+func TestNoEmptyObjectTypeAllowWithNameLookbehind(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoEmptyObjectTypeRule, []rule_tester.ValidTestCase{
+		{
+			Code:    `interface Foo {}`,
+			Options: map[string]interface{}{"allowWithName": "(?<!I)Foo$"},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    `interface IFoo {}`,
+			Options: map[string]interface{}{"allowWithName": "(?<!I)Foo$"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 15,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterface", Output: `type IFoo = object`},
+						{MessageId: "replaceEmptyInterface", Output: `type IFoo = unknown`},
+					},
+				},
+			},
+		},
+	})
+}

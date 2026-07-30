@@ -684,3 +684,23 @@ func TestBanTsCommentDescriptionFormatSchema(t *testing.T) {
 		t.Errorf("expected a valid descriptionFormat regex to pass schema validation, got: %v", err)
 	}
 }
+
+// TestBanTsCommentDescriptionFormatLookahead locks in that `descriptionFormat`
+// is matched with the same ECMAScript regex engine the schema validates it
+// against (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never flag a mismatched description.
+func TestBanTsCommentDescriptionFormatLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &BanTsCommentRule, []rule_tester.ValidTestCase{
+		{
+			Code:    "// @ts-expect-error: explanation",
+			Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^(?!: TODO).*$"}},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "// @ts-expect-error: TODO fix me",
+			Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^(?!: TODO).*$"}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "tsDirectiveCommentDescriptionNotMatchPattern"}},
+		},
+	})
+}

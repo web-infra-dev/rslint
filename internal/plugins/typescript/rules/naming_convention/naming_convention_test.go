@@ -615,3 +615,44 @@ func TestNamingConventionRegexSchema(t *testing.T) {
 		}
 	}
 }
+
+// TestNamingConventionCustomLookahead locks in that `custom.regex` (and by
+// extension `filter`, which shares the same compile path) is matched with
+// the same ECMAScript regex engine the schema validates it against
+// (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a JS-only
+// pattern that passes schema validation would otherwise silently fail to
+// compile and never flag a mismatched name.
+func TestNamingConventionCustomLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule, []rule_tester.ValidTestCase{
+		{
+			Code: `const myVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `const deprecatedVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "satisfyCustom", Line: 1, Column: 7},
+			},
+		},
+	})
+}

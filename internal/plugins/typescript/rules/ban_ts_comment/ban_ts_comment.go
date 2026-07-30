@@ -2,15 +2,16 @@ package ban_ts_comment
 
 import (
 	_ "embed"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed ban_ts_comment.schema.json
@@ -20,7 +21,7 @@ type DirectiveConfig struct {
 	Enabled              bool   // Whether the directive is enabled (true means banned)
 	AllowWithDescription bool   // Whether to allow with description
 	DescriptionFormat    string // Regex pattern for description format
-	descriptionRegex     *regexp.Regexp
+	descriptionRegex     *regexp2.Regexp
 }
 
 type BanTsCommentOptions struct {
@@ -148,7 +149,7 @@ func parseDirectiveConfig(value interface{}) DirectiveConfig {
 		}
 	}
 	if config.DescriptionFormat != "" {
-		config.descriptionRegex, _ = regexp.Compile(config.DescriptionFormat)
+		config.descriptionRegex, _ = utils.CompileRegexp2(config.DescriptionFormat, utils.JSRegexOptions)
 	}
 
 	return config
@@ -372,7 +373,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	}
 
 	// Check description format against raw (untrimmed) description
-	if config.descriptionRegex != nil && !config.descriptionRegex.MatchString(rawDescription) {
+	if config.descriptionRegex != nil && !utils.Regexp2MatchString(config.descriptionRegex, rawDescription) {
 		ctx.ReportRange(
 			commentRange,
 			rule.RuleMessage{

@@ -2,10 +2,11 @@ package no_var_requires
 
 import (
 	_ "embed"
-	"regexp"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_var_requires.schema.json
@@ -38,16 +39,16 @@ var NoVarRequiresRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 
 		// Compile allow patterns into regexes
-		var allowPatterns []*regexp.Regexp
+		var allowPatterns []*regexp2.Regexp
 		for _, pattern := range opts.Allow {
-			if re, err := regexp.Compile(pattern); err == nil {
+			if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
 				allowPatterns = append(allowPatterns, re)
 			}
 		}
 
 		isImportPathAllowed := func(importPath string) bool {
 			for _, pattern := range allowPatterns {
-				if pattern.MatchString(importPath) {
+				if utils.Regexp2MatchString(pattern, importPath) {
 					return true
 				}
 			}

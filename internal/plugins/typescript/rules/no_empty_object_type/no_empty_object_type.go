@@ -3,8 +3,8 @@ package no_empty_object_type
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -174,9 +174,9 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
-		var allowWithNameTester *regexp.Regexp
+		var allowWithNameTester *regexp2.Regexp
 		if opts.AllowWithName != "" {
-			allowWithNameTester, _ = regexp.Compile(opts.AllowWithName)
+			allowWithNameTester, _ = utils.CompileRegexp2(opts.AllowWithName, utils.JSUnicodeRegexOptions)
 		}
 
 		listeners := rule.RuleListeners{}
@@ -192,7 +192,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if allowWithNameTester != nil {
-					if id := nameNode.AsIdentifier(); id != nil && allowWithNameTester.MatchString(id.Text) {
+					if id := nameNode.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
 						return
 					}
 				}
@@ -272,7 +272,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					if typeAlias != nil {
 						aliasName := typeAlias.Name()
 						if aliasName != nil {
-							if id := aliasName.AsIdentifier(); id != nil && allowWithNameTester.MatchString(id.Text) {
+							if id := aliasName.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
 								return
 							}
 						}

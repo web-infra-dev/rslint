@@ -154,3 +154,26 @@ func TestNoVarRequiresAllowSchema(t *testing.T) {
 		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
 	}
 }
+
+// TestNoVarRequiresAllowLookahead locks in that `allow` patterns are matched
+// with the same ECMAScript regex engine the schema validates them against
+// (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a JS-only
+// pattern that passes schema validation would otherwise silently fail to
+// compile and never allow anything.
+func TestNoVarRequiresAllowLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoVarRequiresRule, []rule_tester.ValidTestCase{
+		{Code: "const foo = require('foo');", Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}}},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "const foo = require('barbaz');",
+			Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noVarReqs",
+					Line:      1,
+					Column:    13,
+				},
+			},
+		},
+	})
+}

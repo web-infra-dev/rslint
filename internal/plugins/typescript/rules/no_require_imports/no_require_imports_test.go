@@ -530,3 +530,26 @@ func TestNoRequireImportsAllowSchema(t *testing.T) {
 		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
 	}
 }
+
+// TestNoRequireImportsAllowLookahead locks in that `allow` patterns are
+// matched with the same ECMAScript regex engine the schema validates them
+// against (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never allow anything.
+func TestNoRequireImportsAllowLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRequireImportsRule, []rule_tester.ValidTestCase{
+		{Code: "require('foo');", Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}}},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "require('barbaz');",
+			Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      1,
+					Column:    1,
+				},
+			},
+		},
+	})
+}
