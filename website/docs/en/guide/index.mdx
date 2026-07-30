@@ -40,10 +40,9 @@ npx rslint --type-check .
 The generated config uses the flat config format (an array of config entries), similar to ESLint v10:
 
 ```ts
-import { defineConfig, js, ts } from '@rslint/core';
+import { defineConfig, ts } from '@rslint/core';
 
 export default defineConfig([
-  js.configs.recommended,
   ts.configs.recommended,
   {
     rules: {

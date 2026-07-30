@@ -1,4 +1,5 @@
 import type { RslintConfigEntry } from '../define-config.js';
+import { recommended as jsRecommended } from './javascript.js';
 
 const base: RslintConfigEntry = {
   languageOptions: {
@@ -14,6 +15,7 @@ const base: RslintConfigEntry = {
 // enables TS-beneficial rules).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry[] = [
+  jsRecommended,
   base,
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
