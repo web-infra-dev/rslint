@@ -1,4 +1,4 @@
-# import/namespace
+# namespace
 
 ## Rule Details
 
