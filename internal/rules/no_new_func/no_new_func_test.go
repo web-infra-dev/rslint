@@ -331,6 +331,16 @@ func TestNoNewFuncRule(t *testing.T) {
 				Globals: map[string]bool{"Function": true},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
+
+			// === Ambient augmentations extend the global, they do not shadow it ===
+			{
+				Code:   "export {};\ndeclare global {\n\tnamespace Function {}\n}\nnew Function(\"code\");",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 5, Column: 1}},
+			},
+			{
+				Code:   "export {};\ndeclare global {\n\tvar Function: any;\n}\nnew Function(\"code\");",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 5, Column: 1}},
+			},
 		},
 	)
 }

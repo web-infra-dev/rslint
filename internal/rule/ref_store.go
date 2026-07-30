@@ -3,7 +3,9 @@ package rule
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/binder"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // RefStore owns the per-file identifier-reference index for one linted source
@@ -11,11 +13,26 @@ import (
 // references it, in source order.
 //
 // References are resolved with the binder's NameResolver — the same scope walk
-// the checker performs for identifiers — so lookups never touch the
-// TypeChecker and never trigger lazy type computation. The store consequently
-// deals in raw binder symbols: query it with the symbol attached to a
-// declaration node (node.Symbol()), not with checker.GetSymbolAtLocation
-// results, which may be checker-merged and compare unequal.
+// the checker performs for identifiers. Resolve tries this scope walk first;
+// when it can't place an identifier (a symbol declared outside this file —
+// cross-file, .d.ts, and standard-library globals) and a TypeChecker was
+// supplied to NewRefStore, it falls back to the checker for that identifier.
+// Without a checker, that fallback is a no-op and Resolve returns nil for
+// those identifiers, the same as if they didn't resolve at all.
+//
+// References resolves symbols the same way internally, so it can return
+// identifiers referencing a symbol obtained from the checker fallback too; for
+// a symbol declared in this file the binder scope walk already answers for
+// every identifier sharing its name, the one exception being a global script
+// file's top-level symbols, which cost one checker call each to normalize
+// onto their merged identity (see mergedSymbol).
+//
+// The store deals in raw binder symbols: query it with the symbol attached to
+// a declaration node (node.Symbol()), not with checker.GetSymbolAtLocation
+// results, which may be checker-merged and compare unequal — except for
+// symbols Resolve obtained through the checker fallback itself, and for a
+// global script file's top-level declarations, whose raw and merged
+// identities the store reconciles (see mergedSymbol).
 //
 // Collection is lazy twice over: the single AST walk that gathers candidate
 // identifiers runs on first use, and name resolution runs once per queried
@@ -25,17 +42,25 @@ import (
 type RefStore struct {
 	sourceFile *ast.SourceFile
 	resolver   binder.NameResolver
+	tc         *checker.Checker
 	walked     bool
 	// candidates maps identifier text to the reference-position identifiers
 	// still awaiting resolution; entries move into refs on first query.
 	candidates map[string][]*ast.Node
 	refs       map[*ast.Symbol][]*ast.Node
+	// merged maps a raw binder symbol onto the checker-merged symbol that
+	// refs is keyed by for it; see mergedSymbol.
+	merged map[*ast.Symbol]*ast.Symbol
 }
 
 // NewRefStore creates the reference index for one source file. options must
 // be the file's program options (the resolver consults script target and
-// module settings during scope walks).
-func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions) *RefStore {
+// module settings during scope walks). tc is the file's TypeChecker, used as
+// a fallback by Resolve for identifiers the binder scope walk can't place,
+// and by References when asked about a symbol that fallback produced; nil
+// disables both (Resolve then never falls back, and References behaves as if
+// every such symbol were never queried).
+func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
 		// A script file's own top-level locals are never consulted by the
@@ -48,6 +73,7 @@ func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions) *Ref
 	return &RefStore{
 		sourceFile: sourceFile,
 		resolver:   resolver,
+		tc:         tc,
 	}
 }
 
@@ -74,11 +100,16 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 			s.resolvePending(name.Text())
 		}
 	}
+	if merged, ok := s.merged[sym]; ok {
+		sym = merged
+	}
 	return s.refs[sym]
 }
 
 // resolvePending resolves every not-yet-resolved candidate identifier spelled
-// name and files each one under the symbol it references.
+// name and files each one under the symbol it references. Candidates the
+// binder scope walk can't place (declared outside this file) fall back to
+// the TypeChecker when one is available.
 func (s *RefStore) resolvePending(name string) {
 	pending, ok := s.candidates[name]
 	if !ok {
@@ -87,27 +118,89 @@ func (s *RefStore) resolvePending(name string) {
 	delete(s.candidates, name)
 	for _, id := range pending {
 		target := s.resolver.Resolve(id, name, referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
+		if target == nil {
+			if s.tc != nil {
+				target = utils.GetReferenceSymbol(id, s.tc)
+			}
+		} else {
+			target = s.mergedSymbol(target, id)
+		}
 		if target != nil {
 			s.refs[target] = append(s.refs[target], id)
 		}
 	}
 }
 
+// mergedSymbol returns the identity references to sym must be filed under,
+// given that sym was resolved from the identifier at.
+//
+// The checker merges a global script file's top-level declarations with the
+// same-named lib.d.ts and cross-file globals into one symbol object, distinct
+// from the file's raw binder symbol. Both identities can reach this index for
+// a single name: in `Map; type Alias = Map<string, string>; interface Map<K,
+// V> {}` the type reference binds to the file's own symbol, while the value
+// reference has no local value meaning to bind to and only resolves through
+// the checker fallback. Filing them apart would make References return
+// whichever half happens to match the queried identity, so normalize onto the
+// checker's identity here and record the mapping for References to follow.
+//
+// Only a symbol the resolver found in the file's own globals table can be
+// merged this way, so every symbol of a module file and every nested scope
+// skips the checker round trip; the rest pay it once per symbol.
+func (s *RefStore) mergedSymbol(sym *ast.Symbol, at *ast.Node) *ast.Symbol {
+	if s.tc == nil || s.resolver.Globals == nil || s.resolver.Globals[sym.Name] != sym {
+		return sym
+	}
+	if merged, ok := s.merged[sym]; ok {
+		return merged
+	}
+	merged := utils.GetReferenceSymbol(at, s.tc)
+	if merged == nil || merged == sym || !sharesDeclaration(merged, sym) {
+		merged = sym
+	}
+	if s.merged == nil {
+		s.merged = make(map[*ast.Symbol]*ast.Symbol)
+	}
+	s.merged[sym] = merged
+	return merged
+}
+
+// sharesDeclaration reports whether a and b have a declaration node in
+// common, the mark of one being the merged form of the other.
+func sharesDeclaration(a, b *ast.Symbol) bool {
+	for _, decl := range b.Declarations {
+		for _, other := range a.Declarations {
+			if other == decl {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Resolve returns the symbol that a reference-position identifier resolves
 // to — the forward counterpart to References, for rules that need "what
 // declaration does this identifier refer to" rather than "what identifiers
-// refer to this declaration." It uses the same binder scope walk as
-// References, so it never touches the TypeChecker.
+// refer to this declaration." It uses the binder's scope walk first; when
+// that can't place the identifier — a symbol declared outside this file
+// (cross-file, .d.ts, and standard-library globals) — and a TypeChecker was
+// supplied to NewRefStore, it falls back to the checker. That fallback is a
+// real TypeChecker round-trip, unlike the binder-only common path.
 //
 // Returns nil for identifiers that aren't reference positions (declaration
 // names, property keys, import/export bindings, labels, intrinsic JSX tags —
-// see isReferencePosition) and for names that don't resolve to a symbol
-// bound in this file.
+// see isReferencePosition) and for names that don't resolve to any symbol.
 func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return nil
 	}
-	return s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/)
+	if sym := s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/); sym != nil {
+		return sym
+	}
+	if s.tc == nil {
+		return nil
+	}
+	return utils.GetReferenceSymbol(node, s.tc)
 }
 
 // collectCandidates walks the file once and buckets by name every identifier

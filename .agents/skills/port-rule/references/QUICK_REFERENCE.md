@@ -38,11 +38,12 @@ A quick reference for common commands, file locations, and checklists when porti
 
 ## Framework Performance Defaults
 
-| Need                              | Use                                                                     | Avoid                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Autofixes or suggestions          | Matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method | Constructing edit-only text, ranges, slices, or suggestions before reporting |
-| References to one declared symbol | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
-| Every comment in the file         | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
+| Need                                           | Use                                                                     | Avoid                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Autofixes or suggestions                       | Matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method | Constructing edit-only text, ranges, slices, or suggestions before reporting |
+| References to one declared symbol              | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
+| Identifier → symbol, including globals/`.d.ts` | `ctx.Refs.Resolve(node)`                                                | A hand-rolled "try `ctx.Refs`, fall back to the checker" wrapper             |
+| Every comment in the file                      | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
 
 Deferred edit builders may return nil and run synchronously only when their
 artifact category is requested and the diagnostic is not suppressed. Detection,

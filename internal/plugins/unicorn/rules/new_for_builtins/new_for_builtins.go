@@ -980,14 +980,25 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 		if !state.localRootNames[name] {
 			return false
 		}
-		// Callee roots are reference-position identifiers, so Resolve's nil
-		// result means the value is global; a binder symbol means it is local.
-		return state.ctx.Refs.Resolve(node) != nil
+		// Callee roots are reference-position identifiers. Resolve can
+		// return a symbol declared outside this file (globals, cross-file,
+		// .d.ts), so a non-nil result alone doesn't imply local — it must
+		// additionally be declared in this file.
+		symbol := state.ctx.Refs.Resolve(node)
+		if symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+			return true
+		}
+		// A namespace holding no value of its own is outside the binder's
+		// value lookup, and without a TypeChecker to fall back to Resolve
+		// can't see it at all — so keep the syntactic check, which counts
+		// every identifier-named namespace. The localRootNames gate above
+		// keeps it off the common path.
+		return utils.IsShadowed(node, name)
 	}
 
 	if state.ctx.TypeChecker != nil && state.ctx.SourceFile != nil {
 		symbol := utils.GetReferenceSymbol(node, state.ctx.TypeChecker)
-		if utils.IsSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+		if utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
 			return true
 		}
 	}

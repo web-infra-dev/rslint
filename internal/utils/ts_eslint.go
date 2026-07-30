@@ -1332,12 +1332,65 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 // IsSymbolDeclaredInFile reports whether the given symbol has at least one
 // declaration in the specified source file. Use this to distinguish locally
 // declared symbols (shadowed) from globals provided by lib.d.ts.
+//
+// Declarations inside a `declare global` block or a module augmentation don't
+// count: they extend the augmented symbol rather than bind a name in the
+// enclosing file's scope, so a reference in that file still reaches the
+// ambient declaration.
 func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if ast.GetSourceFileOfNode(decl) == sf {
+		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValueSymbolDeclaredInFile reports whether the given symbol has at least
+// one value-introducing declaration in the specified source file. Use this
+// where a local declaration only counts when it shadows a built-in *value*;
+// use IsSymbolDeclaredInFile when any local declaration counts.
+//
+// Only interfaces and type aliases are skipped as never value-introducing. A
+// file can locally re-open an ambient global's type this way — for example
+// `interface Map {}` in a global script — and declaration merging attaches
+// that type-only declaration to the same (checker-resolved) symbol as the
+// ambient value. The call site still resolves to the global value, not the
+// file's type-only declaration, so these don't count here.
+//
+// A namespace declaration counts unconditionally, even one with no
+// instantiated (value-producing) content of its own, matching how
+// typescript-eslint's scope analysis treats it: syntactically, any
+// `namespace`/`module` declaration can hold a value, so it's never treated as
+// type-only regardless of what it happens to contain.
+//
+// Augmentation declarations are skipped as well, for the reason
+// IsSymbolDeclaredInFile gives.
+func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		switch decl.Kind {
+		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
+			continue
+		}
+		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {
+			return true
+		}
+	}
+	return false
+}
+
+// isInAmbientAugmentation reports whether node sits inside a `declare global`
+// block or a `declare module "..."` augmentation.
+func isInAmbientAugmentation(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if parent.Kind == ast.KindModuleDeclaration &&
+			(ast.IsGlobalScopeAugmentation(parent) || ast.IsExternalModuleAugmentation(parent)) {
 			return true
 		}
 	}

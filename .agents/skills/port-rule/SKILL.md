@@ -141,8 +141,16 @@ that the rule framework already shares or can skip:
   edit-only source-text, range, string, slice, and suggestion construction into
   the builder. A builder may return nil when the diagnostic is not fixable.
 - **Declared-symbol references**: translate ESLint `variable.references` to
-  `ctx.Refs.References(decl.Symbol())`. Never walk the file and call
-  `GetSymbolAtLocation` once per identifier.
+  `ctx.Refs.References(decl.Symbol())`. For the reverse direction (identifier →
+  symbol), use `ctx.Refs.Resolve(node)` — it resolves same-file symbols from
+  the binder alone, and falls back to the checker automatically for
+  global/`.d.ts`/cross-file symbols when a TypeChecker is available — never
+  walk the file and call `GetSymbolAtLocation` once per identifier, and never
+  hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper. To
+  check whether the resolved symbol is declared in this file (locally
+  shadowed), pair it with `utils.IsSymbolDeclaredInFile` — or
+  `utils.IsValueSymbolDeclaredInFile` when only a local _value_ declaration
+  counts (see AST_PATTERNS.md).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
 
@@ -250,11 +258,12 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 
 **Framework defaults**:
 
-| Need                            | Use                                                    |
-| ------------------------------- | ------------------------------------------------------ |
-| Autofixes or suggestions        | `ReportNodeWithDeferred*` / `ReportRangeWithDeferred*` |
-| References to a declared symbol | `ctx.Refs.References(decl.Symbol())`                   |
-| Every comment in the file       | `ctx.Comments.All()`                                   |
+| Need                                        | Use                                                    |
+| ------------------------------------------- | ------------------------------------------------------ |
+| Autofixes or suggestions                    | `ReportNodeWithDeferred*` / `ReportRangeWithDeferred*` |
+| References to a declared symbol             | `ctx.Refs.References(decl.Symbol())`                   |
+| Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
+| Every comment in the file                   | `ctx.Comments.All()`                                   |
 
 **Directory Structure**:
 

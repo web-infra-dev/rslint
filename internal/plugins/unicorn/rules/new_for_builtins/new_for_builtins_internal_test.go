@@ -207,6 +207,11 @@ func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 			want:   []string{""},
 		},
 		{
+			name:   "type-only namespace declaration",
+			source: "namespace Intl { export interface Local {} } Intl.DateTimeFormat();",
+			want:   []string{""},
+		},
+		{
 			name:   "runtime enum declaration",
 			source: "enum Map {} Map();",
 			want:   []string{""},
@@ -330,7 +335,7 @@ func resolveCallReferences(t *testing.T, source string, withRefs bool) []string 
 	ctx := rule.RuleContext{SourceFile: sourceFile}
 	if withRefs {
 		options := core.CompilerOptions{}
-		ctx.Refs = rule.NewRefStore(sourceFile, &options)
+		ctx.Refs = rule.NewRefStore(sourceFile, &options, nil)
 	}
 	state := newRuleState(ctx)
 
@@ -386,7 +391,7 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 		},
 	})
 	options := core.CompilerOptions{}
-	ctx.Refs = rule.NewRefStore(sourceFile, &options)
+	ctx.Refs = rule.NewRefStore(sourceFile, &options, nil)
 
 	listeners := NewForBuiltinsRule.Run(ctx, nil)
 	var visit ast.Visitor

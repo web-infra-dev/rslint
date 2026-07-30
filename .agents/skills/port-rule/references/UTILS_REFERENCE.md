@@ -400,7 +400,7 @@ enumTypes := utils.GetEnumTypes(typeChecker, t)
 
 ## `internal/rule/ref_store.go` - Reference Index (ctx.Refs)
 
-The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`.
+The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Two methods: `Resolve(node)` (identifier → symbol, binder scope walk first, falling back to the checker for symbols declared outside this file when a TypeChecker is available) and `References(sym)` (symbol → every referencing identifier in this file, same fallback trigger, plus one checker call per top-level symbol of a global script file to reconcile it with its checker-merged identity).
 
 ```go
 // Guard first: ctx.Refs is nil when no program is available (JS-only runs).
@@ -415,10 +415,12 @@ refs := ctx.Refs.References(decl.Symbol()) // []*ast.Node, source order, read-on
 
 - Declaration names are excluded; reads and writes are both included.
 - Property names, import/export bindings, labels, and lowercase JSX tags are pre-filtered out; shadowing and type-vs-value positions resolve correctly.
-- Single-file only — cross-file references still need the checker.
-- Never hand-roll this with an AST walk + `GetSymbolAtLocation` per identifier; that pattern triggers lazy type-checking and is a known performance killer.
+- `References` always searches this file only — cross-file references (uses in _other_ files) still need the checker — but the symbol it's queried with can be declared anywhere: pass a `Resolve` result obtained through its checker fallback to find in-file references to a global or ambient declaration too.
+- Never hand-roll any of this with an AST walk + `GetSymbolAtLocation` per identifier, and never hand-roll your own "try ctx.Refs, then fall back to the checker" wrapper — `Resolve` already is that wrapper.
+- To check locality (e.g. "is this callee shadowed by a local declaration") once `Resolve` returns a symbol, pair it with `utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)` (`internal/utils/ts_eslint.go`): it walks `symbol.Declarations` for one that binds a name in this file. Declarations inside a `declare global` block or a module augmentation are not among them — they extend the ambient symbol, so `new Function()` in a file with `declare global { namespace Function {} }` still reaches the builtin.
+- For built-in **value** shadowing specifically, use `utils.IsValueSymbolDeclaredInFile` instead: it narrows that to the declarations that bind a **value** name. Any `namespace`/`module` declaration counts, whatever it contains; interfaces and type aliases don't, because they merge into the ambient global's symbol (`interface Map {}` in a global script attaches to the same symbol as lib.d.ts's `Map`, and a call to `Map()` still reaches the global).
 
-See [AST_PATTERNS.md — Collecting Variable References](./AST_PATTERNS.md#collecting-variable-references-ctxrefs) for the full semantics and a worked example (no-var).
+See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for the full semantics and worked examples.
 
 ---
 

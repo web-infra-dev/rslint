@@ -517,16 +517,22 @@ func checkIdentifier(ctx rule.RuleContext, opts options, node *ast.Node, refScop
 	reportNode(ctx, node)
 }
 
-// needsCheckerFallback covers the small set of reference forms that the
-// binder-only RefStore intentionally cannot resolve:
-//   - type-only references to namespaces with no value declaration;
+// needsCheckerFallback covers the small set of reference forms that
+// ctx.Refs.Resolve either cannot place at all, or can only place through its
+// own TypeChecker fallback:
+//   - type-only references to namespaces with no value declaration — a real
+//     reference position, so Resolve's fallback already reaches these; this
+//     branch is then a no-op (sym is already non-nil), kept for the case
+//     ctx.TypeChecker is unavailable to Resolve but was still supplied here;
 //   - qualified heritage members (`B` in `extends ns.B`), which occupy a
-//     property-name position rather than a normal binder reference position.
-//   - parameter properties referenced through `this.name`.
+//     property-name position rather than a normal binder reference position,
+//     so Resolve — checker fallback included — never even attempts them;
+//   - parameter properties referenced through `this.name`, excluded from
+//     Resolve the same way.
 //
 // The first category can only produce a diagnostic when type references are
 // enabled. Keeping this gate narrow avoids falling back to the checker for
-// ordinary property names and unresolved globals.
+// ordinary property names.
 func needsCheckerFallback(opts options, node *ast.Node) bool {
 	if !opts.ignoreTypeReferences && isTypeReference(node) {
 		return true

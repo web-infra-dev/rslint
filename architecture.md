@@ -316,7 +316,15 @@ identifier walk is deferred until the first reference query, and binder name
 resolution is then performed once per queried symbol name. Rules query it with
 binder declaration symbols instead of repeating AST walks or TypeChecker
 lookups; files whose rules never request references do not materialize the
-index.
+index. `Resolve` (identifier → symbol) and `References` (symbol → identifiers)
+try the binder scope walk first, which answers most queries without ever
+touching the TypeChecker; when the binder can't place an identifier — a
+symbol declared outside the file (cross-file, `.d.ts`, standard-library
+globals) — `Resolve` falls back to the TypeChecker, at the cost of a round
+trip for that identifier, and `References` picks up that same fallback
+automatically when queried with a symbol `Resolve` obtained that way. Without
+a TypeChecker (`NewRefStore`'s third argument is `nil`), that fallback is a
+no-op and both methods only ever see symbols declared in the current file.
 `ConfigGlobals` preserves the effective `languageOptions.globals` source,
 `InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
 resolved map after inline settings override configuration. Rules consume this
