@@ -46,9 +46,7 @@ var StrictVoidReturnRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := StrictVoidReturnOptions{}
 		if len(options) > 0 {
-			if typed, ok := options[0].(StrictVoidReturnOptions); ok {
-				opts = typed
-			} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+			if optsMap, ok := options[0].(map[string]interface{}); ok {
 				if optsJSON, err := json.Marshal(optsMap); err == nil {
 					_ = json.Unmarshal(optsJSON, &opts)
 				}

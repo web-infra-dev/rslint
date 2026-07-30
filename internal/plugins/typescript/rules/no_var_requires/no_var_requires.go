@@ -21,15 +21,11 @@ func parseOptions(options []any) *Options {
 		return opts
 	}
 	optMap, _ := options[0].(map[string]interface{})
-	if allowList, exists := optMap["allow"]; exists {
-		if allowSlice, ok := allowList.([]interface{}); ok {
-			for _, item := range allowSlice {
-				if str, ok := item.(string); ok {
-					opts.Allow = append(opts.Allow, str)
-				}
+	if allowSlice, ok := optMap["allow"].([]interface{}); ok {
+		for _, item := range allowSlice {
+			if str, ok := item.(string); ok {
+				opts.Allow = append(opts.Allow, str)
 			}
-		} else if allowStrSlice, ok := allowList.([]string); ok {
-			opts.Allow = allowStrSlice
 		}
 	}
 	return opts
