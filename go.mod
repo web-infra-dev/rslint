@@ -17,6 +17,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
+	github.com/microsoft/typescript-go/shim/module => ./shim/module
 	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
@@ -44,6 +45,7 @@ require (
 	github.com/microsoft/typescript-go/shim/evaluator v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/jsonrpc v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
+	github.com/microsoft/typescript-go/shim/module v0.0.0
 	github.com/microsoft/typescript-go/shim/parser v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
