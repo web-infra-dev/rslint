@@ -77,9 +77,11 @@ function fn() {
 - For deeply nested `try`/`catch`/`switch` combinations, this rule's control
   flow modeling can occasionally diverge from ESLint's own, which has open,
   accepted-but-unfixed bugs in the same area
-  ([eslint/eslint#17579](https://github.com/eslint/eslint/issues/17579)).
-  These shapes are rare in practice; in the large majority of real code this
-  rule reports the same findings as ESLint.
+  ([eslint/eslint#17579](https://github.com/eslint/eslint/issues/17579)) and
+  its own false negatives on some such shapes. Matching it exactly there is
+  hard to pin down, so it is left as a known gap. These shapes are rare in
+  practice; in the large majority of real code this rule reports the same
+  findings as ESLint.
 
 ## Original Documentation
 
