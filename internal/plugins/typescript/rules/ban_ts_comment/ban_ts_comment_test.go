@@ -665,3 +665,22 @@ func TestBanTsCommentSuggestionDemand(t *testing.T) {
 		}
 	}
 }
+
+// TestBanTsCommentDescriptionFormatSchema locks in that `descriptionFormat`
+// is validated as a regex. The rule compiles it to check each directive's
+// description, so an unparsable pattern would otherwise be dropped and the
+// directive would go unchecked. Upstream's schema declares a bare string.
+func TestBanTsCommentDescriptionFormatSchema(t *testing.T) {
+	invalid := []any{map[string]any{
+		"ts-ignore": map[string]any{"descriptionFormat": "("},
+	}}
+	if err := BanTsCommentRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid descriptionFormat regex to fail schema validation")
+	}
+	valid := []any{map[string]any{
+		"ts-ignore": map[string]any{"descriptionFormat": "^: TS\\d+ because .+$"},
+	}}
+	if err := BanTsCommentRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid descriptionFormat regex to pass schema validation, got: %v", err)
+	}
+}

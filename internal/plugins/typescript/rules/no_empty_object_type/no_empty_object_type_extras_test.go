@@ -1015,3 +1015,18 @@ declare namespace N {
 		},
 	})
 }
+
+// TestNoEmptyObjectTypeAllowWithNameSchema locks in that `allowWithName` is
+// validated as a regex. The rule compiles it to decide which names to skip,
+// so an unparsable pattern would otherwise be dropped silently and every
+// name would report. Upstream's schema declares a bare string.
+func TestNoEmptyObjectTypeAllowWithNameSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allowWithName": "("}}
+	if err := NoEmptyObjectTypeRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allowWithName regex to fail schema validation")
+	}
+	valid := []any{map[string]any{"allowWithName": "Props$"}}
+	if err := NoEmptyObjectTypeRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allowWithName regex to pass schema validation, got: %v", err)
+	}
+}

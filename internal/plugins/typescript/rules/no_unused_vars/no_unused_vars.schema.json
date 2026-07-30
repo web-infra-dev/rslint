@@ -19,6 +19,7 @@
             },
             "argsIgnorePattern": {
               "type": "string",
+              "format": "regex",
               "description": "Regular expressions of argument names to not check for usage."
             },
             "caughtErrors": {
@@ -28,10 +29,12 @@
             },
             "caughtErrorsIgnorePattern": {
               "type": "string",
+              "format": "regex",
               "description": "Regular expressions of catch block argument names to not check for usage."
             },
             "destructuredArrayIgnorePattern": {
               "type": "string",
+              "format": "regex",
               "description": "Regular expressions of destructured array variable names to not check for usage."
             },
             "enableAutofixRemoval": {
@@ -68,6 +71,7 @@
             },
             "varsIgnorePattern": {
               "type": "string",
+              "format": "regex",
               "description": "Regular expressions of variable names to not check for usage."
             }
           }

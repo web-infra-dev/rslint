@@ -515,3 +515,18 @@ configValidator.addSchema(require('./a.json'));
 		},
 	})
 }
+
+// TestNoRequireImportsAllowSchema locks in that each `allow` entry is
+// validated as a regex. The rule compiles every entry to match import paths,
+// so an unparsable one would otherwise be dropped and that path would keep
+// reporting. Upstream's schema declares a plain array of strings.
+func TestNoRequireImportsAllowSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allow": []any{"("}}}
+	if err := NoRequireImportsRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allow pattern to fail schema validation")
+	}
+	valid := []any{map[string]any{"allow": []any{"/package\\.json$"}}}
+	if err := NoRequireImportsRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
+	}
+}

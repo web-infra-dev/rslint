@@ -139,3 +139,18 @@ func TestNoVarRequiresRule(t *testing.T) {
 		},
 	})
 }
+
+// TestNoVarRequiresAllowSchema locks in that each `allow` entry is validated
+// as a regex. The rule compiles every entry to match require paths, so an
+// unparsable one would otherwise be dropped and that path would keep
+// reporting. Upstream's schema declares a plain array of strings.
+func TestNoVarRequiresAllowSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allow": []any{"("}}}
+	if err := NoVarRequiresRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allow pattern to fail schema validation")
+	}
+	valid := []any{map[string]any{"allow": []any{"/package\\.json$"}}}
+	if err := NoVarRequiresRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
+	}
+}

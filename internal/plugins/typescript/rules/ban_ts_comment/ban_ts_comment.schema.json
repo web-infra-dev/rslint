@@ -19,7 +19,8 @@
               "additionalProperties": false,
               "properties": {
                 "descriptionFormat": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "regex"
                 }
               }
             }

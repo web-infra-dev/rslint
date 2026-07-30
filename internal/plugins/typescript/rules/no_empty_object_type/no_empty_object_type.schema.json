@@ -17,6 +17,7 @@
         },
         "allowWithName": {
           "type": "string",
+          "format": "regex",
           "description": "A stringified regular expression to allow interfaces and object type aliases with the configured name."
         }
       }

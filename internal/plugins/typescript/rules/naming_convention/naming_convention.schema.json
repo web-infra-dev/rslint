@@ -47,7 +47,8 @@
           "type": "boolean"
         },
         "regex": {
-          "type": "string"
+          "type": "string",
+          "format": "regex"
         }
       },
       "required": ["match", "regex"],
@@ -94,7 +95,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -202,7 +204,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -272,7 +275,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -324,7 +328,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -390,7 +395,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -442,7 +448,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -501,7 +508,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -564,7 +572,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -633,7 +642,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -692,7 +702,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -751,7 +762,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -810,7 +822,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -880,7 +893,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -942,7 +956,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -994,7 +1009,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1046,7 +1062,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1108,7 +1125,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1175,7 +1193,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1242,7 +1261,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1309,7 +1329,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1361,7 +1382,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1413,7 +1435,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1465,7 +1488,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1517,7 +1541,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1569,7 +1594,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1621,7 +1647,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"
@@ -1673,7 +1700,8 @@
             "oneOf": [
               {
                 "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "format": "regex"
               },
               {
                 "$ref": "#/$defs/matchRegexConfig"

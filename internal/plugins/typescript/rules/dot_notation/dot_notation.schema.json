@@ -15,6 +15,7 @@
         },
         "allowPattern": {
           "type": "string",
+          "format": "regex",
           "description": "Regular expression of names to allow."
         },
         "allowPrivateClassPropertyAccess": {
