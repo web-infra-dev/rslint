@@ -278,6 +278,13 @@ func isReadBeforeFirstAssign(refs []*ast.Node, declPos int) bool {
 			// Found the first write at or after the declaration - stop looking.
 			return foundRead
 		}
+		if utils.IsNonReferenceIdentifier(ref) {
+			// A type-only export (`export type { x }` / `export { type x }`)
+			// is the one reference position ctx.Refs indexes that ESLint's
+			// scope-manager flags as type-only rather than as a read — unlike
+			// `typeof x`, which does count as one.
+			continue
+		}
 		foundRead = true
 	}
 	return foundRead

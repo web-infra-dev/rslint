@@ -464,6 +464,95 @@ func TestRefStoreExportSpecifierResolvesTypeOnlySymbol(t *testing.T) {
 	}
 }
 
+func TestRefStoreTypeOnlyExportSpecifierIndexed(t *testing.T) {
+	// `export type { x }` / `export { type x }` resolves to the binding like
+	// any other local export — ESLint's scope-manager records a type-flagged
+	// reference for it. Consumers that only follow runtime reads classify the
+	// reference site (utils.IsNonReferenceIdentifier reports these as
+	// non-reads); the index itself keeps them.
+	for name, source := range map[string]string{
+		"export type clause":  "let x;\nexport type { x };\nx = 1;\n",
+		"type specifier":      "let x;\nexport { type x };\nx = 1;\n",
+		"export type aliased": "let x;\nexport type { x as y };\nx = 1;\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/type-only-export.ts", core.ScriptKindTS, source)
+
+			occurrences := identifiers(sourceFile.AsNode(), "x")
+			if len(occurrences) != 3 {
+				t.Fatalf("expected 3 occurrences of x, got %d", len(occurrences))
+			}
+			declIdent, specifierIdent, writeIdent := occurrences[0], occurrences[1], occurrences[2]
+			sym := declIdent.Parent.Symbol()
+			if sym == nil {
+				t.Fatal("declaration identifier has no bound symbol")
+			}
+
+			if got := refs.Resolve(specifierIdent); got != sym {
+				t.Fatalf("Resolve(type-only export specifier x) = %v, want %v", got, sym)
+			}
+			got := refs.References(sym)
+			if len(got) != 2 || got[0] != specifierIdent || got[1] != writeIdent {
+				t.Fatalf("References = %v, want [%v %v] (the specifier and the `x = 1` write)", got, specifierIdent, writeIdent)
+			}
+		})
+	}
+}
+
+func TestRefStoreTypeOnlyExportSpecifierResolvesTypeSymbol(t *testing.T) {
+	// The type-space half of the meaning must stay: `export type { Foo }` of
+	// an actual type still references it.
+	sourceFile, refs := newBoundRefStore(t, "/type-only-export-type.ts", core.ScriptKindTS,
+		"type Foo = {};\nexport type { Foo };\n")
+
+	occurrences := identifiers(sourceFile.AsNode(), "Foo")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of Foo, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent := occurrences[0], occurrences[1]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(specifierIdent); got != sym {
+		t.Fatalf("Resolve(type-only export specifier Foo) = %v, want %v", got, sym)
+	}
+	got := refs.References(sym)
+	if len(got) != 1 || got[0] != specifierIdent {
+		t.Fatalf("References = %v, want [%v] (the `export type { Foo }` reference)", got, specifierIdent)
+	}
+}
+
+func TestRefStoreTypeOnlyExportSpecifierWithChecker(t *testing.T) {
+	// With a TypeChecker present, the aliased type-only specifier's
+	// PropertyName must still resolve through the binder onto the same raw
+	// symbol the write does — not detour through the checker fallback, which
+	// would file it under a different (checker-merged alias) identity and
+	// split the index.
+	sourceFile, refs, done := newCheckedRefStore(t,
+		"let x;\nexport type { x as y };\nx = 1;\n")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "x")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of x, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent, writeIdent := occurrences[0], occurrences[1], occurrences[2]
+	sym := declIdent.Parent.Symbol()
+	if sym == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	if got := refs.Resolve(specifierIdent); got != sym {
+		t.Fatalf("Resolve(type-only export PropertyName x) = %v, want %v", got, sym)
+	}
+	got := refs.References(sym)
+	if len(got) != 2 || got[0] != specifierIdent || got[1] != writeIdent {
+		t.Fatalf("References = %v, want [%v %v] (the specifier and the `x = 1` write)", got, specifierIdent, writeIdent)
+	}
+}
+
 func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	// A non-default export is bound to an export symbol too; the local symbol
 	// left in the file's locals carries only the ExportValue marker, so

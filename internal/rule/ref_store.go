@@ -326,7 +326,12 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 	}
 	if p != nil && p.Kind == ast.KindExportSpecifier {
 		// `export { X }` can re-export a value, a type, or a namespace —
-		// same declaration-space breadth as `export =` above.
+		// same declaration-space breadth as `export =` above. Type-only
+		// specifiers (`export type { X }` / `export { type X }`) resolve the
+		// same way, mirroring the type-flagged reference ESLint's
+		// scope-manager records for them; rules that only follow runtime
+		// reads classify the reference site instead (see
+		// utils.IsReadReference / utils.IsNonReferenceIdentifier).
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	// `import a = b.c` — the right-hand side may name a value, type, or
