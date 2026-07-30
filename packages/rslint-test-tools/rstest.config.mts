@@ -128,6 +128,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/prefer-spread.test.ts',
     './tests/eslint/rules/prefer-template.test.ts',
+    './tests/eslint/rules/no-useless-assignment.test.ts',
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
     // eslint-plugin-import
