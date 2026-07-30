@@ -39,7 +39,6 @@ type rstestResolvedAPI struct {
 	state        rstestAPIState
 	originalNode *ast.Node
 	mode         RstestImportMode
-	extended     bool
 }
 
 func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
@@ -71,9 +70,6 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		state = applyRstestChainPart(state, part)
 		if state == rstestAPIInvalid {
 			return nil
-		}
-		if part.name == "extend" {
-			resolved.extended = true
 		}
 	}
 
@@ -124,7 +120,6 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 			},
 		},
 		Parameterized: parameterized,
-		Extended:      resolved.extended,
 	}
 }
 
@@ -282,9 +277,6 @@ func resolveRstestRoot(
 			state = applyRstestChainPart(state, part)
 			if state == rstestAPIInvalid {
 				break
-			}
-			if part.name == "extend" {
-				resolved.extended = true
 			}
 		}
 		if state == rstestAPIInvalid {
