@@ -38,6 +38,8 @@ type rstestResolvedAPI struct {
 	state        rstestAPIState
 	originalNode *ast.Node
 	mode         RstestImportMode
+	hasSkip      bool
+	hasTodo      bool
 }
 
 // ParseRstestFnCall parses a final Rstest test/describe registration call.
@@ -59,16 +61,14 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		return nil
 	}
 
-	state := resolved.state
 	for _, part := range parts[consumed:] {
-		state = applyRstestChainPart(state, part)
-		if state == rstestAPIInvalid {
+		if !applyResolvedRstestChainPart(&resolved, part) {
 			return nil
 		}
 	}
 
 	parameterized := false
-	switch state {
+	switch resolved.state {
 	case rstestAPITest, rstestAPITestWithExtend:
 		resolved.kind = RstestFnTypeTest
 	case rstestAPIDescribe:
@@ -114,6 +114,8 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 			},
 		},
 		Parameterized: parameterized,
+		HasSkip:       resolved.hasSkip,
+		HasTodo:       resolved.hasTodo,
 	}
 }
 
@@ -259,17 +261,16 @@ func resolveRstestRoot(
 		if !ok {
 			continue
 		}
-		state := resolved.state
+		valid := true
 		for _, part := range aliasParts[consumed:] {
-			state = applyRstestChainPart(state, part)
-			if state == rstestAPIInvalid {
+			if !applyResolvedRstestChainPart(&resolved, part) {
+				valid = false
 				break
 			}
 		}
-		if state == rstestAPIInvalid {
+		if !valid {
 			continue
 		}
-		resolved.state = state
 		return resolved, 0, true
 	}
 
@@ -334,4 +335,23 @@ func applyRstestChainPart(state rstestAPIState, part rstestChainPart) rstestAPIS
 		}
 	}
 	return rstestAPIInvalid
+}
+
+func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainPart) bool {
+	state := applyRstestChainPart(resolved.state, part)
+	if state == rstestAPIInvalid {
+		return false
+	}
+
+	resolved.state = state
+	if part.invocation != rstestNotInvoked {
+		return true
+	}
+	switch part.name {
+	case "skip":
+		resolved.hasSkip = true
+	case "todo":
+		resolved.hasTodo = true
+	}
+	return true
 }

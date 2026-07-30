@@ -16,6 +16,8 @@ type RstestImportMode = testFramework.ReferenceMode
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
 	Parameterized bool
+	HasSkip       bool
+	HasTodo       bool
 }
 
 type ParsedRstestFnCallHead = testFramework.ParsedCallHead
