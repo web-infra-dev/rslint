@@ -364,6 +364,10 @@ func TestVfsDirEntry_TypeAndInfo(t *testing.T) {
 	symlinkEntry := &vfsDirEntry{name: "link.ts", isSymlink: true}
 	assert.Assert(t, !symlinkEntry.IsDir())
 	assert.Equal(t, symlinkEntry.Type(), fs.ModeSymlink)
+
+	unknownEntry := &vfsDirEntry{name: "unknown.ts", needsRealpath: true}
+	assert.Equal(t, unknownEntry.Type(), fs.FileMode(0), "unknown identity must not be exposed as a symlink")
+	assert.Assert(t, unknownEntry.needsCanonicalRealpath())
 }
 
 // spyVFS wraps a real VFS and counts DirectoryExists calls.

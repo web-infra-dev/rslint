@@ -936,10 +936,18 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      otherwise introduce.
 
 5. **Program source identity index** (`bindLintTargetPlan`)
-   - Direct lexical Program lookups remain synchronous. If one misses, the
-     binder resolves each unique Program source path once and builds a
-     binding-pass canonical identity index. CLI fix passes rebuild it when they
-     rebind the target plan.
+   - Direct lexical Program lookups remain synchronous. The target identity
+     maps are not allocated until one misses. The binder then builds the
+     governing config's Program indexes in one canonicalization batch, reusing
+     target identities established by discovery before resolving unknown source
+     paths. Programs associated only with other configs remain untouched.
+   - Unknown source identities are cached once across the Programs actually
+     inspected during that binding pass. With complete VFS symlink metadata,
+     regular files in one lexical directory share its canonical directory
+     lookup; file symlinks, ambiguous casing, missing entries, and VFSes without
+     that metadata fall back to per-file realpath. Per-Program indexes retain
+     only canonical identities present in the target plan. CLI fix passes
+     create a fresh index when they rebind the target plan.
    - Independent realpath lookups use `core.NewWorkGroup`; `--singleThreaded`
      runs the same work serially.
 
@@ -950,6 +958,9 @@ Other invariants:
   canonical config root without a per-file realpath call. Explicit directory
   aliases are resolved once and their descendants inherit the corresponding
   physical path; explicit files and file symlinks are resolved individually.
+  A custom VFS whose `Entries.Symlinks` is nil has not established file
+  identity metadata, so the target walker conservatively resolves each selected
+  file instead of treating it as regular.
   Canonical identities use exact comparison, and aliases governed by different
   configs are rejected instead of choosing an owner by scan order.
 - Multi-config target discovery processes config roots in stable order. It uses

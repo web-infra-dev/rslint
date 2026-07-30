@@ -273,7 +273,7 @@ func discoverLintTargetsWithStopDirs(
 		workers = 1
 	}
 
-	processFile := func(walkPath string, isSymlink bool) {
+	processFile := func(walkPath string, needsRealpath bool) {
 		fullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedConfigDir, walkPath))
 		matchPath := configPathForMatching(fullPath)
 		targetPath := fullPath
@@ -303,7 +303,7 @@ func discoverLintTargetsWithStopDirs(
 		if !include {
 			return
 		}
-		if isSymlink && fsys != nil {
+		if needsRealpath && fsys != nil {
 			if realPath := fsys.Realpath(fullPath); realPath != "" {
 				canonicalPath = realPath
 			}
@@ -354,7 +354,11 @@ func discoverLintTargetsWithStopDirs(
 				}
 				childDirs = append(childDirs, childPath)
 			} else {
-				processFile(path.Join(walkPath, name), e.Type()&fs.ModeSymlink != 0)
+				needsRealpath := e.Type()&fs.ModeSymlink != 0
+				if entry, ok := e.(interface{ needsCanonicalRealpath() bool }); ok {
+					needsRealpath = needsRealpath || entry.needsCanonicalRealpath()
+				}
+				processFile(path.Join(walkPath, name), needsRealpath)
 			}
 		}
 		return childDirs
