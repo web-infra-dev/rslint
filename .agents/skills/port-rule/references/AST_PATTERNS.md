@@ -409,15 +409,19 @@ symbol := ctx.Refs.Resolve(node)
 isLocal := symbol != nil && utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 ```
 
+It counts the declarations that bind a name in this file, which leaves out
+anything inside a `declare global` block or a module augmentation: those
+extend the ambient symbol, so `new Function()` in a file carrying `declare
+global { namespace Function {} }` still reaches the builtin.
+
 When the question is specifically "does a local declaration shadow this
-built-in _value_", use `utils.IsValueSymbolDeclaredInFile` instead: it counts
-only the declarations that bind a value name in this file. Any
-`namespace`/`module` declaration counts, whatever it happens to contain.
-Interfaces and type aliases don't, and neither does anything inside a
-`declare global` block or a module augmentation — those merge into the
-ambient global's symbol (`interface Map {}` in a global script attaches to
-the same symbol as lib.d.ts's `Map`) while the call site keeps reaching the
-global value. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#internalruleref_storego---reference-index-ctxrefs).
+built-in _value_", use `utils.IsValueSymbolDeclaredInFile` instead: it
+narrows that set to the declarations binding a value name. Any
+`namespace`/`module` declaration counts, whatever it happens to contain;
+interfaces and type aliases don't, because they merge into the ambient
+global's symbol (`interface Map {}` in a global script attaches to the same
+symbol as lib.d.ts's `Map`) while the call site keeps reaching the global
+value. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#internalruleref_storego---reference-index-ctxrefs).
 
 ### Collecting references to a symbol
 

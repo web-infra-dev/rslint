@@ -183,6 +183,20 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `RegExp("\\1(a)");`, Globals: map[string]bool{"RegExp": false}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- ambient augmentations extend the global RegExp, they do not shadow it ----
+			{
+				Code: "export {};\ndeclare global {\n\tnamespace RegExp {}\n}\nnew RegExp('\\\\1(a)');",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 5, Column: 1},
+				},
+			},
+			{
+				Code: "export {};\ndeclare global {\n\tvar RegExp: any;\n}\nnew RegExp('\\\\1(a)');",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "forward", Line: 5, Column: 1},
+				},
+			},
+
 			// ---- full message tests ----
 			{
 				Code: `/(b)(\2a)/`,

@@ -1332,12 +1332,17 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 // IsSymbolDeclaredInFile reports whether the given symbol has at least one
 // declaration in the specified source file. Use this to distinguish locally
 // declared symbols (shadowed) from globals provided by lib.d.ts.
+//
+// Declarations inside a `declare global` block or a module augmentation don't
+// count: they extend the augmented symbol rather than bind a name in the
+// enclosing file's scope, so a reference in that file still reaches the
+// ambient declaration.
 func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if ast.GetSourceFileOfNode(decl) == sf {
+		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {
 			return true
 		}
 	}
@@ -1362,10 +1367,8 @@ func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 // `namespace`/`module` declaration can hold a value, so it's never treated as
 // type-only regardless of what it happens to contain.
 //
-// Declarations inside a `declare global` block or a module augmentation are
-// skipped too: they extend the augmented symbol rather than bind a name in
-// the enclosing file's scope, so a call site in that file still reaches the
-// ambient value.
+// Augmentation declarations are skipped as well, for the reason
+// IsSymbolDeclaredInFile gives.
 func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
