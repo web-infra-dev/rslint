@@ -22,8 +22,10 @@ import (
 //
 // References resolves symbols the same way internally, so it can return
 // identifiers referencing a symbol obtained from the checker fallback too; for
-// a symbol declared in this file it costs nothing extra, since the binder
-// scope walk already answers for every identifier sharing its name.
+// a symbol declared in this file the binder scope walk already answers for
+// every identifier sharing its name, the one exception being a global script
+// file's top-level symbols, which cost one checker call each to normalize
+// onto their merged identity (see mergedSymbol).
 //
 // The store deals in raw binder symbols: query it with the symbol attached to
 // a declaration node (node.Symbol()), not with checker.GetSymbolAtLocation

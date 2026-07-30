@@ -400,7 +400,7 @@ enumTypes := utils.GetEnumTypes(typeChecker, t)
 
 ## `internal/rule/ref_store.go` - Reference Index (ctx.Refs)
 
-The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Two methods: `Resolve(node)` (identifier → symbol, binder scope walk first, falling back to the checker for symbols declared outside this file when a TypeChecker is available) and `References(sym)` (symbol → every referencing identifier in this file, same fallback trigger).
+The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Two methods: `Resolve(node)` (identifier → symbol, binder scope walk first, falling back to the checker for symbols declared outside this file when a TypeChecker is available) and `References(sym)` (symbol → every referencing identifier in this file, same fallback trigger, plus one checker call per top-level symbol of a global script file to reconcile it with its checker-merged identity).
 
 ```go
 // Guard first: ctx.Refs is nil when no program is available (JS-only runs).

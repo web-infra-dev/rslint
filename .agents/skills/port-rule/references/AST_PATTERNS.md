@@ -377,22 +377,29 @@ Reference: `internal/rule/ref_store.go`, consumer examples: `internal/rules/no_v
 
 `ctx.Refs` is a lazily built per-file identifier-reference index — rslint's stand-in for ESLint's scope manager (`variable.references`, `getScope().references`). It has two methods:
 
-| Method                        | Direction                                                                                                                  | Touches TypeChecker?                                                            |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `Resolve(node) *ast.Symbol`   | identifier → its declaring symbol, anywhere the checker can see (this file, cross-file, `.d.ts`, standard-library globals) | Only as a fallback, when the binder scope walk alone can't place the identifier |
-| `References(sym) []*ast.Node` | symbol → every identifier in this file that references it                                                                  | Same fallback trigger as `Resolve`                                              |
+| Method                        | Direction                                                                                                                  | Touches TypeChecker?                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Resolve(node) *ast.Symbol`   | identifier → its declaring symbol, anywhere the checker can see (this file, cross-file, `.d.ts`, standard-library globals) | Only as a fallback, when the binder scope walk alone can't place the identifier            |
+| `References(sym) []*ast.Node` | symbol → every identifier in this file that references it                                                                  | Same fallback trigger as `Resolve`, plus once per top-level symbol of a global script file |
 
 Both resolve identifiers with the binder's scope walk first — the same scope
 walk the checker performs, but without the checker itself — so the common
 case (same-file locals, which is the overwhelming majority of what rules
-query) never touches the TypeChecker and never triggers lazy type
-computation. When the binder can't place an identifier — a symbol declared
+query) resolves without triggering lazy type computation. When the binder
+can't place an identifier — a symbol declared
 outside this file (cross-file, `.d.ts`, standard-library globals) — and a
 TypeChecker was supplied, `Resolve` falls back to it automatically, at the
 cost of a real round-trip for that identifier; `References` picks up the same
 fallback when queried with a symbol `Resolve` obtained that way. Without a
 TypeChecker, that fallback is a no-op and both methods only ever see symbols
 declared in this file.
+
+One further checker round-trip is unavoidable in a global script file (a
+non-module `.ts`/`.js`): the checker merges such a file's top-level
+declarations with the same-named `lib.d.ts` and cross-file globals into one
+symbol, so the index normalizes each of those top-level symbols onto that
+merged identity — once per symbol, and never for a module file or a nested
+scope.
 
 Do **NOT** hand-roll any of this by walking the AST and calling
 `ctx.TypeChecker.GetSymbolAtLocation` on every identifier, and do **NOT**
@@ -480,7 +487,7 @@ for _, v := range vars {
 
 ### Cost model
 
-The index is lazy twice over: the single AST walk that buckets candidate identifiers runs on the first `References` call in the file, and name resolution runs once per **queried name** — asking about `foo` never pays for resolving unrelated identifiers like `console` or `Promise`. Files where no rule queries the index pay nothing. `Resolve` and `References` never touch the TypeChecker for a same-file symbol; the checker fallback only costs a round-trip for identifiers the binder can't place, which for most rules is a small minority.
+The index is lazy twice over: the single AST walk that buckets candidate identifiers runs on the first `References` call in the file, and name resolution runs once per **queried name** — asking about `foo` never pays for resolving unrelated identifiers like `console` or `Promise`. Files where no rule queries the index pay nothing. The checker fallback only costs a round-trip for identifiers the binder can't place, which for most rules is a small minority; beyond that, `Resolve` and `References` touch the TypeChecker for a same-file symbol only to normalize a global script file's top-level symbols onto their merged identity, once per symbol.
 
 ---
 
