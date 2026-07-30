@@ -43,11 +43,10 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := PreferOptionalChainOptions{}
 		if len(options) > 0 {
-			if typed, ok := options[0].(PreferOptionalChainOptions); ok {
-				opts = typed
-			} else if jsonBytes, err := json.Marshal(options[0]); err == nil {
-				// In IPC mode the option object arrives as map[string]interface{}.
-				_ = json.Unmarshal(jsonBytes, &opts)
+			if optsMap, ok := options[0].(map[string]interface{}); ok {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
+					_ = json.Unmarshal(optsJSON, &opts)
+				}
 			}
 		}
 

@@ -2,6 +2,7 @@ package no_redeclare
 
 import (
 	_ "embed"
+
 	"github.com/web-infra-dev/rslint/internal/rule"
 	coreNoRedeclare "github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
 )

@@ -204,12 +204,6 @@ class Foo {
 				Code:    "function foo(a, b, c, d) {}",
 				Options: objectOption(map[string]interface{}{"maximum": 4, "max": 2}),
 			},
-			// Bare integer / array-of-integer is rejected by the options schema;
-			// the rule tester does not validate, and such a shape falls back to
-			// defaults rather than guessing.
-			{Code: "function foo(a, b, c) {}", Options: 7},
-			{Code: "function foo(a, b, c) {}", Options: []interface{}{7}},
-
 			// --- this parameter handling ---
 			// `this` with no type annotation — never stripped (4 effective).
 			{

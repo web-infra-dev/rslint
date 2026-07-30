@@ -2,6 +2,7 @@ package consistent_generic_constructors
 
 import (
 	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )

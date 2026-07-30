@@ -2,6 +2,8 @@ package prefer_promise_reject_errors
 
 import (
 	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -19,9 +21,35 @@ func buildRejectAnErrorMessage() rule.RuleMessage {
 }
 
 type PreferPromiseRejectErrorsOptions struct {
-	AllowEmptyReject     *bool
-	AllowThrowingAny     *bool
-	AllowThrowingUnknown *bool
+	AllowEmptyReject     *bool `json:"allowEmptyReject"`
+	AllowThrowingAny     *bool `json:"allowThrowingAny"`
+	AllowThrowingUnknown *bool `json:"allowThrowingUnknown"`
+}
+
+func parseOptions(options []any) PreferPromiseRejectErrorsOptions {
+	opts := PreferPromiseRejectErrorsOptions{
+		AllowEmptyReject:     utils.Ref(false),
+		AllowThrowingAny:     utils.Ref(false),
+		AllowThrowingUnknown: utils.Ref(false),
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	if opts.AllowEmptyReject == nil {
+		opts.AllowEmptyReject = utils.Ref(false)
+	}
+	if opts.AllowThrowingAny == nil {
+		opts.AllowThrowingAny = utils.Ref(false)
+	}
+	if opts.AllowThrowingUnknown == nil {
+		opts.AllowThrowingUnknown = utils.Ref(false)
+	}
+	return opts
 }
 
 var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
@@ -29,21 +57,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := PreferPromiseRejectErrorsOptions{}
-		if len(options) > 0 {
-			if typed, ok := options[0].(PreferPromiseRejectErrorsOptions); ok {
-				opts = typed
-			}
-		}
-		if opts.AllowEmptyReject == nil {
-			opts.AllowEmptyReject = utils.Ref(false)
-		}
-		if opts.AllowThrowingAny == nil {
-			opts.AllowThrowingAny = utils.Ref(false)
-		}
-		if opts.AllowThrowingUnknown == nil {
-			opts.AllowThrowingUnknown = utils.Ref(false)
-		}
+		opts := parseOptions(options)
 
 		checkRejectCall := func(callExpression *ast.CallExpression) {
 			if len(callExpression.Arguments.Nodes) != 0 {

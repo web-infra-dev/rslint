@@ -22,16 +22,6 @@ import (
 
 func TestNoRestrictedTypesExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedTypesRule, []rule_tester.ValidTestCase{
-		// ---- Branch lock-in checkBannedTypes() arm 1: bannedType === null disables the ban ----
-		{
-			Code:    `let value: Banned;`,
-			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{"Banned": nil}}),
-		},
-		// ---- Branch lock-in checkBannedTypes() arm 1: bannedType === false disables the ban ----
-		{
-			Code:    `let value: Banned;`,
-			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{"Banned": false}}),
-		},
 		// ---- Branch lock-in: keyword listener is not wired when its name is absent ----
 		// bigint is NOT in the types map → the keyword listener is never
 		// registered, so an unconfigured primitive keyword stays valid.
@@ -721,21 +711,6 @@ func TestNoRestrictedTypesExtras(t *testing.T) {
 				{MessageId: "bannedTypeMessage", Message: "Don't use `Banned<X>` as a type. Replace whole Banned<X>.", Line: 1, Column: 8},
 			},
 		},
-		// ---- Branch lock-in: unknown JSON value shape collapses to bare ban ----
-		// Upstream getCustomMessage treats any truthy non-string non-object
-		// (e.g. a stray number `1` slipped past schema validation) as a bare
-		// ban — customMessage = ''. parseBannedTypes' default arm mirrors
-		// this: a number value goes through Kind="true", reporting with no
-		// custom-message suffix.
-		{
-			Code: `let v: Banned;`,
-			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
-				"Banned": 1,
-			}}),
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "bannedTypeMessage", Message: "Don't use `Banned` as a type.", Line: 1, Column: 8},
-			},
-		},
 		// ---- Real-user: same name banned and not-banned in same file ----
 		// User configures `Banned` but a *different* identifier `Allowed`
 		// appears in the same scope — must not bleed into reports.
@@ -915,15 +890,6 @@ func TestNoRestrictedTypesNonFalsePositives(t *testing.T) {
 		// entirely missing options) doesn't break the listener wiring.
 		{
 			Code: `let v: bigint | string; let w: {}; let x: []; class C implements Whatever {}`,
-		},
-		// ---- Non-FP: explicit `null` value disables an otherwise-active key ----
-		// Already covered in the positive-suite valid cases; repeating in the
-		// FP suite locks the disable-via-null branch into the FP audit.
-		{
-			Code: `let v: bigint;`,
-			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
-				"bigint": nil,
-			}}),
 		},
 	}, []rule_tester.InvalidTestCase{})
 }

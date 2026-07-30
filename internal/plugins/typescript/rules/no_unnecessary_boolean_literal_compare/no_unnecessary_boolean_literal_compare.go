@@ -60,9 +60,7 @@ type NoUnnecessaryBooleanLiteralCompareOptions struct {
 func parseOptions(options []any) NoUnnecessaryBooleanLiteralCompareOptions {
 	opts := NoUnnecessaryBooleanLiteralCompareOptions{}
 	if len(options) > 0 {
-		if typed, ok := options[0].(NoUnnecessaryBooleanLiteralCompareOptions); ok {
-			opts = typed
-		} else if optsJSON, err := json.Marshal(options[0]); err == nil {
+		if optsJSON, err := json.Marshal(options[0]); err == nil {
 			// Convert the configured option object to JSON and back into the struct.
 			_ = json.Unmarshal(optsJSON, &opts)
 		}

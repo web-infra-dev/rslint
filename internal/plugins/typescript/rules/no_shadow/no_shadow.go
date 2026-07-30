@@ -2,6 +2,7 @@ package no_shadow
 
 import (
 	_ "embed"
+
 	"github.com/web-infra-dev/rslint/internal/rule"
 	core "github.com/web-infra-dev/rslint/internal/rules/no_shadow"
 )

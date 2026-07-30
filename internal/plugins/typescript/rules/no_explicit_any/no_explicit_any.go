@@ -2,6 +2,7 @@ package no_explicit_any
 
 import (
 	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )

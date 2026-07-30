@@ -2,6 +2,8 @@ package promise_function_async
 
 import (
 	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -19,20 +21,23 @@ func buildMissingAsyncMessage() rule.RuleMessage {
 }
 
 type PromiseFunctionAsyncOptions struct {
-	AllowAny *bool
+	AllowAny *bool `json:"allowAny,omitempty"`
 	// TODO(port): TypeOrValueSpecifier
-	AllowedPromiseNames       []string
-	CheckArrowFunctions       *bool
-	CheckFunctionDeclarations *bool
-	CheckFunctionExpressions  *bool
-	CheckMethodDeclarations   *bool
+	AllowedPromiseNames       []string `json:"allowedPromiseNames,omitempty"`
+	CheckArrowFunctions       *bool    `json:"checkArrowFunctions,omitempty"`
+	CheckFunctionDeclarations *bool    `json:"checkFunctionDeclarations,omitempty"`
+	CheckFunctionExpressions  *bool    `json:"checkFunctionExpressions,omitempty"`
+	CheckMethodDeclarations   *bool    `json:"checkMethodDeclarations,omitempty"`
 }
 
 func parseOptions(options []any) PromiseFunctionAsyncOptions {
 	opts := PromiseFunctionAsyncOptions{}
 	if len(options) > 0 {
-		if typed, ok := options[0].(PromiseFunctionAsyncOptions); ok {
-			opts = typed
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			// Convert the configured option object to JSON and back into the struct.
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
 		}
 	}
 	if opts.AllowAny == nil {

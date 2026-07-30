@@ -126,9 +126,7 @@ func (o *NoMisusedPromisesOptions) UnmarshalJSON(data []byte) error {
 func parseOptions(options []any) NoMisusedPromisesOptions {
 	opts := NoMisusedPromisesOptions{}
 	if len(options) > 0 {
-		if typed, ok := options[0].(NoMisusedPromisesOptions); ok {
-			opts = typed
-		} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
 			// Round-trip through JSON to populate the typed struct (malformed
 			// input falls back to defaults — config-shape validation is a
 			// project-level concern).

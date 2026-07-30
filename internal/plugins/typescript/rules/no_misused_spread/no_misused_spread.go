@@ -2,6 +2,8 @@ package no_misused_spread
 
 import (
 	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -79,8 +81,23 @@ func buildReplaceMapSpreadInObjectMessage() rule.RuleMessage {
 }
 
 type NoMisusedSpreadOptions struct {
-	Allow       []utils.TypeOrValueSpecifier
-	AllowInline []string
+	Allow []utils.TypeOrValueSpecifier `json:"allow"`
+}
+
+func parseOptions(options []any) NoMisusedSpreadOptions {
+	opts := NoMisusedSpreadOptions{}
+	if len(options) > 0 {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			// Convert the configured option object to JSON and back into the struct.
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
+		}
+	}
+	if opts.Allow == nil {
+		opts.Allow = []utils.TypeOrValueSpecifier{}
+	}
+	return opts
 }
 
 func isString(t *checker.Type) bool {
@@ -159,22 +176,11 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		var opts NoMisusedSpreadOptions
-		if len(options) > 0 {
-			if typed, ok := options[0].(NoMisusedSpreadOptions); ok {
-				opts = typed
-			}
-		}
-		if opts.Allow == nil {
-			opts.Allow = []utils.TypeOrValueSpecifier{}
-		}
-		if opts.AllowInline == nil {
-			opts.AllowInline = []string{}
-		}
+		opts := parseOptions(options)
 
 		checkArrayOrCallSpread := func(node *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsSpreadElement().Expression)
-			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) && isString(t) {
+			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) && isString(t) {
 				ctx.ReportNode(node, buildNoStringSpreadMessage())
 			}
 		}
@@ -230,7 +236,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 		checkObjectSpread := func(node *ast.Node, argument *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 
-			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) {
+			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) {
 				return
 			}
 

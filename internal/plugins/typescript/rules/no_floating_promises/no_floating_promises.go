@@ -15,26 +15,20 @@ import (
 var schemaJSON []byte
 
 type NoFloatingPromisesOptions struct {
-	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier `json:"allowForKnownSafeCalls"`
-	AllowForKnownSafeCallsInline    []string                     `json:"allowForKnownSafeCallsInline"`
-	AllowForKnownSafePromises       []utils.TypeOrValueSpecifier `json:"allowForKnownSafePromises"`
-	AllowForKnownSafePromisesInline []string                     `json:"allowForKnownSafePromisesInline"`
-	CheckThenables                  *bool                        `json:"checkThenables"`
-	IgnoreIIFE                      *bool                        `json:"ignoreIIFE"`
-	IgnoreVoid                      *bool                        `json:"ignoreVoid"`
+	AllowForKnownSafeCalls    []utils.TypeOrValueSpecifier `json:"allowForKnownSafeCalls"`
+	AllowForKnownSafePromises []utils.TypeOrValueSpecifier `json:"allowForKnownSafePromises"`
+	CheckThenables            *bool                        `json:"checkThenables"`
+	IgnoreIIFE                *bool                        `json:"ignoreIIFE"`
+	IgnoreVoid                *bool                        `json:"ignoreVoid"`
 }
 
 func parseOptions(options []any) NoFloatingPromisesOptions {
 	opts := NoFloatingPromisesOptions{
-		AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
-		AllowForKnownSafeCallsInline:    []string{},
-		AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
-		AllowForKnownSafePromisesInline: []string{},
+		AllowForKnownSafeCalls:    []utils.TypeOrValueSpecifier{},
+		AllowForKnownSafePromises: []utils.TypeOrValueSpecifier{},
 	}
 	if len(options) > 0 {
-		if typed, ok := options[0].(NoFloatingPromisesOptions); ok {
-			opts = typed
-		} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
 			if optsJSON, err := json.Marshal(optsMap); err == nil {
 				_ = json.Unmarshal(optsJSON, &opts)
 			}
@@ -175,7 +169,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			if utils.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafePromises,
-				opts.AllowForKnownSafePromisesInline,
+				nil,
 				ctx.Program,
 			) {
 				return false
@@ -260,7 +254,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			return utils.TypeMatchesSomeSpecifierWithCalleeNames(
 				t,
 				opts.AllowForKnownSafeCalls,
-				opts.AllowForKnownSafeCallsInline,
+				nil,
 				ctx.Program,
 				calleeNames,
 			)

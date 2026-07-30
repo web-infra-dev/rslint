@@ -201,13 +201,9 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := UnboundMethodOptions{}
 		if len(options) > 0 {
-			if typed, ok := options[0].(UnboundMethodOptions); ok {
-				opts = typed
-			} else {
-				optsMap, _ := options[0].(map[string]interface{})
-				if ignoreStatic, ok := optsMap["ignoreStatic"].(bool); ok {
-					opts.IgnoreStatic = utils.Ref(ignoreStatic)
-				}
+			optsMap, _ := options[0].(map[string]interface{})
+			if ignoreStatic, ok := optsMap["ignoreStatic"].(bool); ok {
+				opts.IgnoreStatic = utils.Ref(ignoreStatic)
 			}
 		}
 		if opts.IgnoreStatic == nil {

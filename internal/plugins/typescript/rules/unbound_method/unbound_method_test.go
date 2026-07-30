@@ -589,7 +589,7 @@ new ContainsMethods().unbound;
 
 ContainsMethods.unboundStatic;
       `,
-				Options: UnboundMethodOptions{IgnoreStatic: utils.Ref(true)},
+				Options: map[string]interface{}{"ignoreStatic": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unboundWithoutThisAnnotation",

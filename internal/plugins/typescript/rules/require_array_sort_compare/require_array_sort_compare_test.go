@@ -5,7 +5,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestRequireArraySortCompareRule(t *testing.T) {
@@ -93,7 +92,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
 			Code: `
         ['foo', 'bar', 'baz'].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 		},
 		{
 			Code: `
@@ -102,7 +101,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
         }
         [getString(), getString()].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 		},
 		{
 			Code: `
@@ -111,14 +110,14 @@ func TestRequireArraySortCompareRule(t *testing.T) {
         const baz = 'baz';
         [foo, bar, baz].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 		},
 		{
 			Code: `
         declare const x: string[];
         x.sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 		},
 		{
 			Code: `
@@ -158,7 +157,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
           a.sort();
         }
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(false)},
+			Options: map[string]interface{}{"ignoreStringArrays": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requireCompare",
@@ -183,7 +182,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
           if (Array.isArray(a)) a.sort();
         }
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(false)},
+			Options: map[string]interface{}{"ignoreStringArrays": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requireCompare",
@@ -278,7 +277,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
 			Code: `
         [2, 'bar', 'baz'].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requireCompare",
@@ -292,7 +291,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
         }
         [2, 3].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requireCompare",
@@ -306,7 +305,7 @@ func TestRequireArraySortCompareRule(t *testing.T) {
         const three = 3;
         [one, two, three].sort();
       `,
-			Options: RequireArraySortCompareOptions{IgnoreStringArrays: utils.Ref(true)},
+			Options: map[string]interface{}{"ignoreStringArrays": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requireCompare",

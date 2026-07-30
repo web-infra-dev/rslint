@@ -23,9 +23,7 @@ type OnlyThrowErrorOptions struct {
 func parseOptions(options []any) OnlyThrowErrorOptions {
 	opts := OnlyThrowErrorOptions{}
 	if len(options) > 0 {
-		if typed, ok := options[0].(OnlyThrowErrorOptions); ok {
-			opts = typed
-		} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
 			if optsJSON, err := json.Marshal(optsMap); err == nil {
 				_ = json.Unmarshal(optsJSON, &opts)
 			}

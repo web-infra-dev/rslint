@@ -2,6 +2,7 @@ package return_await
 
 import (
 	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -51,25 +52,12 @@ const (
 	ReturnAwaitOptionNever
 )
 
-type ReturnAwaitOptions struct {
-	Option *ReturnAwaitOption
-}
-
 func parseReturnAwaitOption(options []any) ReturnAwaitOption {
 	if len(options) == 0 {
 		return ReturnAwaitOptionInTryCatch
 	}
-	switch opts := options[0].(type) {
-	case ReturnAwaitOptions:
-		if opts.Option != nil {
-			return *opts.Option
-		}
-	case *ReturnAwaitOptions:
-		if opts != nil && opts.Option != nil {
-			return *opts.Option
-		}
-	case string:
-		switch opts {
+	if opt, ok := options[0].(string); ok {
+		switch opt {
 		case "always":
 			return ReturnAwaitOptionAlways
 		case "error-handling-correctness-only":

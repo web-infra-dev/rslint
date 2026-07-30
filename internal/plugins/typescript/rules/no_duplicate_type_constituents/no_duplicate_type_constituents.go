@@ -2,6 +2,7 @@ package no_duplicate_type_constituents
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -42,8 +43,8 @@ const (
 )
 
 type NoDuplicateTypeConstituentsOptions struct {
-	IgnoreIntersections bool
-	IgnoreUnions        bool
+	IgnoreIntersections bool `json:"ignoreIntersections"`
+	IgnoreUnions        bool `json:"ignoreUnions"`
 }
 
 func parseOptions(options []any) NoDuplicateTypeConstituentsOptions {
@@ -54,8 +55,10 @@ func parseOptions(options []any) NoDuplicateTypeConstituentsOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	if typed, ok := options[0].(NoDuplicateTypeConstituentsOptions); ok {
-		opts = typed
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
 	}
 	return opts
 }

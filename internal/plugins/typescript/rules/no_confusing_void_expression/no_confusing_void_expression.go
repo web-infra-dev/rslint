@@ -73,9 +73,6 @@ func parseOptions(options []any) NoConfusingVoidExpressionOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	if typed, ok := options[0].(NoConfusingVoidExpressionOptions); ok {
-		return typed
-	}
 	// Convert the configured option object to JSON and back into the struct.
 	if optsJSON, err := json.Marshal(options[0]); err == nil {
 		_ = json.Unmarshal(optsJSON, &opts)

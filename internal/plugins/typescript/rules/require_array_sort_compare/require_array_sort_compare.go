@@ -2,6 +2,8 @@ package require_array_sort_compare
 
 import (
 	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -19,14 +21,19 @@ func buildRequireCompareMessage() rule.RuleMessage {
 }
 
 type RequireArraySortCompareOptions struct {
-	IgnoreStringArrays *bool
+	IgnoreStringArrays *bool `json:"ignoreStringArrays"`
 }
 
 func parseOptions(options []any) RequireArraySortCompareOptions {
-	opts := RequireArraySortCompareOptions{}
-	if len(options) > 0 {
-		if typed, ok := options[0].(RequireArraySortCompareOptions); ok {
-			opts = typed
+	opts := RequireArraySortCompareOptions{
+		IgnoreStringArrays: utils.Ref(true),
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
 		}
 	}
 	if opts.IgnoreStringArrays == nil {

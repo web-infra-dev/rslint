@@ -20,9 +20,6 @@ func parseOptions(options []any) *Options {
 	if len(options) == 0 {
 		return opts
 	}
-	if typed, ok := options[0].(*Options); ok {
-		return typed
-	}
 	optMap, _ := options[0].(map[string]interface{})
 	if allowList, exists := optMap["allow"]; exists {
 		if allowSlice, ok := allowList.([]interface{}); ok {

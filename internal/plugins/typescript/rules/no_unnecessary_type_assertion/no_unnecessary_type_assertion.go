@@ -52,26 +52,27 @@ type NoUnnecessaryTypeAssertionOptions struct {
 	CheckLiteralConstAssertions bool `json:"checkLiteralConstAssertions"`
 }
 
+func parseOptions(options []any) NoUnnecessaryTypeAssertionOptions {
+	opts := NoUnnecessaryTypeAssertionOptions{
+		TypesToIgnore: []string{},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	return opts
+}
+
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-assertion",
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := NoUnnecessaryTypeAssertionOptions{}
-		if len(options) > 0 {
-			// Try direct type assertion first (for Go tests)
-			if directOpts, ok := options[0].(NoUnnecessaryTypeAssertionOptions); ok {
-				opts = directOpts
-			} else {
-				// For IPC mode, options come as map[string]interface{}, convert via JSON
-				if jsonBytes, err := json.Marshal(options[0]); err == nil {
-					_ = json.Unmarshal(jsonBytes, &opts)
-				}
-			}
-		}
-		if opts.TypesToIgnore == nil {
-			opts.TypesToIgnore = []string{}
-		}
+		opts := parseOptions(options)
 
 		sourceText := ctx.SourceFile.Text()
 		var fixScanner *scanner.Scanner

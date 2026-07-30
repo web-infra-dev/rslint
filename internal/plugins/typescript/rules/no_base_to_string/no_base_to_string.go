@@ -2,6 +2,7 @@ package no_base_to_string
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -41,7 +42,22 @@ func buildBaseToStringMessage(name string, certainty usefulness) rule.RuleMessag
 }
 
 type NoBaseToStringOptions struct {
-	IgnoredTypeNames []string
+	IgnoredTypeNames []string `json:"ignoredTypeNames"`
+}
+
+func parseOptions(options []any) NoBaseToStringOptions {
+	opts := NoBaseToStringOptions{
+		IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	return opts
 }
 
 type usefulness uint32
@@ -57,14 +73,7 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := NoBaseToStringOptions{
-			IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
-		}
-		if len(options) > 0 {
-			if typed, ok := options[0].(NoBaseToStringOptions); ok {
-				opts = typed
-			}
-		}
+		opts := parseOptions(options)
 
 		var collectToStringCertainty func(
 			t *checker.Type,

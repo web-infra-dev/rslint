@@ -2,6 +2,7 @@ package no_meaningless_void_operator
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -27,14 +28,16 @@ func buildRemoveVoidMessage() rule.RuleMessage {
 }
 
 type NoMeaninglessVoidOperatorOptions struct {
-	CheckNever *bool
+	CheckNever *bool `json:"checkNever"`
 }
 
 func parseOptions(options []any) NoMeaninglessVoidOperatorOptions {
 	opts := NoMeaninglessVoidOperatorOptions{}
 	if len(options) > 0 {
-		if typed, ok := options[0].(NoMeaninglessVoidOperatorOptions); ok {
-			opts = typed
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
 		}
 	}
 	if opts.CheckNever == nil {
