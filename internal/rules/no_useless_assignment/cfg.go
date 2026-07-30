@@ -651,11 +651,23 @@ func (b *builder) tryStatement(node *ast.Node) {
 		b.restoreForks(snapshot)
 		b.enter(frame.finallyEntry)
 		b.statement(stmt.FinallyBlock)
-		if b.cur != nil && frame.thrownAny {
-			if i := b.throwFrame(); i >= 0 {
-				outer := b.tryStack[i]
-				outer.thrownAny = true
-				b.link(b.cur, throwTarget(outer))
+		if b.cur != nil {
+			// A `return` inside this `try`/`catch` still needs to run every
+			// enclosing `finally` on its way out, not just this one — so this
+			// second copy's own abrupt exit must keep propagating outward.
+			if frame.returnedAny {
+				if i := b.returnFrame(); i >= 0 {
+					outer := b.tryStack[i]
+					outer.returnedAny = true
+					b.link(b.cur, outer.finallyEntry)
+				}
+			}
+			if frame.thrownAny {
+				if i := b.throwFrame(); i >= 0 {
+					outer := b.tryStack[i]
+					outer.thrownAny = true
+					b.link(b.cur, throwTarget(outer))
+				}
 			}
 		}
 	}

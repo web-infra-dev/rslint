@@ -118,6 +118,17 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
 			// ---- Dimension 4: `typeof` inside a class index signature's return
 			// type reads the variable ----
 			{Code: `let v = 1; g(v); v = 2; class C { [k: string]: typeof v; }`},
+
+			// ---- Dimension 4: a `return` inside a `try` block that lacks its
+			// own `catch` must still run every enclosing `finally` on its way
+			// out, not just the nearest one ----
+			{Code: `function f(){
+  let v = 1;
+  try { fails(); } catch (e) {
+    try { return; } finally { v = 2; }
+    v = arr;
+  } finally { console.log(v); }
+}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized assignment target ----

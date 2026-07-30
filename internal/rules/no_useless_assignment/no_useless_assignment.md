@@ -73,6 +73,13 @@ function fn() {
   used, so assignments to it are never reported:
   `const pipe = {}; class C { handler(@Body(pipe) body) {} }`. ESLint reports
   `const pipe = {}` here.
+- This rule models exceptions and control flow with its own approximation
+  rather than a literal port of ESLint's code-path analysis, so its findings
+  can diverge from ESLint's for deeply nested `try`/`catch`/`finally`
+  combinations — for instance a `switch` nested directly inside a `catch`
+  clause, or a `try` without its own `catch` nested inside another `try`.
+  These shapes are uncommon in real-world code, and in the large majority of
+  cases this rule reports the same findings as ESLint.
 
 ## Original Documentation
 
