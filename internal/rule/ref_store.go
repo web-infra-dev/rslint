@@ -28,7 +28,9 @@ import (
 // The store deals in raw binder symbols: query it with the symbol attached to
 // a declaration node (node.Symbol()), not with checker.GetSymbolAtLocation
 // results, which may be checker-merged and compare unequal — except for
-// symbols Resolve obtained through the checker fallback itself.
+// symbols Resolve obtained through the checker fallback itself, and for a
+// global script file's top-level declarations, whose raw and merged
+// identities the store reconciles (see mergedSymbol).
 //
 // Collection is lazy twice over: the single AST walk that gathers candidate
 // identifiers runs on first use, and name resolution runs once per queried
@@ -44,6 +46,9 @@ type RefStore struct {
 	// still awaiting resolution; entries move into refs on first query.
 	candidates map[string][]*ast.Node
 	refs       map[*ast.Symbol][]*ast.Node
+	// merged maps a raw binder symbol onto the checker-merged symbol that
+	// refs is keyed by for it; see mergedSymbol.
+	merged map[*ast.Symbol]*ast.Symbol
 }
 
 // NewRefStore creates the reference index for one source file. options must
@@ -93,6 +98,9 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 			s.resolvePending(name.Text())
 		}
 	}
+	if merged, ok := s.merged[sym]; ok {
+		sym = merged
+	}
 	return s.refs[sym]
 }
 
@@ -108,13 +116,64 @@ func (s *RefStore) resolvePending(name string) {
 	delete(s.candidates, name)
 	for _, id := range pending {
 		target := s.resolver.Resolve(id, name, referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
-		if target == nil && s.tc != nil {
-			target = utils.GetReferenceSymbol(id, s.tc)
+		if target == nil {
+			if s.tc != nil {
+				target = utils.GetReferenceSymbol(id, s.tc)
+			}
+		} else {
+			target = s.mergedSymbol(target, id)
 		}
 		if target != nil {
 			s.refs[target] = append(s.refs[target], id)
 		}
 	}
+}
+
+// mergedSymbol returns the identity references to sym must be filed under,
+// given that sym was resolved from the identifier at.
+//
+// The checker merges a global script file's top-level declarations with the
+// same-named lib.d.ts and cross-file globals into one symbol object, distinct
+// from the file's raw binder symbol. Both identities can reach this index for
+// a single name: in `Map; type Alias = Map<string, string>; interface Map<K,
+// V> {}` the type reference binds to the file's own symbol, while the value
+// reference has no local value meaning to bind to and only resolves through
+// the checker fallback. Filing them apart would make References return
+// whichever half happens to match the queried identity, so normalize onto the
+// checker's identity here and record the mapping for References to follow.
+//
+// Only a symbol the resolver found in the file's own globals table can be
+// merged this way, so every symbol of a module file and every nested scope
+// skips the checker round trip; the rest pay it once per symbol.
+func (s *RefStore) mergedSymbol(sym *ast.Symbol, at *ast.Node) *ast.Symbol {
+	if s.tc == nil || s.resolver.Globals == nil || s.resolver.Globals[sym.Name] != sym {
+		return sym
+	}
+	if merged, ok := s.merged[sym]; ok {
+		return merged
+	}
+	merged := utils.GetReferenceSymbol(at, s.tc)
+	if merged == nil || merged == sym || !sharesDeclaration(merged, sym) {
+		merged = sym
+	}
+	if s.merged == nil {
+		s.merged = make(map[*ast.Symbol]*ast.Symbol)
+	}
+	s.merged[sym] = merged
+	return merged
+}
+
+// sharesDeclaration reports whether a and b have a declaration node in
+// common, the mark of one being the merged form of the other.
+func sharesDeclaration(a, b *ast.Symbol) bool {
+	for _, decl := range b.Declarations {
+		for _, other := range a.Declarations {
+			if other == decl {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Resolve returns the symbol that a reference-position identifier resolves

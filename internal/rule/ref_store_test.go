@@ -423,3 +423,39 @@ func TestRefStoreResolveNoCheckerFallback(t *testing.T) {
 		t.Fatalf("Resolve(window) = %v, want nil (no TypeChecker supplied)", got)
 	}
 }
+
+func TestRefStoreMergedGlobalSymbolIdentity(t *testing.T) {
+	// A global script file's `interface Map` merges with lib.d.ts's `Map`,
+	// and the two reference sites below reach that one declaration by
+	// different routes: the type reference through the binder scope walk
+	// (the file's own locals are the resolver's globals table), the value
+	// reference only through the checker fallback, since the local interface
+	// carries no value meaning. Both identities must index into one bucket
+	// or References returns whichever half matches the queried symbol.
+	sourceFile, refs, done := newCheckedRefStore(t,
+		"Map;\ntype Alias = Map<string, string>;\ninterface Map<K, V> {}\n")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "Map")
+	if len(occurrences) != 3 {
+		t.Fatalf("expected 3 occurrences of Map, got %d", len(occurrences))
+	}
+	valueRef, typeRef := occurrences[0], occurrences[1]
+
+	fromChecker := refs.Resolve(valueRef)
+	if fromChecker == nil {
+		t.Fatal("Resolve(value Map) = nil, want the merged lib.d.ts symbol")
+	}
+	fromBinder := refs.Resolve(typeRef)
+	if fromBinder == nil {
+		t.Fatal("Resolve(type Map) = nil, want the file's interface symbol")
+	}
+
+	want := []*ast.Node{valueRef, typeRef}
+	for _, sym := range []*ast.Symbol{fromChecker, fromBinder} {
+		got := refs.References(sym)
+		if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+			t.Fatalf("References = %v, want %v (both the value and the type reference)", got, want)
+		}
+	}
+}
