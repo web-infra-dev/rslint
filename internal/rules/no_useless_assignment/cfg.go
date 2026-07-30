@@ -91,10 +91,14 @@ type tryFrame struct {
 
 // jumpTarget is one `break`/`continue` destination. continueTo is nil for
 // targets that only `break` can reach (switch statements, labelled blocks).
+// breakable mirrors ESLint's BreakContext#breakable: it is true for loops and
+// switch statements, and false for a labelled statement that wraps neither, so
+// an unlabelled `break` skips past it to the enclosing loop/switch.
 type jumpTarget struct {
 	label      string
 	breakTo    *block
 	continueTo *block
+	breakable  bool
 }
 
 type builder struct {
@@ -676,7 +680,7 @@ func (b *builder) labeledStatement(node *ast.Node) {
 }
 
 func (b *builder) pushJump(node *ast.Node, breakTo, continueTo *block) {
-	b.jumps = append(b.jumps, jumpTarget{label: labelOf(node), breakTo: breakTo, continueTo: continueTo})
+	b.jumps = append(b.jumps, jumpTarget{label: labelOf(node), breakTo: breakTo, continueTo: continueTo, breakable: true})
 }
 
 func (b *builder) popJump() {
@@ -693,10 +697,15 @@ func (b *builder) makeBreak(label *ast.Node) {
 	}
 	for i := len(b.jumps) - 1; i >= 0; i-- {
 		target := b.jumps[i]
-		if name == "" || target.label == name {
-			b.link(b.cur, target.breakTo)
-			break
+		if name == "" {
+			if !target.breakable {
+				continue
+			}
+		} else if target.label != name {
+			continue
 		}
+		b.link(b.cur, target.breakTo)
+		break
 	}
 	b.cur = nil
 }
@@ -864,7 +873,6 @@ func (b *builder) binaryExpression(node *ast.Node) {
 	case ast.IsLogicalOrCoalescingAssignmentOperator(operator):
 		// `a ||= b` reads a, then conditionally evaluates b and writes a.
 		b.patternReads(binary.Left)
-		b.expr(binary.Left)
 		join := b.newBlock()
 		b.link(b.cur, join)
 		right := b.newBlock()
@@ -883,7 +891,6 @@ func (b *builder) binaryExpression(node *ast.Node) {
 	case ast.IsAssignmentOperator(operator):
 		// Compound assignment reads the target before writing it.
 		b.patternReads(binary.Left)
-		b.expr(binary.Left)
 		b.expr(binary.Right)
 		b.patternWrites(binary.Left)
 
@@ -916,7 +923,6 @@ func (b *builder) conditionalExpression(node *ast.Node) {
 
 func (b *builder) updateExpression(operand *ast.Node) {
 	b.patternReads(operand)
-	b.expr(operand)
 	b.patternWrites(operand)
 }
 
@@ -941,6 +947,7 @@ func (b *builder) accessOrCall(node *ast.Node) {
 		call := node.AsCallExpression()
 		b.expr(call.Expression)
 		b.forkOptionalChain(node)
+		b.typeArguments(node)
 		if call.Arguments != nil {
 			for _, arg := range call.Arguments.Nodes {
 				b.expr(arg)
@@ -949,6 +956,7 @@ func (b *builder) accessOrCall(node *ast.Node) {
 	case ast.KindNewExpression:
 		newExpr := node.AsNewExpression()
 		b.expr(newExpr.Expression)
+		b.typeArguments(node)
 		if newExpr.Arguments != nil {
 			for _, arg := range newExpr.Arguments.Nodes {
 				b.expr(arg)
@@ -957,6 +965,7 @@ func (b *builder) accessOrCall(node *ast.Node) {
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
 		b.expr(tagged.Tag)
+		b.typeArguments(node)
 		b.expr(tagged.Template)
 	}
 
@@ -980,6 +989,28 @@ func (b *builder) forkOptionalChain(node *ast.Node) {
 	b.cur = next
 }
 
+// typeArguments walks an explicit `<T>` argument list, so a `typeof x` inside
+// it still counts as a read even though nothing in it runs.
+func (b *builder) typeArguments(node *ast.Node) {
+	for _, typeArg := range node.TypeArguments() {
+		b.expr(typeArg)
+	}
+}
+
+// typeParameters walks a `<T extends U = D>` declaration list, so a `typeof x`
+// inside a constraint or default still counts as a read even though nothing in
+// it runs.
+func (b *builder) typeParameters(node *ast.Node) {
+	for _, typeParam := range node.TypeParameters() {
+		param := typeParam.AsTypeParameterDeclaration()
+		if param == nil {
+			continue
+		}
+		b.expr(param.Constraint)
+		b.expr(param.DefaultType)
+	}
+}
+
 // nestedFunction keeps evaluating the parts of a nested function that belong to
 // the enclosing code path — a computed member name and decorators — while its
 // parameters and body form their own code path root.
@@ -993,6 +1024,7 @@ func (b *builder) classLike(node *ast.Node) {
 		return
 	}
 	b.decorators(node)
+	b.typeParameters(node)
 	if class.HeritageClauses != nil {
 		for _, clause := range class.HeritageClauses.Nodes {
 			heritage := clause.AsHeritageClause()
@@ -1013,7 +1045,10 @@ func (b *builder) classLike(node *ast.Node) {
 
 // memberHeader evaluates the parts of a class or object member that belong to
 // the enclosing code path: its decorators, its computed key, and its type
-// annotation. The member's parameters and body form their own code path.
+// annotation. A member with a body of its own — a method, accessor, or
+// property initializer — forms its own code path, so its parameters and
+// return type are walked there instead; an index signature has no body, so
+// its parameter and return types are walked here.
 func (b *builder) memberHeader(node *ast.Node) {
 	b.decorators(node)
 	if ast.IsFunctionLikeDeclaration(node) {
@@ -1025,8 +1060,14 @@ func (b *builder) memberHeader(node *ast.Node) {
 	if name != nil && name.Kind == ast.KindComputedPropertyName {
 		b.expr(name.AsComputedPropertyName().Expression)
 	}
-	if node.Kind == ast.KindPropertyDeclaration {
+	switch node.Kind {
+	case ast.KindPropertyDeclaration:
 		b.expr(node.AsPropertyDeclaration().Type)
+	case ast.KindIndexSignature:
+		for _, parameter := range node.Parameters() {
+			b.expr(parameter.Type())
+		}
+		b.expr(node.Type())
 	}
 }
 
@@ -1049,9 +1090,14 @@ func (b *builder) patternReads(node *ast.Node) {
 	}
 	switch node.Kind {
 	case ast.KindIdentifier:
-		// A pure target reads nothing, but ESLint still counts naming the
-		// variable as a point where the enclosing `try` block can throw — so
-		// the handler sees the value the target had before the assignment.
+		// A compound-assignment or update-expression target reads the
+		// variable before writing it; a plain assignment target does not,
+		// but ESLint still counts naming it as a point where the enclosing
+		// `try` block can throw — so the handler sees the value the target
+		// had before the assignment.
+		if sym, ok := b.readNodes[node]; ok {
+			b.emitRead(sym)
+		}
 		if isThrowableIdentifier(node) {
 			b.firstThrowableFork()
 		}

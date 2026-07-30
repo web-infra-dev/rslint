@@ -364,18 +364,18 @@ func isTrackable(
 	if !declaredHere {
 		return false
 	}
-	if isModule && root.Kind == ast.KindSourceFile && isExported(sym, exportedNames) {
+	if isModule && root.Kind == ast.KindSourceFile && isExported(sym, exportedNames, root) {
 		return false
 	}
 	return true
 }
 
 // isExported reports whether a module-level binding leaves the file, in which
-// case a later assignment to it can still be observed elsewhere.
-func isExported(sym *ast.Symbol, exportedNames map[string]bool) bool {
-	if exportedNames[sym.Name] {
-		return true
-	}
+// case a later assignment to it can still be observed elsewhere. Both an
+// `export` modifier and an `export { ... }` re-export only apply to the
+// declaration actually named at the top level of the file — a block-scoped
+// variable that merely shares that name is a different binding.
+func isExported(sym *ast.Symbol, exportedNames map[string]bool, root *ast.Node) bool {
 	for _, decl := range sym.Declarations {
 		target := decl
 		if decl.Kind == ast.KindVariableDeclaration {
@@ -384,7 +384,13 @@ func isExported(sym *ast.Symbol, exportedNames map[string]bool) bool {
 				target = list.Parent
 			}
 		}
+		if target.Parent != root {
+			continue
+		}
 		if ast.HasSyntacticModifier(target, ast.ModifierFlagsExport) {
+			return true
+		}
+		if exportedNames[sym.Name] {
 			return true
 		}
 	}

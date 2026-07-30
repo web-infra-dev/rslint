@@ -100,6 +100,24 @@ export { foo as bar };`},
 			{Code: `declare function Body(p: unknown): any;
 const pipe = {};
 class C { handler(@Body(pipe) _b: unknown) {} }`},
+
+			// ---- Dimension 4: an unlabelled `break` inside a labelled non-loop
+			// block skips it and exits the enclosing loop instead ----
+			{Code: `function f() {
+  let v = 'used';
+  while (true) { lbl: { break; } v = 'x'; }
+  console.log(v);
+}`},
+
+			// ---- Dimension 4: `typeof` inside a call's type arguments reads the
+			// variable ----
+			{Code: `function f() { let v = 1; g(v); v = 2; h<typeof v>(); }`},
+			// ---- Dimension 4: `typeof` inside a class type parameter's
+			// constraint reads the variable ----
+			{Code: `let v = 1; g(v); v = 2; class C<T extends typeof v> {}`},
+			// ---- Dimension 4: `typeof` inside a class index signature's return
+			// type reads the variable ----
+			{Code: `let v = 1; g(v); v = 2; class C { [k: string]: typeof v; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized assignment target ----
@@ -369,6 +387,26 @@ function f(a: any): void { let v = 1; g(v); v = 2; }`,
 						Message:   "The value assigned to 'v' is not used in subsequent statements.",
 						Line:      1, Column: 33, EndLine: 1, EndColumn: 34,
 					},
+				},
+			},
+
+			// ---- Dimension 4: an update expression inside a member target's
+			// computed key is only read and written once ----
+			{
+				Code: `function f() { let i = 0; console.log(i); obj[i++] += 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 47, EndLine: 1, EndColumn: 48},
+				},
+			},
+
+			// ---- Dimension 4: `export { ... }` only silences the module-level
+			// binding it names, not a block-scoped shadow of the same name ----
+			{
+				Code: `let a = 1;
+export { a };
+{ let a = 2; a = 3; console.log(a); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 7, EndLine: 3, EndColumn: 8},
 				},
 			},
 		},
