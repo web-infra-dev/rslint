@@ -7,31 +7,20 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type ParsedJestFnCall struct {
-	Name            string
-	LocalName       string
-	Kind            JestFnType
-	Members         []string
-	MemberEntries   []ParsedJestFnMemberEntry
+	testFramework.ParsedCall
 	Modifiers       []string
 	ModifierEntries []ParsedJestFnMemberEntry
 	Matcher         string
 	MatcherEntry    *ParsedJestFnMemberEntry
-	Head            ParsedJestFnCallHead
 }
 
-type ParsedJestFnCallHead struct {
-	Type     JestImportMode
-	Local    ParsedJestFnCallHeadEntry
-	Original ParsedJestFnCallHeadEntry
-}
+type ParsedJestFnCallHead = testFramework.ParsedCallHead
 
-type ParsedJestFnCallHeadEntry struct {
-	Value string
-	Node  *ast.Node
-}
+type ParsedJestFnCallHeadEntry = testFramework.ParsedCallHeadEntry
 
 const (
 	ExpectParseReasonNone            = ""
@@ -89,20 +78,22 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	parsed := &ParsedJestFnCall{
-		Name:          name,
-		LocalName:     localName,
-		Kind:          kind,
-		Members:       members,
-		MemberEntries: memberEntries[1:],
-		Head: ParsedJestFnCallHead{
-			Type: headType,
-			Local: ParsedJestFnCallHeadEntry{
-				Value: localName,
-				Node:  localNode,
-			},
-			Original: ParsedJestFnCallHeadEntry{
-				Value: name,
-				Node:  originalNode,
+		ParsedCall: testFramework.ParsedCall{
+			Name:          name,
+			LocalName:     localName,
+			Kind:          kind,
+			Members:       members,
+			MemberEntries: memberEntries[1:],
+			Head: ParsedJestFnCallHead{
+				Type: headType,
+				Local: ParsedJestFnCallHeadEntry{
+					Value: localName,
+					Node:  localNode,
+				},
+				Original: ParsedJestFnCallHeadEntry{
+					Value: name,
+					Node:  originalNode,
+				},
 			},
 		},
 	}
@@ -142,15 +133,7 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 }
 
 func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
-	current := node
-	for current != nil {
-		switch current.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			return current.AsImportDeclaration()
-		}
-		current = current.Parent
-	}
-	return nil
+	return testFramework.FindImportDeclaration(node)
 }
 
 func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
@@ -229,134 +212,26 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 }
 
 func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
-	if ctx.TypeChecker == nil {
-		return localName, localNode, JEST_GLOBAL_MODE
-	}
-
-	typeChecker := ctx.TypeChecker
-	callExpr := node.AsCallExpression()
-	if callExpr == nil {
-		return localName, localNode, JEST_GLOBAL_MODE
-	}
-
-	ident := ResolveFirstIdentifier(callExpr.Expression)
-	if ident == nil || ident.Kind != ast.KindIdentifier {
-		return localName, localNode, JEST_GLOBAL_MODE
-	}
-
-	symbol := typeChecker.GetSymbolAtLocation(ident)
-	if symbol == nil {
-		return localName, localNode, JEST_GLOBAL_MODE
-	}
-
-	hasLocalNonJestDeclaration := false
-	for _, decl := range symbol.Declarations {
-		if decl == nil {
-			continue
-		}
-
-		if name, originalNode, ok := resolveJestGlobalsImportSpecifier(decl); ok {
-			return name, originalNode, JEST_IMPORT_MODE
-		}
-
-		if name, originalNode, ok := resolveJestGlobalsRequireBinding(decl); ok {
-			return name, originalNode, JEST_IMPORT_MODE
-		}
-
-		if ctx.SourceFile != nil && ast.GetSourceFileOfNode(decl) == ctx.SourceFile {
-			hasLocalNonJestDeclaration = true
-		}
-	}
-
-	if hasLocalNonJestDeclaration {
-		return "", nil, JEST_GLOBAL_MODE
-	}
-
-	return localName, localNode, JEST_GLOBAL_MODE
+	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, jestGlobalsModule)
 }
 
-func resolveJestGlobalsImportSpecifier(decl *ast.Node) (string, *ast.Node, bool) {
-	if decl == nil || decl.Kind != ast.KindImportSpecifier {
-		return "", nil, false
-	}
-
-	importDecl := FindImportDeclaration(decl)
-	if importDecl == nil || importDecl.ModuleSpecifier == nil || importDecl.ModuleSpecifier.Text() != jestGlobalsModule {
-		return "", nil, false
-	}
-
-	spec := decl.AsImportSpecifier()
-	if spec == nil || spec.IsTypeOnly {
-		return "", nil, false
-	}
-
-	if spec.PropertyName != nil {
-		return spec.PropertyName.Text(), spec.PropertyName, true
-	}
-
-	name := spec.Name()
-	if name == nil {
-		return "", nil, false
-	}
-
-	return name.Text(), name, true
-}
-
-func resolveJestGlobalsRequireBinding(decl *ast.Node) (string, *ast.Node, bool) {
-	if decl == nil || decl.Kind != ast.KindBindingElement {
-		return "", nil, false
-	}
-
-	varDecl := internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
-	if varDecl == nil || !isJestGlobalsRequireCall(varDecl.AsVariableDeclaration().Initializer) {
-		return "", nil, false
-	}
-
-	binding := decl.AsBindingElement()
-	if binding == nil {
-		return "", nil, false
-	}
-
-	nameNode := binding.Name()
-	if binding.PropertyName != nil {
-		if name := getPropertyName(binding.PropertyName); name != "" {
-			return name, binding.PropertyName, true
-		}
-	}
-
-	if nameNode != nil {
-		if name := getPropertyName(nameNode); name != "" {
-			return name, nameNode, true
-		}
-	}
-
-	return "", nil, false
-}
-
-func isJestGlobalsRequireCall(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsRequireCall(node, true /*requireStringLiteralLikeArgument*/) {
-		return false
-	}
-
-	args := node.Arguments()
-	if len(args) == 0 || args[0] == nil {
-		return false
-	}
-
-	specifier := ast.SkipParentheses(args[0])
-	if specifier == nil {
-		return false
-	}
-
-	switch specifier.Kind {
-	case ast.KindStringLiteral:
-		return specifier.AsStringLiteral().Text == jestGlobalsModule
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return specifier.AsNoSubstitutionTemplateLiteral().Text == jestGlobalsModule
-	default:
-		return false
-	}
+// ResolveFunctionReferenceForModule is the Jest-facing adapter for shared
+// module reference resolution.
+func ResolveFunctionReferenceForModule(
+	node *ast.Node,
+	localName string,
+	localNode *ast.Node,
+	ctx rule.RuleContext,
+	importModule string,
+) (string, *ast.Node, JestImportMode) {
+	return testFramework.ResolveFunctionReferenceForModule(
+		node,
+		localName,
+		localNode,
+		ctx.TypeChecker,
+		ctx.SourceFile,
+		importModule,
+	)
 }
 
 func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
@@ -369,29 +244,7 @@ func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
 // ResolveFirstIdentifier walks the left side of a call/member chain and returns
 // the first identifier it finds, if any.
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return nil
-	}
-
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return node
-	case ast.KindCallExpression:
-		return ResolveFirstIdentifier(node.AsCallExpression().Expression)
-	case ast.KindPropertyAccessExpression:
-		return ResolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
-	case ast.KindElementAccessExpression:
-		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
-	case ast.KindTaggedTemplateExpression:
-		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
-	}
-
-	return nil
+	return testFramework.ResolveFirstIdentifier(node)
 }
 
 func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
