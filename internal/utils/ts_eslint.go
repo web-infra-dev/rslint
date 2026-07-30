@@ -1361,6 +1361,11 @@ func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 // typescript-eslint's scope analysis treats it: syntactically, any
 // `namespace`/`module` declaration can hold a value, so it's never treated as
 // type-only regardless of what it happens to contain.
+//
+// Declarations inside a `declare global` block or a module augmentation are
+// skipped too: they extend the augmented symbol rather than bind a name in
+// the enclosing file's scope, so a call site in that file still reaches the
+// ambient value.
 func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 	if symbol == nil {
 		return false
@@ -1370,7 +1375,19 @@ func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
 			continue
 		}
-		if ast.GetSourceFileOfNode(decl) == sf {
+		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {
+			return true
+		}
+	}
+	return false
+}
+
+// isInAmbientAugmentation reports whether node sits inside a `declare global`
+// block or a `declare module "..."` augmentation.
+func isInAmbientAugmentation(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if parent.Kind == ast.KindModuleDeclaration &&
+			(ast.IsGlobalScopeAugmentation(parent) || ast.IsExternalModuleAugmentation(parent)) {
 			return true
 		}
 	}

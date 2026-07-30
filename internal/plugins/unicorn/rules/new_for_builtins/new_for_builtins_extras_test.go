@@ -311,6 +311,21 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 				"interface Array {}",
 				"A();",
 			), "A()", "Array"),
+			// ---- Adversarial: augmentations extend the global instead of shadowing it ----
+			tsEnforceInvalid(lines(
+				"export {};",
+				"declare global {",
+				"\tnamespace Map {}",
+				"}",
+				"Map();",
+			), "Map()", "Map"),
+			tsEnforceInvalid(lines(
+				"export {};",
+				"declare global {",
+				"\tvar Map: any;",
+				"}",
+				"Map();",
+			), "Map()", "Map"),
 
 			// ---- Real-user: #901 new String('test') reports but has no autofix ----
 			disallowNoFixInvalid("const str = new String('test');", "new String('test')", "String"),
