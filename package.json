@@ -22,6 +22,7 @@
     "version": "zx scripts/version.mjs",
     "version:crates": "zx scripts/version-crates.mjs",
     "release": "pnpm publish -r --no-git-checks",
+    "sync:rule-releases": "node scripts/sync-rule-releases.js",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --write .",
