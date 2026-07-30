@@ -126,6 +126,10 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 	top := node
 	parent := node.Parent
 	for parent != nil {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			parent = parent.Parent
+			continue
+		}
 		if parent.Kind == ast.KindCallExpression {
 			top = parent
 			parent = parent.Parent
@@ -200,7 +204,7 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
-		grandparent := parent.Parent
+		grandparent := ast.WalkUpParenthesizedExpressions(parent.Parent)
 		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
 			return modifiers, &member, ExpectParseReasonNone
 		}
@@ -518,7 +522,10 @@ func ReceiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
 		return nil
 	}
 
-	expr := matcherCall.AsCallExpression().Expression
+	expr := ast.SkipParentheses(matcherCall.AsCallExpression().Expression)
+	if expr == nil {
+		return nil
+	}
 	switch expr.Kind {
 	case ast.KindPropertyAccessExpression:
 		return expr.AsPropertyAccessExpression().Expression

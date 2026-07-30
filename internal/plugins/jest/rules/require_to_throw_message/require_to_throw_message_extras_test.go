@@ -23,6 +23,7 @@ func TestRequireToThrowMessageExtras(t *testing.T) {
 			{Code: "await expect(Promise.reject(new Error('a'))).rejects.not.toThrow();"},
 			{Code: "(expect(() => { throw new Error('a'); })).toThrow('a');"},
 			{Code: "((expect(() => { throw new Error('a'); }))).not.toThrow();"},
+			{Code: "((expect(() => { throw new Error('a'); }).not.toThrow))();"},
 			{Code: "expect(() => { throw new Error('a'); })!.toThrow('a');"},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -58,6 +59,20 @@ func TestRequireToThrowMessageExtras(t *testing.T) {
 			},
 			{
 				Code: "(expect(() => { throw new Error('a'); })).toThrow();",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "addErrorMessage"},
+				},
+			},
+			{
+				// Matcher access wrapped in parens: TS AST inserts ParenthesizedExpression;
+				// ESTree does not. Shared ParseJestFnCall must skip those wrappers.
+				Code: "(expect(() => { throw new Error('a'); }).toThrow)();",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "addErrorMessage"},
+				},
+			},
+			{
+				Code: "(expect(() => { throw new Error('a'); }).toThrowError)();",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "addErrorMessage"},
 				},

@@ -93,6 +93,18 @@ ruleTester.run('require-to-throw-message', {} as never, {
         },
       ],
     },
+    // Parenthesized matcher access (TS AST has ParenthesizedExpression; ESTree does not)
+    {
+      code: "(expect(() => { throw new Error('a'); }).toThrow)();",
+      errors: [
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrow' },
+          column: 42,
+          line: 1,
+        },
+      ],
+    },
     // Empty toThrowError
     {
       code: "expect(() => { throw new Error('a'); }).toThrowError();",
