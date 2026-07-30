@@ -291,7 +291,7 @@ func TestBindLintTargetPlan_PreservesExactAndProjectOrder(t *testing.T) {
 			OwnerConfigDir: configDir,
 		}}}
 
-		binding, err := bindLintTargetPlan(set, plan, configDir, fsys, utils.NewParseCache(), true)
+		binding, err := bindLintTargetPlan(set, plan, configDir, utils.NewProgramBuildContext(fsys), true)
 		if err != nil {
 			t.Fatalf("bindLintTargetPlan: %v", err)
 		}
@@ -316,7 +316,7 @@ func TestBindLintTargetPlan_PreservesExactAndProjectOrder(t *testing.T) {
 		}}}
 		fsys.resetCalls()
 
-		binding, err := bindLintTargetPlan(set, plan, configDir, fsys, utils.NewParseCache(), true)
+		binding, err := bindLintTargetPlan(set, plan, configDir, utils.NewProgramBuildContext(fsys), true)
 		if err != nil {
 			t.Fatalf("bindLintTargetPlan: %v", err)
 		}
