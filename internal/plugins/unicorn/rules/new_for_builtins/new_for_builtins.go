@@ -987,7 +987,7 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 		symbol := state.ctx.Refs.Resolve(node)
 		if symbol != nil {
 			// A resolved type-only symbol is authoritative. Falling through
-			// would rescan the containing scope for every reference.
+			// would scan the containing scope again for every reference.
 			return utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile)
 		}
 		// A namespace holding no value of its own is outside the binder's
