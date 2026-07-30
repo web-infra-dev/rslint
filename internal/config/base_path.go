@@ -142,21 +142,8 @@ func rebasePattern(pattern string, relativeBase string) string {
 	return joined
 }
 
+// isAbsolutePattern reports whether pattern is an absolute path in any form
+// tspath recognizes (POSIX, UNC, Windows drive-letter).
 func isAbsolutePattern(pattern string) bool {
-	if pattern == "" {
-		return false
-	}
-	// POSIX absolute, Windows drive, or UNC.
-	if strings.HasPrefix(pattern, "/") || strings.HasPrefix(pattern, "\\") {
-		return true
-	}
-	if len(pattern) >= 3 {
-		drive := pattern[0]
-		if (drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z') {
-			if pattern[1] == ':' && (pattern[2] == '/' || pattern[2] == '\\') {
-				return true
-			}
-		}
-	}
 	return tspath.GetEncodedRootLength(pattern) > 0
 }
