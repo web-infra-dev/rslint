@@ -179,6 +179,30 @@ func TestGetConfigForFile_WithDesugaredBasePath(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSON_RejectsEmptyBasePath(t *testing.T) {
+	var config RslintConfig
+	raw := []byte(`[{"basePath":"","rules":{"no-console":"error"}}]`)
+	err := config.UnmarshalJSON(raw)
+	if err == nil {
+		t.Fatal("expected empty basePath to be rejected")
+	}
+	if got := err.Error(); got != `config entry at index 0: key "basePath": expected value to be a non-empty string` {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestUnmarshalJSON_RejectsNullBasePath(t *testing.T) {
+	var config RslintConfig
+	raw := []byte(`[{"basePath":null,"rules":{"no-console":"error"}}]`)
+	err := config.UnmarshalJSON(raw)
+	if err == nil {
+		t.Fatal("expected null basePath to be rejected")
+	}
+	if got := err.Error(); got != `config entry at index 0: key "basePath": expected value to be a non-empty string` {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
 func TestUnmarshalJSON_BasePathIsMetaForGlobalIgnore(t *testing.T) {
 	var config RslintConfig
 	raw := []byte(`[{"basePath":"packages/foo","ignores":["fixtures/**"]}]`)

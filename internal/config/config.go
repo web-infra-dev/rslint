@@ -184,6 +184,15 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(entryForDecode, &decoded); err != nil {
 			return err
 		}
+		// A present-but-empty (or null) "basePath" decodes to the same Go
+		// zero value as an absent key, so it must be rejected here while raw
+		// still distinguishes "key absent" from "key present". Mirrors
+		// normalizeConfig's rejection of "basePath": "" on the JS/TS config
+		// path, and also covers callers (e.g. the low-level API's Config
+		// field) that hand Go raw JSON without going through normalizeConfig.
+		if _, ok := raw["basePath"]; ok && decoded.BasePath == "" {
+			return fmt.Errorf("config entry at index %d: key \"basePath\": expected value to be a non-empty string", index)
+		}
 		if err := validateConfigRules(decoded.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
