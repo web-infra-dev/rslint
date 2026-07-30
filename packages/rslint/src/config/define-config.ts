@@ -225,6 +225,7 @@ export type RslintConfig = RslintConfigEntry | RslintConfig[];
  */
 export function defineConfig(...config: RslintConfig[]): RslintConfigEntry[] {
   // @ts-expect-error -- infinite recursive
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- flat(Infinity) is typed as any[]
   return config.flat(Infinity) as RslintConfigEntry[];
 }
 

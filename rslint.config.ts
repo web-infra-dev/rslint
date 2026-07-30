@@ -27,6 +27,7 @@ export default defineConfig([
     // Files that need special handling
     'packages/rslint-wasm/src/worker.ts',
     'packages/rule-tester/src/index.ts',
+    'packages/rslint-wasm/wasm_exec.js',
   ]),
   // Start from recommended preset, then override rules and parserOptions
   ts.configs.recommended,
@@ -73,6 +74,12 @@ export default defineConfig([
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['**/*.js', '**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ]);
