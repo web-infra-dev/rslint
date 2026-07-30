@@ -985,7 +985,15 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 		// .d.ts), so a non-nil result alone doesn't imply local — it must
 		// additionally be declared in this file.
 		symbol := state.ctx.Refs.Resolve(node)
-		return symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile)
+		if symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+			return true
+		}
+		// A namespace holding no value of its own is outside the binder's
+		// value lookup, and without a TypeChecker to fall back to Resolve
+		// can't see it at all — so keep the syntactic check, which counts
+		// every identifier-named namespace. The localRootNames gate above
+		// keeps it off the common path.
+		return utils.IsShadowed(node, name)
 	}
 
 	if state.ctx.TypeChecker != nil && state.ctx.SourceFile != nil {

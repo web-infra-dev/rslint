@@ -207,6 +207,11 @@ func TestReferenceResolutionWithAndWithoutRefStore(t *testing.T) {
 			want:   []string{""},
 		},
 		{
+			name:   "type-only namespace declaration",
+			source: "namespace Intl { export interface Local {} } Intl.DateTimeFormat();",
+			want:   []string{""},
+		},
+		{
 			name:   "runtime enum declaration",
 			source: "enum Map {} Map();",
 			want:   []string{""},
