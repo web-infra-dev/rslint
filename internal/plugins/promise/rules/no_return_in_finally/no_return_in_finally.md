@@ -1,4 +1,4 @@
-# promise/no-return-in-finally
+# no-return-in-finally
 
 Disallow return statements inside a callback passed to `.finally()`, since nothing would consume what's returned.
 

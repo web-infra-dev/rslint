@@ -1,4 +1,4 @@
-# promise/no-callback-in-promise
+# no-callback-in-promise
 
 Disallow calling `cb()` inside of a `then()` (use `util.callbackify` instead).
 

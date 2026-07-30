@@ -1,4 +1,4 @@
-# promise/no-nesting
+# no-nesting
 
 ## Rule Details
 
