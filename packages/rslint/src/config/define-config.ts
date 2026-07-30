@@ -217,13 +217,23 @@ export interface RslintConfigEntry {
   rules?: RulesRecord;
 }
 
-/** Top-level rslint config: an array of entries. */
-export type RslintConfig = RslintConfigEntry | RslintConfig[];
+/** Top-level rslint config: a flat array of entries, as the loader expects it. */
+export type RslintConfig = RslintConfigEntry[];
 
 /**
- * Type-safe config helper. Returns the config array as-is (identity function).
+ * A `defineConfig` argument: a single entry, or an array of these nested to
+ * any depth (e.g. a preset that expands to several entries). `defineConfig`
+ * flattens the nesting into the flat `RslintConfig` the loader expects.
  */
-export function defineConfig(...config: RslintConfig[]): RslintConfigEntry[] {
+export type DefineConfigInput = RslintConfigEntry | DefineConfigInput[];
+
+/**
+ * Type-safe config helper. Flattens nested entries (presets, arrays of
+ * presets, ...) into a single flat config array.
+ */
+export function defineConfig(
+  ...config: DefineConfigInput[]
+): RslintConfigEntry[] {
   // @ts-expect-error -- infinite recursive
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- flat(Infinity) is typed as any[]
   return config.flat(Infinity) as RslintConfigEntry[];
