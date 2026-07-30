@@ -67,6 +67,7 @@ const (
 
 var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-assignment",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()

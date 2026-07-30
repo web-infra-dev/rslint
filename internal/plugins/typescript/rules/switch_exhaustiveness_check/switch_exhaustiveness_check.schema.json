@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowDefaultCaseForExhaustiveSwitch": {
+          "type": "boolean",
+          "description": "If 'true', allow 'default' cases on switch statements with exhaustive cases."
+        },
+        "considerDefaultExhaustiveForUnions": {
+          "type": "boolean",
+          "description": "If 'true', the 'default' clause is used to determine whether the switch statement is exhaustive for union type"
+        },
+        "defaultCaseCommentPattern": {
+          "type": "string",
+          "description": "Regular expression for a comment that can indicate an intentionally omitted default case."
+        },
+        "requireDefaultForNonUnion": {
+          "type": "boolean",
+          "description": "If 'true', require a 'default' clause for switches on non-union types."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

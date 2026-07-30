@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ignoreStringArrays": {
+          "type": "boolean",
+          "description": "Whether to ignore arrays in which all elements are strings."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

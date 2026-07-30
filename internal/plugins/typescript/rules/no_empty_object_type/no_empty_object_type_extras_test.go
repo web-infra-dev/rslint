@@ -130,8 +130,8 @@ interface Both extends A, B {}
 		// `map[string]interface{}{...}` shape (covered by all options tests
 		// above) AND the array-wrapped `[]interface{}{...}` shape (matches
 		// the multi-element rule_tester / CLI invocation). These mirror
-		// upstream-valid cases via the array shape so that the JSON path
-		// through `utils.GetOptionsMap` is exercised end-to-end.
+		// upstream-valid cases via the array shape so that the rule's own
+		// options-array parsing is exercised end-to-end.
 		{
 			Code:    `interface Base {}`,
 			Options: []interface{}{map[string]interface{}{"allowInterfaces": "always"}},
@@ -994,8 +994,8 @@ declare namespace N {
 
 		// ---- Option JSON-array shape coverage (invalid side) ----
 		// Mirrors an upstream-invalid case but passes options through the
-		// `[]interface{}{...}` shape to exercise `utils.GetOptionsMap`'s
-		// multi-element path end-to-end.
+		// `[]interface{}{...}` shape to exercise the rule's own
+		// options-array parsing end-to-end.
 		{
 			Code:    `type Base = {};`,
 			Options: []interface{}{map[string]interface{}{"allowObjectTypes": "never"}},

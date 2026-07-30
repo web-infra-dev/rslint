@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "string",
+      "description": "Which constructor call syntax to prefer.",
+      "enum": ["type-annotation", "constructor"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

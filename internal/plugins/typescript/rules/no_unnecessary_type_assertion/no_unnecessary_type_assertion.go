@@ -1,6 +1,7 @@
 package no_unnecessary_type_assertion
 
 import (
+	_ "embed"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unnecessary_type_assertion.schema.json
+var schemaJSON []byte
 
 const nullableTypeFlags = checker.TypeFlagsAny |
 	checker.TypeFlagsUnknown |
@@ -50,17 +54,17 @@ type NoUnnecessaryTypeAssertionOptions struct {
 
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-assertion",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := NoUnnecessaryTypeAssertionOptions{}
-		if options != nil {
+		if len(options) > 0 {
 			// Try direct type assertion first (for Go tests)
-			if directOpts, ok := options.(NoUnnecessaryTypeAssertionOptions); ok {
+			if directOpts, ok := options[0].(NoUnnecessaryTypeAssertionOptions); ok {
 				opts = directOpts
 			} else {
 				// For IPC mode, options come as map[string]interface{}, convert via JSON
-				if jsonBytes, err := json.Marshal(options); err == nil {
+				if jsonBytes, err := json.Marshal(options[0]); err == nil {
 					_ = json.Unmarshal(jsonBytes, &opts)
 				}
 			}

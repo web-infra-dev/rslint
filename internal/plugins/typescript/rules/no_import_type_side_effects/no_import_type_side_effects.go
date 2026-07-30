@@ -15,7 +15,8 @@ func buildUseTopLevelQualifierMessage() rule.RuleMessage {
 }
 
 var NoImportTypeSideEffectsRule = rule.CreateRule(rule.Rule{
-	Name: "no-import-type-side-effects",
+	Name:   "no-import-type-side-effects",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

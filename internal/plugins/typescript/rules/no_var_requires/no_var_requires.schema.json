@@ -1,0 +1,20 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "description": "Patterns of import paths to allow requiring from.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

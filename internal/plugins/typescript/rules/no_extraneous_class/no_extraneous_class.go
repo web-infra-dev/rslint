@@ -1,9 +1,13 @@
 package no_extraneous_class
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_extraneous_class.schema.json
+var schemaJSON []byte
 
 type NoExtraneousClassOptions struct {
 	AllowConstructorOnly bool `json:"allowConstructorOnly"`
@@ -12,45 +16,37 @@ type NoExtraneousClassOptions struct {
 	AllowWithDecorator   bool `json:"allowWithDecorator"`
 }
 
+func parseOptions(options []any) NoExtraneousClassOptions {
+	opts := NoExtraneousClassOptions{
+		AllowConstructorOnly: false,
+		AllowEmpty:           false,
+		AllowStaticOnly:      false,
+		AllowWithDecorator:   false,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if allowConstructorOnly, ok := optsMap["allowConstructorOnly"].(bool); ok {
+		opts.AllowConstructorOnly = allowConstructorOnly
+	}
+	if allowEmpty, ok := optsMap["allowEmpty"].(bool); ok {
+		opts.AllowEmpty = allowEmpty
+	}
+	if allowStaticOnly, ok := optsMap["allowStaticOnly"].(bool); ok {
+		opts.AllowStaticOnly = allowStaticOnly
+	}
+	if allowWithDecorator, ok := optsMap["allowWithDecorator"].(bool); ok {
+		opts.AllowWithDecorator = allowWithDecorator
+	}
+	return opts
+}
+
 var NoExtraneousClassRule = rule.CreateRule(rule.Rule{
-	Name: "no-extraneous-class",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoExtraneousClassOptions{
-			AllowConstructorOnly: false,
-			AllowEmpty:           false,
-			AllowStaticOnly:      false,
-			AllowWithDecorator:   false,
-		}
-
-		// Parse options with dual-format support
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			// Handle array format: [{ option: value }]
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				// Handle direct object format: { option: value }
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if allowConstructorOnly, ok := optsMap["allowConstructorOnly"].(bool); ok {
-					opts.AllowConstructorOnly = allowConstructorOnly
-				}
-				if allowEmpty, ok := optsMap["allowEmpty"].(bool); ok {
-					opts.AllowEmpty = allowEmpty
-				}
-				if allowStaticOnly, ok := optsMap["allowStaticOnly"].(bool); ok {
-					opts.AllowStaticOnly = allowStaticOnly
-				}
-				if allowWithDecorator, ok := optsMap["allowWithDecorator"].(bool); ok {
-					opts.AllowWithDecorator = allowWithDecorator
-				}
-			}
-		}
+	Name:   "no-extraneous-class",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindClassDeclaration: func(node *ast.Node) {

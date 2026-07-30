@@ -1,6 +1,7 @@
 package naming_convention
 
 import (
+	_ "embed"
 	"fmt"
 	"math/bits"
 	"regexp"
@@ -15,10 +16,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed naming_convention.schema.json
+var schemaJSON []byte
+
 // NamingConventionRule is the exported rule for registration.
 var NamingConventionRule = rule.CreateRule(rule.Rule{
-	Name: "naming-convention",
-	Run:  run,
+	Name:   "naming-convention",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 // ---- Enums ----
@@ -443,29 +448,13 @@ func checkFormat(name string, format predefinedFormat) bool {
 
 // ---- Options parsing ----
 
-func parseOptions(rawOpts any) []normalizedSelector {
-	if rawOpts == nil {
-		return getDefaultConfig()
-	}
-
-	var optsList []interface{}
-	switch v := rawOpts.(type) {
-	case []interface{}:
-		optsList = v
-	case map[string]interface{}:
-		// Single selector object (e.g., when the config has one option element,
-		// LegacyUnwrapOptions collapses the single-element options array).
-		optsList = []interface{}{v}
-	default:
-		return getDefaultConfig()
-	}
-
-	if len(optsList) == 0 {
+func parseOptions(options []any) []normalizedSelector {
+	if len(options) == 0 {
 		return getDefaultConfig()
 	}
 
 	var selectors []normalizedSelector
-	for _, opt := range optsList {
+	for _, opt := range options {
 		optMap, ok := opt.(map[string]interface{})
 		if !ok {
 			continue
@@ -509,7 +498,7 @@ func parseOptions(rawOpts any) []normalizedSelector {
 }
 
 func getDefaultConfig() []normalizedSelector {
-	return parseOptions([]interface{}{
+	return parseOptions([]any{
 		map[string]interface{}{
 			"selector":           "default",
 			"format":             []interface{}{"camelCase"},
@@ -2146,8 +2135,7 @@ func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
 
 // ---- Main run function ----
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	selectors := parseOptions(options)
 
 	if len(selectors) == 0 {

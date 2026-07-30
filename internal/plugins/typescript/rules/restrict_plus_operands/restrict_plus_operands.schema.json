@@ -1,0 +1,37 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowAny": {
+          "type": "boolean",
+          "description": "Whether to allow `any` typed values."
+        },
+        "allowBoolean": {
+          "type": "boolean",
+          "description": "Whether to allow `boolean` typed values."
+        },
+        "allowNullish": {
+          "type": "boolean",
+          "description": "Whether to allow potentially `null` or `undefined` typed values."
+        },
+        "allowNumberAndString": {
+          "type": "boolean",
+          "description": "Whether to allow `bigint`/`number` typed values and `string` typed values to be added together."
+        },
+        "allowRegExp": {
+          "type": "boolean",
+          "description": "Whether to allow `regexp` typed values."
+        },
+        "skipCompoundAssignments": {
+          "type": "boolean",
+          "description": "Whether to skip compound assignments such as `+=`."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

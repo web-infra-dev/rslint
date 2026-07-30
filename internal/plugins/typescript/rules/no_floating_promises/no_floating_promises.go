@@ -1,6 +1,7 @@
 package no_floating_promises
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_floating_promises.schema.json
+var schemaJSON []byte
+
 type NoFloatingPromisesOptions struct {
 	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier `json:"allowForKnownSafeCalls"`
 	AllowForKnownSafeCallsInline    []string                     `json:"allowForKnownSafeCallsInline"`
@@ -18,6 +22,34 @@ type NoFloatingPromisesOptions struct {
 	CheckThenables                  *bool                        `json:"checkThenables"`
 	IgnoreIIFE                      *bool                        `json:"ignoreIIFE"`
 	IgnoreVoid                      *bool                        `json:"ignoreVoid"`
+}
+
+func parseOptions(options []any) NoFloatingPromisesOptions {
+	opts := NoFloatingPromisesOptions{
+		AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
+		AllowForKnownSafeCallsInline:    []string{},
+		AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
+		AllowForKnownSafePromisesInline: []string{},
+	}
+	if len(options) > 0 {
+		if typed, ok := options[0].(NoFloatingPromisesOptions); ok {
+			opts = typed
+		} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
+		}
+	}
+	if opts.CheckThenables == nil {
+		opts.CheckThenables = utils.Ref(false)
+	}
+	if opts.IgnoreIIFE == nil {
+		opts.IgnoreIIFE = utils.Ref(false)
+	}
+	if opts.IgnoreVoid == nil {
+		opts.IgnoreVoid = utils.Ref(true)
+	}
+	return opts
 }
 
 var messageBase = "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler."
@@ -79,35 +111,10 @@ func buildFloatingVoidMessage() rule.RuleMessage {
 
 var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-floating-promises",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoFloatingPromisesOptions)
-		if !ok {
-			opts = NoFloatingPromisesOptions{
-				AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
-				AllowForKnownSafeCallsInline:    []string{},
-				AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
-				AllowForKnownSafePromisesInline: []string{},
-			}
-			// Options from JS configs may arrive as either an array
-			// (`[{ checkThenables: true }]`) or a bare object (`{ checkThenables: true }`).
-			// GetOptionsMap normalizes both shapes.
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.CheckThenables == nil {
-			opts.CheckThenables = utils.Ref(false)
-		}
-		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = utils.Ref(false)
-		}
-		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
 			operator := ast.KindUnknown
 			if ast.IsBinaryExpression(node) {

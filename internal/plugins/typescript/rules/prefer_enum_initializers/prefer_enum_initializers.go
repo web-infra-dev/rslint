@@ -25,7 +25,8 @@ func buildDefineInitializerSuggestionMessage(name, suggested string) rule.RuleMe
 }
 
 var PreferEnumInitializersRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-enum-initializers",
+	Name:   "prefer-enum-initializers",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 		return rule.RuleListeners{

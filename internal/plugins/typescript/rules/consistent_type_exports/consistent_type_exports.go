@@ -1,9 +1,13 @@
 package consistent_type_exports
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed consistent_type_exports.schema.json
+var schemaJSON []byte
 
 type ConsistentTypeExportsOptions struct {
 	FixMixedExportsWithInlineTypeSpecifier bool `json:"fixMixedExportsWithInlineTypeSpecifier"`
@@ -12,30 +16,27 @@ type ConsistentTypeExportsOptions struct {
 // ConsistentTypeExportsRule enforces consistent type exports
 var ConsistentTypeExportsRule = rule.CreateRule(rule.Rule{
 	Name:             "consistent-type-exports",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func parseOptions(options []any) ConsistentTypeExportsOptions {
 	opts := ConsistentTypeExportsOptions{
 		FixMixedExportsWithInlineTypeSpecifier: false,
 	}
-
-	// Parse options
-	if options != nil {
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if optMap, ok := optArray[0].(map[string]interface{}); ok {
-				if fixMixed, ok := optMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
-					opts.FixMixedExportsWithInlineTypeSpecifier = fixMixed
-				}
-			}
-		} else if optMap, ok := options.(map[string]interface{}); ok {
-			if fixMixed, ok := optMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
-				opts.FixMixedExportsWithInlineTypeSpecifier = fixMixed
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optMap, _ := options[0].(map[string]interface{})
+	if fixMixed, ok := optMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
+		opts.FixMixedExportsWithInlineTypeSpecifier = fixMixed
+	}
+	return opts
+}
+
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	// Helper to check if a symbol is type-only
 	// Returns: true = type-only, false = value-based, nil = unknown/unresolved

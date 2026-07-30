@@ -1,6 +1,7 @@
 package no_empty_interface
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,37 +10,33 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_empty_interface.schema.json
+var schemaJSON []byte
+
 type NoEmptyInterfaceOptions struct {
 	AllowSingleExtends bool `json:"allowSingleExtends"`
 }
 
+func parseOptions(options []any) NoEmptyInterfaceOptions {
+	opts := NoEmptyInterfaceOptions{
+		AllowSingleExtends: false,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if allowSingleExtends, ok := optsMap["allowSingleExtends"].(bool); ok {
+		opts.AllowSingleExtends = allowSingleExtends
+	}
+	return opts
+}
+
 var NoEmptyInterfaceRule = rule.CreateRule(rule.Rule{
 	Name:             "no-empty-interface",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoEmptyInterfaceOptions{
-			AllowSingleExtends: false,
-		}
-		// Parse options with dual-format support (handles both array and object formats)
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			// Handle array format: [{ option: value }]
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				// Handle direct object format: { option: value }
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if allowSingleExtends, ok := optsMap["allowSingleExtends"].(bool); ok {
-					opts.AllowSingleExtends = allowSingleExtends
-				}
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {

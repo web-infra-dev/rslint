@@ -1,11 +1,15 @@
 package consistent_return
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed consistent_return.schema.json
+var schemaJSON []byte
 
 type ConsistentReturnOptions struct {
 	TreatUndefinedAsUnspecified bool `json:"treatUndefinedAsUnspecified"`
@@ -14,6 +18,7 @@ type ConsistentReturnOptions struct {
 // ConsistentReturnRule enforces consistent return statements
 var ConsistentReturnRule = rule.CreateRule(rule.Rule{
 	Name:             "consistent-return",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run:              run,
 })
@@ -26,26 +31,22 @@ type functionInfo struct {
 	isVoidOrPromiseVoid   bool
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func parseOptions(options []any) ConsistentReturnOptions {
 	opts := ConsistentReturnOptions{
 		TreatUndefinedAsUnspecified: false,
 	}
-
-	// Parse options
-	if options != nil {
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if optsMap, ok := optArray[0].(map[string]interface{}); ok {
-				if v, exists := optsMap["treatUndefinedAsUnspecified"].(bool); exists {
-					opts.TreatUndefinedAsUnspecified = v
-				}
-			}
-		} else if optsMap, ok := options.(map[string]interface{}); ok {
-			if v, exists := optsMap["treatUndefinedAsUnspecified"].(bool); exists {
-				opts.TreatUndefinedAsUnspecified = v
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["treatUndefinedAsUnspecified"].(bool); ok {
+		opts.TreatUndefinedAsUnspecified = v
+	}
+	return opts
+}
+
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	// Stack to track nested functions
 	functionStack := make([]*functionInfo, 0)

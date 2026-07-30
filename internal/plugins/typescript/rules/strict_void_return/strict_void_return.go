@@ -1,6 +1,7 @@
 package strict_void_return
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed strict_void_return.schema.json
+var schemaJSON []byte
 
 func buildAsyncFuncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -37,13 +41,14 @@ type StrictVoidReturnOptions struct {
 
 var StrictVoidReturnRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-void-return",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(StrictVoidReturnOptions)
-		if !ok {
-			opts = StrictVoidReturnOptions{}
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := StrictVoidReturnOptions{}
+		if len(options) > 0 {
+			if typed, ok := options[0].(StrictVoidReturnOptions); ok {
+				opts = typed
+			} else if optsMap, ok := options[0].(map[string]interface{}); ok {
 				if optsJSON, err := json.Marshal(optsMap); err == nil {
 					_ = json.Unmarshal(optsJSON, &opts)
 				}

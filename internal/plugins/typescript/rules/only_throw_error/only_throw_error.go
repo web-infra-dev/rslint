@@ -1,6 +1,7 @@
 package only_throw_error
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,11 +10,40 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed only_throw_error.schema.json
+var schemaJSON []byte
+
 type OnlyThrowErrorOptions struct {
 	Allow                []utils.TypeOrValueSpecifier `json:"allow"`
 	AllowRethrowing      *bool                        `json:"allowRethrowing"`
 	AllowThrowingAny     *bool                        `json:"allowThrowingAny"`
 	AllowThrowingUnknown *bool                        `json:"allowThrowingUnknown"`
+}
+
+func parseOptions(options []any) OnlyThrowErrorOptions {
+	opts := OnlyThrowErrorOptions{}
+	if len(options) > 0 {
+		if typed, ok := options[0].(OnlyThrowErrorOptions); ok {
+			opts = typed
+		} else if optsMap, ok := options[0].(map[string]interface{}); ok {
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
+		}
+	}
+	if opts.Allow == nil {
+		opts.Allow = []utils.TypeOrValueSpecifier{}
+	}
+	if opts.AllowRethrowing == nil {
+		opts.AllowRethrowing = utils.Ref(true)
+	}
+	if opts.AllowThrowingAny == nil {
+		opts.AllowThrowingAny = utils.Ref(true)
+	}
+	if opts.AllowThrowingUnknown == nil {
+		opts.AllowThrowingUnknown = utils.Ref(true)
+	}
+	return opts
 }
 
 func buildObjectMessage() rule.RuleMessage {
@@ -133,32 +163,10 @@ func isRethrownError(ctx rule.RuleContext, expr *ast.Node) bool {
 
 var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 	Name:             "only-throw-error",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(OnlyThrowErrorOptions)
-		if !ok {
-			opts = OnlyThrowErrorOptions{}
-			// When options come from JSON (API/TS tests), they arrive as []interface{};
-			// NormalizeOptions also re-wraps config.rules' unwrapped single option.
-			if optionsArray := rule.NormalizeOptions(options); len(optionsArray) > 0 {
-				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.Allow == nil {
-			opts.Allow = []utils.TypeOrValueSpecifier{}
-		}
-		if opts.AllowRethrowing == nil {
-			opts.AllowRethrowing = utils.Ref(true)
-		}
-		if opts.AllowThrowingAny == nil {
-			opts.AllowThrowingAny = utils.Ref(true)
-		}
-		if opts.AllowThrowingUnknown == nil {
-			opts.AllowThrowingUnknown = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindThrowStatement: func(node *ast.Node) {

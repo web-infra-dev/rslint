@@ -1,11 +1,15 @@
 package return_await
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed return_await.schema.json
+var schemaJSON []byte
 
 func buildDisallowedPromiseAwaitMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -52,7 +56,10 @@ type ReturnAwaitOptions struct {
 }
 
 func parseReturnAwaitOption(options []any) ReturnAwaitOption {
-	switch opts := rule.LegacyUnwrapOptions(options).(type) {
+	if len(options) == 0 {
+		return ReturnAwaitOptionInTryCatch
+	}
+	switch opts := options[0].(type) {
 	case ReturnAwaitOptions:
 		if opts.Option != nil {
 			return *opts.Option
@@ -160,9 +167,10 @@ func reportNodeWithDeferredFixesOrSuggestions(
 
 var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "return-await",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		option := parseReturnAwaitOption(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		option := parseReturnAwaitOption(options)
 		sourceFile := ctx.SourceFile
 
 		var scopes []scopeInfo

@@ -1,6 +1,7 @@
 package no_unused_vars
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 	"sync"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unused_vars.schema.json
+var schemaJSON []byte
 
 type EnableAutofixRemoval struct {
 	Imports bool `json:"imports"`
@@ -93,15 +97,24 @@ var patternCache = struct {
 	order:   make([]string, 0, maxCachedPatterns),
 }
 
-func parseOptions(options interface{}) Config {
+func parseOptions(options []any) Config {
 	config := Config{
 		Vars:         "all",
 		Args:         "after-used",
 		CaughtErrors: "all",
 	}
 
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-		parseOptionsFromMap(optsMap, &config)
+	if len(options) == 0 {
+		return compilePatterns(config)
+	}
+
+	// The first option is either the broad `vars` setting as a bare string or a
+	// full options object.
+	switch first := options[0].(type) {
+	case string:
+		config.Vars = first
+	case map[string]interface{}:
+		parseOptionsFromMap(first, &config)
 	}
 
 	return compilePatterns(config)
@@ -2075,9 +2088,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 
 var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unused-vars",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		ac := &analysisContext{

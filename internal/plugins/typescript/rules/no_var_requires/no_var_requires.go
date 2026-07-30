@@ -1,38 +1,48 @@
 package no_var_requires
 
 import (
+	_ "embed"
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+//go:embed no_var_requires.schema.json
+var schemaJSON []byte
+
 type Options struct {
 	Allow []string `json:"allow"`
 }
 
-var NoVarRequiresRule = rule.CreateRule(rule.Rule{
-	Name: "no-var-requires",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := &Options{}
-		if options != nil {
-			if optMap, ok := options.(map[string]interface{}); ok {
-				if allowList, exists := optMap["allow"]; exists {
-					if allowSlice, ok := allowList.([]interface{}); ok {
-						for _, item := range allowSlice {
-							if str, ok := item.(string); ok {
-								opts.Allow = append(opts.Allow, str)
-							}
-						}
-					} else if allowStrSlice, ok := allowList.([]string); ok {
-						opts.Allow = allowStrSlice
-					}
+func parseOptions(options []any) *Options {
+	opts := &Options{}
+	if len(options) == 0 {
+		return opts
+	}
+	if typed, ok := options[0].(*Options); ok {
+		return typed
+	}
+	optMap, _ := options[0].(map[string]interface{})
+	if allowList, exists := optMap["allow"]; exists {
+		if allowSlice, ok := allowList.([]interface{}); ok {
+			for _, item := range allowSlice {
+				if str, ok := item.(string); ok {
+					opts.Allow = append(opts.Allow, str)
 				}
-			} else if o, ok := options.(*Options); ok {
-				opts = o
 			}
+		} else if allowStrSlice, ok := allowList.([]string); ok {
+			opts.Allow = allowStrSlice
 		}
+	}
+	return opts
+}
+
+var NoVarRequiresRule = rule.CreateRule(rule.Rule{
+	Name:   "no-var-requires",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// Compile allow patterns into regexes
 		var allowPatterns []*regexp.Regexp

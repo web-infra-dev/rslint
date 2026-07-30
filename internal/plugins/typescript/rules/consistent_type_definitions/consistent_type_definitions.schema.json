@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "string",
+      "description": "Which type definition syntax to prefer.",
+      "enum": ["interface", "type"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

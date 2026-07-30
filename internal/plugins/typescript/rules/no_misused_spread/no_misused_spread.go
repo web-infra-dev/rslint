@@ -1,6 +1,7 @@
 package no_misused_spread
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_misused_spread.schema.json
+var schemaJSON []byte
 
 func buildAddAwaitMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -152,12 +156,14 @@ func isClassDeclaration(t *checker.Type) bool {
 
 var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-spread",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoMisusedSpreadOptions)
-		if !ok {
-			opts = NoMisusedSpreadOptions{}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var opts NoMisusedSpreadOptions
+		if len(options) > 0 {
+			if typed, ok := options[0].(NoMisusedSpreadOptions); ok {
+				opts = typed
+			}
 		}
 		if opts.Allow == nil {
 			opts.Allow = []utils.TypeOrValueSpecifier{}

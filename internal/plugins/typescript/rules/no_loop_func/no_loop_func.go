@@ -123,6 +123,7 @@ func checkForLoops(s *core.RunState, node *ast.Node) {
 //   - Repeated unsafe variable names are not deduplicated.
 var NoLoopFuncRule = rule.CreateRule(rule.Rule{
 	Name:             "no-loop-func",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {

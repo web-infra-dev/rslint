@@ -1,11 +1,15 @@
 package prefer_promise_reject_errors
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_promise_reject_errors.schema.json
+var schemaJSON []byte
 
 func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -22,12 +26,14 @@ type PreferPromiseRejectErrorsOptions struct {
 
 var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-promise-reject-errors",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PreferPromiseRejectErrorsOptions)
-		if !ok {
-			opts = PreferPromiseRejectErrorsOptions{}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := PreferPromiseRejectErrorsOptions{}
+		if len(options) > 0 {
+			if typed, ok := options[0].(PreferPromiseRejectErrorsOptions); ok {
+				opts = typed
+			}
 		}
 		if opts.AllowEmptyReject == nil {
 			opts.AllowEmptyReject = utils.Ref(false)

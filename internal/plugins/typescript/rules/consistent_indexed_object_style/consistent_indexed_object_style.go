@@ -1,9 +1,13 @@
 package consistent_indexed_object_style
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed consistent_indexed_object_style.schema.json
+var schemaJSON []byte
 
 type ConsistentIndexedObjectStyleOptions struct {
 	Style string `json:"style"`
@@ -11,31 +15,26 @@ type ConsistentIndexedObjectStyleOptions struct {
 
 // ConsistentIndexedObjectStyleRule enforces consistent usage of type imports
 var ConsistentIndexedObjectStyleRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-indexed-object-style",
-	Run:  run,
+	Name:   "consistent-indexed-object-style",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func parseOptions(options []any) ConsistentIndexedObjectStyleOptions {
 	opts := ConsistentIndexedObjectStyleOptions{
 		Style: "record", // default
 	}
-
-	// Parse options
-	if options != nil {
-		// Handle array format: ["index-signature"]
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if style, ok := optArray[0].(string); ok {
-				opts.Style = style
-			}
-		} else if optsMap, ok := options.(map[string]interface{}); ok {
-			if style, exists := optsMap["style"].(string); exists {
-				opts.Style = style
-			}
-		} else if style, ok := options.(string); ok {
-			opts.Style = style
-		}
+	if len(options) == 0 {
+		return opts
 	}
+	if style, ok := options[0].(string); ok {
+		opts.Style = style
+	}
+	return opts
+}
+
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	return rule.RuleListeners{
 		// Check interfaces with index signatures

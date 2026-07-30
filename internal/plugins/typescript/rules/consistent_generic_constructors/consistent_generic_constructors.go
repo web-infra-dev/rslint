@@ -1,41 +1,40 @@
 package consistent_generic_constructors
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed consistent_generic_constructors.schema.json
+var schemaJSON []byte
 
 type ConsistentGenericConstructorsOptions struct {
 	Style string `json:"style"`
 }
 
+func parseOptions(options []any) ConsistentGenericConstructorsOptions {
+	opts := ConsistentGenericConstructorsOptions{
+		Style: "constructor",
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if style, ok := options[0].(string); ok {
+		opts.Style = style
+	}
+	return opts
+}
+
 // ConsistentGenericConstructorsRule enforces consistent generic specifier style in constructor signatures
 var ConsistentGenericConstructorsRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-generic-constructors",
-	Run:  run,
+	Name:   "consistent-generic-constructors",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opts := ConsistentGenericConstructorsOptions{
-		Style: "constructor", // default
-	}
-
-	// Parse options
-	if options != nil {
-		// Handle array format: ["type-annotation"]
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if style, ok := optArray[0].(string); ok {
-				opts.Style = style
-			}
-		} else if optsMap, ok := options.(map[string]interface{}); ok {
-			if style, exists := optsMap["style"].(string); exists {
-				opts.Style = style
-			}
-		} else if style, ok := options.(string); ok {
-			opts.Style = style
-		}
-	}
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	checkNode := func(node *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, isBindingElement bool) {
 		if initializer == nil {

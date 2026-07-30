@@ -928,6 +928,29 @@ func TestNoRestrictedTypesNonFalsePositives(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{})
 }
 
+// TestNoRestrictedTypesTypesSchema locks in that upstream's `$defs` container
+// still governs the `types` values under the draft-4 dialect rslint compiles
+// rule schemas with. `$defs` is a 2019-09 keyword, so draft-4 treats it as an
+// unknown keyword — but the JSON Pointer `#/items/0/$defs/banConfig` resolves
+// against the raw document regardless of which keywords the dialect knows, so
+// the ban-config `oneOf` is still enforced rather than silently dropped.
+func TestNoRestrictedTypesTypesSchema(t *testing.T) {
+	valid := []any{map[string]any{"types": map[string]any{
+		"Banned":  true,
+		"Banned2": "Use Ok instead.",
+		"Banned3": map[string]any{"fixWith": "Ok", "suggest": []any{"Ok"}},
+	}}}
+	if err := NoRestrictedTypesRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected every ban-config shape to pass schema validation, got: %v", err)
+	}
+	// `false` is not one of the ban-config branches (only `true` is), so it
+	// must fail — which it can only do if the `$ref` into `$defs` resolved.
+	invalid := []any{map[string]any{"types": map[string]any{"Banned": false}}}
+	if err := NoRestrictedTypesRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected a non-ban-config value to fail schema validation")
+	}
+}
+
 func TestNoRestrictedTypesEditDemand(t *testing.T) {
 	t.Parallel()
 

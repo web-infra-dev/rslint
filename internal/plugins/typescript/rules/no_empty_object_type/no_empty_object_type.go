@@ -1,6 +1,7 @@
 package no_empty_object_type
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 
@@ -11,21 +12,24 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_empty_object_type.schema.json
+var schemaJSON []byte
+
 type NoEmptyObjectTypeOptions struct {
 	AllowInterfaces  string
 	AllowObjectTypes string
 	AllowWithName    string
 }
 
-func parseOptions(options any) NoEmptyObjectTypeOptions {
+func parseOptions(options []any) NoEmptyObjectTypeOptions {
 	opts := NoEmptyObjectTypeOptions{
 		AllowInterfaces:  "never",
 		AllowObjectTypes: "never",
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowInterfaces"].(string); ok {
 		opts.AllowInterfaces = v
 	}
@@ -165,9 +169,9 @@ func interfaceFixRange(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclara
 }
 
 var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
-	Name: "no-empty-object-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-empty-object-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		var allowWithNameTester *regexp.Regexp

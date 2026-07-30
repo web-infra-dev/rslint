@@ -119,7 +119,8 @@ func noArrayConstructorListeners(ctx rule.RuleContext) rule.RuleListeners {
 }
 
 var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
-	Name: "no-array-constructor",
+	Name:   "no-array-constructor",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseArrayConstructor(ctx.SourceFile) {
 			return nil

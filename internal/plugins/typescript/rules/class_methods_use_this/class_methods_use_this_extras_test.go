@@ -460,8 +460,8 @@ class C implements I {
 			{Code: `class C { foo() { return this.x; } x = 0; }`, Options: objectOption(map[string]interface{}{})},
 
 			// ---- Locks in: passing a non-object options shape gracefully degrades ----
-			// rule_tester passes the value through GetOptionsMap which returns nil
-			// for non-object shapes; rule falls back to defaults.
+			// parseOptions gets a nil map for non-object shapes; the rule falls
+			// back to defaults.
 			{Code: `class C { foo() { return this.x; } x = 0; }`, Options: []interface{}{"not-an-object"}},
 
 			// ---- Locks in: exceptMethods with empty array is equivalent to no exceptions ----

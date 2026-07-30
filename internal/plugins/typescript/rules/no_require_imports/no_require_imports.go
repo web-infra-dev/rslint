@@ -1,12 +1,16 @@
 package no_require_imports
 
 import (
+	_ "embed"
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_require_imports.schema.json
+var schemaJSON []byte
 
 // getStaticStringValue extracts static string value from literal or template
 func getStaticStringValue(node *ast.Node) (string, bool) {
@@ -35,10 +39,13 @@ var noRequireImportsMessage = rule.RuleMessage{
 }
 
 var NoRequireImportsRule = rule.CreateRule(rule.Rule{
-	Name: "no-require-imports",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		optsMap := utils.GetOptionsMap(options)
+	Name:   "no-require-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var optsMap map[string]interface{}
+		if len(options) > 0 {
+			optsMap, _ = options[0].(map[string]interface{})
+		}
 		allowAsImport, _ := optsMap["allowAsImport"].(bool)
 		var allowPatterns []*regexp.Regexp
 		if allow, ok := optsMap["allow"].([]interface{}); ok {

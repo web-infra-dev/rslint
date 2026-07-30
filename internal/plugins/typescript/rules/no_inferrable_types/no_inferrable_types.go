@@ -1,11 +1,15 @@
 package no_inferrable_types
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_inferrable_types.schema.json
+var schemaJSON []byte
 
 type Options struct {
 	IgnoreParameters bool
@@ -61,34 +65,21 @@ var noInferrableTypesMessages = [...]rule.RuleMessage{
 	},
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	// Default values match typescript-eslint defaults
 	opts := Options{
 		IgnoreParameters: false,
 		IgnoreProperties: false,
 	}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
-
-	var optsMap map[string]interface{}
-	// Handle array format: [{ option: value }]
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			optsMap, _ = arr[0].(map[string]interface{})
-		}
-	} else {
-		// Handle direct object format
-		optsMap, _ = options.(map[string]interface{})
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["ignoreParameters"].(bool); ok {
+		opts.IgnoreParameters = v
 	}
-
-	if optsMap != nil {
-		if v, ok := optsMap["ignoreParameters"].(bool); ok {
-			opts.IgnoreParameters = v
-		}
-		if v, ok := optsMap["ignoreProperties"].(bool); ok {
-			opts.IgnoreProperties = v
-		}
+	if v, ok := optsMap["ignoreProperties"].(bool); ok {
+		opts.IgnoreProperties = v
 	}
 	return opts
 }
@@ -266,9 +257,9 @@ func buildNoInferrableTypesFixes(sourceText string, typeAnnotation *ast.Node, po
 }
 
 var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
-	Name: "no-inferrable-types",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-inferrable-types",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		sourceText := ctx.SourceFile.Text()
 

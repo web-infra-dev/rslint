@@ -1,10 +1,14 @@
 package no_namespace
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_namespace.schema.json
+var schemaJSON []byte
 
 var noNamespaceMessage = rule.RuleMessage{
 	Id:          "moduleSyntaxIsPreferred",
@@ -60,7 +64,8 @@ func isDeclaredNamespace(node *ast.Node, isDefinitionFile bool) bool {
 }
 
 var NoNamespaceRule = rule.CreateRule(rule.Rule{
-	Name: "no-namespace",
+	Name:   "no-namespace",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseNoNamespaceOptions(options)
 		if opts.AllowDefinitionFiles && ctx.SourceFile.IsDeclarationFile {

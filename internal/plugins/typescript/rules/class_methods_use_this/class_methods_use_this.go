@@ -1,6 +1,7 @@
 package class_methods_use_this
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -11,14 +12,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed class_methods_use_this.schema.json
+var schemaJSON []byte
+
 // ClassMethodsUseThisRule mirrors @typescript-eslint/class-methods-use-this,
 // which extends ESLint core's class-methods-use-this with two TS-specific
 // options: `ignoreOverrideMethods` and `ignoreClassesThatImplementAnInterface`.
 //
 // https://typescript-eslint.io/rules/class-methods-use-this
 var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
-	Name: "class-methods-use-this",
-	Run:  run,
+	Name:   "class-methods-use-this",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 type ignoreClassesMode int
@@ -38,12 +43,13 @@ type ruleOptions struct {
 
 // parseOptions extracts the rule options. Defaults match the upstream
 // `defaultOptions`: `enforceForClassFields: true`, all other flags off.
-func parseOptions(raw any) ruleOptions {
+func parseOptions(raw []any) ruleOptions {
 	opts := ruleOptions{enforceForClassFields: true}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]interface{})
+
 	if v, ok := m["enforceForClassFields"]; ok {
 		if b, ok := v.(bool); ok {
 			opts.enforceForClassFields = b
@@ -86,8 +92,7 @@ type stackEntry struct {
 	usesThis  bool
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	var stack *stackEntry
 

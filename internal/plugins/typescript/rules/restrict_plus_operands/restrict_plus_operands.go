@@ -1,6 +1,7 @@
 package restrict_plus_operands
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed restrict_plus_operands.schema.json
+var schemaJSON []byte
 
 func buildBigintAndNumberMessage(left, right string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -40,12 +44,14 @@ type RestrictPlusOperandsOptions struct {
 
 var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(RestrictPlusOperandsOptions)
-		if !ok {
-			opts = RestrictPlusOperandsOptions{}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var opts RestrictPlusOperandsOptions
+		if len(options) > 0 {
+			if typed, ok := options[0].(RestrictPlusOperandsOptions); ok {
+				opts = typed
+			}
 		}
 		if opts.AllowAny == nil {
 			opts.AllowAny = utils.Ref(true)

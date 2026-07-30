@@ -1,9 +1,13 @@
 package unified_signatures
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed unified_signatures.schema.json
+var schemaJSON []byte
 
 type UnifiedSignaturesOptions struct {
 	IgnoreDifferentlyNamedParameters  bool `json:"ignoreDifferentlyNamedParameters"`
@@ -11,32 +15,21 @@ type UnifiedSignaturesOptions struct {
 }
 
 var UnifiedSignaturesRule = rule.CreateRule(rule.Rule{
-	Name: "unified-signatures",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "unified-signatures",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := UnifiedSignaturesOptions{
 			IgnoreDifferentlyNamedParameters:  false,
 			IgnoreOverloadsWithDifferentJSDoc: false,
 		}
 
-		// Parse options with dual-format support
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			if val, ok := optsMap["ignoreDifferentlyNamedParameters"].(bool); ok {
+				opts.IgnoreDifferentlyNamedParameters = val
 			}
-
-			if ok {
-				if val, ok := optsMap["ignoreDifferentlyNamedParameters"].(bool); ok {
-					opts.IgnoreDifferentlyNamedParameters = val
-				}
-				if val, ok := optsMap["ignoreOverloadsWithDifferentJSDoc"].(bool); ok {
-					opts.IgnoreOverloadsWithDifferentJSDoc = val
-				}
+			if val, ok := optsMap["ignoreOverloadsWithDifferentJSDoc"].(bool); ok {
+				opts.IgnoreOverloadsWithDifferentJSDoc = val
 			}
 		}
 

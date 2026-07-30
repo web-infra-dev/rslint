@@ -7,9 +7,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// objectOption returns the array-wrapped single-option shape that matches
-// rule_tester / multi-element CLI configs and exercises the JSON path through
-// utils.GetOptionsMap (the typed-struct shortcut would silently bypass it).
+// objectOption returns the array-wrapped single-option shape a config declares,
+// exercising the weakly-typed JSON path (a typed struct would bypass it).
 func objectOption(opts map[string]interface{}) []interface{} {
 	return []interface{}{opts}
 }
@@ -167,7 +166,7 @@ class Foo {
 			},
 
 			// --- Options shapes — exercise the JSON path ---
-			// Bare object (single-option CLI shape).
+			// Non-array `Options`, which the tester wraps into a one-element array.
 			{
 				Code:    "function foo(a, b, c, d) {}",
 				Options: map[string]interface{}{"max": 4},
@@ -205,9 +204,9 @@ class Foo {
 				Code:    "function foo(a, b, c, d) {}",
 				Options: objectOption(map[string]interface{}{"maximum": 4, "max": 2}),
 			},
-			// Bare integer / array-of-integer is REJECTED upstream by schema —
-			// rslint has no schema layer, so we treat as "no option" and fall
-			// back to defaults rather than guessing.
+			// Bare integer / array-of-integer is rejected by the options schema;
+			// the rule tester does not validate, and such a shape falls back to
+			// defaults rather than guessing.
 			{Code: "function foo(a, b, c) {}", Options: 7},
 			{Code: "function foo(a, b, c) {}", Options: []interface{}{7}},
 

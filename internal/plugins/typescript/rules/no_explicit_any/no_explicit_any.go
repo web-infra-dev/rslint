@@ -1,9 +1,13 @@
 package no_explicit_any
 
 import (
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_explicit_any.schema.json
+var schemaJSON []byte
 
 type NoExplicitAnyOptions struct {
 	FixToUnknown   bool `json:"fixToUnknown"`
@@ -38,33 +42,17 @@ func buildSuggestPropertyKeyMessage() rule.RuleMessage {
 	}
 }
 
-func parseOptions(options any) NoExplicitAnyOptions {
+func parseOptions(options []any) NoExplicitAnyOptions {
 	opts := NoExplicitAnyOptions{}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	// Handle array format: [{ option: value }]
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			if m, ok := arr[0].(map[string]interface{}); ok {
-				if v, ok := m["fixToUnknown"].(bool); ok {
-					opts.FixToUnknown = v
-				}
-				if v, ok := m["ignoreRestArgs"].(bool); ok {
-					opts.IgnoreRestArgs = v
-				}
-			}
-		}
-		return opts
+	m, _ := options[0].(map[string]interface{})
+	if v, ok := m["fixToUnknown"].(bool); ok {
+		opts.FixToUnknown = v
 	}
-	// Handle direct object format
-	if m, ok := options.(map[string]interface{}); ok {
-		if v, ok := m["fixToUnknown"].(bool); ok {
-			opts.FixToUnknown = v
-		}
-		if v, ok := m["ignoreRestArgs"].(bool); ok {
-			opts.IgnoreRestArgs = v
-		}
+	if v, ok := m["ignoreRestArgs"].(bool); ok {
+		opts.IgnoreRestArgs = v
 	}
 	return opts
 }
@@ -116,9 +104,9 @@ func isWithinKeyofAny(node *ast.Node) bool {
 }
 
 var NoExplicitAnyRule = rule.CreateRule(rule.Rule{
-	Name: "no-explicit-any",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-explicit-any",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

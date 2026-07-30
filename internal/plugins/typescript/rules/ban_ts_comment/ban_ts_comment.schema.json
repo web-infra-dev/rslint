@@ -1,0 +1,56 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "$defs": {
+        "directiveConfigSchema": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "default": true
+            },
+            {
+              "type": "string",
+              "enum": ["allow-with-description"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "descriptionFormat": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "minimumDescriptionLength": {
+          "type": "number",
+          "description": "A minimum character length for descriptions when `allow-with-description` is enabled."
+        },
+        "ts-check": {
+          "$ref": "#/items/0/$defs/directiveConfigSchema",
+          "description": "Whether to allow ts-check directives, and with which restrictions."
+        },
+        "ts-expect-error": {
+          "$ref": "#/items/0/$defs/directiveConfigSchema",
+          "description": "Whether to allow ts-expect-error directives, and with which restrictions."
+        },
+        "ts-ignore": {
+          "$ref": "#/items/0/$defs/directiveConfigSchema",
+          "description": "Whether to allow ts-ignore directives, and with which restrictions."
+        },
+        "ts-nocheck": {
+          "$ref": "#/items/0/$defs/directiveConfigSchema",
+          "description": "Whether to allow ts-nocheck directives, and with which restrictions."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

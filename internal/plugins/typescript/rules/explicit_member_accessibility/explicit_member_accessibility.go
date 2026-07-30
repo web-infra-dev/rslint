@@ -1,6 +1,7 @@
 package explicit_member_accessibility
 
 import (
+	_ "embed"
 	"strings"
 	"unicode"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed explicit_member_accessibility.schema.json
+var schemaJSON []byte
 
 type accessibilityLevel string
 
@@ -33,15 +37,15 @@ type options struct {
 	overrides          overrides
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		accessibility:      levelExplicit,
 		ignoredMethodNames: map[string]bool{},
 	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if v, ok := optsMap["accessibility"].(string); ok {
 		opts.accessibility = accessibilityLevel(v)
 	}
@@ -318,9 +322,9 @@ func isClassMember(node *ast.Node) bool {
 }
 
 var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-member-accessibility",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "explicit-member-accessibility",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		sf := ctx.SourceFile
 

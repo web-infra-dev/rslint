@@ -1,6 +1,7 @@
 package member_ordering
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed member_ordering.schema.json
+var schemaJSON []byte
 
 // --- Message builders ---
 
@@ -307,16 +311,16 @@ func convertToMemberTypes(arr []interface{}) []interface{} {
 	return result
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		opts.defaultConfig = &parsedConfig{
 			memberTypes: defaultOrder,
 			order:       orderAsWritten,
 		}
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
 	if def, ok := optsMap["default"]; ok {
 		opts.defaultConfig = parseConfig(def)
@@ -958,9 +962,9 @@ func getClassMembers(node *ast.Node) []*ast.Node {
 // --- Rule definition ---
 
 var MemberOrderingRule = rule.CreateRule(rule.Rule{
-	Name: "member-ordering",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "member-ordering",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		getConfig := func(nodeKind ast.Kind) *parsedConfig {

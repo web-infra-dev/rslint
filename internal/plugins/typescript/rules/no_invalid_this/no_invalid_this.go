@@ -1,6 +1,7 @@
 package no_invalid_this
 
 import (
+	_ "embed"
 	"regexp"
 	"slices"
 	"strings"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_invalid_this.schema.json
+var schemaJSON []byte
 
 // NoInvalidThisRule mirrors @typescript-eslint/no-invalid-this, which wraps
 // ESLint core's no-invalid-this with two TypeScript-specific recognitions:
@@ -28,8 +32,9 @@ import (
 //
 // https://typescript-eslint.io/rules/no-invalid-this
 var NoInvalidThisRule = rule.CreateRule(rule.Rule{
-	Name: "no-invalid-this",
-	Run:  run,
+	Name:   "no-invalid-this",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 type ruleOptions struct {
@@ -38,12 +43,12 @@ type ruleOptions struct {
 	capIsConstructor bool
 }
 
-func parseOptions(raw any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{capIsConstructor: true}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	m, _ := options[0].(map[string]interface{})
 	if v, ok := m["capIsConstructor"]; ok {
 		if b, ok := v.(bool); ok {
 			opts.capIsConstructor = b
@@ -52,8 +57,7 @@ func parseOptions(raw any) ruleOptions {
 	return opts
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	sf := ctx.SourceFile
 

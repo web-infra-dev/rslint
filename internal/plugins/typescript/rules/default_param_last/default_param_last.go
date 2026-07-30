@@ -7,8 +7,9 @@ import (
 
 // DefaultParamLastRule enforces default parameters to be last
 var DefaultParamLastRule = rule.CreateRule(rule.Rule{
-	Name: "default-param-last",
-	Run:  run,
+	Name:   "default-param-last",
+	Schema: rule.EmptyArraySchema,
+	Run:    run,
 })
 
 var shouldBeLastMessage = rule.RuleMessage{

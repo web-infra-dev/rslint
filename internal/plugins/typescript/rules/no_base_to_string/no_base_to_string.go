@@ -1,6 +1,7 @@
 package no_base_to_string
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_base_to_string.schema.json
+var schemaJSON []byte
 
 func certaintyToString(certainty usefulness) string {
 	switch certainty {
@@ -50,13 +54,15 @@ const (
 
 var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Name:             "no-base-to-string",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoBaseToStringOptions)
-		if !ok {
-			opts = NoBaseToStringOptions{
-				IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := NoBaseToStringOptions{
+			IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
+		}
+		if len(options) > 0 {
+			if typed, ok := options[0].(NoBaseToStringOptions); ok {
+				opts = typed
 			}
 		}
 
