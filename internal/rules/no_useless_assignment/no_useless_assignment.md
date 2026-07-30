@@ -72,29 +72,14 @@ function fn() {
 - A variable read from inside a parameter decorator's arguments is treated as
   used, so assignments to it are never reported:
   `const pipe = {}; class C { handler(@Body(pipe) body) {} }`. ESLint reports
-  `const pipe = {}` here — a false positive tracked at
-  [eslint/eslint#20947](https://github.com/eslint/eslint/issues/20947). Its
-  root cause turned out to be that `@typescript-eslint`'s scope manager does
-  not register reads inside legacy parameter decorators as a reference at
-  all, tracked separately at
-  [typescript-eslint/typescript-eslint#12407](https://github.com/typescript-eslint/typescript-eslint/issues/12407);
-  this rule's own reference tracking is not affected by that gap.
-- This rule models exceptions and control flow with its own approximation
-  rather than a literal port of ESLint's code-path analysis, so its findings
-  can diverge from ESLint's for deeply nested `try`/`catch`/`finally`
-  combinations — for instance a `switch` nested directly inside a `catch`
-  clause:
-  `function f() { let v = 0; try {} catch (e) { v = 1; switch (k) { case 1: use(v); v = 2; } } }`.
-  ESLint reports only `v = 2` there; this rule also reports the initial
-  `let v = 0`, which is unused on every path just as `v = 2` is. Other
-  diverging shapes involve a `try` without its own `catch` nested inside
-  another `try`. These shapes are uncommon in real-world code, and in the
-  large majority of cases this rule reports the same findings as ESLint.
-  ESLint's own code-path analysis has open, accepted-but-unfixed bugs in this
-  exact area — see
-  [eslint/eslint#17579](https://github.com/eslint/eslint/issues/17579), left
-  open specifically because fixing it would be a breaking change — so
-  matching it exactly for every nested shape isn't a well-defined target.
+  `const pipe = {}` here — a known false positive
+  ([eslint/eslint#20947](https://github.com/eslint/eslint/issues/20947)).
+- For deeply nested `try`/`catch`/`switch` combinations, this rule's control
+  flow modeling can occasionally diverge from ESLint's own, which has open,
+  accepted-but-unfixed bugs in the same area
+  ([eslint/eslint#17579](https://github.com/eslint/eslint/issues/17579)).
+  These shapes are rare in practice; in the large majority of real code this
+  rule reports the same findings as ESLint.
 
 ## Original Documentation
 
