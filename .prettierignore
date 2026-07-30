@@ -26,6 +26,7 @@ internal/plugins/**/rules/**/*.md
 internal/rules/**/*.md
 website/docs/en/rules/_meta.json
 website/docs/en/rules/*/
+website/rule-releases.json
 packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/
 crates/rslint-native/index.js
 crates/rslint-native/index.d.ts

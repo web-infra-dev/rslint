@@ -5,11 +5,17 @@ import path from 'node:path';
 import * as rslintCore from '@rslint/core';
 import type { RslintConfigEntry } from '@rslint/core';
 import { PLUGIN_REGISTRY, groupToRouteSlug } from './theme/plugin-registry';
+import ruleReleases from './rule-releases.json';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.resolve(__dirname, 'generated/rule-manifest.json');
 const SCRIPT_PATH = path.resolve(REPO_ROOT, 'scripts/gen-rule-manifest.js');
 const RULES_DOCS_DIR = path.resolve(__dirname, 'docs/en/rules');
+const RULE_VERSION_BY_ID = new Map(
+  ruleReleases.flatMap(({ version, rules }) =>
+    rules.map((rule) => [rule, version] as const),
+  ),
+);
 
 /** Shape of each rule entry in rule-manifest.json. */
 interface RuleEntry {
@@ -134,8 +140,11 @@ function loadManifest(): RuleEntry[] {
  *
  * Output (.mdx):
  *   import RuleConfig from '@/theme/components/RuleConfig.tsx';
+ *   import RuleVersionBadge from '@/theme/components/RuleVersionBadge.tsx';
  *
  *   # no-console
+ *
+ *   <RuleVersionBadge introducedIn="0.1.4" />
  *
  *   ## Configuration
  *
@@ -154,7 +163,14 @@ function buildRuleDocContent(rule: RuleEntry): string {
     'utf-8',
   );
   const fullName = getFullRuleName(rule);
-  const importLine = `import RuleConfig from '@/theme/components/RuleConfig.tsx';`;
+  const importLines = [
+    `import RuleConfig from '@/theme/components/RuleConfig.tsx';`,
+    `import RuleVersionBadge from '@/theme/components/RuleVersionBadge.tsx';`,
+  ].join('\n');
+  const introducedIn = RULE_VERSION_BY_ID.get(`${rule.group}:${rule.name}`);
+  const versionBadge = introducedIn
+    ? `<RuleVersionBadge introducedIn="${introducedIn}" />`
+    : `<RuleVersionBadge />`;
 
   // Build preset table if the rule is in any preset
   let presetTable = '';
@@ -180,12 +196,14 @@ function buildRuleDocContent(rule: RuleEntry): string {
 
   const headingEnd = sourceContent.indexOf('\n');
   if (headingEnd === -1) {
-    return `${importLine}\n\n${sourceContent}\n\n${configSection}\n`;
+    return `${importLines}\n\n${sourceContent}\n\n${versionBadge}\n\n${configSection}\n`;
   }
   return [
-    importLine,
+    importLines,
     '',
     sourceContent.slice(0, headingEnd),
+    '',
+    versionBadge,
     '',
     configSection,
     '',

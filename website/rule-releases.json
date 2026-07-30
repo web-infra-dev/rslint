@@ -1,0 +1,646 @@
+[
+  {
+    "version": "0.1.4",
+    "rules": [
+      "@typescript-eslint:adjacent-overload-signatures",
+      "@typescript-eslint:array-type",
+      "@typescript-eslint:await-thenable",
+      "@typescript-eslint:class-literal-property-style",
+      "@typescript-eslint:no-array-delete",
+      "@typescript-eslint:no-base-to-string",
+      "@typescript-eslint:no-confusing-void-expression",
+      "@typescript-eslint:no-duplicate-type-constituents",
+      "@typescript-eslint:no-floating-promises",
+      "@typescript-eslint:no-for-in-array",
+      "@typescript-eslint:no-implied-eval",
+      "@typescript-eslint:no-meaningless-void-operator",
+      "@typescript-eslint:no-misused-promises",
+      "@typescript-eslint:no-misused-spread",
+      "@typescript-eslint:no-mixed-enums",
+      "@typescript-eslint:no-redundant-type-constituents",
+      "@typescript-eslint:no-unnecessary-boolean-literal-compare",
+      "@typescript-eslint:no-unnecessary-template-expression",
+      "@typescript-eslint:no-unnecessary-type-arguments",
+      "@typescript-eslint:no-unnecessary-type-assertion",
+      "@typescript-eslint:no-unsafe-argument",
+      "@typescript-eslint:no-unsafe-assignment",
+      "@typescript-eslint:no-unsafe-call",
+      "@typescript-eslint:no-unsafe-enum-comparison",
+      "@typescript-eslint:no-unsafe-member-access",
+      "@typescript-eslint:no-unsafe-return",
+      "@typescript-eslint:no-unsafe-type-assertion",
+      "@typescript-eslint:no-unsafe-unary-minus",
+      "@typescript-eslint:no-unused-vars",
+      "@typescript-eslint:no-useless-empty-export",
+      "@typescript-eslint:no-var-requires",
+      "@typescript-eslint:non-nullable-type-assertion-style",
+      "@typescript-eslint:only-throw-error",
+      "@typescript-eslint:prefer-as-const",
+      "@typescript-eslint:prefer-promise-reject-errors",
+      "@typescript-eslint:prefer-reduce-type-parameter",
+      "@typescript-eslint:prefer-return-this-type",
+      "@typescript-eslint:promise-function-async",
+      "@typescript-eslint:related-getter-setter-pairs",
+      "@typescript-eslint:require-array-sort-compare",
+      "@typescript-eslint:require-await",
+      "@typescript-eslint:restrict-plus-operands",
+      "@typescript-eslint:restrict-template-expressions",
+      "@typescript-eslint:return-await",
+      "@typescript-eslint:switch-exhaustiveness-check",
+      "@typescript-eslint:unbound-method",
+      "@typescript-eslint:use-unknown-in-catch-callback-variable"
+    ]
+  },
+  {
+    "version": "0.1.5",
+    "rules": []
+  },
+  {
+    "version": "0.1.6",
+    "rules": [
+      "@typescript-eslint:no-empty-function",
+      "@typescript-eslint:no-empty-interface",
+      "@typescript-eslint:no-namespace",
+      "@typescript-eslint:no-require-imports"
+    ]
+  },
+  {
+    "version": "0.1.7",
+    "rules": []
+  },
+  {
+    "version": "0.1.8",
+    "rules": [
+      "eslint-plugin-import:no-self-import"
+    ]
+  },
+  {
+    "version": "0.1.9",
+    "rules": []
+  },
+  {
+    "version": "0.1.10",
+    "rules": []
+  },
+  {
+    "version": "0.1.11",
+    "rules": []
+  },
+  {
+    "version": "0.1.12",
+    "rules": []
+  },
+  {
+    "version": "0.1.13",
+    "rules": [
+      "@typescript-eslint:no-explicit-any",
+      "eslint:dot-notation"
+    ]
+  },
+  {
+    "version": "0.1.14",
+    "rules": [
+      "@typescript-eslint:ban-ts-comment",
+      "@typescript-eslint:ban-types",
+      "@typescript-eslint:consistent-generic-constructors",
+      "@typescript-eslint:consistent-indexed-object-style",
+      "@typescript-eslint:consistent-return",
+      "@typescript-eslint:consistent-type-assertions",
+      "@typescript-eslint:consistent-type-definitions",
+      "@typescript-eslint:consistent-type-exports",
+      "@typescript-eslint:consistent-type-imports",
+      "@typescript-eslint:default-param-last",
+      "@typescript-eslint:dot-notation",
+      "@typescript-eslint:no-duplicate-enum-values",
+      "@typescript-eslint:no-extraneous-class",
+      "@typescript-eslint:no-invalid-void-type",
+      "@typescript-eslint:no-misused-new",
+      "@typescript-eslint:no-this-alias",
+      "@typescript-eslint:prefer-readonly-parameter-types",
+      "@typescript-eslint:triple-slash-reference",
+      "@typescript-eslint:unified-signatures",
+      "eslint-plugin-import:no-webpack-loader-syntax",
+      "eslint:array-callback-return",
+      "eslint:constructor-super",
+      "eslint:for-direction",
+      "eslint:getter-return",
+      "eslint:no-async-promise-executor",
+      "eslint:no-await-in-loop",
+      "eslint:no-class-assign",
+      "eslint:no-compare-neg-zero",
+      "eslint:no-cond-assign",
+      "eslint:no-const-assign",
+      "eslint:no-constant-binary-expression",
+      "eslint:no-constant-condition",
+      "eslint:no-constructor-return",
+      "eslint:no-debugger",
+      "eslint:no-sparse-arrays",
+      "eslint:no-template-curly-in-string"
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "rules": []
+  },
+  {
+    "version": "0.2.1",
+    "rules": [
+      "@typescript-eslint:no-array-constructor",
+      "@typescript-eslint:no-extra-non-null-assertion",
+      "@typescript-eslint:no-inferrable-types",
+      "@typescript-eslint:no-non-null-asserted-nullish-coalescing",
+      "@typescript-eslint:no-non-null-asserted-optional-chain",
+      "@typescript-eslint:no-non-null-assertion",
+      "@typescript-eslint:prefer-literal-enum-member",
+      "@typescript-eslint:prefer-namespace-keyword",
+      "@typescript-eslint:prefer-readonly",
+      "@typescript-eslint:prefer-string-starts-ends-with",
+      "eslint:no-loss-of-precision"
+    ]
+  },
+  {
+    "version": "0.2.2",
+    "rules": [
+      "eslint:default-case",
+      "eslint:no-case-declarations",
+      "eslint:no-console",
+      "eslint:no-dupe-args",
+      "eslint:no-dupe-keys",
+      "eslint:no-duplicate-case",
+      "eslint:no-empty",
+      "eslint:no-empty-pattern"
+    ]
+  },
+  {
+    "version": "0.2.3",
+    "rules": []
+  },
+  {
+    "version": "0.3.0",
+    "rules": [
+      "@typescript-eslint:ban-tslint-comment",
+      "@typescript-eslint:prefer-includes",
+      "@typescript-eslint:prefer-regexp-exec",
+      "@typescript-eslint:prefer-ts-expect-error",
+      "eslint-plugin-react:jsx-boolean-value",
+      "eslint-plugin-react:jsx-closing-tag-location",
+      "eslint-plugin-react:jsx-equals-spacing",
+      "eslint-plugin-react:jsx-filename-extension",
+      "eslint-plugin-react:jsx-first-prop-new-line",
+      "eslint-plugin-react:jsx-max-props-per-line",
+      "eslint-plugin-react:jsx-props-no-multi-spaces",
+      "eslint-plugin-react:jsx-uses-react",
+      "eslint-plugin-react:jsx-uses-vars",
+      "eslint-plugin-react:jsx-wrap-multilines",
+      "eslint-plugin-react:react-in-jsx-scope",
+      "eslint-plugin-react:self-closing-comp",
+      "eslint-plugin-react:style-prop-object",
+      "eslint-plugin-react:void-dom-elements-no-children",
+      "eslint:no-ex-assign"
+    ]
+  },
+  {
+    "version": "0.3.1",
+    "rules": []
+  },
+  {
+    "version": "0.3.2",
+    "rules": [
+      "@typescript-eslint:no-dynamic-delete"
+    ]
+  },
+  {
+    "version": "0.3.3",
+    "rules": [
+      "eslint:no-this-before-super",
+      "eslint:no-undef",
+      "eslint:prefer-const"
+    ]
+  },
+  {
+    "version": "0.3.4",
+    "rules": [
+      "eslint-plugin-jest:no-hooks",
+      "eslint-plugin-jest:valid-describe-callback",
+      "eslint:no-extra-bind",
+      "eslint:no-global-assign"
+    ]
+  },
+  {
+    "version": "0.4.0",
+    "rules": [
+      "eslint-plugin-jest:no-disabled-tests",
+      "eslint-plugin-jest:no-focused-tests",
+      "eslint:default-case-last",
+      "eslint:no-caller",
+      "eslint:no-empty-character-class",
+      "eslint:no-func-assign",
+      "eslint:no-import-assign",
+      "eslint:no-inner-declarations",
+      "eslint:no-invalid-regexp",
+      "eslint:no-new-symbol",
+      "eslint:no-new-wrappers",
+      "eslint:no-obj-calls",
+      "eslint:no-self-assign",
+      "eslint:no-setter-return",
+      "eslint:no-unsafe-negation",
+      "eslint:no-var",
+      "eslint:prefer-rest-params",
+      "eslint:use-isnan"
+    ]
+  },
+  {
+    "version": "0.4.1",
+    "rules": [
+      "eslint-plugin-jest:no-test-prefixes",
+      "eslint:eqeqeq"
+    ]
+  },
+  {
+    "version": "0.4.2",
+    "rules": [
+      "@typescript-eslint:explicit-function-return-type",
+      "@typescript-eslint:member-ordering",
+      "@typescript-eslint:naming-convention",
+      "@typescript-eslint:no-dupe-class-members",
+      "@typescript-eslint:no-unnecessary-condition",
+      "@typescript-eslint:no-unused-expressions",
+      "@typescript-eslint:no-use-before-define",
+      "@typescript-eslint:no-useless-constructor",
+      "@typescript-eslint:parameter-properties",
+      "eslint-plugin-import:first",
+      "eslint-plugin-import:newline-after-import",
+      "eslint-plugin-import:no-duplicates",
+      "eslint-plugin-import:no-mutable-exports",
+      "eslint-plugin-jest:no-alias-methods",
+      "eslint-plugin-jest:prefer-to-have-length",
+      "eslint-plugin-jest:prefer-todo",
+      "eslint:no-alert",
+      "eslint:no-delete-var",
+      "eslint:no-eval",
+      "eslint:no-fallthrough",
+      "eslint:no-iterator",
+      "eslint:no-labels",
+      "eslint:no-multi-str",
+      "eslint:no-new-func",
+      "eslint:no-new-object",
+      "eslint:no-octal-escape",
+      "eslint:no-proto",
+      "eslint:no-restricted-imports",
+      "eslint:no-script-url",
+      "eslint:no-undef-init",
+      "eslint:no-unmodified-loop-condition",
+      "eslint:no-unreachable",
+      "eslint:no-unsafe-finally",
+      "eslint:no-unsafe-optional-chaining",
+      "eslint:no-with",
+      "eslint:require-atomic-updates",
+      "eslint:valid-typeof"
+    ]
+  },
+  {
+    "version": "0.5.0",
+    "rules": [
+      "@typescript-eslint:method-signature-style",
+      "@typescript-eslint:no-redeclare",
+      "@typescript-eslint:no-unnecessary-type-constraint",
+      "@typescript-eslint:prefer-optional-chain",
+      "eslint-plugin-jest:prefer-strict-equal",
+      "eslint-plugin-promise:param-names",
+      "eslint-plugin-react:button-has-type",
+      "eslint-plugin-react:jsx-key",
+      "eslint-plugin-react:jsx-no-bind",
+      "eslint-plugin-react:jsx-no-comment-textnodes",
+      "eslint-plugin-react:jsx-no-duplicate-props",
+      "eslint-plugin-react:jsx-no-target-blank",
+      "eslint-plugin-react:jsx-no-undef",
+      "eslint-plugin-react:jsx-pascal-case",
+      "eslint-plugin-react:no-access-state-in-setstate",
+      "eslint-plugin-react:no-children-prop",
+      "eslint-plugin-react:no-danger",
+      "eslint-plugin-react:no-danger-with-children",
+      "eslint-plugin-react:no-deprecated",
+      "eslint-plugin-react:no-did-update-set-state",
+      "eslint-plugin-react:no-direct-mutation-state",
+      "eslint-plugin-react:no-find-dom-node",
+      "eslint-plugin-react:no-is-mounted",
+      "eslint-plugin-react:no-redundant-should-component-update",
+      "eslint-plugin-react:no-render-return-value",
+      "eslint-plugin-react:no-string-refs",
+      "eslint-plugin-react:no-this-in-sfc",
+      "eslint-plugin-react:no-typos",
+      "eslint-plugin-react:no-unescaped-entities",
+      "eslint-plugin-react:no-unknown-property",
+      "eslint-plugin-react:no-will-update-set-state",
+      "eslint-plugin-react:prefer-es6-class",
+      "eslint-plugin-react:require-render-return",
+      "eslint:accessor-pairs",
+      "eslint:guard-for-in",
+      "eslint:max-lines",
+      "eslint:no-bitwise",
+      "eslint:no-control-regex",
+      "eslint:no-dupe-class-members",
+      "eslint:no-dupe-else-if",
+      "eslint:no-extend-native",
+      "eslint:no-extra-boolean-cast",
+      "eslint:no-extra-label",
+      "eslint:no-implicit-coercion",
+      "eslint:no-implied-eval",
+      "eslint:no-label-var",
+      "eslint:no-lone-blocks",
+      "eslint:no-loop-func",
+      "eslint:no-misleading-character-class",
+      "eslint:no-nested-ternary",
+      "eslint:no-new",
+      "eslint:no-octal",
+      "eslint:no-param-reassign",
+      "eslint:no-prototype-builtins",
+      "eslint:no-regex-spaces",
+      "eslint:no-return-assign",
+      "eslint:no-self-compare",
+      "eslint:no-sequences",
+      "eslint:no-shadow",
+      "eslint:no-shadow-restricted-names",
+      "eslint:no-throw-literal",
+      "eslint:no-unneeded-ternary",
+      "eslint:no-useless-call",
+      "eslint:no-useless-catch",
+      "eslint:no-useless-computed-key",
+      "eslint:no-useless-concat",
+      "eslint:no-useless-constructor",
+      "eslint:no-useless-rename",
+      "eslint:object-shorthand",
+      "eslint:prefer-promise-reject-errors",
+      "eslint:prefer-spread",
+      "eslint:prefer-template",
+      "eslint:radix",
+      "eslint:require-yield",
+      "eslint:strict",
+      "eslint:symbol-description"
+    ]
+  },
+  {
+    "version": "0.5.1",
+    "rules": [
+      "@typescript-eslint:no-magic-numbers",
+      "@typescript-eslint:prefer-destructuring",
+      "@typescript-eslint:prefer-for-of",
+      "eslint-plugin-react-hooks:exhaustive-deps",
+      "eslint-plugin-react-hooks:rules-of-hooks",
+      "eslint-plugin-react:jsx-curly-brace-presence",
+      "eslint-plugin-react:jsx-no-leaked-render",
+      "eslint-plugin-react:jsx-no-script-url",
+      "eslint-plugin-react:no-unstable-nested-components",
+      "eslint-plugin-react:no-unused-class-component-methods",
+      "eslint-plugin-react:no-unused-state",
+      "eslint-plugin-react:prefer-stateless-function",
+      "eslint-plugin-unicorn:filename-case",
+      "eslint-plugin-unicorn:no-static-only-class",
+      "eslint:no-irregular-whitespace"
+    ]
+  },
+  {
+    "version": "0.5.2",
+    "rules": [
+      "@typescript-eslint:explicit-member-accessibility",
+      "@typescript-eslint:max-params",
+      "@typescript-eslint:no-loop-func",
+      "@typescript-eslint:no-restricted-imports",
+      "@typescript-eslint:no-shadow",
+      "@typescript-eslint:prefer-nullish-coalescing",
+      "eslint-plugin-jest:no-deprecated-functions",
+      "eslint-plugin-jest:no-done-callback",
+      "eslint-plugin-jest:no-mocks-import",
+      "eslint-plugin-jest:prefer-to-contain",
+      "eslint-plugin-react:boolean-prop-naming",
+      "eslint-plugin-react:forbid-component-props",
+      "eslint-plugin-react:forbid-dom-props",
+      "eslint-plugin-react:forbid-elements",
+      "eslint-plugin-react:forbid-prop-types",
+      "eslint-plugin-react:jsx-child-element-spacing",
+      "eslint-plugin-react:jsx-curly-spacing",
+      "eslint-plugin-react:jsx-handler-names",
+      "eslint-plugin-react:no-array-index-key",
+      "eslint-plugin-react:no-did-mount-set-state",
+      "eslint-plugin-react:no-multi-comp",
+      "eslint-plugin-react:no-set-state",
+      "eslint:complexity",
+      "eslint:max-depth",
+      "eslint:max-lines-per-function",
+      "eslint:max-nested-callbacks",
+      "eslint:no-duplicate-imports",
+      "eslint:no-multi-assign",
+      "eslint:no-nonoctal-decimal-escape",
+      "eslint:no-restricted-syntax",
+      "eslint:no-unexpected-multiline",
+      "eslint:no-useless-backreference",
+      "eslint:no-useless-escape",
+      "eslint:one-var"
+    ]
+  },
+  {
+    "version": "0.5.3",
+    "rules": [
+      "eslint-plugin-jest:no-commented-out-tests",
+      "eslint-plugin-jest:no-identical-title",
+      "eslint-plugin-jest:prefer-to-be",
+      "eslint-plugin-jsx-a11y:alt-text",
+      "eslint-plugin-jsx-a11y:anchor-has-content",
+      "eslint-plugin-jsx-a11y:anchor-is-valid",
+      "eslint-plugin-jsx-a11y:aria-activedescendant-has-tabindex",
+      "eslint-plugin-jsx-a11y:aria-props",
+      "eslint-plugin-jsx-a11y:aria-proptypes",
+      "eslint-plugin-jsx-a11y:aria-role",
+      "eslint-plugin-jsx-a11y:aria-unsupported-elements",
+      "eslint-plugin-jsx-a11y:autocomplete-valid",
+      "eslint-plugin-jsx-a11y:click-events-have-key-events",
+      "eslint-plugin-jsx-a11y:control-has-associated-label",
+      "eslint-plugin-jsx-a11y:heading-has-content",
+      "eslint-plugin-jsx-a11y:html-has-lang",
+      "eslint-plugin-jsx-a11y:iframe-has-title",
+      "eslint-plugin-jsx-a11y:img-redundant-alt",
+      "eslint-plugin-jsx-a11y:interactive-supports-focus",
+      "eslint-plugin-jsx-a11y:label-has-associated-control",
+      "eslint-plugin-jsx-a11y:media-has-caption",
+      "eslint-plugin-jsx-a11y:mouse-events-have-key-events",
+      "eslint-plugin-jsx-a11y:no-access-key",
+      "eslint-plugin-jsx-a11y:no-autofocus",
+      "eslint-plugin-jsx-a11y:no-distracting-elements",
+      "eslint-plugin-jsx-a11y:no-interactive-element-to-noninteractive-role",
+      "eslint-plugin-jsx-a11y:no-noninteractive-element-interactions",
+      "eslint-plugin-jsx-a11y:no-noninteractive-element-to-interactive-role",
+      "eslint-plugin-jsx-a11y:no-noninteractive-tabindex",
+      "eslint-plugin-jsx-a11y:no-redundant-roles",
+      "eslint-plugin-jsx-a11y:no-static-element-interactions",
+      "eslint-plugin-jsx-a11y:role-has-required-aria-props",
+      "eslint-plugin-jsx-a11y:role-supports-aria-props",
+      "eslint-plugin-jsx-a11y:scope",
+      "eslint-plugin-jsx-a11y:tabindex-no-positive",
+      "eslint-plugin-react:destructuring-assignment",
+      "eslint-plugin-react:display-name",
+      "eslint-plugin-react:forbid-foreign-prop-types",
+      "eslint-plugin-react:jsx-closing-bracket-location",
+      "eslint-plugin-react:jsx-indent",
+      "eslint-plugin-react:jsx-indent-props",
+      "eslint-plugin-react:jsx-max-depth",
+      "eslint-plugin-react:jsx-no-literals",
+      "eslint-plugin-react:no-unsafe",
+      "eslint-plugin-react:require-optimization"
+    ]
+  },
+  {
+    "version": "0.6.0",
+    "rules": [
+      "@typescript-eslint:class-methods-use-this",
+      "@typescript-eslint:explicit-module-boundary-types",
+      "@typescript-eslint:init-declarations",
+      "@typescript-eslint:no-confusing-non-null-assertion",
+      "@typescript-eslint:no-deprecated",
+      "@typescript-eslint:no-empty-object-type",
+      "@typescript-eslint:no-import-type-side-effects",
+      "@typescript-eslint:no-invalid-this",
+      "@typescript-eslint:no-restricted-types",
+      "@typescript-eslint:no-type-alias",
+      "@typescript-eslint:no-unnecessary-parameter-property-assignment",
+      "@typescript-eslint:no-unnecessary-qualifier",
+      "@typescript-eslint:no-unnecessary-type-conversion",
+      "@typescript-eslint:no-unsafe-declaration-merging",
+      "@typescript-eslint:no-unsafe-function-type",
+      "@typescript-eslint:no-unused-private-class-members",
+      "@typescript-eslint:no-useless-default-assignment",
+      "@typescript-eslint:no-wrapper-object-types",
+      "@typescript-eslint:prefer-enum-initializers",
+      "@typescript-eslint:prefer-find",
+      "@typescript-eslint:prefer-function-type",
+      "@typescript-eslint:strict-boolean-expressions",
+      "@typescript-eslint:strict-void-return",
+      "eslint-plugin-jest:expect-expect",
+      "eslint-plugin-jest:max-nested-describe",
+      "eslint-plugin-jest:no-duplicate-hooks",
+      "eslint-plugin-jest:no-jasmine-globals",
+      "eslint-plugin-jest:no-standalone-expect",
+      "eslint-plugin-jest:prefer-called-with",
+      "eslint-plugin-jest:prefer-each",
+      "eslint-plugin-jest:prefer-expect-resolves",
+      "eslint-plugin-jest:prefer-to-have-been-called",
+      "eslint-plugin-jest:prefer-to-have-been-called-times",
+      "eslint-plugin-jest:valid-expect",
+      "eslint-plugin-jest:valid-title",
+      "eslint-plugin-jsx-a11y:anchor-ambiguous-text",
+      "eslint-plugin-jsx-a11y:lang",
+      "eslint-plugin-jsx-a11y:no-aria-hidden-on-focusable",
+      "eslint-plugin-jsx-a11y:prefer-tag-over-role",
+      "eslint-plugin-promise:always-return",
+      "eslint-plugin-promise:avoid-new",
+      "eslint-plugin-promise:catch-or-return",
+      "eslint-plugin-promise:no-return-wrap",
+      "eslint-plugin-react:checked-requires-onchange-or-readonly"
+    ]
+  },
+  {
+    "version": "0.6.1",
+    "rules": [
+      "eslint-plugin-jest:max-expects"
+    ]
+  },
+  {
+    "version": "0.6.2",
+    "rules": [
+      "eslint-plugin-jest:prefer-equality-matcher",
+      "eslint-plugin-promise:no-multiple-resolved",
+      "eslint-plugin-promise:no-nesting"
+    ]
+  },
+  {
+    "version": "0.6.3",
+    "rules": [
+      "eslint-plugin-jest:no-confusing-set-timeout",
+      "eslint-plugin-jest:no-export",
+      "eslint-plugin-jest:prefer-hooks-in-order",
+      "eslint-plugin-jest:prefer-hooks-on-top",
+      "eslint-plugin-promise:no-new-statics",
+      "eslint-plugin-promise:valid-params",
+      "eslint:arrow-body-style",
+      "eslint:curly"
+    ]
+  },
+  {
+    "version": "0.6.4",
+    "rules": [
+      "eslint-plugin-jest:prefer-jest-mocked",
+      "eslint-plugin-jest:prefer-spy-on",
+      "eslint-plugin-promise:no-callback-in-promise",
+      "eslint-plugin-promise:no-return-in-finally",
+      "eslint-plugin-promise:prefer-catch"
+    ]
+  },
+  {
+    "version": "0.6.5",
+    "rules": [
+      "eslint-plugin-import:default",
+      "eslint-plugin-import:namespace",
+      "eslint-plugin-import:no-cycle",
+      "eslint-plugin-import:no-default-export",
+      "eslint-plugin-jest:no-conditional-expect",
+      "eslint-plugin-jest:no-restricted-matchers",
+      "eslint-plugin-jest:no-unneeded-async-expect-function",
+      "eslint-plugin-promise:no-promise-in-callback",
+      "eslint-plugin-promise:prefer-await-to-then",
+      "eslint-plugin-react-hooks:component-hook-factories",
+      "eslint-plugin-react-hooks:error-boundaries",
+      "eslint-plugin-react-hooks:globals",
+      "eslint-plugin-react:forward-ref-uses-ref",
+      "eslint-plugin-react:jsx-fragments",
+      "eslint-plugin-react:jsx-props-no-spread-multi",
+      "eslint-plugin-unicorn:new-for-builtins",
+      "eslint-plugin-unicorn:no-instanceof-builtins",
+      "eslint-plugin-unicorn:no-thenable",
+      "eslint-plugin-unicorn:no-useless-switch-case",
+      "eslint-plugin-unicorn:prefer-array-flat-map",
+      "eslint-plugin-unicorn:prefer-number-properties",
+      "eslint:max-params",
+      "eslint:no-else-return",
+      "eslint:no-empty-function",
+      "eslint:no-empty-static-block",
+      "eslint:no-new-native-nonconstructor",
+      "eslint:no-unassigned-vars",
+      "eslint:no-unused-expressions",
+      "eslint:no-unused-labels",
+      "eslint:no-unused-private-class-members",
+      "eslint:prefer-arrow-callback",
+      "eslint:prefer-exponentiation-operator",
+      "eslint:prefer-numeric-literals",
+      "eslint:prefer-regex-literals",
+      "eslint:require-await"
+    ]
+  },
+  {
+    "version": "0.7.0",
+    "rules": [
+      "eslint-plugin-jest:no-interpolation-in-snapshots",
+      "eslint-plugin-jest:no-restricted-jest-methods",
+      "eslint-plugin-jest:prefer-comparison-matcher",
+      "eslint-plugin-unicorn:require-array-join-separator",
+      "eslint-plugin-unicorn:require-number-to-fixed-digits-argument",
+      "eslint:no-redeclare",
+      "eslint:no-restricted-globals"
+    ]
+  },
+  {
+    "version": "0.7.1",
+    "rules": [
+      "eslint-plugin-jest:no-conditional-in-test",
+      "eslint-plugin-unicorn:prefer-array-flat",
+      "eslint:no-unused-vars",
+      "eslint:prefer-destructuring",
+      "eslint:prefer-object-spread"
+    ]
+  },
+  {
+    "version": "0.7.2",
+    "rules": [
+      "eslint-plugin-jest:require-hook",
+      "rstest:no-mocks-import"
+    ]
+  }
+]

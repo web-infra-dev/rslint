@@ -12,7 +12,9 @@ import { CancelSymbol, TableSelector } from './table-selector';
 import { Badge, Heading, PresetBadge, Text } from './ui-utils';
 import { Button } from '@components/ui/button';
 import manifest from '@/generated/rule-manifest.json';
+import ruleReleases from '@/rule-releases.json';
 import { groupToRouteSlug } from '@/theme/plugin-registry';
+import RuleVersionBadge from '@/theme/components/RuleVersionBadge';
 
 // Type definitions
 type FailingCase = {
@@ -28,6 +30,12 @@ type Rule = {
   docPath: string | null;
   presets: { name: string; value: unknown }[];
 };
+
+const introducedInByRule = new Map(
+  ruleReleases.flatMap(({ version, rules }) =>
+    rules.map((rule) => [rule, version] as const),
+  ),
+);
 
 type RuleStateDescribe = {
   name: string;
@@ -231,6 +239,7 @@ const RuleImplementationStatus: React.FC = () => {
                   <TableHead className="w-2/6">Rule Name</TableHead>
                   <TableHead className="w-1/6">Group</TableHead>
                   <TableHead className="w-1/6">Preset</TableHead>
+                  <TableHead className="w-1/12">Since</TableHead>
                   <TableHead className="w-1/12">Status</TableHead>
                   <TableHead className="w-1/6">Failing Cases</TableHead>
                 </TableRow>
@@ -270,6 +279,13 @@ const RuleImplementationStatus: React.FC = () => {
                           ))}
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <RuleVersionBadge
+                        introducedIn={introducedInByRule.get(
+                          `${rule.group}:${rule.name}`,
+                        )}
+                      />
                     </TableCell>
                     <TableCell>
                       <Badge>{rule.status}</Badge>
