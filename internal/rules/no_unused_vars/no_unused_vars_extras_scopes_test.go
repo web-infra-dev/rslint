@@ -577,6 +577,22 @@ overloaded("x");`,
 			wantNames: []string{"A", "overloadArg", "implementationArg"},
 		},
 		{
+			name:      "type-only exports preserve declaration spaces",
+			extension: ".ts",
+			code: `type Outer = {};
+namespace N {
+  const Outer = 1;
+  const local = 1;
+  export type { Outer, local };
+}
+const top = 1;
+export type { top };
+const HTMLElement = 1;
+export type { HTMLElement };
+consume(N);`,
+			wantNames: []string{"Outer", "local", "top", "HTMLElement"},
+		},
+		{
 			name:      "typescript class type parameters",
 			extension: ".ts",
 			code: `class Box<T, U> { value!: T; method(arg: T) { return arg; } }

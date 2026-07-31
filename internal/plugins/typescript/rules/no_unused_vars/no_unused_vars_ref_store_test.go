@@ -172,6 +172,41 @@ export { publicValue };`,
 	)
 }
 
+func TestNoUnusedVarsTypeOnlyLocalExports(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `type T = {}; export type { T };`},
+			{Code: `interface M {} const M = 1; export type { M };`},
+			{Code: `import { V } from "./foo"; export type { V };`},
+			{Code: `const value = 1; export namespace N { export { value }; } consume(N);`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `const value = 1; export type { value };`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
+			},
+			{
+				Code:   "function f() {}\nexport { type f as F };",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 10}},
+			},
+			{
+				Code: "type Token = {};\nnamespace Box {\n  const Token = 1;\n  export type { Token };\n}\nconsume(Box);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Line: 3, Column: 9},
+				},
+			},
+			{
+				Code:   "let assigned;\nexport type { assigned };\nassigned = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 1}},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsPatternCacheBounded(t *testing.T) {
 	for i := range maxCachedPatterns + 32 {
 		cachedPattern(fmt.Sprintf("^cache-attack-%d$", i))

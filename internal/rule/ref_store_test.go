@@ -601,6 +601,196 @@ func TestRefStoreTypeOnlyExportCheckerFallbackRespectsMeaningAndShadowing(t *tes
 	}
 }
 
+func TestRefStoreNestedLocalExports(t *testing.T) {
+	tests := []struct {
+		name            string
+		source          string
+		identifier      string
+		occurrenceCount int
+		targetIndex     int
+		localValueIndex int
+	}{
+		{
+			name: "type export skips a value shadow",
+			source: `
+type X = {};
+namespace N {
+	let X;
+	export type { X };
+}`,
+			identifier:      "X",
+			occurrenceCount: 3,
+			targetIndex:     0,
+			localValueIndex: 1,
+		},
+		{
+			name: "type export keeps its local type",
+			source: `
+namespace N {
+	type X = {};
+	export type { X };
+}`,
+			identifier:      "X",
+			occurrenceCount: 2,
+			targetIndex:     0,
+			localValueIndex: -1,
+		},
+		{
+			name: "deeply nested type export finds its lexical type",
+			source: `
+namespace Outer {
+	type X = {};
+	export namespace Inner {
+		let X;
+		export type { X };
+	}
+}`,
+			identifier:      "X",
+			occurrenceCount: 3,
+			targetIndex:     0,
+			localValueIndex: 1,
+		},
+		{
+			name: "type export rejects its own value-only alias",
+			source: `
+namespace N {
+	let x;
+	export type { x };
+}`,
+			identifier:      "x",
+			occurrenceCount: 2,
+			targetIndex:     -1,
+			localValueIndex: 0,
+		},
+		{
+			name: "ordinary export keeps its local value",
+			source: `
+namespace N {
+	const x = 1;
+	export { x };
+}`,
+			identifier:      "x",
+			occurrenceCount: 2,
+			targetIndex:     0,
+			localValueIndex: -1,
+		},
+		{
+			name: "ordinary export finds its outer value",
+			source: `
+const x = 1;
+namespace N {
+	export { x };
+}`,
+			identifier:      "x",
+			occurrenceCount: 2,
+			targetIndex:     0,
+			localValueIndex: -1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/nested-local-export.ts", core.ScriptKindTS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), test.identifier)
+			if len(occurrences) != test.occurrenceCount {
+				t.Fatalf("identifier occurrences = %d, want %d", len(occurrences), test.occurrenceCount)
+			}
+			specifier := occurrences[len(occurrences)-1]
+
+			if test.targetIndex < 0 {
+				if got := refs.Resolve(specifier); got != nil {
+					t.Fatalf("Resolve(export specifier) = %v, want nil", got)
+				}
+			} else {
+				target := occurrences[test.targetIndex].Parent.Symbol()
+				if target == nil {
+					t.Fatal("target declaration identifier has no bound symbol")
+				}
+				if got := refs.Resolve(specifier); got != target {
+					t.Fatalf("Resolve(export specifier) = %v, want %v", got, target)
+				}
+				if got := refs.References(target); len(got) != 1 || got[0] != specifier {
+					t.Fatalf("References(target) = %v, want [%v]", got, specifier)
+				}
+			}
+
+			if test.localValueIndex >= 0 {
+				localValue := occurrences[test.localValueIndex].Parent.Symbol()
+				if localValue == nil {
+					t.Fatal("local value declaration identifier has no bound symbol")
+				}
+				if got := refs.References(localValue); len(got) != 0 {
+					t.Fatalf("References(local value) = %v, want none", got)
+				}
+			}
+		})
+	}
+}
+
+func TestRefStoreNestedTypeOnlyExportsWithChecker(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		identifier string
+		source     string
+		wantOuter  bool
+	}{
+		{
+			name:       "skips own alias and resolves global type",
+			identifier: "HTMLElement",
+			source: `
+namespace N {
+	let HTMLElement;
+	export type { HTMLElement };
+}`,
+			wantOuter: true,
+		},
+		{
+			name:       "does not return own alias without outer type",
+			identifier: "localValue",
+			source: `
+namespace N {
+	let localValue;
+	export type { localValue };
+}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs, done := newCheckedRefStore(t, test.source)
+			defer done()
+
+			occurrences := identifiers(sourceFile.AsNode(), test.identifier)
+			if len(occurrences) != 2 {
+				t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+			}
+			localValue := occurrences[0].Parent.Symbol()
+			specifier := occurrences[1]
+			if localValue == nil {
+				t.Fatal("local value declaration identifier has no bound symbol")
+			}
+
+			target := refs.Resolve(specifier)
+			if !test.wantOuter {
+				if target != nil {
+					t.Fatalf("Resolve(type-only export) = %v, want nil", target)
+				}
+			} else {
+				if target == nil || target == localValue || isOwnExportAlias(specifier, target) {
+					t.Fatalf("Resolve(type-only export) = %v, want the outer type", target)
+				}
+				if target.Flags&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+					t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags)
+				}
+				if got := refs.References(target); len(got) != 1 || got[0] != specifier {
+					t.Fatalf("References(outer type) = %v, want [%v]", got, specifier)
+				}
+			}
+			if got := refs.References(localValue); len(got) != 0 {
+				t.Fatalf("References(local value) = %v, want none", got)
+			}
+		})
+	}
+}
+
 func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
 	// The meaning-aware ExportSpecifier fallback also preserves ordinary
 	// dual-space exports of globals; it must not be limited to type-only

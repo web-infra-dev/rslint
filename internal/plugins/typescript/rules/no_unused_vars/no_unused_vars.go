@@ -1451,18 +1451,33 @@ func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, ac *analysi
 		return
 	}
 	for _, spec := range namedExports.Elements.Nodes {
-		if spec.AsExportSpecifier() == nil {
+		exportSpecifier := spec.AsExportSpecifier()
+		if exportSpecifier == nil {
 			continue
 		}
-		target := ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(spec)
+		localName := exportSpecifier.Name()
+		if exportSpecifier.PropertyName != nil {
+			localName = exportSpecifier.PropertyName
+		}
+		// RefStore applies the specifier's declaration-space meaning. In
+		// particular, a type-only export remains unresolved when only a
+		// value binding exists.
+		target := ctx.Refs.Resolve(localName)
 		if target == nil {
 			continue
 		}
 		if ac.localExportTargets == nil {
 			ac.localExportTargets = make(map[*ast.Symbol]bool)
 		}
+		// RefStore returns binder symbols on its fast path, while
+		// processVariable starts from the checker symbol at the declaration.
+		// Retain both identities plus the alias target.
 		ac.localExportTargets[target] = true
-		if resolved := ctx.TypeChecker.SkipAlias(target); resolved != target {
+		if merged := ctx.TypeChecker.GetMergedSymbol(target); merged != nil {
+			target = merged
+			ac.localExportTargets[target] = true
+		}
+		if resolved := ctx.TypeChecker.SkipAlias(target); resolved != nil && resolved != target {
 			ac.localExportTargets[resolved] = true
 		}
 	}
