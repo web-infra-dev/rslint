@@ -115,8 +115,10 @@ function extractDefault(mod: unknown): unknown {
  *
  * `configDirectory` is the match root used to resolve relative `basePath`
  * values: config-file directory for auto-discovered configs, cwd for
- * `--config` / explicit override configs. When omitted, `process.cwd()` is
- * used (correct for overrideConfig and other cwd-rooted paths).
+ * `--config` / explicit override configs. Production callers must pass it —
+ * the API's `overrideConfig` is rooted at the instance cwd, not
+ * `process.cwd()` — so the `process.cwd()` default below only serves
+ * basePath-free test configs.
  */
 export interface NormalizeConfigOptions {
   configDirectory?: string;

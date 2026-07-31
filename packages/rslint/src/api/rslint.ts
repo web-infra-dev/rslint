@@ -622,7 +622,13 @@ export class Rslint {
         );
       }
     }
-    this.#normalizedOverrideConfig = normalizeConfig(override);
+    // overrideConfig is rooted at the instance cwd, and Go matches the
+    // desugared patterns relative to that same cwd. Passing it explicitly (not
+    // process.cwd()) keeps an overrideConfig basePath from desugaring against
+    // the wrong root when the instance cwd differs from the process cwd.
+    this.#normalizedOverrideConfig = normalizeConfig(override, {
+      configDirectory: this.#cwd,
+    });
     return this.#normalizedOverrideConfig;
   }
 
