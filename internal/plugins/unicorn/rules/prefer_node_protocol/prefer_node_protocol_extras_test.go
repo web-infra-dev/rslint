@@ -87,6 +87,22 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 21}},
 			},
 
+			// ---- Branch lock-in: parenthesized require callee ----
+			// ESTree flattens parentheses, so `(require)("fs")` presents a bare
+			// `require` identifier callee to upstream. tsgo keeps the
+			// ParenthesizedExpression, so isStaticRequire applies SkipParentheses
+			// to the callee to stay 1:1.
+			{
+				Code:   `const fs = (require)("fs")`,
+				Output: []string{`const fs = (require)("node:fs")`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 22}},
+			},
+			{
+				Code:   `const fs = ((require))("fs")`,
+				Output: []string{`const fs = ((require))("node:fs")`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 24}},
+			},
+
 			// ---- Branch lock-in: direct (unparenthesized) process.getBuiltinModule ----
 			{
 				Code:   `const fs = process.getBuiltinModule("buffer")`,

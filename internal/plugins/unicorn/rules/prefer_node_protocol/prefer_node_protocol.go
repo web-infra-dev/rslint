@@ -148,8 +148,12 @@ func isStaticRequire(node *ast.Node) bool {
 		return false
 	}
 	call := node.AsCallExpression()
-	if call.Expression.Kind != ast.KindIdentifier ||
-		call.Expression.AsIdentifier().Text != "require" {
+	// Parentheses are transparent in ESTree, so `(require)("fs")` presents a
+	// bare `require` identifier callee to upstream. tsgo keeps the
+	// ParenthesizedExpression, so skip it before the name check.
+	callee := ast.SkipParentheses(call.Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier ||
+		callee.AsIdentifier().Text != "require" {
 		return false
 	}
 	args := call.Arguments
