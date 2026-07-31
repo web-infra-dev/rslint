@@ -83,8 +83,56 @@ func TestPreferSetHasExtras(t *testing.T) {
 			{Code: "const foo = Array(-1);\nfunction unicorn() { return foo.includes(1); }", Options: minimumItems(5)},
 			// Array('x') → constructor size 1 < 5 → bail.
 			{Code: "const foo = Array('x');\nfunction unicorn() { return foo.includes(1); }", Options: minimumItems(5)},
+
+			// ---- KNOWN DIVERGENCE (PR #1479 review, swwind): parenthesized `.length` ----
+			// `(foo).length` — a parenthesized `.length` read. isLengthRead reads
+			// identifier.Parent directly without unwrapping through outerParen (unlike
+			// isIncludesCall), so the parenthesized read classifies as neither
+			// includes/length/extra and the whole rule bails. Upstream (unicorn v72)
+			// reports and autofixes the looped `includes` here, rewriting the third
+			// line to `(foo).size`:
+			//   const foo = new Set([1, 2, 3]);
+			//   for (let i = 0; i < 3; i++) foo.has(1);
+			//   const n = (foo).size;
+			// Locked in as currently-valid so the missed report can't change silently;
+			// when isLengthRead unwraps parentheses this case flips to Invalid.
+			{Code: "const foo = [1, 2, 3];\nfor (let i = 0; i < 3; i++) foo.includes(1);\nconst n = (foo).length;"},
+			// Control: the non-parenthesized form IS reported+fixed today (see the
+			// Invalid block), proving the divergence is specifically the paren unwrap.
+
+			// ---- KNOWN DIVERGENCE (PR #1479 review, swwind): NaN / undefined elements ----
+			// evaluateStaticIdentifier only special-cases `Infinity`; `NaN` and
+			// `undefined` are not modeled, so an array containing them fails static
+			// evaluation and isKnownUniqueArrayExpression is false. With an extra
+			// reference (forEach) present, the rule then bails. Upstream reports and
+			// autofixes to `new Set([NaN, 1, 2])` / `.has`. Locked in as
+			// currently-valid; modeling NaN/undefined flips these to Invalid.
+			{Code: "const foo = [NaN, 1, 2];\nfoo.forEach(x => log(x));\nfor (let i = 0; i < 3; i++) foo.includes(1);"},
+			{Code: "const foo = [undefined, 1, 2];\nconst spread = [...foo];\nfor (let i = 0; i < 3; i++) foo.includes(1);"},
+			// Control: Infinity IS modeled, so the same shape with Infinity reports
+			// and fixes today (locked in the Invalid block below).
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Control for PR #1479 divergence: non-parenthesized `.length` ----
+			// Contrast with the parenthesized `(foo).length` valid case above: the
+			// non-parenthesized `.length` read classifies correctly, so a looped
+			// includes IS reported and both `.has`/`.size` rewrites apply.
+			{
+				Code:   "const foo = [1, 2, 3];\nfor (let i = 0; i < 3; i++) foo.includes(1);\nconst n = foo.length;",
+				Output: []string{"const foo = new Set([1, 2, 3]);\nfor (let i = 0; i < 3; i++) foo.has(1);\nconst n = foo.size;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- Control for PR #1479 divergence: Infinity element IS modeled ----
+			// Contrast with the NaN/undefined valid cases above: Infinity is
+			// special-cased in evaluateStaticIdentifier, so the array is a known-
+			// unique literal, the extra forEach ref is allowed, and it reports+fixes.
+			{
+				Code:   "const foo = [Infinity, 1, 2];\nfoo.forEach(x => log(x));\nfor (let i = 0; i < 3; i++) foo.includes(1);",
+				Output: []string{"const foo = new Set([Infinity, 1, 2]);\nfoo.forEach(x => log(x));\nfor (let i = 0; i < 3; i++) foo.has(1);"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
 			// ---- Dimension 4: parenthesized receiver inside a loop reports ----
 			// The `.includes` property is renamed even through the parens.
 			{
