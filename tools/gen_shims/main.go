@@ -68,6 +68,7 @@ func main() {
 		"collections",
 		"lsp/lsproto",
 		"ls",
+		"module",
 		"project",
 		"project/logging",
 		"api",

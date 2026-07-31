@@ -39,6 +39,11 @@ type SymbolInfo struct {
 	// Declaration node reference (if available)
 	Decl *NodeReference `json:"decl,omitempty"`
 }
+type ExternalSymbol struct {
+	SymbolId  ast.SymbolId `json:"symbol_id"`
+	Namespace CString      `json:"namespace"`
+	Name      CString      `json:"name"`
+}
 type TypeExtra struct {
 	Name map[int]CString      `json:"name"`
 	Func map[int]FunctionData `json:"func"`
@@ -66,6 +71,8 @@ func CollectSemantic(program *compiler.Program) Semantic {
 
 	tc, done := program.GetTypeChecker(context.Background())
 	defer done()
+
+	collectExternalSymbols(program, tc, &semantic)
 
 	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
@@ -112,6 +119,8 @@ type Semantic struct {
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
+	// ExternalSymbols contains globals and dependency exports with their qualified external names.
+	ExternalSymbols []ExternalSymbol `json:"external_symbols"`
 }
 
 func NewSemantic() Semantic {
@@ -125,6 +134,7 @@ func NewSemantic() Semantic {
 		NodeFlags:                make(map[NodeReference]uint32),
 		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
 		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
+		ExternalSymbols:          []ExternalSymbol{},
 		Primtypes:                PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
