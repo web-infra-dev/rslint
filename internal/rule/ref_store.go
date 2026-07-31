@@ -120,7 +120,7 @@ func (s *RefStore) resolvePending(name string) {
 	delete(s.candidates, name)
 	for _, id := range pending {
 		meaning := referenceMeaning(id)
-		target := s.resolver.Resolve(id, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+		target := s.binderReferenceSymbol(id, meaning)
 		if target == nil {
 			target = s.checkerReferenceSymbol(id, meaning)
 		} else {
@@ -196,10 +196,27 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 		return nil
 	}
 	meaning := referenceMeaning(node)
-	if sym := s.resolver.Resolve(node, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/); sym != nil {
+	if sym := s.binderReferenceSymbol(node, meaning); sym != nil {
 		return sym
 	}
 	return s.checkerReferenceSymbol(node, meaning)
+}
+
+// binderReferenceSymbol resolves one reference without checker work. A named
+// export nested in a namespace needs one extra guard: the binder exposes that
+// export's own alias in the namespace's Exports table. If no local declaration
+// matches the requested meaning, NameResolver can otherwise return the alias
+// being declared instead of continuing to an outer lexical declaration.
+func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	target := s.resolver.Resolve(node, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+	if !isOwnExportAlias(node, target) {
+		return target
+	}
+	outer := outerExportScopeLocation(node)
+	if outer == nil {
+		return nil
+	}
+	return s.resolver.Resolve(outer, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
 }
 
 // checkerReferenceSymbol resolves a reference the binder-only scope walk
@@ -218,9 +235,47 @@ func (s *RefStore) checkerReferenceSymbol(node *ast.Node, meaning ast.SymbolFlag
 		return nil
 	}
 	if node.Parent != nil && node.Parent.Kind == ast.KindExportSpecifier {
-		return s.tc.ResolveName(node.Text(), node, meaning, false /*excludeGlobals*/)
+		target := s.tc.ResolveName(node.Text(), node, meaning, false /*excludeGlobals*/)
+		if !isOwnExportAlias(node, target) {
+			return target
+		}
+		outer := outerExportScopeLocation(node)
+		if outer == nil {
+			return nil
+		}
+		return s.tc.ResolveName(node.Text(), outer, meaning, false /*excludeGlobals*/)
 	}
 	return utils.GetReferenceSymbol(node, s.tc)
+}
+
+// isOwnExportAlias identifies the alias symbol declared by node's own export
+// specifier. It is a declaration result, not the local target that the
+// specifier references.
+func isOwnExportAlias(node *ast.Node, symbol *ast.Symbol) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindExportSpecifier || symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration == node.Parent {
+			return true
+		}
+	}
+	return false
+}
+
+// outerExportScopeLocation returns the first location outside the namespace
+// containing a local export specifier. Top-level module exports have no outer
+// lexical scope to retry.
+func outerExportScopeLocation(node *ast.Node) *ast.Node {
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindModuleDeclaration {
+			return current.Parent
+		}
+		if current.Kind == ast.KindSourceFile {
+			return nil
+		}
+	}
+	return nil
 }
 
 // collectCandidates walks the file once and buckets by name every identifier

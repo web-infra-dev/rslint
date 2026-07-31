@@ -375,6 +375,54 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 	)
 }
 
+func TestNoUnusedVarsTypeOnlyLocalExports(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `type T = {}; export type { T };`},
+			{Code: `interface M {} const M = 1; export type { M };`},
+			{Code: `import { V } from "./foo"; export type { V };`},
+			{Code: `const value = 1; export namespace N { export { value }; } consume(N);`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `const value = 1; export type { value };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("value", true, 1, 7, 12, ` export type { value };`),
+				},
+			},
+			{
+				Code: "function f() {}\nexport { type f as F };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("f", false, 1, 10, 11, "\nexport { type f as F };"),
+				},
+			},
+			{
+				Code: "type Token = {};\nnamespace Box {\n  const Token = 1;\n  export type { Token };\n}\nconsume(Box);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion(
+						"Token",
+						true,
+						3,
+						9,
+						14,
+						"type Token = {};\nnamespace Box {\n  \n  export type { Token };\n}\nconsume(Box);",
+					),
+				},
+			},
+			{
+				Code: "let assigned;\nexport type { assigned };\nassigned = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("assigned", true, 3, 1, 9, ""),
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsWithoutSourceFile(t *testing.T) {
 	t.Parallel()
 	listeners := NoUnusedVarsRule.Run(rule.RuleContext{}, nil)

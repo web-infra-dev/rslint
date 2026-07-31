@@ -1733,10 +1733,51 @@ func binderReferenceSymbol(node *ast.Node) *ast.Symbol {
 	return nil
 }
 
+// binderReferenceSymbolWithMeaning is the declaration-space-aware fallback
+// used only when a RuleContext has no RefStore. Unlike the hot-path
+// binderReferenceSymbol above, it keeps walking when a same-named symbol
+// exists only in another declaration space.
+func binderReferenceSymbolWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	if meaning == ast.SymbolFlagsNone {
+		return binderReferenceSymbol(node)
+	}
+	if node == nil || !ast.IsIdentifier(node) {
+		return nil
+	}
+	name := node.Text()
+	matchesMeaning := func(symbol *ast.Symbol) bool {
+		return symbol != nil && symbol.Flags&meaning != 0
+	}
+	for current := node.Parent; current != nil; current = current.Parent {
+		if symbol := enumMemberSymbol(current, name); matchesMeaning(symbol) {
+			return symbol
+		}
+		if symbol := typeParameterSymbol(current, name); matchesMeaning(symbol) {
+			return symbol
+		}
+		if ast.IsLocalsContainer(current) {
+			symbol := ast.GetLocals(current)[name]
+			if matchesMeaning(symbol) {
+				if ast.IsFunctionLike(current) && referenceIsInFunctionSignature(node, current) &&
+					!symbolIsVisibleInFunctionSignature(symbol, current) {
+					// Body declarations are outside the function signature's
+					// parameter/type environment. Keep searching outward.
+				} else {
+					return symbol
+				}
+			}
+		}
+		if symbol := namedExpressionSymbol(current, name); matchesMeaning(symbol) {
+			return symbol
+		}
+	}
+	return nil
+}
+
 // collectLocalExportTargets adds the exact local symbols consumed by one named
 // export declaration. It deliberately ignores source-bearing re-exports: in
 // `export { A } from "mod"`, A does not refer to an in-scope declaration.
-func collectLocalExportTargets(node *ast.Node, targets map[*ast.Symbol]bool) {
+func collectLocalExportTargets(refs *rule.RefStore, node *ast.Node, targets map[*ast.Symbol]bool) {
 	if node == nil || node.Kind != ast.KindExportDeclaration {
 		return
 	}
@@ -1757,7 +1798,22 @@ func collectLocalExportTargets(node *ast.Node, targets map[*ast.Symbol]bool) {
 		if exportSpecifier.PropertyName != nil {
 			localName = exportSpecifier.PropertyName
 		}
-		target := binderReferenceSymbol(localName)
+		var target *ast.Symbol
+		if refs != nil {
+			// RefStore applies the export specifier's declaration-space
+			// meaning, so a type-only export cannot consume a value-only
+			// binding with the same name.
+			target = refs.Resolve(localName)
+		} else {
+			// RuleContext normally provides RefStore whenever a source file is
+			// linted. Preserve direct-use robustness without falling back to
+			// the old all-space behavior.
+			meaning := ast.SymbolFlagsNone
+			if ast.IsTypeOnlyImportOrExportDeclaration(spec) {
+				meaning = ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+			}
+			target = binderReferenceSymbolWithMeaning(localName, meaning)
+		}
 		if target != nil {
 			targets[target] = true
 		}
@@ -1769,7 +1825,7 @@ func collectLocalExportTargets(node *ast.Node, targets map[*ast.Symbol]bool) {
 //   - writeRefs: maps each symbol to its write-only reference nodes (assignments)
 //   - localExportTargets: local symbols consumed by named export declarations
 //   - globalRefsByName: references that are not shadowed by a local declaration
-func collectSymbolUsages(sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, localExportTargets map[*ast.Symbol]bool, globalRefsByName map[string][]*ast.Node) {
+func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, localExportTargets map[*ast.Symbol]bool, globalRefsByName map[string][]*ast.Node) {
 	sf := sourceFile.AsSourceFile()
 	addUsage := func(sym *ast.Symbol, node *ast.Node) {
 		if sym == nil {
@@ -1783,7 +1839,7 @@ func collectSymbolUsages(sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Nod
 		if node == nil {
 			return
 		}
-		collectLocalExportTargets(node, localExportTargets)
+		collectLocalExportTargets(refs, node, localExportTargets)
 
 		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
 			sym := binderReferenceSymbol(node)
@@ -2106,7 +2162,7 @@ func newRule() rule.Rule {
 			ensureCollected := func(node *ast.Node) {
 				if !collected {
 					sourceFile := ast.GetSourceFileOfNode(node)
-					collectSymbolUsages(sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName)
+					collectSymbolUsages(ctx.Refs, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName)
 					collected = true
 				}
 			}
