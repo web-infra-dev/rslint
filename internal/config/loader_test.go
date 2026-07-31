@@ -101,7 +101,10 @@ func TestLoadRslintConfig_PreservesBasePathUntilResolve(t *testing.T) {
 	assert.Equal(t, cfg[0].BasePath, "packages/foo")
 	assert.DeepEqual(t, cfg[0].Files, []string{"src/**/*.ts"})
 
-	cfg = ResolveBasePaths(cfg, configDir)
+	cfg, err = ResolveBasePaths(cfg, configDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, cfg[0].BasePath, "")
 	assert.DeepEqual(t, cfg[0].Files, []string{"packages/foo/src/**/*.ts"})
 }

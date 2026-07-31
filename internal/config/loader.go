@@ -295,7 +295,10 @@ func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, 
 	}
 
 	// Convenience path assumes auto-discovery match root = config-file directory.
-	rslintConfig = ResolveBasePaths(rslintConfig, configDirectory)
+	rslintConfig, err = ResolveBasePaths(rslintConfig, configDirectory, loader.fs)
+	if err != nil {
+		return nil, nil, "", err
+	}
 
 	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
 	if err != nil {

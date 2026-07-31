@@ -665,7 +665,10 @@ func loadJSONConfigFallbackWithFS(
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("load JSON fallback %q: %w", configPath, err)
 	}
-	rslintConfig = config.ResolveBasePaths(rslintConfig, cwd)
+	rslintConfig, err = config.ResolveBasePaths(rslintConfig, cwd, fsys)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("resolve base paths in JSON fallback %q: %w", configPath, err)
+	}
 	paths, err := resolveTsConfigPathsWithFS(rslintConfig, cwd, fsys)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("resolve tsconfig paths for JSON fallback %q: %w", configPath, err)

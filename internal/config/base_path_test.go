@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -13,19 +14,86 @@ func TestResolveRelativeBasePath(t *testing.T) {
 		root = `C:\repo`
 	}
 
-	got := resolveRelativeBasePath("packages/foo", root)
+	got, err := resolveRelativeBasePath("packages/foo", root, true)
+	if err != nil {
+		t.Fatalf("resolveRelativeBasePath: %v", err)
+	}
 	if got != "packages/foo" {
 		t.Fatalf("relative basePath: got %q, want packages/foo", got)
 	}
 
-	got = resolveRelativeBasePath(".", root)
+	got, err = resolveRelativeBasePath(".", root, true)
+	if err != nil {
+		t.Fatalf("resolveRelativeBasePath: %v", err)
+	}
 	if got != "" {
 		t.Fatalf("dot basePath: got %q, want empty", got)
 	}
 
-	got = resolveRelativeBasePath("packages/foo/../bar", root)
+	got, err = resolveRelativeBasePath("packages/foo/../bar", root, true)
+	if err != nil {
+		t.Fatalf("resolveRelativeBasePath: %v", err)
+	}
 	if got != "packages/bar" {
 		t.Fatalf("normalized basePath: got %q, want packages/bar", got)
+	}
+}
+
+func TestResolveRelativeBasePath_EscapesGlobMeta(t *testing.T) {
+	root := filepath.FromSlash("/repo")
+	if runtime.GOOS == "windows" {
+		root = `C:\repo`
+	}
+
+	got, err := resolveRelativeBasePath("packages/[locale]", root, true)
+	if err != nil {
+		t.Fatalf("resolveRelativeBasePath: %v", err)
+	}
+	// [locale] must be treated as a literal directory, not a character class.
+	// The leading '[' is escaped as a class ([[]); the trailing ']' is already
+	// literal outside a class and needs no escaping.
+	if got != "packages/[[]locale]" {
+		t.Fatalf("escaped basePath: got %q, want packages/[[]locale]", got)
+	}
+
+	got, err = resolveRelativeBasePath("packages/foo", root, true)
+	if err != nil {
+		t.Fatalf("resolveRelativeBasePath: %v", err)
+	}
+	if got != "packages/foo" {
+		t.Fatalf("plain basePath must be unchanged, got %q", got)
+	}
+}
+
+func TestResolveRelativeBasePath_RejectsOutsideRoot(t *testing.T) {
+	root := filepath.FromSlash("/repo")
+	if runtime.GOOS == "windows" {
+		root = `C:\repo`
+	}
+
+	for _, base := range []string{"../shared", "../../outside"} {
+		if _, err := resolveRelativeBasePath(base, root, true); err == nil {
+			t.Fatalf("expected %q to be rejected as outside the match root", base)
+		}
+	}
+}
+
+func TestResolveRelativeBasePath_CaseInsensitiveRebase(t *testing.T) {
+	root := filepath.FromSlash("/repo")
+	caseDiffers := "/Repo/packages/foo"
+	if runtime.GOOS == "windows" {
+		root = `C:\repo`
+		caseDiffers = `C:\Repo\packages\foo`
+	}
+	// An absolute basePath whose casing differs from the match root must still
+	// resolve on a case-insensitive filesystem (useCaseSensitive=false models a
+	// case-insensitive vfs), instead of manufacturing ../ patterns.
+	got, err := resolveRelativeBasePath(caseDiffers, root, false)
+	if err != nil {
+		t.Fatalf("case-insensitive resolveRelativeBasePath: %v", err)
+	}
+	if got == "" || strings.HasPrefix(got, "..") {
+		t.Fatalf("expected a match-root-relative path, got %q", got)
 	}
 }
 
@@ -70,7 +138,10 @@ func TestResolveBasePaths_FilesIgnoresProject(t *testing.T) {
 		},
 	}
 
-	got := ResolveBasePaths(config, "/repo")
+	got, err := ResolveBasePaths(config, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
 	entry := got[0]
 	if entry.BasePath != "" {
 		t.Fatalf("BasePath should be cleared, got %q", entry.BasePath)
@@ -96,7 +167,10 @@ func TestResolveBasePaths_GlobalIgnoreWithBasePath(t *testing.T) {
 			Ignores:   []string{"fixtures/**"},
 		},
 	}
-	got := ResolveBasePaths(config, "/repo")
+	got, err := ResolveBasePaths(config, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
 	entry := got[0]
 	if entry.BasePath != "" {
 		t.Fatalf("BasePath should be cleared")
@@ -116,7 +190,10 @@ func TestResolveBasePaths_BareBasePathInjectsCatchAll(t *testing.T) {
 			Rules:    Rules{"no-console": "error"},
 		},
 	}
-	got := ResolveBasePaths(config, "/repo")
+	got, err := ResolveBasePaths(config, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
 	entry := got[0]
 	if !reflect.DeepEqual(entry.Files, []string{"packages/foo/**"}) {
 		t.Fatalf("Files = %#v, want [packages/foo/**]", entry.Files)
@@ -134,7 +211,10 @@ func TestResolveBasePaths_NoBasePathUnchanged(t *testing.T) {
 			Rules:  Rules{"no-console": "error"},
 		},
 	}
-	got := ResolveBasePaths(config, "/repo")
+	got, err := ResolveBasePaths(config, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
 	if !reflect.DeepEqual(got[0].Files, []string{"src/**/*.ts"}) {
 		t.Fatalf("Files mutated: %#v", got[0].Files)
 	}
@@ -155,13 +235,16 @@ func TestIsGlobalIgnoreEntry_WithBasePathMeta(t *testing.T) {
 }
 
 func TestGetConfigForFile_WithDesugaredBasePath(t *testing.T) {
-	config := ResolveBasePaths(RslintConfig{
+	config, err := ResolveBasePaths(RslintConfig{
 		{
 			BasePath: "packages/foo",
 			Files:    []string{"src/**/*.ts"},
 			Rules:    Rules{"no-console": "error"},
 		},
-	}, "/repo")
+	}, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
 
 	// Match using relative paths (cwd empty → raw path matching), same style as
 	// the rest of the config unit tests.
@@ -221,5 +304,43 @@ func TestUnmarshalJSON_BasePathIsMetaForGlobalIgnore(t *testing.T) {
 	}
 	if !isGlobalIgnoreEntry(config[0]) {
 		t.Fatal("expected global ignore before desugar")
+	}
+}
+
+func TestResolveBasePaths_RejectsOutsideRoot(t *testing.T) {
+	config := RslintConfig{
+		{
+			BasePath: "../shared",
+			Files:    []string{"src/**"},
+			Rules:    Rules{"no-console": "error"},
+		},
+	}
+	_, err := ResolveBasePaths(config, "/repo", nil)
+	if err == nil {
+		t.Fatal("expected outside-root basePath to be rejected")
+	}
+	if !strings.Contains(err.Error(), "config entry at index 0") {
+		t.Fatalf("expected entry index in error, got %q", err)
+	}
+	if !strings.Contains(err.Error(), "outside the config match root") {
+		t.Fatalf("expected outside-root message in error, got %q", err)
+	}
+}
+
+func TestResolveBasePaths_GlobEscapesBasePathPrefix(t *testing.T) {
+	config := RslintConfig{
+		{
+			BasePath: "packages/[locale]",
+			Files:    []string{"src/**/*.ts"},
+			Rules:    Rules{"no-console": "error"},
+		},
+	}
+	got, err := ResolveBasePaths(config, "/repo", nil)
+	if err != nil {
+		t.Fatalf("ResolveBasePaths: %v", err)
+	}
+	want := []string{"packages/[[]locale]/src/**/*.ts"}
+	if !reflect.DeepEqual(got[0].Files, want) {
+		t.Fatalf("Files = %#v, want %#v", got[0].Files, want)
 	}
 }

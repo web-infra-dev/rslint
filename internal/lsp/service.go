@@ -254,7 +254,10 @@ func (s *Server) reloadConfig() error {
 	}
 	// LSP JSON config matching and project resolution are rooted at the
 	// workspace cwd (same as resolveTsConfigPaths below).
-	rslintConfig = config.ResolveBasePaths(rslintConfig, s.cwd)
+	rslintConfig, err = config.ResolveBasePaths(rslintConfig, s.cwd, s.fs)
+	if err != nil {
+		return fmt.Errorf("could not resolve base paths in rslint config: %w", err)
+	}
 	paths, err := s.resolveTsConfigPaths(rslintConfig, s.cwd)
 	if err != nil {
 		return fmt.Errorf("could not resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)

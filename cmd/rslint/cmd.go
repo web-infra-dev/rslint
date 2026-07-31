@@ -744,7 +744,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 		// Desugar basePath against the final match root (cwd for --config,
 		// config-file directory for auto-discovered JSON).
-		rslintConfig = rslintconfig.ResolveBasePaths(rslintConfig, currentDirectory)
+		rslintConfig, err = rslintconfig.ResolveBasePaths(rslintConfig, currentDirectory, fs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
 
 		var exactTargetFiles []string
 		if len(allowFiles) > 0 && len(allowDirs) == 0 {
