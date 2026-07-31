@@ -1,0 +1,1612 @@
+// Rstest Snapshot v1
+
+exports[`preserve-caught-error > invalid 1`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            throw new Error("Something failed");
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 2`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            const unrelated = new Error("other");
+            throw new Error("Something failed", { cause: unrelated });
+        }",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 5,
+        },
+        "start": {
+          "column": 58,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 3`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            const unrelated = new Error("other");
+            throw new Error("Something failed", { "cause": unrelated });
+        }",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 5,
+        },
+        "start": {
+          "column": 60,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 4`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            const e = err;
+            throw new Error("Failed", { cause: e });
+        }",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 5,
+        },
+        "start": {
+          "column": 48,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 5`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            throw new Error("Failed", { cause: error.message });
+        }",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 48,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 6`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            if (shouldThrow) {
+                while (true) {
+                    if (Math.random() > 0.5) {
+                        throw new Error("Failed without cause");
+                    }
+                }
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 7,
+        },
+        "start": {
+          "column": 25,
+          "line": 7,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 7`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            switch (error.code) {
+                case "A":
+                    throw new Error("Type A");
+                case "B":
+                    throw new Error("Type B", { cause: error });
+                default:
+                    throw new Error("Other", { cause: error });
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 6,
+        },
+        "start": {
+          "column": 21,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 8`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            throw new Error(\`The certificate key "\${chalk.yellow(keyFile)}" is invalid.
+\${err.message}\`);
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 9`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            const errorMessage = "Operation failed";
+            throw new Error(errorMessage);
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 10`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (error) {
+            const errorMessage = "Operation failed";
+            throw new Error(errorMessage, { existingOption: true, complexOption: { moreOptions: {} } });
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 105,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 11`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            if (err.code === "A") {
+                throw new Error("Type A");
+            }
+            throw new TypeError("Fallback error");
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 12`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            throw Error("Something failed");
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 13`] = `
+{
+  "code": "try {
+        } catch (err) {
+            my_label:
+            throw new Error("Failed without cause");
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 14`] = `
+{
+  "code": "try {
+        } catch (err) {
+            {
+                throw new Error("Something went wrong");
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 15`] = `
+{
+  "code": "try {
+        } catch (err) {
+            {
+                throw new Error();
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 16`] = `
+{
+  "code": "try {
+        } catch (err) {
+            {
+                throw new AggregateError([], "Lorem ipsum");
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 17`] = `
+{
+  "code": "try {
+        } catch (err) {
+            {
+                throw new AggregateError();
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 18`] = `
+{
+  "code": "try {
+        } catch (err) {
+            {
+                throw new AggregateError([]);
+            }
+        }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 19`] = `
+{
+  "code": "try {
+			doSomething();
+		} catch {
+			throw new Error("Something went wrong");
+		}",
+  "diagnostics": [
+    {
+      "message": "The caught error is not accessible because the catch clause lacks the error parameter. Start referencing the caught error using the catch parameter.",
+      "messageId": "missingCatchErrorParam",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 4,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 20`] = `
+{
+  "code": "try {
+            doSomething();
+        } catch (err) {
+            throw new Error("Something failed", { cause });
+        }",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 4,
+        },
+        "start": {
+          "column": 51,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 21`] = `
+{
+  "code": "try {
+				doSomething();
+			} catch ({ message }) {
+				throw new Error(message);
+			}",
+  "diagnostics": [
+    {
+      "message": "Re-throws cannot preserve the caught error as a part of it is being lost due to destructuring.",
+      "messageId": "partiallyLostError",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 22`] = `
+{
+  "code": "try {
+				doSomethingElse();
+			} catch ({ ...error }) {
+				throw new Error(error.message);
+			}",
+  "diagnostics": [
+    {
+      "message": "Re-throws cannot preserve the caught error as a part of it is being lost due to destructuring.",
+      "messageId": "partiallyLostError",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 23`] = `
+{
+  "code": "try {
+				doSomething();
+			} catch (error) {
+				if (whatever) {
+					const error = anotherError;
+					throw new Error("Something went wrong", { cause: error });
+				}
+			}",
+  "diagnostics": [
+    {
+      "message": "The caught error is being attached as \`cause\`, but is shadowed by a closer scoped redeclaration.",
+      "messageId": "caughtErrorShadowed",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 6,
+        },
+        "start": {
+          "column": 6,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 24`] = `
+{
+  "code": "try {
+				doSomething();
+			} catch (error) {
+				throw new Error(
+					"Something went wrong" // some comments
+				);
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 25`] = `
+{
+  "code": "try {
+				doSomething();
+			} catch (err) {
+				throw new Error("Something failed", {});
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 26`] = `
+{
+  "code": "try {
+			doSomething();
+		} catch (error) {
+			const cause = "desc";
+			throw new Error("Something failed", { [cause]: "Some error" });
+		}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 5,
+        },
+        "start": {
+          "column": 4,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 27`] = `
+{
+  "code": "try {
+			doSomething();
+			} catch (error) {
+			throw new Error("Something failed", { cause() { /* do something */ }  });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 4,
+        },
+        "start": {
+          "column": 47,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 28`] = `
+{
+  "code": "try {} catch (error) {
+				throw new Error("Something failed", { cause: error, cause: anotherError });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 2,
+        },
+        "start": {
+          "column": 64,
+          "line": 2,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 29`] = `
+{
+  "code": "try {} catch (error) {
+				throw new Error("Something failed", { cause: error, "cause": anotherError });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 2,
+        },
+        "start": {
+          "column": 66,
+          "line": 2,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 30`] = `
+{
+  "code": "try {} catch (error) {
+				throw new Error("Something failed", { get cause() { } });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 2,
+        },
+        "start": {
+          "column": 52,
+          "line": 2,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 31`] = `
+{
+  "code": "try {} catch (error) {
+				throw new Error("Something failed", { set cause(value) { } });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 2,
+        },
+        "start": {
+          "column": 52,
+          "line": 2,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 32`] = `
+{
+  "code": "try {} catch (error) {
+				throw new Error("Something failed", {
+					get cause() { return error; },
+					set cause(value) { error = value; },
+				});
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 33`] = `
+{
+  "code": "try { doSomething(); } catch (err) { throw new Error(("Something failed")); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 34`] = `
+{
+  "code": "try { doSomething(); } catch (err) { throw new Error(("Something failed"),); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 35`] = `
+{
+  "code": "try { doSomething(); } catch (err) { throw new AggregateError((errors)); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 36`] = `
+{
+  "code": "try { doSomething(); } catch (err) { throw new AggregateError(errors, ("message")); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 84,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 37`] = `
+{
+  "code": "try { doSomething(); } catch (err) { throw new CustomError((foo)); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 38`] = `
+{
+  "code": "
+			class CustomApplicationError extends Error {}
+			try {
+				doSomething();
+			} catch (err) {
+				throw new CustomApplicationError("Cause not provided");
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 39`] = `
+{
+  "code": "
+			class APIError extends Error {}
+			try {
+				doSomething();
+			} catch (error) {
+				throw new APIError("API failed", { cause: wrong });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 6,
+        },
+        "start": {
+          "column": 47,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 40`] = `
+{
+  "code": "
+			const errors = { AppError: class AppError extends Error {} };
+			try {
+				doSomething();
+			} catch (error) {
+				throw new errors.AppError("Something failed");
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 41`] = `
+{
+  "code": "
+			const lib = { APIError: class APIError extends Error {} };
+			try {
+				doSomething();
+			} catch (error) {
+				throw new lib.APIError("Something failed", { cause: wrong });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 6,
+        },
+        "start": {
+          "column": 57,
+          "line": 6,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 42`] = `
+{
+  "code": "
+			try {
+				doSomething();
+			} catch (err) {
+				throw new MyError("failed", someData);
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 43`] = `
+{
+  "code": "
+			try {
+				doSomething();
+			} catch (err) {
+				throw new MyError("failed", someData, { cause: wrong });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 5,
+        },
+        "start": {
+          "column": 52,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 44`] = `
+{
+  "code": "
+			try {
+				doSomething();
+			} catch (err) {
+				throw new SimpleError();
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 45`] = `
+{
+  "code": "
+			try {
+				doSomething();
+			} catch (err) {
+				throw new MyError();
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 46`] = `
+{
+  "code": "
+			try {
+			    doSomething();
+			} catch (err) {
+			    throw new context.Error("failed", someData);
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 47`] = `
+{
+  "code": "
+			try {
+			    doSomething();
+			} catch (err) {
+			    throw new Error("failed");
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 48`] = `
+{
+  "code": "import { AggregateError } from "some-module";
+			try {
+				doSomething();
+			} catch (err) {
+				throw new AggregateError();
+			}",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 49`] = `
+{
+  "code": "import { AggregateError } from "some-module";
+			try {
+				doSomething();
+			} catch (err) {
+				throw new AggregateError({ cause: wrong });
+			}",
+  "diagnostics": [
+    {
+      "message": "The symptom error is being thrown with an incorrect \`cause\`.",
+      "messageId": "incorrectCause",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 5,
+        },
+        "start": {
+          "column": 39,
+          "line": 5,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 50`] = `
+{
+  "code": "try {} catch (err) { throw new Error; }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 51`] = `
+{
+  "code": "try {} catch (err) { throw new AggregateError; }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 52`] = `
+{
+  "code": "try {} catch (err) { throw new CustomError; }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`preserve-caught-error > invalid 53`] = `
+{
+  "code": "try {} catch (err) { throw new (Error); }",
+  "diagnostics": [
+    {
+      "message": "There is no \`cause\` attached to the symptom error being thrown.",
+      "messageId": "missingCause",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "preserve-caught-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

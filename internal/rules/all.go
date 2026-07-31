@@ -142,6 +142,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
+	"github.com/web-infra-dev/rslint/internal/rules/preserve_caught_error"
 	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
@@ -257,6 +258,7 @@ func GetAllRules() []rule.Rule {
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_object_spread.PreferObjectSpreadRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+		preserve_caught_error.PreserveCaughtErrorRule,
 		prefer_regex_literals.PreferRegexLiteralsRule,
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,

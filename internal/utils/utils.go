@@ -610,6 +610,26 @@ func ToStringSlice(val interface{}) []string {
 	return result
 }
 
+// ToInt converts a weakly-typed JSON number to an int. Rule options reach a
+// rule as float64 when decoded from a JSON/JS config and as int when written
+// as a Go literal in a test, so both shapes have to be accepted. Returns false
+// when the value is not a number.
+func ToInt(val interface{}) (int, bool) {
+	switch n := val.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float32:
+		return int(n), true
+	case float64:
+		return int(n), true
+	}
+	return 0, false
+}
+
 // NeedsLeadingSpaceForReplacement reports whether inserting `replacement`
 // at `insertPos` in `src` would merge with the preceding character into a
 // single identifier token. Callers use this when synthesizing a fix whose

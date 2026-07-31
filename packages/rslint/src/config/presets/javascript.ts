@@ -47,7 +47,7 @@ const recommended: RslintConfigEntry = {
     'no-useless-catch': 'error',
     'no-useless-escape': 'error',
     'no-with': 'error',
-    // 'preserve-caught-error': 'error', // not implemented
+    'preserve-caught-error': 'error',
     'require-yield': 'error',
     'use-isnan': 'error',
     'valid-typeof': 'error',
