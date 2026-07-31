@@ -83,13 +83,13 @@ func parseOptions(opts any) maxLinesPerFunctionOptions {
 		}
 		opts = arr[0]
 	}
-	if n, ok := utils.ToInt(opts); ok {
+	if n, ok := utils.CoerceInt(opts); ok {
 		result.max = n
 		return result
 	}
 	if m, ok := opts.(map[string]interface{}); ok {
 		if v, ok := m["max"]; ok {
-			if n, ok := utils.ToInt(v); ok {
+			if n, ok := utils.CoerceInt(v); ok {
 				result.max = n
 			}
 		}

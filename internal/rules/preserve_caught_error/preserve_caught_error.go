@@ -53,7 +53,7 @@ func parseOptions(options []any) Options {
 			if !ok {
 				continue
 			}
-			position, ok := utils.ToInt(entry["argumentPosition"])
+			position, ok := utils.CoerceIntegral(entry["argumentPosition"])
 			if !ok {
 				continue
 			}
@@ -329,7 +329,7 @@ func insertAt(pos int, text string) rule.RuleFix {
 // insertion lands outside any parentheses wrapping that argument.
 func appendArguments(info thrownError, text string) []rule.RuleFix {
 	args := info.args()
-	return []rule.RuleFix{insertAt(args[len(args)-1].End(), text)}
+	return []rule.RuleFix{rule.RuleFixInsertAfter(args[len(args)-1], text)}
 }
 
 // addArgumentsToEmptyCall inserts text as the whole argument list, whether the
@@ -338,7 +338,7 @@ func addArgumentsToEmptyCall(info thrownError, text string) []rule.RuleFix {
 	if info.arguments != nil {
 		return []rule.RuleFix{insertAt(info.arguments.Pos(), text)}
 	}
-	return []rule.RuleFix{insertAt(info.expression.End(), "("+text+")")}
+	return []rule.RuleFix{rule.RuleFixInsertAfter(info.expression, "("+text+")")}
 }
 
 // insertCauseIntoOptions adds `cause` to an existing inline options object.
@@ -355,7 +355,7 @@ func insertCauseIntoOptions(optionsArg *ast.Node, caughtName string) []rule.Rule
 		return []rule.RuleFix{insertAt(properties.Pos(), "cause: "+caughtName)}
 	}
 	lastProperty := properties.Nodes[len(properties.Nodes)-1]
-	return []rule.RuleFix{insertAt(lastProperty.End(), ", cause: "+caughtName)}
+	return []rule.RuleFix{rule.RuleFixInsertAfter(lastProperty, ", cause: "+caughtName)}
 }
 
 // buildMissingCauseFixes attaches the caught error as the `cause` of an error
