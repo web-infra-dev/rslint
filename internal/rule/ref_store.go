@@ -14,11 +14,13 @@ import (
 //
 // References are resolved with the binder's NameResolver — the same scope walk
 // the checker performs for identifiers. Resolve tries this scope walk first;
-// when it can't place an identifier (a symbol declared outside this file —
-// cross-file, .d.ts, and standard-library globals) and a TypeChecker was
-// supplied to NewRefStore, it falls back to the checker for that identifier.
-// Without a checker, that fallback is a no-op and Resolve returns nil for
-// those identifiers, the same as if they didn't resolve at all.
+// when it can't place an identifier and a TypeChecker was supplied to
+// NewRefStore, it falls back to the checker. This is usually needed for
+// cross-file, .d.ts, and standard-library globals; export specifiers also need
+// it when a declaration-space-specific lookup continues past a same-named
+// local binding. Without a checker, that fallback is a no-op and Resolve
+// returns nil for those identifiers, the same as if they didn't resolve at
+// all.
 //
 // References resolves symbols the same way internally, so it can return
 // identifiers referencing a symbol obtained from the checker fallback too; for
@@ -108,8 +110,8 @@ func (s *RefStore) References(sym *ast.Symbol) []*ast.Node {
 
 // resolvePending resolves every not-yet-resolved candidate identifier spelled
 // name and files each one under the symbol it references. Candidates the
-// binder scope walk can't place (declared outside this file) fall back to
-// the TypeChecker when one is available.
+// binder scope walk can't place fall back to the TypeChecker when one is
+// available.
 func (s *RefStore) resolvePending(name string) {
 	pending, ok := s.candidates[name]
 	if !ok {
@@ -117,11 +119,10 @@ func (s *RefStore) resolvePending(name string) {
 	}
 	delete(s.candidates, name)
 	for _, id := range pending {
-		target := s.resolver.Resolve(id, name, referenceMeaning(id), nil, true /*isUse*/, false /*excludeGlobals*/)
+		meaning := referenceMeaning(id)
+		target := s.resolver.Resolve(id, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
 		if target == nil {
-			if s.tc != nil {
-				target = utils.GetReferenceSymbol(id, s.tc)
-			}
+			target = s.checkerReferenceSymbol(id, meaning)
 		} else {
 			target = s.mergedSymbol(target, id)
 		}
@@ -182,10 +183,9 @@ func sharesDeclaration(a, b *ast.Symbol) bool {
 // to — the forward counterpart to References, for rules that need "what
 // declaration does this identifier refer to" rather than "what identifiers
 // refer to this declaration." It uses the binder's scope walk first; when
-// that can't place the identifier — a symbol declared outside this file
-// (cross-file, .d.ts, and standard-library globals) — and a TypeChecker was
-// supplied to NewRefStore, it falls back to the checker. That fallback is a
-// real TypeChecker round-trip, unlike the binder-only common path.
+// that can't place the identifier and a TypeChecker was supplied to
+// NewRefStore, it falls back to the checker. That fallback is a real
+// TypeChecker round-trip, unlike the binder-only common path.
 //
 // Returns nil for identifiers that aren't reference positions (declaration
 // names, property keys, import bindings, re-export/alias-label names, labels,
@@ -195,11 +195,30 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return nil
 	}
-	if sym := s.resolver.Resolve(node, node.Text(), referenceMeaning(node), nil, true /*isUse*/, false /*excludeGlobals*/); sym != nil {
+	meaning := referenceMeaning(node)
+	if sym := s.resolver.Resolve(node, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/); sym != nil {
 		return sym
 	}
+	return s.checkerReferenceSymbol(node, meaning)
+}
+
+// checkerReferenceSymbol resolves a reference the binder-only scope walk
+// could not place. Most identifiers can use GetReferenceSymbol, whose
+// GetSymbolAtLocation fallback understands their syntactic context.
+//
+// Export specifiers are different: GetSymbolAtLocation returns the export
+// alias symbol rather than the local binding, and
+// GetExportSpecifierLocalTargetSymbol searches all declaration spaces at
+// once. The latter is also insufficient for a type-only export: a local
+// value-only binding could win that broad lookup even when an outer/global
+// type binding is the actual target. ResolveName applies meaning during the
+// scope walk, preserving both declaration-space selection and shadowing.
+func (s *RefStore) checkerReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
 	if s.tc == nil {
 		return nil
+	}
+	if node.Parent != nil && node.Parent.Kind == ast.KindExportSpecifier {
+		return s.tc.ResolveName(node.Text(), node, meaning, false /*excludeGlobals*/)
 	}
 	return utils.GetReferenceSymbol(node, s.tc)
 }
@@ -325,13 +344,16 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	if p != nil && p.Kind == ast.KindExportSpecifier {
-		// `export { X }` can re-export a value, a type, or a namespace —
-		// same declaration-space breadth as `export =` above. Type-only
-		// specifiers (`export type { X }` / `export { type X }`) resolve the
-		// same way, mirroring the type-flagged reference ESLint's
-		// scope-manager records for them; rules that only follow runtime
-		// reads classify the reference site instead (see
-		// utils.IsReadReference / utils.IsNonReferenceIdentifier).
+		// A type-only export creates a type reference. It may bind to a type,
+		// namespace, or import alias, but never to a value-only declaration.
+		// Namespace is separate from Type in the TypeScript binder even though
+		// typescript-eslint scope-manager treats namespace definitions as
+		// type-capable variables.
+		if ast.IsTypeOnlyImportOrExportDeclaration(p) {
+			return ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+		}
+		// A regular local export creates a dual value/type reference, so it
+		// can bind in any declaration space.
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	// `import a = b.c` — the right-hand side may name a value, type, or

@@ -596,6 +596,17 @@ func checkNamedExport(ctx rule.RuleContext, opts options, node *ast.Node) {
 	// module's. getDefinitionInfo below then finds that local declaration
 	// without any alias-chain walking through the checker.
 	sym := ctx.Refs.Resolve(node)
+	if sym == nil &&
+		ctx.TypeChecker != nil &&
+		ast.IsTypeOnlyImportOrExportDeclaration(node.Parent) &&
+		!utils.IsReExportSpecifier(node.Parent) {
+		// RefStore deliberately leaves a type-only reference unresolved when
+		// only a value binding exists. no-use-before-define is the exception:
+		// its named-export branch still compares that local value declaration
+		// with the export site. Keep this rule-specific lookup here instead of
+		// polluting RefStore's declaration-space semantics.
+		sym = ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(node.Parent)
+	}
 	if sym == nil {
 		return
 	}

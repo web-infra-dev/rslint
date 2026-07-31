@@ -87,6 +87,36 @@ func TestNoVarRule(t *testing.T) {
 					{MessageId: "unexpectedVar"},
 				},
 			},
+			// Type-only exports do not reference a value-only var, so they do
+			// not create a false "used before declaration" blocker for the fix.
+			{
+				Code:   `export type { x }; var x = 1;`,
+				Output: []string{`export type { x }; let x = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			{
+				Code:   `export { type x }; var x = 1;`,
+				Output: []string{`export { type x }; let x = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			{
+				Code:   `export type { x as y }; var x = 1;`,
+				Output: []string{`export type { x as y }; let x = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			{
+				Code:   `export type { HTMLElement }; var HTMLElement = 1;`,
+				Output: []string{`export type { HTMLElement }; let HTMLElement = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
 			// Import attribute keys are syntax names, not variable references.
 			{
 				Code:   `import data from "pkg" with { type: "json" }; var type = 1;`,
