@@ -231,8 +231,8 @@ for (var i = 0; i < 10; i++) {
 			{Code: `enum Color { Red } for (var i = 0; i < l; i++) { (function() { Color.Red; }) }`},
 
 			// ---- Ambient/lib global (declared in lib.dom.d.ts, not this file —
-			// ctx.Refs' per-file binder walk can't resolve it, only the
-			// TypeChecker fallback can) is read-only — safe through ref ----
+			// only ctx.Refs' TypeChecker fallback can resolve it, not the
+			// binder scope walk) is read-only — safe through ref ----
 			{Code: `for (var i = 0; i < l; i++) { (function() { window.location; }); }`},
 
 			// ---- Through refs collected from nested functions inside a non-loop
@@ -1005,10 +1005,11 @@ for (var i = 0; i < 3; i++) {
 			// escaping closure. `window` is declared in lib.dom.d.ts, not this
 			// file, so resolving it — both the through-reference in
 			// CollectThroughReferences and the write-reference scan in
-			// isSafeCore — requires the TypeChecker fallback; ctx.Refs' per-file
-			// binder walk returns nil for it. Proves the fallback actually
-			// detects a real violation, not just that it avoids false positives
-			// on read-only globals (covered by the "window.location" valid case). ----
+			// isSafeCore — requires ctx.Refs' internal TypeChecker fallback;
+			// the binder scope walk alone can't place it. Proves the fallback
+			// actually detects a real violation, not just that it avoids
+			// false positives on read-only globals (covered by the
+			// "window.location" valid case). ----
 			{
 				Code: `
 const funcs: unknown[] = [];

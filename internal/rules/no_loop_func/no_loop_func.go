@@ -20,11 +20,6 @@ func BuildUnsafeRefsMessage(varNames string) rule.RuleMessage {
 type RunState struct {
 	Ctx          rule.RuleContext
 	SkippedIIFEs map[*ast.Node]bool
-	refIndex     *utils.ReferenceIndex
-	// checkerRefs memoizes the checker-based fallback reference list per
-	// symbol, since isSafeCore may query the same outer symbol once for every
-	// function-in-loop that closes over it.
-	checkerRefs map[*ast.Symbol][]*ast.Node
 }
 
 // NewRunState constructs a RunState ready for one source-file pass.
@@ -170,29 +165,6 @@ func (r ReferenceEntry) Node() *ast.Node { return r.node }
 // Symbol returns the resolved symbol for the reference, or nil if unresolved.
 func (r ReferenceEntry) Symbol() *ast.Symbol { return r.symbol }
 
-// resolveReference resolves an identifier to its referenced symbol, trying
-// ctx.Refs first: it answers from a per-node binder scope-walk with no
-// TypeChecker round-trip, and correctly resolves same-file locals — the
-// overwhelming majority of through-references a loop-closure can actually
-// capture (loop counters, outer function locals, imported bindings, which are
-// all declared, and therefore locally bound, in this file). It returns nil
-// for identifiers naming a symbol declared outside this file — ambient/lib
-// globals (`console`, `Array`, ...) and checker-merged declarations (a
-// namespace merged with a value, for instance) — which only the TypeChecker
-// can see, so it's used as a fallback there when available. Falling all the
-// way through to nil (no TypeChecker either) simply excludes the reference
-// from the through-reference set — the same outcome as if it had resolved
-// but turned out to be declared outside `funcNode` and never written to.
-func (s *RunState) resolveReference(n *ast.Node) *ast.Symbol {
-	if sym := s.Ctx.Refs.Resolve(n); sym != nil {
-		return sym
-	}
-	if s.Ctx.TypeChecker != nil {
-		return utils.GetReferenceSymbol(n, s.Ctx.TypeChecker)
-	}
-	return nil
-}
-
 // collectThroughReferences walks the function-like node's parameters and body
 // and returns all identifier references whose resolved symbol has at least one
 // declaration outside the function subtree. The function's own name node is
@@ -222,7 +194,18 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 		}
 
 		if n.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(n) {
-			sym := s.resolveReference(n)
+			// ctx.Refs resolves same-file locals from the binder scope walk —
+			// the overwhelming majority of through-references a loop-closure
+			// can capture (loop counters, outer function locals, imported
+			// bindings) — and falls back to the checker internally for
+			// symbols only it can see (ambient/lib globals like `console`,
+			// cross-file and checker-merged declarations). nil — a position
+			// ctx.Refs doesn't treat as a variable reference (a lowercase
+			// JSX intrinsic tag name), an unresolvable name, or no checker
+			// available — excludes the identifier from the through-reference
+			// set, the same outcome as one that resolved but was declared
+			// outside `funcNode` and never written to.
+			sym := s.Ctx.Refs.Resolve(n)
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
@@ -355,13 +338,6 @@ func GetDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 	return utils.GetDeclListForSymbolDecl(decl)
 }
 
-func (s *RunState) buildRefIndex() {
-	if s.refIndex != nil {
-		return
-	}
-	s.refIndex = utils.NewReferenceIndex(s.Ctx.SourceFile, s.Ctx.TypeChecker)
-}
-
 // forEachReference invokes `cb` for every identifier node resolving to `sym`,
 // in source order. Returns early when `cb` returns true.
 func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
@@ -373,55 +349,35 @@ func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
 }
 
 // references returns every identifier resolving to `sym`, in source order,
-// preferring `ctx.Refs` — a per-file reference index built once and shared by
-// every query — over the checker's GetReferencesToSymbolInFile, which
-// recomputes references for the whole file from scratch on every call.
-// isSafeCore queries this once per (loop-function, through-reference) pair,
-// so a symbol closed over by many functions in a file pays the checker's
-// whole-file cost once per closure under the old path.
+// from ctx.Refs.References — a per-file index built once and shared by every
+// query. The index answers for checker-fallback symbols too, and files
+// references to a merged symbol under one identity regardless of which raw
+// declaration symbol the caller resolved, so no separate checker scan is
+// needed. isSafeCore queries this once per (loop-function, through-reference)
+// pair.
+//
+// ctx.Refs excludes declaration-name identifiers (they declare the symbol
+// rather than reference it), but ESLint's scope manager — and IsWriteRef,
+// which mirrors it — treats several of them as write references: var/let/
+// const bindings with initializers, for-in/of loop bindings, and catch
+// parameters. This file's declaration names are merged back into the result
+// in source order so isSafeCore keeps seeing them.
 func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
-	if refs, ok := s.binderReferences(sym); ok {
-		return refs
+	if sym == nil {
+		return nil
 	}
-	return s.checkerReferences(sym)
-}
-
-// binderReferences returns sym's references via ctx.Refs, reporting false
-// when the binder-based index can't be trusted to answer for this symbol.
-//
-// ctx.Refs keys on raw binder symbols. resolveReference hands out exactly
-// that kind of symbol on its common path (ctx.Refs.Resolve), but falls back
-// to the checker for symbols the binder can't see from this file (ambient
-// globals, cross-file/merged declarations) — those checker symbols can
-// compare unequal to what the binder's own scope walk would return for the
-// same declaration (for example a namespace merged with a value). A
-// declaration keeps its own unmerged symbol, so requiring decl.Symbol() ==
-// sym on every declaration (and that it lives in this file, since ctx.Refs is
-// per-file) is an exact identity test; failing it falls back to the checker
-// instead of risking a wrong answer.
-//
-// ctx.Refs also excludes declaration-name identifiers (they declare the
-// symbol rather than reference it), but ESLint's scope manager — and
-// IsWriteRef, which mirrors it — treats several of them as write references:
-// var/let/const bindings with initializers, for-in/of loop bindings, and
-// catch parameters. Those names are merged back into the result in source
-// order so isSafeCore keeps seeing them.
-func (s *RunState) binderReferences(sym *ast.Symbol) ([]*ast.Node, bool) {
-	if sym == nil || len(sym.Declarations) == 0 {
-		return nil, false
-	}
-	declNames := make([]*ast.Node, 0, len(sym.Declarations))
+	refs := s.Ctx.Refs.References(sym)
+	var declNames []*ast.Node
 	for _, decl := range sym.Declarations {
-		if decl.Symbol() != sym || ast.GetSourceFileOfNode(decl) != s.Ctx.SourceFile {
-			return nil, false
+		if ast.GetSourceFileOfNode(decl) != s.Ctx.SourceFile {
+			continue
 		}
 		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier {
 			declNames = append(declNames, name)
 		}
 	}
-	refs := s.Ctx.Refs.References(sym)
 	if len(declNames) == 0 {
-		return refs, true
+		return refs
 	}
 	sort.Slice(declNames, func(i, j int) bool { return declNames[i].Pos() < declNames[j].Pos() })
 	merged := make([]*ast.Node, 0, len(refs)+len(declNames))
@@ -433,27 +389,7 @@ func (s *RunState) binderReferences(sym *ast.Symbol) ([]*ast.Node, bool) {
 		}
 		merged = append(merged, name)
 	}
-	return append(merged, refs[next:]...), true
-}
-
-// checkerReferences returns sym's references via the TypeChecker, memoized
-// per symbol since the same fallback symbol may be queried by more than one
-// loop-function closure in the file.
-func (s *RunState) checkerReferences(sym *ast.Symbol) []*ast.Node {
-	if refs, ok := s.checkerRefs[sym]; ok {
-		return refs
-	}
-	s.buildRefIndex()
-	var refs []*ast.Node
-	s.refIndex.ForEachReference(sym, func(refNode *ast.Node) bool {
-		refs = append(refs, refNode)
-		return false
-	})
-	if s.checkerRefs == nil {
-		s.checkerRefs = map[*ast.Symbol][]*ast.Node{}
-	}
-	s.checkerRefs[sym] = refs
-	return refs
+	return append(merged, refs[next:]...)
 }
 
 // checkForLoops processes a function-like node: if it is inside a loop and
