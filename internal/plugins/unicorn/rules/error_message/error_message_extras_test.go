@@ -75,6 +75,9 @@ func TestErrorMessageExtras(t *testing.T) {
 			jsValid("new Error(msg += '')"),
 			jsValid("new Error(['a', 'b'].join(''))"),
 			jsValid("let Object = {freeze: x => x};\nnew Error(Object.freeze({msg: ''}).msg)"),
+
+			// ---- A folded array in a template coerces via Array.prototype.join ----
+			jsValid("new Error(`${[1, 2]}`)"),
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: Parenthesized receiver ----
@@ -111,6 +114,12 @@ func TestErrorMessageExtras(t *testing.T) {
 			invalid("throw new Error([][0])", "[][0]", messageIDNotString, msgNotString),
 			invalid("throw new Error(['msg'][1])", "['msg'][1]", messageIDNotString, msgNotString),
 			invalid("throw new Error([, 'msg'][0])", "[, 'msg'][0]", messageIDNotString, msgNotString),
+
+			// ---- A folded array in a template coerces via Array.prototype.join ----
+			invalid("throw new Error(`${[]}`)", "`${[]}`", messageIDEmpty, msgEmpty),
+
+			// ---- A non-canonical index string is an ordinary property, not an array index ----
+			invalid("throw new Error(['msg']['00'])", "['msg']['00']", messageIDNotString, msgNotString),
 		},
 	)
 }

@@ -493,8 +493,9 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 
 // staticMemberValue reads key off a folded object or array literal. Reading a
 // key that isn't there yields `undefined`, as it would at runtime. Anything
-// else — a string index, an array `length` — stays unresolved, because folding
-// it would need a numeric value representation this evaluator doesn't carry.
+// else — a non-index string, an array `length` — stays unresolved, because
+// folding it would need a numeric value representation this evaluator doesn't
+// carry.
 func staticMemberValue(object any, key string) staticEvalResult {
 	switch object := object.(type) {
 	case staticObjectValue:
@@ -503,8 +504,8 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case staticArrayValue:
-		index, err := strconv.Atoi(key)
-		if err != nil {
+		index, ok := staticArrayIndex(key)
+		if !ok {
 			return staticEvalResult{}
 		}
 		if index < 0 || index >= len(object.elements) {
@@ -513,6 +514,29 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		return staticEvalResult{value: object.elements[index], ok: true}
 	}
 	return staticEvalResult{}
+}
+
+// staticArrayIndex parses key as a canonical array index string: decimal
+// digits only, with no leading zero unless key is exactly "0". JavaScript
+// treats any other shape (`"00"`, `"1e3"`, `"-1"`) as an ordinary property
+// name, which array literals don't have.
+func staticArrayIndex(key string) (int, bool) {
+	if key == "0" {
+		return 0, true
+	}
+	if key == "" || key[0] < '1' || key[0] > '9' {
+		return 0, false
+	}
+	for i := 1; i < len(key); i++ {
+		if key[i] < '0' || key[i] > '9' {
+			return 0, false
+		}
+	}
+	index, err := strconv.Atoi(key)
+	if err != nil {
+		return 0, false
+	}
+	return index, true
 }
 
 // evalObjectPassThroughCall folds `Object.freeze(x)` and its siblings to the
@@ -727,14 +751,35 @@ func staticValueToString(value any) (string, bool) {
 		return "null", true
 	case staticUndefinedValue:
 		return "undefined", true
-	case staticObjectValue, staticArrayValue:
-		// Converting these to text means running `Array.prototype.join`
-		// semantics over folded elements; callers only need to know that the
+	case staticArrayValue:
+		return staticArrayToString(value)
+	case staticObjectValue:
+		// A plain object's default ToString is "[object Object]", but a
+		// folded object literal can't tell whether a property overrides
+		// toString/Symbol.toPrimitive; callers only need to know that the
 		// value is not a string.
 		return "", false
 	default:
 		return evaluatorString(func() string { return evaluator.AnyToString(value) })
 	}
+}
+
+// staticArrayToString implements `Array.prototype.join(',')`, which is what
+// an array coerces to via the default ToString. Nullish elements fold to "",
+// not "null"/"undefined" (unlike stringifying them directly).
+func staticArrayToString(value staticArrayValue) (string, bool) {
+	parts := make([]string, len(value.elements))
+	for i, element := range value.elements {
+		if staticValueNullish(element) {
+			continue
+		}
+		part, ok := staticValueToString(element)
+		if !ok {
+			return "", false
+		}
+		parts[i] = part
+	}
+	return strings.Join(parts, ","), true
 }
 
 func evaluatorBool(fn func() bool) (value bool, ok bool) {

@@ -24,7 +24,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-template-literal-escape': 'error', // not implemented
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/empty-brace-spaces': 'error', // not implemented
-    // 'unicorn/error-message': 'error', // not implemented
+    'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
     // 'unicorn/expiring-todo-comments': 'error', // not implemented
     // 'unicorn/explicit-length-check': 'error', // not implemented
