@@ -126,7 +126,10 @@ func collectAssignments(ctx *rule.RuleContext, sourceFile *ast.SourceFile, emit 
 }
 
 // forEachTargetIdentifier yields every identifier an assignment target writes
-// to, mirroring ESLint's `extractIdentifiersFromPattern`.
+// to, mirroring ESLint's `extractIdentifiersFromPattern`. A target wrapped in
+// a TS assertion — `x as T`, `x!`, `x satisfies T`, `<T>x` — yields nothing:
+// upstream does not treat those wrappers as patterns, so such a write is
+// invisible to the rule.
 func forEachTargetIdentifier(node *ast.Node, cb func(*ast.Node)) {
 	if node == nil {
 		return
@@ -137,14 +140,6 @@ func forEachTargetIdentifier(node *ast.Node, cb func(*ast.Node)) {
 
 	case ast.KindParenthesizedExpression:
 		forEachTargetIdentifier(node.AsParenthesizedExpression().Expression, cb)
-	case ast.KindNonNullExpression:
-		forEachTargetIdentifier(node.AsNonNullExpression().Expression, cb)
-	case ast.KindAsExpression:
-		forEachTargetIdentifier(node.AsAsExpression().Expression, cb)
-	case ast.KindSatisfiesExpression:
-		forEachTargetIdentifier(node.AsSatisfiesExpression().Expression, cb)
-	case ast.KindTypeAssertionExpression:
-		forEachTargetIdentifier(node.AsTypeAssertion().Expression, cb)
 
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
 		pattern := node.AsBindingPattern()
@@ -317,24 +312,7 @@ func (b *builder) parameter(node *ast.Node) {
 		return
 	}
 	b.expr(parameter.Type)
-	b.patternReads(parameter.Name())
-	if parameter.Initializer != nil {
-		join := b.newBlock()
-		bypass := b.newBlock()
-		b.link(b.cur, bypass)
-		withDefault := b.newBlock()
-		b.link(b.cur, withDefault)
-
-		b.enter(withDefault)
-		b.expr(parameter.Initializer)
-		b.link(b.cur, join)
-
-		b.enter(bypass)
-		b.link(bypass, join)
-
-		b.enter(join)
-	}
-	b.patternWrites(parameter.Name())
+	b.bindWithDefault(parameter.Name(), parameter.Initializer)
 }
 
 // isTrackable reports whether assignments to sym can be proven unused: the
@@ -377,14 +355,21 @@ func isTrackable(
 // variable that merely shares that name is a different binding.
 func isExported(sym *ast.Symbol, exportedNames map[string]bool, root *ast.Node) bool {
 	for _, decl := range sym.Declarations {
+		// `export let x = 1` and `export let { x } = obj` carry the modifier
+		// on the variable statement; climb to it from the declarator or the
+		// binding element.
 		target := decl
-		if decl.Kind == ast.KindVariableDeclaration {
-			// `export let x = 1` carries the modifier on the statement.
-			if list := decl.Parent; list != nil && list.Parent != nil {
-				target = list.Parent
+	climb:
+		for target != nil {
+			switch target.Kind {
+			case ast.KindBindingElement, ast.KindObjectBindingPattern, ast.KindArrayBindingPattern,
+				ast.KindVariableDeclaration, ast.KindVariableDeclarationList:
+				target = target.Parent
+			default:
+				break climb
 			}
 		}
-		if target.Parent != root {
+		if target == nil || target.Parent != root {
 			continue
 		}
 		if ast.HasSyntacticModifier(target, ast.ModifierFlagsExport) {

@@ -69,6 +69,20 @@ function fn() {
 
 ## Differences from ESLint
 
+- The `/* exported foo */` directive comment is not supported. In a script
+  file, ESLint treats a variable named by it as observable from outside and
+  reports no assignments to it; this rule still analyzes the variable.
+- Destructuring follows the run-time evaluation order: the initializer or
+  right-hand side produces its value first, then each element evaluates its
+  computed key and default. So `let { a = x } = (x = 1, obj)` is clean here —
+  the default may read `x = 1` — while ESLint reports it based on source
+  positions; and in `({ [a = 1]: x } = (a = 2, obj)); console.log(a)` this
+  rule reports the genuinely dead `a = 2` where ESLint reports the `a = 1`
+  the log actually observes.
+- Every label wrapped around a loop resolves its `break`/`continue`:
+  `outer: inner: while (cond) { … continue outer; }` keeps its back edge, so
+  values the next iteration reads are counted as used. ESLint attaches only
+  the innermost label and falsely reports such assignments.
 - A variable read from inside a parameter decorator's arguments is treated as
   used, so assignments to it are never reported:
   `const pipe = {}; class C { handler(@Body(pipe) body) {} }`. ESLint reports

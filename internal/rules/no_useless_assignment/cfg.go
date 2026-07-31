@@ -1,6 +1,8 @@
 package no_useless_assignment
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -93,9 +95,11 @@ type tryFrame struct {
 // targets that only `break` can reach (switch statements, labelled blocks).
 // breakable mirrors ESLint's BreakContext#breakable: it is true for loops and
 // switch statements, and false for a labelled statement that wraps neither, so
-// an unlabelled `break` skips past it to the enclosing loop/switch.
+// an unlabelled `break` skips past it to the enclosing loop/switch. labels
+// holds every label the target answers to — a loop wrapped as
+// `outer: inner: while (…)` accepts both names.
 type jumpTarget struct {
-	label      string
+	labels     []string
 	breakTo    *block
 	continueTo *block
 	breakable  bool
@@ -350,15 +354,22 @@ func (b *builder) variableDeclaration(node *ast.Node) {
 	// A `typeof x` inside the annotation references the variable, so the
 	// annotation is walked even though nothing in it runs.
 	b.expr(decl.Type)
-	if decl.Initializer == nil {
-		// `let x;` writes nothing this rule can report on, but a binding
-		// pattern can still contain evaluated expressions.
-		b.patternReads(decl.Name())
+	name := decl.Name()
+	if name != nil && (name.Kind == ast.KindObjectBindingPattern || name.Kind == ast.KindArrayBindingPattern) {
+		// Run-time evaluation order: the initializer produces the value
+		// first, then the pattern binds element by element.
+		b.expr(decl.Initializer)
+		b.patternBind(name)
 		return
 	}
-	b.patternReads(decl.Name())
+	if decl.Initializer == nil {
+		// `let x;` writes nothing this rule can report on.
+		b.patternReads(name)
+		return
+	}
+	b.patternReads(name)
 	b.expr(decl.Initializer)
-	b.patternWrites(decl.Name())
+	b.patternWrites(name)
 }
 
 func (b *builder) ifStatement(node *ast.Node) {
@@ -498,17 +509,18 @@ func (b *builder) forInOfStatement(node *ast.Node) {
 	if stmt.Initializer != nil {
 		if stmt.Initializer.Kind == ast.KindVariableDeclarationList {
 			// The loop variable is bound, not assigned: ESLint only tracks
-			// declarators that carry an initializer.
+			// declarators that carry an initializer. Computed keys and
+			// destructuring defaults still evaluate every iteration.
 			declList := stmt.Initializer.AsVariableDeclarationList()
 			if declList != nil && declList.Declarations != nil {
 				for _, decl := range declList.Declarations.Nodes {
-					b.patternReads(decl.Name())
+					b.patternBind(decl.Name())
 				}
 			}
 		} else {
 			// `for (x of xs)` / `for ([a] of xs)` — a write reference, but not
 			// an assignment this rule reports on.
-			b.patternReads(stmt.Initializer)
+			b.patternBind(stmt.Initializer)
 		}
 	}
 	b.statement(stmt.Statement)
@@ -612,7 +624,7 @@ func (b *builder) tryStatement(node *ast.Node) {
 		b.enter(frame.catchEntry)
 		catchClause := stmt.CatchClause.AsCatchClause()
 		if catchClause.VariableDeclaration != nil {
-			b.patternReads(catchClause.VariableDeclaration.Name())
+			b.patternBind(catchClause.VariableDeclaration.Name())
 		}
 		b.statement(catchClause.Block)
 		if b.cur != nil {
@@ -684,7 +696,7 @@ func (b *builder) labeledStatement(node *ast.Node) {
 		return
 	}
 	after := b.newBlock()
-	b.jumps = append(b.jumps, jumpTarget{label: stmt.Label.Text(), breakTo: after})
+	b.jumps = append(b.jumps, jumpTarget{labels: []string{stmt.Label.Text()}, breakTo: after})
 	b.statement(stmt.Statement)
 	b.popJump()
 	b.link(b.cur, after)
@@ -692,7 +704,7 @@ func (b *builder) labeledStatement(node *ast.Node) {
 }
 
 func (b *builder) pushJump(node *ast.Node, breakTo, continueTo *block) {
-	b.jumps = append(b.jumps, jumpTarget{label: labelOf(node), breakTo: breakTo, continueTo: continueTo, breakable: true})
+	b.jumps = append(b.jumps, jumpTarget{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, breakable: true})
 }
 
 func (b *builder) popJump() {
@@ -713,7 +725,7 @@ func (b *builder) makeBreak(label *ast.Node) {
 			if !target.breakable {
 				continue
 			}
-		} else if target.label != name {
+		} else if !slices.Contains(target.labels, name) {
 			continue
 		}
 		b.link(b.cur, target.breakTo)
@@ -735,7 +747,7 @@ func (b *builder) makeContinue(label *ast.Node) {
 		if target.continueTo == nil {
 			continue
 		}
-		if name == "" || target.label == name {
+		if name == "" || slices.Contains(target.labels, name) {
 			b.link(b.cur, target.continueTo)
 			break
 		}
@@ -896,6 +908,13 @@ func (b *builder) binaryExpression(node *ast.Node) {
 		b.enter(join)
 
 	case operator == ast.KindEqualsToken:
+		if isDestructuringTarget(binary.Left) {
+			// Run-time evaluation order: the right-hand side produces the
+			// value first, then the pattern binds element by element.
+			b.expr(binary.Right)
+			b.patternBind(binary.Left)
+			return
+		}
 		b.patternReads(binary.Left)
 		b.expr(binary.Right)
 		b.patternWrites(binary.Left)
@@ -1093,9 +1112,10 @@ func (b *builder) decorators(node *ast.Node) {
 // assignment patterns
 // ---------------------------------------------------------------------------
 
-// patternReads emits the reads an assignment target performs before anything is
-// written: the object and computed key of a member target, and the key
-// expressions of a destructuring pattern.
+// patternReads emits what an identifier or member assignment target evaluates
+// before the assigned expression: the receiver and computed key of a member
+// target, and the throwable fork ESLint records for naming the target inside a
+// `try` block. Destructuring targets are laid out by patternBind instead.
 func (b *builder) patternReads(node *ast.Node) {
 	if node == nil || b.cur == nil {
 		return
@@ -1114,9 +1134,6 @@ func (b *builder) patternReads(node *ast.Node) {
 			b.firstThrowableFork()
 		}
 
-	case ast.KindOmittedExpression:
-		// An array hole writes nothing.
-
 	case ast.KindParenthesizedExpression:
 		b.patternReads(node.AsParenthesizedExpression().Expression)
 
@@ -1132,64 +1149,14 @@ func (b *builder) patternReads(node *ast.Node) {
 	case ast.KindTypeAssertionExpression:
 		b.patternReads(node.AsTypeAssertion().Expression)
 
-	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-		pattern := node.AsBindingPattern()
-		if pattern.Elements == nil {
-			return
-		}
-		for _, element := range pattern.Elements.Nodes {
-			binding := element.AsBindingElement()
-			if binding == nil {
-				continue
-			}
-			if binding.PropertyName != nil && binding.PropertyName.Kind == ast.KindComputedPropertyName {
-				b.expr(binding.PropertyName.AsComputedPropertyName().Expression)
-			}
-			b.patternReads(binding.Name())
-		}
-
-	case ast.KindObjectLiteralExpression:
-		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-			switch property.Kind {
-			case ast.KindPropertyAssignment:
-				assignment := property.AsPropertyAssignment()
-				if name := assignment.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-					b.expr(name.AsComputedPropertyName().Expression)
-				}
-				b.patternReads(assignment.Initializer)
-			case ast.KindShorthandPropertyAssignment:
-				// The name is the target; its default is evaluated later.
-			case ast.KindSpreadAssignment:
-				b.patternReads(property.AsSpreadAssignment().Expression)
-			}
-		}
-
-	case ast.KindArrayLiteralExpression:
-		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-			b.patternReads(element)
-		}
-
-	case ast.KindSpreadElement:
-		b.patternReads(node.AsSpreadElement().Expression)
-
-	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
-		if binary.OperatorToken.Kind == ast.KindEqualsToken {
-			// A default inside a destructuring target; the default expression
-			// is evaluated during patternWrites.
-			b.patternReads(binary.Left)
-			return
-		}
-		b.expr(node)
-
 	default:
 		// A member target such as `obj.x` or `obj[k]` evaluates its receiver.
 		b.expr(node)
 	}
 }
 
-// patternWrites emits the writes an assignment target performs, in source
-// order, forking around each default value the target may skip.
+// patternWrites emits the write of an identifier assignment target after its
+// assigned expression. Member targets write no variable.
 func (b *builder) patternWrites(node *ast.Node) {
 	if node == nil || b.cur == nil {
 		return
@@ -1199,8 +1166,6 @@ func (b *builder) patternWrites(node *ast.Node) {
 		if a, ok := b.assignByIdent[node]; ok {
 			b.emitWrite(a)
 		}
-
-	case ast.KindOmittedExpression:
 
 	case ast.KindParenthesizedExpression:
 		b.patternWrites(node.AsParenthesizedExpression().Expression)
@@ -1216,6 +1181,46 @@ func (b *builder) patternWrites(node *ast.Node) {
 
 	case ast.KindTypeAssertionExpression:
 		b.patternWrites(node.AsTypeAssertion().Expression)
+	}
+}
+
+// patternBind lays out a destructuring target the way it evaluates at run
+// time, after the assigned expression has produced its value: each element in
+// source order evaluates its computed key, forks around its default, and
+// writes its target.
+func (b *builder) patternBind(node *ast.Node) {
+	if node == nil || b.cur == nil {
+		return
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		if sym, ok := b.readNodes[node]; ok {
+			b.emitRead(sym)
+		}
+		if isThrowableIdentifier(node) {
+			b.firstThrowableFork()
+		}
+		if a, ok := b.assignByIdent[node]; ok {
+			b.emitWrite(a)
+		}
+
+	case ast.KindOmittedExpression:
+		// An array hole binds nothing.
+
+	case ast.KindParenthesizedExpression:
+		b.patternBind(node.AsParenthesizedExpression().Expression)
+
+	case ast.KindNonNullExpression:
+		b.patternBind(node.AsNonNullExpression().Expression)
+
+	case ast.KindAsExpression:
+		b.patternBind(node.AsAsExpression().Expression)
+
+	case ast.KindSatisfiesExpression:
+		b.patternBind(node.AsSatisfiesExpression().Expression)
+
+	case ast.KindTypeAssertionExpression:
+		b.patternBind(node.AsTypeAssertion().Expression)
 
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
 		pattern := node.AsBindingPattern()
@@ -1227,64 +1232,76 @@ func (b *builder) patternWrites(node *ast.Node) {
 			if binding == nil {
 				continue
 			}
-			b.withDefault(binding.Initializer, binding.Name())
+			if binding.PropertyName != nil && binding.PropertyName.Kind == ast.KindComputedPropertyName {
+				b.expr(binding.PropertyName.AsComputedPropertyName().Expression)
+			}
+			b.bindWithDefault(binding.Name(), binding.Initializer)
 		}
 
 	case ast.KindObjectLiteralExpression:
 		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 			switch property.Kind {
 			case ast.KindPropertyAssignment:
-				b.patternWrites(property.AsPropertyAssignment().Initializer)
+				assignment := property.AsPropertyAssignment()
+				if name := assignment.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					b.expr(name.AsComputedPropertyName().Expression)
+				}
+				b.patternBind(assignment.Initializer)
 			case ast.KindShorthandPropertyAssignment:
 				shorthand := property.AsShorthandPropertyAssignment()
-				b.withDefault(shorthand.ObjectAssignmentInitializer, shorthand.Name())
+				b.bindWithDefault(shorthand.Name(), shorthand.ObjectAssignmentInitializer)
 			case ast.KindSpreadAssignment:
-				b.patternWrites(property.AsSpreadAssignment().Expression)
+				b.patternBind(property.AsSpreadAssignment().Expression)
 			}
 		}
 
 	case ast.KindArrayLiteralExpression:
 		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-			b.patternWrites(element)
+			b.patternBind(element)
 		}
 
 	case ast.KindSpreadElement:
-		b.patternWrites(node.AsSpreadElement().Expression)
+		b.patternBind(node.AsSpreadElement().Expression)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if binary.OperatorToken.Kind == ast.KindEqualsToken {
-			b.withDefault(binary.Right, binary.Left)
+			b.bindWithDefault(binary.Left, binary.Right)
+			return
 		}
+		b.expr(node)
+
+	default:
+		// A member target such as `obj.x` or `obj[k]` evaluates its receiver.
+		b.expr(node)
 	}
 }
 
-// withDefault models `target = fallback` inside a destructuring pattern: the
-// fallback is only evaluated when the incoming value is undefined.
-func (b *builder) withDefault(fallback *ast.Node, target *ast.Node) {
-	if fallback == nil {
-		b.patternWrites(target)
-		return
+// bindWithDefault lays out one pattern element: a fork around the default
+// value, which only runs when the incoming value is undefined, then the
+// target's own binding.
+func (b *builder) bindWithDefault(target *ast.Node, fallback *ast.Node) {
+	if fallback != nil && b.cur != nil {
+		join := b.newBlock()
+		b.link(b.cur, join)
+		withFallback := b.newBlock()
+		b.link(b.cur, withFallback)
+
+		b.enter(withFallback)
+		b.expr(fallback)
+		b.link(b.cur, join)
+
+		b.enter(join)
 	}
-	if b.cur == nil {
-		return
-	}
-	join := b.newBlock()
-	bypass := b.newBlock()
-	b.link(b.cur, bypass)
-	withFallback := b.newBlock()
-	b.link(b.cur, withFallback)
+	b.patternBind(target)
+}
 
-	b.enter(withFallback)
-	b.expr(fallback)
-	b.patternWrites(target)
-	b.link(b.cur, join)
-
-	b.enter(bypass)
-	b.patternWrites(target)
-	b.link(b.cur, join)
-
-	b.enter(join)
+// isDestructuringTarget reports whether an assignment's left-hand side is an
+// object or array pattern.
+func isDestructuringTarget(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	return node != nil &&
+		(node.Kind == ast.KindObjectLiteralExpression || node.Kind == ast.KindArrayLiteralExpression)
 }
 
 // ---------------------------------------------------------------------------
@@ -1392,16 +1409,23 @@ func isBreakableStatement(node *ast.Node) bool {
 	return false
 }
 
-func labelOf(node *ast.Node) string {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindLabeledStatement {
-		return ""
+// labelsOf collects every label wrapped directly around a loop or switch, so
+// `outer: inner: while (…)` resolves `continue outer` and `break outer` as
+// well as `inner`. (ESLint's code path analysis attaches only the innermost
+// label and loses the back edge of a `continue` naming an outer one, falsely
+// reporting assignments the next iteration reads; this rule keeps the edge.)
+func labelsOf(node *ast.Node) []string {
+	var labels []string
+	current := node
+	for parent := current.Parent; parent != nil && parent.Kind == ast.KindLabeledStatement; parent = parent.Parent {
+		labeled := parent.AsLabeledStatement()
+		if labeled.Statement != current {
+			break
+		}
+		labels = append(labels, labeled.Label.Text())
+		current = parent
 	}
-	labeled := parent.AsLabeledStatement()
-	if labeled.Statement != node {
-		return ""
-	}
-	return labeled.Label.Text()
+	return labels
 }
 
 // isAlwaysTruthyTest mirrors ESLint's `getBooleanValueIfSimpleConstant`: only a

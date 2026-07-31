@@ -129,6 +129,53 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
     v = arr;
   } finally { console.log(v); }
 }`},
+
+			// ---- A TS assertion wrapper around an assignment target is not a
+			// pattern: the write is invisible to the rule, so it neither
+			// reports nor overwrites anything ----
+			{Code: `function f(g) { let x = 1; g(x); (x as any) = 2; }`},
+			{Code: `function f(g) { let x = 1; g(x); x! = 2; }`},
+			{Code: `function f(g) { let x = 1; g(x); (x satisfies any) = 2; }`},
+			{Code: `function f(g) { let x = 1; g(x); (<any>x) = 2; }`},
+			{Code: `function f(g, o) { let x = 1; g(x); ({ a: x as any } = o); }`},
+			{Code: `function f(g) { let x = 1; g(x); x = 2; (x as any) = 3; g(x); }`},
+
+			// ---- A computed key or default later in the pattern reads the
+			// value an earlier element just wrote ----
+			{Code: `function f(obj) { let { a: x, [x]: y } = obj; console.log(y); }`},
+			{Code: `function f(obj) { let x, y; ({ a: x, [x]: y } = obj); console.log(y); }`},
+			{Code: `function f(obj) { let { a, b = a } = obj; console.log(b); }`},
+
+			// ---- The initializer runs before the pattern binds, so a
+			// computed key or default can read a value the initializer wrote.
+			// (ESLint's position-based model reports both initializer writes;
+			// this rule follows the run-time order instead.) ----
+			{Code: `function f(obj) { let x = 0; console.log(x); let { a = x } = (x = 1, obj); console.log(a); }`},
+			{Code: `function f(obj) { let a = 0; console.log(a); let { [a]: q } = (a = 1, obj); console.log(q); }`},
+
+			// ---- Destructuring defaults in loop heads and catch bindings are
+			// read on every pass ----
+			{Code: `function f(xs) { let y = 1; console.log(y); y = 2; for (let [x = y] of xs) console.log(x); }`},
+			{Code: `function f(xs) { let y = 1; console.log(y); y = 2; for (let [x = y] in xs) console.log(x); }`},
+			{Code: `function f() { let y = 1; console.log(y); y = 2; try { throw {}; } catch ({ x = y }) { console.log(x); } }`},
+
+			// ---- A destructured top-level binding leaves the file like a
+			// plain one, whether by modifier or by `export { ... }` ----
+			{Code: `export let { a } = obj; console.log(a); a = 2; var obj;`},
+			{Code: `let { a } = obj; export { a }; console.log(a); a = 2; var obj;`},
+			{Code: `let { a } = obj; export { a as b }; console.log(a); a = 2; var obj;`},
+			{Code: `export let [c, d] = arr; console.log(c, d); c = 1; var arr;`},
+
+			// ---- Every label wrapped around a loop resolves its
+			// break/continue, so the next iteration's reads stay reachable.
+			// (ESLint attaches only the innermost label and falsely reports
+			// the `continue outer` cases; this rule keeps the back edge.) ----
+			{Code: `function f(c, v) { outer: inner: while (c()) { console.log(v); v = 1; continue inner; } }`},
+			{Code: `function f(c, v) { outer: inner: while (c()) { console.log(v); v = 1; continue outer; } }`},
+			{Code: `function f(c, v) { outer: inner: while (c()) { v = 1; continue outer; } console.log(v); }`},
+			{Code: `function f(c, v) { a: b: c2: while (c()) { console.log(v); v = 1; continue b; } }`},
+			{Code: `function f(c, v) { outer: inner: while (c()) { v = 1; break outer; } console.log(v); }`},
+			{Code: `function f(v) { outer: inner: { v = 1; break outer; } console.log(v); }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized assignment target ----
@@ -419,6 +466,105 @@ export { a };
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryAssignment", Line: 3, Column: 7, EndLine: 3, EndColumn: 8},
 				},
+			},
+			{
+				Code: `let { a } = obj;
+export { a };
+{ let a = 2; a = 3; console.log(a); }
+var obj;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 7, EndLine: 3, EndColumn: 8},
+				},
+			},
+
+			// ---- A TS-assertion-wrapped write is invisible: it does not count
+			// as a read of the overwritten store either ----
+			{
+				Code: `function f(g) { let x = 1; g(x); x = 2; (x as any) = 3; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 34, EndLine: 1, EndColumn: 35},
+				},
+			},
+
+			// ---- The right-hand side runs before the pattern binds, so a
+			// store the pattern immediately overwrites is dead. (ESLint's
+			// position-based model reports `a = 1` — which the final read
+			// actually observes — and misses `a = 2`; this rule follows the
+			// run-time order.) ----
+			{
+				Code: `function f(obj) { let a = 0, x; console.log(a); ({ [a = 1]: x } = (a = 2, obj)); console.log(a, x); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 68, EndLine: 1, EndColumn: 69},
+				},
+			},
+			// ---- A read inside the assignment's own right-hand side sees the
+			// value from before the write, so it cannot keep the write alive ----
+			{
+				Code: `function f(fn) { let x = 1; console.log(x); ({ a: x } = fn(x)); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 51, EndLine: 1, EndColumn: 52},
+				},
+			},
+
+			// ---- Known divergences on deeply nested try/catch/finally
+			// exception paths (found by differential fuzzing; the expectations
+			// below are ESLint 10.8 output). rslint routes the throw a
+			// destructuring or assignment target can raise before its write
+			// into the enclosing `finally`, and treats a store every reachable
+			// read path overwrites as dead — ESLint's segment approximation
+			// disagrees on the three shapes below. See "Differences from
+			// ESLint" in the rule docs. ----
+
+			// SKIP: rslint also reports `let v = 0` at 2:7 — every path to the
+			// `g(v)` read first runs the finally's `({ v } = o)` write, so the
+			// initial store is never read; ESLint misses it.
+			{
+				Code: `function f() {
+  let v = 0;
+  try { if (c) { for (;;) { h(); break; } } } catch (e) { while (c) { try { h(); } catch (e) { h(); } finally { ({ v } = o); } switch (k) { case 1: g(v); v = 3; break;  } } }
+  throw new Error();
+  do { try { v = 1; } finally { try { v++; } finally { g(v); } } } while (c);
+  try { v = 2; } finally { if (c) { try { v += 1; } catch (e) { v += 1; } finally { g(v); v = 3; } } else { ({ v } = o); } }
+  g(v);
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 155, EndLine: 3, EndColumn: 156},
+				},
+				Skip: true,
+			},
+			// SKIP: rslint reports nothing — `[v] = arr` can throw before
+			// writing `v`, so the preceding `v = 3` can still reach the
+			// enclosing finally's `g(v)` read.
+			{
+				Code: `function* f() {
+  let v = 0;
+  try { for (let i = 0; i < 3; i++) { yield 1; } } catch (e) { if (c) { try { [v] = arr; } finally { g(v); v = 3; } lbl: { [v] = arr; break lbl; } } else { throw new Error(); v += 1; } } finally { switch (k) { case 1: try { g(v); [v] = arr; } finally { g(v); v = 3; } break; default: switch (k) { case 1: ({ v } = o); break; default: h(); } } }
+  if (c) { for (;;) { do { v++; } while (c); continue; } }
+  g(v);
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 108, EndLine: 3, EndColumn: 109},
+				},
+				Skip: true,
+			},
+			// SKIP: rslint reports all but the `v += 1` at 3:223 — the `v = 1`
+			// that overwrites it can throw first, letting the value reach the
+			// outer finally's `v += 1` read.
+			{
+				Code: `function* f() {
+  let v = 0;
+  try { if (c) { if (c) { v++; c && (v = 4); } else { h(); } try { g(v); v = 1; } catch (e) { h(); } } } catch (e) { if (c) { for (let i = 0; i < 3; i++) { v++; ({ v } = o); } } else { try { c && (v = 4); h(); } finally { v += 1; } v = 1; } } finally { lbl: { v += 1;  } }
+  [v] = arr;
+  try { if (c) { for (;;) { g(v); v = 3; continue; } } else { try { g(v); v = 3; } finally { v = 2; } } } finally { for (let i = 0; i < 3; i++) { switch (k) { case 1: v = c ? 5 : 6; break;  } c && (v = 4); } }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 157, EndLine: 3, EndColumn: 158},
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 223, EndLine: 3, EndColumn: 224},
+					{MessageId: "unnecessaryAssignment", Line: 3, Column: 261, EndLine: 3, EndColumn: 262},
+					{MessageId: "unnecessaryAssignment", Line: 5, Column: 168, EndLine: 5, EndColumn: 169},
+					{MessageId: "unnecessaryAssignment", Line: 5, Column: 199, EndLine: 5, EndColumn: 200},
+				},
+				Skip: true,
 			},
 		},
 	)
