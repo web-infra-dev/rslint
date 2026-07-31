@@ -121,6 +121,15 @@ func TestPreferConstRule(t *testing.T) {
 				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
 			},
 
+			// A type-only export does resolve to a merged type/value symbol.
+			// scope-manager records that reference on the variable, so
+			// ignoreReadBeforeAssign suppresses the report just like a regular
+			// read before assignment.
+			{
+				Code:    "interface X {}\nlet X; export type { X }; X = 1;",
+				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
+			},
+
 			// Uninitialized, assigned inside if block - can't be safely converted to const
 			{Code: `let x: number; if (true) { x = 1; }`},
 
@@ -576,6 +585,15 @@ func TestPreferConstRule(t *testing.T) {
 				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 27},
+				},
+			},
+			// Unlike the value-only cases above, a merged interface/variable is
+			// type-capable, so the type-only export is attached to that symbol
+			// and moves the report to the declaration.
+			{
+				Code: "interface X {}\nlet X; export type { X }; X = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 2, Column: 5},
 				},
 			},
 

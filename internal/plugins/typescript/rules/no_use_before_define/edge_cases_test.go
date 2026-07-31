@@ -130,7 +130,10 @@ func TestEdgeCases(t *testing.T) {
 
 			// ----- Type-only named exports -----
 			{Code: `let x = 1; export type { x };`},
+			{Code: `function f() {} export type { f };`},
 			{Code: `type T = number; export type { T };`},
+			// The local value does not shadow the real global type target.
+			{Code: `export type { HTMLElement }; let HTMLElement = 1;`},
 			{
 				Code:    `export type { x }; let x = 1;`,
 				Options: map[string]interface{}{"allowNamedExports": true},
@@ -413,6 +416,12 @@ declare global {
 			},
 			{
 				Code: `export type { x as y }; let x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `export type { f }; function f() {}`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
 				},

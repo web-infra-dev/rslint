@@ -464,16 +464,16 @@ func TestRefStoreExportSpecifierResolvesTypeOnlySymbol(t *testing.T) {
 	}
 }
 
-func TestRefStoreTypeOnlyExportSpecifierIndexed(t *testing.T) {
-	// `export type { x }` / `export { type x }` resolves to the binding like
-	// any other local export — ESLint's scope-manager records a type-flagged
-	// reference for it. Consumers that only follow runtime reads classify the
-	// reference site (utils.IsNonReferenceIdentifier reports these as
-	// non-reads); the index itself keeps them.
+func TestRefStoreTypeOnlyExportSpecifierExcludesValueOnlySymbol(t *testing.T) {
+	// A type-only export cannot resolve to a value-only declaration. This is
+	// declaration-space filtering, not merely read classification: the
+	// specifier must be absent from the value symbol's reference list.
 	for name, source := range map[string]string{
-		"export type clause":  "let x;\nexport type { x };\nx = 1;\n",
-		"type specifier":      "let x;\nexport { type x };\nx = 1;\n",
-		"export type aliased": "let x;\nexport type { x as y };\nx = 1;\n",
+		"export type clause":   "let x;\nexport type { x };\nx = 1;\n",
+		"inline type":          "let x;\nexport { type x };\nx = 1;\n",
+		"aliased":              "let x;\nexport type { x as y };\nx = 1;\n",
+		"value-only function":  "function x() {}\nexport type { x };\nx();\n",
+		"inline function type": "function x() {}\nexport { type x };\nx();\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			sourceFile, refs := newBoundRefStore(t, "/type-only-export.ts", core.ScriptKindTS, source)
@@ -482,54 +482,64 @@ func TestRefStoreTypeOnlyExportSpecifierIndexed(t *testing.T) {
 			if len(occurrences) != 3 {
 				t.Fatalf("expected 3 occurrences of x, got %d", len(occurrences))
 			}
-			declIdent, specifierIdent, writeIdent := occurrences[0], occurrences[1], occurrences[2]
+			declIdent, specifierIdent, valueUseIdent := occurrences[0], occurrences[1], occurrences[2]
+			sym := declIdent.Parent.Symbol()
+			if sym == nil {
+				t.Fatal("declaration identifier has no bound symbol")
+			}
+
+			if got := refs.Resolve(specifierIdent); got != nil {
+				t.Fatalf("Resolve(type-only export specifier x) = %v, want nil for a value-only declaration", got)
+			}
+			got := refs.References(sym)
+			if len(got) != 1 || got[0] != valueUseIdent {
+				t.Fatalf("References = %v, want [%v] (only the value-space use)", got, valueUseIdent)
+			}
+		})
+	}
+}
+
+func TestRefStoreTypeOnlyExportSpecifierResolvesTypeCapableSymbol(t *testing.T) {
+	// Type aliases/interfaces, dual-space declarations, namespaces, merged
+	// symbols, and import aliases are all type-capable in scope-manager's
+	// model and must keep their type-only export reference.
+	for name, source := range map[string]string{
+		"type alias":          "type X = {};\nexport type { X };\n",
+		"interface":           "interface X {}\nexport type { X };\n",
+		"class":               "class X {}\nexport type { X };\n",
+		"enum":                "enum X { A }\nexport type { X };\n",
+		"namespace":           "namespace X {}\nexport type { X };\n",
+		"function namespace":  "function X() {}\nnamespace X {}\nexport type { X };\n",
+		"interface and value": "interface X {}\nlet X;\nexport type { X };\n",
+		"import alias":        "import { Foo as X } from './missing';\nexport type { X };\n",
+		"type import alias":   "import type { Foo as X } from './missing';\nexport type { X };\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/type-only-export-type.ts", core.ScriptKindTS, source)
+			occurrences := identifiers(sourceFile.AsNode(), "X")
+			if len(occurrences) < 2 {
+				t.Fatalf("expected at least 2 occurrences of X, got %d", len(occurrences))
+			}
+			declIdent, specifierIdent := occurrences[0], occurrences[len(occurrences)-1]
 			sym := declIdent.Parent.Symbol()
 			if sym == nil {
 				t.Fatal("declaration identifier has no bound symbol")
 			}
 
 			if got := refs.Resolve(specifierIdent); got != sym {
-				t.Fatalf("Resolve(type-only export specifier x) = %v, want %v", got, sym)
+				t.Fatalf("Resolve(type-only export specifier X) = %v, want %v", got, sym)
 			}
 			got := refs.References(sym)
-			if len(got) != 2 || got[0] != specifierIdent || got[1] != writeIdent {
-				t.Fatalf("References = %v, want [%v %v] (the specifier and the `x = 1` write)", got, specifierIdent, writeIdent)
+			if len(got) != 1 || got[0] != specifierIdent {
+				t.Fatalf("References = %v, want [%v] (the type-only export reference)", got, specifierIdent)
 			}
 		})
 	}
 }
 
-func TestRefStoreTypeOnlyExportSpecifierResolvesTypeSymbol(t *testing.T) {
-	// The type-space half of the meaning must stay: `export type { Foo }` of
-	// an actual type still references it.
-	sourceFile, refs := newBoundRefStore(t, "/type-only-export-type.ts", core.ScriptKindTS,
-		"type Foo = {};\nexport type { Foo };\n")
-
-	occurrences := identifiers(sourceFile.AsNode(), "Foo")
-	if len(occurrences) != 2 {
-		t.Fatalf("expected 2 occurrences of Foo, got %d", len(occurrences))
-	}
-	declIdent, specifierIdent := occurrences[0], occurrences[1]
-	sym := declIdent.Parent.Symbol()
-	if sym == nil {
-		t.Fatal("declaration identifier has no bound symbol")
-	}
-
-	if got := refs.Resolve(specifierIdent); got != sym {
-		t.Fatalf("Resolve(type-only export specifier Foo) = %v, want %v", got, sym)
-	}
-	got := refs.References(sym)
-	if len(got) != 1 || got[0] != specifierIdent {
-		t.Fatalf("References = %v, want [%v] (the `export type { Foo }` reference)", got, specifierIdent)
-	}
-}
-
-func TestRefStoreTypeOnlyExportSpecifierWithChecker(t *testing.T) {
-	// With a TypeChecker present, the aliased type-only specifier's
-	// PropertyName must still resolve through the binder onto the same raw
-	// symbol the write does — not detour through the checker fallback, which
-	// would file it under a different (checker-merged alias) identity and
-	// split the index.
+func TestRefStoreTypeOnlyExportSpecifierWithCheckerExcludesValueOnlySymbol(t *testing.T) {
+	// The checker fallback must not reintroduce the value binding after the
+	// binder correctly rejects it.
 	sourceFile, refs, done := newCheckedRefStore(t,
 		"let x;\nexport type { x as y };\nx = 1;\n")
 	defer done()
@@ -544,12 +554,76 @@ func TestRefStoreTypeOnlyExportSpecifierWithChecker(t *testing.T) {
 		t.Fatal("declaration identifier has no bound symbol")
 	}
 
-	if got := refs.Resolve(specifierIdent); got != sym {
-		t.Fatalf("Resolve(type-only export PropertyName x) = %v, want %v", got, sym)
+	if got := refs.Resolve(specifierIdent); got != nil {
+		t.Fatalf("Resolve(type-only export PropertyName x) = %v, want nil", got)
 	}
 	got := refs.References(sym)
-	if len(got) != 2 || got[0] != specifierIdent || got[1] != writeIdent {
-		t.Fatalf("References = %v, want [%v %v] (the specifier and the `x = 1` write)", got, specifierIdent, writeIdent)
+	if len(got) != 1 || got[0] != writeIdent {
+		t.Fatalf("References = %v, want [%v] (only the `x = 1` write)", got, writeIdent)
+	}
+}
+
+func TestRefStoreTypeOnlyExportCheckerFallbackRespectsMeaningAndShadowing(t *testing.T) {
+	// A local value-only HTMLElement does not shadow the outer/global
+	// HTMLElement type. A broad checker lookup would pick the local value and
+	// either misfile the reference or lose the real type target; the requested
+	// declaration-space meaning must participate in the checker scope walk.
+	sourceFile, refs, done := newCheckedRefStore(t,
+		"let HTMLElement;\nexport type { HTMLElement as LocalHTMLElement };\n")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "HTMLElement")
+	if len(occurrences) != 2 {
+		t.Fatalf("expected 2 occurrences of HTMLElement, got %d", len(occurrences))
+	}
+	declIdent, specifierIdent := occurrences[0], occurrences[1]
+	localValue := declIdent.Parent.Symbol()
+	if localValue == nil {
+		t.Fatal("declaration identifier has no bound symbol")
+	}
+
+	target := refs.Resolve(specifierIdent)
+	if target == nil {
+		t.Fatal("Resolve(type-only export HTMLElement) = nil, want the global type symbol")
+	}
+	if target == localValue {
+		t.Fatal("type-only export resolved to the shadowing local value symbol")
+	}
+	if target.Flags&(ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a type-capable symbol", target.Flags)
+	}
+	if got := refs.References(localValue); len(got) != 0 {
+		t.Fatalf("References(local value) = %v, want none", got)
+	}
+	got := refs.References(target)
+	if len(got) != 1 || got[0] != specifierIdent {
+		t.Fatalf("References(global type) = %v, want [%v]", got, specifierIdent)
+	}
+}
+
+func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
+	// The meaning-aware ExportSpecifier fallback also preserves ordinary
+	// dual-space exports of globals; it must not be limited to type-only
+	// syntax.
+	sourceFile, refs, done := newCheckedRefStore(t,
+		"export { window as browserWindow };\n")
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "window")
+	if len(occurrences) != 1 {
+		t.Fatalf("expected 1 occurrence of window, got %d", len(occurrences))
+	}
+	specifierIdent := occurrences[0]
+	target := refs.Resolve(specifierIdent)
+	if target == nil {
+		t.Fatal("Resolve(local export window) = nil, want the global value symbol")
+	}
+	if target.Flags&ast.SymbolFlagsValue == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a value-capable symbol", target.Flags)
+	}
+	got := refs.References(target)
+	if len(got) != 1 || got[0] != specifierIdent {
+		t.Fatalf("References(global value) = %v, want [%v]", got, specifierIdent)
 	}
 }
 
