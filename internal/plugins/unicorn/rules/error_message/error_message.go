@@ -2,7 +2,6 @@ package error_message
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -42,6 +41,19 @@ var builtinErrors = map[string]bool{
 	"SuppressedError": true,
 }
 
+// isLocalReference reports whether the error name resolves to a binding
+// declared in this file rather than to the global constructor.
+func isLocalReference(ctx rule.RuleContext, node *ast.Node, name string) bool {
+	if ctx.Refs != nil {
+		// Resolve can return a symbol declared elsewhere (globals, cross-file,
+		// .d.ts), so a non-nil result alone doesn't mean local.
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			return utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+		}
+	}
+	return utils.IsShadowed(node, name)
+}
+
 func getMessageArgumentIndex(constructorName string) int {
 	switch constructorName {
 	case "AggregateError":
@@ -67,19 +79,20 @@ var ErrorMessageRule = rule.Rule{
 			var calleeNode *ast.Node
 			var args []*ast.Node
 
-			if node.Kind == ast.KindCallExpression {
+			switch node.Kind {
+			case ast.KindCallExpression:
 				call := node.AsCallExpression()
 				calleeNode = call.Expression
 				if call.Arguments != nil {
 					args = call.Arguments.Nodes
 				}
-			} else if node.Kind == ast.KindNewExpression {
+			case ast.KindNewExpression:
 				newExpr := node.AsNewExpression()
 				calleeNode = newExpr.Expression
 				if newExpr.Arguments != nil {
 					args = newExpr.Arguments.Nodes
 				}
-			} else {
+			default:
 				return
 			}
 
@@ -87,8 +100,11 @@ var ErrorMessageRule = rule.Rule{
 				return
 			}
 
-			callee := utils.SkipAssertionsAndParens(calleeNode)
-			if callee.Kind != ast.KindIdentifier {
+			// Only parentheses are skipped: a type assertion or non-null
+			// assertion makes the callee a wrapper node, which upstream's
+			// identifier check rejects.
+			callee := ast.SkipOuterExpressions(calleeNode, ast.OEKParentheses)
+			if callee == nil || callee.Kind != ast.KindIdentifier {
 				return
 			}
 
@@ -97,7 +113,7 @@ var ErrorMessageRule = rule.Rule{
 				return
 			}
 
-			if utils.IsShadowed(callee, constructorName) {
+			if isLocalReference(ctx, callee, constructorName) {
 				return
 			}
 
@@ -116,42 +132,17 @@ var ErrorMessageRule = rule.Rule{
 			}
 
 			argNode := args[messageArgumentIndex]
-			if argNode == nil {
-				ctx.ReportNode(node, missingMessage(constructorName))
-				return
-			}
 
-			unwrapped := utils.SkipAssertionsAndParens(argNode)
-
-			// Fallback AST checks for literals that are definitely not strings
-			switch unwrapped.Kind {
+			// Literals that can never be a string, for the shapes the static
+			// evaluator leaves unresolved.
+			switch utils.SkipAssertionsAndParens(argNode).Kind {
 			case ast.KindNumericLiteral,
 				ast.KindBigIntLiteral,
-				ast.KindTrueKeyword,
-				ast.KindFalseKeyword,
-				ast.KindNullKeyword,
 				ast.KindArrayLiteralExpression,
 				ast.KindObjectLiteralExpression,
-				ast.KindRegularExpressionLiteral,
-				ast.KindFunctionExpression,
-				ast.KindArrowFunction,
-				ast.KindClassExpression:
+				ast.KindRegularExpressionLiteral:
 				ctx.ReportNode(argNode, notStringMessage)
 				return
-			}
-
-			// If type checking is available, check if the type is definitely not string-like
-			if ctx.TypeChecker != nil {
-				t := ctx.TypeChecker.GetTypeAtLocation(argNode)
-				if t != nil {
-					flags := t.Flags()
-					if flags&(checker.TypeFlagsStringLike|checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsUnion|checker.TypeFlagsIntersection) == 0 {
-						if flags&(checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsObject) != 0 {
-							ctx.ReportNode(argNode, notStringMessage)
-							return
-						}
-					}
-				}
 			}
 
 			val, ok := staticStrings.EvalValue(argNode)
