@@ -101,12 +101,12 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 ## Composing Presets
 
-A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers declare the plugin, turn off the core rules TypeScript already reports, and enable the TypeScript rules. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
+When configuring a TypeScript project, you should place `js.configs.recommended` before `ts.configs.recommended`. This is because `ts.configs.recommended` contains a layer that disables ESLint core rules already reported by TypeScript.
 
 ```ts
 export default defineConfig([
-  js.configs.recommended, // core ESLint recommended rules
-  ts.configs.recommended, // expands to the preset's entries, in order
+  js.configs.recommended,
+  ts.configs.recommended,
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
@@ -115,11 +115,7 @@ export default defineConfig([
 ]);
 ```
 
-A TypeScript project lists both presets: `js.configs.recommended` turns the core rules on, and the `ts.configs.recommended` layer after it turns off the ones TypeScript reports itself.
-
-Entries can also be passed as separate arguments: `defineConfig(ts.configs.recommended, { rules: { … } })`.
-
-Later entries win over earlier ones for the files they both match, which is what lets the trailing entry above relax a rule the preset enabled. A config that exports the array directly, without `defineConfig`, spreads the preset instead: `[...ts.configs.recommended, { … }]`.
+Later entries in the configuration array override earlier ones. Placing `js.configs.recommended` after `ts.configs.recommended` would re-enable core rules that TypeScript already handles.
 
 ## Configuration Options
 
