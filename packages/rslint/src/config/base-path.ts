@@ -1,30 +1,39 @@
 import path from 'node:path';
 
-/**
- * Options for desugaring per-entry `basePath` into ordinary relative
- * `files` / `ignores` / `parserOptions.project` patterns.
- *
- * `configDirectory` is the match root the Go engine already uses:
- * config-file directory for auto-discovered configs, cwd for `--config`
- * / explicit override configs. Relative `basePath` values resolve against it.
- */
-export interface ApplyBasePathOptions {
-  configDirectory?: string;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** True for absolute POSIX or Windows paths (including drive-letter forms). */
-export function isAbsolutePattern(pattern: string): boolean {
+function isAbsolutePattern(pattern: string): boolean {
   return path.posix.isAbsolute(pattern) || path.win32.isAbsolute(pattern);
 }
 
 /**
- * Resolve an entry `basePath` to a POSIX path relative to `configDirectory`.
- * Absolute base paths are rebased via `path.relative`. Empty / "." means the
- * config root itself (no prefix).
+ * Escape glob metacharacters in a resolved basePath so the directory is treated
+ * literally when spliced into glob patterns. ESLint treats basePath as a literal
+ * path; without escaping, basePath "packages/[locale]" would be interpreted as a
+ * character class and never match. Character-class escapes ([*], [?], [[] ...)
+ * are understood by both the Go (doublestar) and TS (picomatch) matchers on
+ * every platform.
+ */
+function escapeGlobBasePath(s: string): string {
+  return s
+    .replaceAll('[', '[[]')
+    .replaceAll('*', '[*]')
+    .replaceAll('?', '[?]')
+    .replaceAll('{', '[{]');
+}
+
+/**
+ * Resolve an entry `basePath` to a glob-escaped POSIX path relative to
+ * `configDirectory`. Absolute base paths are rebased via `path.relative`.
+ * Empty / "." means the config root itself (no prefix).
+ *
+ * A basePath resolving outside `configDirectory` is rejected: the resulting
+ * `../`-prefixed (or cross-root) patterns could never match under the Go
+ * engine's single-match-root model, so it fails fast instead of silently
+ * contributing nothing (mirrors the Go `ResolveBasePaths` rejection).
  */
 export function resolveRelativeBasePath(
   basePath: string,
@@ -32,17 +41,27 @@ export function resolveRelativeBasePath(
 ): string {
   const root = configDirectory || process.cwd();
   const absoluteBase = path.resolve(root, basePath);
-  let relative = path.relative(root, absoluteBase);
-  relative = relative.split(path.sep).join('/');
+  let relative = path.relative(root, absoluteBase).replace(/\\/g, '/');
+  if (
+    relative === '..' ||
+    relative.startsWith('../') ||
+    isAbsolutePattern(relative)
+  ) {
+    throw new Error(
+      `basePath "${basePath}" resolves outside the config match root "${root}"; ` +
+        'basePath must be a subdirectory of the config root',
+    );
+  }
   relative = path.posix.normalize(relative);
   if (relative === '.' || relative === '') {
     return '';
   }
-  return relative.replace(/^\.\//, '');
+  return escapeGlobBasePath(relative).replace(/^\.\//, '');
 }
 
 /**
- * Rebase one glob or path pattern under `relativeBase`.
+ * Rebase one glob or path pattern under the glob-escaped `relativeBase`
+ * produced by {@link resolveRelativeBasePath}.
  *
  * - Leading `!` negation is preserved (odd count → negated).
  * - Leading `./` is stripped before joining.
@@ -71,7 +90,9 @@ export function rebasePattern(pattern: string, relativeBase: string): string {
   }
 
   // path.posix.join collapses `a` + `../b` and keeps `**` segments intact.
-  const joined = path.posix.join(relativeBase, body);
+  // Strip trailing slashes so the result matches Go's path.Join, which drops
+  // them — trailing-slash patterns must not behave differently per side.
+  const joined = path.posix.join(relativeBase, body).replace(/\/+$/, '');
   return (negated ? '!' : '') + joined;
 }
 
@@ -174,14 +195,4 @@ export function applyBasePathToEntry(
   }
 
   return next;
-}
-
-/**
- * Apply {@link applyBasePathToEntry} across a whole flat-config array.
- */
-export function applyBasePathToConfig(
-  entries: Record<string, unknown>[],
-  configDirectory: string = process.cwd(),
-): Record<string, unknown>[] {
-  return entries.map((entry) => applyBasePathToEntry(entry, configDirectory));
 }

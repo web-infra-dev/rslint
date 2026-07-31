@@ -13,7 +13,6 @@ export {
   type PluginConfigDescriptor,
 } from './config-file-loader.js';
 export {
-  applyBasePathToConfig,
   applyBasePathToEntry,
   rebasePattern,
   resolveRelativeBasePath,

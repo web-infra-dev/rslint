@@ -423,6 +423,36 @@ describe('normalizeConfig', () => {
     });
     expect(entry).toEqual({});
   });
+
+  test('glob-escapes basePath so it is treated as a literal directory', () => {
+    // ESLint treats basePath as a literal path; without escaping,
+    // "packages/[locale]" would become a character class and never match. Only
+    // the leading '[' needs escaping ([[]); a bare ']' is literal outside a
+    // class.
+    const [entry] = normalizeConfig(
+      [{ basePath: 'packages/[locale]', files: ['src/**/*.ts'] }],
+      { configDirectory: '/repo' },
+    );
+    expect(entry.files).toEqual(['packages/[[]locale]/src/**/*.ts']);
+  });
+
+  test('rejects a basePath resolving outside the config match root', () => {
+    expect(() =>
+      normalizeConfig([{ basePath: '../shared', rules: {} }], {
+        configDirectory: '/repo',
+      }),
+    ).toThrow(/resolves outside the config match root/);
+  });
+
+  test('strips trailing slashes like the Go path.Join', () => {
+    // Go's path.Join drops trailing slashes while path.posix.join keeps them;
+    // both sides must agree so trailing-slash ignores behave identically.
+    const [entry] = normalizeConfig(
+      [{ basePath: 'packages/foo', ignores: ['src/**/'] }],
+      { configDirectory: '/repo' },
+    );
+    expect(entry.ignores).toEqual(['packages/foo/src/**']);
+  });
 });
 
 describe('normalizeConfig — community plugins (object-form)', () => {
