@@ -330,6 +330,61 @@ func TestMigrate_GlobalIgnoreEntry(t *testing.T) {
 	assertContains(t, content, "no-console")
 }
 
+func TestMigrate_GlobalIgnoreEntry_WithBasePath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "rslint.json"), `[
+		{ "basePath": "packages/foo", "ignores": ["fixtures/**"] },
+		{ "rules": { "no-console": "warn" } }
+	]`)
+
+	if err := InitDefaultConfig(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, filepath.Join(dir, "rslint.config.mjs"))
+	// Without basePath, the ignore would silently widen to every fixtures/** in
+	// the repo after the source JSON is deleted.
+	assertContains(t, content, "basePath: 'packages/foo'")
+	assertContains(t, content, "fixtures/**")
+}
+
+func TestMigrate_EntryWithBasePath_PreservedInOverride(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "rslint.json"), `[{
+		"basePath": "packages/foo",
+		"files": ["src/**/*.ts"],
+		"rules": { "no-console": "warn" }
+	}]`)
+
+	if err := InitDefaultConfig(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, filepath.Join(dir, "rslint.config.mjs"))
+	assertContains(t, content, "basePath: 'packages/foo'")
+	assertContains(t, content, "src/**/*.ts")
+}
+
+func TestMigrate_IgnoresExtractedAsGlobal_PreservesBasePath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "rslint.json"), `[{
+		"basePath": "packages/foo",
+		"ignores": ["fixtures/**"],
+		"rules": { "no-console": "warn" }
+	}]`)
+
+	if err := InitDefaultConfig(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, filepath.Join(dir, "rslint.config.mjs"))
+	// The extracted global ignore entry must stay scoped to packages/foo, and
+	// the original override entry must keep its own basePath too.
+	assertContains(t, content, "basePath: 'packages/foo'")
+	assertContains(t, content, "fixtures/**")
+	assertContains(t, content, "no-console")
+}
+
 func TestMigrate_MultiEntry_DifferentPlugins(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
