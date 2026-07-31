@@ -50,6 +50,7 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			contexts := []*titleLayer{newTitleLayer()}
+			var describeCalls []*ast.Node
 
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
@@ -61,6 +62,7 @@ func NewRule(config Config) rule.Rule {
 					current := contexts[len(contexts)-1]
 					if parsed.Call.Kind == testFramework.FnKindDescribe {
 						contexts = append(contexts, newTitleLayer())
+						describeCalls = append(describeCalls, node)
 					}
 
 					if parsed.Parameterized {
@@ -94,14 +96,12 @@ func NewRule(config Config) rule.Rule {
 					current.describeTitles[title] = struct{}{}
 				},
 				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-					parsed := config.Parse(node, ctx)
-					if parsed == nil || parsed.Call == nil ||
-						parsed.Call.Kind != testFramework.FnKindDescribe {
+					last := len(describeCalls) - 1
+					if last < 0 || describeCalls[last] != node {
 						return
 					}
-					if len(contexts) > 1 {
-						contexts = contexts[:len(contexts)-1]
-					}
+					describeCalls = describeCalls[:last]
+					contexts = contexts[:len(contexts)-1]
 				},
 			}
 		},

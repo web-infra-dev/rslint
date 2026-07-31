@@ -54,7 +54,7 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		return nil
 	}
 
-	resolved, consumed, ok := resolveRstestRoot(root, parts, ctx, make(map[*ast.Symbol]bool), 0)
+	resolved, consumed, ok := resolveRstestRoot(root, parts, ctx, nil, 0)
 	if !ok {
 		return nil
 	}
@@ -197,10 +197,14 @@ func resolveRstestRoot(
 	}
 
 	localName := root.AsIdentifier().Text
-	name, originalNode, mode := testFramework.ResolveFunctionIdentifierReference(
+	var symbol *ast.Symbol
+	if ctx.TypeChecker != nil {
+		symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
+	}
+	name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 		localName,
 		root,
-		ctx.TypeChecker,
+		symbol,
 		ctx.SourceFile,
 		RstestImportModule,
 	)
@@ -213,7 +217,7 @@ func resolveRstestRoot(
 		}, 0, true
 	}
 
-	if testFramework.IsModuleNamespaceReference(root, ctx.TypeChecker, RstestImportModule) {
+	if testFramework.IsModuleNamespaceSymbol(symbol, RstestImportModule) {
 		if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 			return rstestResolvedAPI{}, 0, false
 		}
@@ -229,16 +233,11 @@ func resolveRstestRoot(
 		}, 1, true
 	}
 
-	if ctx.TypeChecker == nil {
+	if symbol == nil || (visited != nil && visited[symbol]) {
 		return rstestResolvedAPI{}, 0, false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
-	if symbol == nil || visited[symbol] {
-		return rstestResolvedAPI{}, 0, false
-	}
-	visited[symbol] = true
-	defer delete(visited, symbol)
 
+	tracking := false
 	for _, declaration := range symbol.Declarations {
 		if !isConstRstestVariableDeclaration(declaration) {
 			continue
@@ -247,6 +246,14 @@ func resolveRstestRoot(
 		aliasRoot, aliasParts, aliasRootInvoked, ok := parseRstestChain(initializer)
 		if !ok || aliasRootInvoked {
 			continue
+		}
+		if !tracking {
+			if visited == nil {
+				visited = make(map[*ast.Symbol]bool)
+			}
+			visited[symbol] = true
+			defer delete(visited, symbol)
+			tracking = true
 		}
 		resolved, consumed, ok := resolveRstestRoot(aliasRoot, aliasParts, ctx, visited, depth+1)
 		if !ok {

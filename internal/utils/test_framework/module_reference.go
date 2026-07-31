@@ -53,6 +53,28 @@ func ResolveFunctionIdentifierReference(
 	}
 
 	symbol := typeChecker.GetSymbolAtLocation(identifier)
+	return ResolveFunctionIdentifierReferenceFromSymbol(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		importModule,
+	)
+}
+
+// ResolveFunctionIdentifierReferenceFromSymbol resolves an identifier using
+// its already-looked-up symbol. Callers that perform additional symbol-based
+// checks can use this helper to avoid repeating TypeChecker lookups.
+func ResolveFunctionIdentifierReferenceFromSymbol(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModule string,
+) (string, *ast.Node, ReferenceMode) {
+	if identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return localName, identifier, ReferenceModeGlobal
+	}
 	if symbol == nil {
 		return localName, identifier, ReferenceModeGlobal
 	}
@@ -91,18 +113,9 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 	return nil
 }
 
-// IsModuleNamespaceReference reports whether identifier is bound to a namespace
-// import or a whole-module require for importModule.
-func IsModuleNamespaceReference(
-	identifier *ast.Node,
-	typeChecker *checker.Checker,
-	importModule string,
-) bool {
-	if identifier == nil || identifier.Kind != ast.KindIdentifier || typeChecker == nil {
-		return false
-	}
-
-	symbol := typeChecker.GetSymbolAtLocation(identifier)
+// IsModuleNamespaceSymbol reports whether symbol is a namespace import or a
+// whole-module require for importModule.
+func IsModuleNamespaceSymbol(symbol *ast.Symbol, importModule string) bool {
 	if symbol == nil {
 		return false
 	}
