@@ -539,3 +539,38 @@ func TestIsConstructorName(t *testing.T) {
 		}
 	}
 }
+
+func TestSliceEnclosingDelimiters(t *testing.T) {
+	tests := []struct {
+		name        string
+		text        string
+		start, end  int
+		open, close byte
+		want        string
+	}{
+		// Inner range excludes the brackets; the helper widens outward to include them.
+		{name: "type args", text: "Foo<T>", start: 4, end: 5, open: '<', close: '>', want: "<T>"},
+		{name: "param list", text: "f(a, b)", start: 2, end: 6, open: '(', close: ')', want: "(a, b)"},
+		// Trivia between a delimiter and the inner range is absorbed.
+		{name: "comment before open", text: "Foo</* c */ T>", start: 12, end: 13, open: '<', close: '>', want: "</* c */ T>"},
+		{name: "space after close", text: "Foo<T >", start: 4, end: 5, open: '<', close: '>', want: "<T >"},
+		// Missing close delimiter: scan stops at the text boundary.
+		{name: "no close", text: "Foo<T", start: 4, end: 5, open: '<', close: '>', want: "<T"},
+		// Missing open delimiter: scan stops at the start boundary.
+		{name: "no open", text: "T>", start: 0, end: 1, open: '<', close: '>', want: "T>"},
+		// Out-of-bounds offsets are clamped.
+		{name: "end past len", text: "<T>", start: 1, end: 99, open: '<', close: '>', want: "<T>"},
+		// start past len clamps to len; with no open delimiter the back-scan
+		// reaches offset 0, so the whole text is returned.
+		{name: "start past len", text: "abc", start: 99, end: 99, open: '<', close: '>', want: "abc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SliceEnclosingDelimiters(tt.text, tt.start, tt.end, tt.open, tt.close)
+			if got != tt.want {
+				t.Errorf("SliceEnclosingDelimiters(%q, %d, %d, %q, %q) = %q, want %q",
+					tt.text, tt.start, tt.end, tt.open, tt.close, got, tt.want)
+			}
+		})
+	}
+}

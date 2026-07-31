@@ -76,6 +76,46 @@ func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	return sourceFile.Text()[r.Pos():r.End()]
 }
 
+// SliceEnclosingDelimiters returns text[start..end] widened outward so it
+// includes the nearest enclosing `open`/`close` delimiter pair. Given an inner
+// range (e.g. the span of a comma-separated list whose own range excludes the
+// surrounding brackets), it scans left from `start` to the `open` byte and
+// right from `end` to the `close` byte, both inclusive, tolerating comments or
+// whitespace between a delimiter and the list. Offsets are clamped to text
+// bounds; if a delimiter is not found the scan stops at the boundary. Used to
+// recover bracket-delimited source such as `<T>` type-argument lists and `(…)`
+// parameter lists whose AST node ranges start after the opening bracket.
+func SliceEnclosingDelimiters(text string, start, end int, open byte, closeCh byte) string {
+	if start > len(text) {
+		start = len(text)
+	}
+	for start > 0 && text[start-1] != open {
+		start--
+	}
+	if start > 0 {
+		start--
+	}
+	if end < 0 {
+		end = 0
+	}
+	for end < len(text) && text[end] != closeCh {
+		end++
+	}
+	if end < len(text) {
+		end++
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(text) {
+		end = len(text)
+	}
+	if start > end {
+		return ""
+	}
+	return text[start:end]
+}
+
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 

@@ -59,17 +59,6 @@ type methodSignatureFixer struct {
 	sourceText string
 }
 
-// safeSlice returns sourceText[start:end] with bounds clamping.
-func (f *methodSignatureFixer) safeSlice(start, end int) string {
-	if start < 0 {
-		start = 0
-	}
-	if end > len(f.sourceText) {
-		end = len(f.sourceText)
-	}
-	return f.sourceText[start:end]
-}
-
 // getMethodKey returns the key text for a method or property signature,
 // including optional marker and readonly prefix.
 func (f *methodSignatureFixer) getMethodKey(node *ast.Node) string {
@@ -119,32 +108,20 @@ func (f *methodSignatureFixer) getMethodParams(node *ast.Node) string {
 	if params != nil && len(params.Nodes) > 0 {
 		firstRange := utils.TrimNodeTextRange(f.sourceFile, params.Nodes[0])
 		lastRange := utils.TrimNodeTextRange(f.sourceFile, params.Nodes[len(params.Nodes)-1])
-		// Scan backward to find '(' before first param
-		openParen := firstRange.Pos() - 1
-		for openParen > 0 && f.sourceText[openParen] != '(' {
-			openParen--
-		}
-		// Scan forward to find ')' after last param
-		closeParen := lastRange.End()
-		for closeParen < len(f.sourceText) && f.sourceText[closeParen] != ')' {
-			closeParen++
-		}
-		paramsText = f.safeSlice(openParen, closeParen+1)
+		// Widen the param-list span outward to the enclosing `(`/`)` pair
+		// (comments may sit between a paren and the first/last param).
+		paramsText = utils.SliceEnclosingDelimiters(
+			f.sourceText, firstRange.Pos(), lastRange.End(), '(', ')',
+		)
 	}
 
 	if typeParams != nil && len(typeParams.Nodes) > 0 {
 		firstRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[0])
 		lastRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[len(typeParams.Nodes)-1])
-		// Scan backward/forward to find '<'/'>' (comments may sit between the bracket and the first/last param)
-		start := firstRange.Pos() - 1
-		for start > 0 && f.sourceText[start] != '<' {
-			start--
-		}
-		end := lastRange.End()
-		for end < len(f.sourceText) && f.sourceText[end] != '>' {
-			end++
-		}
-		paramsText = f.safeSlice(start, end+1) + paramsText
+		// Widen the type-param-list span outward to the enclosing `<`/`>` pair.
+		paramsText = utils.SliceEnclosingDelimiters(
+			f.sourceText, firstRange.Pos(), lastRange.End(), '<', '>',
+		) + paramsText
 	}
 
 	return paramsText

@@ -306,24 +306,12 @@ func elementTypeText(ctx rule.RuleContext, elementType *ast.Node) string {
 
 // typeArgumentsText returns the source text of a type-argument list including
 // its angle brackets (`<T>`), mirroring upstream's `sourceCode.getText(typeArguments)`.
+// The node list range starts after `<` and ends before `>`, so widen it outward
+// to the enclosing bracket pair.
 func typeArgumentsText(ctx rule.RuleContext, typeArguments *ast.NodeList) string {
-	text := ctx.SourceFile.Text()
-	start := typeArguments.Pos()
-	// The node list range starts after `<`; scan back to include it.
-	for start > 0 && text[start-1] != '<' {
-		start--
-	}
-	if start > 0 {
-		start--
-	}
-	end := typeArguments.End()
-	for end < len(text) && text[end] != '>' {
-		end++
-	}
-	if end < len(text) {
-		end++
-	}
-	return text[start:end]
+	return utils.SliceEnclosingDelimiters(
+		ctx.SourceFile.Text(), typeArguments.Pos(), typeArguments.End(), '<', '>',
+	)
 }
 
 // hasCommentsOutsideNode mirrors upstream's `hasCommentsOutsideNode`: whether
@@ -354,6 +342,7 @@ const (
 	svBigInt
 	svBool
 	svNull
+	svUndefined
 )
 
 // staticValue is a statically-evaluated comparable JavaScript value, modeling
@@ -374,11 +363,11 @@ func (v staticValue) asNumber() (float64, bool) {
 	return 0, false
 }
 
-// isComparable mirrors upstream's `isComparableStaticValue`: null, or any
-// non-object / non-function primitive.
+// isComparable mirrors upstream's `isComparableStaticValue`: null, undefined,
+// or any non-object / non-function primitive.
 func (v staticValue) isComparable() bool {
 	switch v.kind {
-	case svString, svNumber, svBigInt, svBool, svNull:
+	case svString, svNumber, svBigInt, svBool, svNull, svUndefined:
 		return true
 	}
 	return false
@@ -412,6 +401,8 @@ func sameValueZero(left, right staticValue) bool {
 	case svBool:
 		return left.boolean == right.boolean
 	case svNull:
+		return true
+	case svUndefined:
 		return true
 	}
 	return false
@@ -535,8 +526,22 @@ func evaluateStaticBinary(ctx rule.RuleContext, binary *ast.BinaryExpression, vi
 }
 
 func evaluateStaticIdentifier(ctx rule.RuleContext, node *ast.Node, visited map[*ast.Symbol]bool) (staticValue, bool) {
-	if node.AsIdentifier().Text == "Infinity" && !utils.IsShadowed(node, "Infinity") {
-		return staticValue{kind: svNumber, number: math.Inf(1)}, true
+	// The global numeric/undefined identifiers upstream's getStaticValue models.
+	// Each is only a constant when not shadowed by a local binding of the same
+	// name (e.g. `const NaN = 0`), matching the Infinity shadow check.
+	switch node.AsIdentifier().Text {
+	case "Infinity":
+		if !utils.IsShadowed(node, "Infinity") {
+			return staticValue{kind: svNumber, number: math.Inf(1)}, true
+		}
+	case "NaN":
+		if !utils.IsShadowed(node, "NaN") {
+			return staticValue{kind: svNumber, number: math.NaN()}, true
+		}
+	case "undefined":
+		if !utils.IsShadowed(node, "undefined") {
+			return staticValue{kind: svUndefined}, true
+		}
 	}
 	if ctx.Refs == nil {
 		return staticValue{}, false
@@ -575,6 +580,8 @@ func (v staticValue) truthy() (bool, bool) {
 	case svBool:
 		return v.boolean, true
 	case svNull:
+		return false, true
+	case svUndefined:
 		return false, true
 	}
 	return false, false

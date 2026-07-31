@@ -208,14 +208,14 @@ func buildSetFixes(
 	fixes = append(fixes, rule.RuleFixInsertAfter(initializer, ")"))
 
 	for _, identifier := range groups.includes {
-		property := propertyOfMemberAccess(outerParen(identifier).Parent)
+		property := propertyOfMemberAccess(ast.WalkUpParenthesizedExpressions(identifier.Parent))
 		if property != nil {
 			fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, property, "has"))
 		}
 	}
 
 	for _, identifier := range groups.lengths {
-		property := propertyOfMemberAccess(outerParen(identifier).Parent)
+		property := propertyOfMemberAccess(ast.WalkUpParenthesizedExpressions(identifier.Parent))
 		if property != nil {
 			fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, property, "size"))
 		}
@@ -265,11 +265,11 @@ func getReferenceGroups(identifiers []*ast.Node) (referenceGroups, bool) {
 // `identifier.includes(x)` call with exactly one non-spread argument, mirroring
 // upstream's `isIncludesCall` (isMethodCall defaults: non-optional, no spread).
 func isIncludesCall(node *ast.Node) bool {
-	member := outerParen(node).Parent
+	member := ast.WalkUpParenthesizedExpressions(node.Parent)
 	if member == nil || !ast.IsPropertyAccessExpression(member) {
 		return false
 	}
-	call := outerParen(member).Parent
+	call := ast.WalkUpParenthesizedExpressions(member.Parent)
 	argumentsLength := 1
 	match, ok := unicornutil.MatchDotMethodCall(call, unicornutil.DotMethodCallOptions{
 		Method:          "includes",
@@ -288,38 +288,6 @@ func isIncludesCall(node *ast.Node) bool {
 	return ast.SkipParentheses(match.Object) == node
 }
 
-// outerParen returns node walked up through any enclosing
-// ParenthesizedExpression nodes — the ESTree view in which parentheses are
-// invisible.
-func outerParen(node *ast.Node) *ast.Node {
-	current := node
-	for current.Parent != nil && current.Parent.Kind == ast.KindParenthesizedExpression {
-		current = current.Parent
-	}
-	return current
-}
-
-var multipleCallNodeKinds = map[ast.Kind]bool{
-	ast.KindForOfStatement:      true,
-	ast.KindForStatement:        true,
-	ast.KindForInStatement:      true,
-	ast.KindWhileStatement:      true,
-	ast.KindDoStatement:         true,
-	ast.KindFunctionDeclaration: true,
-	ast.KindFunctionExpression:  true,
-	ast.KindArrowFunction:       true,
-	// tsgo divergence: ESTree models object / class methods, accessors, and
-	// constructors as a Property/MethodDefinition wrapping a FunctionExpression,
-	// so upstream's FunctionExpression entry catches them. tsgo has no wrapping
-	// FunctionExpression — the method body lives directly under these kinds —
-	// so they must be listed explicitly to preserve the "crosses a function
-	// boundary" semantics.
-	ast.KindMethodDeclaration: true,
-	ast.KindGetAccessor:       true,
-	ast.KindSetAccessor:       true,
-	ast.KindConstructor:       true,
-}
-
 // isMultipleCall mirrors upstream's `isMultipleCall`. Walking up from the
 // `includes` call towards the declaration's container, it reports whether a
 // loop/function boundary is crossed (so the single call may run many times).
@@ -334,15 +302,29 @@ func isMultipleCall(includesIdentifier *ast.Node, node *ast.Node) bool {
 
 	// Upstream starts the walk at the `.includes()` CallExpression
 	// (`identifier.parent.parent`). Parentheses are transparent in ESTree.
-	member := outerParen(includesIdentifier).Parent
-	parent := outerParen(member).Parent
+	member := ast.WalkUpParenthesizedExpressions(includesIdentifier.Parent)
+	parent := ast.WalkUpParenthesizedExpressions(member.Parent)
 	for parent != nil && parent != root {
-		if multipleCallNodeKinds[parent.Kind] {
+		if isMultipleCallBoundary(parent) {
 			return true
 		}
 		parent = parent.Parent
 	}
 	return false
+}
+
+// isMultipleCallBoundary reports whether crossing `node` means the enclosed
+// `includes` call may execute more than once: a loop, or a function-like
+// container. The function-like set is shared via utils.IsFunctionLikeContainer,
+// which already accounts for tsgo modeling object/class methods, accessors, and
+// constructors as their own kinds rather than wrapping a FunctionExpression.
+func isMultipleCallBoundary(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindForOfStatement, ast.KindForStatement, ast.KindForInStatement,
+		ast.KindWhileStatement, ast.KindDoStatement:
+		return true
+	}
+	return utils.IsFunctionLikeContainer(node)
 }
 
 // ancestorAt returns the ancestor reached by following `.Parent` `depth` times.
@@ -356,13 +338,16 @@ func ancestorAt(node *ast.Node, depth int) *ast.Node {
 
 // isLengthRead mirrors upstream's `isLengthRead`: a non-computed `.length`
 // member read that is neither an assignment target nor a call callee.
+// Parentheses are transparent in ESTree, so unwrap them (both around the
+// receiver and around the member) to match upstream's flattened view — e.g.
+// `(foo).length`.
 func isLengthRead(identifier *ast.Node) bool {
-	parent := identifier.Parent
+	parent := ast.WalkUpParenthesizedExpressions(identifier.Parent)
 	if parent == nil || !ast.IsPropertyAccessExpression(parent) {
 		return false
 	}
 	access := parent.AsPropertyAccessExpression()
-	if access.Expression != identifier || ast.IsOptionalChainRoot(parent) {
+	if ast.SkipParentheses(access.Expression) != identifier || ast.IsOptionalChainRoot(parent) {
 		return false
 	}
 	property := access.Name()
@@ -375,7 +360,7 @@ func isLengthRead(identifier *ast.Node) bool {
 	}
 
 	// `grandParent.type === 'CallExpression' && grandParent.callee === parent`
-	grandParent := parent.Parent
+	grandParent := ast.WalkUpParenthesizedExpressions(parent.Parent)
 	if grandParent != nil && ast.IsCallExpression(grandParent) {
 		if ast.SkipParentheses(grandParent.AsCallExpression().Expression) == parent {
 			return false
@@ -405,21 +390,18 @@ func isAssignmentTarget(node *ast.Node) bool {
 	return isForInOrForOfTarget(target)
 }
 
-// isTypeScriptExpressionWrapper reports whether `parent` is a TS `as` / `<T>` /
-// `!` wrapper whose expression is `child`.
+// isTypeScriptExpressionWrapper reports whether `parent` is a TS assertion
+// wrapper (`as` / `<T>` / `!` / `satisfies`) whose expression is `child`. It
+// keys off ast.OEKAssertions — the same assertion set the static-value
+// evaluator unwraps via SkipOuterExpressions — so both directions stay
+// consistent (previously `satisfies` was handled by the evaluator but not
+// here). isAssignmentTarget walks parents upward, hence the manual child check
+// instead of the downward SkipOuterExpressions helper.
 func isTypeScriptExpressionWrapper(parent *ast.Node, child *ast.Node) bool {
-	if parent == nil {
+	if parent == nil || !ast.IsOuterExpression(parent, ast.OEKAssertions) {
 		return false
 	}
-	switch parent.Kind {
-	case ast.KindAsExpression:
-		return parent.AsAsExpression().Expression == child
-	case ast.KindTypeAssertionExpression:
-		return parent.AsTypeAssertion().Expression == child
-	case ast.KindNonNullExpression:
-		return parent.AsNonNullExpression().Expression == child
-	}
-	return false
+	return parent.Expression() == child
 }
 
 // isForInOrForOfTarget reports whether `node` is the left-hand target of a
@@ -443,23 +425,26 @@ func isAllowedExtraReference(identifier *ast.Node) bool {
 }
 
 // isIterableUse reports whether the identifier is the iterable of a for-of
-// statement (`for (const x of identifier)`).
+// statement (`for (const x of identifier)`). Parentheses around the iterable
+// (`for (const x of (foo))`) are transparent in ESTree, so unwrap them.
 func isIterableUse(identifier *ast.Node) bool {
-	parent := identifier.Parent
+	parent := ast.WalkUpParenthesizedExpressions(identifier.Parent)
 	if parent == nil || parent.Kind != ast.KindForOfStatement {
 		return false
 	}
-	return parent.AsForInOrOfStatement().Expression == identifier
+	return ast.SkipParentheses(parent.AsForInOrOfStatement().Expression) == identifier
 }
 
 // isArrayOrArgumentSpread reports whether the identifier is spread into an
 // array literal, call, or new expression (`[...x]`, `f(...x)`, `new F(...x)`).
+// Parentheses around the spread argument (`[...(foo)]`) are transparent in
+// ESTree, so unwrap them.
 func isArrayOrArgumentSpread(identifier *ast.Node) bool {
-	parent := identifier.Parent
+	parent := ast.WalkUpParenthesizedExpressions(identifier.Parent)
 	if parent == nil || !ast.IsSpreadElement(parent) {
 		return false
 	}
-	if parent.AsSpreadElement().Expression != identifier {
+	if ast.SkipParentheses(parent.AsSpreadElement().Expression) != identifier {
 		return false
 	}
 	grandParent := parent.Parent
@@ -475,15 +460,21 @@ func isArrayOrArgumentSpread(identifier *ast.Node) bool {
 
 // isAllowedForEachCall reports whether the identifier is the receiver of a
 // `identifier.forEach(arrow)` call whose callback is a one-parameter arrow
-// function, mirroring upstream's `isAllowedForEachCall`.
+// function, mirroring upstream's `isAllowedForEachCall`. Parentheses around the
+// receiver (`(foo).forEach(...)`) are transparent in ESTree, so walk up through
+// them (like isIncludesCall) instead of assuming a fixed ancestor depth.
 func isAllowedForEachCall(identifier *ast.Node) bool {
-	callExpression := ancestorAt(identifier, 2)
+	member := ast.WalkUpParenthesizedExpressions(identifier.Parent)
+	if member == nil || !ast.IsPropertyAccessExpression(member) {
+		return false
+	}
+	callExpression := ast.WalkUpParenthesizedExpressions(member.Parent)
 	argumentsLength := 1
 	match, ok := unicornutil.MatchDotMethodCall(callExpression, unicornutil.DotMethodCallOptions{
 		Method:          "forEach",
 		ArgumentsLength: &argumentsLength,
 	})
-	if !ok || match.Object != identifier {
+	if !ok || ast.SkipParentheses(match.Object) != identifier {
 		return false
 	}
 	return isOneParameterArrowFunction(callExpression.Arguments()[0])
