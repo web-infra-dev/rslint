@@ -1,0 +1,28 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "skipComments": {
+          "type": "boolean"
+        },
+        "skipStrings": {
+          "type": "boolean"
+        },
+        "skipTemplates": {
+          "type": "boolean"
+        },
+        "skipRegExps": {
+          "type": "boolean"
+        },
+        "skipJSXText": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

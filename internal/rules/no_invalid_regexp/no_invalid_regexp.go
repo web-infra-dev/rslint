@@ -1,14 +1,17 @@
 package no_invalid_regexp
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_invalid_regexp.schema.json
+var schemaJSON []byte
 
 // validFlags is the set of standard RegExp flags.
 var validFlags = map[byte]bool{
@@ -24,9 +27,9 @@ var validFlags = map[byte]bool{
 
 // https://eslint.org/docs/latest/rules/no-invalid-regexp
 var NoInvalidRegexpRule = rule.Rule{
-	Name: "no-invalid-regexp",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-invalid-regexp",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		report := func(node *ast.Node, msg string) {
@@ -188,29 +191,24 @@ type noInvalidRegexpOptions struct {
 	allowConstructorFlags map[byte]bool
 }
 
-func parseOptions(opts any) noInvalidRegexpOptions {
-	result := noInvalidRegexpOptions{
+func parseOptions(options []any) noInvalidRegexpOptions {
+	opts := noInvalidRegexpOptions{
 		allowConstructorFlags: make(map[byte]bool),
 	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allowArr, ok := optsMap["allowConstructorFlags"].([]interface{}); ok {
-			for _, item := range allowArr {
-				if str, ok := item.(string); ok {
-					for i := range len(str) {
-						result.allowConstructorFlags[str[i]] = true
-					}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if allowArr, ok := m["allowConstructorFlags"].([]interface{}); ok {
+		for _, item := range allowArr {
+			if str, ok := item.(string); ok {
+				for i := range len(str) {
+					opts.allowConstructorFlags[str[i]] = true
 				}
-			}
-		}
-		// Also handle string format: "allowConstructorFlags": "a"
-		if allowStr, ok := optsMap["allowConstructorFlags"].(string); ok {
-			for i := range len(allowStr) {
-				result.allowConstructorFlags[allowStr[i]] = true
 			}
 		}
 	}
 
-	return result
+	return opts
 }

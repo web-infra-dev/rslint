@@ -27,11 +27,11 @@ func TestNoMultiAssignRule(t *testing.T) {
 			{Code: "export let a,\n b = 0;"},
 			{
 				Code:    "const x = {};const y = {};x.one = y.one = 1;",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 			},
 			{
 				Code:    "let a, b;a = b = 1",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 			},
 			{Code: "class C { [foo = 0] = 0 }"},
 
@@ -64,12 +64,12 @@ func TestNoMultiAssignRule(t *testing.T) {
 			// `ignoreNonDeclaration: true` allows property-target assignment chains
 			{
 				Code:    "let a; let b; a = b = 'baz';",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 			},
 			// `ignoreNonDeclaration: true` with logical assignment in non-declaration
 			{
 				Code:    "let a, b; a = b ||= 1;",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 			},
 			// Default value inside destructuring pattern is not an init
 			{Code: "var { a = 1 } = obj;"},
@@ -215,28 +215,28 @@ func TestNoMultiAssignRule(t *testing.T) {
 			},
 			{
 				Code:    "const x = {};\nconst y = x.one = 1;",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 2, Column: 11},
 				},
 			},
 			{
 				Code:    "let a, b;a = b = 1",
-				Options: map[string]interface{}{},
+				Options: []any{map[string]interface{}{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 14},
 				},
 			},
 			{
 				Code:    "let x, y;x = y = 'baz'",
-				Options: map[string]interface{}{"ignoreNonDeclaration": false},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 14},
 				},
 			},
 			{
 				Code:    "const a = b = 1",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 11},
 				},
@@ -249,7 +249,7 @@ func TestNoMultiAssignRule(t *testing.T) {
 			},
 			{
 				Code:    "class C { field = foo = 0 }",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 19},
 				},
@@ -340,7 +340,7 @@ func TestNoMultiAssignRule(t *testing.T) {
 			// `ignoreNonDeclaration: true` still reports declaration chains.
 			{
 				Code:    "let a = b = 1",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 9},
 				},
@@ -535,7 +535,7 @@ func TestNoMultiAssignRule(t *testing.T) {
 			// `ignoreNonDeclaration: true` — paren-wrapped declaration init still reports.
 			{
 				Code:    "let a = (b = 1);",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 10},
 				},
@@ -543,7 +543,7 @@ func TestNoMultiAssignRule(t *testing.T) {
 			// `ignoreNonDeclaration: true` — class field paren-wrapped still reports.
 			{
 				Code:    "class C { x = (y = 1); }",
-				Options: map[string]interface{}{"ignoreNonDeclaration": true},
+				Options: []any{map[string]interface{}{"ignoreNonDeclaration": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedChain", Line: 1, Column: 16},
 				},

@@ -431,6 +431,36 @@ func TestNoUnusedVarsWithoutSourceFile(t *testing.T) {
 	}
 }
 
+// TestNoUnusedVarsIgnorePatternSchema locks in the fail-fast behavior for an
+// invalid ignore pattern. Upstream builds `new RegExp(pattern, "u")` while
+// creating the rule, so an invalid pattern like `"("` throws before any linting
+// happens. rslint's equivalent surface is config validation: the schema marks
+// every ignore-pattern option with `format: "regex"`, so the config is rejected
+// up front instead of linting as if no pattern were configured.
+func TestNoUnusedVarsIgnorePatternSchema(t *testing.T) {
+	t.Parallel()
+
+	patternOptions := []string{
+		"varsIgnorePattern",
+		"argsIgnorePattern",
+		"caughtErrorsIgnorePattern",
+		"destructuredArrayIgnorePattern",
+	}
+	for _, name := range patternOptions {
+		invalid := []any{map[string]any{name: "("}}
+		if err := NoUnusedVarsRule.Schema.Validate(invalid); err == nil {
+			t.Errorf("expected an invalid %s regex to fail schema validation", name)
+		}
+		// Lookbehind is JS-legal but RE2-illegal; it must still validate,
+		// proving the schema checks patterns with the ECMAScript engine, not
+		// Go's regexp.
+		valid := []any{map[string]any{name: "(?<=_)unused"}}
+		if err := NoUnusedVarsRule.Schema.Validate(valid); err != nil {
+			t.Errorf("expected a valid %s regex to pass schema validation, got: %v", name, err)
+		}
+	}
+}
+
 func extraUnusedCase(code string, name string, assigned bool, line int, column int, endColumn int, suggestionOutput string) rule_tester.InvalidTestCase {
 	return rule_tester.InvalidTestCase{
 		Code: code,

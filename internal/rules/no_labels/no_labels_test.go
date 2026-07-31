@@ -31,33 +31,33 @@ func TestNoLabelsRule(t *testing.T) {
 			// ================================================================
 			{
 				Code:    `A: while (a) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			{
 				Code:    `A: do { if (b) { break A; } } while (a);`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			{
 				Code:    `A: for (;;) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			{
 				Code:    `A: for (var x in obj) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			{
 				Code:    `A: for (var x of arr) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			// allowLoop: continue targeting labeled loop
 			{
 				Code:    `A: while (a) { continue A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 			// allowLoop: labeled loop with nested switch using continue to outer loop
 			{
 				Code:    `A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 
 			// ================================================================
@@ -65,7 +65,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// ================================================================
 			{
 				Code:    `A: switch (a) { case 0: break A; }`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 			},
 
 			// ================================================================
@@ -73,26 +73,26 @@ func TestNoLabelsRule(t *testing.T) {
 			// ================================================================
 			{
 				Code:    `A: while (a) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 			},
 			{
 				Code:    `A: switch (a) { case 0: break A; }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 			},
 			// Both options: nested loop + switch, break/continue targeting outer loop
 			{
 				Code:    `A: while (a) { switch (x) { case 0: break A; continue A; } }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 			},
 			// Both options: nested loops with labels — all break/continue target loops
 			{
 				Code:    `A: for (;;) { B: while (a) { break A; continue A; break B; continue B; } }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 			},
 			// allowLoop: multiple break/continue targeting different labels — all loops, all allowed
 			{
 				Code:    `A: while (true) { B: while (true) { break A; break B; continue A; continue B; } }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 			},
 		},
 		// Invalid cases
@@ -297,7 +297,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Chained labels with allowLoop: B (loop) is allowed, A (other) is not
 			{
 				Code:    `A: B: while (true) { break B; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -305,7 +305,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Chained labels with allowLoop: break A still errors (A is "other")
 			{
 				Code:    `A: B: while (true) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 22},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -323,7 +323,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Chained labels on switch with allowSwitch: same principle
 			{
 				Code:    `A: B: switch (a) { case 0: break B; }`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -344,7 +344,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Shadowing with allowLoop: inner A (loop) allowed, break A allowed, outer A (other) errors
 			{
 				Code:    `A: { A: while (true) { break A; } }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -356,7 +356,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: variable declaration label — still "other"
 			{
 				Code:    `A: var foo = 0;`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -364,7 +364,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: break label on block — still "other"
 			{
 				Code:    `A: break A;`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 4},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -373,7 +373,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: block label with break
 			{
 				Code:    `A: { if (foo()) { break A; } bar(); };`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 19},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -382,7 +382,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: if label with break
 			{
 				Code:    `A: if (a) { if (foo()) { break A; } bar(); };`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 26},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -391,7 +391,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: switch label — switch is not "loop", still errors
 			{
 				Code:    `A: switch (a) { case 0: break A; default: break; };`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 25},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -400,7 +400,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: variable declaration
 			{
 				Code:    `A: var foo = 0;`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -408,7 +408,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: break label on other
 			{
 				Code:    `A: break A;`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 4},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -417,7 +417,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: block label with break
 			{
 				Code:    `A: { if (foo()) { break A; } bar(); };`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 19},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -426,7 +426,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: if label
 			{
 				Code:    `A: if (a) { if (foo()) { break A; } bar(); };`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 26},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -435,7 +435,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: while label — loop is not "switch", still errors
 			{
 				Code:    `A: while (a) { break A; }`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 16},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -444,7 +444,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: do-while label
 			{
 				Code:    `A: do { if (b) { break A; } } while (a);`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 18},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -453,7 +453,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: for-in label with break targeting labeled loop
 			{
 				Code:    `A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 57},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -462,7 +462,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Both options true: block label — "other" is never allowed
 			{
 				Code:    `A: { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 6},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -471,7 +471,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Both options true: if label — still "other"
 			{
 				Code:    `A: if (true) { break A; }`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 16},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
@@ -480,7 +480,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Both options true: variable declaration
 			{
 				Code:    `A: var foo = 0;`,
-				Options: map[string]interface{}{"allowLoop": true, "allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowLoop": true, "allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},
 				},
@@ -492,7 +492,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: break targets outer loop from inner block label — outer is loop, allowed
 			{
 				Code:    `A: while (true) { B: { break A; } }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					// B (block) is not allowed
 					{MessageId: "unexpectedLabel", Line: 1, Column: 19},
@@ -501,7 +501,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowLoop: continue targets outer loop from inner block label
 			{
 				Code:    `A: while (true) { B: { continue A; } }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 19},
 				},
@@ -509,7 +509,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// allowSwitch: break targets outer switch from inner block label
 			{
 				Code:    `A: switch (a) { case 0: B: { break A; } }`,
-				Options: map[string]interface{}{"allowSwitch": true},
+				Options: []any{map[string]interface{}{"allowSwitch": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabel", Line: 1, Column: 25},
 				},
@@ -551,7 +551,7 @@ func TestNoLabelsRule(t *testing.T) {
 			// Sequential with allowLoop: first (block) errors, second (loop) allowed
 			{
 				Code:    `A: { break A; } B: while (true) { break B; }`,
-				Options: map[string]interface{}{"allowLoop": true},
+				Options: []any{map[string]interface{}{"allowLoop": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedLabelInBreak", Line: 1, Column: 6},
 					{MessageId: "unexpectedLabel", Line: 1, Column: 1},

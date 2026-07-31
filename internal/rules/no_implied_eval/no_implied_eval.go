@@ -40,7 +40,8 @@ func buildExecScriptMessage() rule.RuleMessage {
 
 // https://eslint.org/docs/latest/rules/no-implied-eval
 var NoImpliedEvalRule = rule.Rule{
-	Name: "no-implied-eval",
+	Name:   "no-implied-eval",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sctx := newStrCtx(ctx)
 

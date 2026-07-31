@@ -10,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-script-url
 var NoScriptUrlRule = rule.Rule{
-	Name: "no-script-url",
+	Name:   "no-script-url",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		const jsScheme = "javascript:"
 

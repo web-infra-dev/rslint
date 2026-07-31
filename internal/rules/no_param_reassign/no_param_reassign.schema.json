@@ -1,0 +1,44 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "props": {
+              "enum": [false]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "props": {
+              "enum": [true]
+            },
+            "ignorePropertyModificationsFor": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "ignorePropertyModificationsForRegex": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "regex"
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

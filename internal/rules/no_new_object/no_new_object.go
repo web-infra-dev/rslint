@@ -7,7 +7,8 @@ import (
 )
 
 var NoNewObjectRule = rule.Rule{
-	Name: "no-new-object",
+	Name:   "no-new-object",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {

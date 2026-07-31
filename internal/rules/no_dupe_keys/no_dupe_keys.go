@@ -82,7 +82,8 @@ func (state *objectState) register(name string, kind propertyKind) bool {
 
 // https://eslint.org/docs/latest/rules/no-dupe-keys
 var NoDupeKeysRule = rule.Rule{
-	Name: "no-dupe-keys",
+	Name:   "no-dupe-keys",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {

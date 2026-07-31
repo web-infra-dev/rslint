@@ -14,12 +14,12 @@ type NoUnusedExpressionOptions struct {
 // ParseNoUnusedExpressionOptions reads the shared ESLint-compatible options.
 // ignoreDirectives only affects ESLint's legacy ecmaVersion: 3 mode, which
 // rslint does not expose; directive prologues are always skipped.
-func ParseNoUnusedExpressionOptions(raw any) NoUnusedExpressionOptions {
+func ParseNoUnusedExpressionOptions(options []any) NoUnusedExpressionOptions {
 	opts := NoUnusedExpressionOptions{}
-	optsMap := GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowShortCircuit"].(bool); ok {
 		opts.AllowShortCircuit = v
 	}

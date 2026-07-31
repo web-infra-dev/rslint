@@ -31,9 +31,9 @@ func TestNoEmptyFunctionExtras(t *testing.T) {
 			{Code: `const fn = () => value;`},
 
 			// ---- Dimension 4: expression wrappers around function values preserve allow matching ----
-			{Code: `const fn = ((() => {})) as Fn;`, Options: map[string]interface{}{"allow": []interface{}{"arrowFunctions"}}},
-			{Code: `const fn = (function named() {}) satisfies Fn;`, Options: map[string]interface{}{"allow": []interface{}{"functions"}}},
-			{Code: `const fn = (function named() {})!;`, Options: map[string]interface{}{"allow": []interface{}{"functions"}}},
+			{Code: `const fn = ((() => {})) as Fn;`, Options: []any{map[string]any{"allow": []any{"arrowFunctions"}}}},
+			{Code: `const fn = (function named() {}) satisfies Fn;`, Options: []any{map[string]any{"allow": []any{"functions"}}}},
+			{Code: `const fn = (function named() {})!;`, Options: []any{map[string]any{"allow": []any{"functions"}}}},
 
 			// ---- Dimension 4: comments inside an otherwise empty body are allowed ----
 			{Code: `function f() { /* intentionally empty */ }`},
@@ -53,41 +53,40 @@ func TestNoEmptyFunctionExtras(t *testing.T) {
 			{Code: `class C { constructor(readonly value: string) {} }`},
 
 			// Locks in upstream isAllowedEmptyFunction() private/protected constructor arms.
-			{Code: `class C { private constructor() {} }`, Options: map[string]interface{}{"allow": []interface{}{"privateConstructors"}}},
-			{Code: `class C { protected constructor() {} }`, Options: map[string]interface{}{"allow": []interface{}{"protectedConstructors"}}},
+			{Code: `class C { private constructor() {} }`, Options: []any{map[string]any{"allow": []any{"privateConstructors"}}}},
+			{Code: `class C { protected constructor() {} }`, Options: []any{map[string]any{"allow": []any{"protectedConstructors"}}}},
 
 			// Locks in upstream isAllowedEmptyFunction() decoratedFunctions arm.
-			{Code: `class C { @Log("This is a contrived example.") blah(): void { } }`, Options: map[string]interface{}{"allow": []interface{}{"decoratedFunctions"}}},
+			{Code: `class C { @Log("This is a contrived example.") blah(): void { } }`, Options: []any{map[string]any{"allow": []any{"decoratedFunctions"}}}},
 
 			// ---- Real-user: typescript-eslint#2838 decorated methods may be intentionally empty ----
-			{Code: `class C { @Log("This is a contrived example.") blah(): void {} }`, Options: map[string]interface{}{"allow": []interface{}{"decoratedFunctions"}}},
+			{Code: `class C { @Log("This is a contrived example.") blah(): void {} }`, Options: []any{map[string]any{"allow": []any{"decoratedFunctions"}}}},
 
 			// ---- Real-user: typescript-eslint#2278 decorated private methods may be intentionally empty ----
-			{Code: `class C { @Emit("click") private onClick() {} }`, Options: map[string]interface{}{"allow": []interface{}{"decoratedFunctions"}}},
+			{Code: `class C { @Emit("click") private onClick() {} }`, Options: []any{map[string]any{"allow": []any{"decoratedFunctions"}}}},
 
 			// Locks in upstream isAllowedEmptyFunction() overrideMethods arm.
-			{Code: `class C extends B { override method() {} }`, Options: map[string]interface{}{"allow": []interface{}{"overrideMethods"}}},
-			{Code: `class C extends B { static override async method() {} }`, Options: map[string]interface{}{"allow": []interface{}{"overrideMethods"}}},
+			{Code: `class C extends B { override method() {} }`, Options: []any{map[string]any{"allow": []any{"overrideMethods"}}}},
+			{Code: `class C extends B { static override async method() {} }`, Options: []any{map[string]any{"allow": []any{"overrideMethods"}}}},
 
 			// ---- Dimension 4: class-field arrows are named as methods but allowed by arrowFunctions ----
-			{Code: `class C { field = () => {} }`, Options: map[string]interface{}{"allow": []interface{}{"arrowFunctions"}}},
-			{Code: `class C { field = (() => {}) }`, Options: map[string]interface{}{"allow": []interface{}{"arrowFunctions"}}},
+			{Code: `class C { field = () => {} }`, Options: []any{map[string]any{"allow": []any{"arrowFunctions"}}}},
+			{Code: `class C { field = (() => {}) }`, Options: []any{map[string]any{"allow": []any{"arrowFunctions"}}}},
 
 			// Locks in upstream getKind() parent PropertyDefinition fallback: class-field function expressions are functions.
-			{Code: `class C { field = function named() {} }`, Options: map[string]interface{}{"allow": []interface{}{"functions"}}},
-			{Code: `class C { field = async function named() {} }`, Options: map[string]interface{}{"allow": []interface{}{"asyncFunctions"}}},
+			{Code: `class C { field = function named() {} }`, Options: []any{map[string]any{"allow": []any{"functions"}}}},
+			{Code: `class C { field = async function named() {} }`, Options: []any{map[string]any{"allow": []any{"asyncFunctions"}}}},
 
 			// Locks in upstream getKind() parent Property fallback: object property arrows/functions keep their function kind.
-			{Code: `const obj = { foo: () => {} };`, Options: map[string]interface{}{"allow": []interface{}{"arrowFunctions"}}},
-			{Code: `const obj = { foo: async function () {} };`, Options: map[string]interface{}{"allow": []interface{}{"asyncFunctions"}}},
+			{Code: `const obj = { foo: () => {} };`, Options: []any{map[string]any{"allow": []any{"arrowFunctions"}}}},
+			{Code: `const obj = { foo: async function () {} };`, Options: []any{map[string]any{"allow": []any{"asyncFunctions"}}}},
 
 			// ---- Dimension 4: async generator functions take the generatorFunctions kind, matching upstream prefix priority ----
-			{Code: `async function* f() {}`, Options: map[string]interface{}{"allow": []interface{}{"generatorFunctions"}}},
-			{Code: `class C { async *m() {} }`, Options: map[string]interface{}{"allow": []interface{}{"generatorMethods"}}},
+			{Code: `async function* f() {}`, Options: []any{map[string]any{"allow": []any{"generatorFunctions"}}}},
+			{Code: `class C { async *m() {} }`, Options: []any{map[string]any{"allow": []any{"generatorMethods"}}}},
 
-			// Locks in option parsing for combined arrays and the typed []string branch.
-			{Code: `function f() {} const g = () => {}; class C { method() {} }`, Options: map[string]interface{}{"allow": []interface{}{"functions", "arrowFunctions", "methods"}}},
-			{Code: `function f() {}`, Options: map[string]interface{}{"allow": []string{"functions"}}},
+			// Locks in option parsing for combined arrays.
+			{Code: `function f() {} const g = () => {}; class C { method() {} }`, Options: []any{map[string]any{"allow": []any{"functions", "arrowFunctions", "methods"}}}},
 
 			// ---- Dimension 4: declaration/body-absent forms do not report or crash ----
 			{Code: `declare function f(): void;`},
@@ -144,21 +143,14 @@ func TestNoEmptyFunctionExtras(t *testing.T) {
 			generatedInvalidCase(`function f() /* outside body */ {}`, "function 'f'", nil),
 			locationCase("class C {\n  field = () => {\n  }\n}", "method 'field'", 2, 17, 3, 4, "class C {\n  field = () => { /* empty */ }\n}"),
 
-			// Locks in upstream isAllowedEmptyFunction() constructors arm: ESLint uses camelCase option names.
-			generatedInvalidCase(`class C { private constructor() {} }`, "constructor", map[string]interface{}{"allow": []interface{}{"private-constructors"}}),
-			generatedInvalidCase(`class C { protected constructor() {} }`, "constructor", map[string]interface{}{"allow": []interface{}{"protected-constructors"}}),
-
 			// Locks in upstream getKind() prefix priority: async generator is not allowed by asyncFunctions.
-			generatedInvalidCase(`async function* f() {}`, "async generator function 'f'", map[string]interface{}{"allow": []interface{}{"asyncFunctions"}}),
-			generatedInvalidCase(`class C { async *m() {} }`, "async generator method 'm'", map[string]interface{}{"allow": []interface{}{"asyncMethods"}}),
+			generatedInvalidCase(`async function* f() {}`, "async generator function 'f'", []any{map[string]any{"allow": []any{"asyncFunctions"}}}),
+			generatedInvalidCase(`class C { async *m() {} }`, "async generator method 'm'", []any{map[string]any{"allow": []any{"asyncMethods"}}}),
 
-			// Locks in option parsing for bare object, empty object, empty allow, and malformed allow values.
-			generatedInvalidCase(`const fn = () => {};`, "arrow function", map[string]interface{}{"allow": []interface{}{"functions"}}),
-			generatedInvalidCase(`function f() {}`, "function 'f'", map[string]interface{}{}),
-			generatedInvalidCase(`function f() {}`, "function 'f'", []interface{}{map[string]interface{}{}}),
-			generatedInvalidCase(`function f() {}`, "function 'f'", map[string]interface{}{"allow": []interface{}{}}),
-			generatedInvalidCase(`function f() {}`, "function 'f'", map[string]interface{}{"allow": "functions"}),
-			generatedInvalidCase(`function f() {}`, "function 'f'", map[string]interface{}{"allow": []interface{}{"unknown"}}),
+			// Locks in option parsing for empty object and empty allow.
+			generatedInvalidCase(`const fn = () => {};`, "arrow function", []any{map[string]any{"allow": []any{"functions"}}}),
+			generatedInvalidCase(`function f() {}`, "function 'f'", []any{map[string]any{}}),
+			generatedInvalidCase(`function f() {}`, "function 'f'", []any{map[string]any{"allow": []any{}}}),
 
 			// ---- Dimension 4: overload/body-absent declarations do not mask the implementation body ----
 			generatedInvalidCase(`function f(value: string): void; function f(value: number): void; function f(value: string | number) {}`, "function 'f'", nil),
@@ -168,8 +160,8 @@ func TestNoEmptyFunctionExtras(t *testing.T) {
 			generatedInvalidCase(`class C { @Emit("click") private onClick() {} }`, "method 'onClick'", nil),
 
 			// Locks in upstream isAllowedEmptyFunction() method/accessor-only arm: decorated/override fields stay function/arrow kinds.
-			generatedInvalidCase(`class C { @dec field = () => {} }`, "method 'field'", map[string]interface{}{"allow": []interface{}{"decoratedFunctions"}}),
-			generatedInvalidCase(`class C extends B { override field = () => {} }`, "method 'field'", map[string]interface{}{"allow": []interface{}{"overrideMethods"}}),
+			generatedInvalidCase(`class C { @dec field = () => {} }`, "method 'field'", []any{map[string]any{"allow": []any{"decoratedFunctions"}}}),
+			generatedInvalidCase(`class C extends B { override field = () => {} }`, "method 'field'", []any{map[string]any{"allow": []any{"overrideMethods"}}}),
 		},
 	)
 }

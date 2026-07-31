@@ -1,6 +1,7 @@
 package prefer_arrow_callback
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_arrow_callback.schema.json
+var schemaJSON []byte
 
 // prefer-arrow-callback requires arrow functions for callbacks when doing so
 // preserves the callback's binding semantics.
@@ -32,12 +36,12 @@ type callbackInfo struct {
 	bindCall      *ast.Node
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{allowUnboundThis: true}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]any)
 	if v, ok := m["allowNamedFunctions"].(bool); ok {
 		opts.allowNamedFunctions = v
 	}
@@ -497,9 +501,9 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, scope scopeInfo, info call
 }
 
 var PreferArrowCallbackRule = rule.Rule{
-	Name: "prefer-arrow-callback",
-	Run: func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
-		raw := rule.LegacyUnwrapOptions(_raw)
+	Name:   "prefer-arrow-callback",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, raw []any) rule.RuleListeners {
 		opts := parseOptions(raw)
 		return rule.RuleListeners{
 			ast.KindFunctionExpression: func(node *ast.Node) {

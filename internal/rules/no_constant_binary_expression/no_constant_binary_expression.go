@@ -1,10 +1,15 @@
 package no_constant_binary_expression
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_constant_binary_expression.schema.json
+var schemaJSON []byte
 
 // Message builders
 func buildConstantBinaryOperandMessage() rule.RuleMessage {
@@ -902,7 +907,8 @@ func findBinaryExpressionConstantOperand(ctx *rule.RuleContext, a, b *ast.Node, 
 
 // NoConstantBinaryExpressionRule detects constant binary expressions
 var NoConstantBinaryExpressionRule = rule.Rule{
-	Name: "no-constant-binary-expression",
+	Name:   "no-constant-binary-expression",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

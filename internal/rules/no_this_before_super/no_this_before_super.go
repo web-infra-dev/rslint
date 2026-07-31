@@ -101,7 +101,8 @@ func bodyAlwaysExits(node *ast.Node) bool {
 // NoThisBeforeSuperRule disallows this/super before calling super() in constructors.
 // https://eslint.org/docs/latest/rules/no-this-before-super
 var NoThisBeforeSuperRule = rule.Rule{
-	Name: "no-this-before-super",
+	Name:   "no-this-before-super",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {

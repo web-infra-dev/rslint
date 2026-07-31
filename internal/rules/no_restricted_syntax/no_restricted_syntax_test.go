@@ -101,16 +101,6 @@ func TestNoRestrictedSyntaxRule(t *testing.T) {
 			{Code: `var a = 1;`, Options: []interface{}{":nth-child(abc)"}},
 
 			// ============================================================
-			// Selector boundary: object option without `selector` is dropped
-			// ============================================================
-			{
-				Code: `var a = 1;`,
-				Options: []interface{}{
-					map[string]interface{}{"message": "no selector key"},
-				},
-			},
-
-			// ============================================================
 			// :not — non-matching head means whole selector is a no-op
 			// ============================================================
 			{

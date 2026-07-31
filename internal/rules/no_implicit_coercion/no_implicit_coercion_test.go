@@ -74,24 +74,24 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{Code: "foo + `${bar}`"},
 
 			// Option toggles — rule types individually disabled.
-			{Code: `!!foo`, Options: map[string]interface{}{"boolean": false}},
-			{Code: `~foo.indexOf(1)`, Options: map[string]interface{}{"boolean": false}},
-			{Code: `+foo`, Options: map[string]interface{}{"number": false}},
-			{Code: `-(-foo)`, Options: map[string]interface{}{"number": false}},
-			{Code: `foo - 0`, Options: map[string]interface{}{"number": false}},
-			{Code: `1*foo`, Options: map[string]interface{}{"number": false}},
-			{Code: `""+foo`, Options: map[string]interface{}{"string": false}},
-			{Code: `foo += ""`, Options: map[string]interface{}{"string": false}},
+			{Code: `!!foo`, Options: []any{map[string]interface{}{"boolean": false}}},
+			{Code: `~foo.indexOf(1)`, Options: []any{map[string]interface{}{"boolean": false}}},
+			{Code: `+foo`, Options: []any{map[string]interface{}{"number": false}}},
+			{Code: `-(-foo)`, Options: []any{map[string]interface{}{"number": false}}},
+			{Code: `foo - 0`, Options: []any{map[string]interface{}{"number": false}}},
+			{Code: `1*foo`, Options: []any{map[string]interface{}{"number": false}}},
+			{Code: `""+foo`, Options: []any{map[string]interface{}{"string": false}}},
+			{Code: `foo += ""`, Options: []any{map[string]interface{}{"string": false}}},
 
 			// Allowlist entries.
-			{Code: `var a = !!foo`, Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"!!"}}},
-			{Code: `var a = ~foo.indexOf(1)`, Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"~"}}},
-			{Code: `var a = ~foo`, Options: map[string]interface{}{"boolean": true}},
-			{Code: `var a = 1 * foo`, Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}}},
-			{Code: `- -foo`, Options: map[string]interface{}{"number": true, "allow": []interface{}{"- -"}}},
-			{Code: `foo - 0`, Options: map[string]interface{}{"number": true, "allow": []interface{}{"-"}}},
-			{Code: `var a = +foo`, Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"+"}}},
-			{Code: `var a = "" + foo`, Options: map[string]interface{}{"boolean": true, "string": true, "allow": []interface{}{"+"}}},
+			{Code: `var a = !!foo`, Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"!!"}}}},
+			{Code: `var a = ~foo.indexOf(1)`, Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"~"}}}},
+			{Code: `var a = ~foo`, Options: []any{map[string]interface{}{"boolean": true}}},
+			{Code: `var a = 1 * foo`, Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}}}},
+			{Code: `- -foo`, Options: []any{map[string]interface{}{"number": true, "allow": []interface{}{"- -"}}}},
+			{Code: `foo - 0`, Options: []any{map[string]interface{}{"number": true, "allow": []interface{}{"-"}}}},
+			{Code: `var a = +foo`, Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"+"}}}},
+			{Code: `var a = "" + foo`, Options: []any{map[string]interface{}{"boolean": true, "string": true, "allow": []interface{}{"+"}}}},
 
 			// https://github.com/eslint/eslint/issues/7057 — both operands already string.
 			{Code: `'' + 'foo'`},
@@ -104,13 +104,13 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{Code: "foo += `${bar}`"},
 
 			// disallowTemplateShorthand: non-shorthand templates don't trigger.
-			{Code: "`a${foo}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
-			{Code: "`${foo}b`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
-			{Code: "`${foo}${bar}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
-			{Code: "tag`${foo}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
+			{Code: "`a${foo}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
+			{Code: "`${foo}b`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
+			{Code: "`${foo}${bar}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
+			{Code: "tag`${foo}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
 			// Default is off.
 			{Code: "`${foo}`"},
-			{Code: "`${foo}`", Options: map[string]interface{}{"disallowTemplateShorthand": false}},
+			{Code: "`${foo}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": false}}},
 			{Code: `+42`},
 
 			// https://github.com/eslint/eslint/issues/14623 — String(...) operand is already string.
@@ -118,9 +118,9 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{Code: `String(foo) + ''`},
 			{Code: "`` + String(foo)"},
 			{Code: "String(foo) + ``"},
-			{Code: "`${'foo'}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
-			{Code: "`${`foo`}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
-			{Code: "`${String(foo)}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
+			{Code: "`${'foo'}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
+			{Code: "`${`foo`}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
+			{Code: "`${String(foo)}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
 
 			// https://github.com/eslint/eslint/issues/16373 — fraction-of-one pattern.
 			{Code: `console.log(Math.PI * 1/4)`},
@@ -137,7 +137,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{Code: `(String)(foo) + ''`},
 			{Code: "`` + (String)(foo)"},
 			{Code: "(String)(foo) + ``"},
-			{Code: "`${(String)(foo)}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
+			{Code: "`${(String)(foo)}`", Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}}},
 			// Doubly-parenthesised callee.
 			{Code: `+((Number))(foo)`},
 		},
@@ -369,7 +369,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// Template shorthand.
 			{
 				Code:    "`${foo}`",
-				Options: map[string]interface{}{"disallowTemplateShorthand": true},
+				Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 1,
@@ -406,21 +406,21 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{
 				Code:    `var a = !!foo`,
 				Output:  []string{`var a = Boolean(foo)`},
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"~"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"~"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "implicitCoercion", Line: 1, Column: 9},
 				},
 			},
 			{
 				Code:    `var a = ~foo.indexOf(1)`,
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"!!"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"!!"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "implicitCoercion", Line: 1, Column: 9},
 				},
 			},
 			{
 				Code:    `var a = 1 * foo`,
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"+"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"+"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 9,
@@ -432,7 +432,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			},
 			{
 				Code:    `var a = +foo`,
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 9,
@@ -444,7 +444,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			},
 			{
 				Code:    `var a = "" + foo`,
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 9,
@@ -456,7 +456,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			},
 			{
 				Code:    "var a = `` + foo",
-				Options: map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}},
+				Options: []any{map[string]interface{}{"boolean": true, "allow": []interface{}{"*"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 9,
@@ -894,7 +894,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// `` `${expr}` `` variants.
 			{
 				Code:    "`${foo.bar}`",
-				Options: map[string]interface{}{"disallowTemplateShorthand": true},
+				Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 1,
@@ -907,7 +907,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// Parens around the interpolated expression — stripped in output.
 			{
 				Code:    "`${(foo)}`",
-				Options: map[string]interface{}{"disallowTemplateShorthand": true},
+				Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 1,
@@ -921,7 +921,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// string type), so only the inner `` `${foo}` `` is flagged.
 			{
 				Code:    "`${`${foo}`}`",
-				Options: map[string]interface{}{"disallowTemplateShorthand": true},
+				Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 4,
@@ -1218,7 +1218,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// still empty, so the shorthand pattern applies).
 			{
 				Code:    "`${foo}\\\n`",
-				Options: map[string]interface{}{"disallowTemplateShorthand": true},
+				Options: []any{map[string]interface{}{"disallowTemplateShorthand": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 1,

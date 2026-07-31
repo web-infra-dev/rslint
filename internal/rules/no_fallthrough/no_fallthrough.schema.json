@@ -1,0 +1,23 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "commentPattern": {
+          "type": "string",
+          "format": "regex"
+        },
+        "allowEmptyCase": {
+          "type": "boolean"
+        },
+        "reportUnusedFallthroughComment": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

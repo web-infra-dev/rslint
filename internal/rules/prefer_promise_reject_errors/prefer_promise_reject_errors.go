@@ -1,10 +1,15 @@
 package prefer_promise_reject_errors
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_promise_reject_errors.schema.json
+var schemaJSON []byte
 
 func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -17,13 +22,14 @@ type Options struct {
 	AllowEmptyReject bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{AllowEmptyReject: false}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["allowEmptyReject"].(bool); ok {
-			opts.AllowEmptyReject = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowEmptyReject"].(bool); ok {
+		opts.AllowEmptyReject = v
 	}
 	return opts
 }
@@ -44,9 +50,9 @@ func checkRejectCall(ctx rule.RuleContext, callExpression *ast.Node, allowEmptyR
 }
 
 var PreferPromiseRejectErrorsRule = rule.Rule{
-	Name: "prefer-promise-reject-errors",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "prefer-promise-reject-errors",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

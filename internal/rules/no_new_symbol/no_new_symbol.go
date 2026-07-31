@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-new-symbol
 var NoNewSymbolRule = rule.Rule{
-	Name: "no-new-symbol",
+	Name:   "no-new-symbol",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {

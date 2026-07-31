@@ -1,20 +1,24 @@
 package default_case
 
 import (
-	"regexp"
+	_ "embed"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed default_case.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/default-case
 var DefaultCaseRule = rule.Rule{
-	Name: "default-case",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "default-case",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -67,7 +71,7 @@ var DefaultCaseRule = rule.Rule{
 						commentText = strings.TrimSpace(commentText[2 : len(commentText)-2])
 					}
 
-					if opts.commentPattern.MatchString(commentText) {
+					if matched, err := opts.commentPattern.MatchString(commentText); err == nil && matched {
 						return
 					}
 				}
@@ -82,20 +86,26 @@ var DefaultCaseRule = rule.Rule{
 }
 
 type options struct {
-	commentPattern *regexp.Regexp
+	commentPattern *regexp2.Regexp
 }
 
-func parseOptions(opts any) options {
-	result := options{
-		commentPattern: regexp.MustCompile(`(?i)^no default$`),
+// defaultCommentPattern mirrors upstream's DEFAULT_COMMENT_PATTERN
+// (/^no default$/iu). A configured commentPattern is compiled without the
+// `i` flag, exactly like upstream's `new RegExp(commentPattern, "u")`.
+var defaultCommentPattern = regexp2.MustCompile(`^no default$`, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+
+func parseOptions(opts []any) options {
+	result := options{commentPattern: defaultCommentPattern}
+	if len(opts) == 0 {
+		return result
 	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if pattern, ok := optsMap["commentPattern"].(string); ok && pattern != "" {
-			if compiled, err := regexp.Compile(pattern); err == nil {
-				result.commentPattern = compiled
-			}
+	m, _ := opts[0].(map[string]any)
+	if pattern, ok := m["commentPattern"].(string); ok && pattern != "" {
+		// An invalid pattern is rejected by the schema's `format: "regex"`
+		// before linting starts, so this compile error is only defensive.
+		if compiled, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+			result.commentPattern = compiled
 		}
 	}
 

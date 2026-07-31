@@ -34,7 +34,8 @@ func checkReassignments(declNode *ast.Node, name string, ctx *rule.RuleContext) 
 
 // NoFuncAssignRule disallows reassigning function declarations.
 var NoFuncAssignRule = rule.Rule{
-	Name: "no-func-assign",
+	Name:   "no-func-assign",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {

@@ -680,26 +680,6 @@ func TestMaxLines(t *testing.T) {
 					{MessageId: "exceed", Line: 3, Column: 1, EndLine: 3, EndColumn: 7},
 				},
 			},
-			// Defensive: negative max is treated like 0 rather than crashing.
-			{
-				Code:    "var a;",
-				Options: map[string]interface{}{"max": -1},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "exceed", Line: 1, Column: 1, EndLine: 1, EndColumn: 7},
-				},
-			},
-			// Filtering every line with a negative max still reports safely.
-			{
-				Code:    "// only\n",
-				Options: map[string]interface{}{"max": -1, "skipComments": true},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "exceed",
-						Message:   "File has too many lines (0). Maximum allowed is -1.",
-						Line:      1, Column: 1, EndLine: 2, EndColumn: 1,
-					},
-				},
-			},
 			// Hashbang without skipComments counts toward the limit.
 			{
 				Code:    "#!/usr/bin/env node\nvar x;\nvar y;",

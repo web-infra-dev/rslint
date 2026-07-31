@@ -36,129 +36,129 @@ func TestNoParamReassignRule(t *testing.T) {
 			// With props: true - does not flag non-property reads
 			{
 				Code:    `function foo(a) { bar(a.b).c = 0; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { data[a.b] = 0; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { +a.b; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { (a ? [] : [])[0] = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { (a.b ? [] : [])[0] = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 
 			// ignorePropertyModificationsFor
 			{
 				Code: `function foo(a) { a.b = 0; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(a) { ++a.b; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(a) { delete a.b; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(a) { for (a.b in obj); }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(a) { for (a.b of arr); }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(a) { a.b.c = 0; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 			},
 
 			// ignorePropertyModificationsForRegex
 			{
 				Code: `function foo(aFoo) { aFoo.b = 0; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsForRegex": []interface{}{"^a.*$"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(aFoo) { ++aFoo.b; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsForRegex": []interface{}{"^a.*$"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(aFoo) { delete aFoo.b; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsForRegex": []interface{}{"^a.*$"},
-				},
+				}},
 			},
 			{
 				Code: `function foo(aFoo) { aFoo.b.c = 0; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsForRegex": []interface{}{"^a.*$"},
-				},
+				}},
 			},
 
 			// Destructuring / loop patterns that do not reassign params
 			{
 				Code:    `function foo(a) { ({ [a]: variable } = value) }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{Code: `function foo(a) { ([...a.b] = obj); }`},
 			{Code: `function foo(a) { ({...a.b} = obj); }`},
 			{
 				Code:    `function foo(a) { for (obj[a.b] in obj); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { for (obj[a.b] of arr); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { for (bar in a.b); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { for (bar of a.b); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { for (bar in baz) a.b; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { for (bar of baz) a.b; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 
 			// === Edge cases: function-like kinds (all 7) reading their params ===
@@ -220,15 +220,15 @@ func TestNoParamReassignRule(t *testing.T) {
 
 			{
 				Code:    `function foo(a) { a.map(x => x); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { const o = { [a]: 1 }; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 			{
 				Code:    `function foo(a) { return a?.x; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -321,56 +321,56 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Property modification with props: true
 			{
 				Code:    `function foo(bar) { bar.a = 0; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 21},
 				},
 			},
 			{
 				Code:    `function foo(bar) { bar.get(0).a = 0; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 21},
 				},
 			},
 			{
 				Code:    `function foo(bar) { delete bar.a; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 28},
 				},
 			},
 			{
 				Code:    `function foo(bar) { ++bar.a; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 23},
 				},
 			},
 			{
 				Code:    `function foo(bar) { for (bar.a in {}); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 26},
 				},
 			},
 			{
 				Code:    `function foo(bar) { for (bar.a of []); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 26},
 				},
 			},
 			{
 				Code:    `function foo(bar) { (bar ? bar : [])[0] = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 28},
 				},
 			},
 			{
 				Code:    `function foo(bar) { [bar.a] = []; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 22},
 				},
@@ -379,7 +379,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Parameter reassignment in destructuring
 			{
 				Code:    `function foo(a) { ({a} = obj); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParam", Line: 1, Column: 21},
 				},
@@ -400,21 +400,21 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Spread/rest with property access
 			{
 				Code:    `function foo(a) { ([...a.b] = obj); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 24},
 				},
 			},
 			{
 				Code:    `function foo(a) { ({...a.b} = obj); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 24},
 				},
 			},
 			{
 				Code:    `function foo(a) { for ([a.b] of []); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 25},
 				},
@@ -441,21 +441,21 @@ func TestNoParamReassignRule(t *testing.T) {
 			},
 			{
 				Code:    `function foo(a) { a.b &&= c; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 19},
 				},
 			},
 			{
 				Code:    `function foo(a) { a.b.c ||= d; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 19},
 				},
 			},
 			{
 				Code:    `function foo(a) { a[b] ??= c; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 19},
 				},
@@ -464,20 +464,20 @@ func TestNoParamReassignRule(t *testing.T) {
 			// ignorePropertyModificationsFor bypass (property not whitelisted)
 			{
 				Code: `function foo(bar) { [bar.a] = []; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                          true,
 					"ignorePropertyModificationsFor": []interface{}{"a"},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 22},
 				},
 			},
 			{
 				Code: `function foo(bar) { [bar.a] = []; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsForRegex": []interface{}{"^B.*$"},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 22},
 				},
@@ -713,7 +713,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Property modification in nested arrow
 			{
 				Code:    `function foo(a) { const f = () => { a.x = 1; }; f(); }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 37},
 				},
@@ -721,7 +721,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Compound on property in method
 			{
 				Code:    `class C { m(a: any) { a.x += 1; } }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 23},
 				},
@@ -729,7 +729,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Setter property modification
 			{
 				Code:    `class C { set x(v: any) { v.prop = 1; } }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 27},
 				},
@@ -737,7 +737,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Deep property write
 			{
 				Code:    `function foo(a: any) { a.b.c.d = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 24},
 				},
@@ -745,7 +745,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Destructured binding — property write via destructuring target
 			{
 				Code:    `function foo({a}: any) { a.x = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 26},
 				},
@@ -753,7 +753,7 @@ func TestNoParamReassignRule(t *testing.T) {
 			// Rest param property write
 			{
 				Code:    `function foo(...rest: any[]) { rest[0] = 1; }`,
-				Options: map[string]interface{}{"props": true},
+				Options: []any{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 32},
 				},
@@ -764,11 +764,11 @@ func TestNoParamReassignRule(t *testing.T) {
 			// `bar` ignored, `baz` not — flag only baz.
 			{
 				Code: `function foo(bar, baz) { bar.a = 1; baz.b = 2; }`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"props":                               true,
 					"ignorePropertyModificationsFor":      []interface{}{"bar"},
 					"ignorePropertyModificationsForRegex": []interface{}{"^qux"},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "assignmentToFunctionParamProp", Line: 1, Column: 37},
 				},
@@ -860,4 +860,29 @@ function foo(a: any) { a = 1; }`,
 			},
 		},
 	)
+}
+
+// TestIgnorePropertyModificationsForRegexSchema locks in the fail-fast behavior
+// for an invalid pattern. Upstream builds `new RegExp(pattern, "u")` while
+// checking each identifier, so an invalid pattern like `"("` throws mid-lint.
+// rslint's equivalent surface is config validation: the schema marks each
+// element of ignorePropertyModificationsForRegex with `format: "regex"`, so the
+// config is rejected up front instead of the pattern being silently dropped.
+func TestIgnorePropertyModificationsForRegexSchema(t *testing.T) {
+	invalid := []any{map[string]any{
+		"props":                               true,
+		"ignorePropertyModificationsForRegex": []any{"("},
+	}}
+	if err := NoParamReassignRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid ignorePropertyModificationsForRegex pattern to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{map[string]any{
+		"props":                               true,
+		"ignorePropertyModificationsForRegex": []any{"(?<=a)b"},
+	}}
+	if err := NoParamReassignRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid ignorePropertyModificationsForRegex pattern to pass schema validation, got: %v", err)
+	}
 }
