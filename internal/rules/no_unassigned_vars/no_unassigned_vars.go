@@ -1,8 +1,6 @@
 package no_unassigned_vars
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -23,8 +21,6 @@ func messageUnassigned(name string) rule.RuleMessage {
 type runState struct {
 	ctx                      rule.RuleContext
 	declarationWriteBySymbol map[*ast.Symbol]bool
-	localExportsScanned      bool
-	localExportReadBySym     map[*ast.Symbol]bool
 }
 
 type variableSymbols struct {
@@ -68,16 +64,13 @@ func (s *runState) checkVariableDeclarator(node *ast.Node) {
 				hasWrite = true
 				break
 			}
-			if isReadReference(refNode) {
+			if utils.IsReadReference(refNode) {
 				hasRead = true
 			}
 		}
 		if hasWrite {
 			break
 		}
-	}
-	if !hasRead && !hasWrite {
-		hasRead = s.isLocalExportRead(symbols)
 	}
 	if hasWrite || !hasRead {
 		return
@@ -177,77 +170,6 @@ func (s *runState) symbolHasDeclarationWrite(sym *ast.Symbol) bool {
 	return hasWrite
 }
 
-// isLocalExportRead supplements ctx.Refs for local named export specifiers.
-// RefStore deliberately excludes import/export bindings because its other
-// consumers do not treat them as references, while ESLint scope-manager marks
-// `export { value }` as a read of value for this rule. The exact binder symbol
-// map preserves shadowing and ignores type-only/source-bearing re-exports.
-func (s *runState) isLocalExportRead(symbols variableSymbols) bool {
-	if !s.localExportsScanned {
-		s.localExportsScanned = true
-		if strings.Contains(s.ctx.SourceFile.Text(), "export") {
-			s.localExportReadBySym = collectLocalExportReads(s.ctx.SourceFile)
-		}
-	}
-	for _, sym := range symbols.values[:symbols.count] {
-		if s.localExportReadBySym[sym] {
-			return true
-		}
-	}
-	return false
-}
-
-func collectLocalExportReads(sourceFile *ast.SourceFile) map[*ast.Symbol]bool {
-	if sourceFile == nil {
-		return nil
-	}
-	var result map[*ast.Symbol]bool
-	var walk func(*ast.Node)
-	walk = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node.Kind == ast.KindExportSpecifier &&
-			!ast.IsTypeOnlyImportOrExportDeclaration(node) &&
-			!utils.IsReExportSpecifier(node) {
-			specifier := node.AsExportSpecifier()
-			if specifier != nil {
-				localName := specifier.Name()
-				if specifier.PropertyName != nil {
-					localName = specifier.PropertyName
-				}
-				if target := binderLocalExportTarget(localName); target != nil {
-					if result == nil {
-						result = make(map[*ast.Symbol]bool)
-					}
-					result[target] = true
-				}
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(sourceFile.AsNode())
-	return result
-}
-
-func binderLocalExportTarget(localName *ast.Node) *ast.Symbol {
-	if localName == nil || localName.Kind != ast.KindIdentifier {
-		return nil
-	}
-	name := localName.Text()
-	for current := localName.Parent; current != nil; current = current.Parent {
-		if ast.IsLocalsContainer(current) {
-			if sym := ast.GetLocals(current)[name]; sym != nil {
-				return sym
-			}
-		}
-	}
-	return nil
-}
-
 func (s *runState) shouldSkipDeclarator(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindVariableDeclaration {
 		return true
@@ -275,24 +197,9 @@ func (s *runState) shouldSkipDeclarator(node *ast.Node) bool {
 	return false
 }
 
-func isReadReference(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
-		return false
-	}
-	return !utils.IsNonReferenceIdentifier(node)
-}
-
 var NoUnassignedVarsRule = rule.Rule{
-	Name:             "no-unassigned-vars",
-	RequiresTypeInfo: true,
+	Name: "no-unassigned-vars",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		if ctx.TypeChecker == nil || ctx.Refs == nil {
-			return rule.RuleListeners{}
-		}
-
 		s := &runState{ctx: ctx}
 
 		return rule.RuleListeners{ast.KindVariableDeclaration: s.checkVariableDeclarator}

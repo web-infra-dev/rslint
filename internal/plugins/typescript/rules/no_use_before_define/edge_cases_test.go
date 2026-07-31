@@ -128,6 +128,14 @@ func TestEdgeCases(t *testing.T) {
 				Options: map[string]interface{}{"allowNamedExports": true},
 			},
 
+			// ----- Type-only named exports -----
+			{Code: `let x = 1; export type { x };`},
+			{Code: `type T = number; export type { T };`},
+			{
+				Code:    `export type { x }; let x = 1;`,
+				Options: map[string]interface{}{"allowNamedExports": true},
+			},
+
 			// ----- Decorators with classes:false -----
 			{
 				Code: `
@@ -386,6 +394,33 @@ declare global {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine"},
 					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+
+			// ----- Type-only named exports before define (typescript-eslint -----
+			// ----- reports these even with the default ignoreTypeReferences) -----
+			{
+				Code: `export type { x }; let x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `export { type x }; let x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `export type { x as y }; let x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `export type { T }; type T = number;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
 				},
 			},
 

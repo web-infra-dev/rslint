@@ -114,6 +114,13 @@ func TestPreferConstRule(t *testing.T) {
 				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
 			},
 
+			// ignoreReadBeforeAssign: true - a local named export before the
+			// first assignment is a read of the binding
+			{
+				Code:    `let x; export { x }; x = 1;`,
+				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
+			},
+
 			// Uninitialized, assigned inside if block - can't be safely converted to const
 			{Code: `let x: number; if (true) { x = 1; }`},
 
@@ -538,6 +545,37 @@ func TestPreferConstRule(t *testing.T) {
 				Options: map[string]interface{}{"ignoreReadBeforeAssign": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 8},
+				},
+			},
+
+			// A local named export before the first assignment is a read of the
+			// binding, so the report moves to the declaration
+			{
+				Code: `let x; export { x }; x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+				},
+			},
+
+			// A type-only export is not a read of the value binding: the report
+			// stays at the write, and ignoreReadBeforeAssign must not swallow it
+			{
+				Code: `let x; export type { x }; x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code: `let x; export { type x }; x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code:    `let x; export type { x }; x = 1;`,
+				Options: map[string]interface{}{"ignoreReadBeforeAssign": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 27},
 				},
 			},
 

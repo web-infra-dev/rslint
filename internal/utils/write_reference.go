@@ -116,6 +116,24 @@ func IsWriteReference(node *ast.Node) bool {
 	return false
 }
 
+// IsReadReference reports whether a reference-position identifier represents
+// a genuine runtime read of the value it resolves to. It excludes:
+//   - non-reference positions (property keys, declaration names, labels,
+//     etc. — see IsNonReferenceIdentifier);
+//   - type-only positions (`typeof x` in a type query, or any other spot
+//     inside a type node), which never touch the value at runtime even
+//     though a symbol-based reference index (e.g. ctx.Refs) still resolves
+//     them to the same value symbol.
+func IsReadReference(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
+		return false
+	}
+	return !IsNonReferenceIdentifier(node)
+}
+
 // IsBindingPatternInAssignment checks if a binding pattern is the left side of an assignment.
 func IsBindingPatternInAssignment(node *ast.Node) bool {
 	if node == nil {
