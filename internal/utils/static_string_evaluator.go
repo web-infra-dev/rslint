@@ -61,6 +61,20 @@ func (staticEvaluator *StaticStringEvaluator) Eval(node *ast.Node) (string, bool
 	return value, ok
 }
 
+// EvalValue returns the static value of node if it can be determined, regardless
+// of its type. It allows rules to check if a value is statically known to be a
+// non-string (like a boolean or number).
+func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bool) {
+	if staticEvaluator == nil || node == nil {
+		return nil, false
+	}
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return nil, false
+	}
+	return result.value, true
+}
+
 func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEvalResult {
 	node = SkipAssertionsAndParens(node)
 	if node == nil {
