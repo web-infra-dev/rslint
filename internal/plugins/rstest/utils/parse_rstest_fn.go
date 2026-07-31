@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -153,8 +154,8 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 			return nil, nil, false, false
 		}
 		nameNode := ast.SkipParentheses(element.ArgumentExpression)
-		name := staticRstestMemberName(nameNode)
-		if name == "" {
+		name, ok := internalUtils.GetStaticStringLiteralValue(nameNode)
+		if !ok || name == "" {
 			return nil, nil, false, false
 		}
 		return root, append(parts, rstestChainPart{
@@ -188,20 +189,6 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 		return root, parts, rootInvoked, true
 	default:
 		return nil, nil, false, false
-	}
-}
-
-func staticRstestMemberName(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Kind {
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
-	default:
-		return ""
 	}
 }
 

@@ -3,6 +3,7 @@ package no_identical_title
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -42,20 +43,6 @@ func newTitleLayer() *titleLayer {
 	}
 }
 
-func staticTitleValue(arg *ast.Node) (string, bool) {
-	if arg == nil {
-		return "", false
-	}
-	switch arg.Kind {
-	case ast.KindStringLiteral:
-		return arg.AsStringLiteral().Text, true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return arg.AsNoSubstitutionTemplateLiteral().Text, true
-	default:
-		return "", false
-	}
-}
-
 // NewRule creates a no-identical-title rule for a test framework.
 func NewRule(config Config) rule.Rule {
 	return rule.Rule{
@@ -85,7 +72,7 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 					arg0 := call.Arguments.Nodes[0]
-					title, ok := staticTitleValue(arg0)
+					title, ok := internalUtils.GetStaticStringLiteralValue(arg0)
 					if !ok {
 						return
 					}
