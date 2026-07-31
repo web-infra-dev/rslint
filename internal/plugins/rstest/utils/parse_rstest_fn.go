@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -40,11 +38,6 @@ type rstestResolvedAPI struct {
 	state        rstestAPIState
 	originalNode *ast.Node
 	mode         RstestImportMode
-}
-
-func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
-	parsed := ParseRstestFnCall(node, ctx)
-	return parsed != nil && len(kinds) > 0 && slices.Contains(kinds, parsed.Kind)
 }
 
 // ParseRstestFnCall parses a final Rstest test/describe registration call.
