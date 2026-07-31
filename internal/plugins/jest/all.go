@@ -42,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_hook"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_to_throw_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_top_level_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
@@ -92,6 +93,7 @@ func GetAllRules() []rule.Rule {
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,
 		require_hook.RequireHookRule,
+		require_to_throw_message.RequireToThrowMessageRule,
 		require_top_level_describe.RequireTopLevelDescribeRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,

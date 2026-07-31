@@ -1,0 +1,144 @@
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+ruleTester.run('require-to-throw-message', {} as never, {
+  valid: [
+    // String
+    { code: "expect(() => { throw new Error('a'); }).toThrow('a');" },
+    { code: "expect(() => { throw new Error('a'); }).toThrowError('a');" },
+    {
+      code: `
+      test('string', async () => {
+        const throwErrorAsync = async () => { throw new Error('a') };
+        await expect(throwErrorAsync()).rejects.toThrow('a');
+        await expect(throwErrorAsync()).rejects.toThrowError('a');
+      })
+    `,
+    },
+    // Template literal
+    {
+      code: "const a = 'a'; expect(() => { throw new Error('a'); }).toThrow(`${a}`);",
+    },
+    {
+      code: "const a = 'a'; expect(() => { throw new Error('a'); }).toThrowError(`${a}`);",
+    },
+    {
+      code: `
+      test('Template literal', async () => {
+        const a = 'a';
+        const throwErrorAsync = async () => { throw new Error('a') };
+        await expect(throwErrorAsync()).rejects.toThrow(\`\${a}\`);
+        await expect(throwErrorAsync()).rejects.toThrowError(\`\${a}\`);
+      })
+    `,
+    },
+
+    // Regex
+    { code: "expect(() => { throw new Error('a'); }).toThrow(/^a$/);" },
+    { code: "expect(() => { throw new Error('a'); }).toThrowError(/^a$/);" },
+    {
+      code: `
+      test('Regex', async () => {
+        const throwErrorAsync = async () => { throw new Error('a') };
+        await expect(throwErrorAsync()).rejects.toThrow(/^a$/);
+        await expect(throwErrorAsync()).rejects.toThrowError(/^a$/);
+      })
+    `,
+    },
+
+    // Function
+    {
+      code: "expect(() => { throw new Error('a'); }).toThrow((() => { return 'a'; })());",
+    },
+    {
+      code: "expect(() => { throw new Error('a'); }).toThrowError((() => { return 'a'; })());",
+    },
+    {
+      code: `
+      test('Function', async () => {
+        const throwErrorAsync = async () => { throw new Error('a') };
+        const fn = () => { return 'a'; };
+        await expect(throwErrorAsync()).rejects.toThrow(fn());
+        await expect(throwErrorAsync()).rejects.toThrowError(fn());
+      })
+    `,
+    },
+
+    // Allow no message for `not`.
+    { code: "expect(() => { throw new Error('a'); }).not.toThrow();" },
+    { code: "expect(() => { throw new Error('a'); }).not.toThrowError();" },
+    {
+      code: `
+      test('Allow no message for "not"', async () => {
+        const throwErrorAsync = async () => { throw new Error('a') };
+        await expect(throwErrorAsync()).resolves.not.toThrow();
+        await expect(throwErrorAsync()).resolves.not.toThrowError();
+      })
+    `,
+    },
+    { code: 'expect(a);' },
+  ],
+
+  invalid: [
+    // Empty toThrow
+    {
+      code: "expect(() => { throw new Error('a'); }).toThrow();",
+      errors: [
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrow' },
+          column: 41,
+          line: 1,
+        },
+      ],
+    },
+    // Parenthesized matcher access (TS AST has ParenthesizedExpression; ESTree does not)
+    {
+      code: "(expect(() => { throw new Error('a'); }).toThrow)();",
+      errors: [
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrow' },
+          column: 42,
+          line: 1,
+        },
+      ],
+    },
+    // Empty toThrowError
+    {
+      code: "expect(() => { throw new Error('a'); }).toThrowError();",
+      errors: [
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrowError' },
+          column: 41,
+          line: 1,
+        },
+      ],
+    },
+
+    // Empty rejects.toThrow / rejects.toThrowError
+    {
+      code: `test('empty rejects.toThrow', async () => {
+  const throwErrorAsync = async () => { throw new Error('a') };
+  await expect(throwErrorAsync()).rejects.toThrow();
+  await expect(throwErrorAsync()).rejects.toThrowError();
+})`,
+      errors: [
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrow' },
+          column: 43,
+          line: 3,
+        },
+        {
+          messageId: 'addErrorMessage',
+          data: { matcherName: 'toThrowError' },
+          column: 43,
+          line: 4,
+        },
+      ],
+    },
+  ],
+});
