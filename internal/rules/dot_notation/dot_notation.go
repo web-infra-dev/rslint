@@ -286,9 +286,7 @@ var DotNotationRule = rule.Rule{
 		// only defensive.
 		var allowRE *regexp2.Regexp
 		if opts.AllowPattern != "" {
-			if re, err := regexp2.Compile(opts.AllowPattern, regexp2.ECMAScript|regexp2.Unicode); err == nil {
-				allowRE = re
-			}
+			allowRE, _ = utils.CompileRegexp2(opts.AllowPattern, utils.JSUnicodeRegexOptions)
 		}
 
 		sourceFile := ctx.SourceFile
@@ -305,13 +303,8 @@ var DotNotationRule = rule.Rule{
 			if !opts.AllowKeywords && isKeyword(value) {
 				return
 			}
-			if allowRE != nil {
-				if matched, err := allowRE.MatchString(value); err != nil || matched {
-					// Fail open on regex errors (e.g. a timeout if MatchTimeout
-					// were ever set): skip reporting rather than risk a false
-					// positive.
-					return
-				}
+			if utils.Regexp2MatchString(allowRE, value) {
+				return
 			}
 
 			ctx.ReportNodeWithDeferredFixes(keyNode, buildUseDotMessage(formattedKey), func() []rule.RuleFix {
