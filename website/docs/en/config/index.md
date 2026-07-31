@@ -46,6 +46,7 @@ For directory or no-argument lint runs, global ignores in a parent config preven
 export default defineConfig([
   // Global ignore — blocks directory target discovery in these directories
   { ignores: ['**/fixtures/**', 'e2e/**'] },
+  js.configs.recommended,
   ts.configs.recommended,
   // ...
 ]);
@@ -78,12 +79,13 @@ rslint --init
 A typical TypeScript project configuration:
 
 ```ts
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
 
 export default defineConfig([
   // Global ignores — files excluded from all rules
   globalIgnores(['**/dist/**', '**/fixtures/**']),
-  // Preset with recommended rules
+  // Presets with recommended rules
+  js.configs.recommended,
   ts.configs.recommended,
   // Custom rule overrides
   {
@@ -99,10 +101,11 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 ## Composing Presets
 
-A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers enable the core ESLint recommended rules, declare the plugin, turn off the core rules TypeScript already reports, and enable the TypeScript rules — which is why it covers a TypeScript project on its own. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
+A preset may contribute several config entries: `ts.configs.recommended` is an array whose layers declare the plugin, turn off the core rules TypeScript already reports, and enable the TypeScript rules. `defineConfig` flattens nested entries at any depth, so a preset is listed like a single entry and its layers land at the position you wrote it:
 
 ```ts
 export default defineConfig([
+  js.configs.recommended, // core ESLint recommended rules
   ts.configs.recommended, // expands to the preset's entries, in order
   {
     rules: {
@@ -111,6 +114,8 @@ export default defineConfig([
   },
 ]);
 ```
+
+A TypeScript project lists both presets: `js.configs.recommended` turns the core rules on, and the `ts.configs.recommended` layer after it turns off the ones TypeScript reports itself.
 
 Entries can also be passed as separate arguments: `defineConfig(ts.configs.recommended, { rules: { … } })`.
 
