@@ -39,14 +39,8 @@ func parseOptions(options []any) maxLinesOptions {
 	if len(options) == 0 {
 		return result
 	}
-	if n, ok := utils.CoerceInt(options[0]); ok {
-		result.max = n
-		return result
-	}
+	result.max = utils.ResolveLegacyMaxOption(options[0], 300)
 	m, _ := options[0].(map[string]interface{})
-	if n, ok := utils.CoerceInt(m["max"]); ok {
-		result.max = n
-	}
 	if v, ok := m["skipComments"].(bool); ok {
 		result.skipComments = v
 	}
