@@ -36,7 +36,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			// Exception option allows extending Object's prototype.
 			{
 				Code:    `Object.prototype.g = 0`,
-				Options: map[string]interface{}{"exceptions": []interface{}{"Object"}},
+				Options: []any{map[string]any{"exceptions": []any{"Object"}}},
 			},
 
 			// `Object.prototype` appears as the *index* of a member access, not
@@ -149,7 +149,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			},
 			{
 				Code:    `Number['prototype']['p'] = 0`,
-				Options: map[string]interface{}{"exceptions": []interface{}{"Object"}},
+				Options: []any{map[string]any{"exceptions": []any{"Object"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
@@ -232,7 +232,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			// Exception option does NOT apply to other builtins.
 			{
 				Code:    `Array.prototype.p = 0`,
-				Options: map[string]interface{}{"exceptions": []interface{}{"Object"}},
+				Options: []any{map[string]any{"exceptions": []any{"Object"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
@@ -325,7 +325,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			// Empty options object behaves like the default (no exceptions).
 			{
 				Code:    `Object.prototype.p = 0`,
-				Options: map[string]interface{}{},
+				Options: []any{map[string]any{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
@@ -333,7 +333,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			// Explicit empty exceptions list also matches the default.
 			{
 				Code:    `Object.prototype.p = 0`,
-				Options: map[string]interface{}{"exceptions": []interface{}{}},
+				Options: []any{map[string]any{"exceptions": []any{}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},

@@ -27,7 +27,7 @@ func TestNoEmptyRule(t *testing.T) {
 			{Code: `try { foo() } catch (e) { /* comment */ }`},
 			{
 				Code:    `try { foo() } catch (e) {}`,
-				Options: map[string]interface{}{"allowEmptyCatch": true},
+				Options: []any{map[string]interface{}{"allowEmptyCatch": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{

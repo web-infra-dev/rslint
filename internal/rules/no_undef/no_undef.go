@@ -1,12 +1,16 @@
 package no_undef
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_undef.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-undef
 //
@@ -20,22 +24,23 @@ type options struct {
 	checkTypeof bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(rawOptions []any) options {
 	result := options{checkTypeof: false}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if v, ok := optsMap["typeof"].(bool); ok {
-			result.checkTypeof = v
-		}
+	if len(rawOptions) == 0 {
+		return result
+	}
+	optsMap, _ := rawOptions[0].(map[string]any)
+	if v, ok := optsMap["typeof"].(bool); ok {
+		result.checkTypeof = v
 	}
 	return result
 }
 
 var NoUndefRule = rule.Rule{
-	Name: "no-undef",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := parseOptions(options)
+	Name:   "no-undef",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		opts := parseOptions(rawOptions)
 
 		if ctx.Refs == nil {
 			return rule.RuleListeners{}

@@ -1,57 +1,66 @@
 package no_fallthrough
 
 import (
-	"regexp"
+	_ "embed"
 	"strconv"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_fallthrough.schema.json
+var schemaJSON []byte
+
 // defaultFallthroughPattern matches ESLint's default /falls?\s?through/iu
-var defaultFallthroughPattern = regexp.MustCompile(`(?i)falls?\s?through`)
+var defaultFallthroughPattern = regexp2.MustCompile(`falls?\s?through`, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
 
 type noFallthroughOptions struct {
-	commentPattern                 *regexp.Regexp
+	commentPattern                 *regexp2.Regexp
 	allowEmptyCase                 bool
 	reportUnusedFallthroughComment bool
 }
 
-func parseOptions(opts any) noFallthroughOptions {
-	result := noFallthroughOptions{
+func parseOptions(options []any) noFallthroughOptions {
+	opts := noFallthroughOptions{
 		commentPattern:                 defaultFallthroughPattern,
 		allowEmptyCase:                 false,
 		reportUnusedFallthroughComment: false,
 	}
-
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
-		return result
+	if len(options) == 0 {
+		return opts
 	}
 
-	if pattern, ok := optsMap["commentPattern"].(string); ok && pattern != "" {
-		if compiled, err := regexp.Compile("(?i)" + pattern); err == nil {
-			result.commentPattern = compiled
+	m, _ := options[0].(map[string]any)
+	// Upstream builds `new RegExp(commentPattern, "u")`, so a configured
+	// pattern is case-sensitive even though the default one is not. An
+	// invalid pattern throws there while loading the rule; rslint's
+	// equivalent fail-fast surface is config validation, where the schema's
+	// `format: "regex"` on commentPattern rejects the config before linting
+	// starts - so the compile-error branch here is only defensive.
+	if pattern, ok := m["commentPattern"].(string); ok && pattern != "" {
+		if compiled, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+			opts.commentPattern = compiled
 		}
 	}
-	if allow, ok := optsMap["allowEmptyCase"].(bool); ok {
-		result.allowEmptyCase = allow
+	if allow, ok := m["allowEmptyCase"].(bool); ok {
+		opts.allowEmptyCase = allow
 	}
-	if report, ok := optsMap["reportUnusedFallthroughComment"].(bool); ok {
-		result.reportUnusedFallthroughComment = report
+	if report, ok := m["reportUnusedFallthroughComment"].(bool); ok {
+		opts.reportUnusedFallthroughComment = report
 	}
 
-	return result
+	return opts
 }
 
 // https://eslint.org/docs/latest/rules/no-fallthrough
 var NoFallthroughRule = rule.Rule{
-	Name: "no-fallthrough",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-fallthrough",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -319,9 +328,9 @@ func forEachDescendant(node *ast.Node, fn func(*ast.Node) bool) {
 
 // hasFallthroughComment checks if there is a fallthrough comment matching the
 // given pattern between start and end positions in the source text.
-func hasFallthroughComment(sourceText string, start, end int, pattern *regexp.Regexp) bool {
+func hasFallthroughComment(sourceText string, start, end int, pattern *regexp2.Regexp) bool {
 	if start < 0 || end > len(sourceText) || start >= end {
 		return false
 	}
-	return pattern.MatchString(sourceText[start:end])
+	return utils.Regexp2MatchString(pattern, sourceText[start:end])
 }

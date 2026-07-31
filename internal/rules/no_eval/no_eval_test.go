@@ -174,29 +174,29 @@ func TestNoEvalRule(t *testing.T) {
 			// ================================================================
 			// allowIndirect: true — all indirect forms allowed
 			// ================================================================
-			{Code: `(0, eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(0, window.eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(0, window['eval'])('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `var EVAL = eval; EVAL('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `var EVAL = this.eval; EVAL('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(function(exe){ exe('foo') })(eval);`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `window.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `window.window.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `window.window['eval']('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `global.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `global.global.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `this.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `function foo() { this.eval('foo') }`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(0, globalThis.eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(0, globalThis['eval'])('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `var EVAL = globalThis.eval; EVAL('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `function foo() { globalThis.eval('foo') }`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `globalThis.globalThis.eval('foo');`, Options: map[string]interface{}{"allowIndirect": true}},
+			{Code: `(0, eval)('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(0, window.eval)('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(0, window['eval'])('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `var EVAL = eval; EVAL('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `var EVAL = this.eval; EVAL('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(function(exe){ exe('foo') })(eval);`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `window.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `window.window.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `window.window['eval']('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `global.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `global.global.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `this.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `function foo() { this.eval('foo') }`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(0, globalThis.eval)('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(0, globalThis['eval'])('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `var EVAL = globalThis.eval; EVAL('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `function foo() { globalThis.eval('foo') }`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `globalThis.globalThis.eval('foo');`, Options: []any{map[string]any{"allowIndirect": true}}},
 			// Optional call is not direct eval
-			{Code: `eval?.('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(eval)?.('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `window?.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-			{Code: `(window?.eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
+			{Code: `eval?.('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(eval)?.('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `window?.eval('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
+			{Code: `(window?.eval)('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
 		}),
 		withNoEvalWindowGlobalInvalid([]rule_tester.InvalidTestCase{
 			// ================================================================
@@ -290,21 +290,21 @@ func TestNoEvalRule(t *testing.T) {
 			// ================================================================
 			{
 				Code:    `eval(foo)`,
-				Options: map[string]interface{}{"allowIndirect": true},
+				Options: []any{map[string]any{"allowIndirect": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `eval('foo')`,
-				Options: map[string]interface{}{"allowIndirect": true},
+				Options: []any{map[string]any{"allowIndirect": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `function foo(eval) { eval('foo') }`,
-				Options: map[string]interface{}{"allowIndirect": true},
+				Options: []any{map[string]any{"allowIndirect": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 22},
 				},

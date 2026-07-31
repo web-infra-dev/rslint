@@ -33,7 +33,8 @@ func hasBreakableBody(stmt *ast.Node) bool {
 
 // https://eslint.org/docs/latest/rules/no-extra-label
 var NoExtraLabelRule = rule.Rule{
-	Name: "no-extra-label",
+	Name:   "no-extra-label",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var scope *scopeInfo
 

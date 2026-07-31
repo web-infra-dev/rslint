@@ -1,9 +1,14 @@
 package no_cond_assign
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_cond_assign.schema.json
+var schemaJSON []byte
 
 // Message builders
 func buildMissingMessage() rule.RuleMessage {
@@ -114,22 +119,23 @@ func getConditionalTypeName(node *ast.Node) string {
 	return ""
 }
 
+// parseOptions returns the configured mode, defaulting to "except-parens".
+func parseOptions(options []any) string {
+	if len(options) == 0 {
+		return "except-parens"
+	}
+	if mode, ok := options[0].(string); ok {
+		return mode
+	}
+	return "except-parens"
+}
+
 // NoCondAssignRule disallows assignment operators in conditional expressions
 var NoCondAssignRule = rule.Rule{
-	Name: "no-cond-assign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		// Parse options - default is "except-parens"
-		mode := "except-parens"
-		if options != nil {
-			if optMap, ok := options.(map[string]interface{}); ok {
-				if modeStr, ok := optMap["mode"].(string); ok {
-					mode = modeStr
-				}
-			} else if optStr, ok := options.(string); ok {
-				mode = optStr
-			}
-		}
+	Name:   "no-cond-assign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		mode := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

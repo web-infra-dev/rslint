@@ -7,7 +7,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/default-case-last
 var DefaultCaseLastRule = rule.Rule{
-	Name: "default-case-last",
+	Name:   "default-case-last",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindDefaultClause: func(node *ast.Node) {

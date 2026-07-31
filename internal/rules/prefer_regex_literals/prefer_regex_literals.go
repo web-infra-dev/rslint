@@ -1,6 +1,7 @@
 package prefer_regex_literals
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"slices"
@@ -14,6 +15,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_regex_literals.schema.json
+var schemaJSON []byte
 
 var safeRegexLiteralContentRe = regexp.MustCompile("^[-\\w\\\\\\[\\](){} \\t\\r\\n\\v\\f!@#$%^&*+=/~`.><?,'\"|:;]*$")
 
@@ -32,16 +36,16 @@ var validPrecedingTokens = map[string]bool{
 	"debugger": true, "case": true, "throw": true,
 }
 
-type options struct {
+type ruleOptions struct {
 	disallowRedundantWrapping bool
 }
 
 // https://eslint.org/docs/latest/rules/prefer-regex-literals
 var PreferRegexLiteralsRule = rule.Rule{
-	Name: "prefer-regex-literals",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "prefer-regex-literals",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		check := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {
 			if !isBuiltinRegExpCallee(ctx, utils.SkipAssertionsAndParens(callee)) {
@@ -72,12 +76,14 @@ var PreferRegexLiteralsRule = rule.Rule{
 	},
 }
 
-func parseOptions(rawOptions any) options {
-	opts := options{}
-	if optsMap := utils.GetOptionsMap(rawOptions); optsMap != nil {
-		if v, ok := optsMap["disallowRedundantWrapping"].(bool); ok {
-			opts.disallowRedundantWrapping = v
-		}
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["disallowRedundantWrapping"].(bool); ok {
+		opts.disallowRedundantWrapping = v
 	}
 	return opts
 }

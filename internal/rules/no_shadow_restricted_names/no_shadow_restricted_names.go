@@ -1,21 +1,26 @@
 package no_shadow_restricted_names
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_shadow_restricted_names.schema.json
+var schemaJSON []byte
+
 type ruleOptions struct {
 	ReportGlobalThis bool
 }
 
-func parseOptions(opts any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	o := ruleOptions{ReportGlobalThis: true}
-	m := utils.GetOptionsMap(opts)
-	if m == nil {
+	if len(options) == 0 {
 		return o
 	}
+	m, _ := options[0].(map[string]any)
 	if v, ok := m["reportGlobalThis"].(bool); ok {
 		o.ReportGlobalThis = v
 	}
@@ -160,9 +165,9 @@ func hasSameScopeNonVarUndefinedDeclaration(identNode *ast.Node, scopesWithFnOrC
 }
 
 var NoShadowRestrictedNamesRule = rule.Rule{
-	Name: "no-shadow-restricted-names",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-shadow-restricted-names",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		restricted := map[string]bool{
 			"undefined": true,

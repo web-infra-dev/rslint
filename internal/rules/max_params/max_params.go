@@ -1,6 +1,7 @@
 package max_params
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,12 +9,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_params.schema.json
+var schemaJSON []byte
+
 // MaxParamsRule enforces a maximum number of parameters in function definitions.
 // https://eslint.org/docs/latest/rules/max-params
 var MaxParamsRule = rule.Rule{
-	Name: "max-params",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-params",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {
@@ -81,12 +85,16 @@ type ruleOptions struct {
 
 // parseOptions keeps max parsing in a shared helper; only countThis /
 // countVoidThis are specific to this rule.
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	out := ruleOptions{
-		max:       utils.ResolveLegacyMaxOption(options, defaultMax),
+		max:       defaultMax,
 		countThis: countThisExceptVoid,
 	}
-	m := utils.GetOptionsMap(options)
+	if len(options) == 0 {
+		return out
+	}
+	out.max = utils.ResolveLegacyMaxOption(options[0], defaultMax)
+	m, _ := options[0].(map[string]interface{})
 	if m == nil {
 		return out
 	}

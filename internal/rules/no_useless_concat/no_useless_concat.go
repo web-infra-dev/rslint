@@ -9,7 +9,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-useless-concat
 var NoUselessConcatRule = rule.Rule{
-	Name: "no-useless-concat",
+	Name:   "no-useless-concat",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		lineMap := sourceFile.ECMALineMap()

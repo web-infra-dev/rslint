@@ -94,22 +94,22 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 			t.Fatalf("empty array should yield 0 entries, got %d", len(got))
 		}
 	})
-	t.Run("single string (CLI / single-option config shape)", func(t *testing.T) {
-		got := parseRuleOptions("Identifier")
+	t.Run("single string", func(t *testing.T) {
+		got := parseRuleOptions([]interface{}{"Identifier"})
 		if len(got) != 1 || got[0].selector != "Identifier" {
 			t.Fatalf("unexpected entries: %#v", got)
 		}
 	})
-	t.Run("single map (CLI / single-option config shape)", func(t *testing.T) {
-		got := parseRuleOptions(map[string]interface{}{
+	t.Run("single map", func(t *testing.T) {
+		got := parseRuleOptions([]interface{}{map[string]interface{}{
 			"selector": "Identifier",
 			"message":  "no identifiers",
-		})
+		}})
 		if len(got) != 1 || got[0].selector != "Identifier" || got[0].message != "no identifiers" {
 			t.Fatalf("unexpected entries: %#v", got)
 		}
 	})
-	t.Run("multi-element array of mixed forms (rule_tester shape)", func(t *testing.T) {
+	t.Run("multi-element array of mixed forms", func(t *testing.T) {
 		got := parseRuleOptions([]interface{}{
 			"WithStatement",
 			map[string]interface{}{"selector": "VariableDeclaration", "message": "x"},
@@ -160,7 +160,7 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 }
 
 func TestParseRuleOptions_DefaultMessage(t *testing.T) {
-	got := parseRuleOptions("Identifier")
+	got := parseRuleOptions([]interface{}{"Identifier"})
 	if len(got) != 1 {
 		t.Fatalf("expected 1 entry")
 	}
@@ -170,10 +170,10 @@ func TestParseRuleOptions_DefaultMessage(t *testing.T) {
 }
 
 func TestParseRuleOptions_CustomMessage(t *testing.T) {
-	got := parseRuleOptions(map[string]interface{}{
+	got := parseRuleOptions([]interface{}{map[string]interface{}{
 		"selector": "Identifier",
 		"message":  "no",
-	})
+	}})
 	if len(got) != 1 {
 		t.Fatalf("expected 1 entry")
 	}

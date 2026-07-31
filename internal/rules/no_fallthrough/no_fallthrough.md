@@ -68,7 +68,7 @@ function bar() {
 
 ### `commentPattern`
 
-A custom regular expression pattern to match fallthrough comments. By default matches `/falls?\s?through/i`.
+A custom regular expression pattern to match fallthrough comments, applied case-sensitively as `new RegExp(commentPattern, "u")`. By default matches `/falls?\s?through/iu`.
 
 ```json
 { "no-fallthrough": ["error", { "commentPattern": "break[\\s\\w]*omitted" }] }

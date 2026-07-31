@@ -116,15 +116,15 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// Arithmetic with fallback (with option)
 			{
 				Code:    `(obj?.foo ?? 0) + bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 			},
 			{
 				Code:    `+(obj?.foo ?? 0);`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 			},
 			{
 				Code:    `bar -= (obj?.foo ?? 0);`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 			},
 
 			// Class extends with non-optional
@@ -391,7 +391,7 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// Both sides — 2 errors
 			{
 				Code:    `obj?.foo + obj?.bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 12},
@@ -400,35 +400,35 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// All arithmetic operators
 			{
 				Code:    `obj?.foo - bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `obj?.foo * bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `obj?.foo / bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `obj?.foo % bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `obj?.foo ** bar;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 1},
 				},
@@ -436,14 +436,14 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// Unary +/-
 			{
 				Code:    `+obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 2},
 				},
 			},
 			{
 				Code:    `-obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 2},
 				},
@@ -451,42 +451,42 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// All compound assignments
 			{
 				Code:    `x += obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 6},
 				},
 			},
 			{
 				Code:    `x -= obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 6},
 				},
 			},
 			{
 				Code:    `x *= obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 6},
 				},
 			},
 			{
 				Code:    `x /= obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 6},
 				},
 			},
 			{
 				Code:    `x %= obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 6},
 				},
 			},
 			{
 				Code:    `x **= obj?.foo;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 7},
 				},
@@ -494,7 +494,7 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// Arithmetic with ternary chain — 2 errors
 			{
 				Code:    `(cond ? obj?.a : obj?.b) + 1;`,
-				Options: map[string]interface{}{"disallowArithmeticOperators": true},
+				Options: []interface{}{map[string]interface{}{"disallowArithmeticOperators": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 9},
 					{MessageId: "unsafeArithmetic", Line: 1, Column: 18},

@@ -1,6 +1,7 @@
 package no_duplicate_imports
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_duplicate_imports.schema.json
+var schemaJSON []byte
 
 type declarationKind int
 
@@ -44,12 +48,12 @@ type options struct {
 	allowSeparateTypeImports bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(raw) == 0 {
 		return opts
 	}
+	m, _ := raw[0].(map[string]any)
 	if v, ok := m["includeExports"].(bool); ok {
 		opts.includeExports = v
 	}
@@ -224,9 +228,9 @@ func reportMessage(ctx *rule.RuleContext, node *ast.Node, id, module string) {
 
 // https://eslint.org/docs/latest/rules/no-duplicate-imports
 var NoDuplicateImportsRule = rule.Rule{
-	Name: "no-duplicate-imports",
-	Run: func(ctx rule.RuleContext, _rawOpts []any) rule.RuleListeners {
-		rawOpts := rule.LegacyUnwrapOptions(_rawOpts)
+	Name:   "no-duplicate-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOpts []any) rule.RuleListeners {
 		opts := parseOptions(rawOpts)
 		modules := map[string][]*entry{}
 

@@ -23,16 +23,17 @@ type Options struct {
 	AllowPattern  string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{AllowKeywords: true}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["allowKeywords"].(bool); ok {
-			opts.AllowKeywords = v
-		}
-		if v, ok := optsMap["allowPattern"].(string); ok {
-			opts.AllowPattern = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if v, ok := optsMap["allowKeywords"].(bool); ok {
+		opts.AllowKeywords = v
+	}
+	if v, ok := optsMap["allowPattern"].(string); ok {
+		opts.AllowPattern = v
 	}
 	return opts
 }
@@ -272,8 +273,7 @@ func buildUseBracketsFix(
 var DotNotationRule = rule.Rule{
 	Name:   "dot-notation",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`

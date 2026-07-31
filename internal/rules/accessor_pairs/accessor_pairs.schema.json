@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "getWithoutSet": {
+          "type": "boolean"
+        },
+        "setWithoutGet": {
+          "type": "boolean"
+        },
+        "enforceForClassMembers": {
+          "type": "boolean"
+        },
+        "enforceForTSTypes": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

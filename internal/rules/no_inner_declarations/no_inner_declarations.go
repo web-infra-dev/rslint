@@ -1,12 +1,16 @@
 package no_inner_declarations
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_inner_declarations.schema.json
+var schemaJSON []byte
 
 type ruleOptions struct {
 	both                 bool
@@ -15,9 +19,9 @@ type ruleOptions struct {
 
 // https://eslint.org/docs/latest/rules/no-inner-declarations
 var NoInnerDeclarationsRule = rule.Rule{
-	Name: "no-inner-declarations",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-inner-declarations",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		listeners := rule.RuleListeners{
@@ -50,49 +54,27 @@ var NoInnerDeclarationsRule = rule.Rule{
 	},
 }
 
-func parseOptions(opts any) ruleOptions {
-	result := ruleOptions{
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{
 		both:                 false,
 		blockScopedFunctions: "allow", // default: allow block-scoped functions (ES2015+)
 	}
 
-	if opts == nil {
-		return result
+	if len(options) == 0 {
+		return opts
+	}
+	if v, _ := options[0].(string); v == "both" {
+		opts.both = true
+	}
+	if len(options) < 2 {
+		return opts
+	}
+	m, _ := options[1].(map[string]any)
+	if v, ok := m["blockScopedFunctions"].(string); ok {
+		opts.blockScopedFunctions = v
 	}
 
-	// Extract the first string and the options object from various ESLint option formats:
-	//   "both", ["both"], ["both", {blockScopedFunctions: "disallow"}], {blockScopedFunctions: "disallow"}
-	var firstStr string
-	var optsObj map[string]interface{}
-
-	switch v := opts.(type) {
-	case string:
-		firstStr = v
-	case []interface{}:
-		if len(v) > 0 {
-			firstStr, _ = v[0].(string)
-			// Handle [{...}] format where the first element is an options object
-			if firstStr == "" {
-				optsObj, _ = v[0].(map[string]interface{})
-			}
-		}
-		if len(v) > 1 {
-			optsObj, _ = v[1].(map[string]interface{})
-		}
-	case map[string]interface{}:
-		optsObj = v
-	}
-
-	if firstStr == "both" {
-		result.both = true
-	}
-	if optsObj != nil {
-		if bsf, ok := optsObj["blockScopedFunctions"].(string); ok {
-			result.blockScopedFunctions = bsf
-		}
-	}
-
-	return result
+	return opts
 }
 
 // isValidParent checks whether the declaration's immediate parent represents

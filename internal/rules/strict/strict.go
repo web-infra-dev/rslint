@@ -1,6 +1,7 @@
 package strict
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed strict.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/strict
 //
@@ -347,31 +351,32 @@ func buildFunctionModeListeners(ctx rule.RuleContext) rule.RuleListeners {
 	}
 }
 
-var StrictRule = rule.Rule{
-	Name: "strict",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		optStr := utils.GetOptionsString(options)
-		if optStr == "" {
-			optStr = "safe"
+// parseOptions maps the configured mode name onto a strictMode. rslint cannot
+// detect commonjs / globalReturn, so "safe" — the default — maps to "function",
+// matching ESLint's non-commonjs, non-globalReturn behavior.
+func parseOptions(options []any) strictMode {
+	mode := "safe"
+	if len(options) > 0 {
+		if s, ok := options[0].(string); ok {
+			mode = s
 		}
+	}
 
-		var m strictMode
-		switch optStr {
-		case "never":
-			m = modeNever
-		case "global":
-			m = modeGlobal
-		case "function":
-			m = modeFunction
-		case "safe":
-			// rslint cannot detect commonjs / globalReturn; "safe" on a
-			// script file therefore always maps to "function" (matching
-			// ESLint's non-commonjs, non-globalReturn behavior).
-			m = modeFunction
-		default:
-			m = modeFunction
-		}
+	switch mode {
+	case "never":
+		return modeNever
+	case "global":
+		return modeGlobal
+	default:
+		return modeFunction
+	}
+}
+
+var StrictRule = rule.Rule{
+	Name:   "strict",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		m := parseOptions(options)
 
 		if ast.IsExternalModule(ctx.SourceFile) {
 			m = modeModule

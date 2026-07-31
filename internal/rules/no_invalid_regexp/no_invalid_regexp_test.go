@@ -68,44 +68,35 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			{Code: `new RegExp('.', 'm')`},
 			{Code: `new RegExp('.', 's')`},
 			{Code: `new RegExp('.', 'y')`},
-			// allowConstructorFlags option
-			{
-				Code:    `new RegExp('.', 'z')`,
-				Options: map[string]interface{}{"allowConstructorFlags": "z"},
-			},
-			{
-				Code:    `new RegExp('.', 'az')`,
-				Options: map[string]interface{}{"allowConstructorFlags": "az"},
-			},
 			// allowConstructorFlags as array with multi-char string
 			{
 				Code:    `new RegExp('.', 'az')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"az"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"az"}}},
 			},
 			// allowConstructorFlags as array with single-char strings
 			{
 				Code:    `new RegExp('.', 'az')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"a", "z"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"a", "z"}}},
 			},
 			// allowConstructorFlags: standard flag in list (no-op)
 			{
 				Code:    `new RegExp('.', 'g')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"u"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"u"}}},
 			},
 			// allowConstructorFlags: multiple custom flags
 			{
 				Code:    `new RegExp('.', 'agz')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"a", "z"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"a", "z"}}},
 			},
 			// allowConstructorFlags: case sensitive
 			{
 				Code:    `new RegExp('.', 'A')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"A"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"A"}}},
 			},
 			// allowConstructorFlags: empty array (no effect)
 			{
 				Code:    `new RegExp('.', 'g')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{}}},
 			},
 			// === Skipped: regexp2 engine limitations (FP — valid in ESLint but regexp2 rejects) ===
 			// Unicode property long names
@@ -444,7 +435,7 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// === allowConstructorFlags: still-invalid cases ===
 			{
 				Code:    `new RegExp('.', 'z')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"a"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"a"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
@@ -452,7 +443,7 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Case-sensitive: "A" allowed but "a" used
 			{
 				Code:    `RegExp('.', 'a')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"A"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"A"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
@@ -460,7 +451,7 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Duplicate custom flag with allowConstructorFlags
 			{
 				Code:    `new RegExp('.', 'aa')`,
-				Options: map[string]interface{}{"allowConstructorFlags": []interface{}{"a"}},
+				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{"a"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},

@@ -33,11 +33,11 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 			{Code: `async function foo() { Promise.reject(await foo); }`},
 			{
 				Code:    `Promise.reject()`,
-				Options: map[string]interface{}{"allowEmptyReject": true},
+				Options: []interface{}{map[string]interface{}{"allowEmptyReject": true}},
 			},
 			{
 				Code:    `new Promise(function(resolve, reject) { reject() })`,
-				Options: map[string]interface{}{"allowEmptyReject": true},
+				Options: []interface{}{map[string]interface{}{"allowEmptyReject": true}},
 			},
 
 			// ---- Optional chaining ----
@@ -193,21 +193,21 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 			},
 			{
 				Code:    `Promise.reject()`,
-				Options: map[string]interface{}{"allowEmptyReject": false},
+				Options: []interface{}{map[string]interface{}{"allowEmptyReject": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "rejectAnError", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `new Promise(function(resolve, reject) { reject() })`,
-				Options: map[string]interface{}{"allowEmptyReject": false},
+				Options: []interface{}{map[string]interface{}{"allowEmptyReject": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "rejectAnError", Line: 1, Column: 41},
 				},
 			},
 			{
 				Code:    `Promise.reject(undefined)`,
-				Options: map[string]interface{}{"allowEmptyReject": true},
+				Options: []interface{}{map[string]interface{}{"allowEmptyReject": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "rejectAnError", Line: 1, Column: 1},
 				},

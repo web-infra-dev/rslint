@@ -15,6 +15,7 @@
 package no_misleading_character_class
 
 import (
+	_ "embed"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -26,11 +27,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_misleading_character_class.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/no-misleading-character-class
 var NoMisleadingCharacterClassRule = rule.Rule{
-	Name: "no-misleading-character-class",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-misleading-character-class",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		var callTracker *regexpCallTracker
 		if sourceMayUseRegExp(ctx.SourceFile) {
@@ -89,15 +93,16 @@ type ruleOptions struct {
 	allowEscape bool
 }
 
-func parseOptions(opts any) ruleOptions {
-	res := ruleOptions{}
-	m := utils.GetOptionsMap(opts)
-	if m != nil {
-		if v, ok := m["allowEscape"].(bool); ok {
-			res.allowEscape = v
-		}
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
+		return opts
 	}
-	return res
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowEscape"].(bool); ok {
+		opts.allowEscape = v
+	}
+	return opts
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 package no_restricted_globals
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_restricted_globals.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-restricted-globals
 
@@ -113,7 +117,8 @@ func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (optio
 }
 
 var NoRestrictedGlobalsRule = rule.Rule{
-	Name: "no-restricted-globals",
+	Name:   "no-restricted-globals",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var sourceIdentifiers map[string]string
 		if ctx.SourceFile != nil {

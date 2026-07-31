@@ -87,15 +87,6 @@ func TestCurlyExtras(t *testing.T) {
 			// ---- Dimension 4: parenthesized one-liner body, no braces wanted ----
 			{Code: "if (a) (b());", Options: "multi-or-nest"},
 
-			// ---- Graceful degradation: rslint does not schema-validate options
-			// (no native rule does), so invalid combos degrade instead of erroring.
-			// `["consistent"]` alone has no multi* mode → behaves like "all". ----
-			{Code: "if (a) { b() }", Options: []interface{}{"consistent"}},
-			// Explicit "all" + "consistent" is also just "all".
-			{Code: "if (a) { b() } else { c() }", Options: []interface{}{"all", "consistent"}},
-			// Unknown 2nd option is ignored → behaves like plain "multi".
-			{Code: "if (a) b()", Options: []interface{}{"multi", "foo"}},
-
 			// ==== deep nesting & consistent chains ====
 			// else-if chains, all one-liners, under "multi" → no braces anywhere
 			{Code: "if (a) foo(); else if (b) bar(); else baz();", Options: "multi"},
@@ -134,15 +125,6 @@ func TestCurlyExtras(t *testing.T) {
 			{Code: "do { f(); g(); } while (x)", Options: "multi"},
 		},
 		[]rule_tester.InvalidTestCase{
-			{
-				Code:    "if (a) b(); else c();",
-				Output:  []string{"if (a) {b();} else {c();}"},
-				Options: []interface{}{"all", "consistent"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingCurlyAfterCondition", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
-					{MessageId: "missingCurlyAfter", Line: 1, Column: 18, EndLine: 1, EndColumn: 22},
-				},
-			},
 			// ---- Real-user/tsgo: as-cast body, braces unnecessary under multi ----
 			{
 				Code:    "if (foo) { x = y as Foo; }",
@@ -436,16 +418,6 @@ func TestCurlyExtras(t *testing.T) {
 					{MessageId: "missingCurlyAfterCondition", Line: 1, Column: 9, EndLine: 1, EndColumn: 14},
 				},
 			},
-			// ---- Graceful degradation (invalid option schema): no crash, predictable mode ----
-			{
-				Code:    "if (a) b()",
-				Output:  []string{"if (a) {b()}"},
-				Options: []interface{}{"consistent"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingCurlyAfterCondition", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
-				},
-			},
-
 			// ==== deep nesting & consistent chains ====
 			// ---- 3-level if/while/for under "all": braces added one level per pass ----
 			{

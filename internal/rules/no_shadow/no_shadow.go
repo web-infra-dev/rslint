@@ -1,6 +1,7 @@
 package no_shadow
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_shadow.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-shadow
 //
@@ -60,7 +64,7 @@ func defaultOptionsTSESLint() options {
 	return o
 }
 
-func parseOptionsWith(raw any, opts options) options {
+func parseOptionsWith(rawOptions []any, opts options) options {
 	// Always copy the allow map: the caller's `opts` may be a long-lived
 	// defaults instance shared across rule invocations (e.g. the closure
 	// captured by `runWithDefaults`). Mutating in-place would leak state
@@ -70,10 +74,10 @@ func parseOptionsWith(raw any, opts options) options {
 	for k, v := range src {
 		opts.allow[k] = v
 	}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOptions[0].(map[string]interface{})
 	if v, ok := optsMap["builtinGlobals"].(bool); ok {
 		opts.builtinGlobals = v
 	}
@@ -1226,8 +1230,9 @@ func (b *builder) visitSwitchCases(sw *ast.SwitchStatement, outer *scope) {
 // ---------------------------------------------------------------------------
 
 var NoShadowRule = rule.Rule{
-	Name: "no-shadow",
-	Run:  runWithDefaults(defaultOptions()),
+	Name:   "no-shadow",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    runWithDefaults(defaultOptions()),
 }
 
 // RunTSESLint exposes the rule body with typescript-eslint's defaults so the
@@ -1241,8 +1246,7 @@ func RunTSESLint(ctx rule.RuleContext, options []any) rule.RuleListeners {
 }
 
 func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleListeners {
-	return func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	return func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptionsWith(rawOptions, defaults)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
