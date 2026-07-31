@@ -97,25 +97,11 @@ export default defineConfig([
 ]);
 ```
 
+:::tip
+When using both JavaScript and TypeScript recommended presets, place `js.configs.recommended` before `ts.configs.recommended`. The TypeScript preset disables ESLint core rules that are handled by TypeScript-aware rules, and later config entries override earlier ones.
+:::
+
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
-
-## Configuring Preset Order
-
-When using both JavaScript and TypeScript recommended presets, `js.configs.recommended` should be placed before `ts.configs.recommended`.
-
-The TypeScript preset includes a configuration layer that disables ESLint core rules that are replaced by TypeScript-aware rules. Since later configuration entries take precedence over earlier ones, placing `js.configs.recommended` after `ts.configs.recommended` would override these disabled rules and enable rules that TypeScript already handles.
-
-```ts
-export default defineConfig([
-  js.configs.recommended,
-  ts.configs.recommended,
-  {
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
-  },
-]);
-```
 
 ## Configuration Options
 
