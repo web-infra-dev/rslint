@@ -99,9 +99,11 @@ export default defineConfig([
 
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
-## Composing Presets
+## Configuring Preset Order
 
-When configuring a TypeScript project, you should place `js.configs.recommended` before `ts.configs.recommended`. This is because `ts.configs.recommended` contains a layer that disables ESLint core rules already reported by TypeScript.
+When using both JavaScript and TypeScript recommended presets, `js.configs.recommended` should be placed before `ts.configs.recommended`.
+
+The TypeScript preset includes a configuration layer that disables ESLint core rules that are replaced by TypeScript-aware rules. Since later configuration entries take precedence over earlier ones, placing `js.configs.recommended` after `ts.configs.recommended` would override these disabled rules and enable rules that TypeScript already handles.
 
 ```ts
 export default defineConfig([
@@ -114,8 +116,6 @@ export default defineConfig([
   },
 ]);
 ```
-
-Later entries in the configuration array override earlier ones. Placing `js.configs.recommended` after `ts.configs.recommended` would re-enable core rules that TypeScript already handles.
 
 ## Configuration Options
 
