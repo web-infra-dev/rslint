@@ -122,7 +122,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-module': 'error', // not implemented
     // 'unicorn/prefer-native-coercion-functions': 'error', // not implemented
     // 'unicorn/prefer-negative-index': 'error', // not implemented
-    // 'unicorn/prefer-node-protocol': 'error', // not implemented
+    'unicorn/prefer-node-protocol': 'error',
     'unicorn/prefer-number-properties': 'error',
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
     // 'unicorn/prefer-optional-catch-binding': 'error', // not implemented

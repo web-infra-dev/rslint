@@ -610,6 +610,7 @@ vitest
 vname
 Värde
 walltime
+wasi
 wasmer
 wasmfs
 WCAG
