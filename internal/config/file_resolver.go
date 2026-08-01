@@ -1,21 +1,15 @@
 package config
 
-import (
-	"sync"
+import "github.com/web-infra-dev/rslint/internal/linter"
 
-	"github.com/web-infra-dev/rslint/internal/linter"
-)
-
-type cachedMergedConfig struct {
-	value *MergedConfig
+type effectiveConfigPlan struct {
+	mergedConfig *MergedConfig
+	enabledRules []linter.ConfiguredRule
 }
 
-type cachedEnabledRules struct {
-	value []linter.ConfiguredRule
-}
-
-// FileConfigResolver caches per-file config and rule resolution for one lint
-// run. It is safe for concurrent use by RunLinter workers.
+// FileConfigResolver resolves config and rules for one immutable config root.
+// It interns files with the same exact matched-entry shape for the resolver's
+// lifetime and is safe for concurrent use by native and plugin lint workers.
 type FileConfigResolver struct {
 	config         RslintConfig
 	cwd            string
@@ -25,10 +19,10 @@ type FileConfigResolver struct {
 	// re-deriving it (string parsing + allocation) on every ConfigForFile
 	// call is pure waste at thousands-of-files scale.
 	globalIgnorePatterns []IgnorePattern
+	entryIgnorePatterns  [][]IgnorePattern
 
-	mu          sync.RWMutex
-	configCache map[string]cachedMergedConfig
-	rulesCache  map[string]cachedEnabledRules
+	filePlans  publishOnceCache[string, *effectiveConfigPlan]
+	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
 }
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
@@ -38,55 +32,50 @@ func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool)
 		cwd:                  cwd,
 		enforcePlugins:       enforcePlugins,
 		globalIgnorePatterns: extractConfigIgnores(config),
-		configCache:          make(map[string]cachedMergedConfig),
-		rulesCache:           make(map[string]cachedEnabledRules),
+		entryIgnorePatterns:  parseEntryIgnorePatterns(config),
 	}
 }
 
 // ConfigForFile returns the merged config for filePath, caching nil misses.
+// The returned value is shared immutable resolver state and must be read-only.
 func (r *FileConfigResolver) ConfigForFile(filePath string) *MergedConfig {
-	r.mu.RLock()
-	if cached, ok := r.configCache[filePath]; ok {
-		r.mu.RUnlock()
-		return cached.value
+	plan := r.planForFile(filePath)
+	if plan == nil {
+		return nil
 	}
-	r.mu.RUnlock()
-
-	merged := r.config.getConfigForFileWithIgnores(filePath, r.cwd, r.globalIgnorePatterns)
-
-	r.mu.Lock()
-	if cached, ok := r.configCache[filePath]; ok {
-		r.mu.Unlock()
-		return cached.value
-	}
-	r.configCache[filePath] = cachedMergedConfig{value: merged}
-	r.mu.Unlock()
-	return merged
+	return plan.mergedConfig
 }
 
 // EnabledRulesForFile returns cached enabled rules and their merged config.
-// The returned rule slice is shared cache state and must be treated read-only.
+// Both returned values are shared immutable resolver state and must be read-only.
 func (r *FileConfigResolver) EnabledRulesForFile(filePath string) ([]linter.ConfiguredRule, *MergedConfig) {
-	r.mu.RLock()
-	if cached, ok := r.rulesCache[filePath]; ok {
-		merged := r.configCache[filePath].value
-		r.mu.RUnlock()
-		return cached.value, merged
+	plan := r.planForFile(filePath)
+	if plan == nil {
+		return nil, nil
 	}
-	r.mu.RUnlock()
+	return plan.enabledRules, plan.mergedConfig
+}
 
-	merged := r.ConfigForFile(filePath)
-	enabledRules := GlobalRuleRegistry.GetEnabledRulesForMergedConfig(merged, r.enforcePlugins)
+func (r *FileConfigResolver) planForFile(filePath string) *effectiveConfigPlan {
+	return r.filePlans.getOrInit(filePath, func() *effectiveConfigPlan {
+		key, matched := r.config.matchConfigEntries(
+			filePath,
+			r.cwd,
+			r.globalIgnorePatterns,
+			r.entryIgnorePatterns,
+		)
+		if !matched {
+			return nil
+		}
 
-	r.mu.Lock()
-	if cached, ok := r.rulesCache[filePath]; ok {
-		merged = r.configCache[filePath].value
-		r.mu.Unlock()
-		return cached.value, merged
-	}
-	r.rulesCache[filePath] = cachedEnabledRules{value: enabledRules}
-	r.mu.Unlock()
-	return enabledRules, merged
+		return r.shapePlans.getOrInit(key, func() *effectiveConfigPlan {
+			mergedConfig := r.config.mergeConfigEntries(key)
+			return &effectiveConfigPlan{
+				mergedConfig: mergedConfig,
+				enabledRules: GlobalRuleRegistry.GetEnabledRulesForMergedConfig(mergedConfig, r.enforcePlugins),
+			}
+		})
+	})
 }
 
 // ActiveRulesForFile filters cached enabled rules by the optional type-info set.
