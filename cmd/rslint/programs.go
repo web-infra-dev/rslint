@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sort"
+	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -26,6 +28,21 @@ type programConfigOrders map[string]int
 type lintProgramSet struct {
 	Programs     []*compiler.Program
 	ConfigOrders []programConfigOrders
+}
+
+// programBuildSpec is one stable slot in the Program registry. Planning and
+// construction are deliberately separate: config/project order and shared
+// tsconfig associations are resolved serially, while independent Program
+// construction may fill the already-ordered slots concurrently.
+type programBuildSpec struct {
+	tsconfigPath string
+	programCwd   string
+	configOrders programConfigOrders
+}
+
+type programBuildPlan struct {
+	specs       []programBuildSpec
+	terminalErr error
 }
 
 func exactFilesystemPathID(filePath string) string {
@@ -70,19 +87,18 @@ func storeSourcePathMapping(mapping map[string]string, sourcePath string, canoni
 	}
 }
 
-// createProgramSetForConfigs builds each normalized tsconfig path once while
-// retaining every config that declared it. Config roots are processed in a
-// stable order; target binding later uses the per-config project order rather
-// than map iteration or Program construction order.
-func createProgramSetForConfigs(
+// buildProgramPlan resolves each normalized tsconfig path once while retaining
+// every config that declared it. It stops at the first resolution failure but
+// retains earlier work: the serial implementation built those earlier Programs
+// before surfacing that failure, so executeProgramBuildPlan must preserve the
+// same error precedence.
+func buildProgramPlan(
 	configMap map[string]rslintconfig.RslintConfig,
-	singleThreaded bool,
-	buildContext *utils.ProgramBuildContext,
-) (lintProgramSet, error) {
+	fsys vfs.FS,
+) programBuildPlan {
 	if len(configMap) == 0 {
-		return lintProgramSet{}, nil
+		return programBuildPlan{}
 	}
-	fsys := buildContext.FS()
 
 	configDirs := make([]string, 0, len(configMap))
 	for configDir := range configMap {
@@ -90,7 +106,7 @@ func createProgramSetForConfigs(
 	}
 	sort.Strings(configDirs)
 
-	set := lintProgramSet{}
+	plan := programBuildPlan{}
 	programByTsconfig := make(map[string]int)
 	for _, configDir := range configDirs {
 		entries := configMap[configDir]
@@ -98,15 +114,16 @@ func createProgramSetForConfigs(
 		configDirID := exactFilesystemPathID(normalizedConfigDir)
 		tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, normalizedConfigDir, fsys)
 		if err != nil {
-			return lintProgramSet{}, fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
+			plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
+			return plan
 		}
 
 		for order, tsconfigPath := range tsConfigs {
 			tsconfigPath = tspath.NormalizePath(tsconfigPath)
 			tsconfigID := exactFilesystemPathID(tsconfigPath)
 			if programIndex, ok := programByTsconfig[tsconfigID]; ok {
-				if _, alreadyAssociated := set.ConfigOrders[programIndex][configDirID]; !alreadyAssociated {
-					set.ConfigOrders[programIndex][configDirID] = order
+				if _, alreadyAssociated := plan.specs[programIndex].configOrders[configDirID]; !alreadyAssociated {
+					plan.specs[programIndex].configOrders[configDirID] = order
 				}
 				continue
 			}
@@ -114,19 +131,99 @@ func createProgramSetForConfigs(
 			// Relative paths in a tsconfig are resolved from the declared path,
 			// including when that path is a file symlink. This matches tsc/tsgo;
 			// realpath is only a source-identity fallback during target binding.
-			programCwd := tspath.GetDirectoryPath(tsconfigPath)
-			program, err := buildContext.CreateProgramLenient(singleThreaded, programCwd, tsconfigPath)
-			if err != nil {
-				return lintProgramSet{}, fmt.Errorf("create TypeScript Program from %q: %w", tsconfigPath, err)
-			}
-
-			programByTsconfig[tsconfigID] = len(set.Programs)
-			set.Programs = append(set.Programs, program)
-			set.ConfigOrders = append(set.ConfigOrders, programConfigOrders{configDirID: order})
+			programByTsconfig[tsconfigID] = len(plan.specs)
+			plan.specs = append(plan.specs, programBuildSpec{
+				tsconfigPath: tsconfigPath,
+				programCwd:   tspath.GetDirectoryPath(tsconfigPath),
+				configOrders: programConfigOrders{configDirID: order},
+			})
 		}
 	}
 
-	return set, nil
+	return plan
+}
+
+func executeProgramBuildPlan(
+	plan programBuildPlan,
+	singleThreaded bool,
+	buildContext *utils.ProgramBuildContext,
+) (lintProgramSet, error) {
+	if len(plan.specs) == 0 {
+		if plan.terminalErr != nil {
+			return lintProgramSet{}, plan.terminalErr
+		}
+		return lintProgramSet{}, nil
+	}
+
+	programs := make([]*compiler.Program, len(plan.specs))
+	errs := make([]error, len(plan.specs))
+	build := func(index int) {
+		spec := plan.specs[index]
+		programs[index], errs[index] = buildContext.CreateProgramLenient(
+			singleThreaded,
+			spec.programCwd,
+			spec.tsconfigPath,
+		)
+	}
+
+	workerCount := min(runtime.GOMAXPROCS(0), len(plan.specs))
+	if singleThreaded || workerCount <= 1 {
+		for index := range plan.specs {
+			build(index)
+			if errs[index] != nil {
+				break
+			}
+		}
+	} else {
+		jobs := make(chan int, workerCount)
+		var workers sync.WaitGroup
+		workers.Add(workerCount)
+		for range workerCount {
+			go func() {
+				defer workers.Done()
+				for index := range jobs {
+					build(index)
+				}
+			}()
+		}
+		for index := range plan.specs {
+			jobs <- index
+		}
+		close(jobs)
+		workers.Wait()
+	}
+
+	for index, err := range errs {
+		if err != nil {
+			return lintProgramSet{}, fmt.Errorf(
+				"create TypeScript Program from %q: %w",
+				plan.specs[index].tsconfigPath,
+				err,
+			)
+		}
+	}
+	if plan.terminalErr != nil {
+		return lintProgramSet{}, plan.terminalErr
+	}
+
+	configOrders := make([]programConfigOrders, len(plan.specs))
+	for index := range plan.specs {
+		configOrders[index] = plan.specs[index].configOrders
+	}
+	return lintProgramSet{Programs: programs, ConfigOrders: configOrders}, nil
+}
+
+// createProgramSetForConfigs builds each planned Program into its stable
+// registry slot. At most min(GOMAXPROCS, Program count) Programs are built
+// concurrently; --singleThreaded retains the original serial, fail-fast path
+// exactly.
+func createProgramSetForConfigs(
+	configMap map[string]rslintconfig.RslintConfig,
+	singleThreaded bool,
+	buildContext *utils.ProgramBuildContext,
+) (lintProgramSet, error) {
+	plan := buildProgramPlan(configMap, buildContext.FS())
+	return executeProgramBuildPlan(plan, singleThreaded, buildContext)
 }
 
 func createProgramSetForConfig(

@@ -3,10 +3,13 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -25,6 +28,47 @@ type targetPlanRealpathCountingFS struct {
 	vfs.FS
 	mu    sync.Mutex
 	calls map[string]int
+}
+
+type blockingProgramConfigFS struct {
+	vfs.FS
+	paths      map[string]struct{}
+	waitFor    int
+	mu         sync.Mutex
+	active     int
+	peak       int
+	allStarted chan struct{}
+	release    chan struct{}
+	startOnce  sync.Once
+}
+
+func (f *blockingProgramConfigFS) ReadFile(filePath string) (string, bool) {
+	if _, blocks := f.paths[tspath.NormalizePath(filePath)]; !blocks {
+		return f.FS.ReadFile(filePath)
+	}
+
+	f.mu.Lock()
+	f.active++
+	if f.active > f.peak {
+		f.peak = f.active
+	}
+	if f.active == f.waitFor {
+		f.startOnce.Do(func() { close(f.allStarted) })
+	}
+	f.mu.Unlock()
+
+	<-f.release
+	content, ok := f.FS.ReadFile(filePath)
+	f.mu.Lock()
+	f.active--
+	f.mu.Unlock()
+	return content, ok
+}
+
+func (f *blockingProgramConfigFS) peakConcurrency() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.peak
 }
 
 func (f *targetPlanRealpathCountingFS) Realpath(filePath string) string {
@@ -796,6 +840,139 @@ func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t
 	}
 	if order, ok := set.ConfigOrders[0][childKey]; !ok || order != 0 {
 		t.Fatalf("missing child config association: %v", set.ConfigOrders[0])
+	}
+}
+
+func TestCreateProgramSetForConfigs_BoundsParallelBuildsAndPreservesOrder(t *testing.T) {
+	rootDir := t.TempDir()
+	const (
+		testGOMAXPROCS = 9 // Deliberately exceeds the former fixed worker limit.
+		configCount    = testGOMAXPROCS + 3
+	)
+	previousGOMAXPROCS := runtime.GOMAXPROCS(testGOMAXPROCS)
+	t.Cleanup(func() {
+		runtime.GOMAXPROCS(previousGOMAXPROCS)
+	})
+
+	files := make(map[string]string, configCount)
+	projects := make([]string, 0, configCount)
+	configPaths := make(map[string]struct{}, configCount)
+	for index := range configCount {
+		name := "tsconfig-" + strconv.Itoa(index) + ".json"
+		files[name] = `{"compilerOptions":{"noLib":true},"files":["./shared.ts"]}`
+		projects = append(projects, "./"+name)
+		configPaths[tspath.NormalizePath(filepath.Join(rootDir, name))] = struct{}{}
+	}
+	files["shared.ts"] = "export const shared = true;\n"
+	writeProgramTestFiles(t, rootDir, files)
+
+	expectedConcurrency := testGOMAXPROCS
+	fsys := &blockingProgramConfigFS{
+		FS:         bundled.WrapFS(osvfs.FS()),
+		paths:      configPaths,
+		waitFor:    expectedConcurrency,
+		allStarted: make(chan struct{}),
+		release:    make(chan struct{}),
+	}
+	type result struct {
+		set lintProgramSet
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		set, err := createProgramSetForConfig(
+			tspath.NormalizePath(rootDir),
+			projectConfig(projects...),
+			false,
+			utils.NewProgramBuildContext(fsys),
+		)
+		done <- result{set: set, err: err}
+	}()
+
+	select {
+	case <-fsys.allStarted:
+		close(fsys.release)
+	case <-time.After(5 * time.Second):
+		close(fsys.release)
+		t.Fatalf("Program builds did not reach expected concurrency %d", expectedConcurrency)
+	}
+	got := <-done
+	if got.err != nil {
+		t.Fatalf("createProgramSetForConfig: %v", got.err)
+	}
+	if got := fsys.peakConcurrency(); got != expectedConcurrency {
+		t.Fatalf("peak Program build concurrency = %d, want %d", got, expectedConcurrency)
+	}
+	if len(got.set.Programs) != configCount {
+		t.Fatalf("Programs = %d, want %d", len(got.set.Programs), configCount)
+	}
+	for index, program := range got.set.Programs {
+		want := tspath.ResolvePath(rootDir, projects[index])
+		if got := tspath.NormalizePath(program.Options().ConfigFilePath); got != want {
+			t.Fatalf("Program %d config path = %q, want %q", index, got, want)
+		}
+	}
+}
+
+func TestCreateProgramSetForConfigs_SingleThreadedBuildsSerially(t *testing.T) {
+	rootDir := t.TempDir()
+	files := map[string]string{
+		"tsconfig-a.json": `{"compilerOptions":{"noLib":true},"files":[]}`,
+		"tsconfig-b.json": `{"compilerOptions":{"noLib":true},"files":[]}`,
+	}
+	writeProgramTestFiles(t, rootDir, files)
+	configPaths := make(map[string]struct{}, len(files))
+	for name := range files {
+		configPaths[tspath.NormalizePath(filepath.Join(rootDir, name))] = struct{}{}
+	}
+	fsys := &blockingProgramConfigFS{
+		FS:         bundled.WrapFS(osvfs.FS()),
+		paths:      configPaths,
+		waitFor:    1,
+		allStarted: make(chan struct{}),
+		release:    make(chan struct{}),
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := createProgramSetForConfig(
+			tspath.NormalizePath(rootDir),
+			projectConfig("./tsconfig-a.json", "./tsconfig-b.json"),
+			true,
+			utils.NewProgramBuildContext(fsys),
+		)
+		done <- err
+	}()
+	<-fsys.allStarted
+	close(fsys.release)
+	if err := <-done; err != nil {
+		t.Fatalf("createProgramSetForConfig: %v", err)
+	}
+	if got := fsys.peakConcurrency(); got != 1 {
+		t.Fatalf("--singleThreaded peak Program build concurrency = %d, want 1", got)
+	}
+}
+
+func TestExecuteProgramBuildPlan_PreservesFirstErrorPrecedence(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	first := tspath.ResolvePath(rootDir, "missing-first.json")
+	second := tspath.ResolvePath(rootDir, "missing-second.json")
+	plan := programBuildPlan{
+		specs: []programBuildSpec{
+			{tsconfigPath: first, programCwd: rootDir},
+			{tsconfigPath: second, programCwd: rootDir},
+		},
+		terminalErr: os.ErrInvalid,
+	}
+	_, err := executeProgramBuildPlan(
+		plan,
+		false,
+		utils.NewProgramBuildContext(bundled.WrapFS(osvfs.FS())),
+	)
+	if err == nil || !strings.Contains(err.Error(), first) {
+		t.Fatalf("error = %v, want first Program path %q", err, first)
+	}
+	if strings.Contains(err.Error(), second) || strings.Contains(err.Error(), os.ErrInvalid.Error()) {
+		t.Fatalf("later error won over the first Program failure: %v", err)
 	}
 }
 

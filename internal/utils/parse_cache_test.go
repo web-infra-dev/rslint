@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -126,6 +128,12 @@ func (f *divergentConcurrentFS) ReadFile(path string) (string, bool) {
 	return fmt.Sprintf("export const value = %d;\n", readNumber), true
 }
 
+func (f *divergentConcurrentFS) readCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads
+}
+
 type blockingGenerationFS struct {
 	vfs.FS
 	path    string
@@ -134,6 +142,38 @@ type blockingGenerationFS struct {
 	reads   int
 	started chan struct{}
 	release chan struct{}
+}
+
+type panicOnceSourceFS struct {
+	vfs.FS
+	path    string
+	text    string
+	mu      sync.Mutex
+	reads   int
+	started chan struct{}
+	release chan struct{}
+}
+
+func (f *panicOnceSourceFS) ReadFile(path string) (string, bool) {
+	if path != f.path {
+		return f.FS.ReadFile(path)
+	}
+	f.mu.Lock()
+	f.reads++
+	first := f.reads == 1
+	f.mu.Unlock()
+	if first {
+		close(f.started)
+		<-f.release
+		panic("source read panic")
+	}
+	return f.text, true
+}
+
+func (f *panicOnceSourceFS) readCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads
 }
 
 func (f *blockingGenerationFS) ReadFile(path string) (string, bool) {
@@ -649,7 +689,7 @@ func TestCachingHost_ConcurrentMissesUseOneWinningSnapshot(t *testing.T) {
 	fs := &divergentConcurrentFS{
 		FS:         bundled.WrapFS(osvfs.FS()),
 		path:       fileName,
-		wantReads:  callers,
+		wantReads:  1,
 		allStarted: make(chan struct{}),
 		release:    make(chan struct{}),
 	}
@@ -680,6 +720,9 @@ func TestCachingHost_ConcurrentMissesUseOneWinningSnapshot(t *testing.T) {
 			t.Fatalf("caller %d did not use the source/AST winner", i+1)
 		}
 	}
+	if got := fs.readCount(); got != 1 {
+		t.Fatalf("concurrent source lookup performed %d reads, want 1", got)
+	}
 	value, ok := cache.currentSourceGeneration().entries.Load(fileName)
 	if !ok {
 		t.Fatal("winning source snapshot was not stored")
@@ -687,6 +730,109 @@ func TestCachingHost_ConcurrentMissesUseOneWinningSnapshot(t *testing.T) {
 	snapshot := value.(sourceSnapshot)
 	if winner.Text() != snapshot.text || snapshot.hash != xxh3.HashString128(snapshot.text) {
 		t.Fatal("winner AST and immutable source text/hash pair diverged")
+	}
+}
+
+func TestParseCache_PanicReleasesConcurrentParseMiss(t *testing.T) {
+	fileName := "/virtual/parse-panic.ts"
+	text := "export const recovered = true;\n"
+	opts := testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{})
+	key := project.NewParseCacheKey(
+		opts,
+		xxh3.HashString128(text),
+		core.GetScriptKindFromFileName(fileName),
+	)
+	reference := new(ParseCache).acquire(opts, text)
+	cache := &ParseCache{}
+	parseStarted := make(chan struct{})
+	releaseParse := make(chan struct{})
+	ownerPanic := make(chan any, 1)
+
+	go func() {
+		defer func() { ownerPanic <- recover() }()
+		cache.acquireParseMiss(key, func() *ast.SourceFile {
+			close(parseStarted)
+			<-releaseParse
+			panic("parse panic")
+		})
+	}()
+	<-parseStarted
+
+	waiterResult := make(chan *ast.SourceFile, 1)
+	go func() {
+		waiterResult <- cache.acquireParseMiss(key, func() *ast.SourceFile {
+			return reference
+		})
+	}()
+	close(releaseParse)
+
+	select {
+	case recovered := <-ownerPanic:
+		if recovered == nil {
+			t.Fatal("expected parse panic")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("parse owner did not propagate its panic")
+	}
+	select {
+	case sourceFile := <-waiterResult:
+		if sourceFile != reference {
+			t.Fatal("waiting parse caller did not retry after owner panic")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("parse panic stranded a concurrent waiter")
+	}
+	if _, loaded := cache.inflight.Load(key); loaded {
+		t.Fatal("panicking parse remained in the in-flight map")
+	}
+}
+
+func TestCachingHost_PanicReleasesConcurrentSourceMiss(t *testing.T) {
+	fileName := "/virtual/source-panic.ts"
+	text := "export const recovered = true;\n"
+	fs := &panicOnceSourceFS{
+		FS:      bundled.WrapFS(osvfs.FS()),
+		path:    fileName,
+		text:    text,
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	cache := &ParseCache{}
+	host := WithParseCache(CreateCompilerHost("/virtual", fs), cache)
+	opts := testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{})
+	ownerPanic := make(chan any, 1)
+
+	go func() {
+		defer func() { ownerPanic <- recover() }()
+		host.GetSourceFile(opts)
+	}()
+	<-fs.started
+
+	waiterResult := make(chan *ast.SourceFile, 1)
+	go func() { waiterResult <- host.GetSourceFile(opts) }()
+	close(fs.release)
+
+	select {
+	case recovered := <-ownerPanic:
+		if recovered == nil {
+			t.Fatal("expected source read panic")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("source owner did not propagate its panic")
+	}
+	select {
+	case sourceFile := <-waiterResult:
+		if sourceFile == nil || sourceFile.Text() != text {
+			t.Fatalf("waiting source caller did not retry successfully: %v", sourceFile)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("source read panic stranded a concurrent waiter")
+	}
+	if got := fs.readCount(); got != 2 {
+		t.Fatalf("source reads after one panic = %d, want 2", got)
+	}
+	if _, loaded := cache.currentSourceGeneration().inflight.Load(fileName); loaded {
+		t.Fatal("panicking source read remained in the in-flight map")
 	}
 }
 

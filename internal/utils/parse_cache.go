@@ -42,9 +42,10 @@ import (
 //	I3: file.Hash is never written. The --api EncodeAST header encodes
 //	    sourceFile.Hash (bytes 4-19) and is all-zero today; writing it
 //	    would change encoded output bytes.
-//	I4: concurrent source and AST misses resolve via LoadOrStore. Every loser
-//	    uses the published winner; duplicate cold reads/parses may occur, but
-//	    callers within a generation observe one winning snapshot/AST per key.
+//	I4: concurrent source and AST misses are single-flight. Every caller within
+//	    a generation observes one winning snapshot/AST per key, without
+//	    duplicating successful cold reads, content hashes, or parses. Failed
+//	    reads are retried, and a panic never leaves waiters blocked.
 //	I5: the source layer owned by one cache binds to one exact pointer-identity
 //	    FS across its generations. Hosts backed by another or a non-pointer FS
 //	    bypass only the source layer and still use the content-keyed AST cache.
@@ -58,7 +59,8 @@ import (
 //	I9: cache ownership is explicit and bounded to one CLI run or API request;
 //	    no package-level singleton may extend source/AST lifetime implicitly.
 type ParseCache struct {
-	m sync.Map // project.ParseCacheKey -> *ast.SourceFile
+	m        sync.Map // project.ParseCacheKey -> *ast.SourceFile
+	inflight sync.Map // project.ParseCacheKey -> *parseCacheFlight
 
 	sourceGeneration atomic.Pointer[sourceSnapshotGeneration]
 	sourceFSMu       sync.Mutex
@@ -66,12 +68,26 @@ type ParseCache struct {
 }
 
 type sourceSnapshotGeneration struct {
-	entries sync.Map // exact opts.FileName -> sourceSnapshot
+	entries  sync.Map // exact opts.FileName -> sourceSnapshot
+	inflight sync.Map // exact opts.FileName -> *sourceSnapshotFlight
 }
 
 type sourceSnapshot struct {
 	text string
 	hash xxh3.Uint128
+}
+
+type sourceSnapshotFlight struct {
+	ready     chan struct{}
+	snapshot  sourceSnapshot
+	ok        bool
+	completed bool
+}
+
+type parseCacheFlight struct {
+	ready      chan struct{}
+	sourceFile *ast.SourceFile
+	completed  bool
 }
 
 // NewParseCache returns a fresh cache, or nil (disabling caching entirely via
@@ -104,24 +120,90 @@ func (c *ParseCache) acquireSnapshot(opts ast.SourceFileParseOptions, snapshot s
 	// what the parse below actually uses.
 	scriptKind := core.GetScriptKindFromFileName(opts.FileName)
 	key := project.NewParseCacheKey(opts, snapshot.hash, scriptKind)
-	if v, ok := c.m.Load(key); ok {
-		if cached, ok := v.(*ast.SourceFile); ok {
-			return cached
+	if value, ok := c.m.Load(key); ok {
+		if sourceFile, ok := value.(*ast.SourceFile); ok {
+			return sourceFile
 		}
 	}
-	sf := parser.ParseSourceFile(opts, snapshot.text, scriptKind) // I2/I3: same text, Hash left zero
-	actual, _ := c.m.LoadOrStore(key, sf)                         // I4: winner is the only object handed out
-	if winner, ok := actual.(*ast.SourceFile); ok {
-		return winner
+	return c.acquireParseMiss(key, func() *ast.SourceFile {
+		return parser.ParseSourceFile(opts, snapshot.text, scriptKind) // I2/I3: same text, Hash left zero
+	})
+}
+
+func (c *ParseCache) acquireParseMiss(
+	key project.ParseCacheKey,
+	parse func() *ast.SourceFile,
+) *ast.SourceFile {
+	for {
+		candidate := &parseCacheFlight{ready: make(chan struct{})}
+		actual, loaded := c.inflight.LoadOrStore(key, candidate)
+		if loaded {
+			flight := mustParseCacheFlight(actual)
+			<-flight.ready
+			if flight.completed {
+				return flight.sourceFile
+			}
+			continue
+		}
+
+		// A previous owner can publish the final entry and remove its flight
+		// between acquireSnapshot's fast-path miss and our LoadOrStore above.
+		if value, ok := c.m.Load(key); ok {
+			if sourceFile, ok := value.(*ast.SourceFile); ok {
+				candidate.sourceFile = sourceFile
+				candidate.completed = true
+				c.completeParseFlight(key, candidate)
+				return sourceFile
+			}
+		}
+		return c.parseAndPublish(key, candidate, parse)
 	}
-	return sf // unreachable: the map only ever holds *ast.SourceFile
+}
+
+func (c *ParseCache) parseAndPublish(
+	key project.ParseCacheKey,
+	flight *parseCacheFlight,
+	parse func() *ast.SourceFile,
+) *ast.SourceFile {
+	completed := false
+	defer func() {
+		if !completed {
+			// Preserve the panic while allowing a waiting caller to retry.
+			c.completeParseFlight(key, flight)
+		}
+	}()
+
+	sourceFile := parse()
+	if sourceFile != nil {
+		actual, _ := c.m.LoadOrStore(key, sourceFile)
+		if winner, ok := actual.(*ast.SourceFile); ok {
+			sourceFile = winner
+		}
+	}
+	flight.sourceFile = sourceFile
+	flight.completed = true
+	completed = true
+	c.completeParseFlight(key, flight)
+	return sourceFile
+}
+
+func (c *ParseCache) completeParseFlight(key project.ParseCacheKey, flight *parseCacheFlight) {
+	c.inflight.CompareAndDelete(key, flight)
+	close(flight.ready)
+}
+
+func mustParseCacheFlight(value any) *parseCacheFlight {
+	flight, ok := value.(*parseCacheFlight)
+	if !ok {
+		panic("parse cache in-flight map contains an unexpected value")
+	}
+	return flight
 }
 
 // RetainOnly evicts every entry whose SourceFile is not referenced by any of
 // the given programs (live set = union of all GetSourceFiles() pointers,
 // including gap-fallback programs). One sweep reclaims both --fix
-// intermediate versions (old-hash objects absent from rebuilt programs) and
-// build-time dedup losers (parsed but never included in a program).
+// intermediate versions (old-hash objects absent from rebuilt programs).
 // Deletion-only per I8: an evicted entry that is requested again is re-parsed
 // into a fresh object, which is the no-cache baseline behavior. Source
 // snapshots have a separate generation lifetime and are not pruned here.
@@ -139,8 +221,12 @@ func (c *ParseCache) RetainOnly(programs []*compiler.Program) {
 		}
 	}
 	c.m.Range(func(k, v any) bool {
-		if _, ok := live[v.(*ast.SourceFile)]; !ok {
-			c.m.Delete(k)
+		sourceFile, ok := v.(*ast.SourceFile)
+		if !ok {
+			return true
+		}
+		if _, ok := live[sourceFile]; !ok {
+			c.m.CompareAndDelete(k, v)
 		}
 		return true
 	})
@@ -217,26 +303,11 @@ func WithParseCache(host compiler.CompilerHost, cache *ParseCache) compiler.Comp
 func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.SourceFile {
 	if h.useSourceSnapshots {
 		generation := h.cache.currentSourceGeneration() // I7: capture exactly one generation
-		if value, ok := generation.entries.Load(opts.FileName); ok {
-			if snapshot, ok := value.(sourceSnapshot); ok {
-				return h.cache.acquireSnapshot(opts, snapshot)
-			}
-		}
-
-		text, ok := h.FS().ReadFile(opts.FileName)
+		snapshot, ok := h.acquireSourceSnapshot(generation, opts.FileName)
 		if !ok {
 			return nil // I1: failed reads are never published
 		}
-		candidate := sourceSnapshot{
-			text: text,
-			hash: xxh3.HashString128(text),
-		}
-		actual, _ := generation.entries.LoadOrStore(opts.FileName, candidate)
-		snapshot, ok := actual.(sourceSnapshot)
-		if !ok {
-			snapshot = candidate // unreachable: entries only ever stores sourceSnapshot values
-		}
-		return h.cache.acquireSnapshot(opts, snapshot) // I4: always use the winner
+		return h.cache.acquireSnapshot(opts, snapshot)
 	}
 
 	text, ok := h.FS().ReadFile(opts.FileName)
@@ -244,4 +315,93 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 		return nil // same as the default host, and never cached
 	}
 	return h.cache.acquire(opts, text)
+}
+
+func (h *cachingCompilerHost) acquireSourceSnapshot(
+	generation *sourceSnapshotGeneration,
+	fileName string,
+) (sourceSnapshot, bool) {
+	for {
+		if value, ok := generation.entries.Load(fileName); ok {
+			if snapshot, ok := value.(sourceSnapshot); ok {
+				return snapshot, true
+			}
+		}
+
+		candidate := &sourceSnapshotFlight{ready: make(chan struct{})}
+		actual, loaded := generation.inflight.LoadOrStore(fileName, candidate)
+		if loaded {
+			flight := mustSourceSnapshotFlight(actual)
+			<-flight.ready
+			if flight.completed {
+				return flight.snapshot, flight.ok
+			}
+			// The owner panicked. Retry rather than leaving this caller blocked.
+			continue
+		}
+
+		// As with the AST layer, close the small race between the initial
+		// cache lookup and becoming the single-flight owner.
+		if value, ok := generation.entries.Load(fileName); ok {
+			if snapshot, ok := value.(sourceSnapshot); ok {
+				candidate.snapshot = snapshot
+				candidate.ok = true
+				candidate.completed = true
+				h.completeSourceSnapshotFlight(generation, fileName, candidate)
+				return snapshot, true
+			}
+		}
+		return h.readAndPublishSourceSnapshot(generation, fileName, candidate)
+	}
+}
+
+func (h *cachingCompilerHost) readAndPublishSourceSnapshot(
+	generation *sourceSnapshotGeneration,
+	fileName string,
+	flight *sourceSnapshotFlight,
+) (sourceSnapshot, bool) {
+	completed := false
+	defer func() {
+		if !completed {
+			// A panicking VFS must not strand Programs waiting on the same file.
+			h.completeSourceSnapshotFlight(generation, fileName, flight)
+		}
+	}()
+
+	text, ok := h.FS().ReadFile(fileName)
+	if !ok {
+		flight.completed = true
+		completed = true
+		h.completeSourceSnapshotFlight(generation, fileName, flight)
+		return sourceSnapshot{}, false
+	}
+
+	snapshot := sourceSnapshot{text: text, hash: xxh3.HashString128(text)}
+	actual, _ := generation.entries.LoadOrStore(fileName, snapshot)
+	flight.snapshot = snapshot
+	if winner, ok := actual.(sourceSnapshot); ok {
+		flight.snapshot = winner
+	}
+	flight.ok = true
+	flight.completed = true
+	completed = true
+	h.completeSourceSnapshotFlight(generation, fileName, flight)
+	return flight.snapshot, true
+}
+
+func (h *cachingCompilerHost) completeSourceSnapshotFlight(
+	generation *sourceSnapshotGeneration,
+	fileName string,
+	flight *sourceSnapshotFlight,
+) {
+	generation.inflight.CompareAndDelete(fileName, flight)
+	close(flight.ready)
+}
+
+func mustSourceSnapshotFlight(value any) *sourceSnapshotFlight {
+	flight, ok := value.(*sourceSnapshotFlight)
+	if !ok {
+		panic("source snapshot in-flight map contains an unexpected value")
+	}
+	return flight
 }
