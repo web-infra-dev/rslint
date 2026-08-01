@@ -33,7 +33,7 @@ runs:
   using: composite
   steps:
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       with:
         toolchain: 1.96.1
         targets: ${{ inputs.targets }}
