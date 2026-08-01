@@ -920,7 +920,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      lint-target walk.
    - Configured Program identities, config associations, and result slots are
      planned serially in stable config/project order. Construction then uses at
-     most `min(8, GOMAXPROCS, Program count)` workers and merges results and
+     most `min(GOMAXPROCS, Program count)` workers and merges results and
      errors by the planned order.
    - `--singleThreaded` executes the same state machine with one Go discovery
      worker and serializes module evaluation within each Node frontier batch.

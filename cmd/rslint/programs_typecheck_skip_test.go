@@ -845,7 +845,15 @@ func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t
 
 func TestCreateProgramSetForConfigs_BoundsParallelBuildsAndPreservesOrder(t *testing.T) {
 	rootDir := t.TempDir()
-	const configCount = maxParallelProgramBuilds + 3
+	const (
+		testGOMAXPROCS = 9 // Deliberately exceeds the former fixed worker limit.
+		configCount    = testGOMAXPROCS + 3
+	)
+	previousGOMAXPROCS := runtime.GOMAXPROCS(testGOMAXPROCS)
+	t.Cleanup(func() {
+		runtime.GOMAXPROCS(previousGOMAXPROCS)
+	})
+
 	files := make(map[string]string, configCount)
 	projects := make([]string, 0, configCount)
 	configPaths := make(map[string]struct{}, configCount)
@@ -858,7 +866,7 @@ func TestCreateProgramSetForConfigs_BoundsParallelBuildsAndPreservesOrder(t *tes
 	files["shared.ts"] = "export const shared = true;\n"
 	writeProgramTestFiles(t, rootDir, files)
 
-	expectedConcurrency := min(maxParallelProgramBuilds, runtime.GOMAXPROCS(0), configCount)
+	expectedConcurrency := testGOMAXPROCS
 	fsys := &blockingProgramConfigFS{
 		FS:         bundled.WrapFS(osvfs.FS()),
 		paths:      configPaths,

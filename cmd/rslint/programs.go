@@ -30,8 +30,6 @@ type lintProgramSet struct {
 	ConfigOrders []programConfigOrders
 }
 
-const maxParallelProgramBuilds = 8
-
 // programBuildSpec is one stable slot in the Program registry. Planning and
 // construction are deliberately separate: config/project order and shared
 // tsconfig associations are resolved serially, while independent Program
@@ -168,7 +166,7 @@ func executeProgramBuildPlan(
 		)
 	}
 
-	workerCount := min(maxParallelProgramBuilds, runtime.GOMAXPROCS(0), len(plan.specs))
+	workerCount := min(runtime.GOMAXPROCS(0), len(plan.specs))
 	if singleThreaded || workerCount <= 1 {
 		for index := range plan.specs {
 			build(index)
@@ -216,8 +214,9 @@ func executeProgramBuildPlan(
 }
 
 // createProgramSetForConfigs builds each planned Program into its stable
-// registry slot. At most min(8, GOMAXPROCS) Programs are built concurrently;
-// --singleThreaded retains the original serial, fail-fast path exactly.
+// registry slot. At most min(GOMAXPROCS, Program count) Programs are built
+// concurrently; --singleThreaded retains the original serial, fail-fast path
+// exactly.
 func createProgramSetForConfigs(
 	configMap map[string]rslintconfig.RslintConfig,
 	singleThreaded bool,
