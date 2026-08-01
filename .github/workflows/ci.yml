@@ -47,7 +47,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '24'
+          node-version: '24.18.0'
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
