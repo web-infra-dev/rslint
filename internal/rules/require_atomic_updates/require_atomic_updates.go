@@ -129,29 +129,16 @@ func newAnalyzer(ctx rule.RuleContext, funcNode *ast.Node, allowProperties bool)
 	return a
 }
 
-// symbolOf returns the *ast.Symbol that `node` resolves to (or nil). The rule
-// is type-aware (RequiresTypeInfo is set), so TypeChecker is guaranteed non-nil
-// at runtime. Shorthand property identifiers resolve to their VALUE symbol
-// (the outer binding of the same name), and symbols augmented into the global
-// scope via `declare global { … }` are treated as unresolved — ESLint's
-// scope analyzer leaves those references unresolved too.
+// symbolOf returns the *ast.Symbol that the reference-position identifier
+// `node` resolves to (or nil), through the shared per-file reference index.
+// Shorthand property identifiers resolve to their VALUE symbol (the outer
+// binding of the same name — ctx.Refs treats them as reference positions),
+// and symbols augmented into the global scope via `declare global { … }` are
+// treated as unresolved — ESLint's scope analyzer leaves those references
+// unresolved too.
 func (a *analyzer) symbolOf(node *ast.Node) *ast.Symbol {
-	if node == nil || a.ctx.TypeChecker == nil {
-		return nil
-	}
-	var sym *ast.Symbol
-	if node.Kind == ast.KindIdentifier && node.Parent != nil &&
-		node.Parent.Kind == ast.KindShorthandPropertyAssignment &&
-		node.Parent.AsShorthandPropertyAssignment().Name() == node {
-		sym = a.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-	}
-	if sym == nil {
-		sym = a.ctx.TypeChecker.GetSymbolAtLocation(node)
-	}
-	if sym == nil {
-		return nil
-	}
-	if symbolIsDeclareGlobal(sym) {
+	sym := a.ctx.Refs.Resolve(node)
+	if sym == nil || symbolIsDeclareGlobal(sym) {
 		return nil
 	}
 	return sym
@@ -206,7 +193,13 @@ func (a *analyzer) collectBindingSymbols(nameNode *ast.Node, isParam bool) {
 		return
 	}
 	utils.CollectBindingNames(nameNode, func(ident *ast.Node, _ string) {
-		if sym := a.symbolOf(ident); sym != nil {
+		// A declaration name is not a reference position; its binder symbol
+		// lives on the owning declaration node (ParameterDeclaration,
+		// VariableDeclaration, or BindingElement).
+		if ident.Parent == nil {
+			return
+		}
+		if sym := ident.Parent.Symbol(); sym != nil {
 			a.declaredInFunc[sym] = true
 			if isParam {
 				a.parameterSymbols[sym] = true
@@ -236,7 +229,7 @@ func (a *analyzer) collectDeclsIn(node *ast.Node) {
 		case ast.KindFunctionDeclaration, ast.KindClassDeclaration,
 			ast.KindEnumDeclaration, ast.KindModuleDeclaration:
 			if n := child.Name(); n != nil && n.Kind == ast.KindIdentifier {
-				if sym := a.symbolOf(n); sym != nil {
+				if sym := child.Symbol(); sym != nil {
 					a.declaredInFunc[sym] = true
 				}
 			}
@@ -1132,8 +1125,7 @@ func (a *analyzer) walkForStatement(node *ast.Node, state *analysisState) {
 // RequireAtomicUpdatesRule disallows assignments that can lead to race conditions
 // due to usage of `await` or `yield`.
 var RequireAtomicUpdatesRule = rule.Rule{
-	Name:             "require-atomic-updates",
-	RequiresTypeInfo: true,
+	Name: "require-atomic-updates",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		allowProperties := false
