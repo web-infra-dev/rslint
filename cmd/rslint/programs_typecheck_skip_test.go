@@ -952,6 +952,45 @@ func TestCreateProgramSetForConfigs_SingleThreadedBuildsSerially(t *testing.T) {
 	}
 }
 
+func TestExecuteProgramBuildPlanScopesConcurrentProgramQueries(t *testing.T) {
+	t.Setenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE", "")
+	previousGOMAXPROCS := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() {
+		runtime.GOMAXPROCS(previousGOMAXPROCS)
+	})
+
+	rootDir := tspath.NormalizePath(t.TempDir())
+	tests := []struct {
+		name           string
+		configCount    int
+		singleThreaded bool
+		wantDerivedFS  bool
+	}{
+		{name: "one Program", configCount: 1},
+		{name: "parallel Programs", configCount: 2, wantDerivedFS: true},
+		{name: "single-threaded Programs", configCount: 2, singleThreaded: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan := programBuildPlan{specs: make([]programBuildSpec, test.configCount)}
+			for index := range plan.specs {
+				plan.specs[index] = programBuildSpec{
+					tsconfigPath: tspath.ResolvePath(rootDir, "missing-"+strconv.Itoa(index)+".json"),
+					programCwd:   rootDir,
+				}
+			}
+			buildContext := utils.NewProgramBuildContext(bundled.WrapFS(osvfs.FS()))
+			_, _ = executeProgramBuildPlan(plan, test.singleThreaded, buildContext)
+
+			gotDerivedFS := buildContext.NewCompilerHost(rootDir).FS() != buildContext.FS()
+			if gotDerivedFS != test.wantDerivedFS {
+				t.Fatalf("compiler host derived FS = %t, want %t", gotDerivedFS, test.wantDerivedFS)
+			}
+		})
+	}
+}
+
 func TestExecuteProgramBuildPlan_PreservesFirstErrorPrecedence(t *testing.T) {
 	rootDir := tspath.NormalizePath(t.TempDir())
 	first := tspath.ResolvePath(rootDir, "missing-first.json")

@@ -157,6 +157,12 @@ func executeProgramBuildPlan(
 
 	programs := make([]*compiler.Program, len(plan.specs))
 	errs := make([]error, len(plan.specs))
+
+	workerCount := min(runtime.GOMAXPROCS(0), len(plan.specs))
+	parallel := !singleThreaded && workerCount > 1
+	if parallel {
+		buildContext.EnableConcurrentProgramQueries()
+	}
 	build := func(index int) {
 		spec := plan.specs[index]
 		programs[index], errs[index] = buildContext.CreateProgramLenient(
@@ -166,8 +172,7 @@ func executeProgramBuildPlan(
 		)
 	}
 
-	workerCount := min(runtime.GOMAXPROCS(0), len(plan.specs))
-	if singleThreaded || workerCount <= 1 {
+	if !parallel {
 		for index := range plan.specs {
 			build(index)
 			if errs[index] != nil {
