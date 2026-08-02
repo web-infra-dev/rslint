@@ -27,13 +27,16 @@ import (
 //     parses through programMetadataFS and programExtendedConfigCache.
 //
 // RSLINT_DISABLE_PROGRAM_METADATA_CACHE is an undocumented diagnostic escape
-// hatch. When set, the VFS is not wrapped and tsconfig extends parsing uses the
-// upstream no-cache path. ParseCache keeps its own independent escape hatch.
+// hatch. When set, the Program VFS is not wrapped by either metadata snapshots
+// or concurrent-query coalescing, and tsconfig extends parsing uses the upstream
+// no-cache path. ParseCache keeps its own independent escape hatch.
 type ProgramBuildContext struct {
 	fs                  vfs.FS
 	parseCache          *ParseCache
 	metadataFS          *programMetadataFS
 	extendedConfigCache *programExtendedConfigCache
+	parallelFSOnce      sync.Once
+	parallelFS          atomic.Pointer[parallelProgramFS]
 }
 
 // NewProgramBuildContext creates a context for exactly one final VFS view.
@@ -57,9 +60,30 @@ func NewProgramBuildContext(fs vfs.FS) *ProgramBuildContext {
 	return context
 }
 
-// FS returns the exact VFS view that must be used by config discovery, Program
-// construction, target binding, and linting for this invocation/request.
+// FS returns the logical VFS view used by non-compiler consumers for this
+// invocation/request. Compiler hosts may use a context-owned derived view that
+// delegates to this one without changing its path or content semantics.
 func (c *ProgramBuildContext) FS() vfs.FS {
+	return c.fs
+}
+
+// EnableConcurrentProgramQueries switches future compiler hosts in this
+// context to one shared VFS view that coalesces their same-path Realpath
+// queries. It must be called only after choosing a genuinely parallel Program
+// build; FS and every non-Program consumer retain the original view.
+func (c *ProgramBuildContext) EnableConcurrentProgramQueries() {
+	if c.metadataFS == nil {
+		return
+	}
+	c.parallelFSOnce.Do(func() {
+		c.parallelFS.Store(newParallelProgramFS(c.fs))
+	})
+}
+
+func (c *ProgramBuildContext) compilerFS() vfs.FS {
+	if fs := c.parallelFS.Load(); fs != nil {
+		return fs
+	}
 	return c.fs
 }
 
@@ -67,7 +91,7 @@ func (c *ProgramBuildContext) FS() vfs.FS {
 // Project-reference configs are registered before ts-go reads them; extended
 // configs are registered by programExtendedConfigCache.
 func (c *ProgramBuildContext) NewCompilerHost(cwd string) compiler.CompilerHost {
-	host := compiler.NewCompilerHost(cwd, c.fs, bundled.LibPath(), c.extendedConfigCacheInterface(), nil)
+	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
 			CompilerHost: host,
@@ -99,7 +123,7 @@ func (c *ProgramBuildContext) CreateProgramLenient(singleThreaded bool, cwd stri
 
 func (c *ProgramBuildContext) parseConfig(cwd string, tsconfigPath string) (compiler.CompilerHost, *tsoptions.ParsedCommandLine, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
-	if !c.fs.FileExists(resolvedConfigPath) {
+	if !c.compilerFS().FileExists(resolvedConfigPath) {
 		return nil, nil, configNotFoundError(resolvedConfigPath)
 	}
 	c.registerTSConfig(resolvedConfigPath)
