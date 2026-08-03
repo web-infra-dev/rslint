@@ -24,6 +24,62 @@ import { createRequire } from 'module';
 const require = createRequire();
 require('remark-preset-prettier');
 		`},
+		{Code: `
+function load(require: (id: string) => unknown) {
+  return require('package');
+}
+		`},
+		{Code: `
+function load({ require }: { require: (id: string) => unknown }) {
+  return require('package');
+}
+		`},
+		{Code: `
+try {
+  run();
+} catch (require) {
+  require('package');
+}
+		`},
+		{Code: `
+import require from 'custom-loader';
+require('package');
+		`},
+		{Code: `
+function require(id: string): unknown {
+  return id;
+}
+require('package');
+		`},
+		{Code: `
+{
+  require('package');
+  const require = customRequire;
+}
+		`},
+		{Code: `
+const loader = function require() {
+  return require('package');
+};
+		`},
+		{Code: `
+const Loader = class require {
+  static load() {
+    return require('package');
+  }
+};
+		`},
+		{Code: `
+const require = customRequire;
+function load(value = require('package')) {
+  return value;
+}
+		`},
+		{Code: `
+function load(require = require('package')) {
+  return require;
+}
+		`},
 
 		// Allow patterns
 		{
@@ -155,6 +211,78 @@ var lib5 = require('lib5'),
 					MessageId: "noRequireImports",
 					Line:      3,
 					Column:    10,
+				},
+			},
+		},
+		{
+			Code: `
+function load(require: (id: string) => unknown) {
+  require('local');
+}
+require('global');
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      5,
+					Column:    1,
+				},
+			},
+		},
+		{
+			Code: `
+{
+  const require = customRequire;
+  require('local');
+}
+require('global');
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      6,
+					Column:    1,
+				},
+			},
+		},
+		{
+			Code: `
+type require = (id: string) => unknown;
+require('global');
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      3,
+					Column:    1,
+				},
+			},
+		},
+		{
+			Code: `
+function load(
+  value = require('global'),
+) {
+  const require = customRequire;
+  return value;
+}
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      3,
+					Column:    11,
+				},
+			},
+		},
+		{
+			Code:    "require('global');",
+			Globals: map[string]bool{"require": true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      1,
+					Column:    1,
 				},
 			},
 		},
