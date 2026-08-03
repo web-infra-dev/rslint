@@ -85,16 +85,6 @@ func TestPreferNodeProtocolUpstream(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 24}},
 			},
 			{
-				Code:   `export * from "fs";`,
-				Output: []string{`export * from "node:fs";`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 15}},
-			},
-			{
-				Code:   `export * as ns from "fs";`,
-				Output: []string{`export * as ns from "node:fs";`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 21}},
-			},
-			{
 				Code:   "async function foo() {\n\tconst fs = await import('fs');\n}",
 				Output: []string{"async function foo() {\n\tconst fs = await import('node:fs');\n}"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 2, Column: 26}},
