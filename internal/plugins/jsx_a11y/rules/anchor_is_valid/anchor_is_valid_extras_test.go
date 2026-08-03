@@ -1,11 +1,39 @@
+// cspell:ignore avascript
 package anchor_is_valid
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestHasJavaScriptHrefMatchesUpstreamPattern(t *testing.T) {
+	upstreamPattern := regexp.MustCompile(`^\W*?javascript:`)
+	atoms := []string{"", " ", "#", "\t", "!", "_", "0", "x", "j", "é", "中"}
+	suffixes := []string{
+		"javascript:",
+		"javascript:void(0)",
+		"javascript",
+		"Javascript:",
+		"xjavascript:",
+		"",
+	}
+
+	for _, first := range atoms {
+		for _, second := range atoms {
+			for _, third := range atoms {
+				for _, suffix := range suffixes {
+					value := first + second + third + suffix
+					if got, want := hasJavaScriptHref(value), upstreamPattern.MatchString(value); got != want {
+						t.Fatalf("hasJavaScriptHref(%q) = %t, want %t", value, got, want)
+					}
+				}
+			}
+		}
+	}
+}
 
 // polymorphicSettings exercises the `polymorphicPropName` jsx-a11y setting —
 // `<Foo as="a">` should be treated as `<a>` after getElementType resolution.
@@ -92,6 +120,10 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		// every disjunct of the invalid filter (length>0, !== "#", no
 		// "javascript:" anywhere). Locks in the literal value comparison.
 		{Code: `<a href=" " />`, Tsx: true},
+		// Entity syntax inside a JS expression is ordinary string content;
+		// unlike a direct JSX attribute, the parser must not decode it.
+		{Code: `<a href={"&#35;"} />`, Tsx: true},
+		{Code: `<a href={"&#106;avascript:void(0)"} />`, Tsx: true},
 
 		// ---- Locks in upstream Identifier extractor → string of name.
 		//      `href={foo}` ⇒ jsx-ast-utils returns "foo" (truthy non-empty
@@ -296,6 +328,13 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		// after the lazy quantifier consumes the `#`. Locks in the
 		// non-zero-prefix branch.
 		{Code: `<a href="#javascript:foo" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		// Direct JSX attribute strings are entity-decoded by ESTree parsers
+		// before jsx-ast-utils sees them. Numeric entities can therefore hide
+		// both the exact "#" value and a javascript: prefix and must still be
+		// rejected. The expression-container counterparts above stay encoded.
+		{Code: `<a href="&#35;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="&#106;avascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="&#160;javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
 
 		// ---- Dimension 4: TS expression wrappers around invalid values
 		//      must still be rejected. `("#" as const)` should reach the
