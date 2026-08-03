@@ -273,6 +273,9 @@ func TestPreferArraySomeUpstream(t *testing.T) {
 		{Code: `array.filter(fn).length !== 0`, Output: []string{`array.some(fn)`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
 		// Don't drop comments in the removed part → no fix.
 		{Code: `array.filter(fn).length /* keep */ > 0`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
+		// Parentheses around `.length` survive the removal.
+		{Code: `((array.filter(fn).length)) > 0`, Output: []string{`((array.some(fn)))`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
+		{Code: `(( array.filter(fn).length )) > 0`, Output: []string{`(( array.some(fn) ))`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
 		{Code: `module$.filter(fn).length > 0`, Output: []string{`module$.some(fn)`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
 		{Code: `type Collection = {filter(predicate: Function): {length: number}}; ([] satisfies Collection).filter(fn).length > 0`, Tsx: false, Output: []string{`type Collection = {filter(predicate: Function): {length: number}}; ([] satisfies Collection).some(fn)`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},
 		{Code: `type Items = string[] | {filter(predicate: Function): {length: number}}; function foo(items: Items) { items.filter(fn).length > 0; }`, Tsx: false, Output: []string{`type Items = string[] | {filter(predicate: Function): {length: number}}; function foo(items: Items) { items.some(fn); }`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageFilter}}},

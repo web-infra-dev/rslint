@@ -384,9 +384,11 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 		return []rule.RuleFix{
 			rule.RuleFixReplace(ctx.SourceFile, filterProperty, "some"),
 			// Remove `.length`: from the end of the filter call up to the end
-			// of the `.length` member expression.
-			rule.RuleFixRemoveRange(core.NewTextRange(lengthObjectEnd, parenthesizedEndOf(ctx, lengthMember))),
-			// Remove `> 0`.
+			// of the member expression itself. Upstream's
+			// removeMemberExpressionProperty stops at the member's own end, so
+			// parentheses wrapping the member survive the removal.
+			rule.RuleFixRemoveRange(core.NewTextRange(lengthObjectEnd, utils.TrimNodeTextRange(ctx.SourceFile, lengthMember).End())),
+			// Remove `> 0`, starting after any parentheses around the member.
 			rule.RuleFixRemoveRange(core.NewTextRange(parenthesizedEndOf(ctx, lengthMember), end)),
 		}
 	})
