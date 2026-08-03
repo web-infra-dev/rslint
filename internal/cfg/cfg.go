@@ -48,15 +48,21 @@ type Graph[E any] struct {
 	Blocks []*Block[E]
 }
 
-// Hooks are the points where a consumer turns a reference into an event. Read
-// runs where node is evaluated as a read, Write where its value is stored; a
-// target that is read before it is written — a compound assignment, an update
-// expression, a destructuring element — sees both, in that order. Either may be
-// nil. Both are called only from a reachable position, so Builder.Emit always
-// lands somewhere.
+// Hooks are the points where a consumer turns a position in the walk into an
+// event. Every hook may be nil, and every one is called only from a position
+// control can reach, so Builder.Emit always lands somewhere.
+//
+// Read runs where node is evaluated as a read, Write where its value is stored;
+// a target that is read before it is written — a compound assignment, an update
+// expression, a destructuring element — sees both, in that order.
+//
+// Statement runs as each statement is reached, before it is laid out. Loop runs
+// where control flows back into a loop for another iteration of it.
 type Hooks[E any] struct {
-	Read  func(b *Builder[E], node *ast.Node)
-	Write func(b *Builder[E], node *ast.Node)
+	Read      func(b *Builder[E], node *ast.Node)
+	Write     func(b *Builder[E], node *ast.Node)
+	Statement func(b *Builder[E], node *ast.Node)
+	Loop      func(b *Builder[E], loop *ast.Node)
 }
 
 // tryPosition is where in a `try` statement construction currently is.
@@ -84,11 +90,15 @@ type tryFrame[E any] struct {
 // switch statements, and false for a labelled statement that wraps neither, so
 // an unlabelled `break` skips past it to the enclosing loop/switch. labels
 // holds every label the target answers to — a loop wrapped as
-// `outer: inner: while (…)` accepts both names.
+// `outer: inner: while (…)` accepts both names. loop names the loop a
+// `continue` starts another iteration of, and is nil where continuing does not
+// re-enter the loop's first node: a `do`…`while` continues into its test, which
+// may still end the loop.
 type jumpTarget[E any] struct {
 	labels     []string
 	breakTo    *Block[E]
 	continueTo *Block[E]
+	loop       *ast.Node
 	breakable  bool
 }
 
@@ -209,6 +219,18 @@ func (b *Builder[E]) read(node *ast.Node) {
 func (b *Builder[E]) write(node *ast.Node) {
 	if b.hooks.Write != nil {
 		b.hooks.Write(b, node)
+	}
+}
+
+func (b *Builder[E]) reachedStatement(node *ast.Node) {
+	if b.hooks.Statement != nil {
+		b.hooks.Statement(b, node)
+	}
+}
+
+func (b *Builder[E]) loop(node *ast.Node) {
+	if b.hooks.Loop != nil && b.cur != nil && node != nil {
+		b.hooks.Loop(b, node)
 	}
 }
 

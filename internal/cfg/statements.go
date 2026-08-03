@@ -19,6 +19,7 @@ func (b *Builder[E]) statement(node *ast.Node) {
 	if node == nil || b.cur == nil {
 		return
 	}
+	b.reachedStatement(node)
 
 	switch node.Kind {
 	case ast.KindBlock:
@@ -178,9 +179,10 @@ func (b *Builder[E]) whileStatement(node *ast.Node) {
 	body := b.newBlock()
 	b.link(testEnd, body)
 
-	b.pushJump(node, after, test)
+	b.pushJump(node, after, test, node)
 	b.enter(body)
 	b.statement(stmt.Statement)
+	b.loop(node)
 	b.link(b.cur, test)
 	b.popJump()
 
@@ -194,7 +196,9 @@ func (b *Builder[E]) doStatement(node *ast.Node) {
 	test := b.newBlock()
 	after := b.newBlock()
 
-	b.pushJump(node, after, test)
+	// A `continue` restarts a `do`…`while` at its test, not at its body, so it
+	// is not what starts another iteration — the test passing is.
+	b.pushJump(node, after, test, nil)
 	b.enter(body)
 	b.statement(stmt.Statement)
 	b.link(b.cur, test)
@@ -203,6 +207,7 @@ func (b *Builder[E]) doStatement(node *ast.Node) {
 	b.enter(test)
 	b.expr(stmt.Expression)
 	if b.cur != nil {
+		b.loop(node)
 		b.link(b.cur, body)
 		if !isAlwaysTruthyTest(stmt.Expression) {
 			b.link(b.cur, after)
@@ -242,9 +247,10 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 		update = b.newBlock()
 	}
 
-	b.pushJump(node, after, update)
+	b.pushJump(node, after, update, node)
 	b.enter(body)
 	b.statement(stmt.Statement)
+	b.loop(node)
 	b.link(b.cur, update)
 	b.popJump()
 
@@ -270,7 +276,7 @@ func (b *Builder[E]) forInOfStatement(node *ast.Node) {
 	body := b.newBlock()
 	b.link(head, body)
 
-	b.pushJump(node, after, head)
+	b.pushJump(node, after, head, node)
 	b.enter(body)
 	if stmt.Initializer != nil {
 		// The loop variable takes its value from the iteration, so it binds
@@ -288,6 +294,7 @@ func (b *Builder[E]) forInOfStatement(node *ast.Node) {
 		}
 	}
 	b.statement(stmt.Statement)
+	b.loop(node)
 	b.link(b.cur, head)
 	b.popJump()
 
@@ -345,7 +352,7 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 		}
 	}
 
-	b.pushJump(node, after, nil)
+	b.pushJump(node, after, nil, nil)
 	var fallthroughFrom *Block[E]
 	for i, clause := range clauses {
 		b.link(fallthroughFrom, bodies[i])
@@ -467,8 +474,8 @@ func (b *Builder[E]) labeledStatement(node *ast.Node) {
 	b.enter(after)
 }
 
-func (b *Builder[E]) pushJump(node *ast.Node, breakTo, continueTo *Block[E]) {
-	b.jumps = append(b.jumps, jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, breakable: true})
+func (b *Builder[E]) pushJump(node *ast.Node, breakTo, continueTo *Block[E], loop *ast.Node) {
+	b.jumps = append(b.jumps, jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, loop: loop, breakable: true})
 }
 
 func (b *Builder[E]) popJump() {
@@ -512,6 +519,7 @@ func (b *Builder[E]) makeContinue(label *ast.Node) {
 			continue
 		}
 		if name == "" || slices.Contains(target.labels, name) {
+			b.loop(target.loop)
 			b.link(b.cur, target.continueTo)
 			break
 		}
