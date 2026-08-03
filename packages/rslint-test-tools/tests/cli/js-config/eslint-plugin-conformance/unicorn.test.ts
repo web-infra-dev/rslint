@@ -6,13 +6,8 @@
 import { runConformanceSuite } from './conformance.js';
 import type { DiffCase } from './harness.js';
 
-/** 141 rules that report IDENTICALLY on a minimal trigger. */
+/** 139 rules that report IDENTICALLY on a minimal trigger. */
 const CASES: DiffCase[] = [
-  {
-    pkg: 'eslint-plugin-unicorn',
-    rule: 'better-regex',
-    code: 'const re = /[0-9]/;\n',
-  },
   {
     pkg: 'eslint-plugin-unicorn',
     rule: 'catch-error-name',
@@ -31,7 +26,7 @@ const CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-unicorn',
     rule: 'consistent-destructuring',
-    code: 'const {a} = foo;\nconsole.log(foo.b);\n',
+    code: 'const {a} = foo;\nconsole.log(foo.a);\n',
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -50,6 +45,11 @@ const CASES: DiffCase[] = [
   },
   {
     pkg: 'eslint-plugin-unicorn',
+    rule: 'consistent-json-file-read',
+    code: "import fs from 'node:fs/promises';\nconst pkg = JSON.parse(await fs.readFile('./package.json'));\n",
+  },
+  {
+    pkg: 'eslint-plugin-unicorn',
     rule: 'consistent-template-literal-escape',
     code: 'const a = `$\\{foo}`;\n',
   },
@@ -57,6 +57,11 @@ const CASES: DiffCase[] = [
     pkg: 'eslint-plugin-unicorn',
     rule: 'custom-error-definition',
     code: 'class fooError extends Error {}\n',
+  },
+  {
+    pkg: 'eslint-plugin-unicorn',
+    rule: 'dom-node-dataset',
+    code: "declare const element: any;\nelement.setAttribute('data-unicorn', 'foo');\n",
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -90,6 +95,11 @@ const CASES: DiffCase[] = [
   },
   {
     pkg: 'eslint-plugin-unicorn',
+    rule: 'name-replacements',
+    code: 'const e = 1;\nconsole.log(e);\n',
+  },
+  {
+    pkg: 'eslint-plugin-unicorn',
     rule: 'new-for-builtins',
     code: 'const m = Map();\n',
   },
@@ -107,11 +117,6 @@ const CASES: DiffCase[] = [
     pkg: 'eslint-plugin-unicorn',
     rule: 'no-array-callback-reference',
     code: 'const result = array.map(callback);\n',
-  },
-  {
-    pkg: 'eslint-plugin-unicorn',
-    rule: 'no-array-for-each',
-    code: 'array.forEach((x) => {\n\tconsole.log(x);\n});\n',
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -155,13 +160,13 @@ const CASES: DiffCase[] = [
   },
   {
     pkg: 'eslint-plugin-unicorn',
-    rule: 'no-for-loop',
-    code: 'const arr = [1, 2, 3];\nfor (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}',
+    rule: 'no-for-each',
+    code: 'array.forEach((x) => {\n\tconsole.log(x);\n});\n',
   },
   {
     pkg: 'eslint-plugin-unicorn',
-    rule: 'no-hex-escape',
-    code: 'const x = "\\x41";',
+    rule: 'no-for-loop',
+    code: 'const arr = [1, 2, 3];\nfor (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}',
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -373,7 +378,7 @@ const CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-unicorn',
     rule: 'prefer-array-flat',
-    code: 'const foo = [].concat(maybeArray);\n',
+    code: 'const foo = [].concat(...bar);\n',
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -437,11 +442,6 @@ const CASES: DiffCase[] = [
   },
   {
     pkg: 'eslint-plugin-unicorn',
-    rule: 'prefer-dom-node-dataset',
-    code: "declare const element: any;\nelement.setAttribute('data-unicorn', 'foo');\n",
-  },
-  {
-    pkg: 'eslint-plugin-unicorn',
     rule: 'prefer-dom-node-remove',
     code: 'declare const parentNode: any;\ndeclare const childNode: any;\nparentNode.removeChild(childNode);\n',
   },
@@ -474,11 +474,6 @@ const CASES: DiffCase[] = [
     pkg: 'eslint-plugin-unicorn',
     rule: 'prefer-includes',
     code: 'declare const arr: number[];\nconst x = arr.indexOf(1) !== -1;\n',
-  },
-  {
-    pkg: 'eslint-plugin-unicorn',
-    rule: 'prefer-json-parse-buffer',
-    code: "import fs from 'node:fs';\nconst data = JSON.parse(fs.readFileSync('./foo.json', 'utf8'));\n",
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -647,8 +642,8 @@ const CASES: DiffCase[] = [
   },
   {
     pkg: 'eslint-plugin-unicorn',
-    rule: 'prevent-abbreviations',
-    code: 'const e = 1;\nconsole.log(e);\n',
+    rule: 'prefer-unicode-code-point-escapes',
+    code: 'const x = "\\x41";',
   },
   {
     pkg: 'eslint-plugin-unicorn',
@@ -716,7 +711,7 @@ const CASES: DiffCase[] = [
 const CLEAN_CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-unicorn',
-    rule: 'no-array-for-each',
+    rule: 'no-for-each',
     code: 'for (const x of array) { console.log(x); }\n',
   },
   {
