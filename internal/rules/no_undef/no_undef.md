@@ -4,6 +4,10 @@ Disallow the use of undeclared variables.
 
 This rule reports identifiers that reference variables which have not been declared via `var`, `let`, `const`, `function`, `class`, `import`, or as a parameter.
 
+Resolution is lexical scope analysis: declared bindings, standard ECMAScript built-ins (`Array`, `Promise`, `JSON`, `undefined`, and similar), and anything declared through `languageOptions.globals` or a `/* global */` comment. On a file with type information available, names known only to the type checker — DOM/Node globals such as `console` or `window`, or anything declared in a `.d.ts` file — are recognized too.
+
+Enable this rule for files that aren't type-checked. On a type-checked file, `tsc` already reports references to undeclared names.
+
 ## Options
 
 ### `typeof`

@@ -9,6 +9,13 @@ import (
 )
 
 // https://eslint.org/docs/latest/rules/no-undef
+//
+// ctx.Refs.Resolve() walks the binder's lexical scope chain first — the same
+// model ESLint's own no-undef uses, and enough on its own, which is what
+// makes this rule useful on plain JS and other files no type checker runs
+// on. When a TypeChecker is available for the file, Resolve() falls back to
+// it for anything the scope walk can't place, so this rule also recognizes
+// DOM/Node globals and other names known only to the type checker there.
 
 type options struct {
 	checkTypeof bool
@@ -26,16 +33,12 @@ func parseOptions(opts any) options {
 }
 
 var NoUndefRule = rule.Rule{
-	Name:             "no-undef",
-	RequiresTypeInfo: true,
+	Name: "no-undef",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
+		if ctx.Refs == nil {
 			return rule.RuleListeners{}
 		}
 
@@ -46,26 +49,21 @@ var NoUndefRule = rule.Rule{
 					return
 				}
 
-				// For ShorthandPropertyAssignment ({x}), GetSymbolAtLocation
-				// returns the property symbol which always exists. Use
-				// GetShorthandAssignmentValueSymbol to check the value reference.
-				if node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-					valueSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-					if valueSym != nil {
-						return
-					}
-				} else {
-					sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-					if sym != nil {
-						return
-					}
+				if ctx.Refs.Resolve(node) != nil {
+					return
 				}
 
 				name := node.Text()
 
-				// Skip identifiers declared via languageOptions.globals or
-				// /* global */ comments (merged into ctx.Globals by the linter).
-				if ctx.Globals[name] {
+				// languageOptions.globals / /* global */ comments (merged into
+				// ctx.Globals) take priority over built-ins: an explicit "off"
+				// entry (present but false) still reports even for a name that
+				// would otherwise be a recognized ECMAScript global.
+				if configured, ok := ctx.Globals[name]; ok {
+					if configured {
+						return
+					}
+				} else if utils.IsECMAScriptGlobal(name) {
 					return
 				}
 
@@ -155,6 +153,35 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	// Skip enum member names
 	if parent.Kind == ast.KindEnumMember && parent.Name() == node {
 		return true
+	}
+
+	// Skip meta-property names (`target` in `new.target`, `meta` in
+	// `import.meta`, `defer` in `import.defer`) — syntactic, not identifiers
+	// that reference a variable.
+	if parent.Kind == ast.KindMetaProperty {
+		return true
+	}
+
+	// Skip import attribute keys (`type` in `with { type: "json" }`) —
+	// syntactic names, not references to same-named variables.
+	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
+		return true
+	}
+
+	// Skip the namespace/name parts of a namespaced JSX tag or attribute
+	// (`<foo:bar attr:name="v" />`) — syntactic, never variable references.
+	if parent.Kind == ast.KindJsxNamespacedName {
+		return true
+	}
+
+	// Skip lowercase JSX tag names (`<div>`): these are JSX intrinsics, not
+	// identifier references. Uppercase tag names (`<Foo>`) reference a
+	// component value and are checked normally.
+	if ast.IsJsxTagName(node) {
+		text := node.Text()
+		if len(text) == 0 || (text[0] >= 'a' && text[0] <= 'z') {
+			return true
+		}
 	}
 
 	return false

@@ -22,6 +22,7 @@ var ecmaScriptGlobals = map[string]bool{
 	"encodeURIComponent":   true,
 	"Error":                true,
 	"escape":               true,
+	"eval":                 true,
 	"EvalError":            true,
 	"FinalizationRegistry": true,
 	"Float32Array":         true,
