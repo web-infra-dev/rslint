@@ -84,6 +84,9 @@ func TestNoCommentedOutTests(t *testing.T) {
 			{Code: `// test("foo") should be preferred in examples`},
 			{Code: "/* `test(\"foo\", () => {})` */"},
 			{Code: `// test (see docs)`},
+			// A registration cut short by prose is not code, so the growing
+			// parse window must not accept the parser's recovery of it.
+			{Code: "// test(\"foo\", () => {\n//   prose that is not code !!!"},
 			{Code: `// test (foo bar)`},
 			{Code: `// describe (documentation example)`},
 			{
@@ -248,6 +251,40 @@ func TestNoCommentedOutTests(t *testing.T) {
 			},
 			{
 				Code: "// test(\"valid\", () => {})\n// unrelated invalid prose here",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+
+			// A trailing note that begins with a continuation token still binds
+			// to the call when the block is reconstructed, but the registration
+			// on the first line is complete on its own.
+			{
+				Code: "// test(\"foo\", () => {})\n// - flaky",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "// test(\"foo\", () => {})\n// (fixture)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "// test(\"foo\", () => {})\n// + see #123",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "// test(\"foo\", () => {})\n// `helper` is missing",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "// test(\"foo\", () => {\n//   expect(value).toBe(1)\n// })\n// - flaky",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "commentedTests", Line: 1, Column: 1},
 				},

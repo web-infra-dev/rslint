@@ -214,20 +214,64 @@ func rootStartsLogicalLine(text string, offset int) bool {
 	return true
 }
 
-func insideMarkdownFence(text string, offset int) bool {
+func opensMarkdownFence(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
+}
+
+// markdownFenceTracker reports whether an offset sits inside a fenced code
+// block. Candidates are visited in ascending order, so the tracker advances a
+// cursor across the text once instead of rescanning from the start for each
+// candidate.
+type markdownFenceTracker struct {
+	cursor int
+	inside bool
+}
+
+func (tracker *markdownFenceTracker) insideAt(text string, offset int) bool {
 	if offset < 0 || offset > len(text) {
 		return false
 	}
-	inFence := false
-	for _, line := range strings.Split(text[:offset], "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-			inFence = !inFence
-		}
+	if offset < tracker.cursor {
+		tracker.cursor = 0
+		tracker.inside = false
 	}
-	return inFence
+
+	for tracker.cursor < offset {
+		lineEnd := len(text)
+		if newline := strings.IndexByte(text[tracker.cursor:], '\n'); newline >= 0 {
+			lineEnd = tracker.cursor + newline
+		}
+		if lineEnd >= offset {
+			break
+		}
+		if opensMarkdownFence(text[tracker.cursor:lineEnd]) {
+			tracker.inside = !tracker.inside
+		}
+		tracker.cursor = lineEnd + 1
+	}
+
+	// The partial line holding the offset can open a fence too, but the toggle
+	// is not recorded because a later candidate may sit on the same line.
+	if opensMarkdownFence(text[tracker.cursor:offset]) {
+		return !tracker.inside
+	}
+	return tracker.inside
 }
 
+// registrationExpressionStatement returns the ExpressionStatement a registration
+// opens, or nil when the call does not begin a statement of its own.
+//
+// Adjacent line comments are reconstructed into one block before parsing, so a
+// trailing note binds to the call it follows: `test("foo", () => {})` plus a
+// `- flaky` line parses as a BinaryExpression, and a `(fixture)` line as an
+// outer CallExpression. Demanding that the call be the direct child of an
+// ExpressionStatement therefore drops registrations that are complete on their
+// own line, which is the common shape for a disabled test with a note.
+//
+// Walking through parents that start where the call starts accepts those while
+// still rejecting a call nested in a construct opened earlier, such as an array
+// element or an argument, whose parent begins before the call does.
 func registrationExpressionStatement(node *ast.Node) *ast.Node {
 	for node != nil && node.Parent != nil {
 		parent := node.Parent
@@ -241,7 +285,13 @@ func registrationExpressionStatement(node *ast.Node) *ast.Node {
 		case ast.KindExpressionStatement:
 			return parent
 		default:
-			return nil
+			// A node shares its position with its first child, so equal
+			// positions mean the call is the leftmost token of the parent and
+			// whatever follows only trails the completed registration.
+			if parent.Pos() != node.Pos() {
+				return nil
+			}
+			node = parent
 		}
 	}
 	return nil
@@ -277,11 +327,57 @@ func hasDiagnosticInRange(diagnostics []*ast.Diagnostic, start, end int) bool {
 	return false
 }
 
+// lineWindowEnd returns the offset just past the first count lines of text.
+func lineWindowEnd(text string, count int) int {
+	offset := 0
+	for ; count > 0; count-- {
+		newline := strings.IndexByte(text[offset:], '\n')
+		if newline < 0 {
+			return len(text)
+		}
+		offset += newline + 1
+	}
+	return offset
+}
+
+// findRegistrationInCandidate looks for a registration starting at the given
+// root offset, parsing progressively larger slices of text.
+//
+// Candidates are sliced from the start of their line to the end of the comment
+// block, so parsing every candidate in full makes a block of commented-out
+// tests cost one parse of the remaining block per test. Growing the window by
+// doubling the line count keeps a single-line registration at one parse and a
+// multiline one at a logarithmic number, which bounds the total work for a
+// block by its length rather than by its length times the candidate count.
 func findRegistrationInCandidate(text string, expectedRootOffset int, scriptKind core.ScriptKind) (int, bool) {
+	for lines := 1; ; lines *= 2 {
+		end := lineWindowEnd(text, lines)
+		complete := end >= len(text)
+		if end >= expectedRootOffset {
+			if offset, found := findRegistrationInWindow(text[:end], expectedRootOffset, scriptKind, complete); found {
+				return offset, true
+			}
+		}
+		if complete {
+			return 0, false
+		}
+	}
+}
+
+func findRegistrationInWindow(text string, expectedRootOffset int, scriptKind core.ScriptKind, complete bool) (int, bool) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/commented-rstest",
 		Path:     "/commented-rstest",
 	}, text, scriptKind)
+
+	// A window that stops short of the candidate can cut a registration in
+	// half, and the parser recovers such a slice into a complete-looking call
+	// whose only diagnostic sits past the call's end. Trusting a partial window
+	// therefore requires it to have parsed cleanly; otherwise the search grows
+	// and reconsiders the same call with more text.
+	if !complete && len(sourceFile.Diagnostics()) > 0 {
+		return 0, false
+	}
 
 	bestOffset := len(text) + 1
 	var visit func(*ast.Node) bool
@@ -295,7 +391,7 @@ func findRegistrationInCandidate(text string, expectedRootOffset int, scriptKind
 				!strings.Contains(text[expression.rootOffset:expectedRootOffset], "\n") &&
 				expression.rootOffset < bestOffset &&
 				statement != nil &&
-				!hasDiagnosticInRange(sourceFile.Diagnostics(), statement.Pos(), statement.End()) &&
+				!hasDiagnosticInRange(sourceFile.Diagnostics(), node.Pos(), node.End()) &&
 				registrationHasCleanLineEnd(text, node.End()) {
 				bestOffset = expectedRootOffset
 			}
@@ -314,13 +410,14 @@ func findCommentedRstestRegistrations(text string, scriptKind core.ScriptKind) [
 	matches := rstestRootCandidate.FindAllStringSubmatchIndex(text, -1)
 	offsets := make([]int, 0, len(matches))
 	seen := make(map[int]struct{}, len(matches))
+	var fence markdownFenceTracker
 	for _, match := range matches {
 		if len(match) < 4 {
 			continue
 		}
 		candidateStart := match[0]
 		rootOffset := match[2]
-		if insideMarkdownFence(text, rootOffset) {
+		if fence.insideAt(text, rootOffset) {
 			continue
 		}
 		relativeRoot := rootOffset - candidateStart
