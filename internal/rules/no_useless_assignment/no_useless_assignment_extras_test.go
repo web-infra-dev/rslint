@@ -165,6 +165,10 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
 			{Code: `let { a } = obj; export { a }; console.log(a); a = 2; var obj;`},
 			{Code: `let { a } = obj; export { a as b }; console.log(a); a = 2; var obj;`},
 			{Code: `export let [c, d] = arr; console.log(c, d); c = 1; var arr;`},
+			// A top-level export can name a `var` hoisted from a nested
+			// statement; resolve the specifier to its binding instead of
+			// requiring the declaration statement to be a direct child.
+			{Code: `export { a }; if (condition) { var a = 1; } console.log(a); a = 2;`},
 
 			// ---- Every label wrapped around a loop resolves its
 			// break/continue, so the next iteration's reads stay reachable.

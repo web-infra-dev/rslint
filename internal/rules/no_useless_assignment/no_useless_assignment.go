@@ -25,21 +25,37 @@ var NoUselessAssignmentRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		analyzed := false
-		analyze := func(*ast.Node) {
-			if analyzed {
-				return
-			}
-			analyzed = true
-			run(&ctx)
+		var byRoot map[*ast.Node][]rawAssignment
+		var rootOrder []*ast.Node
+		collect := func(node *ast.Node) {
+			collectAssignment(&ctx, node, func(raw rawAssignment) {
+				if byRoot == nil {
+					byRoot = make(map[*ast.Node][]rawAssignment)
+				}
+				if _, seen := byRoot[raw.root]; !seen {
+					rootOrder = append(rootOrder, raw.root)
+				}
+				byRoot[raw.root] = append(byRoot[raw.root], raw)
+			})
 		}
 
-		return rule.RuleListeners{
-			ast.KindVariableDeclaration:    analyze,
-			ast.KindBinaryExpression:       analyze,
-			ast.KindPrefixUnaryExpression:  analyze,
-			ast.KindPostfixUnaryExpression: analyze,
+		listeners := rule.RuleListeners{
+			ast.KindVariableDeclaration:    collect,
+			ast.KindBinaryExpression:       collect,
+			ast.KindPrefixUnaryExpression:  collect,
+			ast.KindPostfixUnaryExpression: collect,
 		}
+		statements := ctx.SourceFile.Statements
+		if statements == nil || len(statements.Nodes) == 0 {
+			return listeners
+		}
+		lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
+		listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
+			if node == lastTopLevelNode {
+				reportAssignments(&ctx, byRoot, rootOrder)
+			}
+		}
+		return listeners
 	},
 }
 
@@ -51,26 +67,24 @@ type rawAssignment struct {
 	sym        *ast.Symbol
 }
 
-func run(ctx *rule.RuleContext) {
+func reportAssignments(
+	ctx *rule.RuleContext,
+	byRoot map[*ast.Node][]rawAssignment,
+	rootOrder []*ast.Node,
+) {
+	if len(rootOrder) == 0 {
+		return
+	}
 	sourceFile := ctx.SourceFile
 	isModule := ast.IsExternalModule(sourceFile)
-	var exportedNames map[string]bool
+	var exportedSymbols map[*ast.Symbol]bool
 	if isModule {
-		exportedNames = collectLocallyExportedNames(sourceFile)
+		exportedSymbols = collectLocallyExportedSymbols(ctx)
 	}
-
-	byRoot := make(map[*ast.Node][]rawAssignment)
-	var rootOrder []*ast.Node
-	collectAssignments(ctx, sourceFile, func(raw rawAssignment) {
-		if _, seen := byRoot[raw.root]; !seen {
-			rootOrder = append(rootOrder, raw.root)
-		}
-		byRoot[raw.root] = append(byRoot[raw.root], raw)
-	})
 
 	var reports []*ast.Node
 	for _, root := range rootOrder {
-		reports = append(reports, analyzeRoot(ctx, root, byRoot[root], isModule, exportedNames)...)
+		reports = append(reports, analyzeRoot(ctx, root, byRoot[root], isModule, exportedSymbols)...)
 	}
 
 	// ESLint verifies one code path at a time and its reports are ordered by
@@ -81,10 +95,20 @@ func run(ctx *rule.RuleContext) {
 	}
 }
 
-// collectAssignments walks the file once and reports every variable write the
-// rule considers: a declarator with an initializer, an assignment expression,
-// and an update expression.
-func collectAssignments(ctx *rule.RuleContext, sourceFile *ast.SourceFile, emit func(rawAssignment)) {
+// collectAssignment reports every variable write represented by node. The
+// shared linter traversal supplies each candidate node, avoiding a second
+// rule-owned walk over the file.
+func collectAssignment(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
+	collectAssignmentNode(ctx, node, emit)
+	if node.Kind == ast.KindBinaryExpression {
+		binary := node.AsBinaryExpression()
+		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			collectSkippedPatternAssignments(ctx, binary.Left, emit)
+		}
+	}
+}
+
+func collectAssignmentNode(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
 	add := func(target *ast.Node) {
 		forEachTargetIdentifier(target, func(identifier *ast.Node) {
 			root := rootOf(identifier)
@@ -99,30 +123,64 @@ func collectAssignments(ctx *rule.RuleContext, sourceFile *ast.SourceFile, emit 
 		})
 	}
 
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		switch node.Kind {
-		case ast.KindVariableDeclaration:
-			if decl := node.AsVariableDeclaration(); decl.Initializer != nil {
-				add(decl.Name())
-			}
-		case ast.KindBinaryExpression:
-			binary := node.AsBinaryExpression()
-			if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
-				add(binary.Left)
-			}
-		case ast.KindPrefixUnaryExpression:
-			unary := node.AsPrefixUnaryExpression()
-			if unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken {
-				add(unary.Operand)
-			}
-		case ast.KindPostfixUnaryExpression:
-			add(node.AsPostfixUnaryExpression().Operand)
+	switch node.Kind {
+	case ast.KindVariableDeclaration:
+		if decl := node.AsVariableDeclaration(); decl.Initializer != nil {
+			add(decl.Name())
 		}
-		node.ForEachChild(visit)
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			add(binary.Left)
+		}
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		if unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken {
+			add(unary.Operand)
+		}
+	case ast.KindPostfixUnaryExpression:
+		add(node.AsPostfixUnaryExpression().Operand)
+	}
+}
+
+// The linter's pattern traversal deliberately skips computed property names
+// on assignment targets. Collect writes inside those expressions here; every
+// other target subtree is already dispatched through the shared traversal.
+func collectSkippedPatternAssignments(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
+	if node == nil {
+		return
+	}
+	switch node.Kind {
+	case ast.KindObjectLiteralExpression:
+		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+			switch property.Kind {
+			case ast.KindPropertyAssignment:
+				assignment := property.AsPropertyAssignment()
+				if name := assignment.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					collectAssignmentSubtree(ctx, name.AsComputedPropertyName().Expression, emit)
+				}
+				collectSkippedPatternAssignments(ctx, assignment.Initializer, emit)
+			case ast.KindSpreadAssignment:
+				collectSkippedPatternAssignments(ctx, property.AsSpreadAssignment().Expression, emit)
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+			collectSkippedPatternAssignments(ctx, element, emit)
+		}
+	case ast.KindSpreadElement:
+		collectSkippedPatternAssignments(ctx, node.AsSpreadElement().Expression, emit)
+	}
+}
+
+func collectAssignmentSubtree(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
+	var visit func(*ast.Node) bool
+	visit = func(current *ast.Node) bool {
+		collectAssignmentNode(ctx, current, emit)
+		current.ForEachChild(visit)
 		return false
 	}
-	sourceFile.AsNode().ForEachChild(visit)
+	visit(node)
 }
 
 // forEachTargetIdentifier yields every identifier an assignment target writes
@@ -131,6 +189,7 @@ func collectAssignments(ctx *rule.RuleContext, sourceFile *ast.SourceFile, emit 
 // upstream does not treat those wrappers as patterns, so such a write is
 // invisible to the rule.
 func forEachTargetIdentifier(node *ast.Node, cb func(*ast.Node)) {
+	node = ast.SkipParentheses(node)
 	if node == nil {
 		return
 	}
@@ -138,19 +197,10 @@ func forEachTargetIdentifier(node *ast.Node, cb func(*ast.Node)) {
 	case ast.KindIdentifier:
 		cb(node)
 
-	case ast.KindParenthesizedExpression:
-		forEachTargetIdentifier(node.AsParenthesizedExpression().Expression, cb)
-
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-		pattern := node.AsBindingPattern()
-		if pattern.Elements == nil {
-			return
-		}
-		for _, element := range pattern.Elements.Nodes {
-			if binding := element.AsBindingElement(); binding != nil {
-				forEachTargetIdentifier(binding.Name(), cb)
-			}
-		}
+		utils.CollectBindingNames(node, func(identifier *ast.Node, _ string) {
+			cb(identifier)
+		})
 
 	case ast.KindObjectLiteralExpression:
 		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
@@ -199,7 +249,7 @@ func analyzeRoot(
 	root *ast.Node,
 	raws []rawAssignment,
 	isModule bool,
-	exportedNames map[string]bool,
+	exportedSymbols map[*ast.Symbol]bool,
 ) []*ast.Node {
 	assignByIdent := make(map[*ast.Node]*assignment, len(raws))
 	readNodes := make(map[*ast.Node]*ast.Symbol)
@@ -209,7 +259,7 @@ func analyzeRoot(
 	for _, raw := range raws {
 		tracked, known := trackedState[raw.sym]
 		if !known {
-			tracked = isTrackable(ctx, raw.sym, root, isModule, exportedNames)
+			tracked = isTrackable(raw.sym, root, isModule, exportedSymbols)
 			if tracked {
 				// The variable is only usable when every read of it happens in
 				// this same code path: a read from a nested function may run at
@@ -319,11 +369,10 @@ func (b *builder) parameter(node *ast.Node) {
 // variable must be declared in this very code path and must not be reachable
 // from outside the file through an export.
 func isTrackable(
-	ctx *rule.RuleContext,
 	sym *ast.Symbol,
 	root *ast.Node,
 	isModule bool,
-	exportedNames map[string]bool,
+	exportedSymbols map[*ast.Symbol]bool,
 ) bool {
 	if len(sym.Declarations) == 0 {
 		return false
@@ -342,7 +391,7 @@ func isTrackable(
 	if !declaredHere {
 		return false
 	}
-	if isModule && root.Kind == ast.KindSourceFile && isExported(sym, exportedNames, root) {
+	if isModule && root.Kind == ast.KindSourceFile && isExported(sym, exportedSymbols, root) {
 		return false
 	}
 	return true
@@ -350,10 +399,12 @@ func isTrackable(
 
 // isExported reports whether a module-level binding leaves the file, in which
 // case a later assignment to it can still be observed elsewhere. Both an
-// `export` modifier and an `export { ... }` re-export only apply to the
-// declaration actually named at the top level of the file — a block-scoped
-// variable that merely shares that name is a different binding.
-func isExported(sym *ast.Symbol, exportedNames map[string]bool, root *ast.Node) bool {
+// `export` modifier and an `export { ... }` re-export apply to one concrete
+// binding; a block-scoped variable that merely shares its name stays local.
+func isExported(sym *ast.Symbol, exportedSymbols map[*ast.Symbol]bool, root *ast.Node) bool {
+	if exportedSymbols[sym] {
+		return true
+	}
 	for _, decl := range sym.Declarations {
 		// `export let x = 1` and `export let { x } = obj` carry the modifier
 		// on the variable statement; climb to it from the declarator or the
@@ -375,18 +426,16 @@ func isExported(sym *ast.Symbol, exportedNames map[string]bool, root *ast.Node) 
 		if ast.HasSyntacticModifier(target, ast.ModifierFlagsExport) {
 			return true
 		}
-		if exportedNames[sym.Name] {
-			return true
-		}
 	}
 	return false
 }
 
-// collectLocallyExportedNames gathers the local names of `export { ... }`
-// declarations, which re-export a binding without a modifier on it.
-func collectLocallyExportedNames(sourceFile *ast.SourceFile) map[string]bool {
-	var names map[string]bool
-	for _, statement := range sourceFile.Statements.Nodes {
+// collectLocallyExportedSymbols resolves the local targets of `export { ... }`
+// declarations. Symbol identity preserves hoisted `var` bindings declared in
+// nested statements without confusing block-scoped shadows of the same name.
+func collectLocallyExportedSymbols(ctx *rule.RuleContext) map[*ast.Symbol]bool {
+	var symbols map[*ast.Symbol]bool
+	for _, statement := range ctx.SourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindExportDeclaration {
 			continue
 		}
@@ -404,13 +453,17 @@ func collectLocallyExportedNames(sourceFile *ast.SourceFile) map[string]bool {
 			if local == nil || local.Kind != ast.KindIdentifier {
 				continue
 			}
-			if names == nil {
-				names = make(map[string]bool)
+			sym := ctx.Refs.Resolve(local)
+			if sym == nil {
+				continue
 			}
-			names[local.Text()] = true
+			if symbols == nil {
+				symbols = make(map[*ast.Symbol]bool)
+			}
+			symbols[sym] = true
 		}
 	}
-	return names
+	return symbols
 }
 
 // readReferences returns the identifiers that read sym. A compound assignment
