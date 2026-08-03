@@ -680,6 +680,32 @@ func TestNoImportAssignStrategiesMatch(t *testing.T) {
 					ns.deep.value = 1;`,
 		},
 		{
+			name: "integrated namespace mutation roots",
+			code: `import * as ns from "ns";
+				import { value } from "value";
+				ns.property = 1;
+				ns["element"]++;
+				++ns.prefix;
+				delete ((ns)).deleted;
+				for (ns.key in source);
+				for (ns.item of source);
+				({ property: ns.destructured, ...ns } = source);
+				Object.assign(((ns)), source);
+				Object["defineProperty"](ns, key, descriptor);
+				Reflect.set(ns, key, value);
+				[value] = source;
+				(value as any) = 1;
+				ns.deep.property = 2;
+				Object.assign(target, ns);`,
+		},
+		{
+			name: "integrated nested write ordering and deduplication",
+			code: `import { first, second } from "values";
+				[(first = 1), second] = source;
+				foo(first = 2);
+				delete object[(second += 1)];`,
+		},
+		{
 			name: "local shadows and syntactic names",
 			code: `import { value } from "value";
 				import * as ns from "ns";
@@ -694,10 +720,12 @@ func TestNoImportAssignStrategiesMatch(t *testing.T) {
 		{
 			name: "shadowed mutation globals",
 			code: `import * as ns from "ns";
+				import { marker } from "marker";
 				{ const Object = factory; Object.assign(ns, source); }
 				Object.assign(ns, source);
 				function f(Reflect) { Reflect.set(ns, key, value); }
-				Reflect.set(ns, key, value);`,
+				Reflect.set(ns, key, value);
+				marker = 1;`,
 		},
 		{
 			name: "type-only imports",
