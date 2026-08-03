@@ -116,6 +116,24 @@ func TestNoClassAssignRule(t *testing.T) {
 				},
 			},
 
+			// Multiple write references share one message, including
+			// destructuring and for-in/for-of assignment targets.
+			{
+				Code: `class A {}
+A = 0;
+A++;
+[A] = [];
+for (A in object) {}
+for (A of values) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 2, Column: 1},
+					{MessageId: "classReassignment", Line: 3, Column: 1},
+					{MessageId: "classReassignment", Line: 4, Column: 2},
+					{MessageId: "classReassignment", Line: 5, Column: 6},
+					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 6, Column: 6},
+				},
+			},
+
 			// Compound assignment operators
 			{
 				Code: `class A { } A += 0;`,
