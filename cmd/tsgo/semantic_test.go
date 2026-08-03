@@ -166,6 +166,54 @@ func TestSemanticSnapshot_ElementAccess(t *testing.T) {
 	}
 }
 
+func TestSemanticTypeDeclarationSymbols(t *testing.T) {
+	fixture := buildSemanticFixture(t, `
+class ClassType {}
+interface InterfaceType {}
+const classValue = new ClassType();
+let interfaceValue: InterfaceType;
+const anonymousValue = {};
+const primitiveValue = 1;
+`)
+
+	symbols := map[string]ast.SymbolId{}
+	for symbolID, symbol := range fixture.semantic.Symtab {
+		symbols[string(symbol.Name)] = symbolID
+	}
+
+	for name, expectedName := range map[string]string{
+		"classValue":     "ClassType",
+		"interfaceValue": "InterfaceType",
+	} {
+		symbolID := symbols[name]
+		if symbolID == 0 {
+			t.Fatalf("symbol %q not found", name)
+		}
+		typeID := fixture.semantic.Sym2type[symbolID]
+		typeInfo := fixture.semantic.Typetab[typeID]
+		if typeInfo.Symbol == 0 {
+			t.Fatalf("type of %q has no declaration symbol", name)
+		}
+
+		typeSymbol := fixture.semantic.Symtab[typeInfo.Symbol]
+		if got := string(typeSymbol.Name); got != expectedName {
+			t.Fatalf("type of %q points to symbol %q, want %q", name, got, expectedName)
+		}
+	}
+
+	anonymousID := symbols["anonymousValue"]
+	anonymousTypeID := fixture.semantic.Sym2type[anonymousID]
+	if typeInfo := fixture.semantic.Typetab[anonymousTypeID]; typeInfo.Symbol == 0 {
+		t.Fatal("object literal type has no declaration symbol")
+	}
+
+	primitiveID := symbols["primitiveValue"]
+	primitiveTypeID := fixture.semantic.Sym2type[primitiveID]
+	if typeInfo := fixture.semantic.Typetab[primitiveTypeID]; typeInfo.Symbol != 0 {
+		t.Fatalf("primitive type unexpectedly points to symbol %d", typeInfo.Symbol)
+	}
+}
+
 func TestSym2sym_ImportAlias(t *testing.T) {
 	tmpDir := t.TempDir()
 	tsconfigPath := filepath.Join(tmpDir, "tsconfig.json")

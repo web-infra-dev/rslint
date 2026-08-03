@@ -55,8 +55,10 @@ type FuncSignature struct {
 	Result checker.TypeId `json:"result"`
 }
 type TypeInfo struct {
-	Id    checker.TypeId `json:"id"`
-	Flags int            `json:"flags"`
+	Id          checker.TypeId `json:"id"`
+	Flags       int            `json:"flags"`
+	ObjectFlags int            `json:"object_flags,omitempty"`
+	Symbol      ast.SymbolId   `json:"symbol,omitempty"`
 }
 type SymbolTable = map[NodeReference]SymbolInfo
 type TypeTable = map[NodeReference]TypeInfo
@@ -211,10 +213,15 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 		typeID := ty.Id()
 		if _, exists := semantic.Typetab[typeID]; !exists {
-			semantic.Typetab[typeID] = TypeInfo{
-				Id:    typeID,
-				Flags: int(ty.Flags()),
+			typeInfo := TypeInfo{
+				Id:          typeID,
+				Flags:       int(ty.Flags()),
+				ObjectFlags: int(ty.ObjectFlags()),
 			}
+			if symbol := ty.Symbol(); symbol != nil {
+				typeInfo.Symbol = ast.GetSymbolId(symbol)
+			}
+			semantic.Typetab[typeID] = typeInfo
 			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
 			callSignatures := tc.GetCallSignatures(ty)
 			if len(callSignatures) > 0 {
