@@ -5,7 +5,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const (
@@ -36,31 +35,38 @@ var NoUselessSwitchCaseRule = rule.Rule{
 
 				// Upstream walks backward from the final `default` and stops at
 				// the first non-empty case, but ESLint still emits diagnostics in
-				// source order. Collect first, then report in source order.
-				candidates := make([]*ast.Node, 0, len(clauses)-1)
+				// source order. Remember the boundary instead of allocating a
+				// temporary slice for every switch that ends in `default`.
+				firstCandidate := len(clauses) - 1
 				for index := len(clauses) - 2; index >= 0; index-- {
 					clause := clauses[index]
 					if !isEmptySwitchCase(clause) {
 						break
 					}
 
-					candidates = append(candidates, clause)
+					firstCandidate = index
 				}
 
-				for index := len(candidates) - 1; index >= 0; index-- {
-					clause := candidates[index]
-					ctx.ReportRangeWithSuggestions(
-						switchCaseHeadRange(clause, ctx.SourceFile),
+				for index := firstCandidate; index < len(clauses)-1; index++ {
+					clause := clauses[index]
+					headRange := switchCaseHeadRange(clause, ctx.SourceFile)
+					removalRange := headRange.WithEnd(clause.End())
+					ctx.ReportRangeWithDeferredSuggestions(
+						headRange,
 						rule.RuleMessage{
 							Id:          messageIDError,
 							Description: "Useless case in switch statement.",
 						},
-						rule.RuleSuggestion{
-							Message: rule.RuleMessage{
-								Id:          messageIDSuggestion,
-								Description: "Remove this case.",
-							},
-							FixesArr: []rule.RuleFix{rule.RuleFixRemove(ctx.SourceFile, clause)},
+						func() []rule.RuleSuggestion {
+							return []rule.RuleSuggestion{
+								{
+									Message: rule.RuleMessage{
+										Id:          messageIDSuggestion,
+										Description: "Remove this case.",
+									},
+									FixesArr: []rule.RuleFix{rule.RuleFixRemoveRange(removalRange)},
+								},
+							}
 						},
 					)
 				}
@@ -105,12 +111,20 @@ func isEmptyNode(node *ast.Node) bool {
 }
 
 func switchCaseHeadRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
-	start := utils.TrimNodeTextRange(sourceFile, node).Pos()
+	start := scanner.GetTokenPosOfNode(node, sourceFile, false)
 	scanStart := start
 	if clause := node.AsCaseOrDefaultClause(); clause != nil && clause.Expression != nil {
 		scanStart = clause.Expression.End()
 	}
 
+	text := sourceFile.Text()
+	colonStart := scanner.SkipTrivia(text, scanStart)
+	if colonStart < node.End() && colonStart < len(text) && text[colonStart] == ':' {
+		return core.NewTextRange(start, colonStart+1)
+	}
+
+	// Preserve the recovery behavior for malformed clauses where the next
+	// non-trivia byte is not the separator the parser associated with the case.
 	s := scanner.GetScannerForSourceFile(sourceFile, scanStart)
 	for s.Token() != ast.KindEndOfFile && s.TokenStart() < node.End() {
 		if s.Token() == ast.KindColonToken {
