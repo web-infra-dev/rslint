@@ -23,6 +23,9 @@ ruleTester.run('no-disabled-tests', {} as never, {
     // `skip` on the test context is a runtime decision, not a disabled test.
     { code: 'test("case", context => { context.skip(); });' },
     { code: 'describe("empty suite"); describe.concurrent("empty suite");' },
+    { code: 'test("case", { timeout: 100 }, () => {});' },
+    // an identifier is not necessarily an options object
+    { code: 'declare const options: any; test("case", options);' },
     // jest-only aliases are not rstest APIs
     {
       code: 'declare const fit: any, xit: any, xtest: any, fdescribe: any, xdescribe: any; fit("case", () => {}); xit("case", () => {}); xtest("case", () => {}); fdescribe("suite", () => {}); xdescribe("suite", () => {});',
@@ -136,6 +139,14 @@ ruleTester.run('no-disabled-tests', {} as never, {
       errors: [
         { line: 1, column: 1, messageId: 'missingFunction' },
         { line: 1, column: 25, messageId: 'missingFunction' },
+      ],
+    },
+    // `(description, options)` registers a test without a body
+    {
+      code: 'test("case", { timeout: 100 }); it("case", {});',
+      errors: [
+        { line: 1, column: 1, messageId: 'missingFunction' },
+        { line: 1, column: 33, messageId: 'missingFunction' },
       ],
     },
     // both a skipped test and a missing implementation

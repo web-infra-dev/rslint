@@ -22,4 +22,6 @@ func parseRstestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
 var NoDisabledTestsRule = shared.NewRule(shared.Config{
 	Name:  "rstest/no-disabled-tests",
 	Parse: parseRstestCall,
+	// `TestCall` accepts `(description, options, fn?)`.
+	HasOptionsOverload: true,
 })

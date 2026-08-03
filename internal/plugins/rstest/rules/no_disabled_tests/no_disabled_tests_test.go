@@ -27,7 +27,10 @@ func TestNoDisabledTestsRule(t *testing.T) {
 			{Code: `test("case", context => { context.skip(); });`},
 			{Code: `test("case", ctx => { ctx.skip(); }); request.skip();`},
 			{Code: `describe("empty suite"); describe.concurrent("empty suite");`},
+			// an identifier is not necessarily an options object
 			{Code: `test("case", options);`},
+			{Code: `test("case", { timeout: 100 }, () => {});`},
+			{Code: `test.todo("case", { timeout: 100 });`},
 			{Code: `fit("case", () => {}); xit("case", () => {}); xtest("case", () => {}); fdescribe("suite", () => {}); xdescribe("suite", () => {});`},
 			{Code: `pending();`},
 			{Code: `import { pending } from "actions"; pending();`},
@@ -191,6 +194,27 @@ adminTest.concurrent.skip("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingFunction", Line: 1, Column: 1},
 					{MessageId: "missingFunction", Line: 1, Column: 25},
+				},
+			},
+			{
+				Code: `test("case", { timeout: 100 }); it("case", {}); test.concurrent("case", { retry: 2 });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingFunction", Line: 1, Column: 1},
+					{MessageId: "missingFunction", Line: 1, Column: 33},
+					{MessageId: "missingFunction", Line: 1, Column: 49},
+				},
+			},
+			{
+				Code: `test.each([1])("case", { timeout: 100 });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingFunction", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `test.skip("case", { timeout: 100 });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "skippedTest", Line: 1, Column: 1},
+					{MessageId: "missingFunction", Line: 1, Column: 1},
 				},
 			},
 			{

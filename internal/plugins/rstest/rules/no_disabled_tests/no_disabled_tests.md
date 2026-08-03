@@ -14,6 +14,7 @@ describe.skip('suite', () => {});
 it.skip('case', () => {});
 test.skip.each(rows)('case $value', (value) => {});
 test('missing callback');
+test('options without a callback', { timeout: 100 });
 ```
 
 Examples of **correct** code for this rule:
@@ -40,9 +41,10 @@ The rule follows Rstest APIs imported from `@rstest/core`, globals, namespace
 imports, CommonJS requires, and same-file `const` aliases. It does not trace
 custom test APIs through arbitrary cross-file re-exports.
 
-The missing-callback check uses the same conservative argument-count check as
-`jest/no-disabled-tests`. An options-only call such as
-`test('case', options)` is therefore not reported.
+The missing-callback check covers Rstest's `(description, options, fn?)`
+overload only when the options argument is written as an object literal. An
+indirect options call such as `test('case', options)` is not reported, because
+the identifier may resolve to the callback itself.
 
 This rule does not provide an autofix because removing `skip` or inventing a
 callback would change test behavior.

@@ -16,6 +16,24 @@ type Config struct {
 	Name                    string
 	Parse                   func(*ast.Node, rule.RuleContext) *ParsedCall
 	IsStandaloneSkippedCall func(*ast.Node, rule.RuleContext) bool
+	// HasOptionsOverload marks frameworks whose test API accepts a
+	// `(description, options, fn?)` overload. For those, a two-argument call
+	// passing an options object registers a test without a body.
+	HasOptionsOverload bool
+}
+
+// isMissingFunctionArgument reports whether a test registration omits its
+// callback.
+func isMissingFunctionArgument(node *ast.Node, hasOptionsOverload bool) bool {
+	arguments := node.Arguments()
+	if len(arguments) < 2 {
+		return true
+	}
+	if !hasOptionsOverload || len(arguments) > 2 {
+		return false
+	}
+	options := ast.SkipParentheses(arguments[1])
+	return options != nil && options.Kind == ast.KindObjectLiteralExpression
 }
 
 func buildErrorMissingFunctionMessage() rule.RuleMessage {
@@ -58,8 +76,8 @@ func NewRule(config Config) rule.Rule {
 					}
 
 					if parsed.Call.Kind == testFramework.FnKindTest &&
-						len(node.Arguments()) < 2 &&
-						!parsed.HasTodo {
+						!parsed.HasTodo &&
+						isMissingFunctionArgument(node, config.HasOptionsOverload) {
 						ctx.ReportNode(node, buildErrorMissingFunctionMessage())
 					}
 				},
