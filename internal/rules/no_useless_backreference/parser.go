@@ -34,16 +34,11 @@ const (
 // rxNode is a node in the lightweight regex AST. Only the fields relevant to
 // the rule are populated.
 type rxNode struct {
-	kind     rxNodeKind
-	start    int // byte offset of the construct's first char in the pattern
-	end      int // byte offset one past the last char
-	raw      string
-	parent   *rxNode
-	children []*rxNode
-
-	// for capturing groups
-	name   string // empty for unnamed groups
-	number int    // 1-based; 0 for non-capturing groups
+	kind   rxNodeKind
+	start  int // byte offset of the construct's first char in the pattern
+	end    int // byte offset one past the last char
+	raw    string
+	parent *rxNode
 
 	// for lookarounds
 	isAhead bool
@@ -62,7 +57,7 @@ func isNegativeLookaround(n *rxNode) bool { return n != nil && n.kind == nkLooka
 // parsePattern parses a regex pattern and returns the root Pattern node and a
 // flat list of backreference nodes. Returns ok=false on syntax errors.
 func parsePattern(pattern string, flags utils.RegexFlags) (root *rxNode, backrefs []*rxNode, ok bool) {
-	totalGroups, hasNamedGroups, scanOk := scanGroups(pattern, flags)
+	totalGroups, hasNamedGroups, nodeCapacity, backrefCapacity, scanOk := scanGroups(pattern, flags)
 	if !scanOk {
 		return nil, nil, false
 	}
@@ -72,10 +67,15 @@ func parsePattern(pattern string, flags utils.RegexFlags) (root *rxNode, backref
 		flags:          flags,
 		totalGroups:    totalGroups,
 		hasNamedGroups: hasNamedGroups,
-		namedGroups:    map[string][]*rxNode{},
+		nodes:          make([]rxNode, 0, nodeCapacity),
+		numberedGroups: make([]*rxNode, 0, totalGroups),
+		backrefs:       make([]*rxNode, 0, backrefCapacity),
+	}
+	if hasNamedGroups {
+		p.namedGroups = make(map[string][]*rxNode, totalGroups)
 	}
 
-	root = &rxNode{kind: nkPattern, start: 0, end: len(pattern), raw: pattern}
+	root = p.newNode(rxNode{kind: nkPattern})
 	if !p.parseAlternatives(root, false) {
 		return nil, nil, false
 	}
@@ -87,7 +87,7 @@ func parsePattern(pattern string, flags utils.RegexFlags) (root *rxNode, backref
 		if br.refName != "" {
 			br.resolved = p.namedGroups[br.refName]
 		} else if br.refNum > 0 && br.refNum <= len(p.numberedGroups) {
-			br.resolved = []*rxNode{p.numberedGroups[br.refNum-1]}
+			br.resolved = p.numberedGroups[br.refNum-1 : br.refNum]
 		}
 		if len(br.resolved) == 0 {
 			return nil, nil, false
@@ -107,13 +107,30 @@ type rxParser struct {
 	numberedGroups []*rxNode
 	namedGroups    map[string][]*rxNode
 	backrefs       []*rxNode
+	nodes          []rxNode
+}
+
+// newNode allocates parser nodes from one pre-sized backing array. scanGroups
+// computes an upper bound before parsing, so pointers into nodes stay stable
+// and a regex pays for one node allocation instead of one allocation per
+// structural construct. The fallback keeps pointer stability if a future
+// parser extension creates a node the scan does not yet count.
+func (p *rxParser) newNode(node rxNode) *rxNode {
+	if len(p.nodes) == cap(p.nodes) {
+		result := new(rxNode)
+		*result = node
+		return result
+	}
+	p.nodes = p.nodes[:len(p.nodes)+1]
+	result := &p.nodes[len(p.nodes)-1]
+	*result = node
+	return result
 }
 
 // parseAlternatives consumes alternatives separated by `|`, ending at either
 // `)` (when expectClose) or end-of-input.
 func (p *rxParser) parseAlternatives(parent *rxNode, expectClose bool) bool {
-	alt := &rxNode{kind: nkAlternative, start: p.pos, parent: parent}
-	parent.children = append(parent.children, alt)
+	alt := p.newNode(rxNode{kind: nkAlternative, parent: parent})
 
 	for p.pos < len(p.pattern) {
 		c := p.pattern[p.pos]
@@ -121,16 +138,11 @@ func (p *rxParser) parseAlternatives(parent *rxNode, expectClose bool) bool {
 			if !expectClose {
 				return false
 			}
-			alt.end = p.pos
-			alt.raw = p.pattern[alt.start:alt.end]
 			return true
 		}
 		if c == '|' {
-			alt.end = p.pos
-			alt.raw = p.pattern[alt.start:alt.end]
 			p.pos++
-			alt = &rxNode{kind: nkAlternative, start: p.pos, parent: parent}
-			parent.children = append(parent.children, alt)
+			alt = p.newNode(rxNode{kind: nkAlternative, parent: parent})
 			continue
 		}
 		if !p.parseTerm(alt) {
@@ -142,8 +154,6 @@ func (p *rxParser) parseAlternatives(parent *rxNode, expectClose bool) bool {
 		return false
 	}
 
-	alt.end = p.pos
-	alt.raw = p.pattern[alt.start:alt.end]
 	return true
 }
 
@@ -240,13 +250,13 @@ func (p *rxParser) parseGroup(parent *rxNode) bool {
 		switch c {
 		case ':':
 			p.pos += 2
-			node = &rxNode{kind: nkGroup, start: start, parent: parent}
+			node = p.newNode(rxNode{kind: nkGroup, start: start, parent: parent})
 		case '=':
 			p.pos += 2
-			node = &rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: true, negate: false}
+			node = p.newNode(rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: true})
 		case '!':
 			p.pos += 2
-			node = &rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: true, negate: true}
+			node = p.newNode(rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: true, negate: true})
 		case '<':
 			if p.pos+2 >= len(p.pattern) {
 				return false
@@ -254,10 +264,10 @@ func (p *rxParser) parseGroup(parent *rxNode) bool {
 			switch p.pattern[p.pos+2] {
 			case '=':
 				p.pos += 3
-				node = &rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: false, negate: false}
+				node = p.newNode(rxNode{kind: nkLookaround, start: start, parent: parent})
 			case '!':
 				p.pos += 3
-				node = &rxNode{kind: nkLookaround, start: start, parent: parent, isAhead: false, negate: true}
+				node = p.newNode(rxNode{kind: nkLookaround, start: start, parent: parent, negate: true})
 			default:
 				// (?<name>...)
 				p.pos += 2 // consume `?<`
@@ -272,7 +282,7 @@ func (p *rxParser) parseGroup(parent *rxNode) bool {
 				p.pos = nameEnd + 1
 				p.numberedGroups = append(p.numberedGroups, nil)
 				num := len(p.numberedGroups)
-				node = &rxNode{kind: nkCapturingGroup, start: start, parent: parent, name: name, number: num}
+				node = p.newNode(rxNode{kind: nkCapturingGroup, start: start, parent: parent})
 				p.numberedGroups[num-1] = node
 				p.namedGroups[name] = append(p.namedGroups[name], node)
 			}
@@ -282,11 +292,9 @@ func (p *rxParser) parseGroup(parent *rxNode) bool {
 	} else {
 		p.numberedGroups = append(p.numberedGroups, nil)
 		num := len(p.numberedGroups)
-		node = &rxNode{kind: nkCapturingGroup, start: start, parent: parent, number: num}
+		node = p.newNode(rxNode{kind: nkCapturingGroup, start: start, parent: parent})
 		p.numberedGroups[num-1] = node
 	}
-
-	parent.children = append(parent.children, node)
 
 	if !p.parseAlternatives(node, true) {
 		return false
@@ -322,15 +330,14 @@ func (p *rxParser) parseEscape(parent *rxNode) bool {
 				}
 				if nameEnd < len(p.pattern) && nameEnd > p.pos+3 {
 					name := p.pattern[p.pos+3 : nameEnd]
-					bref := &rxNode{
+					bref := p.newNode(rxNode{
 						kind:    nkBackref,
 						start:   p.pos,
 						end:     nameEnd + 1,
 						raw:     p.pattern[p.pos : nameEnd+1],
 						parent:  parent,
 						refName: name,
-					}
-					parent.children = append(parent.children, bref)
+					})
 					p.backrefs = append(p.backrefs, bref)
 					p.pos = nameEnd + 1
 					return true
@@ -353,15 +360,14 @@ func (p *rxParser) parseEscape(parent *rxNode) bool {
 		}
 		n, _ := strconv.Atoi(p.pattern[p.pos+1 : end])
 		if p.flags.UV() || n <= p.totalGroups {
-			bref := &rxNode{
+			bref := p.newNode(rxNode{
 				kind:   nkBackref,
 				start:  p.pos,
 				end:    end,
 				raw:    p.pattern[p.pos:end],
 				parent: parent,
 				refNum: n,
-			}
-			parent.children = append(parent.children, bref)
+			})
 			p.backrefs = append(p.backrefs, bref)
 			p.pos = end
 			return true
@@ -385,28 +391,46 @@ func (p *rxParser) parseEscape(parent *rxNode) bool {
 
 // scanGroups walks the pattern to count capturing groups and detect whether
 // any are named. Skips over character classes and escapes correctly.
-func scanGroups(pattern string, flags utils.RegexFlags) (totalGroups int, hasNamedGroups bool, ok bool) {
+func scanGroups(pattern string, flags utils.RegexFlags) (
+	totalGroups int,
+	hasNamedGroups bool,
+	nodeCapacity int,
+	backrefCapacity int,
+	ok bool,
+) {
+	// Pattern and its first alternative always exist. Each group contributes
+	// its own node and first alternative; each `|` contributes another
+	// alternative; and each backreference-looking escape can contribute at
+	// most one backreference node. This is an upper bound because some numeric
+	// escapes are later classified as octal.
+	nodeCapacity = 2
 	i := 0
 	for i < len(pattern) {
 		c := pattern[i]
 		switch c {
 		case '\\':
+			if i+1 < len(pattern) &&
+				(pattern[i+1] == 'k' || pattern[i+1] >= '1' && pattern[i+1] <= '9') {
+				nodeCapacity++
+				backrefCapacity++
+			}
 			step, escOk := skipBackrefAwareEscape(pattern, i, flags)
 			if !escOk {
-				return 0, false, false
+				return 0, false, 0, 0, false
 			}
 			i += step
 		case '[':
 			end, classOk := utils.ClassEnd(pattern, i, flags)
 			if !classOk {
-				return 0, false, false
+				return 0, false, 0, 0, false
 			}
 			i = end
 		case '(':
+			nodeCapacity += 2
 			i++
 			if i < len(pattern) && pattern[i] == '?' {
 				if i+1 >= len(pattern) {
-					return 0, false, false
+					return 0, false, 0, 0, false
 				}
 				next := pattern[i+1]
 				if next == ':' || next == '=' || next == '!' {
@@ -428,16 +452,19 @@ func scanGroups(pattern string, flags utils.RegexFlags) (totalGroups int, hasNam
 						nameEnd++
 					}
 					if nameEnd >= len(pattern) || nameEnd == i {
-						return 0, false, false
+						return 0, false, 0, 0, false
 					}
 					totalGroups++
 					hasNamedGroups = true
 					i = nameEnd + 1
 					continue
 				}
-				return 0, false, false
+				return 0, false, 0, 0, false
 			}
 			totalGroups++
+		case '|':
+			nodeCapacity++
+			i++
 		default:
 			_, w := utf8.DecodeRuneInString(pattern[i:])
 			if w == 0 {
@@ -447,7 +474,7 @@ func scanGroups(pattern string, flags utils.RegexFlags) (totalGroups int, hasNam
 			}
 		}
 	}
-	return totalGroups, hasNamedGroups, true
+	return totalGroups, hasNamedGroups, nodeCapacity, backrefCapacity, true
 }
 
 // skipBackrefAwareEscape wraps utils.SkipPatternEscape with extra handling
