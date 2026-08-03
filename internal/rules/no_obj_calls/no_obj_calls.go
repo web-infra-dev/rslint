@@ -1,9 +1,10 @@
 package no_obj_calls
 
 import (
-	"fmt"
+	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -74,6 +75,11 @@ type trackedValue struct {
 	globalName string
 }
 
+type trackedCall struct {
+	node       *ast.Node
+	globalName string
+}
+
 type traceWalk struct {
 	variables map[*ast.Symbol]bool
 	globals   map[string]bool
@@ -86,39 +92,35 @@ type ruleState struct {
 	// are collected on demand solely for the rare `/* global alias */ alias =
 	// JSON` propagation path.
 	identifiersByName map[string][]*ast.Node
-	indexedNames      map[string]bool
 	allNamesIndexed   bool
 
-	// localSymbols contains raw binder symbols. Requested names are indexed
-	// lazily: files with many declarations but no tracked alias should not pay
-	// for a per-declaration map entry. ctx.Refs also deals in raw symbols, so
-	// expanding an alias never needs the TypeChecker.
-	localSymbols           []*ast.Symbol
-	symbolsByName          map[string][]*ast.Symbol
-	indexedSymbolNames     map[string]bool
-	symbolLookupCount      int
-	allSymbolsIndexed      bool
-	resolvedReferenceNames map[string]bool
-	referenceSymbols       map[*ast.Node]*ast.Symbol
+	// Only same-named local bindings for watched roots are needed to classify
+	// global references. Assignment aliases resolve directly through ctx.Refs.
+	localRootSymbols map[string][]*ast.Symbol
 
 	propertyEvaluator *utils.StaticStringEvaluator
-	calls             map[*ast.Node]string
-	additionalCalls   map[*ast.Node][]string
+	calls             []trackedCall
+	callsNeedSort     bool
+
+	lastReferenceName    string
+	lastReferenceGlobal  string
+	lastReferenceMessage rule.RuleMessage
 }
 
 var lexicalShadowSentinel = &ast.Symbol{}
 
 func newRuleState(ctx rule.RuleContext) *ruleState {
 	state := &ruleState{
-		ctx:                    ctx,
-		identifiersByName:      make(map[string][]*ast.Node),
-		indexedNames:           make(map[string]bool),
-		symbolsByName:          make(map[string][]*ast.Symbol),
-		indexedSymbolNames:     make(map[string]bool),
-		resolvedReferenceNames: make(map[string]bool),
+		ctx:               ctx,
+		identifiersByName: make(map[string][]*ast.Node),
 	}
 	state.collectFileIndex()
 	state.collectCalls()
+	if state.callsNeedSort {
+		sort.SliceStable(state.calls, func(i, j int) bool {
+			return state.calls[i].node.Pos() < state.calls[j].node.Pos()
+		})
+	}
 	return state
 }
 
@@ -126,26 +128,36 @@ func (state *ruleState) collectFileIndex() {
 	if state.ctx.SourceFile == nil {
 		return
 	}
-
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
-		if symbol := node.Symbol(); isTrackableLocalSymbol(symbol) {
-			state.localSymbols = append(state.localSymbols, symbol)
-		}
-
 		if node.Kind == ast.KindIdentifier {
 			name := node.AsIdentifier().Text
-			if (nonCallableGlobals[name] || globalObjects[name]) &&
-				!utils.IsNonReferenceIdentifier(node) {
-				state.identifiersByName[name] = append(state.identifiersByName[name], node)
-				state.indexedNames[name] = true
+			if nonCallableGlobals[name] || globalObjects[name] {
+				if utils.IsNonReferenceIdentifier(node) {
+					if symbol := bindingSymbol(node); symbol != nil {
+						state.addLocalRootSymbol(name, symbol)
+					}
+				} else {
+					state.identifiersByName[name] = append(state.identifiersByName[name], node)
+				}
 			}
 		}
-
 		node.ForEachChild(visit)
 		return false
 	}
 	visit(state.ctx.SourceFile.AsNode())
+}
+
+func (state *ruleState) addLocalRootSymbol(name string, symbol *ast.Symbol) {
+	if state.localRootSymbols == nil {
+		state.localRootSymbols = make(map[string][]*ast.Symbol)
+	}
+	for _, existing := range state.localRootSymbols[name] {
+		if existing == symbol {
+			return
+		}
+	}
+	state.localRootSymbols[name] = append(state.localRootSymbols[name], symbol)
 }
 
 func isTrackableLocalSymbol(symbol *ast.Symbol) bool {
@@ -163,29 +175,27 @@ func isTrackableLocalSymbol(symbol *ast.Symbol) bool {
 
 func (state *ruleState) collectCalls() {
 	for _, name := range nonCallableGlobalNames {
-		if state.isGlobalOff(name) || state.globalIsModified(name) {
-			continue
-		}
-		value := trackedValue{kind: traceNonCallable, globalName: name}
-		for _, identifier := range state.identifiersByName[name] {
-			if state.isGlobalReference(identifier, name) {
-				walk := traceWalk{}
-				state.trackExpression(identifier, value, &walk)
-			}
-		}
+		state.collectRootCalls(name, trackedValue{kind: traceNonCallable, globalName: name})
 	}
 
 	for _, name := range globalObjectNames {
-		if state.isGlobalOff(name) || state.globalIsModified(name) {
-			continue
+		state.collectRootCalls(name, trackedValue{kind: traceGlobalObject})
+	}
+}
+
+func (state *ruleState) collectRootCalls(name string, value trackedValue) {
+	if state.isGlobalOff(name) {
+		return
+	}
+	references := state.globalRootReferences(name)
+	for _, identifier := range references {
+		if utils.IsWriteReference(identifier) {
+			return
 		}
-		value := trackedValue{kind: traceGlobalObject}
-		for _, identifier := range state.identifiersByName[name] {
-			if state.isGlobalReference(identifier, name) {
-				walk := traceWalk{}
-				state.trackExpression(identifier, value, &walk)
-			}
-		}
+	}
+	for _, identifier := range references {
+		walk := traceWalk{}
+		state.trackExpression(identifier, value, &walk)
 	}
 }
 
@@ -194,13 +204,18 @@ func (state *ruleState) isGlobalOff(name string) bool {
 	return ok && !declared
 }
 
-func (state *ruleState) globalIsModified(name string) bool {
-	for _, identifier := range state.identifiersByName[name] {
-		if state.isGlobalReference(identifier, name) && utils.IsWriteReference(identifier) {
-			return true
+func (state *ruleState) globalRootReferences(name string) []*ast.Node {
+	identifiers := state.identifiersByName[name]
+	if len(state.localRootSymbols[name]) == 0 && state.ctx.Refs != nil {
+		return identifiers
+	}
+	var references []*ast.Node
+	for _, identifier := range identifiers {
+		if state.isGlobalReference(identifier, name) {
+			references = append(references, identifier)
 		}
 	}
-	return false
+	return references
 }
 
 func (state *ruleState) isGlobalReference(identifier *ast.Node, name string) bool {
@@ -208,79 +223,59 @@ func (state *ruleState) isGlobalReference(identifier *ast.Node, name string) boo
 		utils.IsNonReferenceIdentifier(identifier) {
 		return false
 	}
-	return state.localReferenceSymbol(identifier) == nil
+	if nonCallableGlobals[name] || globalObjects[name] {
+		return state.localRootReferenceSymbol(identifier, name) == nil
+	}
+	return state.resolveLocalReferenceSymbol(identifier) == nil
 }
 
-func (state *ruleState) localReferenceSymbol(identifier *ast.Node) *ast.Symbol {
+func (state *ruleState) localRootReferenceSymbol(identifier *ast.Node, name string) *ast.Symbol {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return nil
 	}
-	name := identifier.AsIdentifier().Text
-	if !state.resolvedReferenceNames[name] {
-		state.resolvedReferenceNames[name] = true
-		if state.ctx.Refs != nil {
-			for _, symbol := range state.symbolsForName(name) {
-				for _, reference := range state.ctx.Refs.References(symbol) {
-					if state.referenceSymbols == nil {
-						state.referenceSymbols = make(map[*ast.Node]*ast.Symbol)
-					}
-					state.referenceSymbols[reference] = symbol
-				}
-			}
+	symbols := state.localRootSymbols[name]
+	if len(symbols) == 0 {
+		if state.ctx.Refs == nil && utils.IsShadowed(identifier, name) {
+			return lexicalShadowSentinel
 		}
+		return nil
 	}
-	if symbol := state.referenceSymbols[identifier]; symbol != nil {
-		return symbol
+	if state.ctx.Refs != nil {
+		symbol := state.ctx.Refs.Resolve(identifier)
+		if utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+			return symbol
+		}
+		if symbol != nil {
+			return nil
+		}
 	}
 
 	// NamespaceModule symbols do not resolve in RefStore's value lookup even
 	// though ESLint scope analysis treats namespace declarations as bindings.
 	// The same fallback also protects direct/unit callers without a Program.
-	if (state.ctx.Refs == nil || len(state.symbolsForName(name)) != 0) &&
-		utils.IsShadowed(identifier, name) {
+	if utils.IsShadowed(identifier, name) {
 		return lexicalShadowSentinel
 	}
 	return nil
 }
 
-func (state *ruleState) symbolsForName(name string) []*ast.Symbol {
-	if state.allSymbolsIndexed {
-		return state.symbolsByName[name]
+func (state *ruleState) resolveLocalReferenceSymbol(identifier *ast.Node) *ast.Symbol {
+	if identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return nil
 	}
-	if state.indexedSymbolNames[name] {
-		return state.symbolsByName[name]
-	}
-	state.indexedSymbolNames[name] = true
-	state.symbolLookupCount++
-
-	// A few watched-root lookups are cheaper as flat scans and avoid indexing
-	// every declaration in the common case. Assignment-heavy alias chains can
-	// request many distinct names; cap those scans, then build the complete
-	// name index once to keep the tracker linear.
-	if state.symbolLookupCount > 8 {
-		state.symbolsByName = make(map[string][]*ast.Symbol)
-		for _, symbol := range state.localSymbols {
-			state.addSymbolByName(symbol)
+	if state.ctx.Refs != nil {
+		symbol := state.ctx.Refs.Resolve(identifier)
+		if utils.IsValueSymbolDeclaredInFile(symbol, state.ctx.SourceFile) {
+			return symbol
 		}
-		state.allSymbolsIndexed = true
-		return state.symbolsByName[name]
-	}
-
-	for _, symbol := range state.localSymbols {
-		if symbol.Name == name {
-			state.addSymbolByName(symbol)
+		if symbol != nil {
+			return nil
 		}
 	}
-	return state.symbolsByName[name]
-}
-
-func (state *ruleState) addSymbolByName(symbol *ast.Symbol) {
-	for _, existing := range state.symbolsByName[symbol.Name] {
-		if existing == symbol {
-			return
-		}
+	if utils.IsShadowed(identifier, identifier.AsIdentifier().Text) {
+		return lexicalShadowSentinel
 	}
-	state.symbolsByName[symbol.Name] = append(state.symbolsByName[symbol.Name], symbol)
+	return nil
 }
 
 func (state *ruleState) trackExpression(node *ast.Node, value trackedValue, walk *traceWalk) {
@@ -363,18 +358,10 @@ func (state *ruleState) trackExpression(node *ast.Node, value trackedValue, walk
 }
 
 func (state *ruleState) addCall(node *ast.Node, globalName string) {
-	if state.calls == nil {
-		state.calls = make(map[*ast.Node]string)
+	if len(state.calls) > 0 && state.calls[len(state.calls)-1].node.Pos() > node.Pos() {
+		state.callsNeedSort = true
 	}
-	_, exists := state.calls[node]
-	if !exists {
-		state.calls[node] = globalName
-		return
-	}
-	if state.additionalCalls == nil {
-		state.additionalCalls = make(map[*ast.Node][]string)
-	}
-	state.additionalCalls[node] = append(state.additionalCalls[node], globalName)
+	state.calls = append(state.calls, trackedCall{node: node, globalName: globalName})
 }
 
 func (state *ruleState) accessExpressionStaticName(node *ast.Node) (string, bool) {
@@ -527,7 +514,7 @@ func (state *ruleState) trackIdentifierVariable(identifier *ast.Node, value trac
 		state.trackVariable(symbol, value, walk)
 		return
 	}
-	if symbol := state.localReferenceSymbol(identifier); symbol != nil {
+	if symbol := state.resolveLocalReferenceSymbol(identifier); symbol != nil {
 		state.trackVariable(symbol, value, walk)
 		return
 	}
@@ -598,7 +585,7 @@ func (state *ruleState) trackGlobalVariable(name string, value trackedValue, wal
 }
 
 func (state *ruleState) identifiersForName(name string) []*ast.Node {
-	if state.indexedNames[name] || state.allNamesIndexed || state.ctx.SourceFile == nil {
+	if nonCallableGlobals[name] || globalObjects[name] || state.allNamesIndexed || state.ctx.SourceFile == nil {
 		return state.identifiersByName[name]
 	}
 
@@ -609,7 +596,8 @@ func (state *ruleState) identifiersForName(name string) []*ast.Node {
 	visit = func(node *ast.Node) bool {
 		if node.Kind == ast.KindIdentifier {
 			identifierName := node.AsIdentifier().Text
-			if !state.indexedNames[identifierName] && !utils.IsNonReferenceIdentifier(node) {
+			if !nonCallableGlobals[identifierName] && !globalObjects[identifierName] &&
+				!utils.IsNonReferenceIdentifier(node) {
 				state.identifiersByName[identifierName] = append(state.identifiersByName[identifierName], node)
 			}
 		}
@@ -659,18 +647,32 @@ func (state *ruleState) report(node *ast.Node, globalName string) {
 	}
 
 	name := getCalleeName(callee)
+	textRange := node.Loc.WithPos(scanner.SkipTrivia(state.ctx.SourceFile.Text(), node.Pos()))
 	if name == globalName {
-		state.ctx.ReportNode(node, rule.RuleMessage{
-			Id:          "unexpectedCall",
-			Description: fmt.Sprintf("'%s' is not a function.", name),
-		})
+		state.ctx.ReportRange(textRange, directCallMessages[globalName])
 		return
 	}
-	state.ctx.ReportNode(node, rule.RuleMessage{
-		Id:          "unexpectedRefCall",
-		Description: fmt.Sprintf("'%s' is reference to '%s', which is not a function.", name, globalName),
-	})
+	if name != state.lastReferenceName || globalName != state.lastReferenceGlobal {
+		state.lastReferenceName = name
+		state.lastReferenceGlobal = globalName
+		state.lastReferenceMessage = rule.RuleMessage{
+			Id:          "unexpectedRefCall",
+			Description: "'" + name + "' is reference to '" + globalName + "', which is not a function.",
+		}
+	}
+	state.ctx.ReportRange(textRange, state.lastReferenceMessage)
 }
+
+var directCallMessages = func() map[string]rule.RuleMessage {
+	messages := make(map[string]rule.RuleMessage, len(nonCallableGlobalNames))
+	for _, name := range nonCallableGlobalNames {
+		messages[name] = rule.RuleMessage{
+			Id:          "unexpectedCall",
+			Description: "'" + name + "' is not a function.",
+		}
+	}
+	return messages
+}()
 
 // https://eslint.org/docs/latest/rules/no-obj-calls
 var NoObjCallsRule = rule.Rule{
@@ -684,15 +686,11 @@ var NoObjCallsRule = rule.Rule{
 		if len(state.calls) == 0 {
 			return rule.RuleListeners{}
 		}
-
+		nextCall := 0
 		report := func(node *ast.Node) {
-			globalName, ok := state.calls[node]
-			if !ok {
-				return
-			}
-			state.report(node, globalName)
-			for _, additional := range state.additionalCalls[node] {
-				state.report(node, additional)
+			for nextCall < len(state.calls) && state.calls[nextCall].node == node {
+				state.report(node, state.calls[nextCall].globalName)
+				nextCall++
 			}
 		}
 		return rule.RuleListeners{
