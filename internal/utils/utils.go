@@ -76,44 +76,62 @@ func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	return sourceFile.Text()[r.Pos():r.End()]
 }
 
-// SliceEnclosingDelimiters returns text[start..end] widened outward so it
-// includes the nearest enclosing `open`/`close` delimiter pair. Given an inner
-// range (e.g. the span of a comma-separated list whose own range excludes the
-// surrounding brackets), it scans left from `start` to the `open` byte and
+// RangeEnclosingDelimiters widens the inner range [start, end) outward to the
+// nearest enclosing `open`/`close` delimiter pair and returns the widened
+// offsets. Given the span of a comma-separated list whose own range excludes
+// the surrounding brackets, it scans left from `start` to the `open` byte and
 // right from `end` to the `close` byte, both inclusive, tolerating comments or
-// whitespace between a delimiter and the list. Offsets are clamped to text
-// bounds; if a delimiter is not found the scan stops at the boundary. Used to
-// recover bracket-delimited source such as `<T>` type-argument lists and `(…)`
+// whitespace between a delimiter and the list. Used to recover
+// bracket-delimited source such as `<T>` type-argument lists and `(…)`
 // parameter lists whose AST node ranges start after the opening bracket.
-func SliceEnclosingDelimiters(text string, start, end int, open byte, closeCh byte) string {
+//
+// ok is false when either delimiter is missing, so callers that build fixer
+// text never emit a silently truncated span.
+func RangeEnclosingDelimiters(text string, start, end int, open byte, closeCh byte) (int, int, bool) {
 	if start > len(text) {
 		start = len(text)
-	}
-	for start > 0 && text[start-1] != open {
-		start--
-	}
-	if start > 0 {
-		start--
-	}
-	if end < 0 {
-		end = 0
-	}
-	for end < len(text) && text[end] != closeCh {
-		end++
-	}
-	if end < len(text) {
-		end++
 	}
 	if start < 0 {
 		start = 0
 	}
+	if end < 0 {
+		end = 0
+	}
 	if end > len(text) {
 		end = len(text)
 	}
-	if start > end {
-		return ""
+
+	for start > 0 && text[start-1] != open {
+		start--
 	}
-	return text[start:end]
+	if start == 0 {
+		return 0, 0, false // no opening delimiter
+	}
+	start--
+
+	for end < len(text) && text[end] != closeCh {
+		end++
+	}
+	if end == len(text) {
+		return 0, 0, false // no closing delimiter
+	}
+	end++
+
+	if start > end {
+		return 0, 0, false
+	}
+	return start, end, true
+}
+
+// SliceEnclosingDelimiters returns the source text of the range computed by
+// RangeEnclosingDelimiters, including both delimiters. ok is false when either
+// delimiter is missing.
+func SliceEnclosingDelimiters(text string, start, end int, open byte, closeCh byte) (string, bool) {
+	start, end, ok := RangeEnclosingDelimiters(text, start, end, open, closeCh)
+	if !ok {
+		return "", false
+	}
+	return text[start:end], true
 }
 
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {

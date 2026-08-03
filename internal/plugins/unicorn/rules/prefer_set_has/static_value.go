@@ -112,11 +112,11 @@ func getObjectLength(ctx rule.RuleContext, node *ast.Node) (int, bool) {
 	if properties == nil || len(properties.Nodes) != 1 {
 		return 0, false
 	}
-	property := properties.Nodes[0]
-	if !isLengthProperty(property) {
+	valueNode, isLength := lengthPropertyValue(properties.Nodes[0])
+	if !isLength {
 		return 0, false
 	}
-	value, ok := evaluateStaticValue(ctx, property.AsPropertyAssignment().Initializer)
+	value, ok := evaluateStaticValue(ctx, valueNode)
 	if !ok {
 		return 0, false
 	}
@@ -127,23 +127,43 @@ func getObjectLength(ctx rule.RuleContext, node *ast.Node) (int, bool) {
 	return int(number), true
 }
 
-// isLengthProperty mirrors upstream's `isLengthProperty`: a non-computed
-// `length: value` property assignment.
-func isLengthProperty(property *ast.Node) bool {
-	if property == nil || property.Kind != ast.KindPropertyAssignment {
-		return false
+// lengthPropertyValue mirrors upstream's `isLengthProperty` plus the
+// `property.value` read that follows it: for a non-computed `length` property,
+// it returns the node holding the value. ESTree models `{length}` as a Property
+// whose `value` is the key Identifier, so upstream resolves it through scope;
+// tsgo gives shorthand its own kind, so handle it explicitly.
+func lengthPropertyValue(property *ast.Node) (*ast.Node, bool) {
+	if property == nil {
+		return nil, false
 	}
-	name := property.AsPropertyAssignment().Name()
-	if name == nil {
-		return false
+
+	var name *ast.Node
+	var value *ast.Node
+	switch property.Kind {
+	case ast.KindPropertyAssignment:
+		name = property.AsPropertyAssignment().Name()
+		value = property.AsPropertyAssignment().Initializer
+	case ast.KindShorthandPropertyAssignment:
+		name = property.AsShorthandPropertyAssignment().Name()
+		value = name
+	default:
+		return nil, false
 	}
+	if name == nil || value == nil {
+		return nil, false
+	}
+
 	switch name.Kind {
 	case ast.KindIdentifier:
-		return name.AsIdentifier().Text == "length"
+		if name.AsIdentifier().Text == "length" {
+			return value, true
+		}
 	case ast.KindStringLiteral:
-		return name.AsStringLiteral().Text == "length"
+		if name.AsStringLiteral().Text == "length" {
+			return value, true
+		}
 	}
-	return false
+	return nil, false
 }
 
 // isNonNegativeInteger mirrors upstream's `isNonNegativeInteger`.
@@ -279,11 +299,21 @@ func setTypeAnnotationText(ctx rule.RuleContext, declaration *ast.VariableDeclar
 	if typeArguments == nil || len(typeArguments.Nodes) != 1 {
 		return "", false
 	}
-	if hasCommentsOutsideNode(ctx, typeAnnotation, typeArguments.Nodes[0]) {
+	// Upstream compares against the whole type-argument list — the `<…>` span —
+	// not the type argument inside it, so a comment between the angle brackets
+	// and the argument (`Array</* c */ string>`) is still "inside" and the
+	// rewrite stays available. The replacement text below carries that comment
+	// over verbatim.
+	argumentsStart, argumentsEnd, ok := typeArgumentsRange(ctx, typeArguments)
+	if !ok {
+		return "", false
+	}
+	annotationRange := utils.TrimNodeTextRange(ctx.SourceFile, typeAnnotation)
+	if hasCommentsOutsideRange(ctx, annotationRange.Pos(), annotationRange.End(), argumentsStart, argumentsEnd) {
 		return "", false
 	}
 
-	typeArgumentsText := typeArgumentsText(ctx, typeArguments)
+	typeArgumentsText := ctx.SourceFile.Text()[argumentsStart:argumentsEnd]
 	switch typeReference.TypeName.AsIdentifier().Text {
 	case "Array":
 		return "Set" + typeArgumentsText, true
@@ -304,12 +334,12 @@ func elementTypeText(ctx rule.RuleContext, elementType *ast.Node) string {
 	return utils.TrimmedNodeText(ctx.SourceFile, elementType)
 }
 
-// typeArgumentsText returns the source text of a type-argument list including
-// its angle brackets (`<T>`), mirroring upstream's `sourceCode.getText(typeArguments)`.
-// The node list range starts after `<` and ends before `>`, so widen it outward
-// to the enclosing bracket pair.
-func typeArgumentsText(ctx rule.RuleContext, typeArguments *ast.NodeList) string {
-	return utils.SliceEnclosingDelimiters(
+// typeArgumentsRange returns the source range of a type-argument list including
+// its angle brackets (`<T>`), matching what upstream's ESTree node covers. The
+// tsgo node-list range starts after `<` and ends before `>`, so widen it
+// outward to the enclosing bracket pair.
+func typeArgumentsRange(ctx rule.RuleContext, typeArguments *ast.NodeList) (int, int, bool) {
+	return utils.RangeEnclosingDelimiters(
 		ctx.SourceFile.Text(), typeArguments.Pos(), typeArguments.End(), '<', '>',
 	)
 }
@@ -320,11 +350,18 @@ func typeArgumentsText(ctx rule.RuleContext, typeArguments *ast.NodeList) string
 func hasCommentsOutsideNode(ctx rule.RuleContext, node *ast.Node, child *ast.Node) bool {
 	nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 	childRange := utils.TrimNodeTextRange(ctx.SourceFile, child)
+	return hasCommentsOutsideRange(ctx, nodeRange.Pos(), nodeRange.End(), childRange.Pos(), childRange.End())
+}
+
+// hasCommentsOutsideRange is hasCommentsOutsideNode over raw offsets, for
+// callers whose "child" span is not a single node (the `<…>` type-argument
+// list, whose brackets are not part of any node's range).
+func hasCommentsOutsideRange(ctx rule.RuleContext, nodeStart, nodeEnd, childStart, childEnd int) bool {
 	for _, comment := range ctx.Comments.All() {
-		if comment.Pos() < nodeRange.Pos() || comment.End() > nodeRange.End() {
+		if comment.Pos() < nodeStart || comment.End() > nodeEnd {
 			continue
 		}
-		if comment.Pos() < childRange.Pos() || comment.End() > childRange.End() {
+		if comment.Pos() < childStart || comment.End() > childEnd {
 			return true
 		}
 	}

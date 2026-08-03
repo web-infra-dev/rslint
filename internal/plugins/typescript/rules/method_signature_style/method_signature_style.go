@@ -110,18 +110,22 @@ func (f *methodSignatureFixer) getMethodParams(node *ast.Node) string {
 		lastRange := utils.TrimNodeTextRange(f.sourceFile, params.Nodes[len(params.Nodes)-1])
 		// Widen the param-list span outward to the enclosing `(`/`)` pair
 		// (comments may sit between a paren and the first/last param).
-		paramsText = utils.SliceEnclosingDelimiters(
+		if text, ok := utils.SliceEnclosingDelimiters(
 			f.sourceText, firstRange.Pos(), lastRange.End(), '(', ')',
-		)
+		); ok {
+			paramsText = text
+		}
 	}
 
 	if typeParams != nil && len(typeParams.Nodes) > 0 {
 		firstRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[0])
 		lastRange := utils.TrimNodeTextRange(f.sourceFile, typeParams.Nodes[len(typeParams.Nodes)-1])
 		// Widen the type-param-list span outward to the enclosing `<`/`>` pair.
-		paramsText = utils.SliceEnclosingDelimiters(
+		if text, ok := utils.SliceEnclosingDelimiters(
 			f.sourceText, firstRange.Pos(), lastRange.End(), '<', '>',
-		) + paramsText
+		); ok {
+			paramsText = text + paramsText
+		}
 	}
 
 	return paramsText

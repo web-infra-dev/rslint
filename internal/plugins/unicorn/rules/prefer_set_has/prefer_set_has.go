@@ -292,13 +292,12 @@ func isIncludesCall(node *ast.Node) bool {
 // `includes` call towards the declaration's container, it reports whether a
 // loop/function boundary is crossed (so the single call may run many times).
 //
-// Upstream's `root = node.parent.parent.parent` is the block/program
-// containing the declaration. In ESTree that is Identifier → VariableDeclarator
-// → VariableDeclaration → container; tsgo inserts a VariableDeclarationList and
-// VariableStatement between the declaration and its container, so the same
-// container sits one hop deeper.
+// Upstream's `root = node.parent.parent.parent` is whatever encloses the
+// declaration — see multipleCallRoot for how that maps onto tsgo's deeper
+// declaration chain, which differs between statement and `for` initializer
+// position.
 func isMultipleCall(includesIdentifier *ast.Node, node *ast.Node) bool {
-	root := ancestorAt(node, 4)
+	root := multipleCallRoot(node)
 
 	// Upstream starts the walk at the `.includes()` CallExpression
 	// (`identifier.parent.parent`). Parentheses are transparent in ESTree.
@@ -325,6 +324,28 @@ func isMultipleCallBoundary(node *ast.Node) bool {
 		return true
 	}
 	return utils.IsFunctionLikeContainer(node)
+}
+
+// multipleCallRoot returns upstream's `node.parent.parent.parent`: the ancestor
+// enclosing the whole declaration, at which the upward walk stops.
+//
+// ESTree's VariableDeclaration spans both tsgo's VariableDeclarationList and,
+// at statement position, the enclosing VariableStatement — so skip the
+// statement when there is one. At `for` initializer position there is no
+// statement and the root is the ForStatement itself, which is what makes that
+// enclosing `for` deliberately not a multiple-call boundary: the loop runs the
+// initializer once, so a single `includes` inside it is still a single call.
+func multipleCallRoot(node *ast.Node) *ast.Node {
+	// Identifier → VariableDeclaration → VariableDeclarationList
+	declarationList := ancestorAt(node, 2)
+	if declarationList == nil {
+		return nil
+	}
+	root := declarationList.Parent
+	if root != nil && root.Kind == ast.KindVariableStatement {
+		root = root.Parent
+	}
+	return root
 }
 
 // ancestorAt returns the ancestor reached by following `.Parent` `depth` times.
@@ -511,19 +532,22 @@ func arrayVariableDeclarator(ctx rule.RuleContext, node *ast.Node) *ast.Variable
 	if declarationList == nil || declarationList.Kind != ast.KindVariableDeclarationList {
 		return nil
 	}
-	// Upstream only checks `VariableDeclaration` → `VariableDeclaration` (the
-	// declarator) → `VariableDeclaration` (statement); it does NOT require
-	// `const` here (the const check happens for referenced initializers). But
-	// the identifier must resolve through `findVariable`, and non-const shapes
-	// are excluded downstream via reference analysis. Match upstream's exact
-	// structural gate: parent list's parent is the statement.
-	statement := declarationList.Parent
-	if statement == nil || statement.Kind != ast.KindVariableStatement {
-		return nil
-	}
-
-	// Exclude `export const foo = [];`
-	if ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
+	// Upstream's structural gate is `parent.parent.type === 'VariableDeclaration'`
+	// — the declaration node, checked above as the VariableDeclarationList. tsgo
+	// additionally wraps a statement-position declaration in a VariableStatement
+	// that ESTree has no counterpart for, so requiring one here would wrongly
+	// drop a `for` initializer (`for (const foo = [1, 2]; ;)`), which upstream
+	// accepts. It does NOT require `const` either: non-const shapes are excluded
+	// downstream via reference analysis.
+	//
+	// Exclude `export const foo = [];` — upstream tests
+	// `parent.parent.parent.type === 'ExportNamedDeclaration'`, which maps to the
+	// export modifier on the VariableStatement. A `for` initializer has no
+	// enclosing statement and can never be exported, so this check is the only
+	// place that still needs one.
+	if statement := declarationList.Parent; statement != nil &&
+		statement.Kind == ast.KindVariableStatement &&
+		ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
 		return nil
 	}
 

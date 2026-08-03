@@ -47,6 +47,14 @@ func TestPreferSetHasExtras(t *testing.T) {
 			// unclassifiable → bail even inside a loop.
 			{Code: "const foo = [1, 2, 3];\nfor (let i = 0; i < 3; i++) { foo['includes'](1); }"},
 
+			// ---- multipleCallRoot: `for` initializer is its own root ----
+			// A `for` initializer runs once, so a single includes in the loop
+			// body is a single call: the walk from the includes call reaches the
+			// ForStatement root and stops without crossing a boundary. Guards
+			// against deriving the root by a fixed ancestor depth, which would
+			// overshoot the ForStatement here and over-report.
+			{Code: "for (const foo = [1, 2]; ;) {\n\tfoo.includes(1);\n}"},
+
 			// ---- Branch lock-in: getReferenceGroups default (unclassifiable) ----
 			// A bare read of the array that is neither includes/length/extra
 			// makes the whole rule bail, even with a valid includes call.
@@ -223,6 +231,55 @@ func TestPreferSetHasExtras(t *testing.T) {
 				Code:   "const foo = [1n, 2n];\nconst spread = [...foo];\nfunction has(v) { return foo.includes(v); }",
 				Output: []string{"const foo = new Set([1n, 2n]);\nconst spread = [...foo];\nfunction has(v) { return foo.has(v); }"},
 				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- Structural gate: `for` initializer declaration ----
+			// Upstream's gate is the ESTree VariableDeclaration, which also sits
+			// at `ForStatement.init`. tsgo has no VariableStatement there, so the
+			// rule must not require one. Two includes calls → reported without
+			// needing the multiple-call check.
+			{
+				Code:   "for (const foo = [1, 2]; ;) {\n\tfoo.includes(1);\n\tfoo.includes(2);\n}",
+				Output: []string{"for (const foo = new Set([1, 2]); ;) {\n\tfoo.has(1);\n\tfoo.has(2);\n}"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 12)},
+			},
+			// A single includes inside a `for` initializer's body is still
+			// reported when it sits in a nested function — the callback is a
+			// multiple-call boundary encountered before the ForStatement root.
+			{
+				Code:   "for (const foo = [1, 2]; ;) {\n\tbar.forEach(() => foo.includes(1));\n}",
+				Output: []string{"for (const foo = new Set([1, 2]); ;) {\n\tbar.forEach(() => foo.has(1));\n}"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 12)},
+			},
+
+			// ---- Comment recovery: `Array<T>` with an inner comment ----
+			// Upstream compares comments against the whole `<…>` span, so a
+			// comment between the angle brackets and the type argument does not
+			// block the rewrite; it is carried into `Set<…>` verbatim. This must
+			// stay an autofix — the suggestion path omits the annotation edit, so
+			// a downgrade here would emit `Array<string> = new Set([…])`.
+			{
+				Code:     "const foo: Array</* c */ string> = ['a', 'b'];\nfoo.includes('a');\nfoo.includes('b');",
+				Output:   []string{"const foo: Set</* c */ string> = new Set(['a', 'b']);\nfoo.has('a');\nfoo.has('b');"},
+				FileName: "array-type-inner-comment.ts",
+				Errors:   []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+			{
+				Code:     "const foo: Array<string /* c */> = ['a', 'b'];\nfoo.includes('a');\nfoo.includes('b');",
+				Output:   []string{"const foo: Set<string /* c */> = new Set(['a', 'b']);\nfoo.has('a');\nfoo.has('b');"},
+				FileName: "array-type-trailing-comment.ts",
+				Errors:   []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- getObjectLength: `{length}` shorthand ----
+			// ESTree models `{length}` as a Property whose value is the key
+			// Identifier, resolved through scope; tsgo gives shorthand its own
+			// kind, so lengthPropertyValue must accept it or the size check bails.
+			{
+				Code:    "const length = 3;\nconst foo = Array.from({length});\nfoo.includes(1);\nfoo.includes(2);",
+				Output:  []string{"const length = 3;\nconst foo = new Set(Array.from({length}));\nfoo.has(1);\nfoo.has(2);"},
+				Options: minimumItems(2),
+				Errors:  []rule_tester.InvalidTestCaseError{errorAt("foo", 2, 7)},
 			},
 		},
 	)
