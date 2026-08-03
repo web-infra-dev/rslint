@@ -21,15 +21,23 @@ func buildClassReassignmentMessage(className string) rule.RuleMessage {
 // name comes from the declaration's name node rather than the symbol: a
 // default-exported class is bound to an export symbol named "default",
 // while the reported name must be the one written in the source.
-func checkClassReassignments(classNode *ast.Node, name string, ctx *rule.RuleContext) {
-	sym := classNode.Symbol()
-	if sym == nil {
+func checkClassReassignments(classNode *ast.Node, nameNode *ast.Node, ctx *rule.RuleContext) {
+	symbol := classNode.Symbol()
+	if symbol == nil {
 		return
 	}
-	for _, ref := range ctx.Refs.References(sym) {
-		if utils.IsWriteReference(ref) {
-			ctx.ReportNode(ref, buildClassReassignmentMessage(name))
+
+	var message rule.RuleMessage
+	hasMessage := false
+	for _, reference := range ctx.Refs.References(symbol) {
+		if !utils.IsWriteReference(reference) {
+			continue
 		}
+		if !hasMessage {
+			message = buildClassReassignmentMessage(nameNode.Text())
+			hasMessage = true
+		}
+		ctx.ReportNode(reference, message)
 	}
 }
 
@@ -37,26 +45,16 @@ func checkClassReassignments(classNode *ast.Node, name string, ctx *rule.RuleCon
 var NoClassAssignRule = rule.Rule{
 	Name: "no-class-assign",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		checkClass := func(node *ast.Node) {
+			nameNode := node.Name()
+			if nameNode == nil {
+				return
+			}
+			checkClassReassignments(node, nameNode, &ctx)
+		}
 		return rule.RuleListeners{
-			// Check class declarations
-			ast.KindClassDeclaration: func(node *ast.Node) {
-				nameNode := node.AsClassDeclaration().Name()
-				if nameNode == nil {
-					return
-				}
-				checkClassReassignments(node, nameNode.Text(), &ctx)
-			},
-
-			// Check named class expressions. The name is only visible inside
-			// the class body, which RefStore's scope-aware resolution
-			// enforces on its own.
-			ast.KindClassExpression: func(node *ast.Node) {
-				nameNode := node.AsClassExpression().Name()
-				if nameNode == nil {
-					return
-				}
-				checkClassReassignments(node, nameNode.Text(), &ctx)
-			},
+			ast.KindClassDeclaration: checkClass,
+			ast.KindClassExpression:  checkClass,
 		}
 	},
 }
