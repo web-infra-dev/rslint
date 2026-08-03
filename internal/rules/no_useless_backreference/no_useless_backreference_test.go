@@ -50,6 +50,7 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `function foo() { var RegExp; RegExp('\\1(a)', 'u'); }`},
 			{Code: `function foo(RegExp) { new RegExp('\\1(a)'); }`},
 			{Code: `if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`},
+			{Code: `namespace RegExp {} RegExp('\\1(a)');`},
 			// SKIP: rslint does not support ESLint's /*globals*/ directive comments
 			// `/* globals RegExp:off */ new RegExp('\\1(a)');`
 			// `RegExp('\\1(a)');` with languageOptions.globals { RegExp: "off" }
@@ -613,6 +614,54 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
 		nil,
+		nil,
+	)
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
+		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
+	}
+}
+
+func TestRegExpResolutionWithoutTypeInfo(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		filePath: `
+RegExp("\\1(a)");
+{
+	const RegExp = (pattern: string) => pattern;
+	RegExp("\\1(a)");
+}`,
+	})
+	host := utils.CreateCompilerHost(rootDir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatal("file.ts was not loaded")
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.RunLinterInProgram(
+		program,
+		[]string{sourceFile.FileName()},
+		nil,
+		nil,
+		func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     NoUselessBackreferenceRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoUselessBackreferenceRule.Run(ctx, nil)
+				},
+			}}
+		},
+		false,
+		func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+		map[string]struct{}{}, // Keep the Program/RefStore but withhold the checker.
 		nil,
 	)
 	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
