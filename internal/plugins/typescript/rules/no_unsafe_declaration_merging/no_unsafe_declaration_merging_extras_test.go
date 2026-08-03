@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -100,6 +101,28 @@ namespace B {
   interface Foo {
     y: number;
   }
+}
+`},
+
+		// Reopened namespaces share an export symbol in the TypeScript binder,
+		// but each namespace body is a distinct scope in the upstream rule.
+		{Code: `
+namespace Reopened {
+  export interface Foo {}
+}
+namespace Reopened {
+  export class Foo {}
+}
+`},
+
+		// Plain blocks use separate binder symbols even though the rule's
+		// enclosing-scope helper deliberately ignores ordinary block nodes.
+		{Code: `
+{
+  interface Foo {}
+}
+{
+  class Foo {}
 }
 `},
 
@@ -241,6 +264,21 @@ namespace nested {
 }
 `},
 	}, []rule_tester.InvalidTestCase{
+		// A class and interface in the same ordinary block share one binder
+		// symbol and must still be diagnosed on both declaration names.
+		{
+			Code: `
+{
+  interface Foo {}
+  class Foo {}
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeMerging", Line: 3, Column: 13},
+				{MessageId: "unsafeMerging", Line: 4, Column: 9},
+			},
+		},
+
 		// ---- Branch lock-in: class + interface inside the same namespace ----
 		{
 			Code: `
@@ -469,4 +507,39 @@ interface Foo {}
 			},
 		},
 	})
+}
+
+func TestNoUnsafeDeclarationMergingWithoutTypeChecker(t *testing.T) {
+	if NoUnsafeDeclarationMergingRule.RequiresTypeInfo {
+		t.Fatal("binder-based rule must run without type information")
+	}
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	_, sourceFile, err := helper.CreateTestProgram(`
+interface Foo {}
+class Foo {}
+`, "no-unsafe-declaration-merging-no-checker.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	comments := rule.NewCommentStore(sourceFile)
+	reports := 0
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithReporter(NoUnsafeDeclarationMergingRule.Name, rule.SeverityError, func(rule.RuleDiagnostic) {
+		reports++
+	})
+	listeners := NoUnsafeDeclarationMergingRule.Run(ctx, nil)
+	for _, statement := range sourceFile.Statements.Nodes {
+		if listener := listeners[statement.Kind]; listener != nil {
+			listener(statement)
+		}
+	}
+
+	if reports != 2 {
+		t.Fatalf("got %d reports without a TypeChecker, want 2", reports)
+	}
 }
