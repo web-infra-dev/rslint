@@ -208,5 +208,78 @@ function foo(bar?: { n: number }) {
 				},
 			},
 		},
+		// Leading trivia must not become part of the diagnostic, and the fix
+		// still removes exactly the redundant assertion token.
+		{
+			Code: `const result = /* leading */ value!!;`,
+			Output: []string{
+				`const result = /* leading */ value!;`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noExtraNonNullAssertion",
+					Line:      1,
+					Column:    30,
+					EndLine:   1,
+					EndColumn: 36,
+				},
+			},
+		},
+		// Comments between assertions are preserved verbatim by the fix.
+		{
+			Code: `const result = value /* first */ ! /* second */ !;`,
+			Output: []string{
+				`const result = value /* first */  /* second */ !;`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noExtraNonNullAssertion"},
+			},
+		},
+		// The token range remains byte-exact when the expression contains
+		// multi-byte source text.
+		{
+			Code: `const result = 数据!!;`,
+			Output: []string{
+				`const result = 数据!;`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noExtraNonNullAssertion"},
+			},
+		},
+		// Every redundant token in a longer assertion chain gets its own
+		// non-overlapping fix.
+		{
+			Code: `const result = value!!!;`,
+			Output: []string{
+				`const result = value!;`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noExtraNonNullAssertion"},
+				{MessageId: "noExtraNonNullAssertion"},
+			},
+		},
+		// Exercise the optional element-access branch in addition to the
+		// existing property-access and call cases.
+		{
+			Code: `
+function foo(bar?: number[]) {
+  return bar!?.[0];
+}
+`,
+			Output: []string{`
+function foo(bar?: number[]) {
+  return bar?.[0];
+}
+`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noExtraNonNullAssertion",
+					Line:      3,
+					Column:    10,
+					EndLine:   3,
+					EndColumn: 14,
+				},
+			},
+		},
 	})
 }
