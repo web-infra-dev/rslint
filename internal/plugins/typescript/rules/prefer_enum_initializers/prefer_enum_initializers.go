@@ -1,7 +1,6 @@
 package prefer_enum_initializers
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -12,7 +11,7 @@ import (
 func buildDefineInitializerMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "defineInitializer",
-		Description: fmt.Sprintf("The value of the member '%s' should be explicitly defined.", name),
+		Description: "The value of the member '" + name + "' should be explicitly defined.",
 		Data:        map[string]string{"name": name},
 	}
 }
@@ -20,7 +19,7 @@ func buildDefineInitializerMessage(name string) rule.RuleMessage {
 func buildDefineInitializerSuggestionMessage(name, suggested string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "defineInitializerSuggestion",
-		Description: fmt.Sprintf("Can be fixed to %s = %s", name, suggested),
+		Description: "Can be fixed to " + name + " = " + suggested,
 		Data:        map[string]string{"name": name, "suggested": suggested},
 	}
 }
@@ -28,6 +27,7 @@ func buildDefineInitializerSuggestionMessage(name, suggested string) rule.RuleMe
 var PreferEnumInitializersRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-enum-initializers",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		sourceText := ctx.SourceFile.Text()
 		return rule.RuleListeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				enumDecl := node.AsEnumDeclaration()
@@ -41,31 +41,34 @@ var PreferEnumInitializersRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					name := utils.TrimmedNodeText(ctx.SourceFile, memberNode)
-					indexStr := strconv.Itoa(index)
-					nextStr := strconv.Itoa(index + 1)
-					stringSuggested := "'" + name + "'"
+					memberRange := utils.TrimNodeTextRange(ctx.SourceFile, memberNode)
+					name := sourceText[memberRange.Pos():memberRange.End()]
 
-					ctx.ReportNodeWithSuggestions(memberNode, buildDefineInitializerMessage(name),
-						rule.RuleSuggestion{
-							Message: buildDefineInitializerSuggestionMessage(name, indexStr),
-							FixesArr: []rule.RuleFix{
-								rule.RuleFixReplace(ctx.SourceFile, memberNode, name+" = "+indexStr),
+					ctx.ReportRangeWithDeferredSuggestions(memberRange, buildDefineInitializerMessage(name), func() []rule.RuleSuggestion {
+						indexStr := strconv.Itoa(index)
+						nextStr := strconv.Itoa(index + 1)
+						stringSuggested := "'" + name + "'"
+						// Keep the three single-fix suggestions in one backing array.
+						fixes := [...]rule.RuleFix{
+							rule.RuleFixReplaceRange(memberRange, name+" = "+indexStr),
+							rule.RuleFixReplaceRange(memberRange, name+" = "+nextStr),
+							rule.RuleFixReplaceRange(memberRange, name+" = "+stringSuggested),
+						}
+						return []rule.RuleSuggestion{
+							{
+								Message:  buildDefineInitializerSuggestionMessage(name, indexStr),
+								FixesArr: fixes[0:1:1],
 							},
-						},
-						rule.RuleSuggestion{
-							Message: buildDefineInitializerSuggestionMessage(name, nextStr),
-							FixesArr: []rule.RuleFix{
-								rule.RuleFixReplace(ctx.SourceFile, memberNode, name+" = "+nextStr),
+							{
+								Message:  buildDefineInitializerSuggestionMessage(name, nextStr),
+								FixesArr: fixes[1:2:2],
 							},
-						},
-						rule.RuleSuggestion{
-							Message: buildDefineInitializerSuggestionMessage(name, stringSuggested),
-							FixesArr: []rule.RuleFix{
-								rule.RuleFixReplace(ctx.SourceFile, memberNode, name+" = "+stringSuggested),
+							{
+								Message:  buildDefineInitializerSuggestionMessage(name, stringSuggested),
+								FixesArr: fixes[2:3:3],
 							},
-						},
-					)
+						}
+					})
 				}
 			},
 		}
