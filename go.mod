@@ -82,5 +82,5 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c // indirect
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.40.0
 )
