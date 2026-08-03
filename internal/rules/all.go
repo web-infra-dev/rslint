@@ -118,6 +118,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_private_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_assignment"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
@@ -289,6 +290,7 @@ func GetAllRules() []rule.Rule {
 		prefer_arrow_callback.PreferArrowCallbackRule,
 		no_dupe_else_if.NoDupeElseIfRule,
 		no_throw_literal.NoThrowLiteralRule,
+		no_useless_assignment.NoUselessAssignmentRule,
 		no_useless_backreference.NoUselessBackreferenceRule,
 		no_useless_call.NoUselessCallRule,
 		no_useless_catch.NoUselessCatchRule,

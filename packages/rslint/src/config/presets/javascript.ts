@@ -42,7 +42,7 @@ const recommended: RslintConfigEntry = {
     'no-unused-private-class-members': 'error',
     // 'no-unused-vars': 'error', // not implemented
     'no-unassigned-vars': 'error',
-    // 'no-useless-assignment': 'error', // not implemented
+    'no-useless-assignment': 'error',
     'no-useless-backreference': 'error',
     'no-useless-catch': 'error',
     'no-useless-escape': 'error',
