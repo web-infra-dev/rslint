@@ -375,7 +375,7 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 
 	filterProperty := filterCall.Property
 	ctx.ReportNodeWithDeferredFixes(filterProperty, messageArrayFilter(), func() []rule.RuleFix {
-		lengthObjectEnd := parenthesizedEndOf(ctx, filterCall.Call)
+		lengthObjectEnd := parenthesizedEnd(ctx, filterCall.Call)
 		end := node.End()
 		// Removing `.length > 0` would drop comments in the removed range.
 		if utils.HasCommentInSpan(ctx.Comments.All(), lengthObjectEnd, end) {
@@ -391,7 +391,7 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 			// parentheses wrapping the member survive the removal.
 			rule.RuleFixRemoveRange(core.NewTextRange(lengthObjectEnd, utils.TrimNodeTextRange(ctx.SourceFile, lengthMember).End())),
 			// Remove `> 0`, starting after any parentheses around the member.
-			rule.RuleFixRemoveRange(core.NewTextRange(parenthesizedEndOf(ctx, lengthMember), end)),
+			rule.RuleFixRemoveRange(core.NewTextRange(parenthesizedEnd(ctx, lengthMember), end)),
 		}
 	})
 }
@@ -604,10 +604,6 @@ func parenthesizedEnd(ctx rule.RuleContext, node *ast.Node) int {
 	return parenthesizedRange(ctx, node).End()
 }
 
-func parenthesizedEndOf(ctx rule.RuleContext, node *ast.Node) int {
-	return parenthesizedEnd(ctx, node)
-}
-
 // insertBeforeRange returns a zero-width fix that inserts text at the start of
 // the given range.
 func insertBeforeRange(textRange core.TextRange, text string) rule.RuleFix {
@@ -728,10 +724,7 @@ func classifyReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTarg
 // a plain identifier name are resolved (matching upstream's getTypeFromVariable
 // preconditions).
 func constInitializer(ctx rule.RuleContext, idNode *ast.Node) *ast.Node {
-	if ctx.TypeChecker == nil {
-		return nil
-	}
-	sym := ctx.TypeChecker.GetSymbolAtLocation(idNode)
+	sym := ctx.Refs.Resolve(idNode)
 	if sym == nil || len(sym.Declarations) != 1 {
 		return nil
 	}
