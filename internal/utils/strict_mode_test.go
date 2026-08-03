@@ -13,9 +13,9 @@ import (
 func parseAndFindNode(t *testing.T, code string, kind ast.Kind) (*ast.Node, *ast.SourceFile) {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	fs := NewOverlayVFSForFile(filePath, code)
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
 	sourceFile := program.GetSourceFile(filePath)
 
@@ -168,9 +168,9 @@ func TestHasUseStrictDirective(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			rootDir := fixtures.GetRootDir()
-			filePath := tspath.ResolvePath(rootDir, "file.ts")
-			fs := NewOverlayVFSForFile(filePath, tt.code)
-			program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+			filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+			fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: tt.code})
+			program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 			assert.NilError(t, err)
 			sourceFile := program.GetSourceFile(filePath)
 			result := HasUseStrictDirective(sourceFile.AsNode())

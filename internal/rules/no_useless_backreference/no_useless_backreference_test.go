@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -578,14 +576,14 @@ r('\\1(a)');`,
 
 func TestImportedRegExpConstructorAlias(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	helperPath := tspath.ResolvePath(rootDir, "foo.ts")
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	helperPath := tspath.ResolvePath(rootDir.Dir, "foo.ts")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath:   `import { regexpFactory } from "./foo"; regexpFactory("\\1(a)");`,
 		helperPath: `export const regexpFactory = RegExp;`,
 	})
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,7 +622,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 
 func TestMayEvaluateToRegexPatternAdversarial(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
 
 	var code strings.Builder
 	code.WriteString(`
@@ -705,11 +703,11 @@ enum Pattern {
 		fmt.Fprintf(&code, "const rejected_%d = %s;\n", index, expression)
 	}
 
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath: code.String(),
 	})
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -62,6 +62,7 @@ func main() {
 		"transformers/jsxtransforms",
 		"vfs",
 		"vfs/cachedvfs",
+		"vfs/iovfs",
 		"vfs/osvfs",
 		"vfs/trackingvfs",
 		"vfs/vfsmatch",

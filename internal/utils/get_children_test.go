@@ -13,9 +13,9 @@ import (
 func parseJSFile(t *testing.T, code string) *ast.SourceFile {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "test.js")
-	fs := NewOverlayVFSForFile(filePath, code)
-	host := CreateCompilerHost(rootDir, fs)
+	filePath := tspath.ResolvePath(rootDir.Dir, "test.js")
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	host := CreateCompilerHost(rootDir.Dir, fs)
 	program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
 		AllowJs:  core.TSTrue,
 		CheckJs:  core.TSTrue,

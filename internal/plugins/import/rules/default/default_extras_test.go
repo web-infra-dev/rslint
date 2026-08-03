@@ -124,9 +124,9 @@ func TestDefaultSkippedBabelReExportSyntaxIsNotParsedByTsgo(t *testing.T) {
 
 			rootDir := fixtures.GetRootDir()
 			fileName := "file.ts"
-			fs := rslint_utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), tc.code)
-			host := rslint_utils.CreateCompilerHost(rootDir, fs)
-			_, err := rslint_utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+			fs := rslint_utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): tc.code})
+			host := rslint_utils.CreateCompilerHost(rootDir.Dir, fs)
+			_, err := rslint_utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 			if err == nil {
 				t.Fatalf("expected tsgo parse error for %q", tc.code)
 			}
@@ -144,9 +144,9 @@ func TestDefaultSkippedFooES7ParseErrorIsParsedByTsgo(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
 	fileName := "foo-es7-consumer.ts"
 	code := `import Foo from "./jsx/FooES7.js";`
-	fs := rslint_utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-	host := rslint_utils.CreateCompilerHost(rootDir, fs)
-	if _, err := rslint_utils.CreateProgram(true, fs, rootDir, "tsconfig.allow-js.json", host); err != nil {
+	fs := rslint_utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
+	host := rslint_utils.CreateCompilerHost(rootDir.Dir, fs)
+	if _, err := rslint_utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.allow-js.json", host); err != nil {
 		t.Fatalf("expected tsgo to parse upstream FooES7.js fixture, got %T: %v", err, err)
 	}
 }

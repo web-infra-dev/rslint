@@ -34,7 +34,7 @@ value.outside;
 
 func TestGetConstVariableInitializer(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "const-variable-initializer.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, "const-variable-initializer.ts")
 	code := `
 const direct = [];
 consumeDirect(direct);
@@ -80,8 +80,8 @@ try {} catch (caught) {
 }
 `
 
-	fs := NewOverlayVFSForFile(filePath, code)
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	if err != nil {
 		t.Fatalf("CreateProgram() error = %v", err)
 	}

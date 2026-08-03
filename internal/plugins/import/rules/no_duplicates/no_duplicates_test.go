@@ -847,9 +847,9 @@ func createNoDuplicatesProgram(t testing.TB, fileName string, code string) (*com
 	t.Helper()
 
 	rootDir := fixtures.GetRootDir()
-	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}

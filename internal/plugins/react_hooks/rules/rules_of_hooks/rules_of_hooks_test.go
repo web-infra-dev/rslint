@@ -24,7 +24,7 @@ import (
 func TestRulesOfHooksNilTypeChecker(t *testing.T) {
 	t.Parallel()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "react.tsx")
+	filePath := tspath.ResolvePath(rootDir.Dir, "react.tsx")
 	// Code intentionally exercises every listener that touches the
 	// useEffectEvent resolver: a binding declaration, a JSX-attribute
 	// reference, and a callee-position reference inside a regular
@@ -41,9 +41,9 @@ function MyComponent({ theme }: { theme: string }) {
   return <Child onClick={onClick} />;
 }
 `
-	fs := utils.NewOverlayVFSForFile(filePath, code)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(
-		true, fs, rootDir, "tsconfig.json", utils.CreateCompilerHost(rootDir, fs),
+		true, fs, rootDir.Dir, "tsconfig.json", utils.CreateCompilerHost(rootDir.Dir, fs),
 	)
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
