@@ -38,8 +38,9 @@ type rstestResolvedAPI struct {
 	state        rstestAPIState
 	originalNode *ast.Node
 	mode         RstestImportMode
-	hasSkip      bool
-	hasTodo      bool
+	// members collects every chain member applied to the resolved API,
+	// including members consumed while following same-file const aliases.
+	members []string
 }
 
 // ParseRstestFnCall parses a final Rstest test/describe registration call.
@@ -83,10 +84,10 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		return nil
 	}
 
+	// MemberEntries only covers members written at the call site, because
+	// members resolved through an alias have no node in this expression.
 	memberEntries := make([]ParsedRstestFnMemberEntry, 0, len(parts)-consumed)
-	members := make([]string, 0, len(parts)-consumed)
 	for _, part := range parts[consumed:] {
-		members = append(members, part.name)
 		memberEntries = append(memberEntries, ParsedRstestFnMemberEntry{
 			Name: part.name,
 			Node: part.node,
@@ -99,7 +100,7 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 			Name:          resolved.name,
 			LocalName:     localName,
 			Kind:          resolved.kind,
-			Members:       members,
+			Members:       resolved.members,
 			MemberEntries: memberEntries,
 			Head: ParsedRstestFnCallHead{
 				Type: resolved.mode,
@@ -114,8 +115,6 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 			},
 		},
 		Parameterized: parameterized,
-		HasSkip:       resolved.hasSkip,
-		HasTodo:       resolved.hasTodo,
 	}
 }
 
@@ -344,14 +343,6 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	}
 
 	resolved.state = state
-	if part.invocation != rstestNotInvoked {
-		return true
-	}
-	switch part.name {
-	case "skip":
-		resolved.hasSkip = true
-	case "todo":
-		resolved.hasTodo = true
-	}
+	resolved.members = append(resolved.members, part.name)
 	return true
 }
