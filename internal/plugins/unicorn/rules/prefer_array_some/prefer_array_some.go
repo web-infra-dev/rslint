@@ -330,8 +330,10 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 	// The right side must be the RAW literal `0` — `0.` / `0x00` / `.0` are
-	// distinct source forms upstream deliberately does not match.
-	if !isRawZeroLiteral(ctx.SourceFile, bin.Right) {
+	// distinct source forms upstream deliberately does not match. ESTree drops
+	// parentheses, so upstream sees the literal through `(( 0 ))`; skip them
+	// here to match, the inner literal's source text is still `0`.
+	if !isRawZeroLiteral(ctx.SourceFile, ast.SkipParentheses(bin.Right)) {
 		return
 	}
 
