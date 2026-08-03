@@ -6,7 +6,7 @@ Enforces the use of the `node:` protocol when importing Node.js builtin modules.
 The `node:` protocol makes it explicit that a module is a Node.js builtin and
 disambiguates it from a same-named package on disk.
 
-The rule checks module specifiers in `import`/`export` statements, dynamic
+The rule checks module specifiers in `import` and `export` statements, dynamic
 `import()`, `require()`, `process.getBuiltinModule()`, and TypeScript `import(...)`
 type nodes. It reports a builtin module referenced without the `node:` prefix and
 autofixes it by inserting `node:` before the module name.
@@ -21,6 +21,7 @@ Examples of **incorrect** code for this rule:
 ```javascript
 import fs from 'fs';
 export { promises } from 'fs';
+export * from 'fs';
 const fs = require('fs/promises');
 const fs = process.getBuiltinModule('fs');
 ```
@@ -51,4 +52,4 @@ type fs = import('node:fs');
 
 ## Original Documentation
 
-[eslint-plugin-unicorn/prefer-node-protocol](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-node-protocol.md)
+[eslint-plugin-unicorn/prefer-node-protocol](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/docs/rules/prefer-node-protocol.md)

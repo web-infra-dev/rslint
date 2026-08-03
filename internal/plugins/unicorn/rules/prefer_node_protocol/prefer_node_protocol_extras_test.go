@@ -27,6 +27,39 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 		t,
 		&prefer_node_protocol.PreferNodeProtocolRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Regression: tsgo-reparsed JSDoc imports are invisible upstream ----
+			{
+				Code:     "/** @type {import(\"fs\").Stats} */\nconst stats = {};",
+				FileName: "jsdoc-import-type.js",
+			},
+			{
+				Code:     "/** @param {import(\"fs\").Stats} stats */\nfunction read(stats) {}",
+				FileName: "jsdoc-param-import-type.js",
+			},
+			{
+				Code:     "/** @import {Stats} from \"fs\" */\nconst stats = {};",
+				FileName: "jsdoc-import-tag.js",
+			},
+			{
+				Code:     "/** @typedef {import(\"fs\").Stats} Stats */\nconst stats = {};",
+				FileName: "jsdoc-typedef-import-type.js",
+			},
+			{
+				Code:     "/** @type {typeof import(\"fs\")} */\nconst fsModule = {};",
+				FileName: "jsdoc-typeof-import-type.js",
+			},
+			{
+				Code:     "/** @import * as fs from \"fs\" */\nconst stats = {};",
+				FileName: "jsdoc-namespace-import-tag.js",
+			},
+
+			// ---- Dimension 1: TypeScript import-equals is not an ESTree import source ----
+			{Code: `import fs = require("fs");`, FileName: "import-equals.ts"},
+
+			// ---- Dimension 4: optional chains stay excluded through parentheses ----
+			{Code: `const fs = ((require))?.("fs");`},
+			{Code: `const fs = (process?.getBuiltinModule)("fs");`},
+
 			// ---- Dimension 4: template-literal specifiers are not string literals ----
 			// tsgo splits ESTree's `Literal` into StringLiteral vs
 			// NoSubstitutionTemplateLiteral; the rule matches only the former.
@@ -50,7 +83,7 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 
 			// ---- Asymmetric builtin-modules list entries (node:-only, no bare form) ----
 			// These names exist only under the `node:` prefix in builtin-modules,
-			// so the dual membership check keeps the bare form unflagged.
+			// so the precomputed dual-membership set keeps the bare form unflagged.
 			{Code: `import "sea";`},
 			{Code: `import "sqlite";`},
 			{Code: `import "quic";`},
@@ -67,6 +100,36 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 			{Code: `export * from "./barrel";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 1: TypeScript export-all follows upstream ExportAllDeclaration ----
+			{
+				Code:     `export type * from "fs";`,
+				FileName: "export-all.ts",
+				Output:   []string{`export type * from "node:fs";`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 20}},
+			},
+			{
+				Code:     `export type * as FsTypes from "fs";`,
+				FileName: "export-all-as.ts",
+				Output:   []string{`export type * as FsTypes from "node:fs";`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 31}},
+			},
+
+			// ---- Regression: a real import beside JSDoc still reports exactly once ----
+			{
+				Code:     "/** @type {import(\"fs\").Stats} */\nimport fs from \"fs\";",
+				FileName: "jsdoc-and-runtime-import.js",
+				Output:   []string{"/** @type {import(\"fs\").Stats} */\nimport fs from \"node:fs\";"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 2, Column: 16}},
+			},
+
+			// ---- Branch lock-in: a named type export is still ExportNamedDeclaration upstream ----
+			{
+				Code:     `export type {Stats} from "fs";`,
+				FileName: "named-type-export.ts",
+				Output:   []string{`export type {Stats} from "node:fs";`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 26}},
+			},
+
 			// ---- Branch lock-in: parenthesized `process` receiver for getBuiltinModule ----
 			// ESTree flattens parentheses, so `(process).getBuiltinModule("fs")`
 			// presents a bare `process` identifier object to upstream. tsgo keeps
@@ -102,12 +165,34 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 				Output: []string{`const fs = ((require))("node:fs")`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 24}},
 			},
+			{
+				Code:   `const fs = ((require))((("fs")));`,
+				Output: []string{`const fs = ((require))((("node:fs")));`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 26}},
+			},
 
 			// ---- Branch lock-in: direct (unparenthesized) process.getBuiltinModule ----
 			{
 				Code:   `const fs = process.getBuiltinModule("buffer")`,
 				Output: []string{`const fs = process.getBuiltinModule("node:buffer")`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 37}},
+			},
+			{
+				Code:   `const fs = (process.getBuiltinModule)("fs");`,
+				Output: []string{`const fs = (process.getBuiltinModule)("node:fs");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 39}},
+			},
+
+			// ---- Dimension 3: dynamic import options and static import attributes preserve fixes ----
+			{
+				Code:   `const fs = import("fs", {with: {type: "json"}});`,
+				Output: []string{`const fs = import("node:fs", {with: {type: "json"}});`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 19}},
+			},
+			{
+				Code:   `import fs from "fs" with {type: "json"};`,
+				Output: []string{`import fs from "node:fs" with {type: "json"};`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 16}},
 			},
 
 			// ---- Dimension 4: single-quote fix preserves the original quote ----
@@ -117,7 +202,7 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 16}},
 			},
 
-			// ---- Locks in JSImportDeclaration (JS-flavored import) parity with ImportDeclaration ----
+			// ---- Locks in: normal JavaScript imports remain ImportDeclaration ----
 			{
 				Code:     `import fs from "fs";`,
 				FileName: "js-import.js",
