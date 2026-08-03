@@ -39,6 +39,10 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 			{Code: `function f(window) { return window.parseFloat(value); }`},
 			{Code: `function f(globalThis) { return (globalThis as any).NaN; }`},
 
+			// ---- RefStore: body declarations shadow body reads, including before their declaration ----
+			{Code: `function f() { parseInt("10", 2); var parseInt = custom; }`},
+			{Code: `{ parseFloat("1"); const parseFloat = custom; }`},
+
 			// ---- Dimension 4: value-space declarations shadow globals; type-only declarations do not ----
 			{Code: `namespace NaN {}; NaN;`},
 			{Code: `enum NaN {}; NaN;`},
@@ -63,6 +67,14 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 			// N/A: overload/abstract/declare body-absent forms do not contain value reads beyond declaration names.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- RefStore: parameter initializers run outside the function body's var environment ----
+			fixed(`function f(value = parseInt("10", 2)) { var parseInt = custom; return value; }`, `function f(value = Number.parseInt("10", 2)) { var parseInt = custom; return value; }`, "parseInt", "parseInt", 1, 20, 1, 28),
+			fixed(`function f(value = window.parseFloat("1")) { var window = custom; return value; }`, `function f(value = Number.parseFloat("1")) { var window = custom; return value; }`, "parseFloat", "parseFloat", 1, 20, 1, 37),
+
+			// ---- RefStore: type-only and augmented declarations do not shadow runtime globals ----
+			fixed("type parseInt = (value: string) => number;\nparseInt(\"10\", 2);", "type parseInt = (value: string) => number;\nNumber.parseInt(\"10\", 2);", "parseInt", "parseInt", 2, 1, 2, 9),
+			fixed("export {};\ndeclare global { const NaN: number; }\nNaN;", "export {};\ndeclare global { const NaN: number; }\nNumber.NaN;", "NaN", "NaN", 3, 1, 3, 4),
+
 			// ---- Dimension 4: parenthesized references are transparent ----
 			fixed(`(parseFloat)("10.5");`, `(Number.parseFloat)("10.5");`, "parseFloat", "parseFloat", 1, 2, 1, 12),
 			fixed(`((NaN));`, `((Number.NaN));`, "NaN", "NaN", 1, 3, 1, 6),

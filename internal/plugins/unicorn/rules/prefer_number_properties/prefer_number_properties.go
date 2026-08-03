@@ -3,8 +3,11 @@ package prefer_number_properties
 import (
 	_ "embed"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -29,22 +32,6 @@ type globalReference struct {
 	property    string
 }
 
-var safeGlobalProperties = map[string]bool{
-	"parseInt":   true,
-	"parseFloat": true,
-	"NaN":        true,
-	"Infinity":   true,
-	"isNaN":      false,
-	"isFinite":   false,
-}
-
-var globalObjectNames = map[string]struct{}{
-	"globalThis": {},
-	"global":     {},
-	"window":     {},
-	"self":       {},
-}
-
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-number-properties.md
 var PreferNumberPropertiesRule = rule.Rule{
 	Name:   "unicorn/prefer-number-properties",
@@ -53,45 +40,43 @@ var PreferNumberPropertiesRule = rule.Rule{
 		opts := parseOptions(options)
 
 		report := func(ref globalReference) {
-			if !enabled(ref.name, opts) {
-				return
-			}
 			if isLeftHandSide(ref.node) {
 				return
 			}
 
+			textRange := utils.TrimNodeTextRange(ctx.SourceFile, ref.node)
 			msg := buildErrorMessage(ref.property, ref.description)
-			fixes := buildFixes(ctx.SourceFile, ref)
-			if safeGlobalProperties[ref.name] {
-				ctx.ReportRangeWithFixes(utils.TrimNodeTextRange(ctx.SourceFile, ref.node), msg, fixes...)
+			if isSafeGlobalProperty(ref.name) {
+				ctx.ReportRangeWithDeferredFixes(textRange, msg, func() []rule.RuleFix {
+					return buildFixes(ctx.SourceFile, ref, textRange)
+				})
 				return
 			}
 
-			ctx.ReportRangeWithSuggestions(
-				utils.TrimNodeTextRange(ctx.SourceFile, ref.node),
-				msg,
-				rule.RuleSuggestion{
+			ctx.ReportRangeWithDeferredSuggestions(textRange, msg, func() []rule.RuleSuggestion {
+				return []rule.RuleSuggestion{{
 					Message:  buildSuggestionMessage(ref.property, ref.description),
-					FixesArr: fixes,
-				},
-			)
+					FixesArr: buildFixes(ctx.SourceFile, ref, textRange),
+				}}
+			})
 		}
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.AsIdentifier().Text
-				if !isTrackedGlobalName(name) || utils.IsNonReferenceIdentifier(node) || utils.IsShadowed(node, name) {
+				if !isTrackedGlobalName(name) || !enabled(name, opts) ||
+					utils.IsNonReferenceIdentifier(node) || isShadowed(&ctx, node, name) {
 					return
 				}
 				report(referenceFromNode(node, name))
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				if ref, ok := globalMemberReference(node); ok {
+				if ref, ok := globalMemberReference(&ctx, node, opts); ok {
 					report(ref)
 				}
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				if ref, ok := globalMemberReference(node); ok {
+				if ref, ok := globalMemberReference(&ctx, node, opts); ok {
 					report(ref)
 				}
 			},
@@ -128,8 +113,39 @@ func enabled(name string, opts preferNumberPropertiesOptions) bool {
 }
 
 func isTrackedGlobalName(name string) bool {
-	_, ok := safeGlobalProperties[name]
-	return ok
+	switch name {
+	case "parseInt", "parseFloat", "NaN", "Infinity", "isNaN", "isFinite":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSafeGlobalProperty(name string) bool {
+	switch name {
+	case "parseInt", "parseFloat", "NaN", "Infinity":
+		return true
+	default:
+		return false
+	}
+}
+
+func isGlobalObjectName(name string) bool {
+	switch name {
+	case "globalThis", "global", "window", "self":
+		return true
+	default:
+		return false
+	}
+}
+
+func isShadowed(ctx *rule.RuleContext, node *ast.Node, name string) bool {
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			return utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+		}
+	}
+	return utils.IsShadowed(node, name)
 }
 
 func referenceFromNode(node *ast.Node, name string) globalReference {
@@ -151,9 +167,9 @@ func referenceFromNode(node *ast.Node, name string) globalReference {
 	}
 }
 
-func globalMemberReference(node *ast.Node) (globalReference, bool) {
+func globalMemberReference(ctx *rule.RuleContext, node *ast.Node, opts preferNumberPropertiesOptions) (globalReference, bool) {
 	propertyName, ok := utils.AccessExpressionStaticName(node)
-	if !ok || !isTrackedGlobalName(propertyName) {
+	if !ok || !isTrackedGlobalName(propertyName) || !enabled(propertyName, opts) {
 		return globalReference{}, false
 	}
 
@@ -162,7 +178,7 @@ func globalMemberReference(node *ast.Node) (globalReference, bool) {
 		return globalReference{}, false
 	}
 	objectName := object.AsIdentifier().Text
-	if _, ok := globalObjectNames[objectName]; !ok || utils.IsShadowed(object, objectName) {
+	if !isGlobalObjectName(objectName) || isShadowed(ctx, object, objectName) {
 		return globalReference{}, false
 	}
 
@@ -219,9 +235,8 @@ func buildSuggestionMessage(property, description string) rule.RuleMessage {
 	}
 }
 
-func buildFixes(sf *ast.SourceFile, ref globalReference) []rule.RuleFix {
+func buildFixes(sf *ast.SourceFile, ref globalReference, textRange core.TextRange) []rule.RuleFix {
 	replacement := "Number." + ref.property
-	textRange := utils.TrimNodeTextRange(sf, ref.node)
 
 	if ast.IsIdentifier(ref.node) {
 		if shorthand := ref.node.Parent; shorthand != nil && shorthand.Kind == ast.KindShorthandPropertyAssignment {
@@ -231,6 +246,28 @@ func buildFixes(sf *ast.SourceFile, ref globalReference) []rule.RuleFix {
 		}
 	}
 
-	replacement = utils.SafeReplacementText(sf, ref.node, replacement)
+	replacement = safeNumberReplacementText(sf, textRange, replacement)
 	return []rule.RuleFix{rule.RuleFixReplaceRange(textRange, replacement)}
+}
+
+// safeNumberReplacementText is the rule-specific fast path for
+// utils.SafeReplacementText. Every replacement starts and ends with an
+// identifier character, so only an immediately adjacent identifier character
+// can merge with it. Looking at the two boundary runes avoids scanning all
+// preceding tokens again for every reported reference.
+func safeNumberReplacementText(sf *ast.SourceFile, textRange core.TextRange, replacement string) string {
+	text := sf.Text()
+	if textRange.Pos() > 0 {
+		before, _ := utf8.DecodeLastRuneInString(text[:textRange.Pos()])
+		if scanner.IsIdentifierPart(before) {
+			replacement = " " + replacement
+		}
+	}
+	if textRange.End() < len(text) {
+		after, _ := utf8.DecodeRuneInString(text[textRange.End():])
+		if scanner.IsIdentifierPart(after) {
+			replacement += " "
+		}
+	}
+	return replacement
 }
