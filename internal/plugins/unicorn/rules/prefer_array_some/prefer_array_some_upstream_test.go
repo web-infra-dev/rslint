@@ -1,7 +1,8 @@
 // TestPreferArraySomeUpstream migrates the full valid/invalid suite from
-// upstream test/prefer-array-some.js 1:1. Position assertions cover
-// line/column for every invalid case. rslint-specific lock-in cases live in
-// the prefer_array_some_extras_test.go file.
+// upstream test/prefer-array-some.js 1:1, at eslint-plugin-unicorn 9c2b0bb1
+// ("Harden rules", #3585). Position assertions cover line/column for every
+// invalid case. rslint-specific lock-in cases live in the
+// prefer_array_some_extras_test.go file.
 //
 // Upstream's Vue test cases (test.vue) are omitted: rslint does not support
 // Vue single-file components.

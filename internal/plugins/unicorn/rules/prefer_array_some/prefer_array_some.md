@@ -10,6 +10,10 @@ Prefer using [`Array#some(…)`](https://developer.mozilla.org/en-US/docs/Web/Ja
 
 `.some(…)` communicates the intent — "is there a match?" — more directly and can stop iterating at the first match.
 
+Typed arrays carry the same methods and are checked too. Keyed collections
+(`Map`, `Set`, `WeakMap`, `WeakSet`) are not: their `.find(…)` / `.filter(…)`
+are unrelated APIs where the rewrite would not hold.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript
