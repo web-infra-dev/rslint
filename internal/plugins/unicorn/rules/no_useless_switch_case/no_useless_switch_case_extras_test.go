@@ -1,10 +1,15 @@
 package no_useless_switch_case_test
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -447,4 +452,78 @@ func TestNoUselessSwitchCaseExtras(t *testing.T) {
 			),
 		},
 	)
+}
+
+func TestNoUselessSwitchCaseEditDemand(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, "switch (value) { case value /* comment */: default: useDefault(); }", core.ScriptKindTS)
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+
+		comments := rule.NewCommentStore(sourceFile)
+		diagnostics := make([]rule.RuleDiagnostic, 0, 1)
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(
+			no_useless_switch_case.NoUselessSwitchCaseRule.Name,
+			rule.SeverityError,
+			rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		)
+
+		listeners := no_useless_switch_case.NoUselessSwitchCaseRule.Run(ctx, nil)
+		var visit ast.Visitor
+		visit = func(node *ast.Node) bool {
+			if listener := listeners[node.Kind]; listener != nil {
+				listener(node)
+			}
+			return node.ForEachChild(visit)
+		}
+		sourceFile.AsNode().ForEachChild(visit)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.Suggestions != nil || autofixOnly.Suggestions != nil {
+		t.Fatal("a non-suggestion demand materialized suggestions")
+	}
+	if suggestionOnly.Suggestions == nil || !reflect.DeepEqual(suggestionOnly.Suggestions, allEdits.Suggestions) {
+		t.Fatal("suggestion and all-edits demands produced different suggestions")
+	}
+	if diagnosticsOnly.FixesPtr != nil || autofixOnly.FixesPtr != nil ||
+		suggestionOnly.FixesPtr != nil || allEdits.FixesPtr != nil {
+		t.Fatal("suggestion-only rule materialized autofixes")
+	}
 }
