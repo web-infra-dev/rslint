@@ -3,26 +3,38 @@ package no_misused_new
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-/**
- * check whether the name of the return type of the node is the same as the name of the parent node.
- */
-func check(node *ast.Node) bool {
-	parentName := node.Parent.Name()
-	if parentName == nil {
+// Only identifiers and static computed string names can equal the valid
+// identifiers this rule checks. Keep the hot path on the AST and avoid the
+// generic source-text fallback, which creates a scanner for dynamic names.
+func isMemberNamed(name *ast.Node, expected string) bool {
+	if name == nil {
 		return false
 	}
 
-	nodeType := node.Type()
-	if nodeType != nil && ast.IsTypeReferenceNode(nodeType) {
-		typeName := nodeType.AsTypeReferenceNode().TypeName
-		if ast.IsIdentifier(typeName) {
-			return typeName.Text() == parentName.Text()
-		}
+	switch name.Kind {
+	case ast.KindIdentifier:
+		return name.AsIdentifier().Text == expected
+	case ast.KindComputedPropertyName:
+		expression := name.AsComputedPropertyName().Expression
+		return ast.IsStringLiteralLike(expression) && expression.Text() == expected
 	}
 	return false
+}
+
+func returnsParentType(typeNode *ast.Node, parent *ast.Node) bool {
+	if typeNode == nil || !ast.IsTypeReferenceNode(typeNode) {
+		return false
+	}
+
+	typeName := typeNode.AsTypeReferenceNode().TypeName
+	if !ast.IsIdentifier(typeName) {
+		return false
+	}
+
+	parentName := parent.Name()
+	return parentName != nil && typeName.Text() == parentName.Text()
 }
 
 var NoMisusedNewRule = rule.CreateRule(rule.Rule{
@@ -30,22 +42,22 @@ var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindMethodDeclaration: func(node *ast.Node) {
+				method := node.AsMethodDeclaration()
+				// A method with an implementation is valid regardless of its name.
+				if method.Body != nil {
+					return
+				}
+
 				parentKind := node.Parent.Kind
 				if parentKind != ast.KindClassDeclaration && parentKind != ast.KindClassExpression {
 					return
 				}
 
-				nodeNameText, _ := utils.GetNameFromMember(ctx.SourceFile, node.Name())
-				if nodeNameText != "new" {
-					return
-				}
-				// If the function body exists, it's valid for this rule.
-				body := node.Body()
-				if body != nil {
+				if !isMemberNamed(method.Name(), "new") {
 					return
 				}
 
-				if check(node) {
+				if returnsParentType(method.Type, node.Parent) {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "errorMessageClass",
 						Description: "Class cannot have method named `new`.",
@@ -56,7 +68,8 @@ var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 				if node.Parent.Kind != ast.KindInterfaceDeclaration {
 					return
 				}
-				if check(node) {
+
+				if returnsParentType(node.AsConstructSignatureDeclaration().Type, node.Parent) {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "errorMessageInterface",
 						Description: "interfaces cannot be constructed, only classes.",
@@ -64,8 +77,7 @@ var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 				}
 			},
 			ast.KindMethodSignature: func(node *ast.Node) {
-				nodeNameText, _ := utils.GetNameFromMember(ctx.SourceFile, node.Name())
-				if nodeNameText == "constructor" {
+				if isMemberNamed(node.AsMethodSignatureDeclaration().Name(), "constructor") {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "errorMessageInterface",
 						Description: "interfaces cannot be constructed, only classes.",
