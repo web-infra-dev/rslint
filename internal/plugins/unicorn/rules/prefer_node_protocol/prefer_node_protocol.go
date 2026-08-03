@@ -2,7 +2,7 @@
 // `prefer-node-protocol` rule.
 //
 // It flags a Node.js builtin-module specifier written without the `node:`
-// protocol prefix — in imports, named re-exports, dynamic `import()`,
+// protocol prefix — in imports, re-exports, dynamic `import()`,
 // `require()`, `process.getBuiltinModule()`, and TypeScript `import(...)`
 // type nodes — and autofixes it by inserting `node:` after the opening quote.
 package prefer_node_protocol
@@ -28,7 +28,7 @@ func message(moduleName string) rule.RuleMessage {
 	}
 }
 
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-node-protocol.md
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/docs/rules/prefer-node-protocol.md
 var PreferNodeProtocolRule = rule.Rule{
 	Name:   "unicorn/prefer-node-protocol",
 	Schema: rule.EmptyArraySchema,
@@ -71,16 +71,6 @@ var PreferNodeProtocolRule = rule.Rule{
 			// Literal listener never observes them.
 			if node.Flags&ast.NodeFlagsReparsed != 0 {
 				return
-			}
-
-			// tsgo represents both ESTree ExportNamedDeclaration and
-			// ExportAllDeclaration as ExportDeclaration. Upstream only listens to
-			// module specifiers owned by ExportNamedDeclaration.
-			if ast.IsExportDeclaration(node) {
-				exportClause := node.AsExportDeclaration().ExportClause
-				if exportClause == nil || !ast.IsNamedExports(exportClause) {
-					return
-				}
 			}
 
 			check(ast.GetExternalModuleName(node))

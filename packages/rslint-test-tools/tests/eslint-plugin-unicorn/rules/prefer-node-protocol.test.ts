@@ -76,6 +76,8 @@ ruleTester.run('prefer-node-protocol', null as never, {
     // import / export / dynamic import
     jsInvalid('import fs from "fs";'),
     jsInvalid('export {promises} from "fs";'),
+    jsInvalid('export * from "fs";'),
+    jsInvalid('export * as ns from "fs";'),
     jsInvalid("async function foo() {\n\tconst fs = await import('fs');\n}"),
     jsInvalid('import fs from "fs/promises";'),
     jsInvalid('export {default} from "fs/promises";'),

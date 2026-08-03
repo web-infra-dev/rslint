@@ -53,10 +53,7 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 				FileName: "jsdoc-namespace-import-tag.js",
 			},
 
-			// ---- Branch lock-in: upstream listens to ExportNamedDeclaration only ----
-			{Code: `export * from "fs";`},
-			{Code: `export * as ns from "fs";`},
-			{Code: `export type * from "fs";`, FileName: "export-all.ts"},
+			// ---- Dimension 1: TypeScript import-equals is not an ESTree import source ----
 			{Code: `import fs = require("fs");`, FileName: "import-equals.ts"},
 
 			// ---- Dimension 4: optional chains stay excluded through parentheses ----
@@ -103,6 +100,20 @@ func TestPreferNodeProtocolExtras(t *testing.T) {
 			{Code: `export * from "./barrel";`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 1: TypeScript export-all follows upstream ExportAllDeclaration ----
+			{
+				Code:     `export type * from "fs";`,
+				FileName: "export-all.ts",
+				Output:   []string{`export type * from "node:fs";`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 20}},
+			},
+			{
+				Code:     `export type * as FsTypes from "fs";`,
+				FileName: "export-all-as.ts",
+				Output:   []string{`export type * as FsTypes from "node:fs";`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-node-protocol", Line: 1, Column: 31}},
+			},
+
 			// ---- Regression: a real import beside JSDoc still reports exactly once ----
 			{
 				Code:     "/** @type {import(\"fs\").Stats} */\nimport fs from \"fs\";",
