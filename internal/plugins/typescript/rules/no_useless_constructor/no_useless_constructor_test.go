@@ -715,6 +715,16 @@ class A extends B {
 				}},
 			},
 		},
+		// Identifier escapes are normalized by ESTree and must still match a
+		// directly forwarded parameter.
+		{
+			Code: `class A extends B { constructor(\u0061) { super(a); } }`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 1, Column: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "class A extends B {  }"},
+				}},
+			},
+		},
 		// Multiple params forwarding
 		{
 			Code: `
