@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 
+	"github.com/web-infra-dev/rslint/internal/cfg"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -111,7 +112,7 @@ func collectAssignment(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssig
 func collectAssignmentNode(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
 	add := func(target *ast.Node) {
 		forEachTargetIdentifier(target, func(identifier *ast.Node) {
-			root := rootOf(identifier)
+			root := cfg.RootOf(identifier)
 			if root == nil {
 				return
 			}
@@ -271,7 +272,7 @@ func analyzeRoot(
 					tracked = false
 				} else {
 					for _, read := range reads {
-						if rootOf(read) != root {
+						if cfg.RootOf(read) != root {
 							tracked = false
 							break
 						}
@@ -304,10 +305,9 @@ func analyzeRoot(
 		return nil
 	}
 
-	b := &builder{assignByIdent: assignByIdent, readNodes: readNodes}
-	b.buildRoot(root)
+	graph := cfg.Build(root, hooks(readNodes, assignByIdent))
 
-	dead := deadWrites(b.blocks, assignments)
+	dead := deadWrites(graph, assignments)
 	var reports []*ast.Node
 	for _, a := range assignments {
 		if !a.silent && dead[a] {
@@ -315,54 +315,6 @@ func analyzeRoot(
 		}
 	}
 	return reports
-}
-
-// buildRoot lays out the control-flow graph of one code path root.
-func (b *builder) buildRoot(root *ast.Node) {
-	b.cur = b.newBlock()
-	b.cur.hasIncoming = true
-
-	switch root.Kind {
-	case ast.KindSourceFile:
-		b.statements(root.AsSourceFile().Statements)
-
-	case ast.KindClassStaticBlockDeclaration:
-		b.statement(root.AsClassStaticBlockDeclaration().Body)
-
-	case ast.KindPropertyDeclaration:
-		b.expr(root.AsPropertyDeclaration().Initializer)
-
-	default:
-		for _, parameter := range root.Parameters() {
-			b.parameter(parameter)
-		}
-		// A `typeof x` inside the signature's type annotations references the
-		// variable even though nothing in them runs.
-		b.expr(root.Type())
-		body := root.Body()
-		if body == nil {
-			return
-		}
-		if body.Kind == ast.KindBlock {
-			b.statement(body)
-		} else {
-			b.expr(body)
-		}
-	}
-}
-
-// parameter models a parameter binding: its default value is skipped when an
-// argument was passed.
-func (b *builder) parameter(node *ast.Node) {
-	if b.cur == nil {
-		return
-	}
-	parameter := node.AsParameterDeclaration()
-	if parameter == nil {
-		return
-	}
-	b.expr(parameter.Type)
-	b.bindWithDefault(parameter.Name(), parameter.Initializer)
 }
 
 // isTrackable reports whether assignments to sym can be proven unused: the
@@ -383,7 +335,7 @@ func isTrackable(
 		if name == nil {
 			continue
 		}
-		if rootOf(name) == root {
+		if cfg.RootOf(name) == root {
 			declaredHere = true
 			break
 		}
@@ -522,58 +474,4 @@ func inTryBlockOfRoot(node *ast.Node, root *ast.Node) bool {
 		previous = current
 	}
 	return false
-}
-
-// isCodePathRoot reports whether node owns a control-flow graph of its own.
-func isCodePathRoot(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindSourceFile,
-		ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindConstructor,
-		ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindClassStaticBlockDeclaration:
-		return true
-	case ast.KindPropertyDeclaration:
-		return node.AsPropertyDeclaration().Initializer != nil
-	}
-	return false
-}
-
-// rootOf returns the code path root node executes in.
-func rootOf(node *ast.Node) *ast.Node {
-	previous := node
-	var decorator *ast.Node
-	for current := node.Parent; current != nil; current = current.Parent {
-		if current.Kind == ast.KindDecorator {
-			decorator = current
-		}
-		if current.Kind == ast.KindSourceFile {
-			return current
-		}
-		if isCodePathRoot(current) && runsInsideRoot(current, previous, decorator) {
-			return current
-		}
-		previous = current
-	}
-	return nil
-}
-
-// runsInsideRoot reports whether a direct child of a code path root runs in
-// that root rather than in the surrounding one. A member's name runs where the
-// member is declared, and so do the decorators on the member and on each of its
-// parameters.
-func runsInsideRoot(root *ast.Node, child *ast.Node, decorator *ast.Node) bool {
-	switch root.Kind {
-	case ast.KindPropertyDeclaration:
-		return root.AsPropertyDeclaration().Initializer == child
-	case ast.KindClassStaticBlockDeclaration:
-		return root.AsClassStaticBlockDeclaration().Body == child
-	}
-	if root.Name() == child {
-		return false
-	}
-	if decorator != nil && (decorator.Parent == root || decorator.Parent == child) {
-		return false
-	}
-	return true
 }
