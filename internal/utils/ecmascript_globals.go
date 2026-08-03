@@ -25,6 +25,7 @@ var ecmaScriptGlobals = map[string]bool{
 	"eval":                 true,
 	"EvalError":            true,
 	"FinalizationRegistry": true,
+	"Float16Array":         true,
 	"Float32Array":         true,
 	"Float64Array":         true,
 	"Function":             true,

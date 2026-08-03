@@ -501,6 +501,13 @@ func TestNoRedeclareRule(t *testing.T) {
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
 				},
 			},
+			// eval is in the shared ECMAScript built-in table.
+			{
+				Code: "var eval = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
+				},
+			},
 			// `Promise` lives in lib.es2015.promise — covered by TS lib detection.
 			{
 				Code: "var Promise = 0;",

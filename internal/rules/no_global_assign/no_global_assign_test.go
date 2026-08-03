@@ -260,6 +260,14 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				},
 			},
 
+			// eval is a read-only ECMAScript built-in
+			{
+				Code: `eval = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
 			// Postfix increment on builtin
 			{
 				Code: `String++;`,

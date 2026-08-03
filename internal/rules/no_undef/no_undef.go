@@ -49,22 +49,32 @@ var NoUndefRule = rule.Rule{
 					return
 				}
 
-				if ctx.Refs.Resolve(node) != nil {
-					return
-				}
-
 				name := node.Text()
 
 				// languageOptions.globals / /* global */ comments (merged into
-				// ctx.Globals) take priority over built-ins: an explicit "off"
-				// entry (present but false) still reports even for a name that
-				// would otherwise be a recognized ECMAScript global.
+				// ctx.Globals) take priority over built-ins and over the
+				// checker's lib knowledge; both map lookups come before the
+				// resolver so references to declared or built-in globals never
+				// pay for a failing scope walk plus a checker round trip.
 				if configured, ok := ctx.Globals[name]; ok {
 					if configured {
 						return
 					}
-				} else if utils.IsECMAScriptGlobal(name) {
-					return
+					// An explicit "off" entry un-declares the global: only a
+					// binding this file itself declares can still satisfy the
+					// reference. A symbol the checker fallback found in lib or
+					// ambient declarations elsewhere is the very global that
+					// was switched off, so it still reports.
+					if sym := ctx.Refs.Resolve(node); utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
+						return
+					}
+				} else {
+					if utils.IsECMAScriptGlobal(name) {
+						return
+					}
+					if ctx.Refs.Resolve(node) != nil {
+						return
+					}
 				}
 
 				ctx.ReportNode(node, rule.RuleMessage{
@@ -87,10 +97,15 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	parent := node.Parent
 
 	// Skip declaration names (var x, function x, class x, import x, etc.)
-	// Exception: ShorthandPropertyAssignment names ({x}) are declaration names
-	// but also value references, so they must NOT be skipped.
+	// Exceptions: ShorthandPropertyAssignment names ({x}) and the name of a
+	// non-aliased local export (export { x }) are declaration names but also
+	// value references, so they must NOT be skipped. Re-exports
+	// (export { x } from 'mod') reference the other module's binding instead,
+	// and the alias label of export { x as y } is only a label.
 	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment {
-		return true
+		if parent.Kind != ast.KindExportSpecifier || parent.PropertyName() != nil || utils.IsReExportSpecifier(parent) {
+			return true
+		}
 	}
 
 	// Skip property names in member access (obj.prop -> skip "prop")

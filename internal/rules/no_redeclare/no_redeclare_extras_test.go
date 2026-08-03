@@ -333,6 +333,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 
 			// Locks in upstream findVariablesInScope() detail arm: builtin declaration is first, so user syntax reports builtin-specific message.
 			invalidBuiltin("var Array = 0;", "Array", 1, 5),
+			// eval is in the shared ECMAScript built-in table.
+			invalidBuiltin("var eval = 0;", "eval", 1, 5),
 			// An omitted property in an explicitly supplied empty option object
 			// retains upstream's builtinGlobals: true default.
 			{
