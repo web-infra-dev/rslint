@@ -175,8 +175,8 @@ catalogs:
       specifier: ^3.3.3
       version: 3.3.3
     globals:
-      specifier: ^17.7.0
-      version: 17.7.0
+      specifier: ^17.9.0
+      version: 17.9.0
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -381,7 +381,7 @@ importers:
         version: 1.7.0
       globals:
         specifier: 'catalog:'
-        version: 17.7.0
+        version: 17.9.0
       tinyglobby:
         specifier: 'catalog:'
         version: 0.2.17
@@ -4151,6 +4151,10 @@ packages:
 
   globals@17.7.0:
     resolution: {integrity: sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==}
+    engines: {node: '>=18'}
+
+  globals@17.9.0:
+    resolution: {integrity: sha512-m/MvAW61QVU5VDNF1Vj8axt016h8w7L5TU1e9zlab7XIttAT2YAlCwl75K1fOqvMM9apmD7lbCIRhpfkhmxhCg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -9851,6 +9855,8 @@ snapshots:
       once: 1.4.0
 
   globals@17.7.0: {}
+
+  globals@17.9.0: {}
 
   globalthis@1.0.4:
     dependencies:
