@@ -135,10 +135,7 @@ func (p *rxParser) parseAlternatives(parent *rxNode, expectClose bool) bool {
 	for p.pos < len(p.pattern) {
 		c := p.pattern[p.pos]
 		if c == ')' {
-			if !expectClose {
-				return false
-			}
-			return true
+			return expectClose
 		}
 		if c == '|' {
 			p.pos++
@@ -150,11 +147,7 @@ func (p *rxParser) parseAlternatives(parent *rxNode, expectClose bool) bool {
 		}
 	}
 
-	if expectClose {
-		return false
-	}
-
-	return true
+	return !expectClose
 }
 
 func (p *rxParser) parseTerm(parent *rxNode) bool {
