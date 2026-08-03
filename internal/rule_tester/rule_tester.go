@@ -151,7 +151,7 @@ func ResolveTestCaseOptions(t *testing.T, r *rule.Rule, rawOptions any) []any {
 	return options
 }
 
-func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
+func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	t.Parallel()
 
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
@@ -163,15 +163,15 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
-		fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-		host := utils.CreateCompilerHost(rootDir, fs)
+		fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): code})
+		host := utils.CreateCompilerHost(root.Dir, fs)
 
 		tsconfigPath := tsconfigPath
 		if tsconfigPathOverride != "" {
 			tsconfigPath = tsconfigPathOverride
 		}
 
-		program, err := utils.CreateProgram(true, fs, rootDir, tsconfigPath, host)
+		program, err := utils.CreateProgram(true, fs, root.Dir, tsconfigPath, host)
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
 		sourceFile := program.GetSourceFile(fileName)
@@ -478,24 +478,24 @@ func ConvertESLintTestSuite(suite *ESLintTestSuite) *TestSuite {
 }
 
 // RunRuleTesterFromJSON loads and runs tests from a JSON file
-func RunRuleTesterFromJSON(rootDir string, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
+func RunRuleTesterFromJSON(root Root, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
 	suite, err := LoadTestSuiteFromJSON(testFilePath)
 	if err != nil {
 		return err
 	}
 
-	RunRuleTester(rootDir, tsconfigPath, t, r, suite.Valid, suite.Invalid)
+	RunRuleTester(root, tsconfigPath, t, r, suite.Valid, suite.Invalid)
 	return nil
 }
 
 // RunRuleTesterFromESLintJSON loads and runs ESLint-format tests from a JSON file
-func RunRuleTesterFromESLintJSON(rootDir string, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
+func RunRuleTesterFromESLintJSON(root Root, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
 	eslintSuite, err := LoadESLintTestSuiteFromJSON(testFilePath)
 	if err != nil {
 		return err
 	}
 
 	suite := ConvertESLintTestSuite(eslintSuite)
-	RunRuleTester(rootDir, tsconfigPath, t, r, suite.Valid, suite.Invalid)
+	RunRuleTester(root, tsconfigPath, t, r, suite.Valid, suite.Invalid)
 	return nil
 }

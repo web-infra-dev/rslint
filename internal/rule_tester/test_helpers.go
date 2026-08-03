@@ -126,20 +126,20 @@ func (f *CommonFixtures) Var(name string, type_ string, value string) string {
 
 // ProgramHelper provides utilities for creating TypeScript programs for testing
 type ProgramHelper struct {
-	RootDir string
+	Root Root
 }
 
 // NewProgramHelper creates a new ProgramHelper
-func NewProgramHelper(rootDir string) *ProgramHelper {
-	return &ProgramHelper{RootDir: rootDir}
+func NewProgramHelper(root Root) *ProgramHelper {
+	return &ProgramHelper{Root: root}
 }
 
 // CreateTestProgram creates a TypeScript program from source code
 func (h *ProgramHelper) CreateTestProgram(code string, fileName string, tsconfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(h.RootDir, fileName), code)
-	host := utils.CreateCompilerHost(h.RootDir, fs)
+	fs := utils.NewOverlayVFS(h.Root.FS, map[string]string{tspath.ResolvePath(h.Root.Dir, fileName): code})
+	host := utils.CreateCompilerHost(h.Root.Dir, fs)
 
-	program, err := utils.CreateProgram(true, fs, h.RootDir, tsconfigPath, host)
+	program, err := utils.CreateProgram(true, fs, h.Root.Dir, tsconfigPath, host)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -492,8 +492,8 @@ func TestHasDefaultExportFollowsHostCaseSensitivity(t *testing.T) {
 	t.Parallel()
 
 	rootDir := fixtures.GetRootDir()
-	consumerPath := tspath.ResolvePath(rootDir, "case-consumer.ts")
-	actualTargetPath := tspath.ResolvePath(rootDir, "case-target.ts")
+	consumerPath := tspath.ResolvePath(rootDir.Dir, "case-consumer.ts")
+	actualTargetPath := tspath.ResolvePath(rootDir.Dir, "case-target.ts")
 	virtualFiles := map[string]string{
 		consumerPath:     `import value from "./Case-Target";`,
 		actualTargetPath: `export const named = 1;`,
@@ -600,9 +600,9 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 	rootDir := fixtures.GetRootDir()
 	fileName := "file.ts"
 	code := `import value from "` + source + `";`
-	fs := rslint_utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-	host := rslint_utils.CreateCompilerHost(rootDir, fs)
-	program, err := rslint_utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	fs := rslint_utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
+	host := rslint_utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := rslint_utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}
@@ -627,7 +627,7 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.RuleContext, *ast.Node) {
 	t.Helper()
 
-	host := rslint_utils.CreateCompilerHost(fixtures.GetRootDir(), fs)
+	host := rslint_utils.CreateCompilerHost(fixtures.GetRootDir().Dir, fs)
 	program, err := rslint_utils.CreateProgramFromOptions(true, &core.CompilerOptions{
 		ESModuleInterop: core.TSFalse,
 		Module:          core.ModuleKindCommonJS,
@@ -658,10 +658,10 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 
 	rootDir := fixtures.GetRootDir()
 	fileName := "file.ts"
-	filePath := tspath.ResolvePath(rootDir, fileName)
+	filePath := tspath.ResolvePath(rootDir.Dir, fileName)
 	code := `import value from "` + source + `";`
-	fs := rslint_utils.NewOverlayVFSForFile(filePath, code)
-	host := rslint_utils.CreateCompilerHost(rootDir, fs)
+	fs := rslint_utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	host := rslint_utils.CreateCompilerHost(rootDir.Dir, fs)
 	program, err := rslint_utils.CreateProgramFromOptions(true, options, []string{filePath}, host)
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)

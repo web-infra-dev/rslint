@@ -138,6 +138,7 @@ doublestar
 DPUB
 dropeffect
 eacute
+embedfs
 endline
 englishish
 enochian
@@ -238,6 +239,7 @@ imul
 inlines
 instane
 interrobang
+iovfs
 IPC
 isatty
 isnan
@@ -535,6 +537,7 @@ Testabab
 testcomponent
 testdata
 testrule
+testutil
 textnodes
 Thaa
 thenables
@@ -548,6 +551,7 @@ tokenlist
 trackingvfs
 trae
 treegrid
+trimpath
 trippable
 tsconfiga
 tses
