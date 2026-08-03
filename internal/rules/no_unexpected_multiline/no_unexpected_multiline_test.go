@@ -272,8 +272,16 @@ function () {}
 			{Code: "tag`hi 🎉`"},
 			// Unicode identifier immediately after the second `/` — must NOT
 			// match `^[gimsuy]+$` (ASCII regex), so no division report. This
-			// stress-tests the UTF-8 decoding in scanIdentifier.
+			// stress-tests the UTF-8 identifier-boundary scan.
 			{Code: "foo\n/bar/日本"},
+			// Escaped identifier value decodes to `ga`, which is not made only
+			// of regex flags even though its raw source starts with `g`.
+			{Code: "foo\n/bar/g\\u0061"},
+			// The escape decoder must also reject non-ASCII identifier parts.
+			{Code: "foo\n/bar/g\\u03c0"},
+			// Non-breaking space is ECMAScript whitespace, but not a line
+			// terminator; it must not turn this call into a multiline hazard.
+			{Code: "foo\u00a0(bar)"},
 			// Unicode identifier as numerator with division across lines —
 			// the rule's checks are byte-position based but should treat the
 			// multi-byte name as a single identifier source-text-wise.
@@ -588,6 +596,69 @@ function () {}
 				Code: "x\n/y/i",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "division",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			// Identifier escapes are matched by their decoded token value, as
+			// ESLint does, rather than by a prefix of their raw source text.
+			{
+				Code: "foo\n/bar/g\\u0069",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "division",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			{
+				Code: "foo\n/bar/\\u0067i",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "division",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			// `is` is a contextual TypeScript keyword but an Identifier token
+			// for ESLint's expression grammar; its escaped spelling must match.
+			{
+				Code: "foo\n/bar/\\u0069s",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "division",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			{
+				Code: "foo\n/bar/g\\u{69}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "division",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+
+			// Every ECMAScript line terminator, including the CRLF sequence,
+			// must be recognized in the short source gap between tokens.
+			{
+				Code: "foo\r\n(bar)",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "function",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			{
+				Code: "foo\r(bar)",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "function",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			{
+				Code: "foo\u2028(bar)",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "function",
+					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
+				}},
+			},
+			{
+				Code: "foo\u2029[bar]",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "property",
 					Line:      2, Column: 1, EndLine: 2, EndColumn: 2,
 				}},
 			},
