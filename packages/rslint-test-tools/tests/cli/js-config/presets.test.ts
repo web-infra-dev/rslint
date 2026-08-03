@@ -75,6 +75,7 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('rstest');
     expect(rec.rules).toEqual({
+      'rstest/no-identical-title': 'error',
       'rstest/no-mocks-import': 'error',
     });
   });
