@@ -36,6 +36,9 @@ func TestNoDisabledTestsRule(t *testing.T) {
 			{Code: `import { test, describe } from "vitest"; test.skip("case", () => {}); describe.skip("suite", () => {});`},
 			{Code: `const test = createRunner(); test.skip("case", () => {});`},
 			{Code: `let skipped = test.skip; skipped("case", () => {});`},
+			// a variable declaration without an initializer must not be treated as a require
+			{Code: `declare const skipped: any; skipped("case", () => {});`},
+			{Code: `declare const pending: any; pending();`},
 			{Code: `import { customTest } from "./test-utils"; customTest.skip("case", () => {});`},
 			{Code: `test.for([1]).skip("case", () => {}); describe.each([1]).skip("suite", () => {});`},
 		},
