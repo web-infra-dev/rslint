@@ -128,6 +128,14 @@ ruleTester.run('prefer-set-has', null as never, {
     {
       code: 'const foo = [1, 2, 3];\n(foo.length as number) = 1;\n\nfunction unicorn(value) {\n\treturn foo.includes(value);\n}',
     },
+    // A `for` initializer runs once, so a single `includes` in the loop body
+    // is still a single call — the walk stops at the `ForStatement` root.
+    js('for (const foo = [1, 2]; ;) {\n\tfoo.includes(1);\n}'),
+    // Folded elements that collide are duplicates, so the array is not
+    // known-unique and the extra `forEach` reference blocks the report.
+    js(
+      "const foo = ['ab', 'a' + 'b'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('ab'); }",
+    ),
   ],
   invalid: [
     {
@@ -268,6 +276,50 @@ ruleTester.run('prefer-set-has', null as never, {
     {
       code: "const a: [string, string] = ['foo', 'bar']\n\nfor (let i = 0; i < 3; i++) {\n\tif (a.includes(someString)) {\n\t\tconsole.log(123)\n\t}\n}",
       errors: [error('a')],
+    },
+    // `for` initializer declaration — upstream's structural gate is the
+    // declaration node, which also sits at `ForStatement.init`.
+    {
+      ...js(
+        'for (const foo = [1, 2]; ;) {\n\tfoo.includes(1);\n\tfoo.includes(2);\n}',
+      ),
+      errors: [error('foo')],
+    },
+    // `Array.from({length})` shorthand property drives the size check.
+    {
+      ...js(
+        'const length = 3;\nconst foo = Array.from({length});\nfoo.includes(1);\nfoo.includes(2);',
+      ),
+      options: [{ minimumItems: 2 }],
+      errors: [error('foo')],
+    },
+    // A comment inside `Array<…>` stays inside the type-argument span, so the
+    // annotation is still rewritable and this autofixes rather than degrading
+    // to a suggestion.
+    {
+      code: "const foo: Array</* c */ string> = ['a', 'b'];\nfoo.includes('a');\nfoo.includes('b');",
+      errors: [error('foo')],
+    },
+    // Statically folded elements: string concatenation, template literals and
+    // well-known numeric globals are all comparable, so the extra `forEach`
+    // reference does not block the report.
+    {
+      ...js(
+        "const foo = ['a' + 'b', 'c'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('c'); }",
+      ),
+      errors: [error('foo')],
+    },
+    {
+      ...js(
+        "const foo = [`a${1}`, 'b'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('b'); }",
+      ),
+      errors: [error('foo')],
+    },
+    {
+      ...js(
+        'const foo = [Number.NaN, 1];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes(1); }',
+      ),
+      errors: [error('foo')],
     },
   ],
 });

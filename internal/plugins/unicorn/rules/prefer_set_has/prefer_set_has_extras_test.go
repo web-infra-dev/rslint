@@ -55,6 +55,33 @@ func TestPreferSetHasExtras(t *testing.T) {
 			// overshoot the ForStatement here and over-report.
 			{Code: "for (const foo = [1, 2]; ;) {\n\tfoo.includes(1);\n}"},
 
+			// ---- Static folding: folded elements that collide are duplicates ----
+			// Both elements fold to the same string, so the array is not
+			// known-unique and the extra forEach reference blocks the report.
+			// These are what the ToString parity in toStringValue protects: a
+			// wrong fold here would report and emit a `new Set(...)` that
+			// silently drops an element.
+			{Code: "const foo = ['ab', 'a' + 'b'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('ab'); }"},
+			{Code: "const foo = ['a1', `a${1}`];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('a1'); }"},
+
+			// ---- Static folding: top of the plain-decimal band ----
+			// `1e20 + ''` is "100000000000000000000" in JS, which is exactly
+			// what toStringValue produces, so this collides with the literal
+			// and the array is not known-unique.
+			{Code: "const foo = ['100000000000000000000', 1e20 + ''];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('x'); }"},
+			// Past the band JS switches to exponential ("1e+21"), which
+			// toStringValue will not reproduce, so the fold bails and the
+			// report is skipped. Conservative divergence from upstream, which
+			// folds and reports.
+			{Code: "const foo = [1e21 + '', 'x'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('x'); }"},
+
+			// ---- Static folding: shadowed well-known global ----
+			// `Number` is a local binding, so `Number.NaN` is not the global
+			// constant. Upstream resolves it through the object literal and
+			// still reports; we bail, since object-literal member resolution is
+			// outside the getStaticValue subset modeled here.
+			{Code: "const Number = {NaN: 1};\nconst foo = [Number.NaN, 2];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes(2); }"},
+
 			// ---- Branch lock-in: getReferenceGroups default (unclassifiable) ----
 			// A bare read of the array that is neither includes/length/extra
 			// makes the whole rule bail, even with a valid includes call.
@@ -269,6 +296,56 @@ func TestPreferSetHasExtras(t *testing.T) {
 				Output:   []string{"const foo: Set<string /* c */> = new Set(['a', 'b']);\nfoo.has('a');\nfoo.has('b');"},
 				FileName: "array-type-trailing-comment.ts",
 				Errors:   []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- Static folding: string concatenation ----
+			// `evaluateStaticBinary` folds `+` when either side is a string, so
+			// the elements are comparable and the array is known-unique despite
+			// the extra forEach reference.
+			{
+				Code:   "const foo = ['a' + 'b', 'c'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('c'); }",
+				Output: []string{"const foo = new Set(['a' + 'b', 'c']);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has('c'); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+			// Number operand coerced to string by `+`.
+			{
+				Code:   "const foo = [1 + 'a', '1a2'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('1a'); }",
+				Output: []string{"const foo = new Set([1 + 'a', '1a2']);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has('1a'); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// Top of the plain-decimal band: `1e20 + ''` folds to the same
+			// digits JS produces, so the array is known-unique and reports.
+			{
+				Code:   "const foo = [1e20 + '', 'x'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('x'); }",
+				Output: []string{"const foo = new Set([1e20 + '', 'x']);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has('x'); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- Static folding: template literals ----
+			{
+				Code:   "const foo = [`a${1}`, 'b'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('b'); }",
+				Output: []string{"const foo = new Set([`a${1}`, 'b']);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has('b'); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+			{
+				Code:   "const foo = [`n${42}`, 'z'];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes('z'); }",
+				Output: []string{"const foo = new Set([`n${42}`, 'z']);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has('z'); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+
+			// ---- Static folding: well-known numeric globals ----
+			// Bare `NaN` already folds via evaluateStaticIdentifier; these cover
+			// the `Number.` / `Math.` spellings that upstream also resolves.
+			{
+				Code:   "const foo = [Number.NaN, 1];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes(1); }",
+				Output: []string{"const foo = new Set([Number.NaN, 1]);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has(1); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
+			},
+			{
+				Code:   "const foo = [Math.PI, 1];\nfoo.forEach(x => log(x));\nfunction f() { return foo.includes(1); }",
+				Output: []string{"const foo = new Set([Math.PI, 1]);\nfoo.forEach(x => log(x));\nfunction f() { return foo.has(1); }"},
+				Errors: []rule_tester.InvalidTestCaseError{errorAt("foo", 1, 7)},
 			},
 
 			// ---- getObjectLength: `{length}` shorthand ----

@@ -2,11 +2,45 @@ package prefer_set_has
 
 // Static array-size evaluation, known-unique-array detection, and TypeScript
 // type-annotation rewriting for prefer-set-has.
+//
+// Why not reuse utils.StaticStringEvaluator?
+//
+// That evaluator's public API is `Eval(node) (string, bool)` — it collapses
+// every value to a string on the way out, turning `true` into "true", `null`
+// into "null" and `undefined` into "undefined". This rule compares array
+// elements for SameValueZero uniqueness, so it must keep them typed: `'null'`
+// and `null`, `'1'` and `1`, `'true'` and `true` are three pairs of DISTINCT
+// elements that a string-collapsed model reports as equal. The same applies to
+// `-0` vs `0` and to bigint vs number, both of which this rule distinguishes.
+//
+// It also falls back to tsgo's evaluator.Evaluator, which exists to compute
+// const-enum member values and is wrapped in recover() because it panics on
+// unexpected input. This rule emits an AUTOFIX: a wrong uniqueness verdict
+// produces a `new Set(...)` that silently drops elements, so its value
+// semantics have to be auditable line-by-line against upstream's
+// eslint-utils getStaticValue rather than delegated to a black box.
+//
+// A third evaluator, jsx_a11y/jsxa11yutil/static_eval.go, split off from the
+// same shared one for the same reason — a typed value model the string API
+// cannot express. The repo's convention is to share helpers, not evaluators.
+//
+// Helpers we DO reuse:
+//
+//	utils.NormalizeNumericLiteral / NormalizeBigIntLiteral — text → value
+//	utils.IsShadowed                                       — global checks
+//	ast.SkipOuterExpressions(OEKParentheses|OEKAssertions) — wrapper unwrap
+//	utils.RangeEnclosingDelimiters                         — `<T>` recovery
+//
+// JS semantics that both evaluators need (ToString, string `+`, template
+// folding) are mirrored from StaticStringEvaluator's concatStaticValues /
+// evalTemplateExpression / staticValueToString rather than reinvented; the
+// split is over the value model, not over what JS does.
 
 import (
 	"math"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -483,10 +517,67 @@ func evaluateStaticValueInner(ctx rule.RuleContext, node *ast.Node, visited map[
 		return evaluateStaticPrefix(ctx, node.AsPrefixUnaryExpression(), visited)
 	case ast.KindBinaryExpression:
 		return evaluateStaticBinary(ctx, node.AsBinaryExpression(), visited)
+	case ast.KindTemplateExpression:
+		return evaluateStaticTemplate(ctx, node, visited)
+	case ast.KindPropertyAccessExpression:
+		return evaluateStaticPropertyAccess(node)
 	case ast.KindIdentifier:
 		return evaluateStaticIdentifier(ctx, node, visited)
 	}
 	return staticValue{}, false
+}
+
+// toStringValue mirrors ECMAScript ToString for the primitive kinds this
+// evaluator models, matching what utils.StaticStringEvaluator's
+// staticValueToString produces for the same inputs.
+//
+// Numbers are restricted to the plain-decimal band. Inside it — |x| in
+// [1e-6, 1e21) plus zero — Go's shortest-decimal 'f' formatting reproduces
+// Number::toString exactly (1e20 gives "100000000000000000000", 1e-6 gives
+// "0.000001", 9007199254740991 stays unrounded). Outside it JS switches to
+// exponential notation ("1e+21", "1e-7") in a format 'f' does not produce, so
+// this returns ok=false rather than emit a string JS would never produce.
+//
+// The strictness matters because the result feeds element-uniqueness
+// comparison: a number that stringified differently from JS could make two
+// elements JS considers equal look distinct, the array would be judged
+// unique, and the emitted `new Set(...)` would silently drop one of them.
+// Bailing only costs a missed report.
+func (v staticValue) toStringValue() (string, bool) {
+	switch v.kind {
+	case svString:
+		return v.str, true
+	case svBool:
+		if v.boolean {
+			return "true", true
+		}
+		return "false", true
+	case svNull:
+		return "null", true
+	case svUndefined:
+		return "undefined", true
+	case svBigInt:
+		if v.big == nil {
+			return "", false
+		}
+		return v.big.String(), true
+	case svNumber:
+		switch {
+		case math.IsNaN(v.number):
+			return "NaN", true
+		case math.IsInf(v.number, 1):
+			return "Infinity", true
+		case math.IsInf(v.number, -1):
+			return "-Infinity", true
+		case v.number == 0:
+			return "0", true // ToString(-0) is "0"
+		}
+		if magnitude := math.Abs(v.number); magnitude < 1e-6 || magnitude >= 1e21 {
+			return "", false
+		}
+		return strconv.FormatFloat(v.number, 'f', -1, 64), true
+	}
+	return "", false
 }
 
 func numberFromText(text string) (staticValue, bool) {
@@ -542,6 +633,14 @@ func evaluateStaticBinary(ctx rule.RuleContext, binary *ast.BinaryExpression, vi
 	if !lok || !rok {
 		return staticValue{}, false
 	}
+	// `+` with a string operand concatenates; every other operator we model is
+	// numeric. Both operands are already primitives here, so ToPrimitive is a
+	// no-op and ToString decides the result.
+	if binary.OperatorToken.Kind == ast.KindPlusToken &&
+		(left.kind == svString || right.kind == svString) {
+		return concatStaticValues(left, right)
+	}
+
 	if left.kind != svNumber || right.kind != svNumber {
 		return staticValue{}, false
 	}
@@ -560,6 +659,108 @@ func evaluateStaticBinary(ctx rule.RuleContext, binary *ast.BinaryExpression, vi
 		return staticValue{kind: svNumber, number: math.Pow(left.number, right.number)}, true
 	}
 	return staticValue{}, false
+}
+
+// concatStaticValues joins two primitives with JS string-concatenation
+// semantics, mirroring utils.StaticStringEvaluator's helper of the same name.
+func concatStaticValues(left, right staticValue) (staticValue, bool) {
+	leftText, lok := left.toStringValue()
+	rightText, rok := right.toStringValue()
+	if !lok || !rok {
+		return staticValue{}, false
+	}
+	return staticValue{kind: svString, str: leftText + rightText}, true
+}
+
+// evaluateStaticTemplate folds a template literal with statically-known
+// substitutions, mirroring utils.StaticStringEvaluator's evalTemplateExpression.
+func evaluateStaticTemplate(ctx rule.RuleContext, node *ast.Node, visited map[*ast.Symbol]bool) (staticValue, bool) {
+	template := node.AsTemplateExpression()
+	if template == nil {
+		return staticValue{}, false
+	}
+
+	var builder strings.Builder
+	if template.Head != nil {
+		builder.WriteString(template.Head.Text())
+	}
+	if template.TemplateSpans != nil {
+		for _, spanNode := range template.TemplateSpans.Nodes {
+			span := spanNode.AsTemplateSpan()
+			if span == nil {
+				return staticValue{}, false
+			}
+			value, ok := evaluateStaticValueInner(ctx, span.Expression, visited)
+			if !ok {
+				return staticValue{}, false
+			}
+			text, ok := value.toStringValue()
+			if !ok {
+				return staticValue{}, false
+			}
+			builder.WriteString(text)
+			if span.Literal != nil {
+				builder.WriteString(span.Literal.Text())
+			}
+		}
+	}
+	return staticValue{kind: svString, str: builder.String()}, true
+}
+
+// wellKnownNumberConstants are the `Number.*` / `Math.*` members that
+// eslint-utils' getStaticValue resolves and that can appear as an array
+// element. Keyed by object name, then property name.
+var wellKnownNumberConstants = map[string]map[string]float64{
+	"Number": {
+		"NaN":               math.NaN(),
+		"POSITIVE_INFINITY": math.Inf(1),
+		"NEGATIVE_INFINITY": math.Inf(-1),
+		"MAX_SAFE_INTEGER":  9007199254740991,
+		"MIN_SAFE_INTEGER":  -9007199254740991,
+		"MAX_VALUE":         math.MaxFloat64,
+		"MIN_VALUE":         5e-324,
+		"EPSILON":           2.220446049250313e-16,
+	},
+	"Math": {
+		"PI":      math.Pi,
+		"E":       math.E,
+		"LN2":     math.Ln2,
+		"LN10":    math.Log(10),
+		"LOG2E":   math.Log2E,
+		"LOG10E":  math.Log10E,
+		"SQRT2":   math.Sqrt2,
+		"SQRT1_2": math.Sqrt(0.5),
+	},
+}
+
+// evaluateStaticPropertyAccess resolves the well-known numeric globals. Bare
+// `NaN` / `Infinity` already fold via evaluateStaticIdentifier; this covers the
+// `Number.NaN` spelling of the same values, which upstream also folds.
+func evaluateStaticPropertyAccess(node *ast.Node) (staticValue, bool) {
+	access := node.AsPropertyAccessExpression()
+	if access == nil || access.QuestionDotToken != nil {
+		return staticValue{}, false
+	}
+
+	object := ast.SkipOuterExpressions(access.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	if object == nil || !ast.IsIdentifier(object) {
+		return staticValue{}, false
+	}
+	objectName := object.AsIdentifier().Text
+	members, known := wellKnownNumberConstants[objectName]
+	if !known || utils.IsShadowed(object, objectName) {
+		return staticValue{}, false
+	}
+
+	property := access.Name()
+	if property == nil || !ast.IsIdentifier(property) {
+		return staticValue{}, false
+	}
+	value, found := members[property.AsIdentifier().Text]
+	if !found {
+		return staticValue{}, false
+	}
+	return staticValue{kind: svNumber, number: value}, true
 }
 
 func evaluateStaticIdentifier(ctx rule.RuleContext, node *ast.Node, visited map[*ast.Symbol]bool) (staticValue, bool) {

@@ -5,9 +5,11 @@
 Prefer `Set#has()` over `Array#includes()` when checking for existence or
 non-existence.
 
-`Set#has()` is faster than `Array#includes()`. When a `const` array binding is
+`Set#has()` is faster than `Array#includes()`. When an array variable binding is
 used only for existence checks (and, optionally, a few other supported
-references), this rule recommends declaring it as a `Set` instead.
+references), this rule recommends declaring it as a `Set` instead. `let` and
+`var` bindings qualify as well as `const`; a binding that is reassigned is
+excluded by its own reference analysis, not by the declaration keyword.
 
 Examples of **incorrect** code for this rule:
 

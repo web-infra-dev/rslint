@@ -1,8 +1,10 @@
 // Package prefer_set_has ports eslint-plugin-unicorn's `prefer-set-has` rule.
 //
-// It flags a `const` array binding that is used only for existence checks via
-// `Array#includes()` and recommends declaring it as a `Set` so `Set#has()` can
-// be used instead. When the binding has a rewritable TypeScript type annotation
+// It flags an array variable binding that is used only for existence checks
+// via `Array#includes()` and recommends declaring it as a `Set` so `Set#has()`
+// can be used instead. Like upstream, `let` and `var` bindings qualify too —
+// non-const shapes are excluded downstream by reference analysis rather than by
+// the declaration keyword. When the binding has a rewritable TypeScript type annotation
 // the fix is applied automatically; otherwise the same edit is offered as a
 // manual suggestion.
 package prefer_set_has
