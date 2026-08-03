@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -262,12 +263,228 @@ func TestScanDecimalEscapes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := scanDecimalEscapes(tt.raw)
+			got := collectDecimalEscapes(tt.raw)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("scanDecimalEscapes(%q) = %#v, want %#v", tt.raw, got, tt.want)
+				t.Errorf("decimal escape scan of %q = %#v, want %#v", tt.raw, got, tt.want)
 			}
 		})
 	}
+}
+
+func collectDecimalEscapes(raw string) []decimalEscapeHit {
+	var hits []decimalEscapeHit
+	decimalEscapes := newDecimalEscapeIterator(raw)
+	for hit, ok := decimalEscapes.next(); ok; hit, ok = decimalEscapes.next() {
+		hits = append(hits, hit)
+	}
+	return hits
+}
+
+func FuzzDecimalEscapeIteratorParity(f *testing.F) {
+	for _, seed := range []string{
+		``,
+		`'\8'`,
+		`'\\8'`,
+		`'\\\8'`,
+		`'\0\8\9'`,
+		"'\\\n\\8'",
+		"'\\\xf0\x9f\x91\x8d\\9'",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		got := collectDecimalEscapes(raw)
+		want := referenceScanDecimalEscapes(raw)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("decimal escape scan of %q = %#v, want %#v", raw, got, want)
+		}
+	})
+}
+
+// referenceScanDecimalEscapes preserves the original collect-all scanner so
+// the allocation-free iterator can be checked against it independently.
+func referenceScanDecimalEscapes(raw string) []decimalEscapeHit {
+	var hits []decimalEscapeHit
+	previousEscape := ""
+	previousEscapeStart := -1
+	for i := 0; i < len(raw); {
+		if raw[i] != '\\' {
+			i++
+			previousEscape = ""
+			previousEscapeStart = -1
+			continue
+		}
+		if i+1 >= len(raw) {
+			break
+		}
+		next := raw[i+1]
+		if next == '8' || next == '9' {
+			hits = append(hits, decimalEscapeHit{
+				previousEscape:      previousEscape,
+				previousEscapeStart: previousEscapeStart,
+				decimalEscapeStart:  i,
+				decimalEscapeEnd:    i + 2,
+				decimalEscape:       raw[i : i+2],
+			})
+			i += 2
+			previousEscape = ""
+			previousEscapeStart = -1
+			continue
+		}
+		previousEscape = raw[i : i+2]
+		previousEscapeStart = i
+		i += 2
+	}
+	return hits
+}
+
+func TestNoNonoctalDecimalEscapeFastPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		code       string
+		scriptKind core.ScriptKind
+		wantRanges []string
+	}{
+		{
+			name: "other invalid escapes do not report",
+			code: `const values = ['\xG', '\uZZZZ', '\1', '\08', '\09'];`,
+		},
+		{
+			name:       "ordinary string token flags retain decimal escapes",
+			code:       `const values = ['\8', '\9', '\\8', '\\9'];`,
+			wantRanges: []string{`\8`, `\9`},
+		},
+		{
+			name:       "leading trivia is excluded from the raw literal",
+			code:       `const value = /* '\8' */ '\9';`,
+			wantRanges: []string{`\9`},
+		},
+		{
+			name:       "jsx attributes use raw-text fallback",
+			code:       `const element = <div first='\8' second="\\9" third="safe" />;`,
+			scriptKind: core.ScriptKindTSX,
+			wantRanges: []string{`\8`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scriptKind := tt.scriptKind
+			if scriptKind == core.ScriptKindUnknown {
+				scriptKind = core.ScriptKindTS
+			}
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/fast-path.ts",
+				Path:     "/fast-path.ts",
+			}, tt.code, scriptKind)
+			diagnostics := runRuleOnParsedSource(t, sourceFile, rule.EditDemandNone)
+			if len(diagnostics) != len(tt.wantRanges) {
+				t.Fatalf("diagnostics = %d, want %d", len(diagnostics), len(tt.wantRanges))
+			}
+			for i, diagnostic := range diagnostics {
+				got := sourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if got != tt.wantRanges[i] {
+					t.Errorf("diagnostic %d range text = %q, want %q", i, got, tt.wantRanges[i])
+				}
+			}
+		})
+	}
+}
+
+func TestNoNonoctalDecimalEscapeEditDemand(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `const value = '\0\8\9';`, core.ScriptKindTS)
+
+	diagnostics := make(map[rule.EditDemand][]rule.RuleDiagnostic)
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		diagnostics[demand] = runRuleOnParsedSource(t, sourceFile, demand)
+	}
+
+	allEdits := diagnostics[rule.EditDemandAll]
+	if len(allEdits) != 2 {
+		t.Fatalf("all-edits diagnostics = %d, want 2", len(allEdits))
+	}
+	for demand, got := range diagnostics {
+		if len(got) != len(allEdits) {
+			t.Fatalf("demand %d diagnostics = %d, want %d", demand, len(got), len(allEdits))
+		}
+		for i, diagnostic := range got {
+			if diagnostic.Range != allEdits[i].Range || !reflect.DeepEqual(diagnostic.Message, allEdits[i].Message) {
+				t.Errorf("demand %d changed diagnostic %d identity", demand, i)
+			}
+			wantSuggestions := demand&rule.EditDemandSuggestion != 0
+			if (diagnostic.Suggestions != nil) != wantSuggestions {
+				t.Errorf("demand %d diagnostic %d suggestions present = %v, want %v", demand, i, diagnostic.Suggestions != nil, wantSuggestions)
+			}
+			if diagnostic.FixesPtr != nil {
+				t.Errorf("demand %d diagnostic %d unexpectedly has autofixes", demand, i)
+			}
+		}
+	}
+
+	for i, diagnostic := range allEdits {
+		if diagnostic.Suggestions == nil {
+			t.Fatalf("all-edits diagnostic %d has no suggestions", i)
+		}
+	}
+	if got := len(*allEdits[0].Suggestions); got != 3 {
+		t.Errorf("adjacent-null suggestions = %d, want 3", got)
+	}
+	if got := len(*allEdits[1].Suggestions); got != 2 {
+		t.Errorf("ordinary suggestions = %d, want 2", got)
+	}
+	wantSuggestionDescriptions := [][]string{
+		{
+			`Replace '\0\8' with '\u00008'. This maintains the current functionality.`,
+			`Replace '\8' with '\u0038'. This maintains the current functionality.`,
+			`Replace '\8' with '\\8' to include the actual backslash character.`,
+		},
+		{
+			`Replace '\9' with '9'. This maintains the current functionality.`,
+			`Replace '\9' with '\\9' to include the actual backslash character.`,
+		},
+	}
+	for diagnosticIndex, diagnostic := range allEdits {
+		for suggestionIndex, suggestion := range *diagnostic.Suggestions {
+			if got, want := suggestion.Message.Description, wantSuggestionDescriptions[diagnosticIndex][suggestionIndex]; got != want {
+				t.Errorf("diagnostic %d suggestion %d description = %q, want %q", diagnosticIndex, suggestionIndex, got, want)
+			}
+		}
+	}
+}
+
+func runRuleOnParsedSource(t *testing.T, sourceFile *ast.SourceFile, demand rule.EditDemand) []rule.RuleDiagnostic {
+	t.Helper()
+	comments := rule.NewCommentStore(sourceFile)
+	var diagnostics []rule.RuleDiagnostic
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(NoNonoctalDecimalEscapeRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+		Demand: demand,
+		Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+	listeners := NoNonoctalDecimalEscapeRule.Run(ctx, nil)
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
 }
 
 // TestNoNonoctalDecimalEscapeRule runs the rule against TypeScript fixtures.
