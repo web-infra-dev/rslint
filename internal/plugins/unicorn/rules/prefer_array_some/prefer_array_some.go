@@ -105,20 +105,20 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 
 	comparison := comparisonParent(node) // non-nil only when isCompare
 
-	// Removing the comparison would drop comments between the call and the end
-	// of the comparison; upstream withholds the suggestion in that case.
-	wouldDropComments := isCompare && utils.HasCommentInSpan(
-		ctx.Comments.All(),
-		parenthesizedEnd(ctx, node),
-		comparison.End(),
-	)
-
-	if wouldDropComments {
-		ctx.ReportNode(methodNode, messageArraySome(method))
-		return
-	}
-
 	ctx.ReportNodeWithDeferredSuggestions(methodNode, messageArraySome(method), func() []rule.RuleSuggestion {
+		// Removing the comparison would drop comments between the call and the
+		// end of the comparison; upstream withholds the suggestion in that
+		// case. Checked inside the builder so lint-only runs never materialize
+		// the comment list — returning no suggestions reports exactly what
+		// ReportNode would.
+		if isCompare && utils.HasCommentInSpan(
+			ctx.Comments.All(),
+			parenthesizedEnd(ctx, node),
+			comparison.End(),
+		) {
+			return nil
+		}
+
 		fixes := []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, methodNode, "some")}
 		if isCompare {
 			// Remove the `== undefined` / `!== null` tail.
