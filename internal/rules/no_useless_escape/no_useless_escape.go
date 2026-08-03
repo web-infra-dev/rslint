@@ -7,7 +7,6 @@
 package no_useless_escape
 
 import (
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -64,34 +63,28 @@ var NoUselessEscapeRule = rule.Rule{
 }
 
 func parseAllowRegexCharacters(options any) map[string]bool {
-	out := map[string]bool{}
 	optsMap := utils.GetOptionsMap(options)
 	if optsMap == nil {
-		return out
+		return nil
 	}
 	raw, ok := optsMap["allowRegexCharacters"]
 	if !ok {
-		return out
+		return nil
 	}
 	arr, ok := raw.([]interface{})
 	if !ok {
-		return out
+		return nil
 	}
+	var out map[string]bool
 	for _, v := range arr {
 		if s, ok := v.(string); ok {
+			if out == nil {
+				out = make(map[string]bool, len(arr))
+			}
 			out[s] = true
 		}
 	}
 	return out
-}
-
-// validStringEscape mirrors ESLint's VALID_STRING_ESCAPES — the escape
-// characters that produce a different value from their literal form, so the
-// backslash is meaningful. Single-character entries are checked via this map;
-// linebreak runes are checked separately.
-var validStringEscape = map[byte]bool{
-	'\\': true, 'n': true, 'r': true, 'v': true, 't': true,
-	'b': true, 'f': true, 'u': true, 'x': true,
 }
 
 // isLineContinuation reports whether the rune begins a LineTerminatorSequence
@@ -209,33 +202,42 @@ func isDirectiveBlockContainer(node *ast.Node) bool {
 	return false
 }
 
-// rawStartOf returns the source-text start offset of `node`, skipping any
-// leading trivia. For string/template/regex literals this points at the
-// opening delimiter (`'`, `"`, “ ` “, `}`, or `/`).
-func rawStartOf(sourceFile *ast.SourceFile, node *ast.Node) int {
-	return utils.TrimNodeTextRange(sourceFile, node).Pos()
-}
-
-// rawTextOf returns the raw source text of `node` (delimiters included).
-func rawTextOf(sourceFile *ast.SourceFile, node *ast.Node) string {
-	return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false)
+// rawTextAndStart returns the raw source text of `node` (delimiters included)
+// and its source offset after leading trivia. Computing both together avoids
+// running SkipTrivia twice for every literal. Reparser-transformed literals
+// need the scanner helper's synthesized quotes, so keep its existing behavior
+// on that rare path.
+func rawTextAndStart(sourceFile *ast.SourceFile, node *ast.Node) (string, int) {
+	if ast.NodeIsMissing(node) {
+		return "", node.Pos()
+	}
+	sourceText := sourceFile.Text()
+	rawStart := scanner.SkipTrivia(sourceText, node.Pos())
+	if node.Flags&ast.NodeFlagsReparserTransformedLiteral != 0 {
+		return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false), rawStart
+	}
+	return sourceText[rawStart:node.End()], rawStart
 }
 
 // checkStringLiteral scans a `'…'` / `"…"` literal for useless escapes.
 func checkStringLiteral(ctx rule.RuleContext, node *ast.Node) {
-	rawStart := rawStartOf(ctx.SourceFile, node)
-	raw := rawTextOf(ctx.SourceFile, node)
+	raw, rawStart := rawTextAndStart(ctx.SourceFile, node)
 	if len(raw) < 2 {
 		return
 	}
 	quote := raw[0]
-	directive := isStringLiteralDirective(ctx.SourceFile, node)
+	directive := false
+	directiveChecked := false
 	scanLiteralEscapes(raw, func(escapeIdx int, escapedRune rune, escapedRuneSize int) {
 		if isValidStringEscapeRune(escapedRune) {
 			return
 		}
 		if escapedRuneSize == 1 && byte(escapedRune) == quote {
 			return
+		}
+		if !directiveChecked {
+			directive = isStringLiteralDirective(ctx.SourceFile, node)
+			directiveChecked = true
 		}
 		reportEscape(ctx, rawStart, escapeIdx, escapedDisplayText(raw, escapeIdx, escapedRune, escapedRuneSize), directive, false)
 	})
@@ -253,8 +255,7 @@ func checkStringLiteral(ctx rule.RuleContext, node *ast.Node) {
 // Template literals are never directives, so the suggestion message is always
 // the standard `removeEscape`.
 func checkTemplateElement(ctx rule.RuleContext, node *ast.Node) {
-	rawStart := rawStartOf(ctx.SourceFile, node)
-	raw := rawTextOf(ctx.SourceFile, node)
+	raw, rawStart := rawTextAndStart(ctx.SourceFile, node)
 	scanLiteralEscapes(raw, func(escapeIdx int, escapedRune rune, escapedRuneSize int) {
 		// `\`` is the template quote escape — always valid.
 		if escapedRune == '`' {
@@ -292,7 +293,8 @@ func escapedDisplayText(raw string, escapeIdx int, escapedRune rune, escapedRune
 }
 
 func isValidStringEscapeRune(r rune) bool {
-	if r < 128 && validStringEscape[byte(r)] {
+	switch r {
+	case '\\', 'n', 'r', 'v', 't', 'b', 'f', 'u', 'x':
 		return true
 	}
 	return isLineContinuation(r)
@@ -316,6 +318,11 @@ func scanLiteralEscapes(raw string, cb func(escapeIdx int, escapedRune rune, esc
 		}
 		next := raw[i+1]
 		if next >= '0' && next <= '9' {
+			i += 2
+			continue
+		}
+		if next < utf8.RuneSelf {
+			cb(i, rune(next), 1)
 			i += 2
 			continue
 		}
@@ -343,40 +350,66 @@ func scanLiteralEscapes(raw string, cb func(escapeIdx int, escapedRune rune, esc
 // regexpp AST is a `ClassIntersection` / `ClassSubtraction` operator.
 func reportEscape(ctx rule.RuleContext, rawStart, startOffset int, escapedText string, directive bool, disableEscapeBackslash bool) {
 	rangeStart := rawStart + startOffset
-	rangeEnd := rangeStart + 1
-	textRange := core.NewTextRange(rangeStart, rangeEnd)
+	textRange := core.NewTextRange(rangeStart, rangeStart+1)
 
-	suggestions := make([]rule.RuleSuggestion, 0, 2)
-	removeMsg := rule.RuleMessage{
+	ctx.ReportRangeWithDeferredSuggestions(textRange, unnecessaryEscapeMessage(escapedText), func() []rule.RuleSuggestion {
+		removeMsg := removeEscapeMessage
+		if directive {
+			removeMsg = removeEscapeDirectiveMessage
+		}
+		removeSuggestion := rule.RuleSuggestion{
+			Message:  removeMsg,
+			FixesArr: []rule.RuleFix{rule.RuleFixRemoveRange(textRange)},
+		}
+		if disableEscapeBackslash {
+			return []rule.RuleSuggestion{removeSuggestion}
+		}
+		return []rule.RuleSuggestion{
+			removeSuggestion,
+			{
+				Message: escapeBackslashMessage,
+				FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
+					core.NewTextRange(rangeStart, rangeStart),
+					"\\",
+				)},
+			},
+		}
+	})
+}
+
+var (
+	removeEscapeMessage = rule.RuleMessage{
 		Id:          "removeEscape",
 		Description: "Remove the `\\`. This maintains the current functionality.",
 	}
-	if directive {
-		removeMsg = rule.RuleMessage{
-			Id:          "removeEscapeDoNotKeepSemantics",
-			Description: "Remove the `\\` if it was inserted by mistake.",
+	removeEscapeDirectiveMessage = rule.RuleMessage{
+		Id:          "removeEscapeDoNotKeepSemantics",
+		Description: "Remove the `\\` if it was inserted by mistake.",
+	}
+	escapeBackslashMessage = rule.RuleMessage{
+		Id:          "escapeBackslash",
+		Description: "Replace the `\\` with `\\\\` to include the actual backslash character.",
+	}
+	unnecessaryEscapeASCIIMessages = func() [utf8.RuneSelf]rule.RuleMessage {
+		var messages [utf8.RuneSelf]rule.RuleMessage
+		for character := range messages {
+			messages[character] = rule.RuleMessage{
+				Id:          "unnecessaryEscape",
+				Description: "Unnecessary escape character: \\" + string(rune(character)) + ".",
+			}
 		}
+		return messages
+	}()
+)
+
+func unnecessaryEscapeMessage(escapedText string) rule.RuleMessage {
+	if len(escapedText) == 1 && escapedText[0] < utf8.RuneSelf {
+		return unnecessaryEscapeASCIIMessages[escapedText[0]]
 	}
-	suggestions = append(suggestions, rule.RuleSuggestion{
-		Message:  removeMsg,
-		FixesArr: []rule.RuleFix{rule.RuleFixRemoveRange(textRange)},
-	})
-	if !disableEscapeBackslash {
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message: rule.RuleMessage{
-				Id:          "escapeBackslash",
-				Description: "Replace the `\\` with `\\\\` to include the actual backslash character.",
-			},
-			FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
-				core.NewTextRange(rangeStart, rangeStart),
-				"\\",
-			)},
-		})
-	}
-	ctx.ReportRangeWithSuggestions(textRange, rule.RuleMessage{
+	return rule.RuleMessage{
 		Id:          "unnecessaryEscape",
-		Description: fmt.Sprintf("Unnecessary escape character: \\%s.", escapedText),
-	}, suggestions...)
+		Description: "Unnecessary escape character: \\" + escapedText + ".",
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -403,38 +436,29 @@ type regexClassFrame struct {
 // reservedDoublePunctuator mirrors REGEX_CLASS_SET_RESERVED_DOUBLE_PUNCTUATOR
 // in the ESLint source: characters that, when doubled inside a v-mode class,
 // form a reserved-syntax pair (e.g. `&&`, `++`).
-var reservedDoublePunctuator = map[byte]bool{
-	'!': true, '#': true, '$': true, '%': true, '&': true,
-	'*': true, '+': true, ',': true, '.': true, ':': true,
-	';': true, '<': true, '=': true, '>': true, '?': true,
-	'@': true, '^': true, '`': true, '~': true,
-}
+var reservedDoublePunctuator = makeByteSet(
+	'!', '#', '$', '%', '&', '*', '+', ',', '.', ':', ';', '<', '=', '>',
+	'?', '@', '^', '`', '~',
+)
 
 // regexGeneralEscape mirrors REGEX_GENERAL_ESCAPES: characters whose `\X` form
 // is meaningful in any regex position (assertions, character-class shorthands,
 // hex/unicode escape leaders, octal/backreference digits, the `]` escape).
-var regexGeneralEscape = map[byte]bool{
-	'\\': true, 'b': true, 'c': true, 'd': true, 'D': true, 'f': true,
-	'n': true, 'p': true, 'P': true, 'r': true, 's': true, 'S': true,
-	't': true, 'v': true, 'w': true, 'W': true, 'x': true, 'u': true,
-	'0': true, '1': true, '2': true, '3': true, '4': true, '5': true,
-	'6': true, '7': true, '8': true, '9': true, ']': true,
-}
+var regexGeneralEscape = makeByteSet(
+	'\\', 'b', 'c', 'd', 'D', 'f', 'n', 'p', 'P', 'r', 's', 'S', 't', 'v',
+	'w', 'W', 'x', 'u', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	']',
+)
 
 // regexNonClassExtra adds the characters whose `\X` is meaningful outside any
 // character class (regex metacharacters), on top of regexGeneralEscape.
-var regexNonClassExtra = map[byte]bool{
-	'^': true, '/': true, '.': true, '$': true, '*': true, '+': true,
-	'?': true, '[': true, '{': true, '}': true, '|': true, '(': true,
-	')': true, 'B': true, 'k': true,
-}
+var regexNonClassExtra = makeByteSet(
+	'^', '/', '.', '$', '*', '+', '?', '[', '{', '}', '|', '(', ')', 'B', 'k',
+)
 
 // regexClassSetExtra adds the characters whose `\X` is meaningful inside a
 // v-mode character class, on top of regexGeneralEscape.
-var regexClassSetExtra = map[byte]bool{
-	'q': true, '/': true, '[': true, '{': true, '}': true,
-	'|': true, '(': true, ')': true, '-': true,
-}
+var regexClassSetExtra = makeByteSet('q', '/', '[', '{', '}', '|', '(', ')', '-')
 
 // regexAllowedNonClass / regexAllowedClassU / regexAllowedClassV are the three
 // resolved allow-sets (per ESLint's three context branches), pre-merged at
@@ -452,8 +476,7 @@ var (
 // negate flag, presence of `--`/`&&` in that class). The pre-scan in
 // preScanClass populates the frame metadata before we reach inner content.
 func validateRegExp(ctx rule.RuleContext, node *ast.Node, allowed map[string]bool) {
-	rawStart := rawStartOf(ctx.SourceFile, node)
-	text := rawTextOf(ctx.SourceFile, node)
+	text, rawStart := rawTextAndStart(ctx.SourceFile, node)
 	pattern, flagsStr := utils.ExtractRegexPatternAndFlags(text)
 	if pattern == "" {
 		return
@@ -496,12 +519,7 @@ func validateRegExp(ctx rule.RuleContext, node *ast.Node, allowed map[string]boo
 			// v-mode set operator `--` / `&&` — consumed as one unit.
 			i += 2
 		default:
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
-			} else {
-				i += w
-			}
+			i++
 		}
 	}
 }
@@ -583,13 +601,10 @@ func readRegexEscape(pattern string, i int, flags utils.RegexFlags, inClass bool
 
 	// Single-character identity escape `\X`. Decode the rune to handle
 	// multi-byte X (very rare but possible in identity-escape position).
-	r, w := utf8.DecodeRuneInString(pattern[i+1:])
-	if w == 0 {
-		return 1, 0, 0, false
+	if next < utf8.RuneSelf {
+		return 2, next, 1, true
 	}
-	if w == 1 {
-		return 2, byte(r), 1, true
-	}
+	_, w := utf8.DecodeRuneInString(pattern[i+1:])
 	// Multi-byte identity escape. ESLint's set-membership checks operate on
 	// single ASCII chars; a multi-byte X is never "valid" in any of those
 	// sets, so treating it as a flagged identity is the safe path. Callers
@@ -627,7 +642,7 @@ func handleRegexIdentityEscape(
 		return
 	}
 	escapedText := pattern[escapeIdx+1 : escapeIdx+1+escapedSize]
-	if allowed[escapedText] {
+	if allowed != nil && allowed[escapedText] {
 		return
 	}
 	// Multi-byte identity escapes never match the ASCII-keyed allow sets, so
@@ -638,14 +653,14 @@ func handleRegexIdentityEscape(
 	}
 
 	inClass := len(stack) > 0
-	var allowedSet map[byte]bool
+	var allowedSet *byteSet
 	switch {
 	case !inClass:
-		allowedSet = regexAllowedNonClass
+		allowedSet = &regexAllowedNonClass
 	case flags.UnicodeSets:
-		allowedSet = regexAllowedClassV
+		allowedSet = &regexAllowedClassV
 	default:
-		allowedSet = regexAllowedClassU
+		allowedSet = &regexAllowedClassU
 	}
 	if allowedSet[escapedByte] {
 		return
@@ -745,12 +760,7 @@ func preScanClass(pattern string, start int, flags utils.RegexFlags) regexClassF
 			frame.hasSetOp = true
 			i += 2
 		default:
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
-			} else {
-				i += w
-			}
+			i++
 		}
 	}
 	return frame
@@ -824,19 +834,24 @@ func patternParses(pattern string, flags utils.RegexFlags) bool {
 			depth--
 			i++
 		default:
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
-			} else {
-				i += w
-			}
+			i++
 		}
 	}
 	return depth == 0
 }
 
-func mergeByteSets(sets ...map[byte]bool) map[byte]bool {
-	out := make(map[byte]bool, 64)
+type byteSet [256]bool
+
+func makeByteSet(bytes ...byte) byteSet {
+	var out byteSet
+	for _, b := range bytes {
+		out[b] = true
+	}
+	return out
+}
+
+func mergeByteSets(sets ...byteSet) byteSet {
+	var out byteSet
 	for _, s := range sets {
 		for k, v := range s {
 			if v {
