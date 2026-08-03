@@ -128,6 +128,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
@@ -301,6 +302,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_catch.NoUselessCatchRule,
 		no_useless_escape.NoUselessEscapeRule,
 		no_useless_rename.NoUselessRenameRule,
+		no_useless_return.NoUselessReturnRule,
 		no_useless_constructor.NoUselessConstructorRule,
 		no_prototype_builtins.NoPrototypeBuiltinsRule,
 		require_await.RequireAwaitRule,
