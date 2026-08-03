@@ -201,11 +201,17 @@ const primitiveValue = 1;
 		}
 	}
 
-	anonymousID := symbols["anonymousValue"]
-	anonymousTypeID := fixture.semantic.Sym2type[anonymousID]
-	if typeInfo := fixture.semantic.Typetab[anonymousTypeID]; typeInfo.Symbol == 0 {
-		t.Fatal("object literal type has no declaration symbol")
-	}
+anonymousID, ok := symbols["anonymousValue"]
+if !ok || anonymousID == 0 {
+	t.Fatalf("symbol %q not found", "anonymousValue")
+}
+anonymousTypeID, ok := fixture.semantic.Sym2type[anonymousID]
+if !ok || anonymousTypeID == 0 {
+	t.Fatalf("type for symbol %q not found", "anonymousValue")
+}
+if typeInfo, ok := fixture.semantic.Typetab[anonymousTypeID]; !ok || typeInfo.Symbol == 0 {
+	t.Fatal("object literal type has no declaration symbol")
+}
 
 	primitiveID := symbols["primitiveValue"]
 	primitiveTypeID := fixture.semantic.Sym2type[primitiveID]
