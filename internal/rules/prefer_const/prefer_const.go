@@ -185,14 +185,7 @@ var PreferConstRule = rule.Rule{
 
 // shouldReport determines whether a candidate should be reported as "use const".
 func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, opts preferConstOptions, hasInitializer bool) bool {
-	// The binder attaches the symbol to the enclosing declaration
-	// (VariableDeclaration or BindingElement). ctx.Refs is keyed by that
-	// binder symbol, not by checker.GetSymbolAtLocation results.
-	decl := c.nameNode.Parent
-	if decl == nil || decl.Name() != c.nameNode {
-		return false
-	}
-	sym := decl.Symbol()
+	sym := utils.BindingNameSymbol(c.nameNode)
 	if sym == nil {
 		return false
 	}

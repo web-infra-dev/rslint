@@ -41,17 +41,9 @@ var NoConstAssignRule = rule.Rule{
 					if varDecl == nil || varDecl.Name() == nil {
 						continue
 					}
-					utils.CollectBindingNames(varDecl.Name(), func(ident *ast.Node, _ string) {
-						// The binder attaches the symbol to the enclosing
-						// declaration (VariableDeclaration or BindingElement).
-						bindingDecl := ident.Parent
-						if bindingDecl == nil || bindingDecl.Name() != ident {
-							return
-						}
-						if sym := bindingDecl.Symbol(); sym != nil {
-							constSymbols[sym] = true
-						}
-					})
+					for _, sym := range utils.BindingSymbols(varDecl.Name()) {
+						constSymbols[sym] = true
+					}
 				}
 			},
 

@@ -92,13 +92,8 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 			continue
 		}
 		utils.CollectBindingNames(varDecl.Name(), func(ident *ast.Node, _ string) {
-			// The binder attaches the symbol to the enclosing declaration
-			// (VariableDeclaration or BindingElement). Binder symbols are the
-			// currency of ctx.Refs, so use them on the declaration side too.
-			if decl := ident.Parent; decl != nil && decl.Name() == ident {
-				if sym := decl.Symbol(); sym != nil {
-					vars = append(vars, varInfo{nameNode: ident, sym: sym})
-				}
+			if sym := utils.BindingNameSymbol(ident); sym != nil {
+				vars = append(vars, varInfo{nameNode: ident, sym: sym})
 			}
 		})
 	}
