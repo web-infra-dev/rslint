@@ -72,6 +72,11 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		{Code: `array.filter({}).length > 0`},
 		{Code: `array.filter([]).length > 0`},
 		{Code: `array.filter(new Foo()).length > 0`},
+		// ESTree folds these into UnaryExpression; tsgo gives each its own kind.
+		{Code: `array.filter(!foo).length > 0`},
+		{Code: `array.filter(typeof foo).length > 0`},
+		{Code: `array.filter(void 0).length > 0`},
+		{Code: `array.filter(delete a.b).length > 0`},
 		// No first argument at all.
 		{Code: `array.filter().length > 0`},
 

@@ -417,8 +417,14 @@ func isNodeValueNotFunction(node *ast.Node) bool {
 		ast.KindClassExpression,
 		ast.KindTemplateExpression,
 		ast.KindNoSubstitutionTemplateLiteral,
+		// ESTree's UnaryExpression covers `!x` / `-x` as well as `typeof x`,
+		// `void x` and `delete x`; tsgo splits the last three into their own
+		// kinds, so all five have to be listed here.
 		ast.KindPrefixUnaryExpression,
 		ast.KindPostfixUnaryExpression,
+		ast.KindTypeOfExpression,
+		ast.KindVoidExpression,
+		ast.KindDeleteExpression,
 		// Literals (ESTree collapses these into one `Literal` node type).
 		ast.KindStringLiteral,
 		ast.KindNumericLiteral,
