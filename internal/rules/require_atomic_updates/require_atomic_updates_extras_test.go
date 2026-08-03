@@ -27,8 +27,10 @@ func TestRequireAtomicUpdatesExtras(t *testing.T) {
 			// Branch lock-in: destructured local declarations register the same way.
 			{Code: `async function x() { let { value } = obj; value; await p; value = value + 1; }`},
 			// Branch lock-in: a hoisted function declaration's name is collected
-			// from the declaration node's symbol; writes to it stay local.
-			{Code: `async function x() { function helper() {} helper; await p; helper = () => {}; }`},
+			// from the declaration node's symbol; writes to it stay local. The
+			// RHS must not be function-like, or isFunctionLikeRHS skips the
+			// check before the collected symbol matters.
+			{Code: `async function x() { function helper() {} helper; await p; helper = null; }`},
 			// Branch lock-in: a local shadowing an outer name binds its own
 			// symbol, so state on the outer variable never leaks onto it.
 			{Code: `let value: number; async function x() { let value = 0; value; await p; value = value + 1; }`},

@@ -217,9 +217,6 @@ func (a *analyzer) collectDeclsIn(node *ast.Node) {
 		return
 	}
 	node.ForEachChild(func(child *ast.Node) bool {
-		if ast.IsFunctionLikeDeclaration(child) {
-			return false
-		}
 		switch child.Kind {
 		case ast.KindVariableDeclaration:
 			vd := child.AsVariableDeclaration()
@@ -240,6 +237,9 @@ func (a *analyzer) collectDeclsIn(node *ast.Node) {
 					a.collectBindingSymbols(vd.Name(), false)
 				}
 			}
+		}
+		if ast.IsFunctionLikeDeclaration(child) {
+			return false
 		}
 		a.collectDeclsIn(child)
 		return false
