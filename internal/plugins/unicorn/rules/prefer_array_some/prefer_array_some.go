@@ -862,22 +862,24 @@ func classifyType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetN
 	if targetNames.Has(name) {
 		return classTarget
 	}
-	// Interface / class heritage: `interface Items extends Array<string>` (and
-	// `class X extends Array`) resolve to the array target through their base
-	// types. Upstream reaches the same conclusion via its interface-heritage
-	// walk. Only consult heritage when the receiver could be an array target;
-	// keyed-collection classification does not widen through heritage.
+	// Interface heritage: `interface Items extends Array<string>` resolves to
+	// the array target through its base types. Upstream reaches the same
+	// conclusion via its interface-heritage walk, which runs with
+	// `checkClassHeritage: false` — `class MyArray extends Array {}` therefore
+	// stays a non-target. Only consult heritage when the receiver could be an
+	// array target; keyed-collection classification does not widen through it.
 	if targetNames.Has("Array") && classifyHeritage(ctx, t, targetNames, nonTargetNames) == classTarget {
 		return classTarget
 	}
 	return classNonTarget
 }
 
-// classifyHeritage inspects the base types of a class / interface symbol,
-// returning classTarget when any base resolves to the target classification.
+// classifyHeritage inspects the base types of an interface symbol, returning
+// classTarget when any base resolves to the target classification. Classes are
+// excluded to match upstream's `checkClassHeritage: false`.
 func classifyHeritage(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
 	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) == 0 {
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 {
 		return classUnknown
 	}
 	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)

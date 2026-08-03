@@ -61,6 +61,13 @@ func TestPreferArraySomeExtras(t *testing.T) {
 
 		// N/A: autofix-comment interplay covered in invalid cases below.
 
+		// ---- Class heritage does not widen to Array ----
+		// Upstream's is-array checker runs with `checkClassHeritage: false`, so
+		// only interface heritage reaches the array target (that case is in the
+		// upstream suite as invalid).
+		{Code: `class MyArray extends Array {} function foo(items: MyArray) { if (items.find(fn)) {} }`, Tsx: false},
+		{Code: `class MyArray extends Array {} function foo(items: MyArray) { items.filter(fn).length > 0; }`, Tsx: false},
+
 		// ---- Locks in filter().length arm: `$`-prefixed receiver skipped ----
 		{Code: `$foo.filter(fn).length > 0`},
 		// Parenthesized `$`-prefixed receiver is still skipped.
