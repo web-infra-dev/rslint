@@ -1,6 +1,7 @@
 package no_ex_assign
 
 import (
+	"cmp"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -17,24 +18,6 @@ func buildExAssignMessage() rule.RuleMessage {
 	}
 }
 
-// catchBindingSymbols returns the binder symbol of every name bound by the
-// catch clause's variable declaration: the lone identifier of `catch (e)` or
-// each name nested in a destructuring pattern. The symbol is attached to the
-// declaration node owning the name — the VariableDeclaration itself for a
-// plain identifier, the enclosing BindingElement for pattern names.
-func catchBindingSymbols(name *ast.Node) []*ast.Symbol {
-	var symbols []*ast.Symbol
-	utils.CollectBindingNames(name, func(ident *ast.Node, _ string) {
-		if ident.Parent == nil {
-			return
-		}
-		if sym := ident.Parent.Symbol(); sym != nil {
-			symbols = append(symbols, sym)
-		}
-	})
-	return symbols
-}
-
 var NoExAssignRule = rule.Rule{
 	Name: "no-ex-assign",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -46,7 +29,7 @@ var NoExAssignRule = rule.Rule{
 				}
 
 				var writes []*ast.Node
-				for _, sym := range catchBindingSymbols(varDecl.Name()) {
+				for _, sym := range utils.BindingSymbols(varDecl.Name()) {
 					for _, ref := range ctx.Refs.References(sym) {
 						if utils.IsWriteReference(ref) {
 							writes = append(writes, ref)
@@ -57,7 +40,9 @@ var NoExAssignRule = rule.Rule{
 				// References is source-ordered per symbol; a destructuring
 				// pattern binds several symbols, so restore document order
 				// across them before reporting.
-				slices.SortFunc(writes, func(a, b *ast.Node) int { return a.Pos() - b.Pos() })
+				slices.SortStableFunc(writes, func(a *ast.Node, b *ast.Node) int {
+					return cmp.Compare(a.Pos(), b.Pos())
+				})
 				for _, ref := range writes {
 					ctx.ReportNode(ref, buildExAssignMessage())
 				}

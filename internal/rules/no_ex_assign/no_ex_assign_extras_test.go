@@ -50,6 +50,15 @@ func TestNoExAssignExtras(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 33},
 				},
 			},
+			// Branch lock-in: a write inside a sibling binding's default-value
+			// initializer targets the catch binding even though it sits in the
+			// pattern rather than the catch block (upstream reports this too).
+			{
+				Code: "try { } catch ({a, b = (a = 1)}) { }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 25},
+				},
+			},
 			// Dimension: rest element symbol comes from its BindingElement.
 			{
 				Code: "try { } catch ({...rest}) { rest = {}; }",
