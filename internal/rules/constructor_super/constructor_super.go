@@ -204,31 +204,40 @@ func findDuplicateSuperCalls(body *ast.Node, superCallLocations []*ast.Node) []*
 	statements := body.Statements()
 	var duplicates []*ast.Node
 	foundFirstSuper := false
+	nextSuperCall := 0
 
 	for _, stmt := range statements {
 		if stmt == nil {
 			continue
 		}
+		// findSuperCalls records calls in source order. Partition that list
+		// across the body's top-level statements once so the checks below never
+		// scan calls belonging to unrelated statements again.
+		for nextSuperCall < len(superCallLocations) &&
+			superCallLocations[nextSuperCall].End() <= stmt.Pos() {
+			nextSuperCall++
+		}
+		firstStatementCall := nextSuperCall
+		for nextSuperCall < len(superCallLocations) &&
+			isSuperCallInStatement(stmt, superCallLocations[nextSuperCall]) {
+			nextSuperCall++
+		}
+		statementCalls := superCallLocations[firstStatementCall:nextSuperCall]
 
 		// Check if this statement directly contains a super() call
-		if hasSuperCall(stmt) {
+		hasDirectSuperCall := hasSuperCall(stmt)
+		if hasDirectSuperCall {
 			if foundFirstSuper {
 				// This is a duplicate - super after another super at the same level
-				// Find the corresponding super call node
-				for _, loc := range superCallLocations {
-					if isSuperCallInStatement(stmt, loc) {
-						duplicates = append(duplicates, loc)
-					}
-				}
+				duplicates = append(duplicates, statementCalls...)
 			} else {
 				foundFirstSuper = true
 			}
 		}
 
 		// After finding first super, any additional super calls anywhere are duplicates
-		if foundFirstSuper {
-			// Find all super calls in this statement (recursively)
-			findSuperCallsInNode(stmt, superCallLocations, &duplicates)
+		if foundFirstSuper && !hasDirectSuperCall {
+			duplicates = append(duplicates, statementCalls...)
 		}
 
 		// Check branching statements that have super in all branches
@@ -266,7 +275,7 @@ func findDuplicateSuperCalls(body *ast.Node, superCallLocations []*ast.Node) []*
 					// finally always runs after the try block, so a super()
 					// call there is a genuine duplicate alongside the try
 					// block's own call.
-					findSuperCallsInNode(tryStmt.FinallyBlock, superCallLocations, &duplicates)
+					appendUniqueSuperCallsInNode(tryStmt.FinallyBlock, statementCalls, &duplicates)
 				}
 				if tryStatementHasSuper(tryStmt) {
 					foundFirstSuper = true
@@ -289,8 +298,11 @@ func findAllSuperDuplicates(body *ast.Node, superCallLocations []*ast.Node) []*a
 			duplicates = append(duplicates, loc)
 		}
 	}
+	loopDuplicateCount := len(duplicates)
 	for _, loc := range findDuplicateSuperCalls(body, superCallLocations) {
-		if !contains(duplicates, loc) {
+		// findDuplicateSuperCalls already returns unique calls, so only the
+		// loop-derived prefix can overlap this second group.
+		if !contains(duplicates[:loopDuplicateCount], loc) {
 			duplicates = append(duplicates, loc)
 		}
 	}
@@ -368,38 +380,18 @@ func loopExitsAfterSuper(stmts []*ast.Node) bool {
 	return false
 }
 
-// findSuperCallsInNode finds super() calls in a node (excluding direct super calls at the statement level)
-func findSuperCallsInNode(node *ast.Node, superCallLocations []*ast.Node, duplicates *[]*ast.Node) {
+// appendUniqueSuperCallsInNode adds candidate calls contained by node, skipping
+// calls already classified as duplicates by the enclosing statement scan.
+func appendUniqueSuperCallsInNode(node *ast.Node, superCallLocations []*ast.Node, duplicates *[]*ast.Node) {
 	if node == nil {
 		return
 	}
 
-	// Don't check direct expression statements with super (already handled)
-	if node.Kind == ast.KindExpressionStatement {
-		if hasSuperCall(node) {
-			return
-		}
-	}
-
-	// Check if this node contains any super calls
 	for _, loc := range superCallLocations {
-		if isSuperCallInNode(node, loc) && !contains(*duplicates, loc) {
+		if isSuperCallInStatement(node, loc) && !contains(*duplicates, loc) {
 			*duplicates = append(*duplicates, loc)
 		}
 	}
-}
-
-// isSuperCallInNode checks if a super call is inside a node (not at the direct statement level)
-func isSuperCallInNode(node *ast.Node, superCall *ast.Node) bool {
-	// Don't match if this IS the super call itself at expression statement level
-	if node.Kind == ast.KindExpressionStatement {
-		expr := node.Expression()
-		if expr != nil && expr == superCall {
-			return false
-		}
-	}
-
-	return isSuperCallInStatement(node, superCall)
 }
 
 // contains checks if a slice contains a node
@@ -412,25 +404,14 @@ func contains(slice []*ast.Node, item *ast.Node) bool {
 	return false
 }
 
-// isSuperCallInStatement checks if a super call node is contained in a statement
+// isSuperCallInStatement checks if a super call node is contained in a statement.
+// Both nodes come from the same parsed source file, whose AST ranges are nested,
+// so range containment answers this directly. Walking the statement subtree for
+// every statement/call pair makes duplicate detection quadratic in calls times
+// subtree size on branch-heavy constructors.
 func isSuperCallInStatement(stmt *ast.Node, superCall *ast.Node) bool {
-	found := false
-	var check func(*ast.Node)
-	check = func(node *ast.Node) {
-		if node == nil || found {
-			return
-		}
-		if node == superCall {
-			found = true
-			return
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			check(child)
-			return found // Stop if found
-		})
-	}
-	check(stmt)
-	return found
+	return stmt != nil && superCall != nil &&
+		superCall.Pos() >= stmt.Pos() && superCall.End() <= stmt.End()
 }
 
 // hasBranchingWithEarlyReturn checks if there's any branching where some paths have early return/throw
@@ -522,6 +503,9 @@ func analyzeSuperCallsInBody(body *ast.Node) superCallAnalysis {
 	// Find all super() calls
 	findSuperCalls(body, &result.superCallLocations)
 	result.hasSuperCall = len(result.superCallLocations) > 0
+	if !result.hasSuperCall {
+		return result
+	}
 
 	// Analyze if all paths have super
 	result.allPathsHaveSuper = checkAllPathsHaveSuper(body)
