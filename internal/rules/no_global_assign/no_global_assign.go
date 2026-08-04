@@ -1,8 +1,6 @@
 package no_global_assign
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -13,12 +11,15 @@ type options struct {
 }
 
 func parseOptions(opts any) options {
-	result := options{exceptions: make(map[string]bool)}
+	var result options
 	optsMap := utils.GetOptionsMap(opts)
 	if optsMap != nil {
 		if exceptions, ok := optsMap["exceptions"].([]interface{}); ok {
 			for _, e := range exceptions {
 				if s, ok := e.(string); ok {
+					if result.exceptions == nil {
+						result.exceptions = make(map[string]bool, len(exceptions))
+					}
 					result.exceptions[s] = true
 				}
 			}
@@ -46,12 +47,27 @@ func isWriteThroughTypeAssertion(node *ast.Node) bool {
 	return false
 }
 
+func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "globalShouldNotBeModified",
+		Description: "Read-only global '" + name + "' should not be modified.",
+	}
+}
+
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
 	Name: "no-global-assign",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
+		// A single-entry cache covers the common case of repeated writes to one
+		// global without allocating maps for files that report once.
+		cache := struct {
+			name         string
+			globalSymbol *ast.Symbol
+			message      rule.RuleMessage
+			messageBuilt bool
+		}{}
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -72,14 +88,38 @@ var NoGlobalAssignRule = rule.Rule{
 					return
 				}
 
-				if utils.IsShadowed(node, name) {
-					return
+				if cache.name != name {
+					cache.name = name
+					cache.messageBuilt = false
+					if ctx.Refs != nil && ctx.TypeChecker != nil {
+						cache.globalSymbol = ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsValue, nil)
+					}
 				}
 
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "globalShouldNotBeModified",
-					Description: fmt.Sprintf("Read-only global '%s' should not be modified.", name),
-				})
+				if ctx.Refs == nil || ctx.TypeChecker == nil {
+					if utils.IsShadowed(node, name) {
+						return
+					}
+				} else {
+					if cache.globalSymbol == nil {
+						if utils.IsShadowed(node, name) {
+							return
+						}
+					} else {
+						// Resolve uses the binder's scope walk first, so a local shadow
+						// produces its own symbol; only an unshadowed reference falls back
+						// to the checker global cached above.
+						if ctx.Refs.Resolve(node) != cache.globalSymbol {
+							return
+						}
+					}
+				}
+
+				if !cache.messageBuilt {
+					cache.message = buildGlobalShouldNotBeModifiedMessage(name)
+					cache.messageBuilt = true
+				}
+				ctx.ReportNode(node, cache.message)
 			},
 		}
 	},
