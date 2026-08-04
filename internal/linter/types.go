@@ -111,6 +111,9 @@ type LintResult struct {
 type RunLinterOptions struct {
 	Programs       []*compiler.Program
 	SingleThreaded bool
+	// Cwd is the working directory of the linting run, forwarded verbatim to
+	// every RuleContext. See RuleContext.Cwd for what rules may assume of it.
+	Cwd string
 
 	Scope            FileScope
 	ExcludePaths     []string
@@ -147,6 +150,8 @@ type LintSingleFileOptions struct {
 	HasTypeInfo     bool
 	GetRulesForFile RuleHandler
 	ExcludePaths    []string
+	// Cwd has the same meaning as RunLinterOptions.Cwd.
+	Cwd string
 	// Consumer has the same native-only semantics as RunLinterOptions.Consumer.
 	Consumer rule.DiagnosticConsumer
 }

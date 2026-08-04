@@ -39,6 +39,13 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
+	// Cwd is the normalized working directory of the linting process, the
+	// counterpart of ESLint's `process.cwd()`. Rules that resolve configured
+	// relative paths should use it instead of the Program's current directory,
+	// which is the owning tsconfig's directory and therefore differs between
+	// Programs in the same run. Empty when the caller has no process directory
+	// to speak of, such as rule tests reading an in-memory fixture root.
+	Cwd string
 	// ConfigGlobals contains only globals from the effective
 	// `languageOptions.globals` configuration, before inline comments are
 	// applied. A false value is an explicit "off" setting.

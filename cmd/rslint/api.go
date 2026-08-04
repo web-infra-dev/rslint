@@ -604,6 +604,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	runOpts := linter.RunLinterOptions{
 		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
+		Cwd:            currentDirectory,
 		Scope:          linter.FileScope{Files: allowedFiles},
 		TargetFiles:    targetsByProgram,
 		// RunLinter repeats the RequiresTypeInfo eligibility check for files

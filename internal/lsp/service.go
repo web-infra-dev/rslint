@@ -964,16 +964,21 @@ type lintProgramLoader func(
 ) (*compiler.Program, *ast.SourceFile, error)
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, enforcePlugins, tsConfigPaths, fs, nil)
+	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
 	return result.Diagnostics, err
 }
 
+// runLintWithProgramLoader resolves one document against two distinct
+// directories: configCwd is the config's own path space, which a nested JS
+// config moves to its own directory, while processCwd is the server's working
+// directory that rules see as RuleContext.Cwd.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,
 	ctx context.Context,
 	rslintConfig config.RslintConfig,
 	cwd string,
+	processCwd string,
 	enforcePlugins bool,
 	tsConfigPaths []string,
 	fs vfs.FS,
@@ -1007,6 +1012,7 @@ func runLintWithProgramLoader(
 		program,
 		sourceFile,
 		configFilePath,
+		processCwd,
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
@@ -1018,6 +1024,7 @@ func lintSingleFile(
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
 	configFilePath string,
+	processCwd string,
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
@@ -1057,6 +1064,7 @@ func lintSingleFile(
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     program,
 		File:        sourceFile.FileName(),
+		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
@@ -1244,6 +1252,7 @@ func (s *Server) runConfiguredLint(
 		ctx,
 		rslintConfig,
 		cwd,
+		s.cwd,
 		enforcePlugins,
 		tsConfigPaths,
 		s.fs,
@@ -1289,6 +1298,7 @@ func (s *Server) runConfiguredLintForContent(
 				program,
 				sourceFile,
 				configFilePath,
+				s.cwd,
 				true,
 				resolver,
 				rule.EditDemandAutofix,
@@ -1305,6 +1315,7 @@ func (s *Server) runConfiguredLintForContent(
 		program,
 		sourceFileForPath(program, filename, overlayFS),
 		configFilePath,
+		s.cwd,
 		false,
 		resolver,
 		rule.EditDemandAutofix,

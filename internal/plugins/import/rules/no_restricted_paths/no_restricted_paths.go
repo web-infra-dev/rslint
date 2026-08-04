@@ -17,10 +17,10 @@ import (
 var schemaJSON []byte
 
 type zone struct {
-	targets []string
-	fromPaths   []string
-	except  []string
-	message string
+	targets   []string
+	fromPaths []string
+	except    []string
+	message   string
 }
 
 type ruleOptions struct {
@@ -49,10 +49,7 @@ var NoRestrictedPathsRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		basePath := opts.basePath
-		if basePath == "" {
-			basePath = ctx.Program.Host().GetCurrentDirectory()
-		}
+		basePath := resolveBasePath(ctx, opts.basePath)
 
 		currentFilename := import_utils.GetPhysicalFilename(ctx)
 		matchingZones := make([]zone, 0, len(opts.zones))
@@ -106,6 +103,22 @@ var NoRestrictedPathsRule = rule.Rule{
 	},
 }
 
+// resolveBasePath mirrors upstream's `options.basePath || process.cwd()` fed
+// into `path.resolve`: a configured relative `basePath` is made absolute
+// against the working directory, so zone paths resolved from it can be
+// compared against absolute file names. Rule tests and any other caller
+// without a process directory fall back to the Program's own directory.
+func resolveBasePath(ctx rule.RuleContext, configured string) string {
+	cwd := ctx.Cwd
+	if cwd == "" {
+		cwd = ctx.Program.Host().GetCurrentDirectory()
+	}
+	if configured == "" {
+		return tspath.NormalizePath(cwd)
+	}
+	return tspath.GetNormalizedAbsolutePath(configured, cwd)
+}
+
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
 	optsMap := utils.GetOptionsMap(options)
@@ -123,9 +136,9 @@ func parseOptions(options []any) ruleOptions {
 			continue
 		}
 		z := zone{
-			targets: toStringSlice(zoneMap["target"]),
-			fromPaths:   toStringSlice(zoneMap["from"]),
-			except:  toStringSlice(zoneMap["except"]),
+			targets:   toStringSlice(zoneMap["target"]),
+			fromPaths: toStringSlice(zoneMap["from"]),
+			except:    toStringSlice(zoneMap["except"]),
 		}
 		z.message, _ = zoneMap["message"].(string)
 		opts.zones = append(opts.zones, z)

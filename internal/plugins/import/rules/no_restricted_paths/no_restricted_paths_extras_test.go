@@ -314,6 +314,19 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/one/b", 1, 15)},
 			},
 
+			// Locks in upstream `path.resolve(basePath, ...)`: a relative `basePath` is
+			// made absolute against the current working directory before zone paths are
+			// resolved from it, so the zone still matches absolute file names.
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zonesWithBasePath("./restricted-paths", map[string]interface{}{
+					"target": "./client",
+					"from":   "./server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
 			// ---- Real-user: #2690 — a `dir/**/*` glob in `from` also covers the direct
 			// children of `dir`, not only its nested subtrees ----
 			{

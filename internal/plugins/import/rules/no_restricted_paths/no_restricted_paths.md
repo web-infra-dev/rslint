@@ -1,4 +1,4 @@
-# import/no-restricted-paths
+# no-restricted-paths
 
 ## Rule Details
 
@@ -98,7 +98,7 @@ import b from './b';
 
 ### `basePath`
 
-Relative `target`, `from` and `except` paths are resolved against `basePath`.
+Relative `target` and `from` paths are resolved against `basePath`, and a relative `basePath` is itself resolved against the current working directory. `except` entries stay relative to their zone's `from`.
 
 ```json
 {
