@@ -45,13 +45,14 @@ const msg2 = `items: ${arr.join(', ')}`;
 | `allowNumber`  | `boolean`                                | `true`                                      | Permit `number` and `bigint` typed values.                     |
 | `allowRegExp`  | `boolean`                                | `true`                                      | Permit `RegExp` typed values.                                  |
 
-To require every interpolated value to be a `string`, turn each `allow*` option off:
+To require every interpolated value to be a `string`, empty the `allow` list and turn each `allow*` option off:
 
 ```json
 {
   "@typescript-eslint/restrict-template-expressions": [
     "error",
     {
+      "allow": [],
       "allowAny": false,
       "allowBoolean": false,
       "allowNever": false,

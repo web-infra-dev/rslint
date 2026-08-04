@@ -154,7 +154,7 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 				return true
 			}
 
-			if matchesTypeOrBaseType(ctx.TypeChecker, func(t *checker.Type) bool {
+			if len(opts.Allow) > 0 && matchesTypeOrBaseType(ctx.TypeChecker, func(t *checker.Type) bool {
 				return utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program)
 			}, innerType, map[*checker.Type]struct{}{}) {
 				return true
