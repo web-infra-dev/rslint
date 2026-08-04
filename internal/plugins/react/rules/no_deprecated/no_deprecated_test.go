@@ -1,8 +1,11 @@
 package no_deprecated
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -21,6 +24,111 @@ func msg(oldMethod, version, newMethod, refs string) string {
 
 const lifecycleRefsTail = ". Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
 const lifecycleRefsHead = "https://reactjs.org/docs/react-component.html#"
+
+func TestDetectJsxPragmaFastPathMatchesRegexp(t *testing.T) {
+	t.Parallel()
+
+	for _, source := range []string{
+		"",
+		"const value = 'jsx';",
+		"const value = '@jsx';",
+		"/** @jsx Foo */",
+		"// prefix @jsx\t$Foo_1.Bar trailing",
+		"/* @jsx\nFoo.Bar */",
+		"@jsx Foo-Bar",
+		"@jsx9 Foo",
+		"@@jsx Foo",
+	} {
+		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+
+			want := ""
+			if match := jsxPragmaRe.FindStringSubmatch(source); match != nil {
+				want = match[1]
+			}
+			if got := detectJsxPragma(source); got != want {
+				t.Fatalf("detectJsxPragma(%q) = %q, want regexp result %q", source, got, want)
+			}
+		})
+	}
+}
+
+func TestParseVersionMatchesPreviousImplementation(t *testing.T) {
+	t.Parallel()
+
+	reference := func(version string) (int, int, int) {
+		var parts [3]int
+		for i, segment := range strings.Split(version, ".") {
+			if i >= len(parts) {
+				break
+			}
+			cut := len(segment)
+			for j, char := range segment {
+				if char < '0' || char > '9' {
+					cut = j
+					break
+				}
+			}
+			if value, err := strconv.Atoi(segment[:cut]); err == nil {
+				parts[i] = value
+			}
+		}
+		return parts[0], parts[1], parts[2]
+	}
+
+	for _, version := range []string{
+		"",
+		".",
+		"..",
+		"0.12.0",
+		"15.5.0",
+		"16.9.0-rc.1",
+		"18.0.0+build.7",
+		"1..3",
+		"1.2.3.4",
+		"1.a.3",
+		"v18.2.0",
+		" 18.2.0",
+		"999999999999999999999999.1.2",
+		"1.２.3",
+	} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+
+			wantMajor, wantMinor, wantPatch := reference(version)
+			gotMajor, gotMinor, gotPatch := parseVersion(version)
+			if gotMajor != wantMajor || gotMinor != wantMinor || gotPatch != wantPatch {
+				t.Fatalf(
+					"parseVersion(%q) = (%d, %d, %d), want (%d, %d, %d)",
+					version,
+					gotMajor,
+					gotMinor,
+					gotPatch,
+					wantMajor,
+					wantMinor,
+					wantPatch,
+				)
+			}
+		})
+	}
+}
+
+func TestDeprecatedPropertyGateCoversLookupTable(t *testing.T) {
+	t.Parallel()
+
+	for _, pragma := range []string{reactutil.DefaultReactPragma, "Foo", "Foo.Bar"} {
+		for methodName := range buildDeprecated(pragma) {
+			dot := strings.LastIndexByte(methodName, '.')
+			if dot < 0 {
+				continue
+			}
+			propertyName := methodName[dot+1:]
+			if !canBeDeprecatedPropertyName(propertyName) {
+				t.Errorf("property gate rejects %q from pragma %q", methodName, pragma)
+			}
+		}
+	}
+}
 
 func TestNoDeprecatedRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDeprecatedRule, []rule_tester.ValidTestCase{
