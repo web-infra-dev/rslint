@@ -8,7 +8,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/cfg"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_unreachable_loop.schema.json
@@ -23,8 +22,8 @@ var invalidLoop = rule.RuleMessage{
 var NoUnreachableLoopRule = rule.Rule{
 	Name:   "no-unreachable-loop",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		opts := parseOptions(rule.LegacyUnwrapOptions(_options))
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// Only the code paths that contain a loop worth checking need a graph.
 		var rootOrder []*ast.Node
@@ -65,7 +64,7 @@ var NoUnreachableLoopRule = rule.Rule{
 // reportLoops lays out each collected code path and reports the loops nothing
 // ever re-enters. ESLint collects across the whole file and reports at the end,
 // so the reports are ordered by position rather than by code path.
-func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts options) {
+func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts ruleOptions) {
 	var reports []*ast.Node
 	for _, root := range rootOrder {
 		reports = append(reports, singleIterationLoops(root, opts)...)
@@ -85,7 +84,7 @@ func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts options) {
 // `continue` names any of them. ESLint attaches only the innermost label to the
 // loop, so `outer: inner: while (foo) { continue outer; }` looks to it like a
 // loop nothing re-enters; internal/cfg keeps the edge, so the loop is accepted.
-func singleIterationLoops(root *ast.Node, opts options) []*ast.Node {
+func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
 	cfg.Build(root, cfg.Hooks[struct{}]{
@@ -126,31 +125,21 @@ var loopKinds = map[string]ast.Kind{
 	"ForOfStatement":   ast.KindForOfStatement,
 }
 
-type options struct {
+type ruleOptions struct {
 	ignore []ast.Kind
 }
 
-func parseOptions(raw any) options {
-	opts := options{}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
 		return opts
 	}
-	add := func(name string) {
+	optsMap, _ := options[0].(map[string]interface{})
+	ignore, _ := optsMap["ignore"].([]interface{})
+	for _, item := range ignore {
+		name, _ := item.(string)
 		if kind, ok := loopKinds[name]; ok {
 			opts.ignore = append(opts.ignore, kind)
-		}
-	}
-	switch ignore := optsMap["ignore"].(type) {
-	case []interface{}:
-		for _, item := range ignore {
-			if name, ok := item.(string); ok {
-				add(name)
-			}
-		}
-	case []string:
-		for _, name := range ignore {
-			add(name)
 		}
 	}
 	return opts
