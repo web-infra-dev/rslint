@@ -133,7 +133,7 @@ func TestNoReturnAwaitExtras(t *testing.T) {
 }`},
 			// Locks in upstream isInTailCallPosition() arm 3: the conditional test is not in tail position
 			{Code: `async () => (await bar() ? a : b)`},
-			// Locks in upstream hasErrorHandler(): a catch clause without a finalizer keeps the report
+			// Locks in upstream hasErrorHandler(): a catch clause with a finalizer suppresses the report
 			{Code: `async function foo() {
 	try {}
 	catch (e) {
