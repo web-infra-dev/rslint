@@ -6,7 +6,7 @@
 import { runConformanceSuite } from './conformance.js';
 import type { DiffCase } from './harness.js';
 
-/** 139 rules that report IDENTICALLY on a minimal trigger. */
+/** 140 rules that report IDENTICALLY on a minimal trigger. */
 const CASES: DiffCase[] = [
   {
     pkg: 'eslint-plugin-unicorn',
