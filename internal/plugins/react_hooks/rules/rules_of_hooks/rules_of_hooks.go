@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
@@ -377,12 +376,15 @@ func hasEarlyReturnBefore(hookNode *ast.Node, fn *ast.Node) bool {
 // LabeledStatement labels enclosing `node` within `fn`. Used by
 // `hasLabeledBreakBefore` to recognize `break <label>` references.
 func collectEnclosingLabels(node *ast.Node, fn *ast.Node) map[string]bool {
-	labels := map[string]bool{}
+	var labels map[string]bool
 	p := node.Parent
 	for p != nil && p != fn {
 		if p.Kind == ast.KindLabeledStatement {
 			ls := p.AsLabeledStatement()
 			if ls.Label != nil && ls.Label.Kind == ast.KindIdentifier {
+				if labels == nil {
+					labels = make(map[string]bool)
+				}
 				labels[ls.Label.AsIdentifier().Text] = true
 			}
 		}
@@ -579,69 +581,163 @@ func parseAdditionalHooks(options []any, settings map[string]interface{}) *regex
 	return re
 }
 
+func sourceMayUseHooks(sourceFile *ast.SourceFile) bool {
+	// Parsed identifier names are normalized, including Unicode escapes, and
+	// include property names such as the useState in React.useState. The table
+	// may also intern literal text, making computed properties a harmless false
+	// positive. Stay conservative for direct callers without parser metadata.
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	for name := range sourceFile.Identifiers {
+		if hasHookNameShape(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasHookNameShape(name string) bool {
+	if name == "use" {
+		return true
+	}
+	if len(name) < 4 || name[0] != 'u' || name[1] != 's' || name[2] != 'e' {
+		return false
+	}
+	next := name[3]
+	return next >= 'A' && next <= 'Z' || next >= '0' && next <= '9'
+}
+
+func mayBeHookCallee(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return hasHookNameShape(node.AsIdentifier().Text)
+	case ast.KindPropertyAccessExpression:
+		name := node.AsPropertyAccessExpression().Name()
+		return name != nil && name.Kind == ast.KindIdentifier && hasHookNameShape(name.AsIdentifier().Text)
+	}
+	return false
+}
+
+func sourceMayUseEffectEvent(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	_, ok := sourceFile.Identifiers["useEffectEvent"]
+	return ok
+}
+
 // eeRegistry tracks `const X = useEffectEvent(...)` declarations per enclosing
-// function-like, used as the fallback when TypeChecker symbol resolution is
-// unavailable. The TypeChecker path takes precedence whenever
-// `ctx.TypeChecker != nil`, since it correctly handles shadowing and aliased
-// references that the name-based lookup cannot.
+// function-like. Its name set filters the Identifier listener before reference
+// resolution; its binding list supports parser-only callers without Refs or a
+// TypeChecker.
 type eeRegistry struct {
-	bindings map[*ast.Node]map[string]bool
+	bindings []eeBinding
+	names    map[string]struct{}
+}
+
+type eeBinding struct {
+	container *ast.Node
+	name      string
 }
 
 func (r *eeRegistry) record(container *ast.Node, name string) {
 	if container == nil || name == "" {
 		return
 	}
-	m, ok := r.bindings[container]
-	if !ok {
-		m = make(map[string]bool)
-		r.bindings[container] = m
+	if r.names == nil {
+		r.names = make(map[string]struct{})
 	}
-	m[name] = true
+	r.bindings = append(r.bindings, eeBinding{container: container, name: name})
+	r.names[name] = struct{}{}
+}
+
+func (r *eeRegistry) hasName(name string) bool {
+	if r == nil {
+		return false
+	}
+	_, ok := r.names[name]
+	return ok
 }
 
 // resolveContainer returns the closest container with a tracked binding for
-// `name` walking up via `findEnclosingFunction`. Used as the fallback when
-// `ctx.TypeChecker` is nil — see also `resolveBindingViaSymbol`.
+// `name` walking up via `findEnclosingFunction`. It is only used when neither
+// RefStore nor the TypeChecker can resolve an identifier.
 func (r *eeRegistry) resolveContainer(idNode *ast.Node, name string) *ast.Node {
+	if r == nil {
+		return nil
+	}
 	cur := findEnclosingFunction(idNode)
 	for cur != nil {
-		if m, ok := r.bindings[cur]; ok && m[name] {
-			return cur
+		for _, binding := range r.bindings {
+			if binding.container == cur && binding.name == name {
+				return cur
+			}
 		}
 		cur = findEnclosingFunction(cur)
 	}
 	return nil
 }
 
-// collectEffectEventBindings walks the source file and records every
-// `useEffectEvent(...)` variable binding it finds. Tracks bindings in any
-// enclosing function-like (mirrors upstream's
+// collectEffectEventBindings records every `useEffectEvent(...)` variable
+// binding in any enclosing function-like (mirrors upstream's
 // `recordAllUseEffectEventFunctions` which fires for every
-// FunctionDeclaration / ArrowFunctionExpression). Used by the fallback
-// resolver when `ctx.TypeChecker` is unavailable.
+// FunctionDeclaration / ArrowFunctionExpression). Bound source files use their
+// locals-container chain; parser-only callers fall back to an AST walk.
 func collectEffectEventBindings(sf *ast.SourceFile) *eeRegistry {
-	reg := &eeRegistry{bindings: map[*ast.Node]map[string]bool{}}
+	if sf.IsBound() {
+		reg := &eeRegistry{}
+		complete := true
+		for container := sf.AsNode(); container != nil; {
+			data := container.LocalsContainerData()
+			if data == nil {
+				complete = false
+				break
+			}
+			for _, symbol := range data.Locals {
+				for _, declaration := range symbol.Declarations {
+					recordEffectEventBinding(reg, declaration)
+				}
+			}
+			container = data.NextContainer
+		}
+		if complete {
+			if len(reg.bindings) == 0 {
+				return nil
+			}
+			return reg
+		}
+	}
+
+	// Direct parser-only callers do not have binder symbol tables. Preserve a
+	// syntax-only fallback for them; normal linter execution takes the cheaper
+	// locals-container path above.
+	reg := &eeRegistry{}
 	var visit func(n *ast.Node) bool
 	visit = func(n *ast.Node) bool {
-		if isEffectEventVariableDeclaration(n) {
-			vd := n.AsVariableDeclaration()
-			if name := vd.Name(); name != nil && name.Kind == ast.KindIdentifier {
-				container := findEnclosingFunction(n)
-				reg.record(container, name.AsIdentifier().Text)
-			}
-		} else if isEffectEventBindingElement(n) {
-			be := n.AsBindingElement()
-			if name := be.Name(); name != nil && name.Kind == ast.KindIdentifier {
-				container := findEnclosingFunction(n)
-				reg.record(container, name.AsIdentifier().Text)
-			}
-		}
+		recordEffectEventBinding(reg, n)
 		n.ForEachChild(visit)
 		return false
 	}
 	sf.AsNode().ForEachChild(visit)
+	if len(reg.bindings) == 0 {
+		return nil
+	}
 	return reg
+}
+
+func recordEffectEventBinding(reg *eeRegistry, node *ast.Node) {
+	if !isEffectEventVariableDeclaration(node) && !isEffectEventBindingElement(node) {
+		return
+	}
+	name := node.Name()
+	if name != nil && name.Kind == ast.KindIdentifier {
+		reg.record(findEnclosingFunction(node), name.AsIdentifier().Text)
+	}
 }
 
 // isEffectEventVariableDeclaration reports whether `n` is a VariableDeclaration
@@ -676,9 +772,7 @@ func isEventInitializer(expr *ast.Node) bool {
 }
 
 // isUseEffectEventBindingDeclaration reports whether `decl` is a declaration
-// node whose initializer is `useEffectEvent(...)` — used by the
-// TypeChecker-path resolver to decide whether a resolved symbol is one of
-// our tracked bindings.
+// node whose initializer is `useEffectEvent(...)`.
 func isUseEffectEventBindingDeclaration(decl *ast.Node) bool {
 	if decl == nil {
 		return false
@@ -694,28 +788,31 @@ func isUseEffectEventBindingDeclaration(decl *ast.Node) bool {
 	return false
 }
 
-// resolveBindingViaSymbol uses the TypeChecker to resolve `idNode` to its
-// declaration, then checks whether any declaration is a tracked
-// `useEffectEvent` binding. Returns the enclosing function-like of the
-// declaration when matched, or nil otherwise.
-//
-// This is the preferred resolution path: it correctly handles parameter /
-// variable shadowing across nested closures, and matches references that
-// alias through `import { onClick } from './x'` etc.
-func resolveBindingViaSymbol(tc *checker.Checker, idNode *ast.Node) *ast.Node {
-	if tc == nil || idNode == nil {
-		return nil
+// resolveBinding uses the shared RefStore first and the TypeChecker only as a
+// compatibility fallback. The boolean distinguishes an unresolved identifier
+// from one conclusively resolved to a non-Effect-Event shadowing declaration.
+func resolveBinding(ctx rule.RuleContext, idNode *ast.Node) (*ast.Node, bool) {
+	if idNode == nil {
+		return nil, false
 	}
-	sym := tc.GetSymbolAtLocation(idNode)
+	var sym *ast.Symbol
+	if ctx.Refs != nil {
+		sym = ctx.Refs.Resolve(idNode)
+	}
+	if sym == nil && ctx.TypeChecker != nil {
+		sym = ctx.TypeChecker.GetSymbolAtLocation(idNode)
+	}
 	if sym == nil {
-		return nil
+		return nil, false
 	}
 	for _, decl := range sym.Declarations {
 		if isUseEffectEventBindingDeclaration(decl) {
-			return findEnclosingFunction(decl)
+			return findEnclosingFunction(decl), true
 		}
 	}
-	return nil
+	// A resolved non-Effect-Event symbol proves this occurrence is shadowed.
+	// Only unresolved identifiers should use the name-based fallback.
+	return nil, true
 }
 
 // hasFlowSuppression reports whether the line immediately preceding
@@ -816,14 +913,15 @@ func useEffectEventErrorMessage(fnName string, called bool) string {
 	if !called {
 		suffix = " It cannot be assigned to a variable or passed down."
 	}
-	return fmt.Sprintf("`%s` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component.%s", fnName, suffix)
+	return "`" + fnName + "` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component." + suffix
 }
 
-// silenceUnused keeps the helper imports referenced even when their usage
-// drifts during rule iteration. The runtime cost is zero; the lint hygiene
-// benefit is non-zero.
-var _ = strings.HasPrefix
-var _ core.TextRange
+func reportRange(sourceText string, node *ast.Node) core.TextRange {
+	// RuleContext.ReportNode tokenizes from node.Pos() to trim leading trivia.
+	// SkipTrivia computes the same start without allocating a scanner, while
+	// node.End() remains the report end for every node shape used by this rule.
+	return node.Loc.WithPos(scanner.SkipTrivia(sourceText, node.Pos()))
+}
 
 // RulesOfHooksRule is the rslint port of upstream `react-hooks/rules-of-hooks`.
 //
@@ -834,9 +932,9 @@ var _ core.TextRange
 // BigInt-precise path counting (and we add a `hasLabeledBreakBefore` walk
 // for the `label: { if (cond) break label; useFoo(); }` case).
 //
-// Identifier resolution for `useEffectEvent` references uses the TypeChecker
-// when available (correct under shadowing / aliasing); falls back to a
-// per-container name registry when `ctx.TypeChecker` is nil.
+// Identifier resolution for `useEffectEvent` references uses the shared Refs
+// index first (correct under shadowing), then the TypeChecker compatibility
+// path, and finally the per-container registry for parser-only callers.
 //
 // `$FlowFixMe[react-rule-hook]` suppression on the preceding line is
 // honored, mirroring upstream's `hasFlowSuppression` byte-for-byte.
@@ -844,28 +942,40 @@ var RulesOfHooksRule = rule.Rule{
 	Name:   "react-hooks/rules-of-hooks",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		additionalRe := parseAdditionalHooks(options, ctx.Settings)
 		sf := ctx.SourceFile
-		registry := collectEffectEventBindings(sf)
-		tc := ctx.TypeChecker
-
-		// reportedIdentifiers tracks identifier positions we've already
-		// reported on, so a single Identifier that matches both the
-		// useEffectEvent reference path and another check (rare) doesn't
-		// double-fire.
-		reportedIdentifiers := map[int]bool{}
-
-		report := func(node *ast.Node, msg string) {
-			if hasFlowSuppression(sf, node) {
-				return
+		if !sourceMayUseHooks(sf) {
+			return nil
+		}
+		additionalRe := parseAdditionalHooks(options, ctx.Settings)
+		var registry *eeRegistry
+		if sourceMayUseEffectEvent(sf) {
+			registry = collectEffectEventBindings(sf)
+		}
+		sourceText := sf.Text()
+		flowSuppressionChecked := false
+		mayHaveFlowSuppression := false
+		isFlowSuppressed := func(node *ast.Node) bool {
+			if !flowSuppressionChecked {
+				flowSuppressionChecked = true
+				mayHaveFlowSuppression = strings.Contains(sourceText, "$FlowFixMe[react-rule-hook]")
 			}
-			ctx.ReportNode(node, rule.RuleMessage{Description: msg})
+			return mayHaveFlowSuppression && hasFlowSuppression(sf, node)
 		}
 
-		return rule.RuleListeners{
+		report := func(node *ast.Node, msg string) {
+			if isFlowSuppressed(node) {
+				return
+			}
+			ctx.ReportRange(reportRange(sourceText, node), rule.RuleMessage{Description: msg})
+		}
+
+		listeners := rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
 				callee := call.Expression
+				if !mayBeHookCallee(callee) || !isHookCallee(callee) {
+					return
+				}
 
 				// Inline-call useEffectEvent that isn't being assigned.
 				// Mirrors upstream's standalone check: useEffectEvent must
@@ -879,11 +989,6 @@ var RulesOfHooksRule = rule.Rule{
 					}
 				}
 
-				if !isHookCallee(callee) {
-					return
-				}
-
-				hookText := makeHookText(callee, sf)
 				fn := findEnclosingFunction(node)
 				isUse := isUseIdentifier(callee)
 
@@ -897,7 +1002,7 @@ var RulesOfHooksRule = rule.Rule{
 
 				// Try/catch + use(): hard error, distinct from any other.
 				if isUse && isInsideTryCatchOfFunction(node, fn) {
-					report(callee, fmt.Sprintf(`React Hook "%s" cannot be called in a try/catch block.`, hookText))
+					report(callee, fmt.Sprintf(`React Hook "%s" cannot be called in a try/catch block.`, makeHookText(callee, sf)))
 				}
 
 				// Loop check (cycled || do-while). Skipped for use(), which
@@ -908,7 +1013,7 @@ var RulesOfHooksRule = rule.Rule{
 					if inAnyLoop {
 						report(callee, fmt.Sprintf(
 							`React Hook "%s" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`,
-							hookText,
+							makeHookText(callee, sf),
 						))
 					}
 				}
@@ -917,14 +1022,14 @@ var RulesOfHooksRule = rule.Rule{
 				if fn == nil {
 					report(callee, fmt.Sprintf(
 						`React Hook "%s" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`,
-						hookText,
+						makeHookText(callee, sf),
 					))
 					return
 				}
 
 				if isComponentOrHookFn(fn) {
 					if hasAsyncModifier(fn) {
-						report(callee, fmt.Sprintf(`React Hook "%s" cannot be called in an async function.`, hookText))
+						report(callee, fmt.Sprintf(`React Hook "%s" cannot be called in an async function.`, makeHookText(callee, sf)))
 						return
 					}
 					if isUse || inAnyLoop {
@@ -941,7 +1046,7 @@ var RulesOfHooksRule = rule.Rule{
 						}
 						report(callee, fmt.Sprintf(
 							`React Hook "%s" is called conditionally. React Hooks must be called in the exact same order in every component render.%s`,
-							hookText, suffix,
+							makeHookText(callee, sf), suffix,
 						))
 					}
 					return
@@ -951,7 +1056,7 @@ var RulesOfHooksRule = rule.Rule{
 				if isClassMember(fn) {
 					report(callee, fmt.Sprintf(
 						`React Hook "%s" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`,
-						hookText,
+						makeHookText(callee, sf),
 					))
 					return
 				}
@@ -960,7 +1065,7 @@ var RulesOfHooksRule = rule.Rule{
 				if name := getFunctionName(fn); name != nil {
 					report(callee, fmt.Sprintf(
 						`React Hook "%s" is called in function "%s" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`,
-						hookText, nameText(name, sf),
+						makeHookText(callee, sf), nameText(name, sf),
 					))
 					return
 				}
@@ -969,24 +1074,24 @@ var RulesOfHooksRule = rule.Rule{
 				if !isUse && isInsideComponentOrHook(node) {
 					report(callee, fmt.Sprintf(
 						`React Hook "%s" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`,
-						hookText,
+						makeHookText(callee, sf),
 					))
 				}
 			},
+		}
 
-			ast.KindIdentifier: func(node *ast.Node) {
-				if !isReferenceIdentifier(node) {
+		if registry != nil {
+			listeners[ast.KindIdentifier] = func(node *ast.Node) {
+				name := node.AsIdentifier().Text
+				if !registry.hasName(name) || !isReferenceIdentifier(node) {
 					return
 				}
-				name := node.AsIdentifier().Text
 
-				// Resolution: TypeChecker-first, with a name-based per-container
-				// fallback when type info is unavailable. The TypeChecker path
-				// is robust under shadowing and aliasing — the fallback is
-				// best-effort and may misidentify references when two
-				// containers use the same binding name.
-				container := resolveBindingViaSymbol(tc, node)
-				if container == nil {
+				// RefStore resolves the common local-binding path without a
+				// TypeChecker round trip. A name-based fallback remains for
+				// direct callers that provide neither facility.
+				container, resolved := resolveBinding(ctx, node)
+				if !resolved {
 					container = registry.resolveContainer(node, name)
 				}
 				if container == nil {
@@ -1001,15 +1106,12 @@ var RulesOfHooksRule = rule.Rule{
 						called = true
 					}
 				}
-				if reportedIdentifiers[node.Pos()] {
+				if isFlowSuppressed(node) {
 					return
 				}
-				reportedIdentifiers[node.Pos()] = true
-				if hasFlowSuppression(sf, node) {
-					return
-				}
-				ctx.ReportNode(node, rule.RuleMessage{Description: useEffectEventErrorMessage(name, called)})
-			},
+				ctx.ReportRange(reportRange(sourceText, node), rule.RuleMessage{Description: useEffectEventErrorMessage(name, called)})
+			}
 		}
+		return listeners
 	},
 }
