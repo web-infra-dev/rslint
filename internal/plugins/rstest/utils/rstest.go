@@ -24,8 +24,13 @@ const (
 
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
-	Parameterized     bool
 	ParameterizedKind RstestParameterizedKind
+}
+
+// IsParameterized reports whether the call was registered through `.each` or
+// `.for`. This survives alias resolution, unlike the call site's Members.
+func (parsed *ParsedRstestFnCall) IsParameterized() bool {
+	return parsed.ParameterizedKind != RstestParameterizedNone
 }
 
 type ParsedRstestFnCallHead = testFramework.ParsedCallHead

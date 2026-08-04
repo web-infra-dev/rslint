@@ -121,18 +121,11 @@ func parseRstestFnCall(
 		}
 	}
 
-	parameterized := false
 	switch resolved.state {
-	case rstestAPITest, rstestAPITestWithExtend:
+	case rstestAPITest, rstestAPITestWithExtend, rstestAPIParameterizedTest:
 		resolved.kind = RstestFnTypeTest
-	case rstestAPIDescribe:
+	case rstestAPIDescribe, rstestAPIParameterizedDescribe:
 		resolved.kind = RstestFnTypeDescribe
-	case rstestAPIParameterizedTest:
-		resolved.kind = RstestFnTypeTest
-		parameterized = true
-	case rstestAPIParameterizedDescribe:
-		resolved.kind = RstestFnTypeDescribe
-		parameterized = true
 	default:
 		return nil
 	}
@@ -170,7 +163,6 @@ func parseRstestFnCall(
 				},
 			},
 		},
-		Parameterized:     parameterized,
 		ParameterizedKind: resolved.parameterizedKind,
 	}
 }
