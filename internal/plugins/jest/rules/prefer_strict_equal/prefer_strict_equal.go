@@ -2,9 +2,9 @@ package prefer_strict_equal
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 // Message Builders
@@ -40,12 +40,12 @@ var PreferStrictEqualRule = rule.Rule{
 				}
 
 				for _, memberEntry := range MemberEntries {
-					kind := memberEntry.Node.Kind
-					if kind != ast.KindIdentifier && kind != ast.KindStringLiteral && kind != ast.KindNoSubstitutionTemplateLiteral {
+					if memberEntry.Name != "toEqual" {
 						continue
 					}
 
-					if memberEntry.Name != "toEqual" {
+					fixRange, fixText, ok := testFramework.AccessorReplacement(ctx.SourceFile, memberEntry.Node, "toStrictEqual")
+					if !ok {
 						continue
 					}
 
@@ -56,16 +56,8 @@ var PreferStrictEqualRule = rule.Rule{
 							Message: buildSuggestReplaceWithStrictEqualErrorMessage(),
 							FixesArr: []rule.RuleFix{
 								{
-									Range: core.NewTextRange(memberEntry.Node.Pos(), memberEntry.Node.End()),
-									Text: func() string {
-										if memberEntry.Node.Kind == ast.KindStringLiteral {
-											return "'toStrictEqual'"
-										}
-										if memberEntry.Node.Kind == ast.KindNoSubstitutionTemplateLiteral {
-											return "`toStrictEqual`"
-										}
-										return "toStrictEqual"
-									}(),
+									Range: fixRange,
+									Text:  fixText,
 								},
 							},
 						},

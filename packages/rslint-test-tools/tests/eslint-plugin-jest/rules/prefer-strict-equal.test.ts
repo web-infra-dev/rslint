@@ -42,6 +42,9 @@ ruleTester.run('prefer-strict-equal', {} as never, {
       ],
     },
     {
+      // The suggestion keeps the double quotes; it used to normalise them to
+      // single quotes, which disagreed with jest/no-alias-methods and could
+      // introduce a `quotes` violation.
       code: 'expect(something)["toEqual"](somethingElse);',
       errors: [
         {
@@ -51,7 +54,23 @@ ruleTester.run('prefer-strict-equal', {} as never, {
           suggestions: [
             {
               messageId: 'suggestReplaceWithStrictEqual',
-              output: "expect(something)['toStrictEqual'](somethingElse);",
+              output: 'expect(something)["toStrictEqual"](somethingElse);',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'expect(something).\n  toEqual(somethingElse);',
+      errors: [
+        {
+          messageId: 'useToStrictEqual',
+          column: 3,
+          line: 2,
+          suggestions: [
+            {
+              messageId: 'suggestReplaceWithStrictEqual',
+              output: 'expect(something).\n  toStrictEqual(somethingElse);',
             },
           ],
         },

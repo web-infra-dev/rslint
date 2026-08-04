@@ -53,6 +53,10 @@ func TestPreferStrictEqualRule(t *testing.T) {
 				},
 			},
 			{
+				// The suggestion keeps the double quotes. It used to rewrite
+				// them to single quotes, which introduced a `quotes` violation
+				// in a double-quoted codebase and disagreed with
+				// jest/no-alias-methods, which has always preserved them.
 				Code: `expect(something)["toEqual"](somethingElse);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -62,7 +66,7 @@ func TestPreferStrictEqualRule(t *testing.T) {
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestReplaceWithStrictEqual",
-								Output:    `expect(something)['toStrictEqual'](somethingElse);`,
+								Output:    `expect(something)["toStrictEqual"](somethingElse);`,
 							},
 						},
 					},
@@ -79,6 +83,56 @@ func TestPreferStrictEqualRule(t *testing.T) {
 							{
 								MessageId: "suggestReplaceWithStrictEqual",
 								Output:    "expect(something)[`toStrictEqual`](somethingElse);",
+							},
+						},
+					},
+				},
+			},
+			// Leading-trivia cases: the suggestion must not absorb whatever
+			// separates the dot from the matcher name.
+			{
+				Code: "expect(something).\n  toEqual(somethingElse);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useToStrictEqual",
+						Line:      2,
+						Column:    3,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestReplaceWithStrictEqual",
+								Output:    "expect(something).\n  toStrictEqual(somethingElse);",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: "expect(something). /* c */ toEqual(somethingElse);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useToStrictEqual",
+						Line:      1,
+						Column:    28,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestReplaceWithStrictEqual",
+								Output:    "expect(something). /* c */ toStrictEqual(somethingElse);",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: "expect(something)[/* c */ 'toEqual'](somethingElse);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useToStrictEqual",
+						Line:      1,
+						Column:    27,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestReplaceWithStrictEqual",
+								Output:    "expect(something)[/* c */ 'toStrictEqual'](somethingElse);",
 							},
 						},
 					},
