@@ -1,0 +1,1004 @@
+// Rstest Snapshot v1
+
+exports[`no-return-await > invalid 1`] = `
+{
+  "code": "
+async function foo() {
+	return await bar();
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 2`] = `
+{
+  "code": "
+async function foo() {
+	return await(bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 3`] = `
+{
+  "code": "
+async function foo() {
+	return (a, await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 4`] = `
+{
+  "code": "
+async function foo() {
+	return (a, b, await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 5`] = `
+{
+  "code": "
+async function foo() {
+	return (a && await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 6`] = `
+{
+  "code": "
+async function foo() {
+	return (a && b && await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 7`] = `
+{
+  "code": "
+async function foo() {
+	return (a || await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 8`] = `
+{
+  "code": "
+async function foo() {
+	return (a, b, (c, d, await bar()));
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 9`] = `
+{
+  "code": "
+async function foo() {
+	return (a, b, (c && await bar()));
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 10`] = `
+{
+  "code": "
+async function foo() {
+	return (await baz(), b, await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 11`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? await bar() : b);
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 12`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? a : await bar());
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 13`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? (a, await bar()) : b);
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 14`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? a : (b, await bar()));
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 15`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? (a && await bar()) : b);
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 16`] = `
+{
+  "code": "
+async function foo() {
+	return (baz() ? a : (b && await bar()));
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 17`] = `
+{
+  "code": "
+async () => { return await bar(); }
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 18`] = `
+{
+  "code": "
+async () => await bar()
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 19`] = `
+{
+  "code": "
+async () => (a, b, await bar())
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 20`] = `
+{
+  "code": "
+async () => (a && await bar())
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 21`] = `
+{
+  "code": "
+async () => (baz() ? await bar() : b)
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 22`] = `
+{
+  "code": "
+async () => (baz() ? a : (b, await bar()))
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 23`] = `
+{
+  "code": "
+async () => (baz() ? a : (b && await bar()))
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 2,
+        },
+        "start": {
+          "column": 32,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 24`] = `
+{
+  "code": "
+async function foo() {
+if (a) {
+		if (b) {
+			return await bar();
+		}
+	}
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 25`] = `
+{
+  "code": "
+async () => {
+if (a) {
+		if (b) {
+			return await bar();
+		}
+	}
+}
+",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 26`] = `
+{
+  "code": "
+              async function foo() {
+                try {}
+                finally {
+                  return await bar();
+                }
+              }
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 5,
+        },
+        "start": {
+          "column": 26,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 27`] = `
+{
+  "code": "
+              async function foo() {
+                try {}
+                catch (e) {
+                  return await bar();
+                }
+              }
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 5,
+        },
+        "start": {
+          "column": 26,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 28`] = `
+{
+  "code": "
+              try {
+                async function foo() {
+                  return await bar();
+                }
+              } catch (e) {}
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 29`] = `
+{
+  "code": "
+              try {
+                async () => await bar();
+              } catch (e) {}
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 30`] = `
+{
+  "code": "
+              async function foo() {
+                try {}
+                catch (e) {
+                  try {}
+                  catch (e) {
+                    return await bar();
+                  }
+                }
+              }
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 7,
+        },
+        "start": {
+          "column": 28,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 31`] = `
+{
+  "code": "
+              async function foo() {
+                return await new Promise(resolve => {
+                  resolve(5);
+                });
+              }
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 32`] = `
+{
+  "code": "
+              async () => {
+                return await (
+                  foo()
+                )
+              };
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-await > invalid 33`] = `
+{
+  "code": "
+              async function foo() {
+                return await // Test
+                  5;
+              }
+            ",
+  "diagnostics": [
+    {
+      "message": "Redundant use of \`await\` on a return value.",
+      "messageId": "redundantUseOfAwait",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -482,6 +482,7 @@ export default defineConfig({
     './tests/eslint/rules/no-with.test.ts',
     './tests/eslint/rules/no-proto.test.ts',
     './tests/eslint/rules/no-return-assign.test.ts',
+    './tests/eslint/rules/no-return-await.test.ts',
     './tests/eslint/rules/no-self-compare.test.ts',
     './tests/eslint/rules/no-sequences.test.ts',
     './tests/eslint/rules/strict.test.ts',

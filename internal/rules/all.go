@@ -93,6 +93,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
 	"github.com/web-infra-dev/rslint/internal/rules/no_return_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_return_await"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_compare"
@@ -235,6 +236,7 @@ func GetAllRules() []rule.Rule {
 		radix.RadixRule,
 		no_regex_spaces.NoRegexSpacesRule,
 		no_return_assign.NoReturnAssignRule,
+		no_return_await.NoReturnAwaitRule,
 		no_script_url.NoScriptUrlRule,
 		no_self_assign.NoSelfAssignRule,
 		no_self_compare.NoSelfCompareRule,
