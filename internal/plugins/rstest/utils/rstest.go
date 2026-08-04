@@ -8,14 +8,24 @@ import (
 )
 
 const RstestImportModule = "@rstest/core"
+const RstestPlaywrightImportModule = "@rstest/playwright"
 
 type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode
 
+type RstestParameterizedKind string
+
+const (
+	RstestParameterizedNone RstestParameterizedKind = ""
+	RstestParameterizedEach RstestParameterizedKind = "each"
+	RstestParameterizedFor  RstestParameterizedKind = "for"
+)
+
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
-	Parameterized bool
+	Parameterized     bool
+	ParameterizedKind RstestParameterizedKind
 }
 
 type ParsedRstestFnCallHead = testFramework.ParsedCallHead
