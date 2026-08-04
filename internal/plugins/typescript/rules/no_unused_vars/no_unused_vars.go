@@ -44,6 +44,7 @@ type analysisContext struct {
 	fallbackInfos      map[*ast.Symbol]referenceInfo
 	fallbackCandidates map[string][]*ast.Node
 	jsxScanned         bool
+	globalSourceFile   bool
 	firstJsx           *ast.Node
 	firstFragment      *ast.Node
 }
@@ -198,68 +199,118 @@ func isTypeOnlyReference(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindTypePredicate
 }
 
-// isPartOfAssignment checks if an identifier is a write-only target in an
-// assignment (simple =) or for-in/for-of initializer. Uses the TypeScript-go
-// public API GetAssignmentTarget which handles all destructuring patterns,
-// parenthesized expressions, and for-in/for-of loops.
-func isPartOfAssignment(node *ast.Node) bool {
-	target := ast.GetAssignmentTarget(node)
-	if target == nil {
+type assignmentReferenceKind uint8
+
+const (
+	assignmentReferenceNone assignmentReferenceKind = iota
+	assignmentReferenceWriteOnly
+	assignmentReferenceReadWrite
+)
+
+// classifyAssignmentReference distinguishes write-only references from
+// read/write updates. Direct targets use their parent; nested destructuring
+// and transparent wrappers delegate to tsgo's assignment-target walker.
+func classifyAssignmentReference(node *ast.Node) assignmentReferenceKind {
+	if node == nil || node.Parent == nil {
+		return assignmentReferenceNone
+	}
+
+	// Most identifiers are ordinary reads. Resolve direct assignment shapes
+	// from the parent and reserve tsgo's recursive walker for destructuring and
+	// transparent wrappers.
+	var target *ast.Node
+	switch parent := node.Parent; parent.Kind {
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		if binary == nil || binary.Left != node || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			return assignmentReferenceNone
+		}
+		target = parent
+	case ast.KindPrefixUnaryExpression:
+		operator := parent.AsPrefixUnaryExpression().Operator
+		if operator != ast.KindPlusPlusToken && operator != ast.KindMinusMinusToken {
+			return assignmentReferenceNone
+		}
+		target = parent
+	case ast.KindPostfixUnaryExpression:
+		operator := parent.AsPostfixUnaryExpression().Operator
+		if operator != ast.KindPlusPlusToken && operator != ast.KindMinusMinusToken {
+			return assignmentReferenceNone
+		}
+		target = parent
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		if parent.Initializer() != node {
+			return assignmentReferenceNone
+		}
+		target = parent
+	case ast.KindParenthesizedExpression,
+		ast.KindArrayLiteralExpression,
+		ast.KindSpreadElement,
+		ast.KindNonNullExpression,
+		ast.KindSpreadAssignment,
+		ast.KindShorthandPropertyAssignment,
+		ast.KindPropertyAssignment:
+		target = ast.GetAssignmentTarget(node)
+		if target == nil {
+			return assignmentReferenceNone
+		}
+	default:
+		return assignmentReferenceNone
+	}
+
+	switch target.Kind {
+	case ast.KindBinaryExpression:
+		bin := target.AsBinaryExpression()
+		if bin == nil {
+			return assignmentReferenceNone
+		}
+		if bin.OperatorToken.Kind == ast.KindEqualsToken {
+			return assignmentReferenceWriteOnly
+		}
+		if ast.IsCompoundAssignment(bin.OperatorToken.Kind) {
+			return assignmentReferenceReadWrite
+		}
+	case ast.KindPrefixUnaryExpression, ast.KindPostfixUnaryExpression:
+		return assignmentReferenceReadWrite
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		forStmt := target.AsForInOrOfStatement()
+		if forStmt != nil && forStmt.Statement != nil &&
+			forInBodyStartsWithReturn(forStmt.Statement) && isDirectForInOfTarget(node, target) {
+			return assignmentReferenceNone
+		}
+		return assignmentReferenceWriteOnly
+	}
+	return assignmentReferenceNone
+}
+
+// isDirectForInOfTarget mirrors the narrow shape recognized by ESLint's
+// isForInOfRef: only direct identifiers get the return-first-body exception;
+// a binding nested in a destructuring target remains write-only.
+func isDirectForInOfTarget(node *ast.Node, loop *ast.Node) bool {
+	if node == nil || !ast.IsForInOrOfStatement(loop) {
 		return false
 	}
-	// For simple assignment (=), the target is the LHS identifier → write-only.
-	// Compound assignments (+=, etc.) also read, so they are NOT write-only.
-	if target.Kind == ast.KindBinaryExpression {
-		bin := target.AsBinaryExpression()
-		return bin != nil && bin.OperatorToken.Kind == ast.KindEqualsToken
+	statement := loop.AsForInOrOfStatement()
+	if statement == nil || statement.Initializer == nil {
+		return false
 	}
-	// For-in/for-of initializers are write targets, UNLESS the first statement
-	// in the loop body is a ReturnStatement (pattern for checking property existence).
-	// This matches ESLint's isForInOfRef() logic (see #2342).
-	if target.Kind == ast.KindForInStatement || target.Kind == ast.KindForOfStatement {
-		forStmt := target.AsForInOrOfStatement()
-		if forStmt != nil && forStmt.Statement != nil && forInBodyStartsWithReturn(forStmt.Statement) {
-			return false // Not write-only — the variable is meaningfully used
-		}
+	initializer := ast.SkipParentheses(statement.Initializer)
+	if initializer == node {
 		return true
 	}
-	return false
-}
-
-// isUpdateTarget checks if the identifier is the operand of a prefix/postfix
-// increment or decrement (++x, x++, --x, x--).
-func isUpdateTarget(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
+	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
 		return false
 	}
-	parent := node.Parent
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		op := parent.AsPrefixUnaryExpression().Operator
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
-	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		op := parent.AsPostfixUnaryExpression().Operator
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
-	}
-	return false
-}
-
-// isCompoundAssignmentTarget checks if the identifier is the LHS of a compound
-// assignment (+=, -=, *=, etc.) but NOT a simple = or logical assignment.
-func isCompoundAssignmentTarget(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
+	declarations := initializer.AsVariableDeclarationList().Declarations
+	if declarations == nil || len(declarations.Nodes) != 1 {
 		return false
 	}
-	parent := node.Parent
-	if parent.Kind != ast.KindBinaryExpression {
+	declaration := declarations.Nodes[0].AsVariableDeclaration()
+	if declaration == nil {
 		return false
 	}
-	bin := parent.AsBinaryExpression()
-	if bin == nil || bin.Left != node {
-		return false
-	}
-	op := bin.OperatorToken.Kind
-	return ast.IsCompoundAssignment(op) && op != ast.KindEqualsToken
+	name := declaration.Name()
+	return name != nil && ast.SkipParentheses(name) == node
 }
 
 // hasAssignment checks if a variable declaration has an initializer or any
@@ -304,18 +355,6 @@ func isInsideLoop(node *ast.Node) bool {
 	return false
 }
 
-// nearestVariableScope returns the nearest enclosing function-like node containing
-// node, or nil if node sits at the top level (module/global scope). Blocks don't
-// introduce a new variable scope, matching escope's notion of a "variable scope".
-func nearestVariableScope(node *ast.Node) *ast.Node {
-	for current := node.Parent; current != nil; current = current.Parent {
-		if ast.IsFunctionLike(current) {
-			return current
-		}
-	}
-	return nil
-}
-
 // isSelfModifyingReference checks if a read reference to a variable is ONLY
 // used to modify the same variable, with the result not used elsewhere.
 // Examples: `a = a + 1;`, `a++;`, `a += 1;` (as statements, not sub-expressions).
@@ -330,34 +369,44 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.
 	if node == nil || node.Parent == nil {
 		return false
 	}
-	parent := node.Parent
-
-	// Case 1: a++ or a-- (update expression as a statement)
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		if op := parent.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
-			return isUnusedExpression(parent)
+	// Most reads are not assignment targets. Keep that hot path to a direct
+	// parent check, and use tsgo's walker only for transparent wrappers.
+	var assignmentTarget *ast.Node
+	switch parent := node.Parent; parent.Kind {
+	case ast.KindPrefixUnaryExpression:
+		operator := parent.AsPrefixUnaryExpression().Operator
+		if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
+			assignmentTarget = parent
 		}
-	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		if op := parent.AsPostfixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
-			return isUnusedExpression(parent)
+	case ast.KindPostfixUnaryExpression:
+		operator := parent.AsPostfixUnaryExpression().Operator
+		if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
+			assignmentTarget = parent
 		}
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		if binary != nil && binary.Left == node && ast.IsCompoundAssignment(binary.OperatorToken.Kind) {
+			assignmentTarget = parent
+		}
+	case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
+		assignmentTarget = ast.GetAssignmentTarget(node)
 	}
-
-	// Case 2: a += expr (compound assignment — the LHS identifier is both read and written).
-	// Logical assignments (??=, &&=, ||=) are NOT self-modifying because they conditionally
-	// assign and ESLint considers them as meaningful usage.
-	if parent.Kind == ast.KindBinaryExpression {
-		bin := parent.AsBinaryExpression()
-		if bin != nil && ast.IsCompoundAssignment(bin.OperatorToken.Kind) && bin.Left == node {
+	if assignmentTarget != nil {
+		switch assignmentTarget.Kind {
+		case ast.KindPrefixUnaryExpression, ast.KindPostfixUnaryExpression:
+			return isUnusedExpression(assignmentTarget)
+		case ast.KindBinaryExpression:
+			bin := assignmentTarget.AsBinaryExpression()
+			if bin == nil || !ast.IsCompoundAssignment(bin.OperatorToken.Kind) {
+				break
+			}
 			op := bin.OperatorToken.Kind
 			if op == ast.KindBarBarEqualsToken || op == ast.KindAmpersandAmpersandEqualsToken || op == ast.KindQuestionQuestionEqualsToken {
-				return false // Logical assignment — not self-modifying
+				return false
 			}
-			return isUnusedExpression(parent)
+			return isUnusedExpression(assignmentTarget)
 		}
 	}
-
 	// Case 3: cb = (function(a) { return cb(1+a); })() — identifier inside IIFE body
 	// that's assigned back to the same variable. Walk up from the identifier to find
 	// if it's inside a function whose call result is assigned to the same variable.
@@ -378,7 +427,7 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.
 			if bin != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
 				lhsSym := checker.GetSymbolAtLocation(bin.Left)
 				if lhsSym == sym {
-					if declNode != nil && (nearestVariableScope(p) != nearestVariableScope(declNode) || isInsideLoop(p)) {
+					if declNode != nil && (ast.GetContainingFunction(p) != ast.GetContainingFunction(declNode) || isInsideLoop(p)) {
 						return false
 					}
 					return isUnusedExpression(p)
@@ -562,7 +611,7 @@ func isMethodCallOnSameSymbol(callee *ast.Node, sym *ast.Symbol, checker *checke
 func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
 	current := node
 	for current != nil {
-		if current.Kind == ast.KindFunctionExpression || current.Kind == ast.KindArrowFunction {
+		if ast.IsFunctionExpressionOrArrowFunction(current) {
 			// Walk up from the function expression through parens, commas, and calls
 			// to find the enclosing assignment.
 			ancestor := current.Parent
@@ -615,8 +664,9 @@ func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, ac *analysisContext) 
 	}
 	if ast.IsIdentifier(nameNode) {
 		definition := nameNode.Parent
-		sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
-		info := getReferenceInfo(ctx, nameNode, nameNode.AsIdentifier().Text, definition, sym, ac)
+		rawSym := binderSymbolForDefinition(nameNode, definition)
+		sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
+		info := getReferenceInfo(ctx, nameNode, nameNode.AsIdentifier().Text, definition, rawSym, sym, ac)
 		for _, usage := range info.usages {
 			if usage.Pos() != nameNode.Pos() {
 				return true
@@ -679,7 +729,7 @@ func isForInOfDeclaration(node *ast.Node) *ast.Node {
 	if forStmt == nil {
 		return nil
 	}
-	if forStmt.Kind == ast.KindForInStatement || forStmt.Kind == ast.KindForOfStatement {
+	if ast.IsForInOrOfStatement(forStmt) {
 		return forStmt
 	}
 	return nil
@@ -896,11 +946,11 @@ func isDirectlyExported(definition *ast.Node) bool {
 }
 
 func isParameterNode(node *ast.Node) bool {
-	return ast.FindAncestorKind(node, ast.KindParameter) != nil
+	return node != nil && ast.IsPartOfParameterDeclaration(node)
 }
 
 func isCaughtErrorNode(node *ast.Node) bool {
-	return ast.FindAncestorKind(node, ast.KindCatchClause) != nil
+	return node != nil && ast.IsCatchClauseVariableDeclarationOrBindingElement(node)
 }
 
 func isUsingDeclaration(varDeclNode *ast.Node) bool {
@@ -1156,14 +1206,14 @@ func getImportRemoveFix(ctx rule.RuleContext, definition *ast.Node, reportedUnus
 
 	case ast.KindNamespaceImport:
 		// import * as ns from 'foo' → remove entire import declaration
-		importDecl := getImportDeclaration(definition)
+		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
 		if importDecl != nil {
 			return []rule.RuleFix{removeImportLine(file, importDecl)}, buildRemoveUnusedImportMessage()
 		}
 
 	case ast.KindImportClause:
 		// import Foo from 'foo' (default import)
-		importDecl := getImportDeclaration(definition)
+		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
 		if importDecl == nil {
 			break
 		}
@@ -1189,7 +1239,7 @@ func getImportRemoveFix(ctx rule.RuleContext, definition *ast.Node, reportedUnus
 
 	case ast.KindImportSpecifier:
 		// import { Foo } from 'foo' (named import specifier)
-		importDecl := getImportDeclaration(definition)
+		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
 		if importDecl == nil {
 			break
 		}
@@ -1240,17 +1290,6 @@ func reportUnusedImport(
 			FixesArr: fixes,
 		}}
 	})
-}
-
-func getImportDeclaration(node *ast.Node) *ast.Node {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindImportDeclaration {
-			return current
-		}
-		current = current.Parent
-	}
-	return nil
 }
 
 func allImportSpecifiersUnused(clause *ast.ImportClause, reportedUnused map[*ast.Node]bool) bool {
@@ -1469,9 +1508,9 @@ func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, ac *analysi
 		if ac.localExportTargets == nil {
 			ac.localExportTargets = make(map[*ast.Symbol]bool)
 		}
-		// RefStore returns binder symbols on its fast path, while
-		// processVariable starts from the checker symbol at the declaration.
-		// Retain both identities plus the alias target.
+		// Retain the binder identity plus its merged and alias targets. The
+		// latter two cover the checker-backed paths used for global, merged,
+		// and namespace declarations.
 		ac.localExportTargets[target] = true
 		if merged := ctx.TypeChecker.GetMergedSymbol(target); merged != nil {
 			target = merged
@@ -1484,11 +1523,12 @@ func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, ac *analysi
 }
 
 func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, collector *checkerReferenceCollector) {
+	assignmentKind := classifyAssignmentReference(node)
 	// Keep TypeScript's ordinary location symbol for write-only shorthand
 	// destructuring targets. In `({ a } = value)`, that node is the property
 	// symbol; ESLint reports an unused `a` at its declaration rather than at
 	// this property-shaped write.
-	if isPartOfAssignment(node) {
+	if assignmentKind == assignmentReferenceWriteOnly {
 		if sym := ctx.TypeChecker.GetSymbolAtLocation(node); sym != nil {
 			collector.writeRefs[sym] = append(collector.writeRefs[sym], node)
 		}
@@ -1502,7 +1542,7 @@ func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, collector *che
 
 	// Compound assignments (+=, -=, etc.) and update expressions (++, --)
 	// are both read and write.
-	if sym != nil && (isCompoundAssignmentTarget(node) || isUpdateTarget(node)) {
+	if sym != nil && assignmentKind == assignmentReferenceReadWrite {
 		collector.writeRefs[sym] = append(collector.writeRefs[sym], node)
 	}
 	if sym != nil {
@@ -1573,10 +1613,34 @@ func binderSymbolForDefinition(nameNode *ast.Node, definition *ast.Node) *ast.Sy
 			return sym
 		}
 	}
-	if nameNode != nil && nameNode.Parent != nil && nameNode.Parent.Name() == nameNode {
-		return nameNode.Parent.Symbol()
+	if declaration := ast.GetDeclarationFromName(nameNode); declaration != nil {
+		return declaration.Symbol()
 	}
 	return nil
+}
+
+// symbolForVariable keeps the binder symbol on the common path. RefStore is
+// keyed by that identity, and module-local, unmerged declarations do not need
+// a checker round trip just to recover the same symbol. For declarations that
+// may have a checker-merged identity, tsgo's direct raw-to-merged lookup avoids
+// resolving the declaration name again.
+func symbolForVariable(
+	ctx rule.RuleContext,
+	nameNode *ast.Node,
+	definition *ast.Node,
+	rawSym *ast.Symbol,
+	globalSourceFile bool,
+) *ast.Symbol {
+	if rawSym == nil {
+		return ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	}
+	needsMergedSymbol := globalSourceFile ||
+		len(rawSym.Declarations) > 1 ||
+		(definition != nil && definition.Kind == ast.KindModuleDeclaration)
+	if !needsMergedSymbol {
+		return rawSym
+	}
+	return ctx.TypeChecker.GetMergedSymbol(rawSym)
 }
 
 // classifyReferenceNodes separates write-only references while preserving
@@ -1586,7 +1650,8 @@ func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
 	info := referenceInfo{usages: refs}
 	var filtered []*ast.Node
 	for i, ref := range refs {
-		if isPartOfAssignment(ref) {
+		assignmentKind := classifyAssignmentReference(ref)
+		if assignmentKind == assignmentReferenceWriteOnly {
 			// In `({ x } = value)`, TypeScript exposes the shorthand node as
 			// the object's property symbol. Preserve the existing ESLint-
 			// compatible behavior: exclude it as a read, but report an unused
@@ -1600,7 +1665,7 @@ func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
 			}
 			continue
 		}
-		if isCompoundAssignmentTarget(ref) || isUpdateTarget(ref) {
+		if assignmentKind == assignmentReferenceReadWrite {
 			info.writeRefs = append(info.writeRefs, ref)
 		}
 		if filtered != nil {
@@ -1682,11 +1747,12 @@ func getReferenceInfo(
 	nameNode *ast.Node,
 	name string,
 	definition *ast.Node,
+	rawSym *ast.Symbol,
 	checkerSym *ast.Symbol,
 	ac *analysisContext,
 ) referenceInfo {
-	isParameterProperty := definition != nil && definition.Kind == ast.KindParameter &&
-		ast.HasSyntacticModifier(definition, ast.ModifierFlagsParameterPropertyModifier)
+	isParameterProperty := definition != nil && definition.Parent != nil &&
+		ast.IsParameterPropertyDeclaration(definition, definition.Parent)
 	if isParameterProperty && checkerSym != nil {
 		if info, ok := ac.fallbackInfos[checkerSym]; ok {
 			return info
@@ -1702,7 +1768,7 @@ func getReferenceInfo(
 		return info
 	}
 
-	if rawSym := binderSymbolForDefinition(nameNode, definition); rawSym != nil && ctx.Refs != nil {
+	if rawSym != nil && ctx.Refs != nil {
 		info := classifyReferenceNodes(ctx.Refs.References(rawSym))
 		if definition != nil && definition.Kind == ast.KindModuleDeclaration &&
 			len(info.usages) == 0 && len(info.writeRefs) == 0 && checkerSym != nil {
@@ -1839,7 +1905,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		Definition:     definition,
 	}
 
-	sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	rawSym := binderSymbolForDefinition(nameNode, definition)
+	sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
 	// For declaration merging (interface + const, etc.), only process once.
 	if sym != nil && len(sym.Declarations) > 1 {
 		if ac.seenMergedSymbols[sym] {
@@ -1851,7 +1918,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		ac.seenMergedSymbols[sym] = true
 	}
 
-	info := getReferenceInfo(ctx, nameNode, name, definition, sym, ac)
+	info := getReferenceInfo(ctx, nameNode, name, definition, rawSym, sym, ac)
 	varInfo.References = info.usages
 
 	// For declaration merging (e.g., multiple interfaces with same name),
@@ -1996,7 +2063,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
-		ac := &analysisContext{}
+		ac := &analysisContext{globalSourceFile: ast.IsGlobalSourceFile(ctx.SourceFile.AsNode())}
 		exportsCollected := false
 
 		var seenWithoutBodyFuncSymbols map[*ast.Symbol]bool
@@ -2070,7 +2137,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				// is considered "used" (checking property existence).
 				if forStmt := isForInOfDeclaration(node); forStmt != nil {
 					body := forStmt.AsForInOrOfStatement().Statement
-					if forInBodyStartsWithReturn(body) {
+					if ast.IsIdentifier(varDecl.Name()) && forInBodyStartsWithReturn(body) {
 						return
 					}
 				}
@@ -2264,7 +2331,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 
 				// Skip constructor parameter properties (private/protected/public/readonly params).
 				// These are promoted to class fields and are inherently "used".
-				if ast.HasSyntacticModifier(node, ast.ModifierFlagsParameterPropertyModifier) {
+				if ast.IsParameterPropertyDeclaration(node, node.Parent) {
 					return
 				}
 

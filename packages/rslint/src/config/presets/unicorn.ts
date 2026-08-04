@@ -292,8 +292,8 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-regexp-test': 'error', // not implemented
     // 'unicorn/prefer-response-static-json': 'error', // not implemented
     // 'unicorn/prefer-scoped-selector': 'error', // not implemented
-    // 'unicorn/prefer-set-has': 'error', // not implemented
     // 'unicorn/prefer-set-methods': 'error', // not implemented
+    'unicorn/prefer-set-has': 'error',
     // 'unicorn/prefer-set-size': 'error', // not implemented
     // 'unicorn/prefer-short-arrow-method': 'off', // not implemented
     // 'unicorn/prefer-simple-condition-first': 'error', // not implemented

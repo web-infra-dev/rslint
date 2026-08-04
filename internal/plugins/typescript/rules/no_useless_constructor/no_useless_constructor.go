@@ -22,6 +22,8 @@ func buildRemoveConstructorMessage() rule.RuleMessage {
 	}
 }
 
+const usefulParameterModifiers = ast.ModifierFlagsParameterPropertyModifier | ast.ModifierFlagsDecorator
+
 // checkAccessibility returns true if the constructor should be checked (accessibility
 // does not make it useful). Returns false (skip) for private/protected constructors,
 // and for public constructors in classes that extend another class.
@@ -33,9 +35,12 @@ func checkAccessibility(modifierFlags ast.ModifierFlags, classHasSuperClass bool
 // checkParams returns true if the constructor should be checked (no parameter
 // properties or decorators that make it useful).
 func checkParams(params []*ast.Node) bool {
-	const usefulParameterModifiers = ast.ModifierFlagsParameterPropertyModifier | ast.ModifierFlagsDecorator
 	for _, param := range params {
-		if param.Kind == ast.KindParameter && param.ModifierFlags()&usefulParameterModifiers != 0 {
+		if param.Kind != ast.KindParameter {
+			continue
+		}
+		modifiers := param.AsParameterDeclaration().Modifiers()
+		if modifiers != nil && modifiers.ModifierFlags&usefulParameterModifiers != 0 {
 			return false
 		}
 	}
@@ -49,11 +54,10 @@ func isSimpleParam(param *ast.Node) bool {
 		return false
 	}
 	pd := param.AsParameterDeclaration()
-	if pd == nil {
+	if pd == nil || pd.Initializer != nil {
 		return false
 	}
-	// Must not have default value
-	if pd.Initializer != nil {
+	if modifiers := pd.Modifiers(); modifiers != nil && modifiers.ModifierFlags&usefulParameterModifiers != 0 {
 		return false
 	}
 	// ESTree represents every rest parameter as a RestElement. Its binding
@@ -61,7 +65,7 @@ func isSimpleParam(param *ast.Node) bool {
 	if pd.DotDotDotToken != nil {
 		return true
 	}
-	name := param.Name()
+	name := pd.Name()
 	return name != nil && name.Kind == ast.KindIdentifier
 }
 
@@ -78,11 +82,17 @@ func singleSuperCall(statements []*ast.Node) *ast.CallExpression {
 	if expr == nil {
 		return nil
 	}
-	expr = ast.SkipParentheses(expr)
-	if expr == nil || !ast.IsSuperCall(expr) {
+	if expr.Kind != ast.KindCallExpression {
+		expr = ast.SkipParentheses(expr)
+	}
+	if expr == nil || expr.Kind != ast.KindCallExpression {
 		return nil
 	}
-	return expr.AsCallExpression()
+	call := expr.AsCallExpression()
+	if call.Expression == nil || call.Expression.Kind != ast.KindSuperKeyword {
+		return nil
+	}
+	return call
 }
 
 // isSpreadArguments checks if the arguments are exactly `...arguments`.
@@ -98,8 +108,11 @@ func isSpreadArguments(args []*ast.Node) bool {
 	if se == nil || se.Expression == nil {
 		return false
 	}
-	expr := ast.SkipParentheses(se.Expression)
-	return expr != nil && expr.Kind == ast.KindIdentifier && expr.Text() == "arguments"
+	expr := se.Expression
+	if expr.Kind != ast.KindIdentifier {
+		expr = ast.SkipParentheses(expr)
+	}
+	return expr != nil && expr.Kind == ast.KindIdentifier && expr.AsIdentifier().Text == "arguments"
 }
 
 // isValidIdentifierPair checks if the constructor param and super arg are both identifiers with the same name.
@@ -107,11 +120,15 @@ func isValidIdentifierPair(paramName *ast.Node, superArg *ast.Node) bool {
 	if paramName == nil || superArg == nil {
 		return false
 	}
-	superArg = ast.SkipParentheses(superArg)
-	return paramName.Kind == ast.KindIdentifier &&
-		superArg != nil &&
+	if paramName.Kind != ast.KindIdentifier {
+		return false
+	}
+	if superArg.Kind != ast.KindIdentifier {
+		superArg = ast.SkipParentheses(superArg)
+	}
+	return superArg != nil &&
 		superArg.Kind == ast.KindIdentifier &&
-		paramName.Text() == superArg.Text()
+		paramName.AsIdentifier().Text == superArg.AsIdentifier().Text
 }
 
 // isValidRestSpreadPair checks if the constructor param is a rest param and
@@ -133,11 +150,18 @@ func isPassingThrough(params []*ast.Node, args []*ast.Node) bool {
 		return false
 	}
 	for i := range params {
-		pd := params[i].AsParameterDeclaration()
+		param := params[i]
+		if param.Kind != ast.KindParameter {
+			return false
+		}
+		pd := param.AsParameterDeclaration()
 		if pd == nil || pd.Initializer != nil {
 			return false
 		}
-		paramName := params[i].Name()
+		if modifiers := pd.Modifiers(); modifiers != nil && modifiers.ModifierFlags&usefulParameterModifiers != 0 {
+			return false
+		}
+		paramName := pd.Name()
 		if paramName == nil {
 			return false
 		}
@@ -152,12 +176,9 @@ func isPassingThrough(params []*ast.Node, args []*ast.Node) bool {
 	return true
 }
 
-// isRedundantSuperCall checks if the constructor body is just a redundant super() call.
-func isRedundantSuperCall(statements []*ast.Node, params []*ast.Node) bool {
-	call := singleSuperCall(statements)
-	if call == nil {
-		return false
-	}
+// isRedundantSuperCall checks if parameters are passed through by the only
+// super() call in a derived constructor.
+func isRedundantSuperCall(call *ast.CallExpression, params []*ast.Node) bool {
 	var args []*ast.Node
 	if call.Arguments != nil {
 		args = call.Arguments.Nodes
@@ -171,6 +192,36 @@ func isRedundantSuperCall(statements []*ast.Node, params []*ast.Node) bool {
 		}
 	}
 	return true
+}
+
+func containingClass(node *ast.Node) *ast.Node {
+	classNode := node.Parent
+	if classNode != nil && (classNode.Kind == ast.KindClassDeclaration || classNode.Kind == ast.KindClassExpression) {
+		return classNode
+	}
+	return ast.GetContainingClass(node)
+}
+
+func classHasSuperClass(classNode *ast.Node) bool {
+	var clauses *ast.HeritageClauseList
+	switch classNode.Kind {
+	case ast.KindClassDeclaration:
+		clauses = classNode.AsClassDeclaration().HeritageClauses
+	case ast.KindClassExpression:
+		clauses = classNode.AsClassExpression().HeritageClauses
+	default:
+		return false
+	}
+	if clauses == nil {
+		return false
+	}
+	for _, clauseNode := range clauses.Nodes {
+		clause := clauseNode.AsHeritageClause()
+		if clause.Token == ast.KindExtendsKeyword && clause.Types != nil && len(clause.Types.Nodes) != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // constructorRanges returns ESLint's constructor-key diagnostic span and the
@@ -259,39 +310,54 @@ var NoUselessConstructorRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				classNode := ast.GetContainingClass(node)
+				var statements []*ast.Node
+				if statementList := constructor.Body.AsBlock().Statements; statementList != nil {
+					statements = statementList.Nodes
+				}
+				var superCall *ast.CallExpression
+				switch len(statements) {
+				case 0:
+				case 1:
+					superCall = singleSuperCall(statements)
+					if superCall == nil {
+						return
+					}
+				default:
+					return
+				}
+
+				classNode := containingClass(node)
 				if classNode == nil {
 					return
 				}
 
-				hasSuper := ast.GetExtendsHeritageClauseElement(classNode) != nil
+				hasSuper := classHasSuperClass(classNode)
+				if hasSuper != (superCall != nil) {
+					return
+				}
 
 				// TypeScript-specific: skip if accessibility makes constructor useful
-				modifierFlags := node.ModifierFlags()
+				modifierFlags := ast.ModifierFlagsNone
+				if modifiers := constructor.Modifiers(); modifiers != nil {
+					modifierFlags = modifiers.ModifierFlags
+				}
 				if modifierFlags&ast.ModifierFlagsStatic != 0 ||
 					!checkAccessibility(modifierFlags, hasSuper) {
 					return
 				}
 
-				// TypeScript-specific: skip if params have parameter properties or decorators
 				var params []*ast.Node
 				if constructor.Parameters != nil {
 					params = constructor.Parameters.Nodes
 				}
-				if !checkParams(params) {
-					return
-				}
-
-				body := constructor.Body.Statements()
-
-				isUseless := false
-				if hasSuper {
-					isUseless = isRedundantSuperCall(body, params)
-				} else {
-					isUseless = len(body) == 0
-				}
-
-				if !isUseless {
+				// TypeScript-specific: parameter properties and decorators make a
+				// constructor useful. Derived constructors validate those modifiers
+				// in the same pass that checks argument forwarding.
+				if superCall != nil {
+					if !isRedundantSuperCall(superCall, params) {
+						return
+					}
+				} else if !checkParams(params) {
 					return
 				}
 

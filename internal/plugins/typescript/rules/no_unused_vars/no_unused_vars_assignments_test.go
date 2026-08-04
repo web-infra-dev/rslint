@@ -78,6 +78,16 @@ for (var prop in box) {
 		{Code: `for (let item of [1, 2, 3]) { console.log(item); }`},
 		// for-in with const
 		{Code: `for (const key in { a: 1 }) { console.log(key); }`},
+		// A direct for-in target followed immediately by return is meaningful.
+		{Code: `export function hasKey(obj: object) {
+  for (const key in obj) { return true; }
+}`},
+		{Code: `export function hasKey(obj: object) {
+  let key: string;
+  for (key in obj) { return true; }
+}`},
+		// Ordinary unary reads must not be confused with ++/-- writes.
+		{Code: `export {}; let value = 1; +value;`},
 
 		// --- sequence expression: self-modification result consumed ---
 		{Code: `let x = 0; x++, console.log(x);`},
@@ -101,6 +111,14 @@ for (let i = 0; i < 10; i++) {
 let x: any = 0;
 for (const item of [1, 2, 3]) {
   x = foo(x, item);
+}
+`},
+		// Module-local symbols take the binder-backed reference path.
+		{Code: `
+export {};
+let x: any = 0;
+for (let i = 0; i < 10; i++) {
+  x = foo(x);
 }
 `},
 
@@ -365,6 +383,43 @@ console.log(a);
 		{
 			Code:   `function foo(a: number) { a++; } foo(1);`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 27}},
+		},
+		{
+			Code: `export {};
+let a = 0;
+a = a + 1;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 1}},
+		},
+		{
+			Code: `export {};
+function foo(a: number) { a = a + 1; }
+foo(1);`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 2, Column: 27}},
+		},
+		{
+			Code: `export {};
+let a = 0;
+(a) += 1;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 2}},
+		},
+		{
+			Code: `export {};
+let a = 0;
+(a)++;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 2}},
+		},
+		{
+			Code: `export function first(values: number[][]) {
+  for (const [item] of values) { return; }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 2, Column: 15}},
+		},
+		{
+			Code: `export function first(values: number[][]) {
+  let item: number;
+  for ([item] of values) { return; }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 9}},
 		},
 		{
 			Code:   `var a = 3; a = a * 5 + 6;`,

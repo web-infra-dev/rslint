@@ -35,6 +35,13 @@ func TestNoObjCallsRule(t *testing.T) {
 			{Code: `function f() { var Math = 1; Math(); }`},
 			{Code: `function f(JSON: any) { JSON(); }`},
 			{Code: `function f() { var globalThis = { Math: () => {} }; globalThis.Math(); }`},
+			{Code: `import Math from "math"; Math();`},
+			{Code: `import { JSON } from "json"; JSON();`},
+			{Code: `import * as Reflect from "reflect"; Reflect();`},
+			{Code: `const { Math } = source; Math();`},
+			{Code: `try {} catch (Intl) { Intl(); }`},
+			{Code: `const value = function JSON() { JSON(); };`},
+			{Code: "// rslint-disable-next-line test\nMath();"},
 			// A write to the global binding makes ReferenceTracker skip that
 			// global entirely. Writing one of its properties does not.
 			{Code: `Math(); Math = replacement;`},
@@ -72,6 +79,25 @@ func TestNoObjCallsRule(t *testing.T) {
 				Code: `Math();`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCall", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `/* leading */ Math();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedCall",
+						Message:   "'Math' is not a function.",
+						Line:      1,
+						Column:    15,
+						EndLine:   1,
+						EndColumn: 21,
+					},
+				},
+			},
+			{
+				Code: `{ const Math = () => {}; Math(); } Math();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCall", Line: 1, Column: 36},
 				},
 			},
 			{
@@ -469,6 +495,36 @@ func TestNoObjCallsRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedRefCall", Line: 1, Column: 40},
 					{MessageId: "unexpectedRefCall", Line: 1, Column: 40},
+				},
+			},
+			{
+				Code: `let value; value = JSON; value = Math; value();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedRefCall",
+						Message:   "'value' is reference to 'JSON', which is not a function.",
+					},
+					{
+						MessageId: "unexpectedRefCall",
+						Message:   "'value' is reference to 'Math', which is not a function.",
+					},
+				},
+			},
+			{
+				Code: `const jsonValue = JSON; const mathValue = Math; jsonValue(); mathValue(); jsonValue();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedRefCall",
+						Message:   "'jsonValue' is reference to 'JSON', which is not a function.",
+					},
+					{
+						MessageId: "unexpectedRefCall",
+						Message:   "'mathValue' is reference to 'Math', which is not a function.",
+					},
+					{
+						MessageId: "unexpectedRefCall",
+						Message:   "'jsonValue' is reference to 'JSON', which is not a function.",
+					},
 				},
 			},
 			// A modified watched global can still be an alias reached from a

@@ -447,6 +447,7 @@ reparser
 repoint
 repoints
 reqs
+rescanning
 resolv
 respawn
 respawned

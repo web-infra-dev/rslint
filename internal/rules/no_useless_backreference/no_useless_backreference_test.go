@@ -623,8 +623,8 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 
 func TestRegExpResolutionWithoutTypeInfo(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath: `
 RegExp("\\1(a)");
 {
@@ -632,8 +632,8 @@ RegExp("\\1(a)");
 	RegExp("\\1(a)");
 }`,
 	})
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatal(err)
 	}
