@@ -2,7 +2,6 @@ package no_deprecated
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -122,6 +121,12 @@ var jsxPragmaRe = regexp.MustCompile(`@jsx\s+([A-Za-z_$][\w$.]*)`)
 // detectJsxPragma returns the identifier following the first `@jsx` directive
 // in the source, or "" when no directive is present.
 func detectJsxPragma(sourceText string) string {
+	// Most files do not carry a classic-runtime pragma. Avoid putting the
+	// regexp engine on the hot path for every file in that overwhelmingly
+	// common case.
+	if !strings.Contains(sourceText, "@jsx") {
+		return ""
+	}
 	m := jsxPragmaRe.FindStringSubmatch(sourceText)
 	if m == nil {
 		return ""
@@ -135,35 +140,59 @@ func detectJsxPragma(sourceText string) string {
 // eslint-plugin-react's version util for simple `>= X` checks.
 func parseVersion(s string) (int, int, int) {
 	var parts [3]int
-	i := 0
-	for _, seg := range strings.Split(s, ".") {
-		if i >= 3 {
-			break
+	segmentStart := 0
+	for part := 0; part < len(parts) && segmentStart <= len(s); part++ {
+		segmentEnd := len(s)
+		hasNext := false
+		if dot := strings.IndexByte(s[segmentStart:], '.'); dot >= 0 {
+			segmentEnd = segmentStart + dot
+			hasNext = true
 		}
-		// Strip a trailing non-digit tail (e.g. "-rc.1", "+build").
-		cut := len(seg)
-		for j, c := range seg {
-			if c < '0' || c > '9' {
-				cut = j
-				break
+
+		// Strip a trailing non-digit tail (e.g. "-rc" or "+build") and
+		// parse the numeric prefix without allocating a split slice.
+		digitEnd := segmentStart
+		for digitEnd < segmentEnd && s[digitEnd] >= '0' && s[digitEnd] <= '9' {
+			digitEnd++
+		}
+		if digitEnd > segmentStart {
+			value := 0
+			overflow := false
+			maxInt := int(^uint(0) >> 1)
+			for i := segmentStart; i < digitEnd; i++ {
+				digit := int(s[i] - '0')
+				if value > (maxInt-digit)/10 {
+					overflow = true
+					break
+				}
+				value = value*10 + digit
+			}
+			if !overflow {
+				parts[part] = value
 			}
 		}
-		n, err := strconv.Atoi(seg[:cut])
-		if err == nil {
-			parts[i] = n
+
+		if !hasNext {
+			break
 		}
-		i++
+		segmentStart = segmentEnd + 1
 	}
 	return parts[0], parts[1], parts[2]
 }
 
-// versionActive reports whether the configured React version is greater-or-
-// equal to `deprecVersion` — i.e. whether the deprecation is "in effect" for
-// this project. An absent `settings.react.version` defaults to 999.999.999
-// (matching upstream's "latest"), so every deprecation fires by default.
-func versionActive(settings map[string]interface{}, deprecVersion string) bool {
-	major, minor, patch := parseVersion(deprecVersion)
-	return !reactutil.ReactVersionLessThan(settings, major, minor, patch)
+// versionAtLeast compares a React version parsed once per file with one of
+// the fixed deprecation versions. Keeping the settings lookup and regexp-based
+// version parsing out of each diagnostic is especially important for files
+// that import or destructure several deprecated APIs.
+func versionAtLeast(major, minor, patch int, deprecVersion string) bool {
+	wantMajor, wantMinor, wantPatch := parseVersion(deprecVersion)
+	if major != wantMajor {
+		return major > wantMajor
+	}
+	if minor != wantMinor {
+		return minor > wantMinor
+	}
+	return patch >= wantPatch
 }
 
 // buildDottedPath walks down the Expression chain of a PropertyAccessExpression
@@ -179,7 +208,11 @@ func versionActive(settings map[string]interface{}, deprecVersion string) bool {
 // We flag it — a more permissive, rule-catches-more-cases divergence that
 // we lock in via a dedicated test. See the rule's `.md` for details.
 func buildDottedPath(node *ast.Node) string {
-	var segs []string
+	// Deprecation keys are at most three members deep. Back the slice with a
+	// small local array so all matching paths avoid a separate slice allocation;
+	// append still preserves behavior for arbitrarily deep non-matching chains.
+	var segmentBuffer [4]string
+	segs := segmentBuffer[:0]
 	cur := node
 	for {
 		cur = ast.SkipParentheses(cur)
@@ -215,6 +248,42 @@ func buildDottedPath(node *ast.Node) string {
 	return b.String()
 }
 
+// canBeDeprecatedPropertyName is a cheap allocation-free gate for the
+// PropertyAccessExpression listener. Only these terminal names occur in the
+// deprecation table; checking them first keeps dotted-path construction off
+// unrelated property accesses such as response.data or props.children.
+func canBeDeprecatedPropertyName(name string) bool {
+	switch name {
+	case "renderComponent",
+		"renderComponentToString",
+		"renderComponentToStaticMarkup",
+		"isValidComponent",
+		"component",
+		"renderable",
+		"isValidClass",
+		"transferPropsTo",
+		"classSet",
+		"cloneWithProps",
+		"render",
+		"unmountComponentAtNode",
+		"findDOMNode",
+		"renderToString",
+		"renderToStaticMarkup",
+		"LinkedStateMixin",
+		"printDOM",
+		"getMeasurementsSummaryMap",
+		"createClass",
+		"TestUtils",
+		"PropTypes",
+		"DOM",
+		"hydrate",
+		"renderToNodeStream":
+		return true
+	default:
+		return false
+	}
+}
+
 // formatMessage builds the deprecation diagnostic string. Mirrors upstream's
 // message template:
 //
@@ -239,6 +308,20 @@ func formatMessage(methodName string, d deprecationInfo) string {
 	return b.String()
 }
 
+// The default pragma is used by virtually every file. Its lookup table and
+// messages are immutable, so construct them once instead of rebuilding the
+// same map and strings for every Rule.Run invocation. Custom pragmas still
+// get a per-file table because their keys and replacement text are dynamic.
+var defaultDeprecated = buildDeprecated(reactutil.DefaultReactPragma)
+
+var defaultDeprecatedMessages = func() map[string]string {
+	messages := make(map[string]string, len(defaultDeprecated))
+	for methodName, d := range defaultDeprecated {
+		messages[methodName] = formatMessage(methodName, d)
+	}
+	return messages
+}()
+
 var NoDeprecatedRule = rule.Rule{
 	Name:   "react/no-deprecated",
 	Schema: rule.EmptyArraySchema,
@@ -250,12 +333,25 @@ var NoDeprecatedRule = rule.Rule{
 			pragma = reactutil.GetReactPragma(ctx.Settings)
 		}
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
-		deprecated := buildDeprecated(pragma)
+		usesDefaultPragma := pragma == reactutil.DefaultReactPragma
+		deprecated := defaultDeprecated
+		if !usesDefaultPragma {
+			deprecated = buildDeprecated(pragma)
+		}
+		reactMajor, reactMinor, reactPatch := 0, 0, 0
+		reactVersionParsed := false
 
 		report := func(node *ast.Node, methodName string, d deprecationInfo) {
+			description := ""
+			if usesDefaultPragma {
+				description = defaultDeprecatedMessages[methodName]
+			}
+			if description == "" {
+				description = formatMessage(methodName, d)
+			}
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "deprecated",
-				Description: formatMessage(methodName, d),
+				Description: description,
 			})
 		}
 
@@ -266,7 +362,11 @@ var NoDeprecatedRule = rule.Rule{
 			if !ok {
 				return
 			}
-			if !versionActive(ctx.Settings, d.version) {
+			if !reactVersionParsed {
+				reactMajor, reactMinor, reactPatch = reactutil.ParseReactVersion(ctx.Settings)
+				reactVersionParsed = true
+			}
+			if !versionAtLeast(reactMajor, reactMinor, reactPatch, d.version) {
 				return
 			}
 			report(node, methodName, d)
@@ -299,6 +399,10 @@ var NoDeprecatedRule = rule.Rule{
 			// PropertyAccessExpression level is checked independently;
 			// `React.DOM.div` ⇒ inner `React.DOM` matches, outer doesn't.
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
+				name := node.AsPropertyAccessExpression().Name()
+				if name == nil || name.Kind != ast.KindIdentifier || !canBeDeprecatedPropertyName(name.AsIdentifier().Text) {
+					return
+				}
 				path := buildDottedPath(node)
 				if path == "" {
 					return
