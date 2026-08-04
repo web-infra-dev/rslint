@@ -3,7 +3,12 @@ package display_name
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -11,6 +16,137 @@ const (
 	noDisplayName        = "noDisplayName"
 	noContextDisplayName = "noContextDisplayName"
 )
+
+func TestDisplayNameRuleWithoutSemanticContext(t *testing.T) {
+	code := `
+    const Named = React.memo(() => <div>named</div>);
+    Named.displayName = 'Named';
+    const Missing = React.memo(() => <div>missing</div>);
+  `
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/react.tsx",
+		Path:     "/react.tsx",
+	}, code, core.ScriptKindTSX)
+	comments := rule.NewCommentStore(sourceFile)
+	var diagnostics []rule.RuleDiagnostic
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithReporter(DisplayNameRule.Name, rule.SeverityError, func(diagnostic rule.RuleDiagnostic) {
+		diagnostics = append(diagnostics, diagnostic)
+	})
+
+	DisplayNameRule.Run(ctx, []any{map[string]interface{}{"ignoreTranspilerName": true}})
+
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != noDisplayName {
+		t.Fatalf("expected only the unnamed component diagnostic, got %#v", diagnostics)
+	}
+}
+
+func TestWrapperSiblingIndexMatchesReference(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{
+			name: "class before",
+			code: `class Item extends React.Component {}
+        React.forwardRef(() => <Item />);`,
+			want: true,
+		},
+		{
+			name: "class after",
+			code: `React.forwardRef(() => <Item />);
+        class Item extends React.Component {}`,
+		},
+		{
+			name: "arrow before",
+			code: `const Item = () => <div />;
+        React.memo(() => <Item />);`,
+			want: true,
+		},
+		{
+			name: "function before does not qualify",
+			code: `function Item() { return <div /> }
+        React.memo(() => <Item />);`,
+		},
+		{
+			name: "bare wrapper does not qualify",
+			code: `const Item = () => <div />;
+        forwardRef(() => <Item />);`,
+		},
+		{
+			name: "parenthesized member callee",
+			code: `const Item = () => <div />;
+        (React.forwardRef)(() => <Item />);`,
+			want: true,
+		},
+		{
+			name: "nested declaration remains name based",
+			code: `{ const Item = () => <div />; }
+        React.memo(() => <Item />);`,
+			want: true,
+		},
+		{
+			name: "typescript wrapped arrow",
+			code: `const Item = (() => <div />) as () => JSX.Element;
+        React.memo(() => <Item />);`,
+			want: true,
+		},
+		{
+			name: "class expression does not qualify",
+			code: `const Item = class extends React.Component {};
+        React.memo(() => <Item />);`,
+		},
+		{
+			name: "lowercase names remain name based",
+			code: `const div = () => null;
+        React.memo(() => <div />);`,
+			want: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/react.tsx",
+				Path:     "/react.tsx",
+			}, testCase.code, core.ScriptKindTSX)
+			var call, fn *ast.Node
+			var visit ast.Visitor
+			visit = func(node *ast.Node) bool {
+				if call == nil && node.Kind == ast.KindCallExpression {
+					arguments := node.AsCallExpression().Arguments
+					if arguments != nil && len(arguments.Nodes) > 0 {
+						candidate := reactutil.SkipExpressionWrappers(arguments.Nodes[0])
+						if reactutil.IsFunctionLikeForComponent(candidate) {
+							call, fn = node, candidate
+							return true
+						}
+					}
+				}
+				node.ForEachChild(visit)
+				return call != nil
+			}
+			sourceFile.Node.ForEachChild(visit)
+			if call == nil {
+				t.Fatal("wrapper call not found")
+			}
+
+			reference := reactutil.WrapperWrapsKnownSiblingComponent(call, fn)
+			if reference != testCase.want {
+				t.Fatalf("reference result = %v, want %v", reference, testCase.want)
+			}
+			walker := nodeWalker{ctx: rule.RuleContext{SourceFile: sourceFile}}
+			if got := walker.wrapperWrapsKnownSiblingComponent(call, fn); got != reference {
+				t.Fatalf("indexed result = %v, reference = %v", got, reference)
+			}
+			if got := walker.wrapperWrapsKnownSiblingComponent(call, fn); got != reference {
+				t.Fatalf("cached result = %v, reference = %v", got, reference)
+			}
+		})
+	}
+}
 
 func TestDisplayNameRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &DisplayNameRule, []rule_tester.ValidTestCase{
@@ -1449,6 +1585,37 @@ func TestDisplayNameRule(t *testing.T) {
 				{MessageId: noDisplayName},
 			},
 		},
+		// Cache entries for the three built-in wrapper names must remain
+		// independent: shadowing memo must not suppress forwardRef or React.
+		{Code: `
+        import React, { memo, forwardRef } from 'react'
+
+        function Container() {
+          const memo = (callback) => callback()
+          const Shadowed = memo(() => <div>shadowed</div>)
+          const Bare = forwardRef((props, ref) => <span ref={ref}>{props.value}</span>)
+          const Member = React.memo(() => <section>unshadowed</section>)
+          return [Shadowed, Bare, Member]
+        }
+      `, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: noDisplayName},
+				{MessageId: noDisplayName},
+			},
+		},
+		// The sibling-component gate is order-sensitive: a matching class
+		// declared after the wrapper call must not suppress its diagnostic.
+		{Code: `
+        export default React.forwardRef((props, ref) => (
+          <Later {...props} forwardRef={ref} />
+        ));
+
+        class Later extends React.Component {
+          render() { return <div /> }
+        }
+      `, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: noDisplayName}},
+		},
 
 		// ---- ES5 createReactClass without displayName + ignoreTranspilerName ----
 		{Code: `
@@ -2202,15 +2369,15 @@ func TestDisplayNameRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: noDisplayName}},
 		},
 
-		// ---- TC-aware lock-in: cross-scope same-name binding disambiguation ----
+		// ---- Scope-aware lock-in: cross-scope same-name binding disambiguation ----
 		// Two `Inner` bindings in sibling scopes — only outerB's gets a
 		// displayName assignment. Upstream's scope manager resolves the
 		// `Inner.displayName = 'B'` reference to outerB's Inner, marks it,
-		// and reports outerA's Inner (line 4). Without TC-aware resolution,
+		// and reports outerA's Inner (line 4). Without semantic resolution,
 		// the syntactic `nameToComponent` would map "Inner" to whichever
-		// was discovered first, leading to wrong-node reports. The TC path
-		// in `resolveAndMarkComponentRef` keeps both directions correct;
-		// the line/column assertion locks in the precise node.
+		// was discovered first, leading to wrong-node reports. The shared
+		// reference index in `resolveAndMarkComponentRef` keeps both directions
+		// correct; the line/column assertion locks in the precise node.
 		{Code: `
         function outerA() {
           const Inner = function() { return <div>A</div>; };
