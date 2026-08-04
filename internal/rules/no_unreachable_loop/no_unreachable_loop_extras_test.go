@@ -66,6 +66,9 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 			{Code: `function f() { return; for (;;) break; }`},
 			{Code: `function f() { throw e; while (a) break; }`},
 			{Code: `while (true); for (;;) break;`},
+			{Code: `while (1n); for (;;) break;`},
+			{Code: `while (0x1n); for (;;) break;`},
+			{Code: `while (0x10000000000000000n); for (;;) break;`},
 
 			// ---- Real-user: reading only the first entry of a collection ----
 			// The idiom the `ignore` option exists for.
@@ -299,6 +302,58 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 				},
 			},
 			// N/A: autofix boundaries (Dimension 3) — this rule only reports.
+
+			// ---- A zero test in every BigInt spelling ----
+			// A falsy test leaves the loop, so what follows it stays reachable
+			// and is a candidate of its own.
+			{
+				Code: `while (0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 13, EndLine: 1, EndColumn: 28},
+				},
+			},
+			{
+				Code: `while (0x0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 15, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code: `while (0X0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 15, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code: `while (0x00n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 16, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code: `while (0x0_0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 17, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code: `while (0b0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 15, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code: `while (0o0n); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 15, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code: `for (;0x0n;); for (;;) break;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 15, EndLine: 1, EndColumn: 30},
+				},
+			},
 
 			// ---- A loop that a `finally` block lays out twice ----
 			// The second copy runs on the path that leaves the `try` statement
