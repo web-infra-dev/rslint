@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -22,9 +20,9 @@ func sourceFileFromCode(t *testing.T, code string) *ast.SourceFile {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()
 	fileName := "file.ts"
-	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
@@ -172,11 +170,11 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	rootDir := fixtures.GetRootDir()
 	virtualFiles := make(map[string]string, len(files))
 	for fileName, content := range files {
-		virtualFiles[tspath.ResolvePath(rootDir, fileName)] = content
+		virtualFiles[tspath.ResolvePath(rootDir.Dir, fileName)] = content
 	}
-	fs := utils.NewOverlayVFS(bundled.WrapFS(cachedvfs.From(osvfs.FS())), virtualFiles)
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	fs := utils.NewOverlayVFS(cachedvfs.From(rootDir.FS), virtualFiles)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}

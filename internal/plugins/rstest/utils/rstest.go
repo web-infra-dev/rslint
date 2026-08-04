@@ -13,7 +13,10 @@ type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode
 
-type ParsedRstestFnCall = testFramework.ParsedCall
+type ParsedRstestFnCall struct {
+	testFramework.ParsedCall
+	Parameterized bool
+}
 
 type ParsedRstestFnCallHead = testFramework.ParsedCallHead
 

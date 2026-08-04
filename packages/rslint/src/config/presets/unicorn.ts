@@ -122,7 +122,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-module': 'error', // not implemented
     // 'unicorn/prefer-native-coercion-functions': 'error', // not implemented
     // 'unicorn/prefer-negative-index': 'error', // not implemented
-    // 'unicorn/prefer-node-protocol': 'error', // not implemented
+    'unicorn/prefer-node-protocol': 'error',
     'unicorn/prefer-number-properties': 'error',
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
     // 'unicorn/prefer-optional-catch-binding': 'error', // not implemented
@@ -131,7 +131,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-reflect-apply': 'error', // not implemented
     // 'unicorn/prefer-regexp-test': 'error', // not implemented
     // 'unicorn/prefer-response-static-json': 'error', // not implemented
-    // 'unicorn/prefer-set-has': 'error', // not implemented
+    'unicorn/prefer-set-has': 'error',
     // 'unicorn/prefer-set-size': 'error', // not implemented
     // 'unicorn/prefer-simple-condition-first': 'error', // not implemented
     // 'unicorn/prefer-single-call': 'error', // not implemented

@@ -71,7 +71,7 @@ const recommended: RslintConfigEntry = {
     'no-unused-labels': 'error',
     'no-unused-private-class-members': 'error',
     'no-unassigned-vars': 'error',
-    // 'no-useless-assignment': 'error', // not implemented
+    'no-useless-assignment': 'error',
     'no-useless-backreference': 'error',
     'no-useless-catch': 'error',
     'no-useless-escape': 'error',

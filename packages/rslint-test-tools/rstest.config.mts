@@ -128,6 +128,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/prefer-spread.test.ts',
     './tests/eslint/rules/prefer-template.test.ts',
+    './tests/eslint/rules/no-useless-assignment.test.ts',
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
     // eslint-plugin-import
@@ -542,6 +543,8 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/no-commented-out-tests.test.ts',
+    './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
 
     // eslint-plugin-promise
@@ -570,7 +573,10 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',
 

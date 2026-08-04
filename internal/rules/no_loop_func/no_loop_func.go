@@ -2,6 +2,7 @@ package no_loop_func
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -19,7 +20,6 @@ func BuildUnsafeRefsMessage(varNames string) rule.RuleMessage {
 type RunState struct {
 	Ctx          rule.RuleContext
 	SkippedIIFEs map[*ast.Node]bool
-	refIndex     *utils.ReferenceIndex
 }
 
 // NewRunState constructs a RunState ready for one source-file pass.
@@ -194,7 +194,18 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 		}
 
 		if n.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(n) {
-			sym := utils.GetReferenceSymbol(n, s.Ctx.TypeChecker)
+			// ctx.Refs resolves same-file locals from the binder scope walk —
+			// the overwhelming majority of through-references a loop-closure
+			// can capture (loop counters, outer function locals, imported
+			// bindings) — and falls back to the checker internally for
+			// symbols only it can see (ambient/lib globals like `console`,
+			// cross-file and checker-merged declarations). nil — a position
+			// ctx.Refs doesn't treat as a variable reference (a lowercase
+			// JSX intrinsic tag name), an unresolvable name, or no checker
+			// available — excludes the identifier from the through-reference
+			// set, the same outcome as one that resolved but was declared
+			// outside `funcNode` and never written to.
+			sym := s.Ctx.Refs.Resolve(n)
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
@@ -327,19 +338,58 @@ func GetDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 	return utils.GetDeclListForSymbolDecl(decl)
 }
 
-func (s *RunState) buildRefIndex() {
-	if s.refIndex != nil {
-		return
+// forEachReference invokes `cb` for every identifier node resolving to `sym`,
+// in source order. Returns early when `cb` returns true.
+func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
+	for _, refNode := range s.references(sym) {
+		if cb(refNode) {
+			return
+		}
 	}
-	s.refIndex = utils.NewReferenceIndex(s.Ctx.SourceFile, s.Ctx.TypeChecker)
 }
 
-// forEachReference invokes `cb` for every identifier node resolving to `sym`,
-// in source order. Returns early when `cb` returns true. The underlying index
-// is built on first use via buildRefIndex so subsequent calls are O(refs).
-func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
-	s.buildRefIndex()
-	s.refIndex.ForEachReference(sym, cb)
+// references returns every identifier resolving to `sym`, in source order,
+// from ctx.Refs.References — a per-file index built once and shared by every
+// query. The index answers for checker-fallback symbols too, and files
+// references to a merged symbol under one identity regardless of which raw
+// declaration symbol the caller resolved, so no separate checker scan is
+// needed. isSafeCore queries this once per (loop-function, through-reference)
+// pair.
+//
+// ctx.Refs excludes declaration-name identifiers (they declare the symbol
+// rather than reference it), but ESLint's scope manager — and IsWriteRef,
+// which mirrors it — treats several of them as write references: var/let/
+// const bindings with initializers, for-in/of loop bindings, and catch
+// parameters. This file's declaration names are merged back into the result
+// in source order so isSafeCore keeps seeing them.
+func (s *RunState) references(sym *ast.Symbol) []*ast.Node {
+	if sym == nil {
+		return nil
+	}
+	refs := s.Ctx.Refs.References(sym)
+	var declNames []*ast.Node
+	for _, decl := range sym.Declarations {
+		if ast.GetSourceFileOfNode(decl) != s.Ctx.SourceFile {
+			continue
+		}
+		if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			declNames = append(declNames, name)
+		}
+	}
+	if len(declNames) == 0 {
+		return refs
+	}
+	sort.Slice(declNames, func(i, j int) bool { return declNames[i].Pos() < declNames[j].Pos() })
+	merged := make([]*ast.Node, 0, len(refs)+len(declNames))
+	next := 0
+	for _, name := range declNames {
+		for next < len(refs) && refs[next].Pos() < name.Pos() {
+			merged = append(merged, refs[next])
+			next++
+		}
+		merged = append(merged, name)
+	}
+	return append(merged, refs[next:]...)
 }
 
 // checkForLoops processes a function-like node: if it is inside a loop and
@@ -402,15 +452,8 @@ func (s *RunState) checkForLoopsCore(node *ast.Node) {
 // NoLoopFuncRule disallows function declarations that contain unsafe
 // references to variable(s) inside loop statements.
 var NoLoopFuncRule = rule.Rule{
-	Name:             "no-loop-func",
-	RequiresTypeInfo: true,
+	Name: "no-loop-func",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
-			return rule.RuleListeners{}
-		}
 		s := &RunState{
 			Ctx:          ctx,
 			SkippedIIFEs: map[*ast.Node]bool{},

@@ -116,6 +116,17 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 			{Code: `var x: any = 0; while (x < 10) { x ||= 1; }`},
 			{Code: `var x: any = 0; while (x < 10) { x &&= 1; }`},
 			{Code: `var x: any = 0; while (x < 10) { x ??= 1; }`},
+
+			// === Ambient/lib global (declared in lib.dom.d.ts, not this file —
+			// RefStore's per-file binder walk can't resolve it, only the
+			// TypeChecker fallback can) modified in the body ===
+			{Code: `while (window) { window = window; }`},
+
+			// === Default-exported function modifies the condition variable and
+			// is called in the loop. n.Symbol() on the FunctionDeclaration node
+			// is the export symbol, which never matches a call site's resolved
+			// symbol — the check must compare against n.LocalSymbol() instead. ===
+			{Code: `export default function inc() { x++; } var x = 0; while (x < 10) { inc(); }`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -247,6 +258,28 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 				Code: `var x = 0; function inc() { x++; } while (x < 10) { }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "loopConditionNotModified", Line: 1, Column: 43},
+				},
+			},
+
+			// === Ambient/lib global (declared in lib.dom.d.ts, not this file —
+			// RefStore's per-file binder walk can't resolve it, only the
+			// TypeChecker fallback can) never modified in the body ===
+			{
+				Code: `while (window) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 8},
+				},
+			},
+
+			// === Write only in a parameter's default-value initializer, but the
+			// call site passes an explicit argument, so the default never runs —
+			// the write must not count, so x is still reported as unmodified.
+			// (The modification check must scan n.Body() only, not the whole
+			// FunctionDeclaration including its parameter list.) ===
+			{
+				Code: `var x = 0; function f(y = (x = 1)) { } while (x < 10) { f(2); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 47},
 				},
 			},
 		},

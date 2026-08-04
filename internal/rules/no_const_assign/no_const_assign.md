@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-Disallows reassigning `const` variables. Variables declared with `const` cannot be reassigned after their initial declaration. Attempting to modify them (via assignment, increment, decrement, or destructuring assignment) is always a mistake and would throw a `TypeError` at runtime.
+Disallows reassigning variables declared with `const`, `using`, or `await using`. These constant bindings cannot be reassigned after their initial declaration. Attempting to modify them (via assignment, increment, decrement, or destructuring assignment) is always a mistake and would throw a `TypeError` at runtime.
 
 Examples of **incorrect** code for this rule:
 
@@ -18,6 +18,9 @@ z = 3;
 
 const [a, b] = [1, 2];
 [a, b] = [3, 4];
+
+using resource = acquireResource();
+resource = acquireOtherResource();
 ```
 
 Examples of **correct** code for this rule:
@@ -31,6 +34,9 @@ y = 1;
 
 const obj = {};
 obj.key = 'value'; // mutating properties is fine
+
+using resource = acquireResource();
+resource.use();
 ```
 
 ## Original Documentation

@@ -16,10 +16,13 @@ var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
 		}
 
 		reportExtraNonNull := func(node *ast.Node) {
-			expression := node.AsNonNullExpression().Expression
-			s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
-			fix := rule.RuleFixRemoveRange(s.TokenRange())
-			ctx.ReportNodeWithFixes(node, msg, fix)
+			// A parsed NonNullExpression ends immediately after its `!`, so the
+			// fix needs neither token lookup nor any surrounding trivia.
+			fixRange := node.Loc.WithPos(node.End() - 1)
+			reportRange := node.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), node.Pos()))
+			ctx.ReportRangeWithDeferredFixes(reportRange, msg, func() []rule.RuleFix {
+				return []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
+			})
 		}
 
 		return rule.RuleListeners{

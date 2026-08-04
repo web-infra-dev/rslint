@@ -3,9 +3,52 @@ package no_unsafe_optional_chaining
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestNoUnsafeOptionalChainingListenerFastPath(t *testing.T) {
+	tests := []struct {
+		name          string
+		code          string
+		wantListeners bool
+	}{
+		{
+			name: "no optional-chain token",
+			code: `
+const value = source.method().property;
+value[index];
+`,
+		},
+		{
+			name:          "optional-chain token in code",
+			code:          `const value = source?.property;`,
+			wantListeners: true,
+		},
+		{
+			name:          "token lookalike in a string",
+			code:          `const marker = "?.";`,
+			wantListeners: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, test.code, core.ScriptKindTS)
+			listeners := NoUnsafeOptionalChainingRule.Run(rule.RuleContext{SourceFile: sourceFile}, nil)
+			if got := len(listeners) > 0; got != test.wantListeners {
+				t.Fatalf("listeners present = %t, want %t", got, test.wantListeners)
+			}
+		})
+	}
+}
 
 func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -67,6 +110,8 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 			// Non-optional access on non-chain
 			{Code: `obj.foo.bar;`},
 			{Code: `new obj.Foo();`},
+			// A token lookalike only causes a harmless slow-path scan.
+			{Code: `const marker = "?."; (obj.foo)();`},
 
 			// Arithmetic with fallback (with option)
 			{
@@ -115,6 +160,18 @@ func TestNoUnsafeOptionalChainingRule(t *testing.T) {
 				Code: `(obj?.foo)[0];`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unsafeOptionalChain", Line: 1, Column: 2},
+				},
+			},
+			{
+				Code: `(obj?.[key])();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unsafeOptionalChain"},
+				},
+			},
+			{
+				Code: `(obj.method?.())[0];`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unsafeOptionalChain"},
 				},
 			},
 			{

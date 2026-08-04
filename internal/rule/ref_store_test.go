@@ -36,10 +36,10 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore, func()) {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "ref-store-tc-fallback.ts")
-	fs := utils.NewOverlayVFSForFile(filePath, source)
+	filePath := tspath.ResolvePath(rootDir.Dir, "ref-store-tc-fallback.ts")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: source})
 
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", utils.CreateCompilerHost(rootDir, fs))
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", utils.CreateCompilerHost(rootDir.Dir, fs))
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
 	}

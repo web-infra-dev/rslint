@@ -15,9 +15,9 @@ import (
 func parseBinaryOperands(t *testing.T, code string) (*ast.SourceFile, *ast.Node, *ast.Node) {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	fs := NewOverlayVFSForFile(filePath, code)
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
 	sourceFile := program.GetSourceFile(filePath)
 

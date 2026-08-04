@@ -151,6 +151,28 @@ func TestNoRedeclareExtras(t *testing.T) {
 				},
 			},
 
+			// Program diagnostics precede nested-scope diagnostics even when the
+			// nested duplicate occurs first in source order.
+			{
+				Code: "function nested(arg, arg) {}\nvar program;\nvar program;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("program", 3, 5),
+					redeclaredError("arg", 1, 22),
+				},
+			},
+			// The switch scope is registered before walking its discriminant, so
+			// its report likewise precedes a duplicate inside the discriminant.
+			{
+				Code: "switch ((function (arg, arg) {})()) { case 0: let choice; let choice; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					redeclaredError("choice", 1, 63),
+					redeclaredError("arg", 1, 25),
+				},
+			},
+			// Namespace bodies themselves stay outside the listener set, while an
+			// ordinary block nested inside one still has its own checked scope.
+			invalidRedeclared("namespace N { { let local; let local; } }", "local", 1, 32),
+
 			// Deeply nested `var` declarations still resolve to the program's
 			// variable scope rather than any intervening statement or block.
 			invalidRedeclared("var deep;\ntry { label: if (ok) { switch (value) { case 0: var deep; } } } catch (error) {}", "deep", 2, 53),

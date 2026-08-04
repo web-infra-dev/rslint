@@ -1,6 +1,7 @@
 package no_dupe_class_members
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -619,4 +620,100 @@ func TestRegisterMemberExhaustive(t *testing.T) {
 		}
 	}
 	visit(0, referenceState{}, nil)
+}
+
+func TestClassStateInlineAndOverflow(t *testing.T) {
+	memberCount := inlineClassStateCapacity + 1
+	state := classState{}
+
+	for index := range inlineClassStateCapacity {
+		name := "member" + strconv.Itoa(index)
+		if state.register(name, false, memberKindInit) {
+			t.Fatalf("first registration of %q was reported as duplicate", name)
+		}
+	}
+	if state.overflow != nil {
+		t.Fatal("state promoted before inline capacity was exhausted")
+	}
+
+	lastName := "member" + strconv.Itoa(inlineClassStateCapacity)
+	if state.register(lastName, false, memberKindInit) {
+		t.Fatalf("first registration of %q was reported as duplicate", lastName)
+	}
+	if state.overflow == nil {
+		t.Fatal("state did not promote after inline capacity was exhausted")
+	}
+
+	for index := range memberCount {
+		name := "member" + strconv.Itoa(index)
+		if !state.register(name, false, memberKindInit) {
+			t.Fatalf("second non-static registration of %q was not reported as duplicate", name)
+		}
+		if state.register(name, true, memberKindInit) {
+			t.Fatalf("first static registration of %q conflicted with non-static state", name)
+		}
+		if !state.register(name, true, memberKindInit) {
+			t.Fatalf("second static registration of %q was not reported as duplicate", name)
+		}
+	}
+
+	if state.register("", false, memberKindGet) {
+		t.Fatal("first empty-name getter was reported as duplicate")
+	}
+	if state.register("", false, memberKindSet) {
+		t.Fatal("empty-name getter/setter pair was reported as duplicate")
+	}
+	if !state.register("", false, memberKindGet) {
+		t.Fatal("second empty-name getter was not reported as duplicate")
+	}
+}
+
+func TestClassStateMatchesMap(t *testing.T) {
+	const operationCount = 10_000
+	nameCount := inlineClassStateCapacity*2 + 3
+	state := classState{}
+	reference := make(map[string]stateEntry, nameCount)
+	seed := uint64(0x9e3779b97f4a7c15)
+
+	for operation := range operationCount {
+		seed = seed*6364136223846793005 + 1
+		nameIndex := operation
+		if nameIndex >= nameCount {
+			nameIndex = int(seed % uint64(nameCount))
+		}
+		var name string
+		switch nameIndex {
+		case 0:
+			name = ""
+		case 1:
+			name = "__proto__"
+		default:
+			name = "member" + strconv.Itoa(nameIndex)
+		}
+		static := seed&(1<<8) != 0
+		kind := memberKind(seed % 3)
+
+		expected := reference[name]
+		var wantDuplicate bool
+		if static {
+			expected.static, wantDuplicate = registerMember(expected.static, kind)
+		} else {
+			expected.nonStatic, wantDuplicate = registerMember(expected.nonStatic, kind)
+		}
+		reference[name] = expected
+
+		if gotDuplicate := state.register(name, static, kind); gotDuplicate != wantDuplicate {
+			t.Fatalf("operation %d (%q, static=%v, kind=%d): duplicate = %v, want %v",
+				operation, name, static, kind, gotDuplicate, wantDuplicate)
+		}
+	}
+
+	if state.overflow == nil {
+		t.Fatal("adversarial sequence did not exercise overflow storage")
+	}
+	for name, expected := range reference {
+		if actual := state.overflow[name]; actual != expected {
+			t.Fatalf("state for %q = %#v, want %#v", name, actual, expected)
+		}
+	}
 }

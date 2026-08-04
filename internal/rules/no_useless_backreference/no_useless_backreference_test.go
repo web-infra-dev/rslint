@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -52,6 +50,7 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `function foo() { var RegExp; RegExp('\\1(a)', 'u'); }`},
 			{Code: `function foo(RegExp) { new RegExp('\\1(a)'); }`},
 			{Code: `if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`},
+			{Code: `namespace RegExp {} RegExp('\\1(a)');`},
 			// SKIP: rslint does not support ESLint's /*globals*/ directive comments
 			// `/* globals RegExp:off */ new RegExp('\\1(a)');`
 			// `RegExp('\\1(a)');` with languageOptions.globals { RegExp: "off" }
@@ -578,14 +577,14 @@ r('\\1(a)');`,
 
 func TestImportedRegExpConstructorAlias(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	helperPath := tspath.ResolvePath(rootDir, "foo.ts")
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	helperPath := tspath.ResolvePath(rootDir.Dir, "foo.ts")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath:   `import { regexpFactory } from "./foo"; regexpFactory("\\1(a)");`,
 		helperPath: `export const regexpFactory = RegExp;`,
 	})
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,9 +621,57 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	}
 }
 
+func TestRegExpResolutionWithoutTypeInfo(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
+		filePath: `
+RegExp("\\1(a)");
+{
+	const RegExp = (pattern: string) => pattern;
+	RegExp("\\1(a)");
+}`,
+	})
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatal("file.ts was not loaded")
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.RunLinterInProgram(
+		program,
+		[]string{sourceFile.FileName()},
+		nil,
+		nil,
+		func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     NoUselessBackreferenceRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoUselessBackreferenceRule.Run(ctx, nil)
+				},
+			}}
+		},
+		false,
+		func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+		map[string]struct{}{}, // Keep the Program/RefStore but withhold the checker.
+		nil,
+	)
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
+		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
+	}
+}
+
 func TestMayEvaluateToRegexPatternAdversarial(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
 
 	var code strings.Builder
 	code.WriteString(`
@@ -705,11 +752,11 @@ enum Pattern {
 		fmt.Fprintf(&code, "const rejected_%d = %s;\n", index, expression)
 	}
 
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath: code.String(),
 	})
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	host := utils.CreateCompilerHost(rootDir.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatal(err)
 	}

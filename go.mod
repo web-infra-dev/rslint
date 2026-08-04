@@ -26,6 +26,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/tspath => ./shim/tspath
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
+	github.com/microsoft/typescript-go/shim/vfs/iovfs => ./shim/vfs/iovfs
 	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
 	github.com/microsoft/typescript-go/shim/vfs/trackingvfs => ./shim/vfs/trackingvfs
 	github.com/microsoft/typescript-go/shim/vfs/vfsmatch => ./shim/vfs/vfsmatch
@@ -55,6 +56,7 @@ require (
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
+	github.com/microsoft/typescript-go/shim/vfs/iovfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/trackingvfs v0.0.0
 	github.com/rivo/uniseg v0.4.7
@@ -82,5 +84,5 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c // indirect
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.40.0
 )

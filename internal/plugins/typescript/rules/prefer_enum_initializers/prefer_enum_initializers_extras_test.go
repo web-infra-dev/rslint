@@ -7,9 +7,14 @@
 package prefer_enum_initializers
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1228,4 +1233,88 @@ namespace A {
 			},
 		},
 	})
+}
+
+func TestPreferEnumInitializersSuggestionDemand(t *testing.T) {
+	const source = "enum Direction { /* leading */ Up, Down }"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/prefer-enum-initializers-suggestion-demand.ts",
+		Path:     "/prefer-enum-initializers-suggestion-demand.ts",
+	}, source, core.ScriptKindTS)
+	enumDeclaration := sourceFile.Statements.Nodes[0]
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(PreferEnumInitializersRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+		PreferEnumInitializersRule.Run(ctx, nil)[ast.KindEnumDeclaration](enumDeclaration)
+		return diagnostics
+	}
+
+	type expectedMember struct {
+		name        string
+		start       int
+		suggestions []string
+	}
+	expected := []expectedMember{
+		{name: "Up", start: strings.Index(source, "Up"), suggestions: []string{"0", "1", "'Up'"}},
+		{name: "Down", start: strings.Index(source, "Down"), suggestions: []string{"1", "2", "'Down'"}},
+	}
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		diagnostics := run(demand)
+		if len(diagnostics) != len(expected) {
+			t.Fatalf("demand %d produced %d diagnostics, want %d", demand, len(diagnostics), len(expected))
+		}
+		for index, diagnostic := range diagnostics {
+			want := expected[index]
+			if diagnostic.Range.Pos() != want.start || diagnostic.Range.End() != want.start+len(want.name) {
+				t.Errorf("demand %d diagnostic %d range = %v, want [%d,%d)", demand, index, diagnostic.Range, want.start, want.start+len(want.name))
+			}
+			if diagnostic.Message.Id != "defineInitializer" ||
+				diagnostic.Message.Description != "The value of the member '"+want.name+"' should be explicitly defined." ||
+				diagnostic.Message.Data["name"] != want.name {
+				t.Errorf("demand %d diagnostic %d message = %#v", demand, index, diagnostic.Message)
+			}
+			if diagnostic.FixesPtr != nil {
+				t.Errorf("demand %d diagnostic %d unexpectedly materialized an autofix", demand, index)
+			}
+			if demand&rule.EditDemandSuggestion == 0 {
+				if diagnostic.Suggestions != nil {
+					t.Errorf("demand %d diagnostic %d materialized suggestions", demand, index)
+				}
+				continue
+			}
+			if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != len(want.suggestions) {
+				t.Fatalf("demand %d diagnostic %d suggestions = %#v", demand, index, diagnostic.Suggestions)
+			}
+			for suggestionIndex, suggestion := range *diagnostic.Suggestions {
+				suggested := want.suggestions[suggestionIndex]
+				if suggestion.Message.Id != "defineInitializerSuggestion" ||
+					suggestion.Message.Description != "Can be fixed to "+want.name+" = "+suggested ||
+					suggestion.Message.Data["name"] != want.name ||
+					suggestion.Message.Data["suggested"] != suggested {
+					t.Errorf("demand %d diagnostic %d suggestion %d message = %#v", demand, index, suggestionIndex, suggestion.Message)
+				}
+				fixes := suggestion.Fixes()
+				if len(fixes) != 1 || fixes[0].Range != diagnostic.Range || fixes[0].Text != want.name+" = "+suggested {
+					t.Errorf("demand %d diagnostic %d suggestion %d fixes = %#v", demand, index, suggestionIndex, fixes)
+				}
+			}
+		}
+	}
 }

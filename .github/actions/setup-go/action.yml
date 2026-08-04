@@ -32,7 +32,7 @@ runs:
     # typescript-go uses an exact path, not 'typescript-go/**/go.sum', since
     # that glob would walk the submodule's ~152k testdata files all over again.
     - name: Go cache
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       if: runner.environment == 'github-hosted'
       with:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('go.sum', 'shim/**/go.sum', 'typescript-go/go.sum') }}

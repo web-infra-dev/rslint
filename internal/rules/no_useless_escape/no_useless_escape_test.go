@@ -1,9 +1,17 @@
 package no_useless_escape
 
 import (
+	"slices"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1595,6 +1603,152 @@ func TestNoUselessEscapeRule(t *testing.T) {
 	)
 }
 
+func TestReportEscapeDefersSuggestions(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, `"\#"`, core.ScriptKindTS)
+
+	for _, testCase := range []struct {
+		name            string
+		demand          rule.EditDemand
+		wantSuggestions bool
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix only", demand: rule.EditDemandAutofix},
+		{name: "suggestions", demand: rule.EditDemandSuggestion, wantSuggestions: true},
+		{name: "all edits", demand: rule.EditDemandAll, wantSuggestions: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{SourceFile: sourceFile}.WithDiagnosticConsumer(
+				NoUselessEscapeRule.Name,
+				rule.SeverityError,
+				rule.DiagnosticConsumer{
+					Demand: testCase.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			)
+
+			reportEscape(ctx, 0, 1, "#", false, false)
+
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			hasSuggestions := diagnostics[0].Suggestions != nil
+			if hasSuggestions != testCase.wantSuggestions {
+				t.Fatalf("suggestions present = %v, want %v", hasSuggestions, testCase.wantSuggestions)
+			}
+			if hasSuggestions && len(*diagnostics[0].Suggestions) != 2 {
+				t.Fatalf("suggestions = %d, want 2", len(*diagnostics[0].Suggestions))
+			}
+		})
+	}
+}
+
+func TestRawTextAndStartParity(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/raw-text.ts",
+		Path:     "/raw-text.ts",
+	}, "const stringValue = /* comment */\n  \"\\#\";\n"+
+		"const templateValue = /* comment */ `head\\@${value}middle\\_${other}tail\\#`;\n"+
+		"const regexValue = /* comment */ /before\\;[é]after/u;\n", core.ScriptKindTS)
+
+	literalCount := 0
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindStringLiteral,
+			ast.KindNoSubstitutionTemplateLiteral,
+			ast.KindTemplateHead,
+			ast.KindTemplateMiddle,
+			ast.KindTemplateTail,
+			ast.KindRegularExpressionLiteral:
+			literalCount++
+			gotText, gotStart := rawTextAndStart(sourceFile, node)
+			wantText := scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false)
+			wantStart := utils.TrimNodeTextRange(sourceFile, node).Pos()
+			if gotText != wantText || gotStart != wantStart {
+				t.Errorf(
+					"kind %s: rawTextAndStart() = (%q, %d), want (%q, %d)",
+					node.Kind.String(), gotText, gotStart, wantText, wantStart,
+				)
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	if literalCount != 5 {
+		t.Fatalf("literal nodes = %d, want 5", literalCount)
+	}
+}
+
+func TestScanLiteralEscapesParity(t *testing.T) {
+	alphabet := []string{"a", "\\", "0", "9", "#", "é", "😀", string([]byte{0xff})}
+	for length := range 5 {
+		combinations := 1
+		for range length {
+			combinations *= len(alphabet)
+		}
+		for encoded := range combinations {
+			var raw strings.Builder
+			value := encoded
+			for range length {
+				raw.WriteString(alphabet[value%len(alphabet)])
+				value /= len(alphabet)
+			}
+			input := raw.String()
+			got := collectLiteralEscapes(scanLiteralEscapes, input)
+			want := collectLiteralEscapes(scanLiteralEscapesBeforeOptimization, input)
+			if !slices.Equal(got, want) {
+				t.Fatalf("scanLiteralEscapes(%q) = %#v, want %#v", input, got, want)
+			}
+		}
+	}
+}
+
+type literalEscapeEvent struct {
+	index int
+	r     rune
+	size  int
+}
+
+func collectLiteralEscapes(
+	scan func(string, func(int, rune, int)),
+	raw string,
+) []literalEscapeEvent {
+	var events []literalEscapeEvent
+	scan(raw, func(index int, r rune, size int) {
+		events = append(events, literalEscapeEvent{index: index, r: r, size: size})
+	})
+	return events
+}
+
+func scanLiteralEscapesBeforeOptimization(raw string, cb func(int, rune, int)) {
+	for i := 0; i < len(raw); {
+		if raw[i] != '\\' {
+			i++
+			continue
+		}
+		if i+1 >= len(raw) {
+			return
+		}
+		next := raw[i+1]
+		if next >= '0' && next <= '9' {
+			i += 2
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(raw[i+1:])
+		if size == 0 {
+			return
+		}
+		cb(i, r, size)
+		i += 1 + size
+	}
+}
+
 // =============================================================================
 // Hardening tests for the regex pattern parser. These cover malformed-input
 // skip behavior (matching ESLint's regexpp try/catch) and boundary conditions
@@ -1644,13 +1798,13 @@ func TestPatternParses(t *testing.T) {
 
 func TestPreScanClass(t *testing.T) {
 	tests := []struct {
-		name        string
-		pattern     string
-		start       int
-		flagStr     string
-		wantNegate  bool
-		wantSetOp   bool
-		wantEnd     int
+		name       string
+		pattern    string
+		start      int
+		flagStr    string
+		wantNegate bool
+		wantSetOp  bool
+		wantEnd    int
 	}{
 		{name: "simple", pattern: "[abc]", start: 0, flagStr: "", wantEnd: 5},
 		{name: "negated", pattern: "[^abc]", start: 0, flagStr: "", wantNegate: true, wantEnd: 6},

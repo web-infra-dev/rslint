@@ -91,6 +91,24 @@ func TestNoMisusedNewRule(t *testing.T) {
 				}
 			`,
 		},
+		{
+			Code: `
+				declare class C {
+				  [methodName](): C;
+				  new(): Namespace.C;
+				  new(): (C);
+				}
+				interface I {
+				  [methodName](): void;
+				}
+				type T = {
+				  [methodName](): void;
+				};
+			`,
+		},
+		{
+			Code: "class C { [`new`](): C {} }",
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -225,6 +243,37 @@ func TestNoMisusedNewRule(t *testing.T) {
 				{
 					MessageId: "errorMessageInterface",
 				},
+			},
+		},
+		{
+			Code: "declare class C { [`new`](): C; }",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorMessageClass",
+				},
+			},
+		},
+		{
+			Code: `
+				declare class C {
+				  ["\u006e\u0065\u0077"](): C;
+				  new<T>(): C<T>;
+				}
+				const Value = class Inner {
+				  new(): Inner;
+				};
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "errorMessageClass"},
+				{MessageId: "errorMessageClass"},
+				{MessageId: "errorMessageClass"},
+			},
+		},
+		{
+			Code: "interface I { [`constructor`](): void; }\ntype T = { [`constructor`](): void; };",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "errorMessageInterface"},
+				{MessageId: "errorMessageInterface"},
 			},
 		},
 	})

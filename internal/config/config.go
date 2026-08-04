@@ -790,89 +790,11 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 // patterns supplied by the caller, so repeated calls against the same config
 // (one per lint target) don't re-parse the same ignore pattern strings.
 func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
-	merged := &MergedConfig{
-		Rules:   make(map[string]*RuleConfig),
-		Plugins: make(map[string]struct{}),
-	}
-
-	if len(globalIgnorePatterns) > 0 {
-		if isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
-			return nil
-		}
-		if isFileIgnored(filePath, globalIgnorePatterns, cwd) {
-			return nil
-		}
-	}
-
-	// A CLI/API explicit target can bypass config `files` for parsing, but it
-	// must not make unscoped entries apply to a path the config itself never
-	// selected. Conversely, an explicit selector makes unscoped entries apply
-	// to that file, as in ESLint flat config cascading.
-	if !isFileSelectedByConfig(config, filePath, cwd) {
+	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil)
+	if !matched {
 		return nil
 	}
-
-	// Track whether any non-global entry matched this file
-	entryMatched := false
-
-	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			continue
-		}
-
-		// 2. files matching
-		if hasFileSelectors(entry) && !isFileMatchedByConfigEntry(filePath, entry, cwd) {
-			continue
-		}
-
-		// 3. Entry-level ignores. Parsed per entry; entry.Ignores is usually
-		// empty (ESLint configs put ignores in a dedicated global-ignore entry),
-		// so ParseIgnorePatterns returns nil and this is free in the common case.
-		if isFileIgnored(filePath, ParseIgnorePatterns(entry.Ignores), cwd) {
-			continue
-		}
-
-		entryMatched = true
-
-		// 4. Rules: later entries override earlier ones. When the later value
-		// changes only severity, ESLint retains the earlier rule options.
-		for ruleName, ruleValue := range entry.Rules {
-			next, hasOptions, err := parseRuleConfigValue(ruleValue)
-			if err != nil {
-				// Config ingress validates rule values before merge. Keep this
-				// guard for callers that construct a config without validating it.
-				continue
-			}
-			if previous := merged.Rules[ruleName]; !hasOptions && previous != nil {
-				next.Options = append([]interface{}(nil), previous.Options...)
-			}
-			merged.Rules[ruleName] = next
-		}
-
-		// 5. Plugins: union from all matching entries (normalized to rule prefix form)
-		for _, plugin := range entry.Plugins {
-			merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
-		}
-
-		// 6. Settings: recursively merge ordinary objects; arrays and scalar
-		// values are replaced by the later entry.
-		if entry.Settings != nil {
-			merged.Settings = Settings(deepMergeConfigObjects(
-				map[string]any(merged.Settings),
-				map[string]any(entry.Settings),
-			))
-		}
-
-		// 7. LanguageOptions: deep merge
-		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
-	}
-
-	// No entry matched this file — do not lint it
-	if !entryMatched {
-		return nil
-	}
-
-	return merged
+	return config.mergeConfigEntries(key)
 }
 
 // isGlobalIgnoreEntry returns true if the entry has only ignores and an

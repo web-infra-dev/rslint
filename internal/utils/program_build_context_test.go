@@ -478,6 +478,10 @@ func TestProgramBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	if disabled.metadataFS != nil || disabled.extendedConfigCache != nil {
 		t.Fatal("escape hatch left metadata caches enabled")
 	}
+	disabled.EnableConcurrentProgramQueries()
+	if hostFS := disabled.NewCompilerHost("/").FS(); hostFS != disabled.FS() {
+		t.Fatal("escape hatch enabled the parallel Program VFS")
+	}
 
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
@@ -487,5 +491,34 @@ func TestProgramBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	disabled = NewProgramBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 	if _, err := disabled.CreateProgramLenient(true, root, filepath.Join(root, "tsconfig.json")); err != nil {
 		t.Fatalf("escape hatch must preserve upstream extends parsing: %v", err)
+	}
+}
+
+func TestProgramBuildContextScopesParallelFSToCompilerHosts(t *testing.T) {
+	base := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+	serial := NewProgramBuildContext(base)
+	if hostFS := serial.NewCompilerHost("/").FS(); hostFS != serial.FS() {
+		t.Fatal("serial compiler host did not retain the context VFS")
+	}
+
+	parallel := NewProgramBuildContext(base)
+	logicalFS := parallel.FS()
+	parallel.EnableConcurrentProgramQueries()
+	firstHostFS := parallel.NewCompilerHost("/").FS()
+	parallel.EnableConcurrentProgramQueries()
+	secondHostFS := parallel.NewCompilerHost("/").FS()
+	if parallel.FS() != logicalFS {
+		t.Fatal("parallel activation changed the context's non-Program VFS")
+	}
+	if firstHostFS != secondHostFS {
+		t.Fatal("parallel compiler hosts did not share one stable VFS view")
+	}
+	programFS, ok := firstHostFS.(*parallelProgramFS)
+	if !ok {
+		t.Fatalf("parallel compiler host FS has type %T", firstHostFS)
+	}
+	if programFS.FS != logicalFS {
+		t.Fatal("parallel compiler VFS does not delegate to the context VFS")
 	}
 }

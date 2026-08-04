@@ -259,6 +259,21 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *
 		name := callee.AsIdentifier().Text
 		if name == "RegExp" {
 			// Direct `RegExp` reference — must not be shadowed.
+			// RefStore resolves same-file bindings with the binder's scope walk,
+			// avoiding IsShadowed's repeated scans of enclosing statements. Its
+			// checker fallback still recognizes the standard-library global and
+			// ambient augmentations.
+			if ctx.Refs != nil {
+				if sym := ctx.Refs.Resolve(callee); sym != nil {
+					return !utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)
+				}
+				// With a checker, failure to resolve is authoritative. Without one,
+				// globals are outside RefStore's binder-only scope, so retain the
+				// syntactic fallback below.
+				if ctx.TypeChecker != nil {
+					return false
+				}
+			}
 			if utils.IsShadowed(callee, "RegExp") {
 				return false
 			}

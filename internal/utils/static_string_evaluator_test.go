@@ -11,7 +11,7 @@ import (
 
 func TestStaticStringEvaluator(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
 	code := "\n" +
 		"const direct = \"then\";\n" +
 		"const left = \"th\";\n" +
@@ -62,8 +62,8 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const numeric = 1 + 2;\n" +
 		"const unknownUse = unknownValue;\n"
 
-	fs := NewOverlayVFSForFile(filePath, code)
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
 
 	sourceFile := program.GetSourceFile(filePath)

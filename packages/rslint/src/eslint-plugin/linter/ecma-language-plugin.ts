@@ -444,7 +444,7 @@ export function lintFile(
       suggestionsMode: req.suggestionsMode,
     });
 
-    let returnedListeners: Record<string, ListenerFn | ListenerFn[]> = {};
+    let returnedListeners: Record<string, ListenerFn | ListenerFn[]>;
     const createStart = ruleTimes ? performance.now() : 0;
     try {
       // ruleAny is `any` so the RHS is `any` and assigns to the typed

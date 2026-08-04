@@ -23,7 +23,7 @@ import (
 // The static check matches `if ctx.TypeChecker == nil { return RuleListeners{} }`
 // at the top of Run. Some rules instead push the nil-TC gate into a helper
 // (e.g. no-obj-calls's checkCallee, no-const-assign's checkIdentifierWrite,
-// no-ex-assign's checkReassignments, no-use-before-define's checkIdentifier)
+// no-use-before-define's checkIdentifier)
 // — every listener funnels through that helper, so the rule emits zero
 // diagnostics without TC even though Run itself is unguarded.
 //

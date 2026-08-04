@@ -1,9 +1,15 @@
 package ban_ts_comment
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -480,4 +486,182 @@ func TestBanTsCommentRule(t *testing.T) {
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "tsDirectiveCommentRequiresDescription"}},
 		},
 	})
+}
+
+func TestDirectiveMatchersMatchRegexOracle(t *testing.T) {
+	singleLineDirectiveRegex := regexp.MustCompile(`^/{2,}\s*@ts-(expect-error|ignore)\b`)
+	singleLinePragmaRegex := regexp.MustCompile(`^///?\s*@ts-(check|nocheck)\b`)
+	multiLineLastLineRegex := regexp.MustCompile(`^\s*(?:[/*])*\s*@ts-(expect-error|ignore)\b`)
+
+	directiveFromSuffix := func(suffix string) (directiveKind, bool) {
+		switch suffix {
+		case "expect-error":
+			return directiveExpectError, true
+		case "ignore":
+			return directiveIgnore, true
+		case "nocheck":
+			return directiveNocheck, true
+		case "check":
+			return directiveCheck, true
+		default:
+			return 0, false
+		}
+	}
+	oracleSingleLine := func(commentText string) (directiveKind, int, bool) {
+		for _, expression := range []*regexp.Regexp{singleLineDirectiveRegex, singleLinePragmaRegex} {
+			match := expression.FindStringSubmatchIndex(commentText)
+			if match == nil {
+				continue
+			}
+			directive, ok := directiveFromSuffix(commentText[match[2]:match[3]])
+			return directive, match[1], ok
+		}
+		return 0, 0, false
+	}
+	oracleMultiLine := func(commentText string) (directiveKind, int, int, bool) {
+		contentStart := 2
+		contentEnd := len(commentText) - 2
+		lastLineStart := contentStart
+		if lineBreak := strings.LastIndexByte(commentText[contentStart:contentEnd], '\n'); lineBreak >= 0 {
+			lastLineStart += lineBreak + 1
+		}
+		match := multiLineLastLineRegex.FindStringSubmatchIndex(commentText[lastLineStart:contentEnd])
+		if match == nil {
+			return 0, 0, 0, false
+		}
+		directive, ok := directiveFromSuffix(commentText[lastLineStart+match[2] : lastLineStart+match[3]])
+		return directive, lastLineStart + match[1], contentEnd, ok
+	}
+
+	directives := []string{
+		"@ts-expect-error",
+		"@ts-ignore",
+		"@ts-nocheck",
+		"@ts-check",
+		"@ts-unknown",
+	}
+	whitespace := []string{"", " ", "\t", "\n", "\f", "\r", "\v", " \t\f\r"}
+	suffixes := []string{"", " ", ": why", "-why", "/", "_suffix", "0", "A", "é"}
+	configs := directiveConfigs{}
+	for directive := directiveKind(0); directive < directiveCount; directive++ {
+		configs[directive].Enabled = true
+	}
+
+	for _, slashes := range []string{"", "/", "//", "///", "////", "/////", "//x"} {
+		for _, space := range whitespace {
+			for _, directiveText := range directives {
+				for _, suffix := range suffixes {
+					commentText := slashes + space + directiveText + suffix
+					wantDirective, wantDescriptionStart, wantOK := oracleSingleLine(commentText)
+					gotDirective, gotDescriptionStart, gotOK := matchSingleLineDirective(commentText)
+					if gotOK != wantOK || gotDirective != wantDirective || gotDescriptionStart != wantDescriptionStart {
+						t.Fatalf(
+							"single-line match for %q = (%d, %d, %t), want (%d, %d, %t)",
+							commentText,
+							gotDirective,
+							gotDescriptionStart,
+							gotOK,
+							wantDirective,
+							wantDescriptionStart,
+							wantOK,
+						)
+					}
+					if wantOK && !containsEnabledDirective(commentText, &configs) {
+						t.Fatalf("source-text gate rejected matching single-line directive %q", commentText)
+					}
+				}
+			}
+		}
+	}
+
+	lastLinePrefixes := []string{"", " ", "\t", "\f", "\r", "\v", "*", "**", "/", "/*", " */ ", "\t/*\r"}
+	for _, previousLines := range []string{"", "header\n", "header\r\n", "\n"} {
+		for _, prefix := range lastLinePrefixes {
+			for _, directiveText := range directives {
+				for _, suffix := range suffixes {
+					commentText := "/*" + previousLines + prefix + directiveText + suffix + "*/"
+					wantDirective, wantDescriptionStart, wantContentEnd, wantOK := oracleMultiLine(commentText)
+					gotDirective, gotDescriptionStart, gotContentEnd, gotOK := matchMultiLineDirective(commentText)
+					if gotOK != wantOK || gotDirective != wantDirective || gotDescriptionStart != wantDescriptionStart || gotContentEnd != wantContentEnd {
+						t.Fatalf(
+							"multi-line match for %q = (%d, %d, %d, %t), want (%d, %d, %d, %t)",
+							commentText,
+							gotDirective,
+							gotDescriptionStart,
+							gotContentEnd,
+							gotOK,
+							wantDirective,
+							wantDescriptionStart,
+							wantContentEnd,
+							wantOK,
+						)
+					}
+					if wantOK && !containsEnabledDirective(commentText, &configs) {
+						t.Fatalf("source-text gate rejected matching multi-line directive %q", commentText)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestBanTsCommentSuggestionDemand(t *testing.T) {
+	const source = "// @ts-ignore"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/ban-ts-comment-suggestion.ts",
+		Path:     "/ban-ts-comment-suggestion.ts",
+	}, source, core.ScriptKindTS)
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(BanTsCommentRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+		BanTsCommentRule.Run(ctx, nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d produced %d diagnostics, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		diagnostic := run(demand)
+		if diagnostic.Message.Id != "tsIgnoreInsteadOfExpectError" || diagnostic.Range.Pos() != 0 || diagnostic.Range.End() != len(source) {
+			t.Fatalf("demand %d changed the diagnostic: %#v", demand, diagnostic)
+		}
+		if diagnostic.FixesPtr != nil {
+			t.Fatalf("demand %d unexpectedly materialized an autofix", demand)
+		}
+		if demand&rule.EditDemandSuggestion == 0 {
+			if diagnostic.Suggestions != nil {
+				t.Fatalf("demand %d materialized suggestions", demand)
+			}
+			continue
+		}
+		if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
+			t.Fatalf("demand %d suggestions = %#v, want one", demand, diagnostic.Suggestions)
+		}
+		suggestion := (*diagnostic.Suggestions)[0]
+		if suggestion.Message.Id != "replaceTsIgnoreWithTsExpectError" || len(suggestion.Fixes()) != 1 {
+			t.Fatalf("demand %d suggestion = %#v, want one replacement", demand, suggestion)
+		}
+		fix := suggestion.Fixes()[0]
+		if fix.Range.Pos() != 3 || fix.Range.End() != len(source) || fix.Text != "@ts-expect-error" {
+			t.Fatalf("demand %d fix = %#v, want @ts-ignore replacement", demand, fix)
+		}
+	}
 }

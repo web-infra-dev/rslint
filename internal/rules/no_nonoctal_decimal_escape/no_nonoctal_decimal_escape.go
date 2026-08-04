@@ -1,29 +1,36 @@
 package no_nonoctal_decimal_escape
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // https://eslint.org/docs/latest/rules/no-nonoctal-decimal-escape
 var NoNonoctalDecimalEscapeRule = rule.Rule{
 	Name: "no-nonoctal-decimal-escape",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		sourceText := ctx.SourceFile.Text()
 		return rule.RuleListeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-				rawStart := trimmedRange.Pos()
-				raw := ctx.SourceFile.Text()[rawStart:trimmedRange.End()]
-
-				if !containsBackslashDigit89(raw) {
+				// Ordinary string literals containing \8 or \9 carry this flag.
+				// JSX attribute strings are scanned in verbatim mode, so their token
+				// flags do not describe escapes and they need the raw-text fallback.
+				literal := node.AsStringLiteral()
+				if literal.TokenFlags&ast.TokenFlagsContainsInvalidEscape == 0 &&
+					(node.Parent == nil || node.Parent.Kind != ast.KindJsxAttribute) {
 					return
 				}
 
-				for _, hit := range scanDecimalEscapes(raw) {
+				rawStart := scanner.SkipTrivia(sourceText, node.Pos())
+				rawEnd := node.End()
+				if rawStart < 0 || rawStart >= rawEnd || rawEnd > len(sourceText) {
+					return
+				}
+
+				decimalEscapes := newDecimalEscapeIterator(sourceText[rawStart:rawEnd])
+				for hit, ok := decimalEscapes.next(); ok; hit, ok = decimalEscapes.next() {
 					reportDecimalEscape(ctx, rawStart, hit)
 				}
 			},
@@ -42,16 +49,17 @@ type decimalEscapeHit struct {
 	decimalEscape       string
 }
 
-func containsBackslashDigit89(raw string) bool {
-	for i := 0; i+1 < len(raw); i++ {
-		if raw[i] == '\\' && (raw[i+1] == '8' || raw[i+1] == '9') {
-			return true
-		}
-	}
-	return false
+type decimalEscapeIterator struct {
+	raw                 string
+	offset              int
+	previousEscapeStart int
 }
 
-// scanDecimalEscapes walks raw source text and returns every \8 / \9 hit.
+func newDecimalEscapeIterator(raw string) decimalEscapeIterator {
+	return decimalEscapeIterator{raw: raw, previousEscapeStart: -1}
+}
+
+// next walks raw source text and returns the next \8 / \9 hit.
 // Mirrors ESLint's regex
 //
 //	(?:[^\\]|(?<previousEscape>\\.))*?(?<decimalEscape>\\[89])
@@ -61,127 +69,166 @@ func containsBackslashDigit89(raw string) bool {
 // is immediately adjacent to the decimal escape — any unescaped character
 // between them clears it. We replicate that by resetting `previousEscape`
 // whenever a non-backslash byte is consumed.
-func scanDecimalEscapes(raw string) []decimalEscapeHit {
-	var hits []decimalEscapeHit
-	previousEscape := ""
-	previousEscapeStart := -1
-	n := len(raw)
-	for i := 0; i < n; {
-		if raw[i] != '\\' {
-			i++
-			previousEscape = ""
-			previousEscapeStart = -1
+func (s *decimalEscapeIterator) next() (decimalEscapeHit, bool) {
+	for s.offset < len(s.raw) {
+		if s.raw[s.offset] != '\\' {
+			s.offset++
+			s.previousEscapeStart = -1
 			continue
 		}
-		if i+1 >= n {
+		if s.offset+1 >= len(s.raw) {
 			break
 		}
-		next := raw[i+1]
+
+		escapeStart := s.offset
+		next := s.raw[escapeStart+1]
 		if next == '8' || next == '9' {
-			hits = append(hits, decimalEscapeHit{
+			previousEscape := ""
+			if s.previousEscapeStart >= 0 {
+				previousEscape = s.raw[s.previousEscapeStart : s.previousEscapeStart+2]
+			}
+			hit := decimalEscapeHit{
 				previousEscape:      previousEscape,
-				previousEscapeStart: previousEscapeStart,
-				decimalEscapeStart:  i,
-				decimalEscapeEnd:    i + 2,
-				decimalEscape:       raw[i : i+2],
-			})
-			i += 2
-			previousEscape = ""
-			previousEscapeStart = -1
-			continue
+				previousEscapeStart: s.previousEscapeStart,
+				decimalEscapeStart:  escapeStart,
+				decimalEscapeEnd:    escapeStart + 2,
+				decimalEscape:       s.raw[escapeStart : escapeStart+2],
+			}
+			s.offset = escapeStart + 2
+			s.previousEscapeStart = -1
+			return hit, true
 		}
-		previousEscape = raw[i : i+2]
-		previousEscapeStart = i
-		i += 2
+
+		s.previousEscapeStart = escapeStart
+		s.offset = escapeStart + 2
 	}
-	return hits
+	return decimalEscapeHit{}, false
 }
 
 func reportDecimalEscape(ctx rule.RuleContext, rawStart int, hit decimalEscapeHit) {
 	decimalEscapeStartAbs := rawStart + hit.decimalEscapeStart
 	decimalEscapeEndAbs := rawStart + hit.decimalEscapeEnd
-	digit := hit.decimalEscape[1:]
+	text := decimalEscapeTextFor(hit.decimalEscape[1])
+	decimalEscapeRange := core.NewTextRange(decimalEscapeStartAbs, decimalEscapeEndAbs)
 
-	suggestions := make([]rule.RuleSuggestion, 0, 3)
-
-	if hit.previousEscape == "\\0" {
-		// "\0\X" — replacing with "\0X" would create a legacy octal escape, so
-		// the rule offers two alternative refactors instead of the single one.
-		previousEscapeStartAbs := rawStart + hit.previousEscapeStart
-		nullEscape := unicodeEscape(0)
-		combined := nullEscape + digit
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message: rule.RuleMessage{
-				Id:          "refactor",
-				Description: refactorMessage("\\0"+hit.decimalEscape, combined),
-			},
-			FixesArr: []rule.RuleFix{
-				rule.RuleFixReplaceRange(
-					core.NewTextRange(previousEscapeStartAbs, decimalEscapeEndAbs),
-					combined,
-				),
-			},
-		})
-		digitUnicode := unicodeEscape(rune(digit[0]))
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message: rule.RuleMessage{
-				Id:          "refactor",
-				Description: refactorMessage(hit.decimalEscape, digitUnicode),
-			},
-			FixesArr: []rule.RuleFix{
-				rule.RuleFixReplaceRange(
-					core.NewTextRange(decimalEscapeStartAbs, decimalEscapeEndAbs),
-					digitUnicode,
-				),
-			},
-		})
-	} else {
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message: rule.RuleMessage{
-				Id:          "refactor",
-				Description: refactorMessage(hit.decimalEscape, digit),
-			},
-			FixesArr: []rule.RuleFix{
-				rule.RuleFixReplaceRange(
-					core.NewTextRange(decimalEscapeStartAbs, decimalEscapeEndAbs),
-					digit,
-				),
-			},
-		})
-	}
-
-	escaped := "\\" + hit.decimalEscape
-	suggestions = append(suggestions, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          "escapeBackslash",
-			Description: escapeBackslashMessage(hit.decimalEscape, escaped),
+	ctx.ReportRangeWithDeferredSuggestions(
+		decimalEscapeRange,
+		text.diagnostic,
+		func() []rule.RuleSuggestion {
+			return buildDecimalEscapeSuggestions(rawStart, decimalEscapeRange, hit, text)
 		},
-		FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(
-				core.NewTextRange(decimalEscapeStartAbs, decimalEscapeEndAbs),
-				escaped,
-			),
-		},
-	})
-
-	ctx.ReportRangeWithSuggestions(
-		core.NewTextRange(decimalEscapeStartAbs, decimalEscapeEndAbs),
-		rule.RuleMessage{
-			Id:          "decimalEscape",
-			Description: fmt.Sprintf("Don't use '%s' escape sequence.", hit.decimalEscape),
-		},
-		suggestions...,
 	)
 }
 
-func unicodeEscape(ch rune) string {
-	return fmt.Sprintf("\\u%04x", ch)
+type decimalEscapeText struct {
+	digit                  string
+	digitUnicode           string
+	nullAndDigitUnicode    string
+	escaped                string
+	diagnostic             rule.RuleMessage
+	refactor               rule.RuleMessage
+	refactorNullAndDigit   rule.RuleMessage
+	refactorDigitAsUnicode rule.RuleMessage
+	escapeBackslash        rule.RuleMessage
 }
 
-func refactorMessage(original, replacement string) string {
-	return fmt.Sprintf("Replace '%s' with '%s'. This maintains the current functionality.", original, replacement)
+var decimalEscapeTexts = [...]decimalEscapeText{
+	{
+		digit:               "8",
+		digitUnicode:        `\u0038`,
+		nullAndDigitUnicode: `\u00008`,
+		escaped:             `\\8`,
+		diagnostic: rule.RuleMessage{
+			Id:          "decimalEscape",
+			Description: `Don't use '\8' escape sequence.`,
+		},
+		refactor: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\8' with '8'. This maintains the current functionality.`,
+		},
+		refactorNullAndDigit: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\0\8' with '\u00008'. This maintains the current functionality.`,
+		},
+		refactorDigitAsUnicode: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\8' with '\u0038'. This maintains the current functionality.`,
+		},
+		escapeBackslash: rule.RuleMessage{
+			Id:          "escapeBackslash",
+			Description: `Replace '\8' with '\\8' to include the actual backslash character.`,
+		},
+	},
+	{
+		digit:               "9",
+		digitUnicode:        `\u0039`,
+		nullAndDigitUnicode: `\u00009`,
+		escaped:             `\\9`,
+		diagnostic: rule.RuleMessage{
+			Id:          "decimalEscape",
+			Description: `Don't use '\9' escape sequence.`,
+		},
+		refactor: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\9' with '9'. This maintains the current functionality.`,
+		},
+		refactorNullAndDigit: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\0\9' with '\u00009'. This maintains the current functionality.`,
+		},
+		refactorDigitAsUnicode: rule.RuleMessage{
+			Id:          "refactor",
+			Description: `Replace '\9' with '\u0039'. This maintains the current functionality.`,
+		},
+		escapeBackslash: rule.RuleMessage{
+			Id:          "escapeBackslash",
+			Description: `Replace '\9' with '\\9' to include the actual backslash character.`,
+		},
+	},
 }
 
-func escapeBackslashMessage(original, replacement string) string {
-	return fmt.Sprintf("Replace '%s' with '%s' to include the actual backslash character.", original, replacement)
+func decimalEscapeTextFor(digit byte) *decimalEscapeText {
+	if digit == '8' {
+		return &decimalEscapeTexts[0]
+	}
+	return &decimalEscapeTexts[1]
+}
+
+type decimalEscapeSuggestionBundle struct {
+	fixes       [3]rule.RuleFix
+	suggestions [3]rule.RuleSuggestion
+}
+
+func (b *decimalEscapeSuggestionBundle) set(index int, message rule.RuleMessage, textRange core.TextRange, text string) {
+	b.fixes[index] = rule.RuleFixReplaceRange(textRange, text)
+	b.suggestions[index] = rule.RuleSuggestion{
+		Message:  message,
+		FixesArr: b.fixes[index : index+1 : index+1],
+	}
+}
+
+func buildDecimalEscapeSuggestions(
+	rawStart int,
+	decimalEscapeRange core.TextRange,
+	hit decimalEscapeHit,
+	text *decimalEscapeText,
+) []rule.RuleSuggestion {
+	bundle := &decimalEscapeSuggestionBundle{}
+	if hit.previousEscape == "\\0" {
+		// "\0\X" — replacing with "\0X" would create a legacy octal escape, so
+		// the rule offers two alternative refactors instead of the single one.
+		bundle.set(
+			0,
+			text.refactorNullAndDigit,
+			core.NewTextRange(rawStart+hit.previousEscapeStart, decimalEscapeRange.End()),
+			text.nullAndDigitUnicode,
+		)
+		bundle.set(1, text.refactorDigitAsUnicode, decimalEscapeRange, text.digitUnicode)
+		bundle.set(2, text.escapeBackslash, decimalEscapeRange, text.escaped)
+		return bundle.suggestions[:3:3]
+	}
+
+	bundle.set(0, text.refactor, decimalEscapeRange, text.digit)
+	bundle.set(1, text.escapeBackslash, decimalEscapeRange, text.escaped)
+	return bundle.suggestions[:2:2]
 }

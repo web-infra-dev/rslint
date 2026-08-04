@@ -230,6 +230,11 @@ for (var i = 0; i < 10; i++) {
 			// ---- Enum reference (TS value+type) is a const-like binding ----
 			{Code: `enum Color { Red } for (var i = 0; i < l; i++) { (function() { Color.Red; }) }`},
 
+			// ---- Ambient/lib global (declared in lib.dom.d.ts, not this file —
+			// only ctx.Refs' TypeChecker fallback can resolve it, not the
+			// binder scope walk) is read-only — safe through ref ----
+			{Code: `for (var i = 0; i < l; i++) { (function() { window.location; }); }`},
+
 			// ---- Through refs collected from nested functions inside a non-loop
 			// outer function (the inner function itself IS the closure at risk) ----
 			{Code: `function outer() { for (var i = 0; i < l; i++) { let j = i; (function() { j; }); } }`},
@@ -993,6 +998,28 @@ for (var i = 0; i < 3; i++) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unsafeRefs",
 					Message:   "Function declared in a loop contains unsafe references to variable(s) 'e'.",
+				}},
+			},
+
+			// ---- Ambient/lib global reassigned inside the loop and captured by an
+			// escaping closure. `window` is declared in lib.dom.d.ts, not this
+			// file, so resolving it — both the through-reference in
+			// CollectThroughReferences and the write-reference scan in
+			// isSafeCore — requires ctx.Refs' internal TypeChecker fallback;
+			// the binder scope walk alone can't place it. Proves the fallback
+			// actually detects a real violation, not just that it avoids
+			// false positives on read-only globals (covered by the
+			// "window.location" valid case). ----
+			{
+				Code: `
+const funcs: unknown[] = [];
+for (var i = 0; i < 10; i++) {
+  window = i as any;
+  funcs.push(function () { return window; });
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'window'.",
 				}},
 			},
 		},

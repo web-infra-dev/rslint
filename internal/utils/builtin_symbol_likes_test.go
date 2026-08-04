@@ -15,10 +15,10 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
 
 	getTypes := func(code string) (*compiler.Program, *ast.Symbol) {
-		filePath := tspath.ResolvePath(rootDir, "file.ts")
-		fs := NewOverlayVFSForFile(filePath, code)
+		filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+		fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 
-		program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+		program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 		assert.NilError(t, err, "couldn't create program")
 		sourceFile := program.GetSourceFile(filePath)
 		c, done := program.GetTypeChecker(t.Context())
@@ -66,9 +66,9 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 
 func TestAddDefaultLibraryGlobals(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	fs := NewOverlayVFSForFile(filePath, "export {}; const top = 1; const localOnly = 1;")
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: "export {}; const top = 1; const localOnly = 1;"})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
 
 	typeChecker, done := program.GetTypeChecker(t.Context())
@@ -88,9 +88,9 @@ func TestAddDefaultLibraryGlobals(t *testing.T) {
 
 func TestAddDefaultLibraryTypeGlobalNames(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "file.ts")
-	fs := NewOverlayVFSForFile(filePath, "export {}; type NodeListOf = 1; const localOnly = 1;")
-	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: "export {}; type NodeListOf = 1; const localOnly = 1;"})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program")
 
 	typeChecker, done := program.GetTypeChecker(t.Context())

@@ -2420,7 +2420,7 @@ class C extends Component {}`, Tsx: true},
 func TestRequireOptimizationRule_NilTypeChecker(t *testing.T) {
 	t.Parallel()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "react.tsx")
+	filePath := tspath.ResolvePath(rootDir.Dir, "react.tsx")
 	code := `
 class A extends React.Component {}
 class B extends React.PureComponent { shouldComponentUpdate() {} }
@@ -2446,9 +2446,9 @@ class F extends Component {}
 function TopLevelComp(props) { return <div />; }
 const ArrowComp = (p) => <div />;
 `
-	fs := utils.NewOverlayVFSForFile(filePath, code)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(
-		true, fs, rootDir, "tsconfig.json", utils.CreateCompilerHost(rootDir, fs),
+		true, fs, rootDir.Dir, "tsconfig.json", utils.CreateCompilerHost(rootDir.Dir, fs),
 	)
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)

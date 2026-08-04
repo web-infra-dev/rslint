@@ -14,6 +14,16 @@ func useLiteralMessage() rule.RuleMessage {
 	}
 }
 
+func sourceMayUseArrayConstructor(sourceFile *ast.SourceFile) bool {
+	// Parsed identifier names are normalized, including Unicode escapes. Stay
+	// conservative for direct callers that do not provide parser metadata.
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	_, ok := sourceFile.Identifiers["Array"]
+	return ok
+}
+
 func buildArrayConstructorFixes(
 	sourceText string,
 	node *ast.Node,
@@ -43,70 +53,77 @@ func buildArrayConstructorFixes(
 	}
 }
 
+// Keep listener construction outside Run so the context captured by check
+// does not escape on files rejected by the identifier fast path.
+func noArrayConstructorListeners(ctx rule.RuleContext) rule.RuleListeners {
+	check := func(node *ast.Node) {
+		var callee *ast.Node
+		var args *ast.NodeList
+		var typeArgs *ast.NodeList
+
+		switch node.Kind {
+		case ast.KindCallExpression:
+			callExpr := node.AsCallExpression()
+			callee = callExpr.Expression
+			args = callExpr.Arguments
+			typeArgs = callExpr.TypeArguments
+		case ast.KindNewExpression:
+			newExpr := node.AsNewExpression()
+			callee = newExpr.Expression
+			args = newExpr.Arguments
+			typeArgs = newExpr.TypeArguments
+		default:
+			return
+		}
+
+		// ESTree does not expose grouping parentheses around a callee. Match
+		// that behavior without unwrapping TypeScript-only outer expressions
+		// such as non-null or `as` expressions.
+		if callee == nil {
+			return
+		}
+		if callee.Kind == ast.KindParenthesizedExpression {
+			callee = ast.SkipParentheses(callee)
+		}
+
+		// Check if callee is an Identifier named "Array"
+		if callee.Kind != ast.KindIdentifier {
+			return
+		}
+		identifier := callee.AsIdentifier()
+		if identifier.Text != "Array" {
+			return
+		}
+
+		// Skip if there are type arguments (e.g., Array<Foo>())
+		if typeArgs != nil && len(typeArgs.Nodes) > 0 {
+			return
+		}
+
+		// Skip if there's exactly 1 argument (e.g., Array(5))
+		if args != nil && len(args.Nodes) == 1 {
+			return
+		}
+
+		sourceText := ctx.SourceFile.Text()
+		reportRange := core.NewTextRange(scanner.SkipTrivia(sourceText, node.Pos()), node.End())
+		ctx.ReportRangeWithDeferredFixes(reportRange, useLiteralMessage(), func() []rule.RuleFix {
+			return buildArrayConstructorFixes(sourceText, node, args, reportRange)
+		})
+	}
+
+	return rule.RuleListeners{
+		ast.KindCallExpression: check,
+		ast.KindNewExpression:  check,
+	}
+}
+
 var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 	Name: "no-array-constructor",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		check := func(node *ast.Node) {
-			var callee *ast.Node
-			var args *ast.NodeList
-			var typeArgs *ast.NodeList
-
-			switch node.Kind {
-			case ast.KindCallExpression:
-				callExpr := node.AsCallExpression()
-				callee = callExpr.Expression
-				args = callExpr.Arguments
-				typeArgs = callExpr.TypeArguments
-			case ast.KindNewExpression:
-				newExpr := node.AsNewExpression()
-				callee = newExpr.Expression
-				args = newExpr.Arguments
-				typeArgs = newExpr.TypeArguments
-			default:
-				return
-			}
-
-			// ESTree does not expose grouping parentheses around a callee. Match
-			// that behavior without unwrapping TypeScript-only outer expressions
-			// such as non-null or `as` expressions.
-			if callee == nil {
-				return
-			}
-			callee = ast.SkipParentheses(callee)
-
-			// Check if callee is an Identifier named "Array"
-			if callee.Kind != ast.KindIdentifier {
-				return
-			}
-			identifier := callee.AsIdentifier()
-			if identifier.Text != "Array" {
-				return
-			}
-
-			// Skip if there are type arguments (e.g., Array<Foo>())
-			if typeArgs != nil && len(typeArgs.Nodes) > 0 {
-				return
-			}
-
-			// Skip if there's exactly 1 argument (e.g., Array(5))
-			argCount := 0
-			if args != nil {
-				argCount = len(args.Nodes)
-			}
-			if argCount == 1 {
-				return
-			}
-
-			sourceText := ctx.SourceFile.Text()
-			reportRange := core.NewTextRange(scanner.SkipTrivia(sourceText, node.Pos()), node.End())
-			ctx.ReportRangeWithDeferredFixes(reportRange, useLiteralMessage(), func() []rule.RuleFix {
-				return buildArrayConstructorFixes(sourceText, node, args, reportRange)
-			})
+		if !sourceMayUseArrayConstructor(ctx.SourceFile) {
+			return nil
 		}
-
-		return rule.RuleListeners{
-			ast.KindCallExpression: check,
-			ast.KindNewExpression:  check,
-		}
+		return noArrayConstructorListeners(ctx)
 	},
 })

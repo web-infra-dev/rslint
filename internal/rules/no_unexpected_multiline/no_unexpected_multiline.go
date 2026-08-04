@@ -1,17 +1,13 @@
 package no_unexpected_multiline
 
 import (
-	"regexp"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-var regexFlagMatcher = regexp.MustCompile(`^[gimsuy]+$`)
 
 var messageFunction = rule.RuleMessage{
 	Id:          "function",
@@ -36,7 +32,6 @@ var NoUnexpectedMultilineRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 		text := sf.Text()
-		lineMap := sf.ECMALineMap()
 
 		// reportTokenBreakAfter checks whether the next non-trivia token after
 		// `expr` starts on a different line than the source position of
@@ -50,9 +45,7 @@ var NoUnexpectedMultilineRule = rule.Rule{
 			if tokenStart >= len(text) {
 				return
 			}
-			exprEndLine := scanner.ComputeLineOfPosition(lineMap, exprEnd)
-			tokenLine := scanner.ComputeLineOfPosition(lineMap, tokenStart)
-			if exprEndLine == tokenLine {
+			if !hasLineTerminator(text, exprEnd, tokenStart) {
 				return
 			}
 			// ESLint reports a single-character range for `[` / `(`. Don't use
@@ -100,9 +93,7 @@ var NoUnexpectedMultilineRule = rule.Rule{
 				if prevPos < 0 {
 					return
 				}
-				prevLine := scanner.ComputeLineOfPosition(lineMap, prevPos)
-				backtickLine := scanner.ComputeLineOfPosition(lineMap, backtick)
-				if prevLine == backtickLine {
+				if !hasLineTerminator(text, prevPos+1, backtick) {
 					return
 				}
 				ctx.ReportRange(core.NewTextRange(backtick, backtick+1), messageTaggedTemplate)
@@ -111,6 +102,13 @@ var NoUnexpectedMultilineRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				bin := node.AsBinaryExpression()
 				if bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindSlashToken {
+					return
+				}
+				// A break before the first slash is required regardless of the
+				// surrounding AST shape or the token after the second slash. Reject
+				// ordinary same-line division before doing either of those checks.
+				firstSlashRange := core.NewTextRange(bin.OperatorToken.End()-1, bin.OperatorToken.End())
+				if !hasLineTerminator(text, bin.Left.End(), firstSlashRange.Pos()) {
 					return
 				}
 				// Mirror ESLint's `BinaryExpression > BinaryExpression.left`
@@ -140,53 +138,141 @@ var NoUnexpectedMultilineRule = rule.Rule{
 				if afterPos >= len(text) {
 					return
 				}
-				identEnd, ok := scanIdentifier(text, afterPos)
-				if !ok {
-					return
-				}
-				if !regexFlagMatcher.MatchString(text[afterPos:identEnd]) {
+				if !matchesRegexFlagIdentifier(text, afterPos) {
 					return
 				}
 
-				// checkForBreakAfter(node.left): compare lines of
-				// `bin.Left.End()` (= last char of the numerator, possibly the
-				// closing `)` of a paren-wrapped left) and the first `/`
-				// (= bin.OperatorToken). Use TrimNodeTextRange so we land on
-				// the trimmed start of the slash, not its leading trivia.
-				firstSlashRange := utils.TrimNodeTextRange(sf, bin.OperatorToken)
-				leftEnd := bin.Left.End()
-				leftLine := scanner.ComputeLineOfPosition(lineMap, leftEnd)
-				slashLine := scanner.ComputeLineOfPosition(lineMap, firstSlashRange.Pos())
-				if leftLine == slashLine {
-					return
-				}
 				ctx.ReportRange(firstSlashRange, messageDivision)
 			},
 		}
 	},
 }
 
-// scanIdentifier walks the identifier starting at `pos` (if any) and returns
-// the position right after its last character. Uses the tsgo scanner's
-// Unicode-aware identifier helpers and full UTF-8 rune decoding so we agree
-// with the parser on what counts as an identifier — mirroring ESLint's
-// `tokenAfterOperator.type === "Identifier"` check by construction. Returns
-// ok=false when no identifier starts at `pos`.
-func scanIdentifier(text string, pos int) (int, bool) {
-	if pos >= len(text) {
-		return pos, false
-	}
-	startCh, size := utf8.DecodeRuneInString(text[pos:])
-	if startCh == utf8.RuneError || !scanner.IsIdentifierStart(startCh) {
-		return pos, false
-	}
-	end := pos + size
-	for end < len(text) {
-		ch, sz := utf8.DecodeRuneInString(text[end:])
-		if ch == utf8.RuneError || !scanner.IsIdentifierPart(ch) {
-			break
+// hasLineTerminator reports whether text[start:end] contains an ECMAScript
+// line terminator. Checking the short gap between two tokens directly avoids
+// resolving both positions through the source file's full line map.
+func hasLineTerminator(text string, start int, end int) bool {
+	for i := start; i < end; i++ {
+		switch text[i] {
+		case '\r', '\n':
+			return true
+		case 0xe2:
+			// U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are the
+			// two non-ASCII ECMAScript line terminators (E2 80 A8/A9).
+			if i+2 < end && text[i+1] == 0x80 && (text[i+2] == 0xa8 || text[i+2] == 0xa9) {
+				return true
+			}
 		}
-		end += sz
 	}
-	return end, true
+	return false
+}
+
+// matchesRegexFlagIdentifier implements ESLint's Identifier-token plus
+// /^[gimsuy]+$/ check. Plain identifiers stay on the allocation-free source
+// scan; Unicode escapes are decoded in place so their identifier value (for
+// example, g\u0069 -> gi) is compared without constructing a token string.
+func matchesRegexFlagIdentifier(text string, pos int) bool {
+	matched := false
+	for pos < len(text) {
+		ch := rune(text[pos])
+		if isRegexFlag(ch) {
+			matched = true
+			pos++
+			continue
+		}
+
+		if ch == '\\' {
+			decoded, end, ok := scanIdentifierUnicodeEscape(text, pos)
+			if !ok {
+				return matched
+			}
+			if matched {
+				if !scanner.IsIdentifierPart(decoded) {
+					return true
+				}
+			} else if !scanner.IsIdentifierStart(decoded) {
+				return false
+			}
+			if !isRegexFlag(decoded) {
+				return false
+			}
+			matched = true
+			pos = end
+			continue
+		}
+
+		decoded, _ := utf8.DecodeRuneInString(text[pos:])
+		if decoded != utf8.RuneError && scanner.IsIdentifierPart(decoded) {
+			return false
+		}
+		return matched
+	}
+	return matched
+}
+
+func isRegexFlag(ch rune) bool {
+	switch ch {
+	case 'g', 'i', 'm', 's', 'u', 'y':
+		return true
+	default:
+		return false
+	}
+}
+
+// scanIdentifierUnicodeEscape decodes the identifier escape at pos and
+// returns the first byte after it. Both ECMAScript forms are accepted:
+// \uXXXX and \u{X...}.
+func scanIdentifierUnicodeEscape(text string, pos int) (rune, int, bool) {
+	const maxUnicodeCodePoint uint32 = 0x10ffff
+
+	if pos+2 > len(text) || text[pos] != '\\' || text[pos+1] != 'u' {
+		return 0, pos, false
+	}
+
+	pos += 2
+	if pos < len(text) && text[pos] == '{' {
+		pos++
+		digitStart := pos
+		value := uint32(0)
+		validValue := true
+		for pos < len(text) && isHexDigit(text[pos]) {
+			if value > (maxUnicodeCodePoint-hexValue(text[pos]))/16 {
+				validValue = false
+			} else if validValue {
+				value = value*16 + hexValue(text[pos])
+			}
+			pos++
+		}
+		if pos == digitStart || pos >= len(text) || text[pos] != '}' || !validValue {
+			return 0, pos, false
+		}
+		return rune(value), pos + 1, true
+	}
+
+	if pos+4 > len(text) {
+		return 0, pos, false
+	}
+	value := uint32(0)
+	for end := pos + 4; pos < end; pos++ {
+		if !isHexDigit(text[pos]) {
+			return 0, pos, false
+		}
+		value = value*16 + hexValue(text[pos])
+	}
+	return rune(value), pos, true
+}
+
+func isHexDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'f' || ch >= 'A' && ch <= 'F'
+}
+
+func hexValue(ch byte) uint32 {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return uint32(ch - '0')
+	case ch >= 'a' && ch <= 'f':
+		return uint32(ch-'a') + 10
+	default:
+		return uint32(ch-'A') + 10
+	}
 }

@@ -182,7 +182,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 
 ### Detailed Pipeline Steps
 
-1. **Source and Metadata Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. CLI runs and individual API requests create one `ProgramBuildContext` around their final VFS view. Its compiler hosts keep source snapshots keyed by the exact normalized source path, storing the first successful text read and its xxh3 hash for the current generation. The same context snapshots successful `package.json` and explicitly registered tsconfig reads by the exact requested path; other JSON, source, ignore, and config-discovery reads remain uncached. CLI fix writes replace the source generation before rebuilding Programs; API snapshots end with the request. LSP follows document events and its own session/versioned cache lifecycle instead.
+1. **Source and Metadata Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. CLI runs and individual API requests create one `ProgramBuildContext` around their final VFS view. Its compiler hosts keep source snapshots keyed by the exact normalized source path, storing the first successful text read and its xxh3 hash for the current generation. The same context snapshots successful `package.json` and explicitly registered tsconfig reads by the exact requested path; other JSON, source, ignore, and config-discovery reads remain uncached. When multiple Programs are constructed concurrently, a derived context view coalesces their concurrent cold realpath queries for the same exact path while sharing all parent caches. CLI fix writes replace the source generation before rebuilding Programs; API snapshots end with the request. LSP follows document events and its own session/versioned cache lifecycle instead.
 2. **Program Construction**: Plain CLI/API lint resolves its effective targets first and builds `Program` objects only for governing configs that own a selected target. All real and fallback Programs in that run/request are constructed through its `ProgramBuildContext`. A request-local implementation of ts-go's `ExtendedConfigCache` reuses common `extends` parses without modifying ts-go, while root and project-reference configs are explicitly registered for raw-read snapshots. Program-wide type-check modes build every project declared by the effective loaded config catalog. LSP first reuses matching projects from ts-go `project.Session`. For a declared custom tsconfig that Session has not loaded, rslint can retain the existing standalone Program by exact config path and advance source-only edits through ts-go's `Program.UpdateProgram`. Project-shape events discard it, and dependency reads are registered through ts-go's watcher mapper before the Program becomes resident. If watcher coverage cannot be established, rslint transparently keeps the original fresh construction. Speculative fix Programs remain isolated and request-local.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes.
 4. **Semantic Analysis**: When needed, the linter acquires a `TypeChecker` from the `Program`.
@@ -775,6 +775,16 @@ Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 4. later rule values override earlier values; a severity-only override retains earlier rule options
 5. settings and language options recursively merge ordinary objects, while later arrays and scalar values replace earlier values
 
+`FileConfigResolver` applies that policy in two phases: it first matches a file
+to the exact ordered set of contributing entries, then compiles the set into an
+immutable effective config/rule plan. Files with the same set share one plan for
+that resolver's lifetime. Shape identity is collision-free (`uint64` for the
+first 64 entries plus the complete remaining bitset), resolver-local, and
+independent of path identity. File-cache keys remain the exact caller strings;
+the resolver does not clean, case-fold, canonicalize, or merge symlink aliases.
+The direct `GetConfigForFile()` compatibility path uses the same match/merge
+primitives without retaining a cache.
+
 The staged coordinator builds the effective catalog used by
 `ConfigOwnerResolver.Resolve()` before `GetConfigForFile()` merges the selected
 entries. Staged CLI, native API, and transactional LSP paths therefore reuse the
@@ -874,7 +884,7 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
-5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order.
+5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order. Planning fixes those identities and stable slots serially, then independent Programs fill the slots through a bounded worker pool.
 6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
 7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
 8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
@@ -918,8 +928,10 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      represented configs. `--type-check` and `--type-check-only` construct
      every Program in the effective reachable catalog; the latter skips the
      lint-target walk.
-   - Configured Programs remain serial in stable config/project order because
-     typescript-go's API is invoked one Program at a time.
+   - Configured Program identities, config associations, and result slots are
+     planned serially in stable config/project order. Construction then uses at
+     most `min(GOMAXPROCS, Program count)` workers and merges results and
+     errors by the planned order.
    - `--singleThreaded` executes the same state machine with one Go discovery
      worker and serializes module evaluation within each Node frontier batch.
      Coordinator batches and results remain ordered in either mode.
@@ -1004,6 +1016,7 @@ Other invariants:
 | Linter work group             | Collapsed to serial via `core.NewWorkGroup(true)`.                                                            |
 | Type-check work group         | Program diagnostics are computed serially via `core.NewWorkGroup(true)`.                                      |
 | Staged catalog discovery      | Sibling-frontier workers and Node module evaluation are serialized; batches and catalog merge remain ordered. |
+| Configured Program builds     | Planned and constructed serially in stable config/project order, retaining fail-fast error behavior.          |
 | Lint-target walker workers    | Forced to 1 (single goroutine, no concurrency).                                                               |
 | Program source identity index | Canonical source paths are resolved serially through `core.NewWorkGroup(true)`.                               |
 
@@ -1015,7 +1028,7 @@ goroutines remain outside that guarantee.
 ### Design Principles
 
 - **Direct ts-go Data Model**: rslint operates on ts-go `Program`, AST, and `TypeChecker` objects directly instead of converting through a second AST representation
-- **Program-Level Parallelism**: `RunLinter` queues work per `Program` through `core.NewWorkGroup`; `--singleThreaded` forces the same flow to run serially
+- **Program-Level Parallelism**: configured Program construction uses a bounded, stable-slot worker pool, and `RunLinter` queues subsequent lint work per Program through `core.NewWorkGroup`; `--singleThreaded` forces both flows to run serially
 - **Single-Walk Rule Dispatch**: each file is traversed once, with rules registering listeners up front and sharing the same AST walk
 - **Early Filtering**: exact lint target plans, skip paths, global-ignore filters, and gap-file type filtering reduce work before listeners run
 
@@ -1038,6 +1051,12 @@ goroutines remain outside that guarantee.
   their matching kind is requested, so lint-only runs preserve diagnostics while
   avoiding edit-only analysis. Eager reporting methods remain compatible while
   rules migrate incrementally.
+- **Exact Config-Shape Interning**: a `FileConfigResolver` parses global and
+  entry-local ignores once, maps each exact file path to its complete matched
+  flat-config entry bitset, and merges/prepares enabled rules once per unique
+  bitset. CLI/API native and third-party plugin collection can share the fully
+  published immutable plan. LSP keeps its existing per-document resolver
+  lifetime; per-file rule runtime state stays outside every plan.
 
 ### Caching Strategy
 
@@ -1046,12 +1065,20 @@ goroutines remain outside that guarantee.
 - **Parse Cache in LSP**: the LSP server passes a shared ts-go `project.ParseCache` into the session to avoid re-parsing from scratch on every change.
 - **Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop.
 - **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.
+- **Parallel Program Realpath Queries**: when a CLI or lint API request actually builds multiple Programs concurrently, `ProgramBuildContext` derives a Program-only VFS view that coalesces same-path `Realpath` cold queries across those compiler hosts. Completed realpath and empty-result values remain request-local. Exact path strings are used as keys without cleaning, separator rewriting, case folding, or realpath-key merging. Existence checks and all other operations continue through the existing VFS stack. Serial Program builds, config discovery, target binding, LSP, and `cmd/tsgo` retain their existing filesystem paths and cache lifecycles.
+- **Resolver-Scoped Effective Config Plans**: each `FileConfigResolver` owns
+  exact-path file entries and exact matched-entry shape entries. Both caches use
+  publish-once values so concurrent readers of the same resolver wait for
+  complete initialization. They are discarded with the resolver; CLI fix
+  generations, API requests, LSP lint passes, and config reloads never share a
+  plan cache. Merged config maps and configured-rule slices returned by the
+  resolver are immutable shared state.
 - **Program Build Context Boundary**: one CLI invocation or API lint request owns one `ProgramBuildContext`, created only after the request's overlay/canonical VFS wrappers are complete. It is passed explicitly through real Program construction, gap fallback construction, and fix rebuilds. It is never global, never shared across API requests, and is not used by LSP, whose project session has a different invalidation model.
 - **Run/Request-Scoped Program Metadata**: successful `package.json` reads and explicitly registered root, project-reference, and extended tsconfig reads are snapshotted for the context lifetime. Keys remain exact caller paths—no cleaning, case folding, resolving real paths, or symlink merging—and failed reads are retried. Per-key read single-flight avoids duplicate concurrent I/O; generation swaps make future VFS writes safe without clearing a live map. Arbitrary JSON and non-metadata reads bypass this layer.
 - **Extended Config Parse Reuse**: the context implements ts-go's `ExtendedConfigCache` shim contract and shares common `extends` parse results across Programs. Parsing occurs outside map locks and publishes with `LoadOrStore`, avoiding recursive cross-cycle lock ordering; rare concurrent misses may duplicate parsing but share the winning immutable result and still single-flight raw bytes. Root `ParsedCommandLine` values and parsed `package.json` objects are not cached.
-- **Run/Request-Scoped Source Snapshots**: CLI runs and individual API requests share immutable source text/hash snapshots across their Programs. Keys are the exact compiler-host source names, never real paths, so lexical, overlay, and symlink aliases remain distinct. Failed reads are not cached. The source layer in one cache binds to one filesystem view across its generations; compiler hosts using another view bypass this layer while retaining content-keyed AST reuse.
+- **Run/Request-Scoped Source Snapshots**: CLI runs and individual API requests share immutable source text/hash snapshots across their Programs. Keys are the exact compiler-host source names, never real paths, so lexical, overlay, and symlink aliases remain distinct. Concurrent misses for one key share the successful read/hash operation; failed reads are shared only by the overlapping callers and are not retained. The source layer in one cache binds to one filesystem view across its generations; compiler hosts using another view bypass this layer while retaining content-keyed AST reuse.
 - **Generation-Based Fix Invalidation**: after every CLI fix write attempt, the compiler host atomically installs an empty source generation before any Program rebuild. Swapping generations rather than clearing a live map prevents an older in-flight read from repopulating the new generation. The API fix path only returns output and does not mutate or rebuild its overlay, while LSP remains version/didChange-driven.
-- **Run-Scoped Parse Reuse**: CLI Program rebuilds within one invocation and Programs within one API request share the existing content-keyed AST parse cache. Source-generation invalidation does not clear AST entries, so unchanged bytes can reuse their `SourceFile`. The cache is discarded with its run/request and is never repository-persistent or shared across lint requests.
+- **Run-Scoped Parse Reuse**: CLI Program rebuilds within one invocation and Programs within one API request share the existing content-keyed AST parse cache. Concurrent misses for the same full parse key are single-flight, so bounded Program construction does not duplicate parsing. Source-generation invalidation does not clear AST entries, so unchanged bytes can reuse their `SourceFile`. The cache is discarded with its run/request and is never repository-persistent or shared across lint requests.
 - **Bounded Multi-Pass Fixing**: `--fix` and LSP `fixAll` intentionally rerun lint after applying edits, but cap the cascade at `maxFixPasses = 10`
 
 ### Memory Management
@@ -1223,7 +1250,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  Bind by Governing Config / Project Order ─────► Non-project Fallback        │
 │                           │                                                  │
 │                           ▼                                                  │
-│  Resolve / Merge Config and Enabled Rules Per File                           │
+│  Match Config Shape -> Reuse/Merge Immutable Config and Enabled Rules        │
 │            │                                                                 │
 │            ▼                                                                 │
 │  Run Rule Initializers -> Register Listeners                                 │

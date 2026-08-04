@@ -1,0 +1,1665 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-assignment > invalid 1`] = `
+{
+  "code": "let v = 'used';
+            console.log(v);
+            v = 'unused'",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 2`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 3`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                if (condition) {
+                    v = 'unused';
+                    return
+                }
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 4`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                if (condition) {
+                    console.log(v);
+                } else {
+                    v = 'unused';
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 21,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 5`] = `
+{
+  "code": "var foo = function () {
+                let v = 'used';
+                console.log(v);
+                v = 'unused'
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 6`] = `
+{
+  "code": "var foo = () => {
+                let v = 'used';
+                console.log(v);
+                v = 'unused'
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 7`] = `
+{
+  "code": "class foo {
+                static {
+                    let v = 'used';
+                    console.log(v);
+                    v = 'unused'
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 8`] = `
+{
+  "code": "function foo() {
+                let v = 'unused';
+                if (condition) {
+                    v = 'used';
+                    console.log(v);
+                    return
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 9`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+                v = 'unused';
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 10`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+                v = 'used';
+                console.log(v);
+                v = 'used';
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 11`] = `
+{
+  "code": "
+            let v;
+            v = 'unused';
+            if (foo) {
+                v = 'used';
+            } else {
+                v = 'used';
+            }
+            console.log(v);",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 12`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+                v = 'unused';
+                v = 'used';
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 13`] = `
+{
+  "code": "function foo() {
+                let v = 'unused';
+                if (condition) {
+                    if (condition2) {
+                        v = 'used-2';
+                    } else {
+                        v = 'used-3';
+                    }
+                } else {
+                    v = 'used-4';
+                }
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 14`] = `
+{
+  "code": "function foo() {
+                let v;
+                if (condition) {
+                    v = 'unused';
+                } else {
+                    //
+                }
+                if (condition2) {
+                    v = 'used-1';
+                } else {
+                    v = 'used-2';
+                }
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 15`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                if (condition) {
+                    v = 'unused';
+                    v = 'unused';
+                    v = 'used';
+                }
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 16`] = `
+{
+  "code": "function foo() {
+                let a = 42;
+                console.log(a);
+                a++;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 17`] = `
+{
+  "code": "function foo() {
+                let a = 42;
+                console.log(a);
+                a--;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 18`] = `
+{
+  "code": "function foo() {
+                let a = 'used', b = 'used', c = 'used', d = 'used';
+                console.log(a, b, c, d);
+                ({ a, arr: [b, c,, ...d] } = fn());
+                console.log(c);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'b' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 29,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'd' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 39,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 19`] = `
+{
+  "code": "function foo() {
+                let a = 'used', b = 'used', c = 'used';
+                console.log(a, b, c);
+                ({ a = 'unused', foo: b, ...c } = fn());
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'b' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 39,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'c' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 4,
+        },
+        "start": {
+          "column": 45,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 20`] = `
+{
+  "code": "function foo () {
+                let v = 'used';
+                console.log(v);
+                setTimeout(() => v = 42, 1);
+                v = 'unused and variable is only updated in other scopes';
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 21`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                if (condition) {
+                    let v = 'used';
+                    console.log(v);
+                    v = 'unused';
+                }
+                console.log(v);
+                v = 'unused';
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 21,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 22`] = `
+{
+  "code": "function foo() {
+                let v = 'used';
+                if (condition) {
+                    console.log(v);
+                    v = 'unused';
+                } else {
+                    v = 'unused';
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 23`] = `
+{
+  "code": "function foo () {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+                return;
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 24`] = `
+{
+  "code": "function foo () {
+                let v = 'used';
+                console.log(v);
+                v = 'unused';
+                throw new Error();
+                console.log(v);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 25`] = `
+{
+  "code": "function foo () {
+                let v = 'used';
+                console.log(v);
+                for (let i = 0; i < 10; i++) {
+                    v = 'unused';
+                    continue;
+                    console.log(v);
+                }
+            }
+            function bar () {
+                let v = 'used';
+                console.log(v);
+                for (let i = 0; i < 10; i++) {
+                    v = 'unused';
+                    break;
+                    console.log(v);
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 14,
+        },
+        "start": {
+          "column": 21,
+          "line": 14,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 26`] = `
+{
+  "code": "function foo () {
+                let v = 'used';
+                console.log(v);
+                for (let i = 0; i < 10; i++) {
+                    if (condition) {
+                        v = 'unused';
+                        break;
+                    }
+                    console.log(v);
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 25,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 27`] = `
+{
+  "code": "let message = 'unused';
+            try {
+                const result = call();
+                message = result.message;
+            } catch (e) {
+                message = 'used';
+            }
+            console.log(message)",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'message' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 28`] = `
+{
+  "code": "function* generator() {
+                let done = false;
+                yield 1;
+                done = true;
+                console.log(done);
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'done' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 29`] = `
+{
+  "code": "function* generator() {
+                let done = false;
+                try {
+                    yield 1;
+                } finally {
+                    done = true;
+                    console.log(done);
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'done' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 30`] = `
+{
+  "code": "let message = 'unused';
+            try {
+                message = 'used';
+                console.log(message)
+            } catch (e) {
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'message' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 31`] = `
+{
+  "code": "let message = 'unused';
+            try {
+                message = call();
+            } catch (e) {
+                message = 'used';
+            }
+            console.log(message)",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'message' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 32`] = `
+{
+  "code": "let v = 'unused';
+            try {
+                v = callA();
+                try {
+                    v = callB();
+                } catch (e) {
+                    // ignore
+                }
+            } catch (e) {
+                v = 'used';
+            }
+            console.log(v)",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'v' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 33`] = `
+{
+  "code": "function foo() {
+				let outcome = 'unknown';
+
+				try {
+					bar();
+				} catch (err) {
+					new Baz();
+					outcome = 'exception'; 
+				} finally {
+					return;
+					console.log(outcome);
+				}
+			}",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'outcome' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'outcome' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 8,
+        },
+        "start": {
+          "column": 6,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 34`] = `
+{
+  "code": "
+            var x = 1; // used
+            x = x + 1; // unused
+            x = 5; // used
+            f(x);",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 35`] = `
+{
+  "code": "
+            var x = 1; // used
+            x = // used
+                x++; // unused
+            f(x);",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 36`] = `
+{
+  "code": "const obj = { a: 1 };
+            let {
+                a,
+                b = (a = 2)
+            } = obj;
+            a = 3
+            console.log(a, b);",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'a' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 37`] = `
+{
+  "code": "function App() {
+            let A = "unused";
+            A = "used";
+            return <A/>;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'A' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 38`] = `
+{
+  "code": "function App() {
+            let A = "unused";
+            A = "used";
+            return <A></A>;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'A' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 39`] = `
+{
+  "code": "function App() {
+            let A = "unused";
+            A = "used";
+            return <A.B />;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'A' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 40`] = `
+{
+  "code": "function App() {
+            let x = "used";
+            if (cond) {
+              return <A prop={x} />;
+            } else {
+              x = "unused";
+            }
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 41`] = `
+{
+  "code": "function App() {
+            let A;
+            A = "unused";
+            if (cond) {
+              A = "used1";
+            } else {
+              A = "used2";
+            }
+            return <A/>;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'A' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 42`] = `
+{
+  "code": "function App() {
+            let message = 'unused';
+            try {
+              const result = call();
+              message = result.message;
+            } catch (e) {
+              message = 'used';
+            }
+            return <A prop={message} />;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'message' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 43`] = `
+{
+  "code": "function App() {
+            let x = 1;
+            x = x + 1;
+            x = 5;
+            return <A prop={x} />;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 44`] = `
+{
+  "code": "function App() {
+            let x = 1;
+            x = 2;
+            return <A>{x}</A>;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-assignment > invalid 45`] = `
+{
+  "code": "function App() {
+            let x = 0;
+            x = 1;
+            x = 2;
+            return <A prop={x} />;
+            }",
+  "diagnostics": [
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+    {
+      "message": "The value assigned to 'x' is not used in subsequent statements.",
+      "messageId": "unnecessaryAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

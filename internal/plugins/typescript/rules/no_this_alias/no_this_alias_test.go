@@ -32,6 +32,11 @@ func TestNoThisAliasRule(t *testing.T) {
 			{Code: `const [foo] = this;`},
 			{Code: `const [foo, bar] = this;`},
 			{Code: `const self = this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
+			{Code: `const \u0073elf = this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
+			{
+				Code:    `const nested = this;`,
+				Options: []interface{}{[]interface{}{map[string]interface{}{"allowedNames": []interface{}{"nested"}}}},
+			},
 			{Code: `let self = 1; self ||= this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
 			{Code: `setTimeout(() => { this.doWork(); });`},
 		},
@@ -47,6 +52,18 @@ func TestNoThisAliasRule(t *testing.T) {
 				Code: `const self = (((this)));`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "thisAssignment", Line: 1, Column: 7, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code: `const /* leading */ self = this;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "thisAssignment", Line: 1, Column: 21, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code: `const \u0074hat = this;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "thisAssignment", Line: 1, Column: 7, EndLine: 1, EndColumn: 16},
 				},
 			},
 			{
