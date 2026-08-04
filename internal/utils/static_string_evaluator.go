@@ -492,9 +492,9 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 }
 
 // staticMemberValue reads key off a folded object or array literal. Reading a
-// key that isn't there yields `undefined`, as it would at runtime. Anything
-// else — a non-index string, an array `length` — stays unresolved, because
-// folding it would need a numeric value representation this evaluator doesn't
+// key that isn't there yields `undefined`, as it would at runtime. A key an
+// array inherits — `length`, `join` — stays unresolved, because folding it
+// would need a numeric or callable value representation this evaluator doesn't
 // carry.
 func staticMemberValue(object any, key string) staticEvalResult {
 	switch object := object.(type) {
@@ -506,14 +506,32 @@ func staticMemberValue(object any, key string) staticEvalResult {
 	case staticArrayValue:
 		index, ok := staticArrayIndex(key)
 		if !ok {
+			if staticNumberShapedKey(key) {
+				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+			}
 			return staticEvalResult{}
 		}
-		if index < 0 || index >= len(object.elements) {
+		if index >= len(object.elements) {
 			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 		}
 		return staticEvalResult{value: object.elements[index], ok: true}
 	}
 	return staticEvalResult{}
+}
+
+// staticNumberShapedKey reports whether key opens the way a number's string
+// form can. Such a key is neither an own property of an array literal nor one
+// it inherits, so reading it yields `undefined`.
+func staticNumberShapedKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	switch key[0] {
+	case '-', '+', '.':
+		return true
+	default:
+		return key[0] >= '0' && key[0] <= '9'
+	}
 }
 
 // staticArrayIndex parses key as a canonical array index string: decimal
@@ -766,7 +784,7 @@ func staticValueToString(value any) (string, bool) {
 
 // staticArrayToString implements `Array.prototype.join(',')`, which is what
 // an array coerces to via the default ToString. Nullish elements fold to "",
-// not "null"/"undefined" (unlike stringifying them directly).
+// not "null"/"undefined" as a direct string conversion would give.
 func staticArrayToString(value staticArrayValue) (string, bool) {
 	parts := make([]string, len(value.elements))
 	for i, element := range value.elements {
