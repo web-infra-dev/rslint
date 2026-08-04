@@ -558,9 +558,10 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	}
 	resolved.state = state
 	resolved.members = append(resolved.members, part.name)
-	if part.name == "each" {
+	switch part.name {
+	case "each":
 		resolved.parameterizedKind = RstestParameterizedEach
-	} else if part.name == "for" {
+	case "for":
 		resolved.parameterizedKind = RstestParameterizedFor
 	}
 	return true
