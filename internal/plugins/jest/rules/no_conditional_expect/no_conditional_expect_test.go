@@ -653,6 +653,18 @@ func TestNoConditionalExpectRule(t *testing.T) {
 				},
 			},
 			{
+				// The receiver of `.catch` need not resolve to a name: upstream
+				// `isCatchCall` only inspects the immediate property.
+				Code: `
+        it('works', async () => {
+          await promises[key].catch(error => expect(error).toBeInstanceOf(Error));
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				Code: `
         it('works', async () => {
           await Promise.resolve()
