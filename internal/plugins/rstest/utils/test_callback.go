@@ -10,6 +10,35 @@ type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
+	fnCalls            *rstestFnCallCache
+}
+
+// rstestFnCallCache memoizes call parsing so that the collection walk and the
+// rule traversal that follows it do not each parse every call expression.
+type rstestFnCallCache struct {
+	ctx    rule.RuleContext
+	parsed map[*ast.Node]*ParsedRstestFnCall
+}
+
+func (cache *rstestFnCallCache) parse(node *ast.Node) *ParsedRstestFnCall {
+	if cache == nil {
+		return nil
+	}
+	if parsed, ok := cache.parsed[node]; ok {
+		return parsed
+	}
+	parsed := ParseRstestFnCallWithOfficialExtensions(node, cache.ctx)
+	cache.parsed[node] = parsed
+	return parsed
+}
+
+// ParseFnCall parses node the way CollectRstestTestCallbacks did, reusing the
+// cached result when the collection walk already visited node.
+func (callbacks RstestTestCallbacks) ParseFnCall(node *ast.Node) *ParsedRstestFnCall {
+	if callbacks.fnCalls == nil {
+		return nil
+	}
+	return callbacks.fnCalls.parse(node)
 }
 
 type rstestCallbackInfo struct {
@@ -23,6 +52,10 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 		Functions:          map[*ast.Node]bool{},
 		ContextReceivers:   map[*ast.Symbol]bool{},
 		ContextExpectNames: map[*ast.Symbol]bool{},
+		fnCalls: &rstestFnCallCache{
+			ctx:    ctx,
+			parsed: map[*ast.Node]*ParsedRstestFnCall{},
+		},
 	}
 	pending := map[string][]*ParsedRstestFnCall{}
 
@@ -32,7 +65,7 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 			return
 		}
 		if node.Kind == ast.KindCallExpression {
-			parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
+			parsed := result.fnCalls.parse(node)
 			if parsed != nil && parsed.Kind == RstestFnTypeTest {
 				info := resolveRstestTestCallback(ctx, parsed, node.AsCallExpression())
 				if info.functionNode != nil {

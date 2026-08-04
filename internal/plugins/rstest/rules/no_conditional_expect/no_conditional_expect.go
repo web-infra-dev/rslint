@@ -14,7 +14,7 @@ var NoConditionalExpectRule = shared.NewRule(shared.Config{
 		return shared.Runtime{
 			TestCallbackFunctions: callbacks.Functions,
 			ClassifyCall: func(node *ast.Node) (bool, bool) {
-				parsed := rstestUtils.ParseRstestFnCallWithOfficialExtensions(node, ctx)
+				parsed := callbacks.ParseFnCall(node)
 				return parsed != nil && parsed.Kind == rstestUtils.RstestFnTypeTest,
 					rstestUtils.IsRstestExpectCall(node, ctx, callbacks)
 			},
