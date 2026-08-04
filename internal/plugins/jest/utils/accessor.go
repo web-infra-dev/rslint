@@ -198,7 +198,7 @@ func ReplaceCallSuffixFix(
 		return rule.RuleFix{}, false
 	}
 
-	start := callee.End()
+	start := callExpr.Expression.End()
 	if callExpr.QuestionDotToken != nil {
 		start = callExpr.QuestionDotToken.End()
 	}
