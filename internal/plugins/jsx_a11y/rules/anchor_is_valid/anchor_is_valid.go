@@ -17,10 +17,11 @@ package anchor_is_valid
 
 import (
 	_ "embed"
-	"regexp"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -35,13 +36,28 @@ const (
 	invalidHrefErrorMessage  = "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md"
 )
 
-// jsHrefPattern mirrors upstream's `safeRegexTest(/^\W*?javascript:/)`. The
-// lazy `\W*?` lets a stray non-word prefix (whitespace, `#`, etc.) precede
-// `javascript:` and still match — this is what catches obfuscation attempts
-// like ` javascript:void(0)` while still accepting plain identifiers
-// such as `javascriptFoo`. Both JS and Go default `\W` to ASCII (`[^A-Za-z0-9_]`),
-// so the matched character class is identical.
-var jsHrefPattern = regexp.MustCompile(`^\W*?javascript:`)
+// hasJavaScriptHref mirrors upstream's `/^\W*?javascript:/` without invoking
+// Go's regexp engine for every static href. JavaScript's `\w` is the ASCII
+// class `[A-Za-z0-9_]`, so bytes from a UTF-8 encoded non-ASCII prefix are all
+// non-word bytes and are skipped exactly as the upstream regexp skips their
+// code points. The first word character must begin the literal
+// `javascript:`; a word prefix such as `xjavascript:` therefore stays valid.
+func hasJavaScriptHref(value string) bool {
+	start := 0
+	for start < len(value) {
+		c := value[start]
+		if c == '_' || c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' {
+			break
+		}
+		start++
+	}
+	const prefix = "javascript:"
+	return len(value)-start >= len(prefix) && value[start:start+len(prefix)] == prefix
+}
+
+func isInvalidHrefValue(value string) bool {
+	return value == "" || value == "#" || hasJavaScriptHref(value)
+}
 
 const (
 	aspectNoHref       = "noHref"
@@ -57,19 +73,18 @@ const (
 type options struct {
 	components  []string
 	specialLink []string
-	// activeAspects mirrors upstream's `activeAspects[name] = aspects.indexOf(name) !== -1`
-	// after defaulting. We pre-compute the booleans during options parsing
-	// so the listener never needs to re-walk the `aspects` array.
-	activeAspects map[string]bool
+	// These booleans mirror upstream's activeAspects object without requiring
+	// three map lookups for every matching JSX element.
+	noHref       bool
+	invalidHref  bool
+	preferButton bool
 }
 
 func parseOptions(raw []any) options {
 	opts := options{
-		activeAspects: map[string]bool{
-			aspectNoHref:       true,
-			aspectInvalidHref:  true,
-			aspectPreferButton: true,
-		},
+		noHref:       true,
+		invalidHref:  true,
+		preferButton: true,
 	}
 	if len(raw) == 0 {
 		return opts
@@ -91,14 +106,17 @@ func parseOptions(raw []any) options {
 		// `ok` check remains the single source of the absent/present
 		// distinction.
 		if aspects := jsxa11yutil.StringSliceOption(rawAspects); aspects != nil {
-			opts.activeAspects = map[string]bool{
-				aspectNoHref:       false,
-				aspectInvalidHref:  false,
-				aspectPreferButton: false,
-			}
+			opts.noHref = false
+			opts.invalidHref = false
+			opts.preferButton = false
 			for _, name := range aspects {
-				if _, known := opts.activeAspects[name]; known {
-					opts.activeAspects[name] = true
+				switch name {
+				case aspectNoHref:
+					opts.noHref = true
+				case aspectInvalidHref:
+					opts.invalidHref = true
+				case aspectPreferButton:
+					opts.preferButton = true
 				}
 			}
 		}
@@ -116,15 +134,39 @@ var AnchorIsValidRule = rule.Rule{
 		// `settings['jsx-a11y'].components` remap (Link → a) and the
 		// `polymorphicPropName` setting are honored — same as upstream's
 		// `getElementType(context)(node)` curry.
-		typeCheck := append([]string{"a"}, opts.components...)
+		isTargetType := func(elementType string) bool {
+			return elementType == "a" || slices.Contains(opts.components, elementType)
+		}
+		// With no element-type settings, the raw tag name is already the
+		// effective name. This is the overwhelmingly common configuration and
+		// avoids re-reading nested settings maps for every JSX element.
+		hasElementTypeSettings := false
+		if a11y, ok := ctx.Settings["jsx-a11y"].(map[string]interface{}); ok {
+			polymorphicPropName, _ := a11y["polymorphicPropName"].(string)
+			components, _ := a11y["components"].(map[string]interface{})
+			hasElementTypeSettings = polymorphicPropName != "" || len(components) != 0
+		}
 		// propsToValidate = ['href'].concat(propOptions). Each prop is
 		// looked up case-insensitively via FindAttributeByName and walked
 		// through any literal-spread, mirroring `getProp(attrs, name)`.
 		propsToValidate := append([]string{"href"}, opts.specialLink...)
+		checkInvalidHref := opts.invalidHref || opts.preferButton
+		sourceText := ctx.SourceFile.Text()
+		reportNode := func(node *ast.Node, message rule.RuleMessage) {
+			// ReportNode trims leading trivia by constructing a fresh scanner.
+			// JSX opening nodes always end at node.End(); scanner.SkipTrivia gives
+			// the identical first-token position without allocating a scanner.
+			ctx.ReportRange(core.NewTextRange(scanner.SkipTrivia(sourceText, node.Pos()), node.End()), message)
+		}
 
 		check := func(node *ast.Node) {
-			nodeType := jsxa11yutil.GetElementType(node, ctx.Settings)
-			if !slices.Contains(typeCheck, nodeType) {
+			var nodeType string
+			if hasElementTypeSettings {
+				nodeType = jsxa11yutil.GetElementType(node, ctx.Settings)
+			} else {
+				nodeType = reactutil.GetJsxElementTypeString(node)
+			}
+			if !isTargetType(nodeType) {
 				return
 			}
 
@@ -147,6 +189,36 @@ var AnchorIsValidRule = rule.Rule{
 			hasInvalidHref := false
 			for _, propName := range propsToValidate {
 				attr := jsxa11yutil.FindAttributeByName(attrs, propName)
+				if attr == nil {
+					continue
+				}
+				if jsxa11yutil.AttributeIsBooleanForm(attr) {
+					hasAnyHref = true
+					continue
+				}
+				if checkInvalidHref {
+					// LiteralStringValue covers the common direct-literal path and
+					// decodes JSX entities before the security-sensitive URL check.
+					// PropStaticStringValue is the full expression fallback. Trying
+					// the string classification before the nullish classification
+					// evaluates string-valued expressions only once instead of twice.
+					if val, ok := jsxa11yutil.LiteralStringValue(attr); ok {
+						hasAnyHref = true
+						hasInvalidHref = isInvalidHrefValue(val)
+						if hasInvalidHref {
+							break
+						}
+						continue
+					}
+					if val, ok := jsxa11yutil.PropStaticStringValue(attr); ok {
+						hasAnyHref = true
+						hasInvalidHref = isInvalidHrefValue(val)
+						if hasInvalidHref {
+							break
+						}
+						continue
+					}
+				}
 				if jsxa11yutil.PropValueIsNullish(attr) {
 					// `attr == nil` (absent prop), `prop={null}`,
 					// `prop={undefined}`, and TS-wrapped variants of those
@@ -155,34 +227,18 @@ var AnchorIsValidRule = rule.Rule{
 					continue
 				}
 				hasAnyHref = true
-				if val, ok := jsxa11yutil.PropStaticStringValue(attr); ok {
-					// Only string values are eligible for the invalid-href
-					// check. Booleans (`prop={true}`, boolean form), numbers,
-					// and any non-string truthy synthesized values (member
-					// access, calls, etc.) all skip the typeof === 'string'
-					// guard upstream and stay valid.
-					if val == "" || val == "#" || jsHrefPattern.MatchString(val) {
-						hasInvalidHref = true
-					}
-				}
 			}
-
-			// `attributes.some(a => a.type === 'JSXSpreadAttribute')` — any
-			// spread, literal or not, suppresses the noHref / preferButton
-			// branches when there is no explicit href. Crucially, this is
-			// independent from FindAttributeByName's literal-spread walk:
-			// `<a {...{href: ''}}/>` has hasSpread=true AND will populate
-			// the href-prop branch via the literal walk.
-			hasSpread := false
-			for _, a := range attrs {
-				if a.Kind == ast.KindJsxSpreadAttribute {
-					hasSpread = true
-					break
-				}
-			}
-			onClick := jsxa11yutil.FindAttributeByName(attrs, "onClick")
 
 			if !hasAnyHref {
+				// `attributes.some(a => a.type === 'JSXSpreadAttribute')` — any
+				// spread, literal or not, suppresses both missing-href branches.
+				// Defer this scan until it matters; valid hrefs return without it.
+				for _, attr := range attrs {
+					if attr.Kind == ast.KindJsxSpreadAttribute {
+						return
+					}
+				}
+				onClick := jsxa11yutil.FindAttributeByName(attrs, "onClick")
 				// Upstream:
 				//
 				//   if (!hasSpreadOperator && activeAspects.noHref
@@ -199,15 +255,14 @@ var AnchorIsValidRule = rule.Rule{
 				// preferButton is off, the onClick doesn't redirect the
 				// report into a button-recommendation). Lock-in tests exist
 				// upstream for this combination — see __tests__/.../anchor-is-valid-test.js.
-				if !hasSpread && opts.activeAspects[aspectNoHref] &&
-					(onClick == nil || !opts.activeAspects[aspectPreferButton]) {
-					ctx.ReportNode(node, rule.RuleMessage{
+				if opts.noHref && (onClick == nil || !opts.preferButton) {
+					reportNode(node, rule.RuleMessage{
 						Id:          "noHref",
 						Description: noHrefErrorMessage,
 					})
 				}
-				if !hasSpread && onClick != nil && opts.activeAspects[aspectPreferButton] {
-					ctx.ReportNode(node, rule.RuleMessage{
+				if onClick != nil && opts.preferButton {
+					reportNode(node, rule.RuleMessage{
 						Id:          "preferButton",
 						Description: preferButtonErrorMessage,
 					})
@@ -222,13 +277,17 @@ var AnchorIsValidRule = rule.Rule{
 			// takes precedence over invalidHref when both are active and an
 			// onClick exists — upstream's `if (onClick && activeAspects.preferButton)`
 			// followed by `else if (activeAspects.invalidHref)`.
-			if onClick != nil && opts.activeAspects[aspectPreferButton] {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "preferButton",
-					Description: preferButtonErrorMessage,
-				})
-			} else if opts.activeAspects[aspectInvalidHref] {
-				ctx.ReportNode(node, rule.RuleMessage{
+			if opts.preferButton {
+				if onClick := jsxa11yutil.FindAttributeByName(attrs, "onClick"); onClick != nil {
+					reportNode(node, rule.RuleMessage{
+						Id:          "preferButton",
+						Description: preferButtonErrorMessage,
+					})
+					return
+				}
+			}
+			if opts.invalidHref {
+				reportNode(node, rule.RuleMessage{
 					Id:          "invalidHref",
 					Description: invalidHrefErrorMessage,
 				})
