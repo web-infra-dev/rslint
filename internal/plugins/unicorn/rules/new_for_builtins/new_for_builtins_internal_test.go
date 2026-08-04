@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestDeferredReportsPreserveDiagnostics(t *testing.T) {
@@ -102,7 +103,7 @@ func TestDeferredCollectionPreservesBindingTiming(t *testing.T) {
 
 	diagnostics := runRuleForTest(
 		t,
-		"const Alias = Array; Alias(); Map();",
+		"unresolved(); function helper() {} helper(); const Alias = Array; Alias(); Map();",
 		rule.EditDemandNone,
 	)
 	if len(diagnostics) != 2 {
@@ -320,6 +321,50 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 	sourceFile.Identifiers = nil
 	if !sourceHasPotentialReference(sourceFile) {
 		t.Fatal("sourceHasPotentialReference() must fail open without a parser identifier index")
+	}
+}
+
+func TestTrimmedNodeRangeMatchesCanonicalRange(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/new-for-builtins-range-test.ts",
+		Path:     tspath.Path("/new-for-builtins-range-test.ts"),
+	}, `/* leading call */ Array();
+		const value = new /* constructor */ (Symbol);
+		function make() {
+			return /* returned */ new
+				/* constructor */ BigInt;
+		}
+		function fail() {
+			throw /* thrown */ new Number(1);
+		}
+		const date = (
+			globalThis
+			/* member */ ["Date"]
+		)();`, core.ScriptKindTS)
+
+	nodes := map[*ast.Node]bool{}
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindCallExpression:
+			nodes[node] = true
+			nodes[node.AsCallExpression().Expression] = true
+		case ast.KindNewExpression:
+			nodes[node] = true
+			nodes[node.AsNewExpression().Expression] = true
+		case ast.KindReturnStatement, ast.KindThrowStatement:
+			nodes[node] = true
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	if len(nodes) == 0 {
+		t.Fatal("expected range test nodes")
+	}
+	for node := range nodes {
+		if got, want := trimmedNodeRange(sourceFile, node), utils.TrimNodeTextRange(sourceFile, node); got != want {
+			t.Errorf("%s range = %v, want %v", node.Kind.String(), got, want)
+		}
 	}
 }
 
