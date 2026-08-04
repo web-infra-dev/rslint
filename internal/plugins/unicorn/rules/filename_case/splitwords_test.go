@@ -59,12 +59,74 @@ func TestSplitWordsParity(t *testing.T) {
 		// All three passes together.
 		{"foo-BarBaz", []string{"foo", "Bar", "Baz"}},
 		{"FOO-barBaz", []string{"FOO", "bar", "Baz"}},
+
+		// Unicode category boundaries mirror the upstream property escapes.
+		{"éÉclair", []string{"é", "Éclair"}},
+		{"ÉÉclair", []string{"É", "Éclair"}},
+		// Title-case letters are \p{Lt}, not \p{Lu} or \p{Ll}, so they do not
+		// participate in either camel/acronym boundary expression.
+		{"\u01C5Foo", []string{"\u01C5Foo"}},
+		// Combining marks and non-ASCII decimal digits are delimiters: the
+		// upstream separator accepts \p{L} plus ECMAScript's ASCII-only \d.
+		{"e\u0301Mail", []string{"e", "Mail"}},
+		{"foo١Bar", []string{"foo", "Bar"}},
 	}
 	for _, c := range cases {
 		got := splitWords(c.in)
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("splitWords(%q) = %#v, want %#v", c.in, got, c.want)
 		}
+	}
+}
+
+// TestFixFilenameDecoratedCartesianProduct locks in candidate de-duplication
+// and left-to-right cartesian-product order when ignored decoration splits a
+// filename into multiple independently converted chunks.
+func TestFixFilenameDecoratedCartesianProduct(t *testing.T) {
+	t.Run("order", func(t *testing.T) {
+		leading, words := splitFilename("FOO_BAR[BAZ_QUX]")
+		cases := []caseStyle{allCases[0], allCases[2]} // camel, kebab
+		valid, invalidWord, candidates := validateFilename(words, cases)
+		if valid {
+			t.Fatal("expected filename to be invalid")
+		}
+		got := fixFilename(words, cases, invalidWord, candidates, leading, ".js")
+		want := []string{
+			"fooBar[bazQux].js",
+			"fooBar[baz-qux].js",
+			"foo-bar[bazQux].js",
+			"foo-bar[baz-qux].js",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("fixFilename() = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("deduplicate each chunk", func(t *testing.T) {
+		leading, words := splitFilename("1_[1_]")
+		cases := []caseStyle{allCases[0], allCases[2], allCases[3]} // camel, kebab, pascal
+		valid, invalidWord, candidates := validateFilename(words, cases)
+		if valid {
+			t.Fatal("expected filename to be invalid")
+		}
+		got := fixFilename(words, cases, invalidWord, candidates, leading, ".js")
+		want := []string{"1[1].js"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("fixFilename() = %#v, want %#v", got, want)
+		}
+	})
+}
+
+func TestSplitFilenameNormalizesInvalidUTF8(t *testing.T) {
+	input := string([]byte{'a', 0xff, 'B'})
+	leading, got := splitFilename(input)
+	want := []filenameWord{
+		{word: "a"},
+		{word: "�", ignored: true},
+		{word: "B"},
+	}
+	if leading != "" || !reflect.DeepEqual(got, want) {
+		t.Fatalf("splitFilename(%q) = (%q, %#v), want (%q, %#v)", input, leading, got, "", want)
 	}
 }
 

@@ -4,7 +4,9 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
+	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -23,6 +25,8 @@ type caseStyle struct {
 	fn   func(string) string
 }
 
+const caseStyleCount = 4
+
 // allCases keeps a stable canonical iteration order for the `cases` option.
 //
 // NOTE: Unlike ESLint, where Object.keys() over `options.cases` preserves the
@@ -31,30 +35,31 @@ type caseStyle struct {
 // `map[string]interface{}` after JSON parsing; Go map iteration is not
 // order-preserving, and the original key order is unrecoverable. Locking the
 // order here keeps message text deterministic.
-var allCases = []caseStyle{
+var allCases = [caseStyleCount]caseStyle{
 	{key: "camelCase", name: "camel case", fn: toCamelCase},
 	{key: "snakeCase", name: "snake case", fn: toSnakeCase},
 	{key: "kebabCase", name: "kebab case", fn: toKebabCase},
 	{key: "pascalCase", name: "pascal case", fn: toPascalCase},
 }
 
-var caseByKey = func() map[string]caseStyle {
-	m := make(map[string]caseStyle, len(allCases))
+func caseForKey(key string) (caseStyle, bool) {
 	for _, c := range allCases {
-		m[c.key] = c
+		if c.key == key {
+			return c, true
+		}
 	}
-	return m
-}()
+	return caseStyle{}, false
+}
 
-// ignoredByDefault mirrors the upstream's hardcoded set of files that cannot
+// isIgnoredByDefault mirrors the upstream's hardcoded set of files that cannot
 // change case (notably required by Node / build tooling).
-var ignoredByDefault = map[string]bool{
-	"index.js":  true,
-	"index.mjs": true,
-	"index.cjs": true,
-	"index.ts":  true,
-	"index.tsx": true,
-	"index.vue": true,
+func isIgnoredByDefault(basename string) bool {
+	switch basename {
+	case "index.js", "index.mjs", "index.cjs", "index.ts", "index.tsx", "index.vue":
+		return true
+	default:
+		return false
+	}
 }
 
 const reOpts = regexp2.ECMAScript | regexp2.Unicode
@@ -67,37 +72,43 @@ type invalidIgnore struct {
 	err     error
 }
 
-// Options is the parsed shape of the user's rule configuration.
-type Options struct {
-	Cases                  []caseStyle
-	Ignores                []*regexp2.Regexp
-	InvalidIgnores         []invalidIgnore
-	MultipleFileExtensions bool
+// options is the parsed shape of the user's rule configuration. Cases use a
+// fixed-size array because the schema permits exactly four known styles; this
+// keeps the option parsing done for every file allocation-free unless ignore
+// patterns are configured.
+type options struct {
+	cases                  [caseStyleCount]caseStyle
+	caseCount              int
+	ignores                []*regexp2.Regexp
+	invalidIgnores         []invalidIgnore
+	multipleFileExtensions bool
 }
 
-func parseOptions(rawOpts []any) Options {
-	opts := Options{
-		Cases:                  []caseStyle{caseByKey["kebabCase"]},
-		MultipleFileExtensions: true,
-	}
+func parseOptions(rawOpts []any) options {
+	opts := options{caseCount: 1, multipleFileExtensions: true}
+	opts.cases[0] = allCases[2] // kebabCase
 	optsMap := utils.GetOptionsMap(rawOpts)
 	if optsMap == nil {
 		return opts
 	}
 
 	if v, ok := optsMap["case"].(string); ok {
-		if c, found := caseByKey[v]; found {
-			opts.Cases = []caseStyle{c}
+		if c, found := caseForKey(v); found {
+			opts.cases[0] = c
+			opts.caseCount = 1
 		}
 	} else if casesMap, ok := optsMap["cases"].(map[string]interface{}); ok {
-		var chosen []caseStyle
+		var chosen [caseStyleCount]caseStyle
+		chosenCount := 0
 		for _, c := range allCases {
 			if b, ok := casesMap[c.key].(bool); ok && b {
-				chosen = append(chosen, c)
+				chosen[chosenCount] = c
+				chosenCount++
 			}
 		}
-		if len(chosen) > 0 {
-			opts.Cases = chosen
+		if chosenCount > 0 {
+			opts.cases = chosen
+			opts.caseCount = chosenCount
 		}
 	}
 
@@ -107,19 +118,66 @@ func parseOptions(rawOpts []any) Options {
 			if !ok {
 				continue
 			}
-			if re, err := regexp2.Compile(s, reOpts); err == nil {
-				opts.Ignores = append(opts.Ignores, re)
+			if re, err := compileIgnoreRegexp(s); err == nil {
+				opts.ignores = append(opts.ignores, re)
 			} else {
-				opts.InvalidIgnores = append(opts.InvalidIgnores, invalidIgnore{pattern: s, err: err})
+				opts.invalidIgnores = append(opts.invalidIgnores, invalidIgnore{pattern: s, err: err})
 			}
 		}
 	}
 
 	if v, ok := optsMap["multipleFileExtensions"].(bool); ok {
-		opts.MultipleFileExtensions = v
+		opts.multipleFileExtensions = v
 	}
 
 	return opts
+}
+
+func (o *options) selectedCases() []caseStyle {
+	return o.cases[:o.caseCount]
+}
+
+// regexp2 compilation is considerably more expensive than matching, while a
+// configured ignore list is shared by every file. Cache compiled patterns at
+// rule scope so parallel files reuse them. The fixed-size FIFO bound prevents
+// long-lived API/LSP processes from retaining an unbounded stream of config
+// values; regexp2.Regexp is documented as safe for concurrent use.
+const ignoreRegexpCacheCapacity = 128
+
+type compiledIgnoreRegexp struct {
+	regexp *regexp2.Regexp
+	err    error
+}
+
+var ignoreRegexpCache = struct {
+	sync.Mutex
+	entries map[string]compiledIgnoreRegexp
+	order   [ignoreRegexpCacheCapacity]string
+	count   int
+	next    int
+}{}
+
+func compileIgnoreRegexp(pattern string) (*regexp2.Regexp, error) {
+	ignoreRegexpCache.Lock()
+	defer ignoreRegexpCache.Unlock()
+
+	if cached, ok := ignoreRegexpCache.entries[pattern]; ok {
+		return cached.regexp, cached.err
+	}
+
+	re, err := regexp2.Compile(pattern, reOpts)
+	if ignoreRegexpCache.entries == nil {
+		ignoreRegexpCache.entries = make(map[string]compiledIgnoreRegexp, ignoreRegexpCacheCapacity)
+	}
+	if ignoreRegexpCache.count == ignoreRegexpCacheCapacity {
+		delete(ignoreRegexpCache.entries, ignoreRegexpCache.order[ignoreRegexpCache.next])
+	} else {
+		ignoreRegexpCache.count++
+	}
+	ignoreRegexpCache.order[ignoreRegexpCache.next] = pattern
+	ignoreRegexpCache.next = (ignoreRegexpCache.next + 1) % ignoreRegexpCacheCapacity
+	ignoreRegexpCache.entries[pattern] = compiledIgnoreRegexp{regexp: re, err: err}
+	return re, err
 }
 
 // nodeExtname mirrors Node.js `path.extname`. Returns the suffix from the
@@ -167,77 +225,41 @@ func nodeExtname(basename string) string {
 //  3. /[^\p{L}\d]+/giu               → collapse non-alphanumeric runs into
 //     the same delimiter.
 //
-// Then trim leading/trailing delimiters and split. We use rune `0` as the
-// internal delimiter (matching the upstream's `\0`).
+// Then trim leading/trailing delimiters and split. The three replacements only
+// establish word boundaries, so the implementation below recognizes the same
+// boundaries in one pass and returns slices of the original string. This
+// avoids building three intermediate rune buffers for every case candidate.
 func splitWords(s string) []string {
-	runes := []rune(s)
-
-	// Pass 1: lower/digit + upper → split.
-	var pass1 []rune
-	for i, r := range runes {
-		if i > 0 {
-			prev := runes[i-1]
-			if (unicode.IsLower(prev) || isASCIIDigit(prev)) && unicode.IsUpper(r) {
-				pass1 = append(pass1, 0)
-			}
-		}
-		pass1 = append(pass1, r)
-	}
-
-	// Pass 2: upper + (upper + lower) → split between the first and second
-	// uppercase.
-	var pass2 []rune
-	for i, r := range pass1 {
-		if i > 0 && i < len(pass1)-1 {
-			prev, next := pass1[i-1], pass1[i+1]
-			if unicode.IsUpper(prev) && unicode.IsUpper(r) && unicode.IsLower(next) {
-				pass2 = append(pass2, 0)
-			}
-		}
-		pass2 = append(pass2, r)
-	}
-
-	// Pass 3: collapse runs of non-alphanumeric into one delimiter.
-	var stripped []rune
-	inDelim := false
-	for _, r := range pass2 {
-		if !unicode.IsLetter(r) && !isASCIIDigit(r) {
-			if !inDelim {
-				stripped = append(stripped, 0)
-				inDelim = true
-			}
-			continue
-		}
-		stripped = append(stripped, r)
-		inDelim = false
-	}
-
-	// Trim leading and trailing delimiters.
-	start, end := 0, len(stripped)
-	for start < end && stripped[start] == 0 {
-		start++
-	}
-	for end > start && stripped[end-1] == 0 {
-		end--
-	}
-	if start >= end {
-		return nil
-	}
-
 	var words []string
-	var cur []rune
-	for _, r := range stripped[start:end] {
-		if r == 0 {
-			if len(cur) > 0 {
-				words = append(words, string(cur))
-				cur = cur[:0]
+	wordStart := -1
+	var previous rune
+	for pos, current := range s {
+		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
+			if wordStart >= 0 {
+				words = append(words, s[wordStart:pos])
+				wordStart = -1
 			}
 			continue
 		}
-		cur = append(cur, r)
+
+		if wordStart < 0 {
+			wordStart = pos
+		} else {
+			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
+			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
+				_, size := utf8.DecodeRuneInString(s[pos:])
+				next, _ := utf8.DecodeRuneInString(s[pos+size:])
+				boundary = unicode.IsLower(next)
+			}
+			if boundary {
+				words = append(words, s[wordStart:pos])
+				wordStart = pos
+			}
+		}
+		previous = current
 	}
-	if len(cur) > 0 {
-		words = append(words, string(cur))
+	if wordStart >= 0 {
+		words = append(words, s[wordStart:])
 	}
 	return words
 }
@@ -253,13 +275,13 @@ func pascalLikeTransform(word string, index int) string {
 	if word == "" {
 		return ""
 	}
-	runes := []rune(word)
-	char0 := runes[0]
-	rest := strings.ToLower(string(runes[1:]))
+	char0, size := utf8.DecodeRuneInString(word)
+	first := word[:size]
+	rest := strings.ToLower(word[size:])
 	if index > 0 && isASCIIDigit(char0) {
-		return "_" + string(char0) + rest
+		return "_" + first + rest
 	}
-	return strings.ToUpper(string(char0)) + rest
+	return strings.ToUpper(first) + rest
 }
 
 func toCamelCase(s string) string {
@@ -268,6 +290,7 @@ func toCamelCase(s string) string {
 		return ""
 	}
 	var sb strings.Builder
+	sb.Grow(len(s) + len(words))
 	sb.WriteString(strings.ToLower(words[0]))
 	for i := 1; i < len(words); i++ {
 		sb.WriteString(pascalLikeTransform(words[i], i))
@@ -281,6 +304,7 @@ func toPascalCase(s string) string {
 		return ""
 	}
 	var sb strings.Builder
+	sb.Grow(len(s) + len(words))
 	for i, w := range words {
 		sb.WriteString(pascalLikeTransform(w, i))
 	}
@@ -294,11 +318,19 @@ func joinNoCase(words []string, delim string) string {
 	if len(words) == 0 {
 		return ""
 	}
-	parts := make([]string, len(words))
-	for i, w := range words {
-		parts[i] = strings.ToLower(w)
+	size := len(delim) * (len(words) - 1)
+	for _, word := range words {
+		size += len(word)
 	}
-	return strings.Join(parts, delim)
+	var sb strings.Builder
+	sb.Grow(size)
+	for i, w := range words {
+		if i > 0 {
+			sb.WriteString(delim)
+		}
+		sb.WriteString(strings.ToLower(w))
+	}
+	return sb.String()
 }
 
 // filenameWord is one chunk of the filename produced by splitFilename: a run
@@ -325,6 +357,16 @@ func isIgnoredChar(r rune) bool {
 	return true
 }
 
+func appendFilenameWord(words []filenameWord, word string, ignored bool, invalidUTF8 bool) []filenameWord {
+	if invalidUTF8 {
+		// Match range-over-runes semantics from the original implementation:
+		// malformed bytes become U+FFFD instead of leaking invalid UTF-8 into a
+		// diagnostic suggestion. Valid filenames stay on the zero-copy path.
+		word = string([]rune(word))
+	}
+	return append(words, filenameWord{word: word, ignored: ignored})
+}
+
 // splitFilename mirrors the upstream helper of the same name. Leading
 // underscores are captured separately so they're preserved verbatim in the
 // rename suggestion.
@@ -335,89 +377,146 @@ func splitFilename(filename string) (leading string, words []filenameWord) {
 	}
 	leading = filename[:i]
 	tailing := filename[i:]
-
-	var hasLast, lastIgnored bool
-	var lastWord []rune
-	flush := func() {
-		if !hasLast {
-			return
-		}
-		words = append(words, filenameWord{word: string(lastWord), ignored: lastIgnored})
-		lastWord = lastWord[:0]
-		hasLast = false
+	if tailing == "" {
+		return leading, nil
 	}
-	for _, r := range tailing {
-		ig := isIgnoredChar(r)
-		if hasLast && lastIgnored == ig {
-			lastWord = append(lastWord, r)
+
+	wordStart := 0
+	var lastIgnored bool
+	wordHasInvalidUTF8 := false
+	hasLast := false
+	for pos, r := range tailing {
+		ignored := isIgnoredChar(r)
+		invalidUTF8 := false
+		if r == utf8.RuneError {
+			_, size := utf8.DecodeRuneInString(tailing[pos:])
+			invalidUTF8 = size == 1
+		}
+		if !hasLast {
+			lastIgnored = ignored
+			wordHasInvalidUTF8 = invalidUTF8
+			hasLast = true
 			continue
 		}
-		flush()
-		lastWord = append(lastWord[:0], r)
-		lastIgnored = ig
-		hasLast = true
+		if lastIgnored != ignored {
+			words = appendFilenameWord(words, tailing[wordStart:pos], lastIgnored, wordHasInvalidUTF8)
+			wordStart = pos
+			lastIgnored = ignored
+			wordHasInvalidUTF8 = invalidUTF8
+		} else if invalidUTF8 {
+			wordHasInvalidUTF8 = true
+		}
 	}
-	flush()
+	words = appendFilenameWord(words, tailing[wordStart:], lastIgnored, wordHasInvalidUTF8)
 	return leading, words
 }
 
-// validateFilename returns true when every non-ignored chunk already matches
-// at least one of the chosen case styles.
-func validateFilename(words []filenameWord, cases []caseStyle) bool {
-	for _, w := range words {
+type caseCandidates [caseStyleCount]string
+
+// validateFilename returns whether every non-ignored chunk already matches at
+// least one chosen case style. On failure it also returns the first invalid
+// chunk and the candidates already computed for it, so fixFilename does not
+// repeat those conversions.
+func validateFilename(words []filenameWord, cases []caseStyle) (valid bool, invalidWord int, candidates caseCandidates) {
+	for wordIndex, w := range words {
 		if w.ignored {
 			continue
 		}
-		ok := false
-		for _, c := range cases {
-			if c.fn(w.word) == w.word {
-				ok = true
+		for caseIndex, c := range cases {
+			candidate := c.fn(w.word)
+			if candidate == w.word {
+				candidates = caseCandidates{}
 				break
 			}
-		}
-		if !ok {
-			return false
+			candidates[caseIndex] = candidate
+			if caseIndex == len(cases)-1 {
+				return false, wordIndex, candidates
+			}
 		}
 	}
-	return true
+	return true, -1, caseCandidates{}
 }
 
 // fixFilename builds the deduplicated, ordered list of suggested filenames by
 // taking the cartesian product of each non-ignored chunk's case-conversion
-// candidates. The order matches change-case's left-to-right output so the
-// message reads `fooBar`, `FooBar`, `foo-bar` for cases ordered camel,
-// pascal, kebab.
-func fixFilename(words []filenameWord, cases []caseStyle, leading, trailing string) []string {
-	replacements := make([][]string, len(words))
-	for i, w := range words {
-		if w.ignored {
-			replacements[i] = []string{w.word}
-			continue
-		}
-		cand := make([]string, len(cases))
-		for j, c := range cases {
-			cand[j] = c.fn(w.word)
-		}
-		replacements[i] = cand
-	}
+// candidates. The order matches change-case's left-to-right output, so all
+// four styles produce `fooBar`, `foo_bar`, `foo-bar`, `FooBar` in canonical
+// camel, snake, kebab, pascal order.
+type filenameReplacements struct {
+	items [caseStyleCount]string
+	count int
+}
 
-	seen := map[string]bool{}
-	var out []string
-	var visit func(idx int, acc string)
-	visit = func(idx int, acc string) {
-		if idx == len(replacements) {
-			full := leading + acc + trailing
-			if !seen[full] {
-				seen[full] = true
-				out = append(out, full)
-			}
+func (r *filenameReplacements) add(candidate string) {
+	for i := range r.count {
+		if r.items[i] == candidate {
 			return
 		}
-		for _, item := range replacements[idx] {
-			visit(idx+1, acc+item)
+	}
+	r.items[r.count] = candidate
+	r.count++
+}
+
+func fixFilename(
+	words []filenameWord,
+	cases []caseStyle,
+	invalidWord int,
+	invalidCandidates caseCandidates,
+	leading string,
+	trailing string,
+) []string {
+	replacements := make([]filenameReplacements, len(words))
+	combinationCount := 1
+	maxFilenameLen := len(leading) + len(trailing)
+	for i, w := range words {
+		if w.ignored {
+			replacements[i].add(w.word)
+		} else {
+			for j, c := range cases {
+				candidate := invalidCandidates[j]
+				if i != invalidWord {
+					candidate = c.fn(w.word)
+				}
+				replacements[i].add(candidate)
+			}
+		}
+
+		// Case candidates contain only filename-relevant characters, while
+		// adjacent converted chunks are separated by a fixed ignored chunk.
+		// Removing duplicates inside each chunk therefore also guarantees that
+		// the complete cartesian-product outputs are unique, without a map.
+		maxReplacementLen := 0
+		for j := range replacements[i].count {
+			maxReplacementLen = max(maxReplacementLen, len(replacements[i].items[j]))
+		}
+		maxFilenameLen += maxReplacementLen
+		if combinationCount <= 256/replacements[i].count {
+			combinationCount *= replacements[i].count
+		} else {
+			combinationCount = 256
 		}
 	}
-	visit(0, "")
+
+	out := make([]string, 0, combinationCount)
+	buffer := make([]byte, 0, maxFilenameLen)
+	buffer = append(buffer, leading...)
+	var visit func(idx int)
+	visit = func(idx int) {
+		if idx == len(replacements) {
+			prefixLen := len(buffer)
+			buffer = append(buffer, trailing...)
+			out = append(out, string(buffer))
+			buffer = buffer[:prefixLen]
+			return
+		}
+		for i := range replacements[idx].count {
+			prefixLen := len(buffer)
+			buffer = append(buffer, replacements[idx].items[i]...)
+			visit(idx + 1)
+			buffer = buffer[:prefixLen]
+		}
+	}
+	visit(0)
 	return out
 }
 
@@ -435,18 +534,46 @@ func englishishJoin(items []string) string {
 	return strings.Join(items[:len(items)-1], ", ") + ", or " + items[len(items)-1]
 }
 
-func backtickList(items []string) []string {
-	out := make([]string, len(items))
-	for i, s := range items {
-		out[i] = "`" + s + "`"
+func englishishCaseNames(cases []caseStyle) string {
+	var names [caseStyleCount]string
+	for i, c := range cases {
+		names[i] = c.name
 	}
-	return out
+	return englishishJoin(names[:len(cases)])
 }
 
-func isLowerCase(s string) bool { return s == strings.ToLower(s) }
+func englishishBacktickJoin(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	size := 2 * len(items)
+	for _, item := range items {
+		size += len(item)
+	}
+	var sb strings.Builder
+	sb.Grow(size + 6*(len(items)-1))
+	for i, item := range items {
+		if i > 0 {
+			switch {
+			case i < len(items)-1:
+				sb.WriteString(", ")
+			case len(items) == 2:
+				sb.WriteString(" or ")
+			default:
+				sb.WriteString(", or ")
+			}
+		}
+		sb.WriteByte('`')
+		sb.WriteString(item)
+		sb.WriteByte('`')
+	}
+	return sb.String()
+}
+
+const filenameCaseRuleName = "unicorn/filename-case"
 
 var FilenameCaseRule = rule.Rule{
-	Name:   "unicorn/filename-case",
+	Name:   filenameCaseRuleName,
 	Schema: rule.NewSchema(schemaJSON),
 	// The rule is purely filename-driven — it does not inspect any AST node.
 	// `Run` is invoked once per source file, so we do the work here and
@@ -455,21 +582,22 @@ var FilenameCaseRule = rule.Rule{
 	// `ast.KindSourceFile` listener would silently never fire.)
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.SourceFile == nil {
-			return rule.RuleListeners{}
+			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
 		if fileName == "" {
-			return rule.RuleListeners{}
+			return nil
 		}
 		// `tspath.GetBaseFileName` normalizes `\` → `/` first, so a Windows
 		// path like `src\foo\bar.js` resolves the basename correctly.
 		basename := tspath.GetBaseFileName(fileName)
 		// Skip ESLint's stdin / inline-source virtual filenames.
 		if basename == "<input>" || basename == "<text>" {
-			return rule.RuleListeners{}
+			return nil
 		}
 
 		opts := parseOptions(options)
+		reportRange := core.NewTextRange(0, 0)
 
 		// Configuration error: any malformed `ignore` pattern aborts
 		// case-checking on this file. Mirrors ESLint's behaviour, where
@@ -477,9 +605,12 @@ var FilenameCaseRule = rule.Rule{
 		// produces no further diagnostics until the config is fixed —
 		// returning case reports based on a partially-broken ignore list
 		// would be misleading.
-		if len(opts.InvalidIgnores) > 0 {
-			for _, bad := range opts.InvalidIgnores {
-				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{
+		if len(opts.invalidIgnores) > 0 {
+			if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {
+				return nil
+			}
+			for _, bad := range opts.invalidIgnores {
+				ctx.ReportRange(reportRange, rule.RuleMessage{
 					Id: "invalidIgnorePattern",
 					Description: fmt.Sprintf(
 						"Invalid regular expression in `ignore` option: `%s`: %s",
@@ -487,22 +618,22 @@ var FilenameCaseRule = rule.Rule{
 					),
 				})
 			}
-			return rule.RuleListeners{}
+			return nil
 		}
 
-		if ignoredByDefault[basename] {
-			return rule.RuleListeners{}
+		if isIgnoredByDefault(basename) {
+			return nil
 		}
-		for _, re := range opts.Ignores {
+		for _, re := range opts.ignores {
 			if matched, _ := re.MatchString(basename); matched {
-				return rule.RuleListeners{}
+				return nil
 			}
 		}
 
 		ext := nodeExtname(basename)
-		filename := strings.TrimSuffix(basename, ext)
+		filename := basename[:len(basename)-len(ext)]
 		middle := ""
-		if opts.MultipleFileExtensions {
+		if opts.multipleFileExtensions {
 			if i := strings.IndexByte(filename, '.'); i >= 0 {
 				middle = filename[i:]
 				filename = filename[:i]
@@ -510,32 +641,37 @@ var FilenameCaseRule = rule.Rule{
 		}
 
 		leading, words := splitFilename(filename)
-		if validateFilename(words, opts.Cases) {
-			if !isLowerCase(ext) {
-				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{
+		cases := opts.selectedCases()
+		valid, invalidWord, invalidCandidates := validateFilename(words, cases)
+		lowerExt := strings.ToLower(ext)
+		if valid {
+			if ext != lowerExt {
+				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {
+					return nil
+				}
+				ctx.ReportRange(reportRange, rule.RuleMessage{
 					Id: "filenameExtension",
-					Description: fmt.Sprintf(
-						"File extension `%s` is not in lowercase. Rename it to `%s`.",
-						ext, filename+middle+strings.ToLower(ext),
-					),
+					Description: "File extension `" + ext + "` is not in lowercase. Rename it to `" +
+						filename + middle + lowerExt + "`.",
 				})
 			}
-			return rule.RuleListeners{}
+			return nil
 		}
 
-		renamed := fixFilename(words, opts.Cases, leading, middle+strings.ToLower(ext))
-		caseNames := make([]string, len(opts.Cases))
-		for i, c := range opts.Cases {
-			caseNames[i] = c.name
+		// A filename diagnostic has no optional fix/suggestion artifact for the
+		// deferred reporting APIs to gate. Check suppression here, after cheap
+		// validation but before building the potentially combinatorial rename
+		// list and message; ReportRange repeats only the cached lookup.
+		if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {
+			return nil
 		}
-		ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{
+
+		renamed := fixFilename(words, cases, invalidWord, invalidCandidates, leading, middle+lowerExt)
+		ctx.ReportRange(reportRange, rule.RuleMessage{
 			Id: "filenameCase",
-			Description: fmt.Sprintf(
-				"Filename is not in %s. Rename it to %s.",
-				englishishJoin(caseNames),
-				englishishJoin(backtickList(renamed)),
-			),
+			Description: "Filename is not in " + englishishCaseNames(cases) + ". Rename it to " +
+				englishishBacktickJoin(renamed) + ".",
 		})
-		return rule.RuleListeners{}
+		return nil
 	},
 }
