@@ -1,6 +1,8 @@
 package no_unsafe_optional_chaining
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -10,6 +12,15 @@ import (
 var NoUnsafeOptionalChainingRule = rule.Rule{
 	Name: "no-unsafe-optional-chaining",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		// Every optional chain contains the contiguous `?.` token. A miss is
+		// conclusive, while matches in comments or strings are harmless false
+		// positives that take the regular AST path.
+		if ctx.SourceFile != nil && !strings.Contains(ctx.SourceFile.Text(), "?.") {
+			return nil
+		}
+		// Capture after the guard so token-free files do not move ctx to the heap.
+		reportCtx := ctx
+
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
@@ -25,17 +36,17 @@ var NoUnsafeOptionalChainingRule = rule.Rule{
 
 		checkUnsafeUsage := func(expr *ast.Node) {
 			checkUndefinedShortCircuit(expr, func(chainNode *ast.Node) {
-				ctx.ReportNode(chainNode, unsafeOptionalChainMsg)
+				reportCtx.ReportNode(chainNode, unsafeOptionalChainMsg)
 			})
 		}
 
 		checkUnsafeArithmetic := func(expr *ast.Node) {
 			checkUndefinedShortCircuit(expr, func(chainNode *ast.Node) {
-				ctx.ReportNode(chainNode, unsafeArithmeticMsg)
+				reportCtx.ReportNode(chainNode, unsafeArithmeticMsg)
 			})
 		}
 
-		listeners := rule.RuleListeners{}
+		listeners := make(rule.RuleListeners, 14)
 
 		// CallExpression: (obj?.foo)()
 		listeners[ast.KindCallExpression] = func(node *ast.Node) {
