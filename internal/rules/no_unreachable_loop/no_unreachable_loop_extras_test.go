@@ -11,7 +11,7 @@ import (
 // node shapes ESTree has no analog for, the code path roots and try/finally
 // layouts internal/cfg lays out differently, every arm of the upstream source
 // its own tests leave untouched, and code shapes real projects write. Every
-// verdict below was taken from ESLint itself, except the four marked as
+// verdict below was taken from ESLint itself, except the six marked as
 // intentional differences.
 func TestNoUnreachableLoopExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -88,6 +88,15 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 			{Code: `outer: inner: do { continue outer; } while (a);`},
 			{Code: `a: b: c: for (;;) { continue a; }`},
 			{Code: `outer: inner: for (const x of arr) { continue outer; }`},
+
+			// ---- Intentional difference from ESLint ----
+			// A `continue` in a `finally` block overrides the `return` or `throw`
+			// that left the `try`, so control really does flow back into the loop
+			// and a second iteration begins. ESLint reports these; its code path
+			// analysis leaves the loop out of the jump's target segments once the
+			// `try` can only be left abruptly.
+			{Code: `function f() { for (;;) { try { return; } finally { continue; } } }`},
+			{Code: `for (;;) { try { throw e; } finally { continue; } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized and type-wrapped iterables ----

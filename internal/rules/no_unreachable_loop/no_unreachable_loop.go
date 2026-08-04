@@ -84,6 +84,13 @@ func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts ruleOptions)
 // `continue` names any of them. ESLint attaches only the innermost label to the
 // loop, so `outer: inner: while (foo) { continue outer; }` looks to it like a
 // loop nothing re-enters; internal/cfg keeps the edge, so the loop is accepted.
+//
+// NOTE: Unlike ESLint, a `continue` in a `finally` block repeats the enclosing
+// loop even when the `try` it belongs to can only be left abruptly. That
+// `continue` overrides the pending `return` or `throw`, so `for (;;) { try {
+// return; } finally { continue; } }` really does start a second iteration;
+// ESLint reports it because the loop is missing from the jump's target
+// segments.
 func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
