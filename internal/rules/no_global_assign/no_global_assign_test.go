@@ -246,6 +246,15 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			// Var with computed property destructuring shadows
 			{Code: `const k = "x"; var {[k]: Object}: any = {}; Object = 1;`},
 
+			// A later parameter already owns the binding used by an earlier default.
+			{Code: `function f(x = (Object = 1), Object: any) {}`},
+
+			// Switch clauses share one lexical scope.
+			{Code: `switch (0) { case 0: Object = 1; break; case 1: let Object: any; }`},
+
+			// Var declarations are hoisted within class static blocks.
+			{Code: `class C { static { Object = 1; var Object: any; } }`},
+
 			// Config `off` un-declares the builtin
 			{Code: `Object = 1;`, Globals: map[string]bool{"Object": false}},
 			{Code: `String = 'test';`, Globals: map[string]bool{"String": false}},
@@ -326,10 +335,11 @@ func TestNoGlobalAssignRule(t *testing.T) {
 
 			// Multiple globals assigned
 			{
-				Code: `String = 1; Array = 2;`,
+				Code: `String = 1; Array = 2; String = 3;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
-					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 13},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'String' should not be modified.", Line: 1, Column: 1},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'Array' should not be modified.", Line: 1, Column: 13},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'String' should not be modified.", Line: 1, Column: 24},
 				},
 			},
 
@@ -936,6 +946,39 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Code: `function f() { Object = 1; class Inner { m() { class Object {} } } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 16},
+				},
+			},
+
+			// A body var does not shadow a write in a parameter default.
+			{
+				Code: `function f(x = (Object = 1)) { var Object: any; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 17},
+				},
+			},
+
+			// A switch-local binding does not escape the switch.
+			{
+				Code: `switch (0) { case 0: let Object: any; } Object = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 41},
+				},
+			},
+
+			// Local shadowing suppresses only writes within that scope.
+			{
+				Code: "Object = 1;\n{ let Object: any; Object = 2; }\nObject = 3;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+					{MessageId: "globalShouldNotBeModified", Line: 3, Column: 1},
+				},
+			},
+
+			// A nested type-only declaration does not shadow the value global.
+			{
+				Code: "function f() {\ninterface Object {}\nObject = 1;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 3, Column: 1},
 				},
 			},
 
