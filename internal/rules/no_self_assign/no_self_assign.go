@@ -2,6 +2,8 @@ package no_self_assign
 
 import (
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -35,8 +37,9 @@ var NoSelfAssignRule = rule.Rule{
 				}
 
 				eachSelfAssignment(binExpr.Left, binExpr.Right, opts.props, func(rightNode *ast.Node) {
-					name := getNodeText(ctx.SourceFile, rightNode)
-					ctx.ReportNode(rightNode, rule.RuleMessage{
+					reportRange := utils.TrimNodeTextRange(ctx.SourceFile, rightNode)
+					name := removeWhitespace(ctx.SourceFile.Text()[reportRange.Pos():reportRange.End()])
+					ctx.ReportRange(reportRange, rule.RuleMessage{
 						Id:          "selfAssignment",
 						Description: "'" + name + "' is assigned to itself.",
 					})
@@ -63,12 +66,62 @@ func parseOptions(opts any) selfAssignOptions {
 	return result
 }
 
-// getNodeText returns the source text of a node, with whitespace removed.
-func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
-	trimmed := utils.TrimNodeTextRange(sourceFile, node)
-	text := sourceFile.Text()[trimmed.Pos():trimmed.End()]
-	// Remove internal whitespace to normalize e.g. "a . b" -> "a.b"
-	return strings.Join(strings.Fields(text), "")
+// removeWhitespace normalizes node text such as "a . b" to "a.b" without
+// allocating when the usual compact spelling contains no whitespace. Source
+// text is overwhelmingly ASCII, so only non-ASCII bytes enter unicode.IsSpace.
+func removeWhitespace(text string) string {
+	firstWhitespace := -1
+	for i := 0; i < len(text); {
+		if text[i] < utf8.RuneSelf {
+			if isASCIIWhitespace(text[i]) {
+				firstWhitespace = i
+				break
+			}
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(text[i:])
+		if unicode.IsSpace(r) {
+			firstWhitespace = i
+			break
+		}
+		i += size
+	}
+	if firstWhitespace < 0 {
+		return text
+	}
+
+	var result strings.Builder
+	result.Grow(len(text) - 1)
+	result.WriteString(text[:firstWhitespace])
+	for i := firstWhitespace; i < len(text); {
+		if text[i] < utf8.RuneSelf {
+			if !isASCIIWhitespace(text[i]) {
+				result.WriteByte(text[i])
+			}
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(text[i:])
+		if !unicode.IsSpace(r) {
+			// Copy the original bytes so malformed UTF-8 is preserved instead of
+			// being rewritten as the replacement rune.
+			result.WriteString(text[i : i+size])
+		}
+		i += size
+	}
+	return result.String()
+}
+
+func isASCIIWhitespace(ch byte) bool {
+	return ch == ' ' || ch >= '\t' && ch <= '\r'
+}
+
+const maxLinearObjectProperties = 32
+
+type namedObjectProperty struct {
+	name  string
+	value *ast.Node
 }
 
 // eachSelfAssignment recursively compares the left and right nodes of an assignment,
@@ -152,41 +205,7 @@ func eachSelfAssignment(left *ast.Node, right *ast.Node, props bool, report func
 			}
 		}
 
-		for _, lProp := range leftObj.Properties.Nodes {
-			// Handle spread on left: {...x} = {...y}
-			if lProp.Kind == ast.KindSpreadAssignment {
-				// Find corresponding spread on right, but only after startJ
-				for j := startJ; j < len(rightProps); j++ {
-					rProp := rightProps[j]
-					if rProp.Kind == ast.KindSpreadAssignment {
-						eachSelfAssignment(lProp.AsSpreadAssignment().Expression, rProp.AsSpreadAssignment().Expression, props, report)
-						break
-					}
-				}
-				continue
-			}
-
-			lName := getPropertyKeyName(lProp)
-			if lName == "" {
-				continue
-			}
-
-			// Find matching property on right, starting after the last spread
-			for j := startJ; j < len(rightProps); j++ {
-				rProp := rightProps[j]
-				if rProp.Kind == ast.KindSpreadAssignment {
-					continue
-				}
-
-				rName := getPropertyKeyName(rProp)
-				if rName == lName {
-					lValue := getPropertyValue(lProp)
-					rValue := getPropertyValue(rProp)
-					eachSelfAssignment(lValue, rValue, props, report)
-					break
-				}
-			}
-		}
+		compareObjectProperties(leftObj.Properties.Nodes, rightProps[startJ:], props, report)
 
 	// MemberExpression (PropertyAccessExpression or ElementAccessExpression) with props option.
 	// Unlike destructuring patterns above, member expressions are compared as a whole
@@ -202,32 +221,101 @@ func eachSelfAssignment(left *ast.Node, right *ast.Node, props bool, report func
 	}
 }
 
-// getPropertyKeyName returns the static property name for a property assignment or shorthand property.
-func getPropertyKeyName(prop *ast.Node) string {
+// compareObjectProperties compares properties after the right-hand side's last
+// spread. Small patterns stay allocation-free; larger patterns build a compact
+// name index so adversarial or generated destructuring assignments remain
+// linear instead of repeatedly scanning the right-hand side.
+func compareObjectProperties(leftProps, rightProps []*ast.Node, props bool, report func(*ast.Node)) {
+	if len(rightProps) <= maxLinearObjectProperties {
+		var properties [maxLinearObjectProperties]namedObjectProperty
+		propertyCount := 0
+		for _, rightProp := range rightProps {
+			name, ok := getPropertyKeyName(rightProp)
+			if !ok {
+				continue
+			}
+			properties[propertyCount] = namedObjectProperty{
+				name:  name,
+				value: getPropertyValue(rightProp),
+			}
+			propertyCount++
+		}
+
+		for _, leftProp := range leftProps {
+			leftName, ok := getPropertyKeyName(leftProp)
+			if !ok {
+				continue
+			}
+			leftValue := getPropertyValue(leftProp)
+			for i := range propertyCount {
+				if properties[i].name == leftName {
+					eachSelfAssignment(leftValue, properties[i].value, props, report)
+				}
+			}
+		}
+		return
+	}
+
+	nextProperty := make([]int, len(rightProps))
+	propertiesByName := make(map[string]int, len(rightProps))
+	for i := len(rightProps) - 1; i >= 0; i-- {
+		name, ok := getPropertyKeyName(rightProps[i])
+		if !ok {
+			continue
+		}
+		next := -1
+		if head, exists := propertiesByName[name]; exists {
+			next = head
+		}
+		nextProperty[i] = next
+		propertiesByName[name] = i
+	}
+
+	for _, leftProp := range leftProps {
+		name, ok := getPropertyKeyName(leftProp)
+		if !ok {
+			continue
+		}
+		leftValue := getPropertyValue(leftProp)
+		i, exists := propertiesByName[name]
+		if !exists {
+			continue
+		}
+		for i >= 0 {
+			eachSelfAssignment(leftValue, getPropertyValue(rightProps[i]), props, report)
+			i = nextProperty[i]
+		}
+	}
+}
+
+// getPropertyKeyName returns the static property name for a property assignment
+// or shorthand property. The boolean distinguishes a valid empty-string key
+// from a property whose name cannot be determined statically.
+func getPropertyKeyName(prop *ast.Node) (string, bool) {
 	if prop == nil {
-		return ""
+		return "", false
 	}
 
 	switch prop.Kind {
 	case ast.KindPropertyAssignment:
 		nameNode := prop.AsPropertyAssignment().Name()
 		if nameNode == nil {
-			return ""
+			return "", false
 		}
 		name, ok := utils.GetStaticPropertyName(nameNode)
 		if !ok {
-			return ""
+			return "", false
 		}
-		return name
+		return name, true
 
 	case ast.KindShorthandPropertyAssignment:
 		nameNode := prop.AsShorthandPropertyAssignment().Name()
 		if nameNode == nil {
-			return ""
+			return "", false
 		}
-		return nameNode.Text()
+		return nameNode.Text(), true
 	}
-	return ""
+	return "", false
 }
 
 // getPropertyValue returns the value node for a property assignment or shorthand property.
