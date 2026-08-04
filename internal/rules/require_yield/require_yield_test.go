@@ -1,8 +1,12 @@
 package require_yield
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -567,4 +571,95 @@ func TestRequireYieldRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestGeneratorHeadRangeAdversarialSyntax(t *testing.T) {
+	tests := []struct {
+		name        string
+		code        string
+		startMarker string
+		endMarker   string
+	}{
+		{
+			name:        "exported async declaration with comments and generic function type",
+			code:        `export /* export */ default /* default */ async function /* star */ *named<T extends () => void> /* params */ (/* actual */ value: T) { return; }`,
+			startMarker: "async function",
+			endMarker:   "(/* actual */",
+		},
+		{
+			name: "decorated computed method with nested parens",
+			code: `declare const dec: (...args: any[]) => any;
+declare const key: (...args: any[]) => PropertyKey;
+class A {
+  @dec(() => "(")
+  public static async /* star */ *[key("(", () => ")")]<T extends () => void> /* params */ (/* actual */ value: T) { return; }
+}`,
+			startMarker: "public static async",
+			endMarker:   "(/* actual */",
+		},
+		{
+			name: "decorated field function expression",
+			code: `declare const dec: (...args: any[]) => any;
+class A {
+  @dec(() => "(")
+  public field = function /* star */ *named<T extends () => void> /* params */ (/* actual */ value: T) { return; };
+}`,
+			startMarker: "public field",
+			endMarker:   "(/* actual */",
+		},
+		{
+			name:        "computed object property function expression",
+			code:        `const object = { [(() => "(")()]: function /* star */ *named<T extends () => void> /* params */ (/* actual */ value: T) { return; } };`,
+			startMarker: "[(() =>",
+			endMarker:   "(/* actual */",
+		},
+		{
+			name:        "standalone async function expression",
+			code:        `const fn = (/* leading */ async function /* star */ *named<T extends () => void> /* params */ (/* actual */ value: T) { return; });`,
+			startMarker: "async function",
+			endMarker:   "(/* actual */",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/file.ts",
+				Path:     "/file.ts",
+			}, tt.code, core.ScriptKindTS)
+
+			var generator *ast.Node
+			var walk func(*ast.Node)
+			walk = func(node *ast.Node) {
+				if node == nil || generator != nil {
+					return
+				}
+				if isGenerator(node) {
+					generator = node
+					return
+				}
+				node.ForEachChild(func(child *ast.Node) bool {
+					walk(child)
+					return generator != nil
+				})
+			}
+			walk(sourceFile.AsNode())
+			if generator == nil {
+				t.Fatal("generator not found")
+			}
+
+			wantStart := strings.Index(tt.code, tt.startMarker)
+			wantEnd := strings.Index(tt.code, tt.endMarker)
+			if wantStart < 0 || wantEnd < 0 {
+				t.Fatal("invalid test markers")
+			}
+			got := generatorHeadRange(sourceFile, generator)
+			if got.Pos() != wantStart || got.End() != wantEnd {
+				t.Fatalf(
+					"head range = [%d, %d) %q, want [%d, %d)",
+					got.Pos(), got.End(), tt.code[got.Pos():got.End()], wantStart, wantEnd,
+				)
+			}
+		})
+	}
 }
