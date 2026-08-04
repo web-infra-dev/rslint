@@ -30,6 +30,10 @@ func TestNoConstAssignRule(t *testing.T) {
 			// For-of loop - x is redeclared on each iteration
 			{Code: `for (const x of [1,2,3]) { foo(x); }`},
 
+			// Explicit resource management bindings are constant but may be read.
+			{Code: `function f() { using x = foo(); bar(x); }`},
+			{Code: `async function f() { await using x = foo(); bar(x); }`},
+
 			// Modifying property, not reassigning the constant
 			{Code: `const x = {key: 0}; x.key = 1;`},
 
@@ -38,6 +42,17 @@ func TestNoConstAssignRule(t *testing.T) {
 
 			// let can be reassigned
 			{Code: `let x = 0; x = 1;`},
+
+			// Keyword filter false positives must not change symbol semantics.
+			{Code: `let constable = 0; constable = 1;`},
+
+			// The DOM global `name` is declared with const in lib.dom.d.ts, but
+			// this rule only owns constant declarations in the linted file.
+			{Code: `const local = 0; name = "value";`},
+
+			// A later mutable declaration shadows the outer constant for the
+			// entire block, including its temporal dead zone.
+			{Code: `const x = 0; { x = 1; let x; }`},
 
 			// Function declaration can be reassigned
 			{Code: `function x() {} x = 1;`},
@@ -59,6 +74,9 @@ func TestNoConstAssignRule(t *testing.T) {
 
 			// Const object with method calls
 			{Code: `const x = {}; x.method();`},
+
+			// A using binding's object may be mutated without reassigning it.
+			{Code: `function f() { using x = foo(); x.value = 1; }`},
 
 			// Reading const in conditional
 			{Code: `const x = 0; if (x === 0) {}`},
@@ -124,11 +142,34 @@ func TestNoConstAssignRule(t *testing.T) {
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
+			// References are resolved against declarations that occur later in
+			// the same scope as well as declarations already visited.
+			{
+				Code: "x = 1;\nconst x = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 1},
+				},
+			},
+
 			// Direct reassignment
 			{
 				Code: `const x = 0; x = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "const", Line: 1, Column: 14},
+				},
+			},
+
+			// `using` and `await using` declarations are constant bindings too.
+			{
+				Code: "function f() {\n  using x = foo();\n  x = 1;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 3, Column: 3},
+				},
+			},
+			{
+				Code: "async function f() {\n  await using x = foo();\n  x ||= bar();\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 3, Column: 3},
 				},
 			},
 
@@ -153,6 +194,38 @@ func TestNoConstAssignRule(t *testing.T) {
 				Code: `const x = 0; x += 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "const", Line: 1, Column: 14},
+				},
+			},
+
+			// A pre-existing constant is written by a for-of initializer.
+			{
+				Code: `const x = 0; for (x of values) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 19},
+				},
+			},
+
+			// TypeScript wrappers do not hide an assignment target.
+			{
+				Code: `const x = 0; (x as any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 15},
+				},
+			},
+
+			// Defaults inside an assignment pattern still write the target.
+			{
+				Code: `const x = 0; [x = 1] = values;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 1, Column: 15},
+				},
+			},
+
+			// Resource bindings remain constant inside destructuring writes.
+			{
+				Code: "function f() {\n  using x = foo();\n  [x, y] = bar();\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "const", Line: 3, Column: 4},
 				},
 			},
 
