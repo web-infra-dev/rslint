@@ -234,7 +234,7 @@ Declares globals available to matching files. Values are normalized before rules
 - Read-only: `false`, `null`, `'false'`, `'readonly'`, `'readable'`
 - Disabled: `'off'`
 
-A disabled value removes a declaration inherited from an earlier matching entry, including an ECMAScript built-in in the third-party plugin scope.
+A disabled value removes a declaration inherited from an earlier matching entry, including an ECMAScript built-in. The read-only and writable levels are distinct wherever a rule acts on assignment: `no-global-assign` reports writes to a read-only global and allows them on a writable one.
 
 ```ts
 {
