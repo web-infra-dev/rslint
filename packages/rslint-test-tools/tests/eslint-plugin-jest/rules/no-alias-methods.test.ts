@@ -245,5 +245,45 @@ ruleTester.run('no-alias-methods', {} as never, {
         },
       ],
     },
+    // The fix range must skip the matcher's leading trivia, otherwise the
+    // newline, comment or opening quote in front of the name is overwritten.
+    {
+      code: 'expect(a).\n  toBeCalled()',
+      output: 'expect(a).\n  toHaveBeenCalled()',
+      errors: [
+        {
+          messageId: 'replaceAlias',
+          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
+          column: 3,
+          line: 2,
+        },
+      ],
+    },
+    {
+      code: 'expect(a) . /* c */ toBeCalled()',
+      output: 'expect(a) . /* c */ toHaveBeenCalled()',
+      errors: [
+        {
+          messageId: 'replaceAlias',
+          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
+          column: 21,
+          line: 1,
+        },
+      ],
+    },
+    {
+      // Previously emitted `expect(a)[/toHaveBeenCalled']()`, which is not
+      // parseable JavaScript.
+      code: "expect(a)[/* c */ 'toBeCalled']()",
+      output: "expect(a)[/* c */ 'toHaveBeenCalled']()",
+      errors: [
+        {
+          messageId: 'replaceAlias',
+          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
+          column: 19,
+          line: 1,
+        },
+      ],
+    },
   ],
 });

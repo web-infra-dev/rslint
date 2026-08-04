@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 // Message builder
@@ -56,23 +56,23 @@ var NoAliasMethodsRule = rule.Rule{
 				}
 
 				for _, memberEntry := range jestFnCall.MemberEntries {
-					if canonicalName, ok := methodNames[memberEntry.Name]; ok {
-						start := memberEntry.Node.Pos()
-						end := memberEntry.Node.End()
-
-						if memberEntry.Node.Kind != ast.KindIdentifier {
-							start = start + 1
-							end = end - 1
-						}
-
-						ctx.ReportNodeWithFixes(
-							memberEntry.Node, buildErrorAliasMethodMessage(memberEntry.Name, canonicalName),
-							rule.RuleFix{
-								Text:  canonicalName,
-								Range: core.NewTextRange(start, end),
-							},
-						)
+					canonicalName, ok := methodNames[memberEntry.Name]
+					if !ok {
+						continue
 					}
+
+					fixRange, fixText, ok := testFramework.AccessorReplacement(ctx.SourceFile, memberEntry.Node, canonicalName)
+					if !ok {
+						continue
+					}
+
+					ctx.ReportNodeWithFixes(
+						memberEntry.Node, buildErrorAliasMethodMessage(memberEntry.Name, canonicalName),
+						rule.RuleFix{
+							Text:  fixText,
+							Range: fixRange,
+						},
+					)
 				}
 			},
 		}

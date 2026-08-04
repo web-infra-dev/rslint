@@ -135,6 +135,72 @@ func TestNoAliasMethodsRule(t *testing.T) {
 					{MessageId: "replaceAlias", Column: 15, Line: 1},
 				},
 			},
+			// Leading-trivia cases. The matcher's Pos() sits at the end of the
+			// preceding token, so a fix range built from it swallows whatever
+			// whitespace or comment separates the dot from the matcher name.
+			{
+				Code:   "expect(a).\n  toBeCalled()",
+				Output: []string{"expect(a).\n  toHaveBeenCalled()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 3, Line: 2},
+				},
+			},
+			{
+				// Control: the newline belongs to the dot rather than to the
+				// matcher, so this shape was already correct.
+				Code:   "expect(a)\n  .toBeCalled()",
+				Output: []string{"expect(a)\n  .toHaveBeenCalled()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 4, Line: 2},
+				},
+			},
+			{
+				Code:   "expect(a) . /* c */ toBeCalled()",
+				Output: []string{"expect(a) . /* c */ toHaveBeenCalled()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 21, Line: 1},
+				},
+			},
+			{
+				Code:   "expect(a). // c\n  toBeCalled()",
+				Output: []string{"expect(a). // c\n  toHaveBeenCalled()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 3, Line: 2},
+				},
+			},
+			{
+				// The hand-written `Pos()+1 / End()-1` offsets used to land
+				// inside the comment here, stripping `*` instead of the opening
+				// quote and emitting `expect(a)[/toHaveBeenCalled']()`, which
+				// does not parse.
+				Code:   "expect(a)[/* c */ 'toBeCalled']()",
+				Output: []string{"expect(a)[/* c */ 'toHaveBeenCalled']()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 19, Line: 1},
+				},
+			},
+			{
+				Code:   "expect(a)[\n  'toBeCalled'\n]()",
+				Output: []string{"expect(a)[\n  'toHaveBeenCalled'\n]()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 3, Line: 2},
+				},
+			},
+			{
+				Code:   "expect(a)[`toBeCalled`]()",
+				Output: []string{"expect(a)[`toHaveBeenCalled`]()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 11, Line: 1},
+				},
+			},
+			{
+				// Multiple aliases in one chain are each fixed in place.
+				Code:   "expect(a).\n  resolves.\n  toBeCalledTimes(1)",
+				Output: []string{"expect(a).\n  resolves.\n  toHaveBeenCalledTimes(1)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 3, Line: 3},
+				},
+			},
 		},
 	)
 }
