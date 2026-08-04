@@ -31,8 +31,12 @@ type routeStep struct {
 }
 
 type queuedModule struct {
-	sourceFile *ast.SourceFile
-	route      []routeStep
+	sourceFile    *ast.SourceFile
+	parent        int
+	viaSourceFile *ast.SourceFile
+	viaSource     *ast.Node
+	viaSpecifier  string
+	depth         int
 }
 
 // NoCycleRule forbids dependency paths that resolve back to the linted module.
@@ -131,7 +135,7 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	}
 
 	traversed := make(map[string]bool)
-	for _, ref := range import_utils.CollectModuleReferences(ctx, ctx.SourceFile, opts.moduleReferences) {
+	for _, ref := range collectModuleReferences(ctx, ctx.SourceFile, opts.moduleReferences) {
 		checkReference(ctx, opts, myPath, traversed, ref)
 	}
 }
@@ -162,14 +166,13 @@ func checkReference(ctx rule.RuleContext, opts ruleOptions, myPath string, trave
 }
 
 func detectCycle(ctx rule.RuleContext, opts ruleOptions, myPath string, traversed map[string]bool, start *ast.SourceFile) ([]routeStep, bool) {
-	queue := []queuedModule{{sourceFile: start}}
+	queue := []queuedModule{{sourceFile: start, parent: -1}}
 	if traversed == nil {
 		traversed = make(map[string]bool)
 	}
 
-	for len(queue) > 0 {
-		next := queue[0]
-		queue = queue[1:]
+	for head := 0; head < len(queue); head++ {
+		next := queue[head]
 		if next.sourceFile == nil {
 			continue
 		}
@@ -180,18 +183,27 @@ func detectCycle(ctx rule.RuleContext, opts ruleOptions, myPath string, traverse
 		}
 		traversed[sourcePath] = true
 
-		for _, ref := range referencesToTraverse(ctx, opts, import_utils.CollectModuleReferences(ctx, next.sourceFile, opts.moduleReferences)) {
+		refs := collectModuleReferences(ctx, next.sourceFile, opts.moduleReferences)
+		dynamicPaths := unsafeDynamicPaths(ctx, opts, refs)
+		for _, ref := range refs {
+			if !referenceIsTraversable(ctx, opts, ref) {
+				continue
+			}
 			targetPath := moduleReferencePath(ref)
-			if targetPath == "" || traversed[targetPath] {
+			if targetPath == "" || traversed[targetPath] || dynamicPaths[targetPath] {
 				continue
 			}
 			if targetPath == myPath {
-				return next.route, true
+				return routeTo(queue, head), true
 			}
-			if ref.Target != nil && len(next.route)+1 < opts.maxDepth {
+			if next.depth+1 < opts.maxDepth {
 				queue = append(queue, queuedModule{
-					sourceFile: ref.Target,
-					route:      appendRoute(next.route, ref),
+					sourceFile:    ref.Target,
+					parent:        head,
+					viaSourceFile: ref.SourceFile,
+					viaSource:     ref.Source,
+					viaSpecifier:  ref.Specifier,
+					depth:         next.depth + 1,
 				})
 			}
 		}
@@ -200,47 +212,133 @@ func detectCycle(ctx rule.RuleContext, opts ruleOptions, myPath string, traverse
 	return nil, false
 }
 
-func referencesToTraverse(ctx rule.RuleContext, opts ruleOptions, refs []import_utils.ModuleReference) []import_utils.ModuleReference {
-	filtered := make([]import_utils.ModuleReference, 0, len(refs))
-	dynamicPaths := make(map[string]bool)
+func unsafeDynamicPaths(ctx rule.RuleContext, opts ruleOptions, refs []import_utils.ModuleReference) map[string]bool {
+	if !opts.allowUnsafeDynamicCyclicDependency {
+		return nil
+	}
+
+	var dynamicPaths map[string]bool
 	for _, ref := range refs {
-		if ref.OnlyTypes || ref.Target == nil || shouldIgnoreExternal(ctx, opts, ref) {
+		if !ref.Dynamic || !referenceIsTraversable(ctx, opts, ref) {
 			continue
 		}
-		if opts.allowUnsafeDynamicCyclicDependency && ref.Dynamic {
-			dynamicPaths[moduleReferencePath(ref)] = true
+		if dynamicPaths == nil {
+			dynamicPaths = make(map[string]bool)
 		}
-		filtered = append(filtered, ref)
+		dynamicPaths[moduleReferencePath(ref)] = true
 	}
-
-	if len(dynamicPaths) == 0 {
-		return filtered
-	}
-
-	traversable := filtered[:0]
-	for _, ref := range filtered {
-		if !dynamicPaths[moduleReferencePath(ref)] {
-			traversable = append(traversable, ref)
-		}
-	}
-	return traversable
+	return dynamicPaths
 }
 
-func appendRoute(route []routeStep, ref import_utils.ModuleReference) []routeStep {
-	next := make([]routeStep, 0, len(route)+1)
-	next = append(next, route...)
-	next = append(next, routeStep{
-		value: ref.Specifier,
-		line:  sourceLine(ref),
-	})
-	return next
+func referenceIsTraversable(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
+	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(ctx, opts, ref)
 }
 
-func sourceLine(ref import_utils.ModuleReference) int {
-	if ref.SourceFile == nil || ref.Source == nil {
+func routeTo(queue []queuedModule, index int) []routeStep {
+	// Queue entries retain parent links instead of copying the complete route
+	// at every edge. Materialize source lines only for a path that closes a cycle.
+	depth := queue[index].depth
+	route := make([]routeStep, depth)
+	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
+		next := queue[index]
+		route[routeIndex] = routeStep{
+			value: next.viaSpecifier,
+			line:  sourceLine(next.viaSourceFile, next.viaSource),
+		}
+		index = next.parent
+	}
+	return route
+}
+
+func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options import_utils.ModuleReferenceOptions) []import_utils.ModuleReference {
+	if sourceFile == nil || (!options.ESModule && !options.CommonJS && !options.AMD) {
+		return nil
+	}
+	// SourceFile.Imports is populated by the parser and avoids walking every AST
+	// node in the usual static-ESM case. The generic collector remains necessary
+	// for call-based edges, parser recovery, and imports inside module bodies.
+	if options.CommonJS || options.AMD || sourceFileNeedsFullModuleScan(sourceFile) {
+		return import_utils.CollectModuleReferences(ctx, sourceFile, options)
+	}
+
+	imports := sourceFile.Imports()
+	refs := make([]import_utils.ModuleReference, 0, len(imports))
+	for _, source := range imports {
+		importer := ast.TryGetImportFromModuleSpecifier(source)
+		if importer == nil {
+			continue
+		}
+
+		onlyTypes := false
+		switch importer.Kind {
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+			onlyTypes = importDeclarationOnlyImportsTypes(importer.AsImportDeclaration())
+		case ast.KindExportDeclaration:
+			onlyTypes = ast.IsTypeOnlyImportOrExportDeclaration(importer)
+		default:
+			continue
+		}
+
+		ref := import_utils.ModuleReference{
+			Source:     source,
+			Importer:   importer,
+			SourceFile: sourceFile,
+			Specifier:  source.Text(),
+			OnlyTypes:  onlyTypes,
+		}
+		ref.ResolvedPath, ref.Target, _ = import_utils.ResolveModuleReferenceFromSourceFile(ctx, sourceFile, source)
+		if ref.Target != nil && import_utils.IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
+			continue
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
+func sourceFileNeedsFullModuleScan(sourceFile *ast.SourceFile) bool {
+	if sourceFile.Flags&ast.NodeFlagsPossiblyContainsDynamicImport != 0 || len(sourceFile.Diagnostics()) != 0 {
+		return true
+	}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement != nil && statement.Kind == ast.KindModuleDeclaration {
+			return true
+		}
+	}
+	return false
+}
+
+func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
+	if importDecl == nil || importDecl.ImportClause == nil {
+		return false
+	}
+
+	importClause := importDecl.ImportClause
+	if importClause.IsTypeOnly() {
+		return true
+	}
+
+	clause := importClause.AsImportClause()
+	if clause == nil || clause.Name() != nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
+		return false
+	}
+	namedImports := clause.NamedBindings.AsNamedImports()
+	if namedImports == nil || namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0 {
+		return false
+	}
+
+	for _, specifier := range namedImports.Elements.Nodes {
+		if specifier == nil || specifier.Kind != ast.KindImportSpecifier || !ast.IsTypeOnlyImportDeclaration(specifier) {
+			return false
+		}
+	}
+	return true
+}
+
+func sourceLine(sourceFile *ast.SourceFile, source *ast.Node) int {
+	if sourceFile == nil || source == nil {
 		return 1
 	}
-	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(ref.SourceFile, ref.Source.Pos())
+	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, source.Pos())
 	return line + 1
 }
 
