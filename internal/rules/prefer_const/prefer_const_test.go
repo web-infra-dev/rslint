@@ -294,6 +294,30 @@ func TestPreferConstRule(t *testing.T) {
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
+			// Preserve trivia when fixing the declaration keyword and keep the
+			// diagnostic range on a Unicode binding name.
+			{
+				Code:   "/* header */\nlet /* gap */ café = 1;",
+				Output: []string{"/* header */\nconst /* gap */ café = 1;"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 2, Column: 15, EndLine: 2, EndColumn: 19},
+				},
+			},
+
+			// Exercise the inline candidate buffer's growth path and the shared
+			// deferred fix range used by every diagnostic in one declaration list.
+			{
+				Code:   `let a = 1, b = 2, c = 3, d = 4, e = 5;`,
+				Output: []string{`const a = 1, b = 2, c = 3, d = 4, e = 5;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+					{MessageId: "useConst", Line: 1, Column: 12},
+					{MessageId: "useConst", Line: 1, Column: 19},
+					{MessageId: "useConst", Line: 1, Column: 26},
+					{MessageId: "useConst", Line: 1, Column: 33},
+				},
+			},
+
 			// Simple let that should be const
 			{
 				Code:   `let x = 1;`,
@@ -421,6 +445,15 @@ func TestPreferConstRule(t *testing.T) {
 				Code: `let x; x = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 8},
+				},
+			},
+
+			// Leading comments belong to the write node's trivia, not its
+			// diagnostic range.
+			{
+				Code: "let value: number;\n/* assign */\nvalue = 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 3, Column: 1, EndLine: 3, EndColumn: 6},
 				},
 			},
 
@@ -554,6 +587,15 @@ func TestPreferConstRule(t *testing.T) {
 				Options: map[string]interface{}{"ignoreReadBeforeAssign": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 8},
+				},
+			},
+
+			// A read before the only assignment moves the report to the
+			// declaration when ignoreReadBeforeAssign is disabled.
+			{
+				Code: `let x; console.log(x); x = 0;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5, EndLine: 1, EndColumn: 6},
 				},
 			},
 
