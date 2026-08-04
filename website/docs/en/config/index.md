@@ -247,7 +247,7 @@ A disabled value removes a declaration inherited from an earlier matching entry,
 }
 ```
 
-The [`globals`](https://www.npmjs.com/package/globals) package ships its environments in the boolean shape, so its exports can be spread in directly:
+ECMAScript built-ins such as `Array` and `Promise` are always declared. Globals a runtime adds on top of those — `window` and `document` in a browser, `process` and `__dirname` in Node.js — are not, so declare the ones your files use. The [`globals`](https://www.npmjs.com/package/globals) package collects them per environment; spread in every environment the matched files run in:
 
 ```ts
 import globals from 'globals';
