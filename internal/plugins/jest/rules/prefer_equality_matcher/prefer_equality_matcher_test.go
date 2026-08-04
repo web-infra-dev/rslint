@@ -251,6 +251,19 @@ func TestPreferEqualityMatcherRule(t *testing.T) {
 					},
 				},
 			},
+			{
+				Code: `expect(a === b)[("toBe")](false);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useEqualityMatcher",
+						Line:      1,
+						Column:    18,
+						Suggestions: expectSuggestions(func(equalityMatcher string) string {
+							return `expect(a).not.` + equalityMatcher + `(b);`
+						}),
+					},
+				},
+			},
 			// !==
 			{
 				Code: `expect(a !== b).toBe(true);`,

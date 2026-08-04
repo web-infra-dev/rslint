@@ -103,24 +103,27 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 					return
 				}
 
-				matcherReceiver, matcherParent := jestUtils.GetAccessorReceiverAndParent(jestFnCall.MatcherEntry)
-				if matcherReceiver == nil || matcherParent == nil {
-					return
-				}
-
 				reportNode := node
 				if jestFnCall.MatcherEntry != nil && jestFnCall.MatcherEntry.Node != nil {
 					reportNode = jestFnCall.MatcherEntry.Node
 				}
+				message := buildPreferMatcherMessage()
+
+				matcherFix, ok := jestUtils.ReplaceMemberNameFix(
+					ctx,
+					jestFnCall.MatcherEntry,
+					"toHaveBeenCalledTimes",
+				)
+				if !ok {
+					ctx.ReportNode(reportNode, message)
+					return
+				}
 
 				ctx.ReportNodeWithFixes(
 					reportNode,
-					buildPreferMatcherMessage(),
+					message,
 					rule.RuleFixRemoveRange(core.NewTextRange(inner.End(), unwrappedArg.End())),
-					rule.RuleFixReplaceRange(
-						core.NewTextRange(matcherReceiver.End(), matcherParent.End()),
-						".toHaveBeenCalledTimes",
-					),
+					matcherFix,
 				)
 			},
 		}
