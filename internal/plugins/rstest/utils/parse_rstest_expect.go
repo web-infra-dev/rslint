@@ -31,23 +31,32 @@ func IsRstestExpectCall(
 	return isImportedOrGlobalExpectRoot(root, entries, ctx)
 }
 
+// findTopMostCallExpression walks up the call/member chain that node is the
+// head of. Ascending only continues while node stays on the callee side of its
+// parent: a call in argument or computed-key position heads its own chain.
 func findTopMostCallExpression(node *ast.Node) *ast.Node {
 	top := node
-	for parent := node.Parent; parent != nil; {
-		if parent.Kind == ast.KindParenthesizedExpression {
-			parent = parent.Parent
-			continue
-		}
-		if parent.Kind == ast.KindCallExpression {
+	current := node
+	for parent := current.Parent; parent != nil; {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+		case ast.KindCallExpression:
+			if parent.AsCallExpression().Expression != current {
+				return top
+			}
 			top = parent
-			parent = parent.Parent
-			continue
+		case ast.KindPropertyAccessExpression:
+			if parent.AsPropertyAccessExpression().Expression != current {
+				return top
+			}
+		case ast.KindElementAccessExpression:
+			if parent.AsElementAccessExpression().Expression != current {
+				return top
+			}
+		default:
+			return top
 		}
-		if parent.Kind != ast.KindPropertyAccessExpression &&
-			parent.Kind != ast.KindElementAccessExpression {
-			break
-		}
-		parent = parent.Parent
+		current, parent = parent, parent.Parent
 	}
 	return top
 }

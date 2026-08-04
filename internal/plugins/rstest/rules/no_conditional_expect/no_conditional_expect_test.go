@@ -271,6 +271,31 @@ forCase("case", (row, context) => {
 				},
 			},
 			{
+				Code: `test("case", () => {
+  if (condition) log(expect(value).toBe(1));
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `test("case", () => {
+  if (condition) expect(value).toBe(expect.stringContaining("x"));
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `test("case", () => {
+  if (condition) results[expect(value).toBe(1)] = 1;
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				Code: `function callback() {
   if (condition) expect(value).toBe(1);
 }
