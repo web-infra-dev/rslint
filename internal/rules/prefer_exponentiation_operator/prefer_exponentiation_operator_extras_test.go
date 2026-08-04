@@ -51,8 +51,8 @@ func TestPreferExponentiationOperatorExtras(t *testing.T) {
 			// N/A: overload signatures, abstract members, declare members, empty class/function bodies, and binding patterns are not inputs this rule inspects.
 
 			// ---- Config `/* global Math: off */` / `languageOptions.globals` un-declares the builtin ----
-			{Code: "Math.pow(a, b);", Globals: map[string]bool{"Math": false}},
-			{Code: "globalThis.Math.pow(a, b);", Globals: map[string]bool{"globalThis": false}},
+			{Code: "Math.pow(a, b);", Globals: map[string]any{"Math": "off"}},
+			{Code: "globalThis.Math.pow(a, b);", Globals: map[string]any{"globalThis": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parentheses and TS wrappers around the receiver or callee are transparent ----
@@ -156,7 +156,7 @@ func TestPreferExponentiationOperatorExtras(t *testing.T) {
 			{
 				Code:    "Math.pow(a, b);",
 				Output:  []string{"a**b;"},
-				Globals: map[string]bool{"Math": true},
+				Globals: map[string]any{"Math": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useExponentiation", Line: 1, Column: 1},
 				},

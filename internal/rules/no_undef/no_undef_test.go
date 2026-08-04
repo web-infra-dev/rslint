@@ -106,7 +106,7 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `/*global myVar:writable*/ myVar = 1;`},
 
 			// === languageOptions.globals (config) ===
-			{Code: `myConfiguredGlobal;`, Globals: map[string]bool{"myConfiguredGlobal": true}},
+			{Code: `myConfiguredGlobal;`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
 
 			// === "off" global with a same-file declaration: the binding wins ===
 			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]bool{"myOffGlobal123": false}},
@@ -122,7 +122,7 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `function Foo() { return null; } const el = <Foo />;`, Tsx: true},
 
 			// === languageOptions.globals + /*global*/ comment together ===
-			{Code: `/*global fromComment*/ fromConfig; fromComment;`, Globals: map[string]bool{"fromConfig": true}},
+			{Code: `/*global fromComment*/ fromConfig; fromComment;`, Globals: map[string]any{"fromConfig": "readonly"}},
 
 			// === Namespace ===
 			{Code: `namespace MyNS { export var x = 1; } MyNS.x;`},
@@ -350,7 +350,7 @@ func TestNoUndefRule(t *testing.T) {
 			// === languageOptions.globals explicitly "off" still reports ===
 			{
 				Code:    `myOffGlobal123;`,
-				Globals: map[string]bool{"myOffGlobal123": false},
+				Globals: map[string]any{"myOffGlobal123": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
 				},

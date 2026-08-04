@@ -174,7 +174,7 @@ func TestNoImplicitCoercion(t *testing.T) {
 			// (ESLint's `booleanExists` check); the report itself is unaffected.
 			{
 				Code:    `!!foo`,
-				Globals: map[string]bool{"Boolean": false},
+				Globals: map[string]any{"Boolean": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "implicitCoercion", Line: 1, Column: 1,

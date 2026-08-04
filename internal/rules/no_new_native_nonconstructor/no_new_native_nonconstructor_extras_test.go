@@ -65,8 +65,8 @@ func TestNoNewNativeNonconstructorExtras(t *testing.T) {
 			{Code: `new (Symbol?.for("x"))(); new (BigInt?.(1))();`},
 
 			// ---- Config `/* global Symbol: off */` / `BigInt: off` un-declares the builtin ----
-			{Code: `new Symbol();`, Globals: map[string]bool{"Symbol": false}},
-			{Code: `new BigInt(1);`, Globals: map[string]bool{"BigInt": false}},
+			{Code: `new Symbol();`, Globals: map[string]any{"Symbol": "off"}},
+			{Code: `new BigInt(1);`, Globals: map[string]any{"BigInt": "off"}},
 
 			// N/A: Declaration/container rows for object/class members do not apply; this rule only inspects NewExpression callees.
 			// N/A: Autofix rows do not apply; this rule does not provide fixes.
@@ -195,14 +195,14 @@ func TestNoNewNativeNonconstructorExtras(t *testing.T) {
 			// Config declares Symbol/BigInt as writable globals — still the builtins.
 			{
 				Code:    `new Symbol();`,
-				Globals: map[string]bool{"Symbol": true},
+				Globals: map[string]any{"Symbol": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNewNonconstructor", Line: 1, Column: 5},
 				},
 			},
 			{
 				Code:    `new BigInt(1);`,
-				Globals: map[string]bool{"BigInt": true},
+				Globals: map[string]any{"BigInt": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNewNonconstructor", Line: 1, Column: 5},
 				},

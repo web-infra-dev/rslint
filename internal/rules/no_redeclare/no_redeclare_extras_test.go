@@ -83,8 +83,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{Code: "/* globals custom */"},
 			{Code: "/* globals a */ /* globals a:off */"},
 			{Code: "/* globals Object:off */ var Object = 0;"},
-			{Code: "var Object = 0;", Globals: map[string]bool{"Object": false}},
-			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]bool{"a": true}},
+			{Code: "var Object = 0;", Globals: map[string]any{"Object": "off"}},
+			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]any{"a": "readonly"}},
 			{Code: "/* globals a, a */"},
 
 			// A module-level declaration and an outer global declaration do not
@@ -109,7 +109,7 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{
 				Code:    "const chatgpt = {};",
 				Options: map[string]interface{}{"builtinGlobals": false},
-				Globals: map[string]bool{"chatgpt": true},
+				Globals: map[string]any{"chatgpt": "readonly"},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -359,14 +359,14 @@ func TestNoRedeclareExtras(t *testing.T) {
 			invalidRedeclared("/* globals a:off */ /* globals a */", "a", 1, 32),
 			{
 				Code:    "/* globals Object */ var Object = 0;",
-				Globals: map[string]bool{"Object": false},
+				Globals: map[string]any{"Object": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("Object", 1, 12),
 				},
 			},
 			{
 				Code:    "/* globals a */ var a = 0;",
-				Globals: map[string]bool{"a": true},
+				Globals: map[string]any{"a": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 12),
 					builtinError("a", 1, 21),
@@ -391,7 +391,7 @@ func TestNoRedeclareExtras(t *testing.T) {
 			invalidRedeclared("export {};\n/* globals a */ /* globals a */", "a", 2, 28),
 			{
 				Code:    "export {};\n/* globals app */",
-				Globals: map[string]bool{"app": true},
+				Globals: map[string]any{"app": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("app", 2, 12),
 				},
@@ -401,7 +401,7 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// in the implicit-global branch when builtinGlobals uses its default.
 			{
 				Code:    "const chatgpt = {};",
-				Globals: map[string]bool{"chatgpt": true},
+				Globals: map[string]any{"chatgpt": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("chatgpt", 1, 7),
 				},

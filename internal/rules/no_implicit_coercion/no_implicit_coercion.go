@@ -103,7 +103,7 @@ var NoImplicitCoercionRule = rule.Rule{
 				target := ast.SkipParentheses(innerPue.Operand)
 				recommendation := "Boolean(" + utils.TrimmedNodeText(ctx.SourceFile, target) + ")"
 				shouldFix := !utils.IsShadowed(node, "Boolean")
-				if declared, ok := ctx.Globals["Boolean"]; ok && !declared {
+				if ctx.Globals["Boolean"] == utils.GlobalAccessOff {
 					shouldFix = false
 				}
 				report(node, recommendation, true, shouldFix)

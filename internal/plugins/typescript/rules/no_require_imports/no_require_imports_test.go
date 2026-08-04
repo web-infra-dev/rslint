@@ -277,7 +277,7 @@ function load(
 		},
 		{
 			Code:    "require('global');",
-			Globals: map[string]bool{"require": true},
+			Globals: map[string]any{"require": "readonly"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noRequireImports",

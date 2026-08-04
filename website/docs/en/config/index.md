@@ -247,6 +247,21 @@ A disabled value removes a declaration inherited from an earlier matching entry,
 }
 ```
 
+The [`globals`](https://www.npmjs.com/package/globals) package ships its environments in the boolean shape, so its exports can be spread in directly:
+
+```ts
+import globals from 'globals';
+
+export default [
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
+];
+```
+
 ### settings
 
 - **Type:** `Record<string, unknown>`

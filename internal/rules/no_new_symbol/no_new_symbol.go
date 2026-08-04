@@ -30,7 +30,7 @@ var NoNewSymbolRule = rule.Rule{
 				// entry un-declares the builtin, so `Symbol` no longer resolves to
 				// a known global — ESLint's `globalScope.set.get("Symbol")` would
 				// be undefined and the rule stays silent.
-				if declared, ok := ctx.Globals["Symbol"]; ok && !declared {
+				if ctx.Globals["Symbol"] == utils.GlobalAccessOff {
 					return
 				}
 

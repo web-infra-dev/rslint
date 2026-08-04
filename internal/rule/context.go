@@ -41,19 +41,20 @@ type RuleContext struct {
 	Settings   map[string]interface{}
 	// ConfigGlobals contains only globals from the effective
 	// `languageOptions.globals` configuration, before inline comments are
-	// applied. A false value is an explicit "off" setting.
-	ConfigGlobals map[string]bool
+	// applied.
+	ConfigGlobals map[string]utils.GlobalAccess
 	// InlineGlobals contains `/* global */` declaration metadata in first-name
 	// source order. Rules can use its exact name ranges without scanning source
 	// text again. Treat the slice and its nested ranges as read-only.
 	InlineGlobals []InlineGlobal
-	// Globals is the fully resolved set of declared global names for this
-	// file — config `languageOptions.globals` merged with inline
+	// Globals is the resolved access level of every global name this file
+	// mentions — config `languageOptions.globals` merged with inline
 	// `/* global */` comments, resolved once per file by the linter. Rules
-	// should read this instead of parsing comments or config themselves. Nil
-	// only when neither source mentions any globals; a name maps to false when
-	// its final setting is "off".
-	Globals map[string]bool
+	// should read this instead of parsing comments or config themselves. A name
+	// neither source mentions reads back as utils.GlobalAccessUnset, so rules
+	// can index it directly and fall back to what they already know about the
+	// name, e.g. utils.IsECMAScriptGlobal.
+	Globals map[string]utils.GlobalAccess
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every

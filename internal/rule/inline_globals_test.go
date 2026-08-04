@@ -8,9 +8,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]bool, []InlineGlobal) {
+func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]utils.GlobalAccess, []InlineGlobal) {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
@@ -22,7 +23,7 @@ func parseInlineGlobalsForTest(t *testing.T, source string) (map[string]bool, []
 
 func assertInlineGlobals(t *testing.T, source string, got []InlineGlobal, want []struct {
 	name      string
-	declared  bool
+	access    utils.GlobalAccess
 	positions []int
 }) {
 	t.Helper()
@@ -31,8 +32,8 @@ func assertInlineGlobals(t *testing.T, source string, got []InlineGlobal, want [
 	}
 	for i, expected := range want {
 		actual := got[i]
-		if actual.Name != expected.name || actual.Declared != expected.declared {
-			t.Fatalf("inline global %d = (%q, %v), want (%q, %v)", i, actual.Name, actual.Declared, expected.name, expected.declared)
+		if actual.Name != expected.name || actual.Access != expected.access {
+			t.Fatalf("inline global %d = (%q, %v), want (%q, %v)", i, actual.Name, actual.Access, expected.name, expected.access)
 		}
 		if len(actual.NameRanges) != len(expected.positions) {
 			t.Fatalf("inline global %q has %d ranges, want %d", actual.Name, len(actual.NameRanges), len(expected.positions))
@@ -57,19 +58,60 @@ func TestParseInlineGlobals_MetadataAndSourceFiltering(t *testing.T) {
 		"/*global offName, foo:off */\n"
 
 	values, globals := parseInlineGlobalsForTest(t, source)
-	wantValues := map[string]bool{"foo": false, "Array": true, "offName": true}
+	wantValues := map[string]utils.GlobalAccess{"foo": utils.GlobalAccessOff, "Array": utils.GlobalAccessReadonly, "offName": utils.GlobalAccessReadonly}
 	if !reflect.DeepEqual(values, wantValues) {
 		t.Fatalf("values = %#v, want %#v", values, wantValues)
 	}
 
 	assertInlineGlobals(t, source, globals, []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "foo", declared: false, positions: []int{strings.Index(source, "foo, Array"), strings.LastIndex(source, "foo:off")}},
-		{name: "Array", declared: true, positions: []int{strings.Index(source, "Array:readonly")}},
-		{name: "offName", declared: true, positions: []int{strings.Index(source, "offName:off"), strings.LastIndex(source, "offName, foo")}},
+		{name: "foo", access: utils.GlobalAccessOff, positions: []int{strings.Index(source, "foo, Array"), strings.LastIndex(source, "foo:off")}},
+		{name: "Array", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "Array:readonly")}},
+		{name: "offName", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "offName:off"), strings.LastIndex(source, "offName, foo")}},
+	})
+}
+
+func TestParseInlineGlobals_AccessLevels(t *testing.T) {
+	source := "/*globals bare, ro:readonly, alias:readable, rw:writable, rw2:writeable, gone:off */"
+
+	values, globals := parseInlineGlobalsForTest(t, source)
+	wantValues := map[string]utils.GlobalAccess{
+		"bare":  utils.GlobalAccessReadonly,
+		"ro":    utils.GlobalAccessReadonly,
+		"alias": utils.GlobalAccessReadonly,
+		"rw":    utils.GlobalAccessWritable,
+		"rw2":   utils.GlobalAccessWritable,
+		"gone":  utils.GlobalAccessOff,
+	}
+	if !reflect.DeepEqual(values, wantValues) {
+		t.Fatalf("values = %#v, want %#v", values, wantValues)
+	}
+	if len(globals) != len(wantValues) {
+		t.Fatalf("got %d inline globals, want %d: %#v", len(globals), len(wantValues), globals)
+	}
+}
+
+// A setting that spells none of the three levels leaves the name to the config
+// or built-in setting, as ESLint does after reporting the bad directive.
+func TestParseInlineGlobals_InvalidSettingDropsName(t *testing.T) {
+	source := "/*global nonsense:bar, empty:, kept:writable */\n" +
+		"/*global wasValid:off */\n" +
+		"/*global wasValid:bar */"
+
+	values, globals := parseInlineGlobalsForTest(t, source)
+	wantValues := map[string]utils.GlobalAccess{"kept": utils.GlobalAccessWritable}
+	if !reflect.DeepEqual(values, wantValues) {
+		t.Fatalf("values = %#v, want %#v", values, wantValues)
+	}
+	assertInlineGlobals(t, source, globals, []struct {
+		name      string
+		access    utils.GlobalAccess
+		positions []int
+	}{
+		{name: "kept", access: utils.GlobalAccessWritable, positions: []int{strings.Index(source, "kept")}},
 	})
 }
 
@@ -96,7 +138,7 @@ func TestParseInlineGlobals_DuplicateAndOverrideSemantics(t *testing.T) {
 		"/*global a */"
 
 	values, globals := parseInlineGlobalsForTest(t, source)
-	wantValues := map[string]bool{"a": true, "b": true}
+	wantValues := map[string]utils.GlobalAccess{"a": utils.GlobalAccessReadonly, "b": utils.GlobalAccessReadonly}
 	if !reflect.DeepEqual(values, wantValues) {
 		t.Fatalf("values = %#v, want %#v", values, wantValues)
 	}
@@ -106,11 +148,11 @@ func TestParseInlineGlobals_DuplicateAndOverrideSemantics(t *testing.T) {
 	lastA := strings.LastIndex(source, "a */")
 	assertInlineGlobals(t, source, globals, []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "a", declared: true, positions: []int{firstA, secondA, lastA}},
-		{name: "b", declared: true, positions: []int{strings.Index(source, "b, b:off"), strings.LastIndex(source, "b */")}},
+		{name: "a", access: utils.GlobalAccessReadonly, positions: []int{firstA, secondA, lastA}},
+		{name: "b", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "b, b:off"), strings.LastIndex(source, "b */")}},
 	})
 }
 
@@ -121,49 +163,49 @@ func TestParseInlineGlobals_UnicodeWhitespaceAndNames(t *testing.T) {
 		"/*globals\u00A0π\u2003:\uFEFFwritable,\u2028𐐀\u2029名:off */"
 
 	values, globals := parseInlineGlobalsForTest(t, source)
-	wantValues := map[string]bool{"π": true, "𐐀": true, "名": false}
+	wantValues := map[string]utils.GlobalAccess{"π": utils.GlobalAccessWritable, "𐐀": utils.GlobalAccessReadonly, "名": utils.GlobalAccessOff}
 	if !reflect.DeepEqual(values, wantValues) {
 		t.Fatalf("values = %#v, want %#v", values, wantValues)
 	}
 	assertInlineGlobals(t, source, globals, []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "π", declared: true, positions: []int{strings.LastIndex(source, "π")}},
-		{name: "𐐀", declared: true, positions: []int{strings.LastIndex(source, "𐐀")}},
-		{name: "名", declared: false, positions: []int{strings.LastIndex(source, "名")}},
+		{name: "π", access: utils.GlobalAccessWritable, positions: []int{strings.LastIndex(source, "π")}},
+		{name: "𐐀", access: utils.GlobalAccessReadonly, positions: []int{strings.LastIndex(source, "𐐀")}},
+		{name: "名", access: utils.GlobalAccessOff, positions: []int{strings.LastIndex(source, "名")}},
 	})
 }
 
 func TestParseInlineGlobals_CommentOnlyFileAfterShebang(t *testing.T) {
 	source := "#!/usr/bin/env node\n/*global onlyComment */"
 	values, globals := parseInlineGlobalsForTest(t, source)
-	if !reflect.DeepEqual(values, map[string]bool{"onlyComment": true}) {
+	if !reflect.DeepEqual(values, map[string]utils.GlobalAccess{"onlyComment": utils.GlobalAccessReadonly}) {
 		t.Fatalf("values = %#v, want onlyComment declared", values)
 	}
 	assertInlineGlobals(t, source, globals, []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "onlyComment", declared: true, positions: []int{strings.Index(source, "onlyComment")}},
+		{name: "onlyComment", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "onlyComment")}},
 	})
 }
 
 func TestParseInlineGlobals_TrailingMultilineComment(t *testing.T) {
 	source := "const value = 1; /*globals foo,\r\n    Array */\nfoo; Array;"
 	values, globals := parseInlineGlobalsForTest(t, source)
-	if !reflect.DeepEqual(values, map[string]bool{"foo": true, "Array": true}) {
+	if !reflect.DeepEqual(values, map[string]utils.GlobalAccess{"foo": utils.GlobalAccessReadonly, "Array": utils.GlobalAccessReadonly}) {
 		t.Fatalf("values = %#v, want foo and Array declared", values)
 	}
 	assertInlineGlobals(t, source, globals, []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "foo", declared: true, positions: []int{strings.Index(source, "foo,")}},
-		{name: "Array", declared: true, positions: []int{strings.Index(source, "Array */")}},
+		{name: "foo", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "foo,")}},
+		{name: "Array", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "Array */")}},
 	})
 }
 
@@ -244,18 +286,22 @@ func TestParseGlobalNameList(t *testing.T) {
 }
 
 func TestMergeGlobals_InlineOverridesConfigWithoutMutatingInputs(t *testing.T) {
-	config := map[string]bool{"configOnly": true, "overridden": true}
-	inline := map[string]bool{"inlineOnly": true, "overridden": false}
-	want := map[string]bool{"configOnly": true, "inlineOnly": true, "overridden": false}
+	config := map[string]utils.GlobalAccess{"configOnly": utils.GlobalAccessWritable, "overridden": utils.GlobalAccessWritable}
+	inline := map[string]utils.GlobalAccess{"inlineOnly": utils.GlobalAccessReadonly, "overridden": utils.GlobalAccessOff}
+	want := map[string]utils.GlobalAccess{
+		"configOnly": utils.GlobalAccessWritable,
+		"inlineOnly": utils.GlobalAccessReadonly,
+		"overridden": utils.GlobalAccessOff,
+	}
 
 	got := MergeGlobals(config, inline)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("MergeGlobals() = %#v, want %#v", got, want)
 	}
-	if !config["overridden"] {
+	if config["overridden"] != utils.GlobalAccessWritable {
 		t.Fatal("MergeGlobals mutated config input")
 	}
-	if inline["overridden"] {
+	if inline["overridden"] != utils.GlobalAccessOff {
 		t.Fatal("MergeGlobals mutated inline input")
 	}
 }

@@ -34,7 +34,7 @@ func TestJsxNoUndefRule(t *testing.T) {
 		{
 			Code:    `var React; React.render(<Text />);`,
 			Tsx:     true,
-			Globals: map[string]bool{"Text": true},
+			Globals: map[string]any{"Text": "readonly"},
 		},
 		// Declared global in a module file with `allowGlobals: true`.
 		{
@@ -45,7 +45,7 @@ func TestJsxNoUndefRule(t *testing.T) {
 				};
 			`,
 			Tsx:     true,
-			Globals: map[string]bool{"Text": true},
+			Globals: map[string]any{"Text": "readonly"},
 			Options: map[string]interface{}{"allowGlobals": true},
 		},
 		{
@@ -168,7 +168,7 @@ func TestJsxNoUndefRule(t *testing.T) {
 				export default TextWrapper;
 			`,
 			Tsx:     true,
-			Globals: map[string]bool{"Text": true},
+			Globals: map[string]any{"Text": "readonly"},
 			Options: map[string]interface{}{"allowGlobals": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "undefined", Message: "'Text' is not defined."},

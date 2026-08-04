@@ -165,10 +165,10 @@ func TestNoEvalRule(t *testing.T) {
 			// Config `off` un-declares the builtin (non-call references only —
 			// direct eval() calls never consult scope, see the invalid list).
 			// ================================================================
-			{Code: `var x = eval;`, Globals: map[string]bool{"eval": false}},
-			{Code: `window.eval('foo');`, Globals: map[string]bool{"window": false}},
-			{Code: `global.eval('foo');`, Globals: map[string]bool{"global": false}},
-			{Code: `globalThis.eval('foo');`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `var x = eval;`, Globals: map[string]any{"eval": "off"}},
+			{Code: `window.eval('foo');`, Globals: map[string]any{"window": "off"}},
+			{Code: `global.eval('foo');`, Globals: map[string]any{"global": "off"}},
+			{Code: `globalThis.eval('foo');`, Globals: map[string]any{"globalThis": "off"}},
 
 			// ================================================================
 			// allowIndirect: true — all indirect forms allowed
@@ -924,7 +924,7 @@ func TestNoEvalRule(t *testing.T) {
 			// ================================================================
 			{
 				Code:    `eval('foo');`,
-				Globals: map[string]bool{"eval": false},
+				Globals: map[string]any{"eval": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
@@ -933,14 +933,14 @@ func TestNoEvalRule(t *testing.T) {
 			// Config declares eval/window as writable globals — still the builtins.
 			{
 				Code:    `var x = eval;`,
-				Globals: map[string]bool{"eval": true},
+				Globals: map[string]any{"eval": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 9},
 				},
 			},
 			{
 				Code:    `window.eval('foo');`,
-				Globals: map[string]bool{"window": true},
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 8},
 				},

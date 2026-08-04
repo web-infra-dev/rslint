@@ -48,7 +48,7 @@ var NoLabelVarRule = rule.Rule{
 					return
 				}
 
-				if ctx.Globals[name] {
+				if ctx.Globals[name].IsDeclared() {
 					report(node)
 					return
 				}

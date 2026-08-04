@@ -91,7 +91,7 @@ func GetStaticStringValue(node *ast.Node) string {
 // the identifier no longer resolves to a known global and this returns
 // false. Pass nil to skip that check (e.g. for callers whose upstream ESLint
 // rule doesn't consult scope at all).
-func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
+func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) bool {
 	callee = ast.SkipParentheses(callee)
 	if callee == nil {
 		return false
@@ -101,7 +101,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 		if callee.AsIdentifier().Text != "parseInt" || IsShadowed(callee, "parseInt") {
 			return false
 		}
-		return !isGlobalOff(globals, "parseInt")
+		return globals["parseInt"] != GlobalAccessOff
 	}
 
 	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
@@ -114,15 +114,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]bool) bool {
 		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
 		return false
 	}
-	return !isGlobalOff(globals, "Number")
-}
-
-// isGlobalOff reports whether globals explicitly un-declares name via an
-// `off` setting (e.g. `/* global Foo: off */`). A name absent from globals
-// is not considered off — it just falls back to the normal shadow check.
-func isGlobalOff(globals map[string]bool, name string) bool {
-	declared, ok := globals[name]
-	return ok && !declared
+	return globals["Number"] != GlobalAccessOff
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference

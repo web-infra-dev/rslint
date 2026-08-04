@@ -256,8 +256,25 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			{Code: `class C { static { Object = 1; var Object: any; } }`},
 
 			// Config `off` un-declares the builtin
-			{Code: `Object = 1;`, Globals: map[string]bool{"Object": false}},
-			{Code: `String = 'test';`, Globals: map[string]bool{"String": false}},
+			{Code: `Object = 1;`, Globals: map[string]any{"Object": "off"}},
+			{Code: `String = 'test';`, Globals: map[string]any{"String": "off"}},
+
+			// `writable` lifts a builtin's implicit readonly setting
+			{Code: `Object = 1;`, Globals: map[string]any{"Object": "writable"}},
+			{Code: `String = 'test';`, Globals: map[string]any{"String": true}},
+			{Code: `/* global Object: writable */ Object = 1;`},
+			{Code: `/* global Object: writable */ Object = 1;`, Globals: map[string]any{"Object": "readonly"}},
+
+			// A writable project global is assignable
+			{Code: `myGlobal = 1;`, Globals: map[string]any{"myGlobal": "writable"}},
+			{Code: `/* global myGlobal: writable */ myGlobal = 1;`},
+
+			// A project global the config never declares is not this rule's concern
+			{Code: `myGlobal = 1;`},
+			{Code: `myGlobal = 1;`, Globals: map[string]any{"myGlobal": "off"}},
+
+			// A readonly declaration a local binding shadows
+			{Code: `let myGlobal = 0; myGlobal = 1;`, Globals: map[string]any{"myGlobal": "readonly"}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -1011,6 +1028,41 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Code: `DisposableStack = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// A readonly project global is read-only like a builtin
+			{
+				Code:    `myGlobal = 1;`,
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// The `globals` package spells readonly as false
+			{
+				Code:    `myGlobal = 1;`,
+				Globals: map[string]any{"myGlobal": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// A bare `/* global */` name is readonly
+			{
+				Code: `/* global myGlobal */ myGlobal = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 23},
+				},
+			},
+
+			// An inline `readonly` overrides a writable config setting
+			{
+				Code:    `/* global Object: readonly */ Object = 1;`,
+				Globals: map[string]any{"Object": "writable"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 31},
 				},
 			},
 		},
