@@ -13,6 +13,39 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestSourceMayUseArrayConstructor(t *testing.T) {
+	if !sourceMayUseArrayConstructor(nil) || !sourceMayUseArrayConstructor(&ast.SourceFile{}) {
+		t.Fatal("missing parser identifier metadata must conservatively keep listeners")
+	}
+
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "ordinary call", code: `service.method()`, want: false},
+		{name: "string only", code: `const value = "Array()"`, want: false},
+		{name: "computed property is conservative", code: `service["Array"]()`, want: true},
+		{name: "array call", code: `Array()`, want: true},
+		{name: "escaped array identifier", code: `Arr\u0061y()`, want: true},
+		{name: "array property", code: `service.Array()`, want: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/source.ts",
+				Path:     "/source.ts",
+			}, testCase.code, core.ScriptKindTS)
+			if got := sourceMayUseArrayConstructor(sourceFile); got != testCase.want {
+				t.Fatalf("sourceMayUseArrayConstructor(%q) = %v, want %v", testCase.code, got, testCase.want)
+			}
+			listeners := NoArrayConstructorRule.Run(rule.RuleContext{SourceFile: sourceFile}, nil)
+			if got := len(listeners) != 0; got != testCase.want {
+				t.Fatalf("listener presence for %q = %v, want %v", testCase.code, got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestNoArrayConstructorRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrayConstructorRule, []rule_tester.ValidTestCase{
 		// Single argument (creates array with size)
@@ -302,6 +335,23 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `new (Array)(value);`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// SourceFile.Identifiers and the AST both normalize identifier
+			// escapes, so the file-level fast path must retain these reports.
+			{
+				Code: `Arr\u0061y(a, b);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useLiteral", Line: 1, Column: 1},
+				},
+				Output: []string{`[a, b];`},
+			},
+			{
+				Code: `new Arr\u0061y();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useLiteral", Line: 1, Column: 1},
+				},
+				Output: []string{`[];`},
+			},
+
 			// This typescript-eslint wrapper is intentionally syntactic: a
 			// local binding named Array still matches.
 			{
