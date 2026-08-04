@@ -1,9 +1,13 @@
 package no_useless_rename
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -69,6 +73,7 @@ func TestNoUselessRenameRule(t *testing.T) {
 			{Code: `let {foo: foo} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
 			{Code: `let {foo: foo, bar: baz} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
 			{Code: `let {foo: foo, bar: bar} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
+			{Code: `({foo: foo} = obj); for ({bar: bar} of values) {}`, Options: map[string]interface{}{"ignoreDestructuring": true}},
 
 			// ---- { ignoreImport: true } ----
 			{Code: `import {foo as foo} from 'foo';`, Options: map[string]interface{}{"ignoreImport": true}},
@@ -82,6 +87,19 @@ func TestNoUselessRenameRule(t *testing.T) {
 			{Code: `export {foo as foo} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
 			{Code: `export {foo as foo, bar as baz} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
 			{Code: `export {foo as foo, bar as bar} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
+
+			// When every category is ignored, Run returns no listeners.
+			{
+				Code: `import {foo as foo} from 'mod';
+export {foo as foo};
+const {foo: foo} = value;
+({foo: foo} = value);`,
+				Options: map[string]interface{}{
+					"ignoreDestructuring": true,
+					"ignoreImport":        true,
+					"ignoreExport":        true,
+				},
+			},
 
 			// ---- Extra coverage beyond ESLint's suite ----
 			// Numeric keys can't collide with identifier bindings — no rename.
@@ -942,15 +960,21 @@ func TestNoUselessRenameRule(t *testing.T) {
 					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment foo unnecessarily renamed.", Line: 2, Column: 3},
 				},
 			},
-			// Nested assignment pattern — the inner ObjectLiteralExpression is
-			// not a direct LHS, but `ast.IsAssignmentTarget` walks up through
-			// PropertyAssignment / ObjectLiteralExpression to confirm the
-			// outer `=`. Tests that the listener fires on nested patterns.
+			// Nested assignment pattern — the linter's allow-pattern traversal
+			// propagates through the outer property into the inner object.
 			{
 				Code:   `({a: {foo: foo}} = obj);`,
 				Output: []string{`({a: {foo}} = obj);`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment foo unnecessarily renamed.", Line: 1, Column: 7},
+				},
+			},
+			// Parentheses and TS non-null expressions can wrap a nested target.
+			{
+				Code:   `({a: (({foo: foo})!)} = obj);`,
+				Output: []string{`({a: (({foo})!)} = obj);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment foo unnecessarily renamed."},
 				},
 			},
 			// Array-containing-object assignment pattern.
@@ -967,6 +991,24 @@ func TestNoUselessRenameRule(t *testing.T) {
 				Output: []string{`for ({foo} of arr) {}`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment foo unnecessarily renamed.", Line: 1, Column: 7},
+				},
+			},
+			// `for-in` can also use a nested assignment pattern as its target.
+			{
+				Code:   `for ([{foo: foo}] in arr) {}`,
+				Output: []string{`for ([{foo}] in arr) {}`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment foo unnecessarily renamed.", Line: 1, Column: 8},
+				},
+			},
+			// Only walk the iteration target. The object literal in the default
+			// value is an expression and must not be treated as a nested pattern.
+			{
+				Code:   `for ({outer: {inner: inner}, kept: kept = {ignored: ignored}} of arr) {}`,
+				Output: []string{`for ({outer: {inner}, kept = {ignored: ignored}} of arr) {}`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment inner unnecessarily renamed."},
+					{MessageId: "unnecessarilyRenamed", Message: "Destructuring assignment kept unnecessarily renamed."},
 				},
 			},
 			// TS: destructuring with a type annotation — the annotation is
@@ -1008,4 +1050,109 @@ func TestNoUselessRenameRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoUselessRenameEditDemand(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(
+		`import { imported as imported } from 'module';
+export { imported as imported };
+const { binding: binding = fallback } = input;
+({ assigned: assigned = fallback, parenthesized: (parenthesized) = fallback } = input);
+({ commented/**/: commented } = input);`,
+		"no-useless-rename-edit-demand.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
+		t.Helper()
+		var diagnostics []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program:      program,
+			File:         sourceFile.FileName(),
+			HasTypeInfo:  true,
+			ExcludePaths: []string{},
+			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+				return []linter.ConfiguredRule{{
+					Name:     NoUselessRenameRule.Name,
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return NoUselessRenameRule.Run(ctx, nil)
+					},
+				}}
+			},
+			Consumer: rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		})
+		if len(diagnostics) != 6 {
+			t.Fatalf("demand %d: diagnostics = %d, want 6", demand, len(diagnostics))
+		}
+		return diagnostics
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+	wantFixText := []string{"imported", "imported", "binding = fallback", "assigned = fallback", "", ""}
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for index, wantText := range wantFixText {
+		wantIdentity := withoutEdits(allEdits[index])
+		for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+			rule.EditDemandNone:       diagnosticsOnly,
+			rule.EditDemandAutofix:    autofixOnly,
+			rule.EditDemandSuggestion: suggestionOnly,
+		} {
+			if got := withoutEdits(diagnostics[index]); !reflect.DeepEqual(got, wantIdentity) {
+				t.Errorf("demand %d changed diagnostic %d:\ngot  %#v\nwant %#v", demand, index, got, wantIdentity)
+			}
+		}
+
+		if diagnosticsOnly[index].FixesPtr != nil || suggestionOnly[index].FixesPtr != nil {
+			t.Fatalf("diagnostic %d: non-autofix demand materialized fixes", index)
+		}
+		for _, diagnostics := range [][]rule.RuleDiagnostic{
+			diagnosticsOnly,
+			autofixOnly,
+			suggestionOnly,
+			allEdits,
+		} {
+			if diagnostics[index].Suggestions != nil {
+				t.Fatalf("diagnostic %d: autofix-only rule materialized suggestions", index)
+			}
+		}
+
+		for demand, diagnostics := range map[rule.EditDemand][]rule.RuleDiagnostic{
+			rule.EditDemandAutofix: autofixOnly,
+			rule.EditDemandAll:     allEdits,
+		} {
+			fixes := diagnostics[index].FixesPtr
+			if wantText == "" {
+				if fixes != nil {
+					t.Fatalf("demand %d diagnostic %d: unexpected fixes %#v", demand, index, *fixes)
+				}
+				continue
+			}
+			if fixes == nil || len(*fixes) != 1 || (*fixes)[0].Text != wantText {
+				t.Fatalf("demand %d diagnostic %d: fixes = %#v, want one fix with text %q", demand, index, fixes, wantText)
+			}
+		}
+		if !reflect.DeepEqual(autofixOnly[index].FixesPtr, allEdits[index].FixesPtr) {
+			t.Errorf("diagnostic %d: autofix and all-edit fixes differ", index)
+		}
+	}
 }
