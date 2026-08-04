@@ -16,7 +16,7 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Build, Test, and Development Commands
 
-- Setup submodule: `git submodule update --init --recursive`
+- Setup submodule: `git submodule update --init --depth 1 typescript-go`
 - Install Deps: `pnpm install`
 - Build JS/TS: `pnpm build`
 - Run Go tests: `pnpm run test:go`

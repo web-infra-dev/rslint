@@ -12,7 +12,7 @@ Build the project:
 
 ```bash
 # init typescript-go submodule
-git submodule update --init --recursive
+git submodule update --init --depth 1 typescript-go
 pnpm install
 pnpm build
 ```
