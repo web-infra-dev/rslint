@@ -72,10 +72,7 @@ func makeImportedBinding(nameNode *ast.Node, isNamespace bool, symbol *ast.Symbo
 
 // importBindingSymbol returns the binder-owned alias symbol used by ctx.Refs.
 func importBindingSymbol(nameNode *ast.Node) *ast.Symbol {
-	if nameNode == nil || nameNode.Parent == nil || nameNode.Parent.Name() != nameNode {
-		return nil
-	}
-	return nameNode.Parent.Symbol()
+	return utils.BindingNameSymbol(nameNode)
 }
 
 func checkerImportBindingSymbol(nameNode *ast.Node, ctx *rule.RuleContext) *ast.Symbol {
