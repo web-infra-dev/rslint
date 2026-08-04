@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -74,27 +75,45 @@ func unwrap(node *ast.Node) *ast.Node {
 // Threading a single struct keeps signatures readable and avoids drift when
 // new fields (TypeChecker, settings derivatives) are added later.
 type componentEnv struct {
-	pragma      string
-	createClass string
-	wrappers    []reactutil.ComponentWrapperEntry
-	tc          *checker.Checker
+	pragma         string
+	createClass    string
+	wrappers       []reactutil.ComponentWrapperEntry
+	tc             *checker.Checker
+	componentStack []*ast.Node
 }
 
 // isDetectedComponent is a thin env-aware adapter over
 // reactutil.IsDetectedComponent — see that function's doc for the canonical
 // component-classification semantics.
-func isDetectedComponent(node *ast.Node, env componentEnv) bool {
+func isDetectedComponent(node *ast.Node, env *componentEnv) bool {
 	return reactutil.IsDetectedComponent(node, env.pragma, env.createClass, env.wrappers, env.tc)
+}
+
+// functionReturnsJSX keeps the checker-aware strict-return query behind the
+// same environment adapter as component detection.
+func functionReturnsJSX(node *ast.Node, env *componentEnv) bool {
+	return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
 }
 
 // isInsideWrapperCall reports whether `node` is the FunctionLike argument of
 // a wrapper call (memo / forwardRef / configured wrapper). When true, the
 // outer CallExpression listener handles reporting at the wrapper's Pos —
 // this listener should skip to avoid double-reporting at a different column.
-func isInsideWrapperCall(node *ast.Node, env componentEnv) bool {
+func isInsideWrapperCall(node *ast.Node, env *componentEnv) bool {
 	parent := reactutil.SkipExpressionWrappersUp(node)
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
+	}
+	call := parent.AsCallExpression()
+	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 ||
+		reactutil.SkipExpressionWrappers(call.Arguments.Nodes[0]) != node {
+		return false
+	}
+	// CallExpression listeners run before their arguments. A parent call at the
+	// top of the active component stack is necessarily a matching component
+	// wrapper, so reuse that result instead of resolving the binding again.
+	if len(env.componentStack) > 0 && env.componentStack[len(env.componentStack)-1] == parent {
+		return true
 	}
 	return reactutil.MatchesAnyComponentWrapperWithChecker(parent, node, env.wrappers, env.pragma, env.tc)
 }
@@ -159,8 +178,8 @@ func objectPropertyKey(node *ast.Node) *ast.Node {
 // ObjectLiteralExpression must be the call's second argument — deeper
 // nesting (object inside an object inside the props object) does NOT match,
 // matching upstream's strict-equality check.
-func isComponentInsideCreateElementProp(node *ast.Node, env componentEnv) bool {
-	if !isDetectedComponent(node, env) {
+func isComponentInsideCreateElementProp(node *ast.Node, env *componentEnv, isComponent bool) bool {
+	if !isComponent {
 		return false
 	}
 	// Start the ancestor walks from the wrapper-skipped parent so paren /
@@ -196,9 +215,9 @@ func isComponentInsideCreateElementProp(node *ast.Node, env componentEnv) bool {
 // strictly returns JSX. Matches upstream's `utils.isReturningJSX` which
 // passes `ignoreNull=true` — functions that only return `null` do NOT
 // qualify here (Components.js isReturningJSX wrapper).
-func isComponentInProp(node *ast.Node, env componentEnv) bool {
+func isComponentInProp(node *ast.Node, env *componentEnv, isComponent bool) bool {
 	if isValueOfObjectProperty(node) {
-		return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
+		return functionReturnsJSX(node, env)
 	}
 	// Walk up to a JsxAttribute whose value is a JsxExpression — the tsgo
 	// equivalent of ESTree's "JSXAttribute with JSXExpressionContainer
@@ -206,9 +225,9 @@ func isComponentInProp(node *ast.Node, env componentEnv) bool {
 	// count because upstream's `getClosestMatchingParent` walks past
 	// non-matching ancestors.
 	if hasAncestorJsxAttributeWithExpression(node) {
-		return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
+		return functionReturnsJSX(node, env)
 	}
-	return isComponentInsideCreateElementProp(node, env)
+	return isComponentInsideCreateElementProp(node, env, isComponent)
 }
 
 // hasAncestorJsxAttributeWithExpression walks up from the node's semantic
@@ -353,7 +372,17 @@ func isDirectValueOfRenderProperty(node *ast.Node, propNamePattern string) bool 
 // are excluded because they cannot render as React components. Upstream's
 // `utils.isReturningJSX` negated — ignoreNull=true — is our
 // `FunctionReturnsJSX`.
-func isStatelessComponentReturningNull(node *ast.Node, env componentEnv) bool {
+func isStatelessComponentReturningNull(node *ast.Node, env *componentEnv, isComponent bool) bool {
+	if !reactutil.IsFunctionLikeForComponent(node) {
+		return false
+	}
+	// Every detected FunctionLike came through the stateless-component path
+	// (or its equivalent wrapper fallback), so detection already proves the
+	// first half of this predicate. Avoid repeating the full component body
+	// scan merely to establish it again.
+	if isComponent {
+		return !functionReturnsJSX(node, env)
+	}
 	// Use the wrappers-aware classification so user wrappers (myMemo /
 	// MyLib.observer / ...) correctly participate in stateless detection.
 	// Without this, `myMemo(() => null)` would not classify as a
@@ -362,7 +391,7 @@ func isStatelessComponentReturningNull(node *ast.Node, env componentEnv) bool {
 	if !reactutil.IsStatelessReactComponentWithWrappers(node, env.pragma, env.tc, env.wrappers) {
 		return false
 	}
-	return !reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
+	return !functionReturnsJSX(node, env)
 }
 
 // isFunctionComponentInsideClassComponent mirrors upstream's safety net of
@@ -382,7 +411,7 @@ func isStatelessComponentReturningNull(node *ast.Node, env componentEnv) bool {
 // lowercase-named helper inside a class render method's nested function
 // as a "function component inside class component" purely on the basis
 // of returning JSX.
-func isFunctionComponentInsideClassComponent(node *ast.Node, env componentEnv) bool {
+func isFunctionComponentInsideClassComponent(node *ast.Node, env *componentEnv) bool {
 	if !reactutil.IsFunctionLikeForComponent(node) {
 		return false
 	}
@@ -406,7 +435,7 @@ func isFunctionComponentInsideClassComponent(node *ast.Node, env componentEnv) b
 	if !reactutil.IsStatelessReactComponentWithWrappers(enclosingFn, env.pragma, env.tc, env.wrappers) {
 		return false
 	}
-	return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
+	return functionReturnsJSX(node, env)
 }
 
 // getClosestParentComponent walks up from `node.Parent` and returns the
@@ -416,14 +445,31 @@ func isFunctionComponentInsideClassComponent(node *ast.Node, env componentEnv) b
 // Starts the walk from the wrapper-skipped parent so paren / TS wrappers
 // between the node and its semantic ESTree ancestor don't change the
 // closest-component result. Matches upstream's flattened tree.
-func getClosestParentComponent(node *ast.Node, env componentEnv) *ast.Node {
+func getClosestParentComponent(node *ast.Node, env *componentEnv) *ast.Node {
 	start := reactutil.SkipExpressionWrappersUp(node)
-	if start == nil {
-		return nil
+	var stackedComponent *ast.Node
+	if len(env.componentStack) > 0 {
+		stackedComponent = env.componentStack[len(env.componentStack)-1]
 	}
-	return ast.FindAncestor(start, func(n *ast.Node) bool {
-		return isDetectedComponent(n, env)
-	})
+	for current := start; current != nil; current = current.Parent {
+		if current == stackedComponent {
+			return current
+		}
+		// ClassExpression and createReactClass's ObjectLiteralExpression are
+		// parent-component shapes but intentionally have no reporting listener.
+		// Check only those uncommon gaps while the active stack handles every
+		// ordinary FunctionLike, ClassDeclaration, and wrapper call in O(1).
+		if (current.Kind == ast.KindClassExpression || current.Kind == ast.KindObjectLiteralExpression) &&
+			isDetectedComponent(current, env) {
+			return current
+		}
+	}
+	return nil
+}
+
+type messageCacheKey struct {
+	parentName string
+	asProps    bool
 }
 
 // resolveComponentName returns the display name of a detected component
@@ -518,7 +564,7 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 		// below need. Building it once at rule entry avoids both repeated
 		// `ctx.Settings` lookups and the risk of helpers drifting on
 		// pragma / createClass / wrapper / TypeChecker reads.
-		env := componentEnv{
+		env := &componentEnv{
 			pragma:      reactutil.GetReactPragma(ctx.Settings),
 			createClass: reactutil.GetReactCreateClass(ctx.Settings),
 			tc:          ctx.TypeChecker,
@@ -528,12 +574,17 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 		// forwardRef (pragma-qualified and bare), users may add more.
 		env.wrappers = reactutil.GetComponentWrapperFunctions(ctx.Settings, env.pragma)
 
-		// reported tracks node positions we've already reported on, so
-		// the FunctionLike + CallExpression listeners can both fire for a
-		// React.memo-wrapped arrow without double-counting.
-		reported := map[int]struct{}{}
+		// The only possible duplicate is a wrapper CallExpression followed
+		// immediately by its FunctionLike argument at the same position. AST
+		// nodes are visited once in source order, so retaining the previous
+		// report position is sufficient and avoids a per-file position map.
+		lastReportedPos := -1
+		var lastMessageKey messageCacheKey
+		var lastRuleMessage rule.RuleMessage
+		hasLastMessage := false
+		sourceText := ctx.SourceFile.Text()
 
-		validate := func(node *ast.Node) {
+		validate := func(node *ast.Node, isComponent bool) {
 			if node == nil || node.Parent == nil {
 				return
 			}
@@ -559,8 +610,7 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 				return
 			}
 
-			isDeclaredInsideProps := isComponentInProp(node, env)
-			isComponent := isDetectedComponent(node, env)
+			isDeclaredInsideProps := isComponentInProp(node, env, isComponent)
 			isFnInClass := !isComponent && !isDeclaredInsideProps && isFunctionComponentInsideClassComponent(node, env)
 
 			if !isComponent && !isDeclaredInsideProps && !isFnInClass {
@@ -587,7 +637,7 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 			if isDirectValueOfRenderProperty(node, opts.propNamePattern) {
 				return
 			}
-			if isStatelessComponentReturningNull(node, env) {
+			if isStatelessComponentReturningNull(node, env, isComponent) {
 				return
 			}
 
@@ -640,14 +690,25 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 			}
 
 			pos := node.Pos()
-			if _, seen := reported[pos]; seen {
+			if pos == lastReportedPos {
 				return
 			}
-			reported[pos] = struct{}{}
+			lastReportedPos = pos
 
-			msg := generateErrorMessageWithParentName(parentName)
-			if isDeclaredInsideProps && !opts.allowAsProps {
-				msg += asPropsInfo
+			messageKey := messageCacheKey{
+				parentName: parentName,
+				asProps:    isDeclaredInsideProps && !opts.allowAsProps,
+			}
+			ruleMsg := lastRuleMessage
+			if !hasLastMessage || messageKey != lastMessageKey {
+				msg := generateErrorMessageWithParentName(parentName)
+				if messageKey.asProps {
+					msg += asPropsInfo
+				}
+				ruleMsg = rule.RuleMessage{Id: "", Description: msg}
+				lastMessageKey = messageKey
+				lastRuleMessage = ruleMsg
+				hasLastMessage = true
 			}
 			// MessageId is intentionally empty: upstream's
 			// eslint-plugin-react reports this rule's diagnostic with
@@ -655,7 +716,6 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 			// `report(context, message, null, …)`. We mirror that with an
 			// empty Id; tests matching by `message` text work in both
 			// runners.
-			ruleMsg := rule.RuleMessage{Id: "", Description: msg}
 			// Object-literal shorthand methods (`{ Foo() {} }`,
 			// `{ get Foo() {} }`, `{ async Foo() {} }`) are one
 			// `MethodDeclaration` / `GetAccessor` / `SetAccessor` node in
@@ -672,7 +732,11 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 					return
 				}
 			}
-			ctx.ReportNode(node, ruleMsg)
+			// ReportNode obtains the same trivia-trimmed start by allocating a
+			// scanner for every diagnostic. These component node kinds only need
+			// the first non-trivia byte, so SkipTrivia preserves the range while
+			// keeping this hot path allocation-free.
+			ctx.ReportRange(core.NewTextRange(scanner.SkipTrivia(sourceText, node.Pos()), node.End()), ruleMsg)
 		}
 
 		// Listener set mirrors upstream's exact list:
@@ -686,15 +750,39 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 		// to here so we cover object-literal shorthand methods (`{ Foo() {
 		// return <div/>; } }`); class-body methods are filtered out by the
 		// `parent.Kind != ObjectLiteralExpression` guard inside `validate`.
+		enter := func(node *ast.Node) {
+			// Listener entry order follows source order. Drop components whose
+			// source ranges ended before this candidate, leaving exactly the
+			// active detected ancestors without registering exit listeners for
+			// every candidate kind.
+			for len(env.componentStack) > 0 {
+				parent := env.componentStack[len(env.componentStack)-1]
+				if parent.Pos() <= node.Pos() && node.End() <= parent.End() {
+					break
+				}
+				env.componentStack = env.componentStack[:len(env.componentStack)-1]
+			}
+			switch node.Kind {
+			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+				if node.Parent == nil || node.Parent.Kind != ast.KindObjectLiteralExpression {
+					return
+				}
+			}
+			isComponent := isDetectedComponent(node, env)
+			validate(node, isComponent)
+			if isComponent {
+				env.componentStack = append(env.componentStack, node)
+			}
+		}
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration: validate,
-			ast.KindFunctionExpression:  validate,
-			ast.KindArrowFunction:       validate,
-			ast.KindMethodDeclaration:   validate,
-			ast.KindGetAccessor:         validate,
-			ast.KindSetAccessor:         validate,
-			ast.KindClassDeclaration:    validate,
-			ast.KindCallExpression:      validate,
+			ast.KindFunctionDeclaration: enter,
+			ast.KindFunctionExpression:  enter,
+			ast.KindArrowFunction:       enter,
+			ast.KindMethodDeclaration:   enter,
+			ast.KindGetAccessor:         enter,
+			ast.KindSetAccessor:         enter,
+			ast.KindClassDeclaration:    enter,
+			ast.KindCallExpression:      enter,
 		}
 	},
 }
