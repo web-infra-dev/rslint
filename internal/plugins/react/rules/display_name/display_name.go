@@ -84,6 +84,27 @@ type contextEntry struct {
 	hasDisplayName bool
 }
 
+// shadowBindingCacheEntry memoizes the three wrapper names the rule checks
+// while preserving the bespoke shallow-binding semantics in
+// isIdentifierShadowed. Body and parameter results stay separate because an
+// expression-bodied arrow may itself return another FunctionLike node.
+type shadowBindingCacheEntry struct {
+	bodyChecked  uint8
+	bodyBound    uint8
+	paramChecked uint8
+	paramBound   uint8
+}
+
+type wrapperCallCacheEntry struct {
+	matchesConfigured uint8
+	wrapsSibling      uint8
+}
+
+const (
+	boolCacheFalse uint8 = 1
+	boolCacheTrue  uint8 = 2
+)
+
 // nodeWalker carries per-source-file state for the display-name analysis.
 // A single walker fully owns the components / context maps and the helper
 // closures that mutate them; the rule's `Run` constructs one per file.
@@ -119,6 +140,24 @@ type nodeWalker struct {
 	// contextObjects mirrors upstream's `contextObjects` Map keyed by the
 	// binding identifier of the createContext target.
 	contextObjects map[string]*contextEntry
+
+	// shadowBindings avoids rescanning the same enclosing function body or
+	// parameter list for every memo / forwardRef component in that scope.
+	// It is allocated lazily because files without reportable wrapper calls
+	// never query shadowing.
+	shadowBindings map[*ast.Node]shadowBindingCacheEntry
+
+	// wrapperCalls caches configured-wrapper and sibling-component decisions.
+	// The same call/argument pair is queried from the FunctionLike,
+	// CallExpression, nested-wrapper, and reporting paths.
+	wrapperCalls map[*ast.Node]wrapperCallCacheEntry
+
+	// knownSiblingPositions replaces SourceHasComponentNamedBefore's repeated
+	// full-file scans with one lazy source index. The earliest declaration is
+	// sufficient because the query only asks whether any matching declaration
+	// starts before a wrapper call.
+	knownSiblingPositions map[string]int
+	knownSiblingsIndexed  bool
 }
 
 // addComponent registers `node` in the component registry, deduping on the
@@ -385,7 +424,7 @@ func hasTranspilerNameForClass(node *ast.Node) bool {
 func (w *nodeWalker) outermostWrapperCall(fn *ast.Node) *ast.Node {
 	cur := reactutil.SkipExpressionWrappersUp(fn)
 	if cur == nil || cur.Kind != ast.KindCallExpression ||
-		!reactutil.MatchesAnyComponentWrapperWithChecker(cur, fn, w.wrappers, w.pragma, w.tc) {
+		!w.matchesComponentWrapper(cur, fn) {
 		return nil
 	}
 	for {
@@ -393,11 +432,112 @@ func (w *nodeWalker) outermostWrapperCall(fn *ast.Node) *ast.Node {
 		if next == nil || next.Kind != ast.KindCallExpression {
 			return cur
 		}
-		if !reactutil.MatchesAnyComponentWrapperWithChecker(next, cur, w.wrappers, w.pragma, w.tc) {
+		if !w.matchesComponentWrapper(next, cur) {
 			return cur
 		}
 		cur = next
 	}
+}
+
+func (w *nodeWalker) matchesComponentWrapper(call, fn *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	arguments := call.AsCallExpression().Arguments
+	if arguments == nil || len(arguments.Nodes) == 0 || reactutil.SkipExpressionWrappers(arguments.Nodes[0]) != fn {
+		return false
+	}
+	entry := w.wrapperCalls[call]
+	if entry.matchesConfigured != 0 {
+		return entry.matchesConfigured == boolCacheTrue
+	}
+	matched := reactutil.MatchesAnyComponentWrapperWithChecker(call, fn, w.wrappers, w.pragma, w.tc)
+	if w.wrapperCalls == nil {
+		w.wrapperCalls = make(map[*ast.Node]wrapperCallCacheEntry)
+	}
+	if matched {
+		entry.matchesConfigured = boolCacheTrue
+	} else {
+		entry.matchesConfigured = boolCacheFalse
+	}
+	w.wrapperCalls[call] = entry
+	return matched
+}
+
+func (w *nodeWalker) wrapperWrapsKnownSiblingComponent(call, fn *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	callExpression := call.AsCallExpression()
+	if callExpression.Arguments == nil || len(callExpression.Arguments.Nodes) == 0 ||
+		reactutil.SkipExpressionWrappers(callExpression.Arguments.Nodes[0]) != fn {
+		return false
+	}
+	entry := w.wrapperCalls[call]
+	if entry.wrapsSibling != 0 {
+		return entry.wrapsSibling == boolCacheTrue
+	}
+
+	matched := false
+	callee := reactutil.SkipExpressionWrappers(callExpression.Expression)
+	if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
+		if tag := reactutil.ReturnedJSXRootTagName(fn); tag != "" {
+			w.indexKnownSiblingComponents()
+			if pos, ok := w.knownSiblingPositions[tag]; ok && pos < call.Pos() {
+				matched = true
+			}
+		}
+	}
+	if w.wrapperCalls == nil {
+		w.wrapperCalls = make(map[*ast.Node]wrapperCallCacheEntry)
+	}
+	if matched {
+		entry.wrapsSibling = boolCacheTrue
+	} else {
+		entry.wrapsSibling = boolCacheFalse
+	}
+	w.wrapperCalls[call] = entry
+	return matched
+}
+
+func (w *nodeWalker) indexKnownSiblingComponents() {
+	if w.knownSiblingsIndexed {
+		return
+	}
+	w.knownSiblingsIndexed = true
+
+	record := func(name *ast.Node, declaration *ast.Node) {
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return
+		}
+		text := name.AsIdentifier().Text
+		pos := declaration.Pos()
+		if previous, ok := w.knownSiblingPositions[text]; !ok || pos < previous {
+			if w.knownSiblingPositions == nil {
+				w.knownSiblingPositions = make(map[string]int)
+			}
+			w.knownSiblingPositions[text] = pos
+		}
+	}
+
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindClassDeclaration:
+			record(node.Name(), node)
+		case ast.KindVariableDeclaration:
+			declaration := node.AsVariableDeclaration()
+			if declaration.Initializer != nil {
+				initializer := reactutil.SkipExpressionWrappers(declaration.Initializer)
+				if initializer != nil && initializer.Kind == ast.KindArrowFunction {
+					record(declaration.Name(), node)
+				}
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	w.ctx.SourceFile.Node.ForEachChild(visit)
 }
 
 // bindingNameForFunctionLike returns the binding-identifier name of the
@@ -566,12 +706,12 @@ func (w *nodeWalker) recordTopBinding(name string, init *ast.Node) {
 }
 
 // resolveAndMarkComponentRef tries to resolve `obj` (the receiver of a
-// `.displayName` property access) to a registered component via the
-// TypeChecker, and marks the component's `hasDisplayName` when found.
-// Returns true on a successful match. Always returns false when the
-// TypeChecker is nil — callers must fall back to the syntactic indexes
-// (`nameToComponent` / `topBindings`) in that case, which is the design
-// for non-type-aware rule runs.
+// `.displayName` property access) to a registered component via the shared
+// reference store, with the TypeChecker as a fallback, and marks the
+// component's `hasDisplayName` when found. The binder-backed common path
+// avoids a checker round trip for local component bindings. When neither is
+// available, callers fall back to the syntactic indexes
+// (`nameToComponent` / `topBindings`).
 //
 // Resolution rules — checked in order against `obj`'s value declaration:
 //
@@ -584,12 +724,19 @@ func (w *nodeWalker) recordTopBinding(name string, init *ast.Node) {
 //     CallExpression and the inner ObjectLiteralExpression argument is
 //     the registered component.
 //
-// All TC accesses are guarded — `w.tc == nil` short-circuits to false.
+// All semantic accesses are guarded; a nil reference store and checker
+// short-circuit to false.
 func (w *nodeWalker) resolveAndMarkComponentRef(obj *ast.Node) bool {
-	if w.tc == nil || obj == nil || obj.Kind != ast.KindIdentifier {
+	if obj == nil || obj.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := w.tc.GetSymbolAtLocation(obj)
+	var symbol *ast.Symbol
+	if w.ctx.Refs != nil {
+		symbol = w.ctx.Refs.Resolve(obj)
+	}
+	if symbol == nil && w.tc != nil {
+		symbol = w.tc.GetSymbolAtLocation(obj)
+	}
 	if symbol == nil {
 		return false
 	}
@@ -776,12 +923,12 @@ func (w *nodeWalker) classifyAndRegisterFunctionLike(n *ast.Node) {
 	}
 	directParent := reactutil.SkipExpressionWrappersUp(n)
 	directInWrapper := directParent != nil && directParent.Kind == ast.KindCallExpression &&
-		reactutil.MatchesAnyComponentWrapperWithChecker(directParent, n, w.wrappers, w.pragma, w.tc)
+		w.matchesComponentWrapper(directParent, n)
 	// Wrap-known-sibling gate: when the outer wrapper call returns JSX
 	// whose root tag names a sibling/outer detected component, upstream's
 	// `isPragmaComponentWrapper` short-circuits to false. The inner
 	// FunctionLike is then NOT a component.
-	if directInWrapper && reactutil.WrapperWrapsKnownSiblingComponent(directParent, n) {
+	if directInWrapper && w.wrapperWrapsKnownSiblingComponent(directParent, n) {
 		return
 	}
 	classifies := reactutil.IsStatelessReactComponentWithWrappers(n, w.pragma, w.tc, w.wrappers)
@@ -821,10 +968,10 @@ func (w *nodeWalker) classifyAndRegisterCallExpression(n *ast.Node) {
 	if inner == nil || !reactutil.IsFunctionLikeForComponent(inner) {
 		return
 	}
-	if !reactutil.MatchesAnyComponentWrapperWithChecker(n, inner, w.wrappers, w.pragma, w.tc) {
+	if !w.matchesComponentWrapper(n, inner) {
 		return
 	}
-	if reactutil.WrapperWrapsKnownSiblingComponent(n, inner) {
+	if w.wrapperWrapsKnownSiblingComponent(n, inner) {
 		return
 	}
 	// When the call is itself nested inside another wrapper, redirect to
@@ -988,12 +1135,12 @@ func (w *nodeWalker) collect() {
 			if inner.Kind != ast.KindFunctionExpression && inner.Kind != ast.KindArrowFunction {
 				break
 			}
-			if !reactutil.MatchesAnyComponentWrapperWithChecker(n, inner, w.wrappers, w.pragma, w.tc) {
+			if !w.matchesComponentWrapper(n, inner) {
 				break
 			}
 			isWrappedInAnother := false
 			if outer := reactutil.SkipExpressionWrappersUp(n); outer != nil && outer.Kind == ast.KindCallExpression {
-				if reactutil.MatchesAnyComponentWrapperWithChecker(outer, n, w.wrappers, w.pragma, w.tc) {
+				if w.matchesComponentWrapper(outer, n) {
 					isWrappedInAnother = true
 				}
 			}
@@ -1119,14 +1266,14 @@ func (w *nodeWalker) isShadowedComponent(node *ast.Node) bool {
 	if callee.Kind == ast.KindPropertyAccessExpression {
 		obj := ast.SkipParentheses(callee.AsPropertyAccessExpression().Expression)
 		if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "React" {
-			return isIdentifierShadowed(node, "React")
+			return w.isIdentifierShadowed(node, "React")
 		}
 		return false
 	}
 	if callee.Kind == ast.KindIdentifier {
 		text := callee.AsIdentifier().Text
 		if text == "memo" || text == "forwardRef" {
-			return isIdentifierShadowed(node, text)
+			return w.isIdentifierShadowed(node, text)
 		}
 	}
 	return false
@@ -1150,26 +1297,79 @@ func (w *nodeWalker) isShadowedComponent(node *ast.Node) bool {
 //     would over-suppress.
 //
 // Keep the bespoke walk to preserve byte-for-byte alignment with upstream.
-func isIdentifierShadowed(node *ast.Node, name string) bool {
+func (w *nodeWalker) isIdentifierShadowed(node *ast.Node, name string) bool {
 	cur := node
 	for cur.Parent != nil {
 		cur = cur.Parent
 		if ast.IsFunctionLike(cur) {
-			if body := cur.Body(); body != nil && bodyHasVariableDeclaration(body, name) {
+			if body := cur.Body(); body != nil && w.bodyBindsWrapperName(body, name) {
 				return true
 			}
-			if functionParamsBindName(cur, name) {
+			if w.functionParamsBindWrapperName(cur, name) {
 				return true
 			}
 			continue
 		}
 		if cur.Kind == ast.KindBlock {
-			if bodyHasVariableDeclaration(cur, name) {
+			if w.bodyBindsWrapperName(cur, name) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func wrapperNameBit(name string) uint8 {
+	switch name {
+	case "React":
+		return 1 << 0
+	case "memo":
+		return 1 << 1
+	case "forwardRef":
+		return 1 << 2
+	default:
+		return 0
+	}
+}
+
+func (w *nodeWalker) bodyBindsWrapperName(body *ast.Node, name string) bool {
+	bit := wrapperNameBit(name)
+	if bit == 0 {
+		return bodyHasVariableDeclaration(body, name)
+	}
+	entry := w.shadowBindings[body]
+	if entry.bodyChecked&bit != 0 {
+		return entry.bodyBound&bit != 0
+	}
+	entry.bodyChecked |= bit
+	if bodyHasVariableDeclaration(body, name) {
+		entry.bodyBound |= bit
+	}
+	if w.shadowBindings == nil {
+		w.shadowBindings = make(map[*ast.Node]shadowBindingCacheEntry)
+	}
+	w.shadowBindings[body] = entry
+	return entry.bodyBound&bit != 0
+}
+
+func (w *nodeWalker) functionParamsBindWrapperName(fn *ast.Node, name string) bool {
+	bit := wrapperNameBit(name)
+	if bit == 0 {
+		return functionParamsBindName(fn, name)
+	}
+	entry := w.shadowBindings[fn]
+	if entry.paramChecked&bit != 0 {
+		return entry.paramBound&bit != 0
+	}
+	entry.paramChecked |= bit
+	if functionParamsBindName(fn, name) {
+		entry.paramBound |= bit
+	}
+	if w.shadowBindings == nil {
+		w.shadowBindings = make(map[*ast.Node]shadowBindingCacheEntry)
+	}
+	w.shadowBindings[fn] = entry
+	return entry.paramBound&bit != 0
 }
 
 // bodyHasVariableDeclaration mirrors upstream's `hasVariableDeclaration`
@@ -1312,10 +1512,10 @@ func (w *nodeWalker) isNestedMemo(node *ast.Node) bool {
 		return false
 	}
 	innerFn := reactutil.SkipExpressionWrappers(innerInnerArg.Arguments.Nodes[0])
-	if !reactutil.MatchesAnyComponentWrapperWithChecker(first, innerFn, w.wrappers, w.pragma, w.tc) {
+	if !w.matchesComponentWrapper(first, innerFn) {
 		return false
 	}
-	return reactutil.MatchesAnyComponentWrapperWithChecker(node, first, w.wrappers, w.pragma, w.tc)
+	return w.matchesComponentWrapper(node, first)
 }
 
 // DisplayNameRule is the registered rule. Use the `react/` prefix in
