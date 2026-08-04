@@ -2,14 +2,12 @@ package no_duplicates
 
 import (
 	_ "embed"
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -46,54 +44,59 @@ var NoDuplicatesRule = rule.Rule{
 		}
 
 		sourceText := sourceFile.Text()
+		resolver := importResolver{
+			ctx:        ctx,
+			opts:       opts,
+			sourceText: sourceText,
+		}
 
 		// ESLint groups imports by parent scope (n.parent), so imports inside
 		// `declare module` blocks are checked independently from top-level imports.
-		// We replicate this by processing each scope's statements separately.
-		processScope(ctx, sourceFile.Statements.Nodes, opts, sourceText)
-
-		// Recursively process imports inside `declare module` / `declare namespace` blocks.
-		walkModuleDeclarations(ctx, sourceFile.Statements.Nodes, opts, sourceText)
+		// processScope recursively handles those independent statement lists.
+		processScope(&resolver, sourceFile.Statements.Nodes)
 
 		return rule.RuleListeners{}
 	},
 }
 
-// walkModuleDeclarations recursively finds ModuleDeclaration nodes and processes
-// their body statements as independent scopes.
-func walkModuleDeclarations(ctx rule.RuleContext, statements []*ast.Node, opts ruleOptions, sourceText string) {
-	for _, stmt := range statements {
-		if stmt.Kind != ast.KindModuleDeclaration {
-			continue
-		}
-		body := stmt.AsModuleDeclaration().Body
-		if body == nil {
-			continue
-		}
-		// ModuleDeclaration body can be a ModuleBlock or another ModuleDeclaration (nested namespaces).
-		switch body.Kind {
-		case ast.KindModuleBlock:
-			blockStatements := body.AsModuleBlock().Statements
-			if blockStatements != nil && len(blockStatements.Nodes) > 0 {
-				processScope(ctx, blockStatements.Nodes, opts, sourceText)
-				walkModuleDeclarations(ctx, blockStatements.Nodes, opts, sourceText)
-			}
-		case ast.KindModuleDeclaration:
-			// `declare module A.B { ... }` nests as ModuleDeclaration → ModuleDeclaration → ModuleBlock
-			walkModuleDeclarations(ctx, []*ast.Node{body}, opts, sourceText)
-		}
-	}
+type importCategory uint8
+
+const (
+	valueImport importCategory = iota
+	namespaceImport
+	defaultTypeImport
+	namedTypeImport
+	importCategoryCount
+)
+
+type importMap struct {
+	entries map[string]importEntry
+	groups  []duplicateGroup
+}
+
+type importEntry struct {
+	first      *ast.Node
+	groupIndex int // one-based index into importMap.groups; zero means unique
+}
+
+type duplicateGroup struct {
+	module string
+	first  *ast.Node
+	rest   []*ast.Node
 }
 
 // processScope collects and checks duplicate imports within a single scope (statement list).
-func processScope(ctx rule.RuleContext, statements []*ast.Node, opts ruleOptions, sourceText string) {
-	// Four maps mirror the ESLint rule's import categorization.
-	imported := make(map[string][]*ast.Node)
-	nsImported := make(map[string][]*ast.Node)
-	defaultTypesImported := make(map[string][]*ast.Node)
-	namedTypesImported := make(map[string][]*ast.Node)
+func processScope(resolver *importResolver, statements []*ast.Node) {
+	// The four categories mirror the ESLint rule's import maps. Maps are
+	// allocated lazily because most scopes use only one category (or none).
+	var imports [importCategoryCount]importMap
+	var moduleDeclarations []*ast.Node
 
 	for _, stmt := range statements {
+		if stmt.Kind == ast.KindModuleDeclaration {
+			moduleDeclarations = append(moduleDeclarations, stmt)
+			continue
+		}
 		if stmt.Kind != ast.KindImportDeclaration {
 			continue
 		}
@@ -103,19 +106,62 @@ func processScope(ctx rule.RuleContext, statements []*ast.Node, opts ruleOptions
 			continue
 		}
 
-		resolvedPath := resolveImportPath(importDecl.ModuleSpecifier, ctx, opts, sourceText)
+		resolvedPath := resolver.resolve(importDecl)
 		if resolvedPath == "" {
 			continue
 		}
 
-		importMap := getImportMap(importDecl, opts, imported, nsImported, defaultTypesImported, namedTypesImported)
-		importMap[resolvedPath] = append(importMap[resolvedPath], stmt)
+		category := getImportCategory(importDecl, resolver.opts)
+		importMap := &imports[category]
+		if importMap.entries == nil {
+			importMap.entries = make(map[string]importEntry)
+		}
+
+		entry, exists := importMap.entries[resolvedPath]
+		if !exists {
+			importMap.entries[resolvedPath] = importEntry{first: stmt}
+			continue
+		}
+		if entry.groupIndex == 0 {
+			importMap.groups = append(importMap.groups, duplicateGroup{
+				module: resolvedPath,
+				first:  entry.first,
+				rest:   []*ast.Node{stmt},
+			})
+			entry.groupIndex = len(importMap.groups)
+			importMap.entries[resolvedPath] = entry
+			continue
+		}
+		group := &importMap.groups[entry.groupIndex-1]
+		group.rest = append(group.rest, stmt)
 	}
 
-	checkImports(ctx, imported, sourceText, opts)
-	checkImports(ctx, nsImported, sourceText, opts)
-	checkImports(ctx, defaultTypesImported, sourceText, opts)
-	checkImports(ctx, namedTypesImported, sourceText, opts)
+	for i := range imports {
+		checkImports(resolver, imports[i])
+	}
+
+	for _, declaration := range moduleDeclarations {
+		processModuleDeclaration(resolver, declaration)
+	}
+}
+
+// processModuleDeclaration follows dotted namespace declarations until their
+// module block, then processes that block as its own import scope.
+func processModuleDeclaration(resolver *importResolver, declaration *ast.Node) {
+	body := declaration.AsModuleDeclaration().Body
+	if body == nil {
+		return
+	}
+	switch body.Kind {
+	case ast.KindModuleBlock:
+		blockStatements := body.AsModuleBlock().Statements
+		if blockStatements != nil && len(blockStatements.Nodes) > 0 {
+			processScope(resolver, blockStatements.Nodes)
+		}
+	case ast.KindModuleDeclaration:
+		// `declare module A.B { ... }` nests as ModuleDeclaration → ModuleDeclaration → ModuleBlock.
+		processModuleDeclaration(resolver, body)
+	}
 }
 
 // getModuleSpecifierText returns the string content of a module specifier node.
@@ -146,35 +192,47 @@ func getModuleSpecifierText(moduleSpecifier *ast.Node, sourceText string) string
 	return raw
 }
 
-// resolveImportPath resolves the module specifier to a canonical path for grouping.
-// When considerQueryString is true, query strings are preserved so that
-// `./mod?a` and `./mod?b` are treated as different modules.
-// When false (default), query strings are stripped for comparison.
-func resolveImportPath(moduleSpecifier *ast.Node, ctx rule.RuleContext, opts ruleOptions, sourceText string) string {
+type importResolver struct {
+	ctx            rule.RuleContext
+	opts           ruleOptions
+	sourceText     string
+	normalMode     core.ResolutionMode
+	hasNormalMode  bool
+	commentsKnown  bool
+	hasComments    bool
+	commentFactory *ast.NodeFactory
+}
+
+// resolve returns the canonical grouping path for an import. Resolution mode
+// is identical for ordinary import declarations in one source file, so it is
+// computed once. Type-only declarations with a resolution-mode override keep
+// their per-declaration mode.
+func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) string {
+	moduleSpecifier := importDecl.ModuleSpecifier
 	if moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return ""
 	}
 
-	sourcePath := getModuleSpecifierText(moduleSpecifier, sourceText)
+	sourcePath := getModuleSpecifierText(moduleSpecifier, r.sourceText)
 
-	if opts.considerQueryString {
+	if r.opts.considerQueryString {
 		idx := strings.Index(sourcePath, "?")
 		if idx >= 0 {
 			query := sourcePath[idx:]
-			if resolved, ok := utils.Resolve(moduleSpecifier, ctx); ok && resolved != "" {
+			if resolved, ok := r.resolveModule(importDecl, moduleSpecifier); ok {
 				return resolved + query
 			}
 			return sourcePath[:idx] + query
 		}
 	}
 
-	if resolved, ok := utils.Resolve(moduleSpecifier, ctx); ok && resolved != "" {
+	if resolved, ok := r.resolveModule(importDecl, moduleSpecifier); ok {
 		return resolved
 	}
 
 	// Strip query strings when not considering them, so `./bar?a` and `./bar?b`
 	// map to the same key.
-	if !opts.considerQueryString {
+	if !r.opts.considerQueryString {
 		if idx := strings.Index(sourcePath, "?"); idx >= 0 {
 			return sourcePath[:idx]
 		}
@@ -182,17 +240,49 @@ func resolveImportPath(moduleSpecifier *ast.Node, ctx rule.RuleContext, opts rul
 	return sourcePath
 }
 
-// getImportMap determines which import map an ImportDeclaration should be routed to,
-// mirroring the ESLint rule's `getImportMap` function.
-func getImportMap(
-	importDecl *ast.ImportDeclaration,
-	opts ruleOptions,
-	imported, nsImported, defaultTypesImported, namedTypesImported map[string][]*ast.Node,
-) map[string][]*ast.Node {
+func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, moduleSpecifier *ast.Node) (string, bool) {
+	if r.ctx.Program == nil {
+		return "", false
+	}
+
+	mode := r.normalMode
+	hasOverride := false
+	if importDecl.ImportClause != nil && importDecl.ImportClause.AsImportClause().IsTypeOnly() && importDecl.Attributes != nil {
+		mode, hasOverride = importDecl.Attributes.GetResolutionModeOverride()
+	}
+	if !hasOverride && !r.hasNormalMode {
+		mode = r.ctx.Program.GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)
+		r.normalMode = mode
+		r.hasNormalMode = true
+	}
+
+	resolved := r.ctx.Program.GetResolvedModule(r.ctx.SourceFile, moduleSpecifier.Text(), mode)
+	if resolved == nil || resolved.ResolvedFileName == "" {
+		return "", false
+	}
+	return resolved.ResolvedFileName, true
+}
+
+func (r *importResolver) hasProblematicComments(node *ast.Node) bool {
+	if !r.commentsKnown {
+		r.commentsKnown = true
+		r.hasComments = strings.Contains(r.sourceText, "//") || strings.Contains(r.sourceText, "/*")
+	}
+	if !r.hasComments {
+		return false
+	}
+	if r.commentFactory == nil {
+		r.commentFactory = &ast.NodeFactory{}
+	}
+	return hasProblematicComments(node, r.sourceText, r.ctx.SourceFile, r.commentFactory)
+}
+
+// getImportCategory mirrors the ESLint rule's `getImportMap` routing.
+func getImportCategory(importDecl *ast.ImportDeclaration, opts ruleOptions) importCategory {
 	clause := importDecl.ImportClause
 	if clause == nil {
 		// Side-effect-only import: `import './foo'`
-		return imported
+		return valueImport
 	}
 
 	importClause := clause.AsImportClause()
@@ -201,21 +291,21 @@ func getImportMap(
 		// `import type X from ...` → defaultTypesImported
 		// `import type {X} from ...` → namedTypesImported
 		if importClause.Name() != nil && importClause.NamedBindings == nil {
-			return defaultTypesImported
+			return defaultTypeImport
 		}
-		return namedTypesImported
+		return namedTypeImport
 	}
 
 	// `import { type x } from './foo'` → namedTypesImported (when not prefer-inline)
 	if !opts.preferInline && hasInlineTypeSpecifiers(importClause) {
-		return namedTypesImported
+		return namedTypeImport
 	}
 
 	if importClause.NamedBindings != nil && ast.IsNamespaceImport(importClause.NamedBindings) {
-		return nsImported
+		return namespaceImport
 	}
 
-	return imported
+	return valueImport
 }
 
 // hasInlineTypeSpecifiers checks if any import specifier has the inline `type` modifier
@@ -287,128 +377,100 @@ func isTypeOnlyImport(node *ast.Node) bool {
 func makeMessage(module string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noDuplicates",
-		Description: fmt.Sprintf("'%s' imported multiple times.", module),
+		Description: "'" + module + "' imported multiple times.",
 	}
 }
 
 // checkImports reports errors for every module that has more than one import.
 // The autofix (if applicable) is attached to the first import; all others get plain reports.
 // Groups are reported in document order (by position of first import in each group).
-func checkImports(ctx rule.RuleContext, importMap map[string][]*ast.Node, text string, opts ruleOptions) {
-	// Collect groups that have duplicates.
-	type group struct {
-		module string
-		nodes  []*ast.Node
-	}
-	var groups []group
-	for module, nodes := range importMap {
-		if len(nodes) > 1 {
-			groups = append(groups, group{module, nodes})
-		}
-	}
-
+func checkImports(resolver *importResolver, imports importMap) {
 	// Sort by position of the first import to ensure deterministic, document-order output.
-	slices.SortFunc(groups, func(a, b group) int {
-		return a.nodes[0].Pos() - b.nodes[0].Pos()
+	slices.SortFunc(imports.groups, func(a, b duplicateGroup) int {
+		return a.first.Pos() - b.first.Pos()
 	})
 
-	for _, g := range groups {
+	for _, g := range imports.groups {
 		msg := makeMessage(g.module)
-		first := g.nodes[0]
-		rest := g.nodes[1:]
 
-		firstSource := first.AsImportDeclaration().ModuleSpecifier
-		ctx.ReportNodeWithDeferredFixes(firstSource, msg, func() []rule.RuleFix {
-			return getFix(ctx, first, rest, text, opts)
+		firstSource := g.first.AsImportDeclaration().ModuleSpecifier
+		resolver.ctx.ReportNodeWithDeferredFixes(firstSource, msg, func() []rule.RuleFix {
+			return getFix(resolver, g.first, g.rest)
 		})
 
-		for _, node := range rest {
-			ctx.ReportNode(node.AsImportDeclaration().ModuleSpecifier, msg)
+		for _, node := range g.rest {
+			resolver.ctx.ReportNode(node.AsImportDeclaration().ModuleSpecifier, msg)
 		}
 	}
 }
 
 type specifierInfo struct {
-	importNode  *ast.Node
-	identifiers []string // raw identifier text segments split by ","
-	isEmpty     bool     // true when braces contain no actual specifiers (e.g., `import {} from ...`)
+	importNode     *ast.Node
+	identifiersRaw string // raw identifier text between `{` and `}`
+	isEmpty        bool   // true when braces contain no actual specifiers (e.g., `import {} from ...`)
 }
 
 // getFix builds autofix operations to merge duplicate imports into the first one.
 // Returns nil when autofix is not possible (comments, namespace imports, conflicting defaults).
-func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string, opts ruleOptions) []rule.RuleFix {
-	sourceFile := ctx.SourceFile
+func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.RuleFix {
+	text := resolver.sourceText
+	opts := resolver.opts
 
 	// Bail: first import has comments or is a namespace import.
-	if hasProblematicComments(first, text, sourceFile) || hasNamespaceImport(first) {
+	if hasNamespaceImport(first) || resolver.hasProblematicComments(first) {
 		return nil
 	}
 
 	// Bail: multiple different default import names (user must choose which to keep).
-	defaultNames := make(map[string]bool)
-	if name := getDefaultImportName(first); name != "" {
-		defaultNames[name] = true
-	}
+	firstDefaultName := getDefaultImportName(first)
+	defaultImportName := firstDefaultName
 	for _, node := range rest {
 		if name := getDefaultImportName(node); name != "" {
-			defaultNames[name] = true
-		}
-	}
-	if len(defaultNames) > 1 {
-		return nil
-	}
-
-	// Skip rest nodes with comments or namespace imports — they can't be auto-merged.
-	var restWithoutComments []*ast.Node
-	for _, node := range rest {
-		if !hasProblematicComments(node, text, sourceFile) && !hasNamespaceImport(node) {
-			restWithoutComments = append(restWithoutComments, node)
+			if defaultImportName != "" && name != defaultImportName {
+				return nil
+			}
+			defaultImportName = name
 		}
 	}
 
-	// Collect specifier text from each mergeable rest import that has named bindings.
+	// Collect named specifiers and removable side-effect/default imports in one
+	// pass. Imports with comments or namespace bindings stay untouched.
 	var specifiers []specifierInfo
-	for _, node := range restWithoutComments {
+	var unnecessaryImports []*ast.Node
+	for _, node := range rest {
+		if hasNamespaceImport(node) || resolver.hasProblematicComments(node) {
+			continue
+		}
+
 		importDecl := node.AsImportDeclaration()
 		if importDecl.ImportClause == nil {
+			unnecessaryImports = append(unnecessaryImports, node)
 			continue
 		}
 		clause := importDecl.ImportClause.AsImportClause()
 		if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
+			unnecessaryImports = append(unnecessaryImports, node)
 			continue
 		}
 
 		openBrace, closeBrace := findBraces(node, text)
 		if openBrace < 0 || closeBrace < 0 {
+			namedImports := clause.NamedBindings.AsNamedImports()
+			if namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0 {
+				unnecessaryImports = append(unnecessaryImports, node)
+			}
 			continue
 		}
 
+		namedImports := clause.NamedBindings.AsNamedImports()
 		specifiers = append(specifiers, specifierInfo{
-			importNode:  node,
-			identifiers: strings.Split(text[openBrace+1:closeBrace], ","),
-			isEmpty:     !hasNamedSpecifiers(node),
+			importNode:     node,
+			identifiersRaw: text[openBrace+1 : closeBrace],
+			isEmpty:        namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0,
 		})
 	}
 
-	// Unnecessary imports: no named specifiers, no namespace — pure side-effect or redundant default.
-	var unnecessaryImports []*ast.Node
-	for _, node := range restWithoutComments {
-		if hasNamedSpecifiers(node) || hasNamespaceImport(node) {
-			continue
-		}
-		isSpecifier := false
-		for _, s := range specifiers {
-			if s.importNode == node {
-				isSpecifier = true
-				break
-			}
-		}
-		if !isSpecifier {
-			unnecessaryImports = append(unnecessaryImports, node)
-		}
-	}
-
-	shouldAddDefault := getDefaultImportName(first) == "" && len(defaultNames) == 1
+	shouldAddDefault := firstDefaultName == "" && defaultImportName != ""
 	shouldAddSpecifiers := len(specifiers) > 0
 	shouldRemoveUnnecessary := len(unnecessaryImports) > 0
 
@@ -424,7 +486,7 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 
 	existingIdentifiers := make(map[string]bool)
 	if firstOpenBrace >= 0 && firstCloseBrace >= 0 && !firstIsEmpty {
-		for _, id := range strings.Split(text[firstOpenBrace+1:firstCloseBrace], ",") {
+		for id := range strings.SplitSeq(text[firstOpenBrace+1:firstCloseBrace], ",") {
 			if trimmed := strings.TrimSpace(id); trimmed != "" {
 				existingIdentifiers[trimmed] = true
 			}
@@ -434,9 +496,12 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 	}
 
 	// Snapshot of first import's specifiers before merge (for prefer-inline conversion).
-	firstSpecifierNames := make(map[string]bool, len(existingIdentifiers))
-	for k := range existingIdentifiers {
-		firstSpecifierNames[k] = true
+	var firstSpecifierNames map[string]bool
+	if opts.preferInline && isTypeOnlyImport(first) {
+		firstSpecifierNames = make(map[string]bool, len(existingIdentifiers))
+		for k := range existingIdentifiers {
+			firstSpecifierNames[k] = true
+		}
 	}
 
 	// Build specifiersText following ESLint's reduce pattern:
@@ -446,39 +511,30 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 
 	for _, spec := range specifiers {
 		isTypeSpec := isTypeOnlyImport(spec.importNode)
+		wroteSpecifier := false
 
-		// Build text for this specifier's identifiers, deduplicating.
-		var specTextBuf strings.Builder
-		for _, id := range spec.identifiers {
+		// Append this import's identifiers directly, deduplicating as we go.
+		for id := range strings.SplitSeq(spec.identifiersRaw, ",") {
 			trimmed := strings.TrimSpace(id)
 			if trimmed == "" || existingIdentifiers[trimmed] {
 				continue
 			}
 			existingIdentifiers[trimmed] = true
 
-			curWithType := id
+			if wroteSpecifier {
+				specBuf.WriteByte(',')
+			} else if needsComma && !spec.isEmpty {
+				specBuf.WriteByte(',')
+			}
+
 			if opts.preferInline && isTypeSpec {
-				curWithType = "type " + trimmed
+				specBuf.WriteString("type ")
+				specBuf.WriteString(trimmed)
+			} else {
+				specBuf.WriteString(id)
 			}
-
-			if specTextBuf.Len() > 0 {
-				specTextBuf.WriteString(",")
-			}
-			specTextBuf.WriteString(curWithType)
+			wroteSpecifier = true
 		}
-
-		specText := specTextBuf.String()
-		if specText == "" {
-			if !spec.isEmpty {
-				needsComma = true
-			}
-			continue
-		}
-
-		if needsComma && !spec.isEmpty {
-			specBuf.WriteString(",")
-		}
-		specBuf.WriteString(specText)
 
 		if !spec.isEmpty {
 			needsComma = true
@@ -489,8 +545,15 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 
 	// --- Build fix operations ---
 
-	var fixes []rule.RuleFix
 	firstDecl := first.AsImportDeclaration()
+	fixCapacity := len(specifiers) + len(unnecessaryImports) + 2
+	if shouldAddSpecifiers && opts.preferInline && isTypeOnlyImport(first) && firstDecl.ImportClause != nil {
+		bindings := firstDecl.ImportClause.AsImportClause().NamedBindings
+		if bindings != nil && bindings.Kind == ast.KindNamedImports && bindings.AsNamedImports().Elements != nil {
+			fixCapacity += len(bindings.AsNamedImports().Elements.Nodes)
+		}
+	}
+	fixes := make([]rule.RuleFix, 0, fixCapacity)
 	firstTrimmedPos := scanner.SkipTrivia(text, first.Pos())
 	importKeywordEnd := firstTrimmedPos + len("import")
 
@@ -524,34 +587,25 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 		}
 	}
 
-	// Determine the default import name to add (if any).
-	var defaultImportName string
-	if shouldAddDefault {
-		for name := range defaultNames {
-			defaultImportName = name
-			break
-		}
-	}
-
 	// Insert specifiers / default import into the first import.
 	switch {
 	case shouldAddDefault && firstOpenBrace < 0 && shouldAddSpecifiers:
 		// `import './foo'` → `import def, {...} from './foo'`
 		fixes = append(fixes, rule.RuleFix{
 			Range: core.NewTextRange(importKeywordEnd, importKeywordEnd),
-			Text:  fmt.Sprintf(" %s, {%s} from", defaultImportName, specifiersText),
+			Text:  " " + defaultImportName + ", {" + specifiersText + "} from",
 		})
 	case shouldAddDefault && firstOpenBrace < 0 && !shouldAddSpecifiers:
 		// `import './foo'` → `import def from './foo'`
 		fixes = append(fixes, rule.RuleFix{
 			Range: core.NewTextRange(importKeywordEnd, importKeywordEnd),
-			Text:  fmt.Sprintf(" %s from", defaultImportName),
+			Text:  " " + defaultImportName + " from",
 		})
 	case shouldAddDefault && firstOpenBrace >= 0:
 		// `import {...} from './foo'` → `import def, {...} from './foo'`
 		fixes = append(fixes, rule.RuleFix{
 			Range: core.NewTextRange(importKeywordEnd, importKeywordEnd),
-			Text:  fmt.Sprintf(" %s,", defaultImportName),
+			Text:  " " + defaultImportName + ",",
 		})
 		if shouldAddSpecifiers {
 			fixes = append(fixes, rule.RuleFix{
@@ -565,13 +619,13 @@ func getFix(ctx rule.RuleContext, first *ast.Node, rest []*ast.Node, text string
 			defName := firstDecl.ImportClause.AsImportClause().Name()
 			fixes = append(fixes, rule.RuleFix{
 				Range: core.NewTextRange(defName.End(), defName.End()),
-				Text:  fmt.Sprintf(", {%s}", specifiersText),
+				Text:  ", {" + specifiersText + "}",
 			})
 		} else {
 			// `import './foo'` → `import {...} from './foo'`
 			fixes = append(fixes, rule.RuleFix{
 				Range: core.NewTextRange(importKeywordEnd, importKeywordEnd),
-				Text:  fmt.Sprintf(" {%s} from", specifiersText),
+				Text:  " {" + specifiersText + "} from",
 			})
 		}
 	case !shouldAddDefault && firstOpenBrace >= 0 && shouldAddSpecifiers:
@@ -683,21 +737,20 @@ func findTypeKeyword(node *ast.Node, text string) core.TextRange {
 // hasProblematicComments returns true when comments near the import make autofix risky.
 // This mirrors ESLint's hasProblematicComments: it checks before, after, and inside
 // the import (but outside the `{ ... }` specifier list).
-func hasProblematicComments(node *ast.Node, text string, sourceFile *ast.SourceFile) bool {
-	return hasCommentBefore(node, text, sourceFile) ||
-		hasCommentAfter(node, text, sourceFile) ||
+func hasProblematicComments(node *ast.Node, text string, sourceFile *ast.SourceFile, factory *ast.NodeFactory) bool {
+	return hasCommentBefore(node, text, sourceFile, factory) ||
+		hasCommentAfter(node, text, sourceFile, factory) ||
 		hasCommentInsideNonSpecifiers(node, text, sourceFile)
 }
 
 // hasCommentBefore returns true if a leading comment ends on the line before or
 // the same line as the import starts.
-func hasCommentBefore(node *ast.Node, text string, sourceFile *ast.SourceFile) bool {
+func hasCommentBefore(node *ast.Node, text string, sourceFile *ast.SourceFile, factory *ast.NodeFactory) bool {
 	lineStarts := sourceFile.ECMALineMap()
 	trimmedPos := scanner.SkipTrivia(text, node.Pos())
 	nodeLine := scanner.ComputeLineOfPosition(lineStarts, trimmedPos)
 
-	nodeFactory := &ast.NodeFactory{}
-	for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, text, node.Pos()) {
+	for commentRange := range scanner.GetLeadingCommentRanges(factory, text, node.Pos()) {
 		if scanner.ComputeLineOfPosition(lineStarts, commentRange.End()) >= nodeLine-1 {
 			return true
 		}
@@ -707,12 +760,11 @@ func hasCommentBefore(node *ast.Node, text string, sourceFile *ast.SourceFile) b
 
 // hasCommentAfter returns true if a trailing comment starts on the same line
 // as the import ends.
-func hasCommentAfter(node *ast.Node, text string, sourceFile *ast.SourceFile) bool {
+func hasCommentAfter(node *ast.Node, text string, sourceFile *ast.SourceFile, factory *ast.NodeFactory) bool {
 	lineStarts := sourceFile.ECMALineMap()
 	nodeEndLine := scanner.ComputeLineOfPosition(lineStarts, node.End())
 
-	nodeFactory := &ast.NodeFactory{}
-	for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, text, node.End()) {
+	for commentRange := range scanner.GetTrailingCommentRanges(factory, text, node.End()) {
 		if scanner.ComputeLineOfPosition(lineStarts, commentRange.Pos()) == nodeEndLine {
 			return true
 		}
