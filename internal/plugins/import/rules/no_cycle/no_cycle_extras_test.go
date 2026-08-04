@@ -27,6 +27,10 @@ func TestNoCycleExtras(t *testing.T) {
 			// ---- Dimension 4: string literals inside declarations are not module source literals ----
 			{Code: `class Local { method() { return "./no-cycle/depth-one"; } } ` + rootExports},
 
+			// ---- Fast ESM collection must not widen the rule to TypeScript-only module syntax ----
+			{Code: `import depthOne = require("./no-cycle/depth-one"); void depthOne; ` + rootExports},
+			{Code: `type DepthOneModule = typeof import("./no-cycle/depth-one"); ` + rootExports},
+
 			// ---- Dimension 4: `export type * from` stays type-only and does not form a graph edge ----
 			{Code: `export type * from "./no-cycle/reexport-type-only"; ` + rootExports},
 
@@ -52,6 +56,14 @@ func TestNoCycleExtras(t *testing.T) {
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": 2}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Module-augmentation bodies are not present in SourceFile.Imports and must use the full collector.
+			{
+				Code: `declare module "virtual" { import { depthOne } from "./no-cycle/depth-one"; export { depthOne }; } ` + rootExports,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "cycle", Message: messageDetected, Line: 1},
+				},
+			},
+
 			// ---- Dimension 4: parenthesized CommonJS source literals still resolve ----
 			{
 				Code:    `const common = require(("./no-cycle/commonjs-depth-one")); ` + rootExports,
