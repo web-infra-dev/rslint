@@ -115,7 +115,7 @@ var NoRestrictedMatchersRule = rule.Rule{
 				}
 
 				chain := strings.Join(jestFnCall.Members, ".")
-				reportRange, ok := jestUtils.JestFnMemberEntriesRange(jestFnCall.MemberEntries)
+				reportRange, ok := jestUtils.JestFnMemberEntriesRange(ctx.SourceFile, jestFnCall.MemberEntries)
 				if !ok {
 					return
 				}

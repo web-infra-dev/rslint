@@ -107,11 +107,18 @@ func JoinMemberEntries(entries []MemberEntry) string {
 	return strings.Join(parts, ".")
 }
 
-func MemberEntriesRange(entries []MemberEntry) (core.TextRange, bool) {
-	if len(entries) == 0 || entries[0].Node == nil || entries[len(entries)-1].Node == nil {
+// MemberEntriesRange returns the range spanning the first through the last
+// member entry. sourceFile is required because the first entry's Pos() includes
+// its leading trivia; see accessor.go.
+func MemberEntriesRange(sourceFile *ast.SourceFile, entries []MemberEntry) (core.TextRange, bool) {
+	if len(entries) == 0 || entries[len(entries)-1].Node == nil {
 		return core.TextRange{}, false
 	}
-	return core.NewTextRange(entries[0].Node.Pos(), entries[len(entries)-1].Node.End()), true
+	start, ok := AccessorRange(sourceFile, entries[0].Node)
+	if !ok {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(start.Pos(), entries[len(entries)-1].Node.End()), true
 }
 
 // ResolveFirstIdentifier walks the left side of a call/member chain and
