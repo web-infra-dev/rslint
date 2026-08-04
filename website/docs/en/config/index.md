@@ -254,13 +254,17 @@ import globals from 'globals';
 
 export default [
   {
-    files: ['**/*.ts'],
+    files: ['**/*.js'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },
   },
 ];
 ```
+
+:::tip
+TypeScript files resolve globals from the declaration files their tsconfig pulls in — `lib.dom.d.ts` for `window` and `document`, `@types/node` for `process` and `__dirname`, and any `.d.ts` in the project that declares one. Reach for `globals` on the entries covering plain JavaScript files.
+:::
 
 ### settings
 
