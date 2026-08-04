@@ -3,6 +3,9 @@ package use_isnan
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -41,8 +44,21 @@ func TestUseIsNaNRule(t *testing.T) {
 			{Code: `x === window.NaN;`},
 			{Code: `x === globalThis.NaN;`},
 			{Code: `x === Math.NaN;`},
-			{Code: `x === Number[NaN];`},          // identifier key, not string
+			{Code: `x === Number[NaN];`},           // identifier key, not string
 			{Code: `x === Number.NaN.toString();`}, // method on NaN value
+
+			// ── Local bindings are not the global NaN/Number values ──
+			{Code: `const NaN = 0; x === NaN;`},
+			{Code: `function f(NaN: number) { return x === NaN; }`},
+			{Code: `const Number = { NaN: 0 }; x === Number.NaN;`},
+			{Code: `const f = function NaN() { return x === NaN; };`},
+			{Code: `namespace Number { export const NaN = 0; } x === Number.NaN;`},
+			{Code: `const C = class Number { method() { return x === Number.NaN; } };`},
+			{Code: `function f(NaN: number) { switch (NaN) { case NaN: break; } }`},
+			{
+				Code:    `function f(Number: any) { values.indexOf(Number.NaN); }`,
+				Options: map[string]interface{}{"enforceForIndexOf": true},
+			},
 
 			// ── Sequence expression: NaN NOT last ──
 			{Code: `x === (NaN, 1);`},
@@ -51,7 +67,7 @@ func TestUseIsNaNRule(t *testing.T) {
 			{Code: `x === (Number.NaN, 1);`},
 
 			// ── Nested comma: only ONE level resolved (matches ESLint) ──
-			{Code: `x === (a, (b, NaN));`},         // nested comma → not resolved
+			{Code: `x === (a, (b, NaN));`}, // nested comma → not resolved
 			{Code: `x === (a, (b, Number.NaN));`},
 
 			// ── switch: enforceForSwitchCase: false ──
@@ -250,6 +266,22 @@ func TestUseIsNaNRule(t *testing.T) {
 			{
 				Code:   "x === Number[`NaN`];",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "comparisonWithNaN", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `x === (Number).NaN;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "comparisonWithNaN", Line: 1, Column: 1}},
+			},
+			{
+				Code: `{
+  const NaN = 0;
+  x === NaN;
+}
+x === NaN;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "comparisonWithNaN", Line: 5, Column: 1}},
+			},
+			{
+				Code:   `interface Number {} x === Number.NaN;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "comparisonWithNaN"}},
 			},
 
 			// ════════════════════════════════════════
@@ -647,4 +679,28 @@ func TestUseIsNaNRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestSourceMayUseNaN(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "unrelated source", code: `value === other`, want: false},
+		{name: "global identifier", code: `value === NaN`, want: true},
+		{name: "escaped identifier", code: `value === N\u0061N`, want: true},
+		{name: "computed Number property", code: `value === Number["NaN"]`, want: true},
+		{name: "string only", code: `value === "NaN"`, want: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/source.ts",
+				Path:     "/source.ts",
+			}, testCase.code, core.ScriptKindTS)
+			if got := sourceMayUseNaN(sourceFile); got != testCase.want {
+				t.Fatalf("sourceMayUseNaN() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
 }

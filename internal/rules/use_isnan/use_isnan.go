@@ -1,11 +1,32 @@
 package use_isnan
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+var (
+	comparisonWithNaNMessage = rule.RuleMessage{
+		Id:          "comparisonWithNaN",
+		Description: "Use the isNaN function to compare with NaN.",
+	}
+	switchNaNMessage = rule.RuleMessage{
+		Id:          "switchNaN",
+		Description: "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+	}
+	caseNaNMessage = rule.RuleMessage{
+		Id:          "caseNaN",
+		Description: "'case NaN' can never match. Use Number.isNaN before the switch.",
+	}
+	indexOfNaNMessage = rule.RuleMessage{
+		Id:          "indexOfNaN",
+		Description: "Array prototype method 'indexOf' cannot find NaN.",
+	}
+	lastIndexOfNaNMessage = rule.RuleMessage{
+		Id:          "indexOfNaN",
+		Description: "Array prototype method 'lastIndexOf' cannot find NaN.",
+	}
 )
 
 // unwrapToValue strips parentheses (any depth), resolves at most one level
@@ -29,10 +50,18 @@ func unwrapToValue(node *ast.Node) *ast.Node {
 	return stripped
 }
 
+type globalReferenceChecker struct {
+	refs          *rule.RefStore
+	sourceFile    *ast.SourceFile
+	bindingsReady bool
+	mayShadowNaN  bool
+	mayShadowNum  bool
+}
+
 // isNaNIdentifier checks if a node represents NaN (either as the identifier
 // "NaN" or as the member expression "Number.NaN").
-// Recursively unwraps parentheses and comma expressions to find the value.
-func isNaNIdentifier(node *ast.Node) bool {
+// Parentheses and one sequence-expression level are transparent, matching ESLint.
+func isNaNIdentifier(checker *globalReferenceChecker, node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
@@ -40,20 +69,111 @@ func isNaNIdentifier(node *ast.Node) bool {
 	nodeToCheck := unwrapToValue(node)
 
 	// Check for bare NaN identifier
-	if nodeToCheck.Kind == ast.KindIdentifier && nodeToCheck.Text() == "NaN" {
-		return true
+	if nodeToCheck.Kind == ast.KindIdentifier {
+		return nodeToCheck.AsIdentifier().Text == "NaN" && checker.isGlobalReference(nodeToCheck)
 	}
 
 	// Check for Number.NaN / Number['NaN'] / Number?.NaN / Number[`NaN`]
-	// Uses AccessExpressionStaticName + AccessExpressionObject to handle
-	// both PropertyAccessExpression and ElementAccessExpression uniformly.
-	if propName, ok := utils.AccessExpressionStaticName(nodeToCheck); ok && propName == "NaN" {
-		obj := utils.AccessExpressionObject(nodeToCheck)
-		if obj != nil && obj.Kind == ast.KindIdentifier && obj.Text() == "Number" {
+	if !isNaNProperty(nodeToCheck) {
+		return false
+	}
+	object := ast.SkipParentheses(nodeToCheck.Expression())
+	return object != nil && object.Kind == ast.KindIdentifier &&
+		object.AsIdentifier().Text == "Number" && checker.isGlobalReference(object)
+}
+
+func isNaNProperty(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		name := node.AsPropertyAccessExpression().Name()
+		return name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "NaN"
+	case ast.KindElementAccessExpression:
+		argument := utils.SkipAssertionsAndParens(node.AsElementAccessExpression().ArgumentExpression)
+		name, ok := utils.GetStaticExpressionValue(argument)
+		return ok && name == "NaN"
+	}
+	return false
+}
+
+func (checker *globalReferenceChecker) isGlobalReference(identifier *ast.Node) bool {
+	name := identifier.AsIdentifier().Text
+	if isInsideNamedExpression(identifier, name) {
+		return false
+	}
+	if checker.refs == nil {
+		return !utils.IsShadowed(identifier, name)
+	}
+	if !checker.mayShadow(name) {
+		return true
+	}
+	if symbol := checker.refs.Resolve(identifier); symbol != nil {
+		return !utils.IsValueSymbolDeclaredInFile(symbol, checker.sourceFile)
+	}
+	// Namespace-only bindings are outside RefStore's value lookup. Preserve a
+	// syntactic fallback for those and for parser-recovered trees.
+	return !utils.IsShadowed(identifier, name)
+}
+
+func isInsideNamedExpression(identifier *ast.Node, name string) bool {
+	for current := identifier.Parent; current != nil; current = current.Parent {
+		if current.Kind != ast.KindFunctionExpression && current.Kind != ast.KindClassExpression {
+			continue
+		}
+		expressionName := current.Name()
+		if expressionName != nil && expressionName.Kind == ast.KindIdentifier &&
+			expressionName.AsIdentifier().Text == name {
 			return true
 		}
 	}
+	return false
+}
 
+func (checker *globalReferenceChecker) mayShadow(name string) bool {
+	if !checker.bindingsReady {
+		checker.bindingsReady = true
+		for container := checker.sourceFile.AsNode(); container != nil; {
+			data := container.LocalsContainerData()
+			if data == nil {
+				break
+			}
+			if utils.IsValueSymbolDeclaredInFile(data.Locals["NaN"], checker.sourceFile) {
+				checker.mayShadowNaN = true
+			}
+			if utils.IsValueSymbolDeclaredInFile(data.Locals["Number"], checker.sourceFile) {
+				checker.mayShadowNum = true
+			}
+			container = data.NextContainer
+		}
+	}
+	if name == "NaN" {
+		return checker.mayShadowNaN
+	}
+	return checker.mayShadowNum
+}
+
+func sourceMayUseNaN(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	if _, ok := sourceFile.Identifiers["NaN"]; ok {
+		return true
+	}
+	_, ok := sourceFile.Identifiers["Number"]
+	return ok
+}
+
+func isComparisonOperator(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindEqualsEqualsToken,
+		ast.KindEqualsEqualsEqualsToken,
+		ast.KindExclamationEqualsToken,
+		ast.KindExclamationEqualsEqualsToken,
+		ast.KindGreaterThanToken,
+		ast.KindGreaterThanEqualsToken,
+		ast.KindLessThanToken,
+		ast.KindLessThanEqualsToken:
+		return true
+	}
 	return false
 }
 
@@ -89,19 +209,15 @@ func parseOptions(opts any) useIsNaNOptions {
 var UseIsNaNRule = rule.Rule{
 	Name: "use-isnan",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		if !sourceMayUseNaN(ctx.SourceFile) {
+			return nil
+		}
+
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
-
-		// Comparison operators to check
-		comparisonOperators := map[ast.Kind]bool{
-			ast.KindEqualsEqualsToken:            true, // ==
-			ast.KindEqualsEqualsEqualsToken:      true, // ===
-			ast.KindExclamationEqualsToken:       true, // !=
-			ast.KindExclamationEqualsEqualsToken: true, // !==
-			ast.KindGreaterThanToken:             true, // >
-			ast.KindGreaterThanEqualsToken:       true, // >=
-			ast.KindLessThanToken:                true, // <
-			ast.KindLessThanEqualsToken:          true, // <=
+		checker := globalReferenceChecker{
+			refs:       ctx.Refs,
+			sourceFile: ctx.SourceFile,
 		}
 
 		listeners := rule.RuleListeners{
@@ -112,15 +228,12 @@ var UseIsNaNRule = rule.Rule{
 					return
 				}
 
-				if !comparisonOperators[binary.OperatorToken.Kind] {
+				if !isComparisonOperator(binary.OperatorToken.Kind) {
 					return
 				}
 
-				if isNaNIdentifier(binary.Left) || isNaNIdentifier(binary.Right) {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "comparisonWithNaN",
-						Description: "Use the isNaN function to compare with NaN.",
-					})
+				if isNaNIdentifier(&checker, binary.Left) || isNaNIdentifier(&checker, binary.Right) {
+					ctx.ReportNode(node, comparisonWithNaNMessage)
 				}
 			},
 		}
@@ -134,11 +247,8 @@ var UseIsNaNRule = rule.Rule{
 				}
 
 				// Check if discriminant is NaN
-				if isNaNIdentifier(switchStmt.Expression) {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "switchNaN",
-						Description: "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
-					})
+				if isNaNIdentifier(&checker, switchStmt.Expression) {
+					ctx.ReportNode(node, switchNaNMessage)
 				}
 
 				// Check case clauses for NaN
@@ -158,11 +268,8 @@ var UseIsNaNRule = rule.Rule{
 					if caseClause == nil || caseClause.Expression == nil {
 						continue
 					}
-					if isNaNIdentifier(caseClause.Expression) {
-						ctx.ReportNode(clause, rule.RuleMessage{
-							Id:          "caseNaN",
-							Description: "'case NaN' can never match. Use Number.isNaN before the switch.",
-						})
+					if isNaNIdentifier(&checker, caseClause.Expression) {
+						ctx.ReportNode(clause, caseNaNMessage)
 					}
 				}
 			}
@@ -177,14 +284,9 @@ var UseIsNaNRule = rule.Rule{
 					return
 				}
 
-				// Extract method name from both dot notation (foo.indexOf) and
-				// bracket notation (foo["indexOf"]) using shared utility.
-				methodName, ok := utils.AccessExpressionStaticName(callee)
+				// Extract the method name from dot and bracket notation.
+				message, ok := indexOfMethod(callee)
 				if !ok {
-					return
-				}
-
-				if methodName != "indexOf" && methodName != "lastIndexOf" {
 					return
 				}
 
@@ -194,21 +296,42 @@ var UseIsNaNRule = rule.Rule{
 					return
 				}
 
-				if isNaNIdentifier(args[0]) {
-					description := strings.Replace(
-						"Array prototype method '{{methodName}}' cannot find NaN.",
-						"{{methodName}}",
-						methodName,
-						1,
-					)
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "indexOfNaN",
-						Description: description,
-					})
+				if isNaNIdentifier(&checker, args[0]) {
+					ctx.ReportNode(node, message)
 				}
 			}
 		}
 
 		return listeners
 	},
+}
+
+func indexOfMethod(callee *ast.Node) (rule.RuleMessage, bool) {
+	var methodName string
+	switch callee.Kind {
+	case ast.KindPropertyAccessExpression:
+		name := callee.AsPropertyAccessExpression().Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return rule.RuleMessage{}, false
+		}
+		methodName = name.AsIdentifier().Text
+	case ast.KindElementAccessExpression:
+		argument := utils.SkipAssertionsAndParens(callee.AsElementAccessExpression().ArgumentExpression)
+		var ok bool
+		methodName, ok = utils.GetStaticExpressionValue(argument)
+		if !ok {
+			return rule.RuleMessage{}, false
+		}
+	default:
+		return rule.RuleMessage{}, false
+	}
+
+	switch methodName {
+	case "indexOf":
+		return indexOfNaNMessage, true
+	case "lastIndexOf":
+		return lastIndexOfNaNMessage, true
+	default:
+		return rule.RuleMessage{}, false
+	}
 }
