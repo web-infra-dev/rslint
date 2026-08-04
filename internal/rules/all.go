@@ -111,6 +111,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
@@ -280,6 +281,7 @@ func GetAllRules() []rule.Rule {
 		no_unsafe_finally.NoUnsafeFinallyRule,
 		no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule,
 		no_unreachable.NoUnreachableRule,
+		no_unreachable_loop.NoUnreachableLoopRule,
 		require_atomic_updates.RequireAtomicUpdatesRule,
 		object_shorthand.ObjectShorthandRule,
 		no_unused_expressions.NoUnusedExpressionsRule,

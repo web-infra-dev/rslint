@@ -1,0 +1,730 @@
+// Rstest Snapshot v1
+
+exports[`no-unreachable-loop > invalid 1`] = `
+{
+  "code": "while (a) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 2`] = `
+{
+  "code": "do break; while (a)",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 3`] = `
+{
+  "code": "for (a; b; c) { foo(); break; }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 4`] = `
+{
+  "code": "for (;;) throw err;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 5`] = `
+{
+  "code": "for (a in b) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 6`] = `
+{
+  "code": "for (a of b) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 7`] = `
+{
+  "code": "function someFunc() { while (a) { if (foo) { return; } else { break; } bar(); } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 8`] = `
+{
+  "code": "while (a) { switch (foo) { case 1: throw err; default: return; } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 9`] = `
+{
+  "code": "while (a) { try { return bar(); } catch (e) { break; } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 10`] = `
+{
+  "code": "while (a) for (;;);",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 11`] = `
+{
+  "code": "while (foo) { for (a of b) { if (baz) { break; } else { throw err; } } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 12`] = `
+{
+  "code": "lbl: for (var i = 0; i < 10; i++) { while (foo) break lbl; } /* outer is valid because inner can have 0 iterations */",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 13`] = `
+{
+  "code": "for (a in b) { while (foo) { if(baz) { break; } else { break; } } break; }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 14`] = `
+{
+  "code": "function foo() { for (var i = 0; i < 10; i++) { do { return; } while(i) } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 15`] = `
+{
+  "code": "lbl: while(foo) { do { break lbl; } while(baz) }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 16`] = `
+{
+  "code": "lbl: for (a in b) { while(foo) { continue lbl; } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 17`] = `
+{
+  "code": "for (a of b) { for(;;) { if (foo) { throw err; } } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 18`] = `
+{
+  "code": "function foo () { for (a in b) { while (true) { if (bar) { return; } } } }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 19`] = `
+{
+  "code": "do for (var i = 1; i < 10; i++) break; while(foo)",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 20`] = `
+{
+  "code": "do { for (var i = 1; i < 10; i++) continue; break; } while(foo)",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 21`] = `
+{
+  "code": "for (;;) { for (var i = 1; i < 10; i ++) break; if (foo) break; continue; }",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 22`] = `
+{
+  "code": "while (a) break; do break; while (b); for (;;) break; for (c in d) break; for (e of f) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 94,
+          "line": 1,
+        },
+        "start": {
+          "column": 75,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 23`] = `
+{
+  "code": "while (a) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable-loop > invalid 24`] = `
+{
+  "code": "for (a in b) break; for (;;) break; for (c of d) break;",
+  "diagnostics": [
+    {
+      "message": "Invalid loop. Its body allows only one iteration.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable-loop",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
