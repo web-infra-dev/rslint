@@ -1,11 +1,102 @@
 package no_duplicate_enum_values
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+type enumValueKind uint8
+
+const (
+	enumValueString enumValueKind = 1 << iota
+	enumValueNumber
+	enumValueNegativeNumber
+)
+
+type enumValue struct {
+	text string
+	kind enumValueKind
+}
+
+const inlineEnumValueCount = 8
+
+// Most enums are small. Keep their values inline so checking them does not
+// allocate a map; larger enums promote the same state to overflow.
+type seenEnumValues struct {
+	inline      [inlineEnumValueCount]enumValue
+	inlineCount int
+	valueCount  int
+	overflow    map[string]enumValueKind
+}
+
+func (seen *seenEnumValues) add(value enumValue, capacity int) bool {
+	seen.valueCount++
+	if seen.overflow != nil {
+		seenKinds := seen.overflow[value.text]
+		if seenKinds&value.kind != 0 {
+			return true
+		}
+		seen.overflow[value.text] = seenKinds | value.kind
+		return false
+	}
+
+	for index := range seen.inlineCount {
+		if seen.inline[index].text != value.text {
+			continue
+		}
+		if seen.inline[index].kind&value.kind != 0 {
+			return true
+		}
+		seen.inline[index].kind |= value.kind
+		return false
+	}
+
+	if seen.inlineCount < len(seen.inline) {
+		seen.inline[seen.inlineCount] = value
+		seen.inlineCount++
+		return false
+	}
+
+	uniqueCount := seen.inlineCount + 1
+	// Preserve the full-capacity fast path for unique enums, but scale the hint
+	// down when the values seen so far contain duplicates.
+	mapCapacity := capacity * uniqueCount / seen.valueCount
+	if mapCapacity < uniqueCount {
+		mapCapacity = uniqueCount
+	}
+	seen.overflow = make(map[string]enumValueKind, mapCapacity)
+	for _, inlineValue := range seen.inline {
+		seen.overflow[inlineValue.text] = inlineValue.kind
+	}
+	seen.overflow[value.text] = value.kind
+	return false
+}
+
+func getEnumValue(initializer *ast.Node) (enumValue, bool) {
+	switch initializer.Kind {
+	case ast.KindNumericLiteral:
+		return enumValue{text: initializer.AsNumericLiteral().Text, kind: enumValueNumber}, true
+	case ast.KindStringLiteral:
+		return enumValue{text: initializer.AsStringLiteral().Text, kind: enumValueString}, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return enumValue{text: initializer.AsNoSubstitutionTemplateLiteral().Text, kind: enumValueString}, true
+	case ast.KindPrefixUnaryExpression:
+		unaryExpression := initializer.AsPrefixUnaryExpression()
+		if unaryExpression.Operator != ast.KindMinusToken || unaryExpression.Operand.Kind != ast.KindNumericLiteral {
+			return enumValue{}, false
+		}
+		return enumValue{text: unaryExpression.Operand.AsNumericLiteral().Text, kind: enumValueNegativeNumber}, true
+	default:
+		return enumValue{}, false
+	}
+}
+
+func duplicateValueMessage(value enumValue) rule.RuleMessage {
+	if value.kind == enumValueNegativeNumber {
+		return rule.RuleMessage{Id: "duplicateValue", Description: "Duplicate enum member value -" + value.text + "."}
+	}
+	return rule.RuleMessage{Id: "duplicateValue", Description: "Duplicate enum member value " + value.text + "."}
+}
 
 var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 	Name: "no-duplicate-enum-values",
@@ -17,8 +108,7 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Track seen values
-				seenValues := make(map[string]*ast.Node)
+				var seenValues seenEnumValues
 
 				for _, memberNode := range enumDecl.Members.Nodes {
 					member := memberNode.AsEnumMember()
@@ -26,80 +116,14 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					// Get the initializer value
 					initializer := member.Initializer
-					var valueStr string
-					var isLiteral bool
-
-					switch initializer.Kind {
-					case ast.KindNumericLiteral:
-						numLit := initializer.AsNumericLiteral()
-						if numLit != nil {
-							valueStr = numLit.Text
-							isLiteral = true
-						}
-					case ast.KindStringLiteral:
-						strLit := initializer.AsStringLiteral()
-						if strLit != nil {
-							valueStr = strLit.Text
-							isLiteral = true
-						}
-					case ast.KindNoSubstitutionTemplateLiteral:
-						templateLit := initializer.AsNoSubstitutionTemplateLiteral()
-						if templateLit != nil {
-							valueStr = templateLit.Text
-							isLiteral = true
-						}
-					case ast.KindPrefixUnaryExpression:
-						// Handle negative numbers
-						unaryExpr := initializer.AsPrefixUnaryExpression()
-						if unaryExpr != nil && unaryExpr.Operator == ast.KindMinusToken {
-							if numLit := unaryExpr.Operand.AsNumericLiteral(); numLit != nil {
-								valueStr = "-" + numLit.Text
-								isLiteral = true
-							}
-						}
-					}
-
-					if !isLiteral {
+					value, ok := getEnumValue(initializer)
+					if !ok {
 						continue
 					}
 
-					// Check for duplicate
-					if prevNode, exists := seenValues[valueStr]; exists {
-						// Get the value for display
-						displayValue := valueStr
-
-						// For string literals and template literals, display the actual string content
-						switch initializer.Kind {
-						case ast.KindStringLiteral:
-							strLit := initializer.AsStringLiteral()
-							if strLit != nil {
-								displayValue = strLit.Text
-							}
-						case ast.KindNoSubstitutionTemplateLiteral:
-							templateLit := initializer.AsNoSubstitutionTemplateLiteral()
-							if templateLit != nil {
-								// Remove backticks for display
-								displayValue = templateLit.Text
-								if len(displayValue) >= 2 && displayValue[0] == '`' && displayValue[len(displayValue)-1] == '`' {
-									displayValue = displayValue[1 : len(displayValue)-1]
-								}
-							}
-						}
-
-						ctx.ReportNode(member.Name(), rule.RuleMessage{
-							Id:          "duplicateValue",
-							Description: fmt.Sprintf("Duplicate enum member value %s.", displayValue),
-						})
-
-						// Report the previous occurrence as well if needed
-						if prevMember := prevNode.AsEnumMember(); prevMember != nil {
-							// Only report once per duplicate
-							continue
-						}
-					} else {
-						seenValues[valueStr] = memberNode
+					if seenValues.add(value, len(enumDecl.Members.Nodes)) {
+						ctx.ReportNode(member.Name(), duplicateValueMessage(value))
 					}
 				}
 			},
