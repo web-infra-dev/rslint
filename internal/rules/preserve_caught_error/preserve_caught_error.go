@@ -189,6 +189,12 @@ func classifyThrownError(ctx rule.RuleContext, expression *ast.Node, opts Option
 	info.expression = expression
 
 	callee := ast.SkipParentheses(info.callee)
+	// Parentheses end an optional chain, so a chain used as the callee stays a
+	// `ChainExpression` in ESLint's AST — `(ns?.AppError)('m')` matches neither
+	// a global error name nor a configured class.
+	if ast.IsOptionalChain(callee) {
+		return info, false
+	}
 	if isBuiltInGlobalError(ctx, callee) {
 		info.builtIn = true
 		info.className = callee.AsIdentifier().Text
@@ -419,6 +425,19 @@ func buildIncorrectCauseFixes(ctx rule.RuleContext, cause causeInfo, caughtName 
 	return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, cause.value, caughtName)}
 }
 
+// isCaughtErrorShadowed reports whether the identifier attached as `cause`
+// resolves to a binding other than the catch parameter it is spelled like. A
+// `var` sharing the name is hoisted out of the catch clause and still resolves
+// to the parameter, so only a closer block-scoped binding shadows it.
+func isCaughtErrorShadowed(ctx rule.RuleContext, causeValue *ast.Node, param *ast.Node) bool {
+	caught := param.Symbol()
+	if caught == nil {
+		return false
+	}
+	target := ctx.Refs.Resolve(causeValue)
+	return target != nil && target != caught
+}
+
 func suggestIncludeCause(fixes []rule.RuleFix) []rule.RuleSuggestion {
 	if len(fixes) == 0 {
 		return nil
@@ -487,7 +506,7 @@ var PreserveCaughtErrorRule = rule.Rule{
 					return
 				}
 
-				if utils.IsNameShadowedBetween(cause.value, parentCatch, caughtName) {
+				if isCaughtErrorShadowed(ctx, cause.value, param) {
 					ctx.ReportNode(node, messageCaughtErrorShadowed())
 				}
 			},

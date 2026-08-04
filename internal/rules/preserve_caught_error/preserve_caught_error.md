@@ -153,8 +153,7 @@ try {
 
 ## Differences from ESLint
 
-- A `cause` key written as a parenthesized computed key — `{ [('cause')]: error }` — is reported as a missing `cause`; ESLint accepts it. Every other spelling of the key (`cause`, `'cause'`, `["cause"]`, `` [`cause`] ``) is accepted by both.
-- For a constructor written with type arguments and no argument list — `throw new AppError<T>;` — the suggestion inserts the arguments after the type arguments (`new AppError<T>({ cause: error })`); ESLint inserts them before the type arguments.
+- For a constructor written without an argument list, the suggestion adds the arguments after the whole expression — `new AppError<T>` becomes `new AppError<T>({ cause: error })` and `new (AppError)` becomes `new (AppError)({ cause: error })`. ESLint puts them directly after the callee name, which lands inside the type arguments or the parentheses.
 
 ## Original Documentation
 

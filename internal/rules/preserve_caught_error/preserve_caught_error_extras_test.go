@@ -56,6 +56,12 @@ func TestPreserveCaughtErrorExtras(t *testing.T) {
 			{Code: `try {} catch (err) { throw a?.b.AppError("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
 			// ---- Dimension 4: optional call of a configured error class ----
 			{Code: `try {} catch (err) { throw obj.AppError?.("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
+			// ---- Dimension 4: parenthesized optional chain as the call callee ----
+			{Code: `try {} catch (err) { throw (ns?.AppError)("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
+			// ---- Dimension 4: parenthesized optional chain as the new callee ----
+			{Code: `try {} catch (err) { throw new (ns?.AppError)("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
+			// ---- Dimension 4: the chain root itself is parenthesized, the property is not ----
+			{Code: `try {} catch (err) { throw (ns?.errors.AppError)("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
 			// ---- Dimension 4: element access callee is never a configured error class ----
 			{Code: `try {} catch (err) { throw new lib["AppError"]("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}}},
 			// ---- Dimension 4: function declaration boundary ----
@@ -133,6 +139,18 @@ try {} catch (err) { throw new RangeError("m"); }`},
 			{Code: `try {} catch (cause) { throw new Error("m", { cause }); }`},
 			// Locks in upstream shadow arm 1: an unshadowed caught error passes.
 			{Code: `try {} catch (err) { if (x) { throw new Error("m", { cause: err }); } }`},
+			// ---- Dimension 4: a parenthesized computed key names the static `cause` ----
+			{Code: `try {} catch (err) { throw new Error("m", { [('cause')]: err }); }`},
+			// ---- Dimension 4: `var` hoists out of the catch clause, so it is not a closer binding ----
+			{Code: `try {} catch (err) { var err; throw new Error("m", { cause: err }); }`},
+			// ---- Dimension 4: `var` in a nested block still hoists past the catch clause ----
+			{Code: `try {} catch (err) { { var err; } throw new Error("m", { cause: err }); }`},
+			// ---- Dimension 4: a `var` for-of binding is not scoped to the loop ----
+			{Code: `try {} catch (err) { for (var err of list) {} throw new Error("m", { cause: err }); }`},
+			// ---- Dimension 4: a `var` for binding is not scoped to the loop ----
+			{Code: `try {} catch (err) { for (var err = 0; err < 1; err++) {} throw new Error("m", { cause: err }); }`},
+			// ---- Dimension 4: a `var` in another switch case is not a closer binding ----
+			{Code: `try {} catch (err) { switch (x) { case 1: var err = 1; break; case 2: throw new Error("m", { cause: err }); } }`},
 			// ---- Real-user: extra diagnostic data alongside the cause is accepted in any order ----
 			{Code: `try {} catch (error) { throw new Error("m", { retryable: true, cause: error }); }`},
 			// ---- Options: array-wrapped errorClassNames ----
@@ -143,13 +161,16 @@ try {} catch (err) { throw new RangeError("m"); }`},
 			{Code: `try {} catch (err) { throw new AppError("m"); }`, Options: map[string]interface{}{"errorClassNames": []interface{}{"OtherError"}}},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Dimension 4: parenthesized computed key ----
-			// Parentheses around a computed key hide the static `cause` name, so
-			// the rule asks for a cause ESLint considers already present. See the
-			// rule doc's "Differences from ESLint".
+			// ---- Dimension 4: parenthesized computed key holding the wrong value ----
 			{
-				Code:   `try {} catch (err) { throw new Error("m", { [('cause')]: err }); }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingCause", Line: 1, Column: 22, EndLine: 1, EndColumn: 65, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "includeCause", Output: `try {} catch (err) { throw new Error("m", { [('cause')]: err, cause: err }); }`}}}},
+				Code:   `try {} catch (err) { throw new Error("m", { [('cause')]: other }); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "incorrectCause", Line: 1, Column: 58, EndLine: 1, EndColumn: 63, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "includeCause", Output: `try {} catch (err) { throw new Error("m", { [('cause')]: err }); }`}}}},
+			},
+			// ---- Dimension 4: a chain broken by parentheses before the property ----
+			{
+				Code:    `try {} catch (err) { throw (ns?.errors).AppError("m"); }`,
+				Options: map[string]interface{}{"errorClassNames": []interface{}{"AppError"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingCause", Line: 1, Column: 22, EndLine: 1, EndColumn: 55, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "includeCause", Output: `try {} catch (err) { throw (ns?.errors).AppError("m", { cause: err }); }`}}}},
 			},
 			// ---- Dimension 4: type arguments with no argument list ----
 			// The suggestion appends the argument list after the type arguments;
@@ -159,6 +180,15 @@ try {} catch (err) { throw new RangeError("m"); }`},
 				Code:    `try {} catch (err) { throw new AppError<string>; }`,
 				Options: map[string]interface{}{"errorClassNames": []interface{}{map[string]interface{}{"name": "AppError", "argumentPosition": 1}}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingCause", Line: 1, Column: 22, EndLine: 1, EndColumn: 49, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "includeCause", Output: `try {} catch (err) { throw new AppError<string>({ cause: err }); }`}}}},
+			},
+			// ---- Dimension 4: parenthesized callee with no argument list ----
+			// The suggestion appends the argument list after the parentheses;
+			// ESLint puts it inside them. See the rule doc's "Differences from
+			// ESLint".
+			{
+				Code:    `try {} catch (err) { throw new (AppError); }`,
+				Options: map[string]interface{}{"errorClassNames": []interface{}{map[string]interface{}{"name": "AppError", "argumentPosition": 1}}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingCause", Line: 1, Column: 22, EndLine: 1, EndColumn: 43, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "includeCause", Output: `try {} catch (err) { throw new (AppError)({ cause: err }); }`}}}},
 			},
 			// ---- Dimension 4: parenthesized thrown expression ----
 			{
