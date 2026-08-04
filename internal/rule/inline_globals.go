@@ -33,14 +33,6 @@ type inlineGlobalName struct {
 	nameRange  core.TextRange
 }
 
-// inlineGlobalEntry carries the accumulating state for one name while comments
-// are still being read. A name whose final setting is not one of ESLint's
-// three levels never reaches the returned results.
-type inlineGlobalEntry struct {
-	global InlineGlobal
-	valid  bool
-}
-
 // ParseInlineGlobals returns both the final name -> access map and ordered
 // declaration metadata for `/* global ... */` / `/* globals ... */` comments.
 // A source-text candidate check keeps the shared comment store lazy unless such a
@@ -50,9 +42,10 @@ type inlineGlobalEntry struct {
 // so lookalike text in strings, templates, regexes, or line comments is ignored.
 // Within a comment, duplicate names use the last setting and retain the first
 // name range. Across comments, the last setting wins and every comment range is
-// preserved. A name written without a setting is readonly; a name whose final
-// setting spells none of ESLint's three levels is dropped, leaving the config
-// or built-in setting in place.
+// preserved. A name written without a setting is readonly; a setting that
+// spells none of ESLint's three levels is ignored along with its name range,
+// leaving the name's earlier inline setting — or the config or built-in
+// setting — in place.
 func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map[string]utils.GlobalAccess, []InlineGlobal) {
 	if sourceFile == nil || sourceFile.Text() == "" || !mayContainInlineGlobalDirective(sourceFile.Text()) {
 		return nil, nil
@@ -63,7 +56,7 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map
 	if len(sourceComments) == 0 {
 		return nil, nil
 	}
-	var entries []inlineGlobalEntry
+	var globals []InlineGlobal
 	var entryIndexes map[string]int
 
 	for _, comment := range sourceComments {
@@ -90,37 +83,33 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map
 			entryIndexes = make(map[string]int)
 		}
 		for _, entry := range commentEntries {
+			// ESLint reports the bad directive and moves on, so an unusable
+			// setting contributes neither an access level nor a name range.
 			access, valid := utils.NormalizeInlineGlobalAccess(entry.setting, entry.hasSetting)
-
-			if index, exists := entryIndexes[entry.name]; exists {
-				entries[index].global.Access = access
-				entries[index].global.NameRanges = append(entries[index].global.NameRanges, entry.nameRange)
-				entries[index].valid = valid
+			if !valid {
 				continue
 			}
-			entryIndexes[entry.name] = len(entries)
-			entries = append(entries, inlineGlobalEntry{
-				global: InlineGlobal{
-					Name:       entry.name,
-					Access:     access,
-					NameRanges: []core.TextRange{entry.nameRange},
-				},
-				valid: valid,
+
+			if index, exists := entryIndexes[entry.name]; exists {
+				globals[index].Access = access
+				globals[index].NameRanges = append(globals[index].NameRanges, entry.nameRange)
+				continue
+			}
+			entryIndexes[entry.name] = len(globals)
+			globals = append(globals, InlineGlobal{
+				Name:       entry.name,
+				Access:     access,
+				NameRanges: []core.TextRange{entry.nameRange},
 			})
 		}
 	}
 
-	var values map[string]utils.GlobalAccess
-	var globals []InlineGlobal
-	for _, entry := range entries {
-		if !entry.valid {
-			continue
-		}
-		if values == nil {
-			values = make(map[string]utils.GlobalAccess)
-		}
-		values[entry.global.Name] = entry.global.Access
-		globals = append(globals, entry.global)
+	if len(globals) == 0 {
+		return nil, nil
+	}
+	values := make(map[string]utils.GlobalAccess, len(globals))
+	for _, global := range globals {
+		values[global.Name] = global.Access
 	}
 
 	return values, globals

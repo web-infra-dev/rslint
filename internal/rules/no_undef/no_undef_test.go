@@ -104,6 +104,7 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `/*global myVar*/ myVar = 1;`},
 			{Code: `/*global a, b*/ a = 1; b = 2;`},
 			{Code: `/*global myVar:writable*/ myVar = 1;`},
+			{Code: `/*global myVar*/ /*global myVar:bogus*/ myVar;`},
 
 			// === languageOptions.globals (config) ===
 			{Code: `myConfiguredGlobal;`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},

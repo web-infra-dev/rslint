@@ -94,15 +94,23 @@ func TestParseInlineGlobals_AccessLevels(t *testing.T) {
 	}
 }
 
-// A setting that spells none of the three levels leaves the name to the config
-// or built-in setting, as ESLint does after reporting the bad directive.
-func TestParseInlineGlobals_InvalidSettingDropsName(t *testing.T) {
+// A setting that spells none of the three levels is ignored, as ESLint does
+// after reporting the bad directive. A name with no earlier inline setting is
+// left to the config or built-in setting; one that already has a setting keeps
+// it, and the ignored comment contributes no name range.
+func TestParseInlineGlobals_InvalidSettingIsIgnored(t *testing.T) {
 	source := "/*global nonsense:bar, empty:, kept:writable */\n" +
 		"/*global wasValid:off */\n" +
-		"/*global wasValid:bar */"
+		"/*global wasValid:bar, kept:bar */\n" +
+		"/*global lateValid:bar */\n" +
+		"/*global lateValid:writable */"
 
 	values, globals := parseInlineGlobalsForTest(t, source)
-	wantValues := map[string]utils.GlobalAccess{"kept": utils.GlobalAccessWritable}
+	wantValues := map[string]utils.GlobalAccess{
+		"kept":      utils.GlobalAccessWritable,
+		"wasValid":  utils.GlobalAccessOff,
+		"lateValid": utils.GlobalAccessWritable,
+	}
 	if !reflect.DeepEqual(values, wantValues) {
 		t.Fatalf("values = %#v, want %#v", values, wantValues)
 	}
@@ -112,6 +120,8 @@ func TestParseInlineGlobals_InvalidSettingDropsName(t *testing.T) {
 		positions []int
 	}{
 		{name: "kept", access: utils.GlobalAccessWritable, positions: []int{strings.Index(source, "kept")}},
+		{name: "wasValid", access: utils.GlobalAccessOff, positions: []int{strings.Index(source, "wasValid")}},
+		{name: "lateValid", access: utils.GlobalAccessWritable, positions: []int{strings.LastIndex(source, "lateValid")}},
 	})
 }
 

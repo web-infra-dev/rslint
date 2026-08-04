@@ -87,6 +87,9 @@ func TestNoRedeclareExtras(t *testing.T) {
 			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]any{"a": "readonly"}},
 			{Code: "/* globals a, a */"},
 
+			// An unusable setting is ignored, so it declares nothing to redeclare.
+			{Code: "/* globals a */ /* globals a:bogus */"},
+
 			// A module-level declaration and an outer global declaration do not
 			// share a scope, even when they have the same name.
 			{Code: "export {};\n/* globals a */ var a = 0;"},

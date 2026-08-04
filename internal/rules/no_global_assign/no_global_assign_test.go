@@ -274,7 +274,10 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			{Code: `myGlobal = 1;`, Globals: map[string]any{"myGlobal": "off"}},
 
 			// A readonly declaration a local binding shadows
-			{Code: `let myGlobal = 0; myGlobal = 1;`, Globals: map[string]any{"myGlobal": "readonly"}},
+			{Code: `function f() { let myGlobal = 0; myGlobal = 1; }`, Globals: map[string]any{"myGlobal": "readonly"}},
+
+			// An unusable setting leaves the earlier `off` in place
+			{Code: `/* global Object: off */ /* global Object: bogus */ Object = 1;`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -1063,6 +1066,14 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Globals: map[string]any{"Object": "writable"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 31},
+				},
+			},
+
+			// An unusable setting leaves the earlier `readonly` in place
+			{
+				Code: `/* global myGlobal: readonly */ /* global myGlobal: bogus */ myGlobal = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 62},
 				},
 			},
 		},
