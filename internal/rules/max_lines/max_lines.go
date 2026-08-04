@@ -1,8 +1,7 @@
 package max_lines
 
 import (
-	"fmt"
-	"unicode/utf8"
+	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -69,173 +68,144 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 	if len(lineStarts) == 0 {
 		lineStarts = []core.TextPos{0}
 	}
-	nLines := len(lineStarts)
-
-	// Slice out a single line's content (excluding its terminator). Matches the
-	// semantics of ESLint's SourceCode.lines entries.
-	lineContent := func(i int) string {
-		start := int(lineStarts[i])
-		if i+1 >= nLines {
-			return text[start:]
-		}
-		return text[start:utils.LineContentEnd(text, int(lineStarts[i+1]))]
+	realLineCount := len(lineStarts)
+	// SourceCode.lines includes an empty final entry when the file ends in a
+	// line terminator. ESLint drops that entry before enforcing max-lines.
+	if realLineCount > 1 && int(lineStarts[realLineCount-1]) == len(text) {
+		realLineCount--
 	}
 
-	// If the file ends with a line terminator, the final entry is an extra
-	// empty string that doesn't represent a real line. Drop it from counting
-	// but keep it visible to the end-position calculation below.
-	lastLineIsTrailingEmpty := nLines > 1 && lineContent(nLines-1) == ""
-
-	keep := make([]bool, nLines)
-	for i := range keep {
-		keep[i] = true
-	}
-	if lastLineIsTrailingEmpty {
-		keep[nLines-1] = false
-	}
-
-	if opts.skipBlankLines {
-		for i := range nLines {
-			if keep[i] && utils.IsECMABlankLine(lineContent(i)) {
-				keep[i] = false
-			}
-		}
-	}
-
+	var comments []*ast.CommentRange
+	shebangEnd := 0
 	if opts.skipComments {
-		for line := range commentOnlyLines(ctx.Comments.All(), text, lineStarts) {
-			idx := line - 1
-			if idx >= 0 && idx < nLines {
-				keep[idx] = false
-			}
+		comments = ctx.Comments.All()
+		shebangEnd = len(scanner.GetShebang(text))
+		// With no comments there is nothing for skipComments to filter. This
+		// also lets comment-free files use the direct-count path below.
+		if len(comments) == 0 && shebangEnd == 0 {
+			opts.skipComments = false
 		}
 	}
 
-	kept := make([]int, 0, nLines)
-	for i := range nLines {
-		if keep[i] {
-			kept = append(kept, i)
-		}
-	}
-	if len(kept) <= opts.max {
-		return
-	}
 	excessIdx := opts.max
 	if excessIdx < 0 {
 		// ESLint's schema requires max >= 0; if a consumer bypasses the
-		// schema and supplies a negative value, report from the first line
-		// rather than panic.
+		// schema, report from the first counted line rather than panic.
 		excessIdx = 0
 	}
-	startLineIdx := kept[excessIdx]
 
+	keptCount := realLineCount
+	startLineIdx := excessIdx
+	if opts.skipBlankLines || opts.skipComments {
+		keptCount = 0
+		startLineIdx = -1
+		commentIdx := 0
+		for i := range realLineCount {
+			start := int(lineStarts[i])
+			nextStart := len(text)
+			contentEnd := nextStart
+			if i+1 < len(lineStarts) {
+				nextStart = int(lineStarts[i+1])
+				contentEnd = utils.LineContentEnd(text, nextStart)
+			}
+
+			if opts.skipComments && lineIsCommentOnly(
+				text,
+				start,
+				contentEnd,
+				nextStart,
+				comments,
+				&commentIdx,
+				shebangEnd,
+			) {
+				continue
+			}
+			if opts.skipBlankLines && utils.IsECMABlankLine(text[start:contentEnd]) {
+				continue
+			}
+
+			keptCount++
+			if startLineIdx < 0 && keptCount > excessIdx {
+				startLineIdx = i
+			}
+		}
+	}
+
+	if keptCount <= opts.max {
+		return
+	}
+	if startLineIdx < 0 {
+		// Only possible for an invalid negative max when every line is
+		// skipped. There is no counted line to point at, so use file start.
+		startLineIdx = 0
+	}
 	ctx.ReportRange(
 		core.NewTextRange(int(lineStarts[startLineIdx]), len(text)),
 		rule.RuleMessage{
 			Id:          "exceed",
-			Description: fmt.Sprintf("File has too many lines (%d). Maximum allowed is %d.", len(kept), opts.max),
+			Description: maxLinesDescription(keptCount, opts.max),
 		},
 	)
 }
 
-// commentOnlyLines returns the set of 1-indexed line numbers that contain only
-// comments and whitespace, matching ESLint's max-lines `getLinesWithoutCode`.
-// A multi-line comment's first (last) line is excluded when non-comment code
-// exists earlier (later) on that same line.
-func commentOnlyLines(sourceComments []*ast.CommentRange, text string, lineStarts []core.TextPos) map[int]bool {
-	var comments []*ast.CommentRange
-	// ESLint's sourceCode.getAllComments() includes the hashbang (`#!`) line,
-	// but tsgo's ForEachComment skips past it. Synthesize a comment range so
-	// skipComments filters it the same way ESLint does.
-	if shebang := scanner.GetShebang(text); shebang != "" {
-		comments = append(comments, &ast.CommentRange{
-			TextRange: core.NewTextRange(0, len(shebang)),
-			Kind:      ast.KindSingleLineCommentTrivia,
-		})
+func maxLinesDescription(lines int, maximum int) string {
+	var storage [128]byte
+	description := append(storage[:0], "File has too many lines ("...)
+	description = strconv.AppendInt(description, int64(lines), 10)
+	description = append(description, "). Maximum allowed is "...)
+	description = strconv.AppendInt(description, int64(maximum), 10)
+	description = append(description, '.')
+	return string(description)
+}
+
+// lineIsCommentOnly reports whether a line contains at least one comment and
+// nothing but comments and ECMAScript whitespace. comments must be ordered by
+// source position. commentIdx carries the first range that may overlap this or
+// a later line, so the whole file and comment list are traversed only once.
+func lineIsCommentOnly(
+	text string,
+	lineStart int,
+	contentEnd int,
+	nextLineStart int,
+	comments []*ast.CommentRange,
+	commentIdx *int,
+	shebangEnd int,
+) bool {
+	firstComment := *commentIdx
+	for firstComment < len(comments) && comments[firstComment].End() <= lineStart {
+		firstComment++
 	}
-	comments = append(comments, sourceComments...)
-	if len(comments) == 0 {
-		return nil
-	}
-	// CommentStore guarantees that sourceComments is ordered and deduplicated;
-	// the optional synthesized hashbang is at position zero.
+	*commentIdx = firstComment
 
-	nLines := len(lineStarts)
-	// minCodePos[line] / maxCodeEnd[line] bound the non-comment,
-	// non-whitespace characters on each 0-indexed line. -1 means "none".
-	minCodePos := make([]int, nLines)
-	maxCodeEnd := make([]int, nLines)
-	for i := range minCodePos {
-		minCodePos[i] = -1
-		maxCodeEnd[i] = -1
-	}
-
-	commentIdx := 0
-	line := 0
-	i := 0
-	for i < len(text) {
-		r, size := utf8.DecodeRuneInString(text[i:])
-		// CRLF collapses to a single line break.
-		if r == '\r' {
-			if i+1 < len(text) && text[i+1] == '\n' {
-				i += 2
-			} else {
-				i++
-			}
-			line++
-			continue
-		}
-		if r == '\n' || r == 0x2028 || r == 0x2029 {
-			i += size
-			line++
-			continue
-		}
-
-		// Advance past comments that ended at or before i.
-		for commentIdx < len(comments) && comments[commentIdx].End() <= i {
-			commentIdx++
-		}
-		// Inside a comment — ignore.
-		if commentIdx < len(comments) && comments[commentIdx].Pos() <= i && i < comments[commentIdx].End() {
-			i += size
-			continue
-		}
-
-		// Line-terminator runes are consumed above, so at this point
-		// IsStrWhiteSpace only matches ECMAScript WhiteSpace.
-		if utils.IsStrWhiteSpace(r) {
-			i += size
-			continue
-		}
-
-		if minCodePos[line] == -1 {
-			minCodePos[line] = i
-		}
-		maxCodeEnd[line] = i + size
-		i += size
+	hasComment := false
+	outsideStart := lineStart
+	// CommentStore intentionally excludes the hashbang, while ESLint's
+	// SourceCode.getAllComments includes it. Treat it as the first comment
+	// without allocating a synthetic CommentRange.
+	if lineStart == 0 && shebangEnd > 0 {
+		hasComment = true
+		outsideStart = min(shebangEnd, contentEnd)
 	}
 
-	commentOnly := make(map[int]bool)
-	for _, cmt := range comments {
-		startPos := cmt.Pos()
-		endPos := cmt.End()
-		if endPos <= startPos {
+	for i := firstComment; i < len(comments); i++ {
+		comment := comments[i]
+		if comment.Pos() >= nextLineStart {
+			break
+		}
+		if comment.End() <= lineStart {
 			continue
 		}
-		startLine := scanner.ComputeLineOfPosition(lineStarts, startPos)
-		endLine := scanner.ComputeLineOfPosition(lineStarts, endPos-1)
+		hasComment = true
 
-		if mc := minCodePos[startLine]; mc != -1 && mc < startPos {
-			startLine++
+		commentStart := min(max(comment.Pos(), lineStart), contentEnd)
+		if commentStart > outsideStart && !utils.IsECMABlankLine(text[outsideStart:commentStart]) {
+			return false
 		}
-		if me := maxCodeEnd[endLine]; me != -1 && me > endPos {
-			endLine--
-		}
-		for l := startLine; l <= endLine; l++ {
-			if l >= 0 && l < nLines {
-				commentOnly[l+1] = true
-			}
+		commentEnd := min(comment.End(), contentEnd)
+		if commentEnd > outsideStart {
+			outsideStart = commentEnd
 		}
 	}
-	return commentOnly
+
+	return hasComment && utils.IsECMABlankLine(text[outsideStart:contentEnd])
 }
