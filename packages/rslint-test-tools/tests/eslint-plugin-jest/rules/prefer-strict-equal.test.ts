@@ -61,6 +61,19 @@ ruleTester.run('prefer-strict-equal', {} as never, {
       ],
     },
     {
+      // `toEqual` is a variable here, so the matcher is reported but gets no
+      // suggestion; rewriting it would point the computed key at an identifier
+      // that does not exist.
+      code: "const toEqual = 'toEqual';\nexpect(something)[toEqual](somethingElse);",
+      errors: [
+        {
+          messageId: 'useToStrictEqual',
+          column: 19,
+          line: 2,
+        },
+      ],
+    },
+    {
       code: 'expect(something).\n  toEqual(somethingElse);',
       errors: [
         {

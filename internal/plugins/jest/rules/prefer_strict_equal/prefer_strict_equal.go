@@ -40,12 +40,21 @@ var PreferStrictEqualRule = rule.Rule{
 				}
 
 				for _, memberEntry := range MemberEntries {
+					kind := memberEntry.Node.Kind
+					if kind != ast.KindIdentifier && kind != ast.KindStringLiteral && kind != ast.KindNoSubstitutionTemplateLiteral {
+						continue
+					}
+
 					if memberEntry.Name != "toEqual" {
 						continue
 					}
 
+					// A computed identifier key such as `expect(a)[toEqual](b)`
+					// names a variable, not the matcher, so it still gets
+					// reported but must not be rewritten.
 					fixRange, fixText, ok := testFramework.AccessorReplacement(ctx.SourceFile, memberEntry.Node, "toStrictEqual")
 					if !ok {
+						ctx.ReportNode(memberEntry.Node, buildUseToStrictEqualErrorMessage())
 						continue
 					}
 

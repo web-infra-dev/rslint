@@ -194,6 +194,15 @@ func TestNoAliasMethodsRule(t *testing.T) {
 				},
 			},
 			{
+				// `toBeCalled` here is a variable, so the alias is reported but
+				// deliberately not fixed: rewriting it would point the computed
+				// key at an identifier that does not exist.
+				Code: "const toBeCalled = 'toBeCalled';\nexpect(a)[toBeCalled]();",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "replaceAlias", Column: 11, Line: 2},
+				},
+			},
+			{
 				// Multiple aliases in one chain are each fixed in place.
 				Code:   "expect(a).\n  resolves.\n  toBeCalledTimes(1)",
 				Output: []string{"expect(a).\n  resolves.\n  toHaveBeenCalledTimes(1)"},

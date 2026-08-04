@@ -272,6 +272,20 @@ ruleTester.run('no-alias-methods', {} as never, {
       ],
     },
     {
+      // `toBeCalled` is a variable here, so the alias is reported but not
+      // fixed; rewriting it would point the computed key at an identifier that
+      // does not exist.
+      code: "const toBeCalled = 'toBeCalled';\nexpect(a)[toBeCalled]();",
+      errors: [
+        {
+          messageId: 'replaceAlias',
+          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
+          column: 11,
+          line: 2,
+        },
+      ],
+    },
+    {
       // Previously emitted `expect(a)[/toHaveBeenCalled']()`, which is not
       // parseable JavaScript.
       code: "expect(a)[/* c */ 'toBeCalled']()",

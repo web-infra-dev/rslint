@@ -211,6 +211,30 @@ func TestAccessorRejectsUnsupportedNodes(t *testing.T) {
 		}
 	})
 
+	t.Run("computed identifier key is not rewritable", func(t *testing.T) {
+		for _, code := range []string{"a[b]()", "a[(b)]()", "a.c[b]()"} {
+			sourceFile, node := lastAccessor(t, code)
+			if !IsComputedIdentifierAccessor(node) {
+				t.Errorf("IsComputedIdentifierAccessor(%s) = false, want true", code)
+			}
+			if _, _, ok := AccessorReplacement(sourceFile, node, "x"); ok {
+				t.Errorf("AccessorReplacement(%s) = true, want false", code)
+			}
+		}
+	})
+
+	t.Run("written-out member names stay rewritable", func(t *testing.T) {
+		for _, code := range []string{"a.b()", "a['b']()", "a[`b`]()"} {
+			sourceFile, node := lastAccessor(t, code)
+			if IsComputedIdentifierAccessor(node) {
+				t.Errorf("IsComputedIdentifierAccessor(%s) = true, want false", code)
+			}
+			if _, _, ok := AccessorReplacement(sourceFile, node, "x"); !ok {
+				t.Errorf("AccessorReplacement(%s) = false, want true", code)
+			}
+		}
+	})
+
 	t.Run("computed identifier key is read as a member name", func(t *testing.T) {
 		// `a[b]` reads the variable b, yet the chain reports a member named
 		// "b". This matches eslint-plugin-jest, whose getNodeChain

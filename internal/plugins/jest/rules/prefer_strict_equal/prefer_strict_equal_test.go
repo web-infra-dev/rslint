@@ -123,6 +123,15 @@ func TestPreferStrictEqualRule(t *testing.T) {
 				},
 			},
 			{
+				// `toEqual` here is a variable, so the matcher is reported but
+				// gets no suggestion: rewriting it would point the computed key
+				// at an identifier that does not exist.
+				Code: "const toEqual = 'toEqual';\nexpect(something)[toEqual](somethingElse);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToStrictEqual", Line: 2, Column: 19},
+				},
+			},
+			{
 				Code: "expect(something)[/* c */ 'toEqual'](somethingElse);",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{

@@ -61,13 +61,19 @@ var NoAliasMethodsRule = rule.Rule{
 						continue
 					}
 
+					message := buildErrorAliasMethodMessage(memberEntry.Name, canonicalName)
+
+					// A computed identifier key such as `expect(a)[toBeCalled]()`
+					// names a variable, not the matcher, so it still gets
+					// reported but must not be rewritten.
 					fixRange, fixText, ok := testFramework.AccessorReplacement(ctx.SourceFile, memberEntry.Node, canonicalName)
 					if !ok {
+						ctx.ReportNode(memberEntry.Node, message)
 						continue
 					}
 
 					ctx.ReportNodeWithFixes(
-						memberEntry.Node, buildErrorAliasMethodMessage(memberEntry.Name, canonicalName),
+						memberEntry.Node, message,
 						rule.RuleFix{
 							Text:  fixText,
 							Range: fixRange,

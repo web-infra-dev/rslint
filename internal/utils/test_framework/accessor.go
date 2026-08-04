@@ -33,6 +33,31 @@ func IsAccessorNode(node *ast.Node) bool {
 	}
 }
 
+// IsComputedIdentifierAccessor reports whether node is an identifier written as
+// a computed key — the `b` in `a[b]` rather than the `b` in `a.b`.
+//
+// GetMemberEntries reports such a key as a member named after the identifier's
+// text, which matches eslint-plugin-jest's getNodeChain. That keeps chains like
+// `expect(a).not[x]()` parseable, which upstream relies on, but the name is the
+// identifier's runtime *value*, not its text. Rewriting the node would rename a
+// variable reference rather than a member, so fixes must not touch it.
+func IsComputedIdentifierAccessor(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return false
+	}
+
+	child := node
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			child = parent
+			continue
+		}
+		return parent.Kind == ast.KindElementAccessExpression &&
+			parent.AsElementAccessExpression().ArgumentExpression == child
+	}
+	return false
+}
+
 // AccessorRange returns the accessor's own source range, excluding leading
 // trivia. For string and template literals the range includes the delimiters.
 func AccessorRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, bool) {
@@ -76,10 +101,13 @@ func AccessorValueRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRa
 // already preserved delimiters before this helper existed; this makes the whole
 // plugin consistent with that.
 //
-// Returns false for accessors that cannot meaningfully be renamed — a private
-// identifier is never a matcher or a framework API member.
+// Returns false for accessors that cannot meaningfully be renamed: a computed
+// identifier key, whose text is a variable reference rather than the member name
+// (see IsComputedIdentifierAccessor), and a private identifier, which is never a
+// matcher or a framework API member. Callers should still report those — only
+// the fix has to be withheld.
 func AccessorReplacement(sourceFile *ast.SourceFile, node *ast.Node, name string) (core.TextRange, string, bool) {
-	if node == nil {
+	if node == nil || IsComputedIdentifierAccessor(node) {
 		return core.TextRange{}, "", false
 	}
 
