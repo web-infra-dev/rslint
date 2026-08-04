@@ -539,3 +539,42 @@ func TestIsConstructorName(t *testing.T) {
 		}
 	}
 }
+
+func TestSliceEnclosingDelimiters(t *testing.T) {
+	tests := []struct {
+		name        string
+		text        string
+		start, end  int
+		open, close byte
+		want        string
+		wantOK      bool
+	}{
+		// Inner range excludes the brackets; the helper widens outward to include them.
+		{name: "type args", text: "Foo<T>", start: 4, end: 5, open: '<', close: '>', want: "<T>", wantOK: true},
+		{name: "param list", text: "f(a, b)", start: 2, end: 6, open: '(', close: ')', want: "(a, b)", wantOK: true},
+		// Trivia between a delimiter and the inner range is absorbed.
+		{name: "comment before open", text: "Foo</* c */ T>", start: 12, end: 13, open: '<', close: '>', want: "</* c */ T>", wantOK: true},
+		{name: "comment after inner range", text: "Foo<T /* c */>", start: 4, end: 5, open: '<', close: '>', want: "<T /* c */>", wantOK: true},
+		{name: "space after close", text: "Foo<T >", start: 4, end: 5, open: '<', close: '>', want: "<T >", wantOK: true},
+		// An opening delimiter at offset 0 is still found.
+		{name: "open at offset zero", text: "<T>", start: 1, end: 2, open: '<', close: '>', want: "<T>", wantOK: true},
+		// A missing delimiter is reported rather than silently truncating the
+		// span: callers build fixer text from this and must not emit a partial
+		// bracket pair.
+		{name: "no close", text: "Foo<T", start: 4, end: 5, open: '<', close: '>', wantOK: false},
+		{name: "no open", text: "T>", start: 0, end: 1, open: '<', close: '>', wantOK: false},
+		{name: "neither delimiter", text: "abc", start: 1, end: 2, open: '<', close: '>', wantOK: false},
+		// Out-of-bounds offsets are clamped before scanning.
+		{name: "end past len", text: "<T>", start: 1, end: 99, open: '<', close: '>', wantOK: false},
+		{name: "start past len", text: "abc", start: 99, end: 99, open: '<', close: '>', wantOK: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := SliceEnclosingDelimiters(tt.text, tt.start, tt.end, tt.open, tt.close)
+			if ok != tt.wantOK || got != tt.want {
+				t.Errorf("SliceEnclosingDelimiters(%q, %d, %d, %q, %q) = (%q, %v), want (%q, %v)",
+					tt.text, tt.start, tt.end, tt.open, tt.close, got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
