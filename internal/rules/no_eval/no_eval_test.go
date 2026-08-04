@@ -147,6 +147,19 @@ func TestNoEvalRule(t *testing.T) {
 			{Code: `var { a: eval } = obj; var x = eval`},
 			// Import creates local eval binding
 			{Code: `import { eval } from 'mod'; var x = eval`},
+			// Global-object names can be shadowed locally.
+			{Code: `function foo(window: any) { window.eval('foo') }`},
+			{Code: `function foo(globalThis: any) { globalThis.globalThis.eval('foo') }`},
+			{Code: `export {}; const window = { eval() {} }; window['eval']()`},
+			{Code: `function foo() { const global = { eval() {} }; global.eval() }`},
+			{Code: `function foo(x = window.eval('foo'), window: any) {}`},
+			{Code: `switch (0) { case 0: window.eval('foo'); break; case 1: let window: any; }`},
+			{Code: `const fn = function window() { window.eval('foo') }`},
+			{Code: `const C = class window { static value = window.eval('foo') }`},
+			{Code: `{ const window = { eval() {} }; window.eval() }`},
+			// ESLint follows only repeated same-name global-object chains.
+			{Code: `window.globalThis.eval('foo')`},
+			{Code: `globalThis['window'].eval('foo')`},
 
 			// ================================================================
 			// Config `off` un-declares the builtin (non-call references only —
@@ -180,6 +193,7 @@ func TestNoEvalRule(t *testing.T) {
 			{Code: `globalThis.globalThis.eval('foo');`, Options: map[string]interface{}{"allowIndirect": true}},
 			// Optional call is not direct eval
 			{Code: `eval?.('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
+			{Code: `(eval)?.('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
 			{Code: `window?.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
 			{Code: `(window?.eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
 		},
@@ -294,6 +308,23 @@ func TestNoEvalRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 22},
 				},
 			},
+			// Grouping parentheses are not semantically indirect and ESTree omits
+			// them around a callee.
+			{
+				Code:    `function foo(eval) { (eval)('foo') }`,
+				Options: map[string]interface{}{"allowIndirect": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 23},
+				},
+			},
+			// Parser identifier metadata normalizes Unicode escapes, so the
+			// file-level candidate filter must retain this direct call.
+			{
+				Code: `ev\u0061l('foo')`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 1},
+				},
+			},
 
 			// ================================================================
 			// Indirect eval — flagged in default mode
@@ -320,6 +351,34 @@ func TestNoEvalRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 15},
 				},
 			},
+			// Script-level declarations remain global-scope candidates; only
+			// nested or module bindings shadow the global object.
+			{
+				Code: `const window = { eval() {} }; window.eval()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 38},
+				},
+			},
+			{
+				Code: `if (true) { var window = { eval() {} }; } window.eval()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// A type-only declaration does not shadow the global value.
+			{
+				Code: `interface window {}; window.eval('foo')`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 29},
+				},
+			},
+			// A body var does not shadow a reference in the parameter environment.
+			{
+				Code: `function foo(x = window.eval('foo')) { var window: any; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 25},
+				},
+			},
 			// global.eval — global is not declared in test env (no @types/node)
 			// so these are valid. Tested via window/globalThis which ARE declared.
 			{
@@ -334,6 +393,23 @@ func TestNoEvalRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 23},
 				},
 			},
+			// Configured globals are known even when the TypeScript environment
+			// does not declare them.
+			{
+				Code:    `global.eval('foo')`,
+				Globals: map[string]bool{"global": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+				},
+			},
+			// A local shadow suppresses only references in its own scope.
+			{
+				Code: "window.eval('a');\nfunction f(window: any) { window.eval('b'); }\nwindow.eval('c');",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+					{MessageId: "unexpected", Line: 3, Column: 8},
+				},
+			},
 
 			// ================================================================
 			// Global object property access: bracket notation
@@ -342,6 +418,19 @@ func TestNoEvalRule(t *testing.T) {
 				Code: `window.window['eval']('foo')`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 15},
+				},
+			},
+			// Escaped static member names do not appear as an `eval` identifier.
+			{
+				Code: `window['\x65val']('foo')`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `window.ev\u0061l('foo')`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
 				},
 			},
 			{
@@ -408,6 +497,13 @@ func TestNoEvalRule(t *testing.T) {
 				Code: `var EVAL = eval; EVAL('foo')`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 12},
+				},
+			},
+			// A type-only declaration does not shadow the global value.
+			{
+				Code: `interface eval {}; var x = eval`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 28},
 				},
 			},
 			// Passed as argument
