@@ -5,165 +5,131 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func buildPreferConstAssertionMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "preferConstAssertion",
-		Description: "Expected a `const` instead of a literal type assertion.",
-	}
+var preferConstAssertionMessage = rule.RuleMessage{
+	Id:          "preferConstAssertion",
+	Description: "Expected a `const` instead of a literal type assertion.",
 }
 
-func buildVariableConstAssertionMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "variableConstAssertion",
-		Description: "Expected a `const` assertion instead of a literal type annotation.",
-	}
+var variableConstAssertionMessage = rule.RuleMessage{
+	Id:          "variableConstAssertion",
+	Description: "Expected a `const` assertion instead of a literal type annotation.",
 }
 
-func buildVariableSuggestMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "variableSuggest",
-		Description: "You should use `as const` instead of type annotation.",
+var variableSuggestMessage = rule.RuleMessage{
+	Id:          "variableSuggest",
+	Description: "You should use `as const` instead of type annotation.",
+}
+
+const (
+	constAssertionText = "const"
+	asConstSuffixText  = " as const"
+)
+
+func trimmedLiteralRange(sourceText string, node *ast.Node) (core.TextRange, bool) {
+	start := scanner.SkipTrivia(sourceText, node.Pos())
+	end := node.End()
+	if start < 0 || start > end || end > len(sourceText) {
+		return core.TextRange{}, false
 	}
+	return core.NewTextRange(start, end), true
+}
+
+func isComparableLiteral(node *ast.Node) bool {
+	kind := node.Kind
+	// ESTree represents booleans as Literal nodes, while ts-go's literal-token
+	// range excludes keyword literals. Null remains excluded because ESTree
+	// represents a null type annotation as TSNullKeyword, not TSLiteralType.
+	return kind >= ast.KindFirstLiteralToken && kind <= ast.KindLastLiteralToken ||
+		kind == ast.KindTrueKeyword || kind == ast.KindFalseKeyword
+}
+
+func matchingLiteralRange(sourceText string, valueNode *ast.Node, typeNode *ast.Node) (core.TextRange, bool) {
+	literalNode := typeNode.AsLiteralTypeNode().Literal
+	if literalNode == nil || !isComparableLiteral(literalNode) ||
+		literalNode.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return core.TextRange{}, false
+	}
+
+	valueRange, ok := trimmedLiteralRange(sourceText, valueNode)
+	if !ok {
+		return core.TextRange{}, false
+	}
+	literalRange, ok := trimmedLiteralRange(sourceText, literalNode)
+	if !ok || valueRange.End()-valueRange.Pos() != literalRange.End()-literalRange.Pos() ||
+		sourceText[valueRange.Pos():valueRange.End()] != sourceText[literalRange.Pos():literalRange.End()] {
+		return core.TextRange{}, false
+	}
+	return literalRange, true
+}
+
+// TypeScript starts a parsed type node immediately after its annotation colon;
+// trivia between the colon and the first type token belongs to the type node.
+func typeAnnotationRange(sourceText string, typeNode *ast.Node) (core.TextRange, bool) {
+	colonStart := typeNode.Pos() - 1
+	if colonStart < 0 || typeNode.End() > len(sourceText) || sourceText[colonStart] != ':' {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(colonStart, typeNode.End()), true
+}
+
+func compareLiteralTypes(ctx *rule.RuleContext, sourceText string, valueNode *ast.Node, typeNode *ast.Node, canFix bool) {
+	literalRange, matches := matchingLiteralRange(sourceText, valueNode, typeNode)
+	if !matches {
+		return
+	}
+
+	if canFix {
+		ctx.ReportRangeWithDeferredFixes(literalRange, preferConstAssertionMessage, func() []rule.RuleFix {
+			return []rule.RuleFix{rule.RuleFixReplaceRange(literalRange, constAssertionText)}
+		})
+		return
+	}
+
+	ctx.ReportRangeWithDeferredSuggestions(literalRange, variableConstAssertionMessage, func() []rule.RuleSuggestion {
+		annotationRange, ok := typeAnnotationRange(sourceText, typeNode)
+		if !ok {
+			return nil
+		}
+		return []rule.RuleSuggestion{
+			{
+				Message: variableSuggestMessage,
+				FixesArr: []rule.RuleFix{
+					rule.RuleFixReplaceRange(annotationRange, ""),
+					rule.RuleFixInsertAfter(valueNode, asConstSuffixText),
+				},
+			},
+		}
+	})
 }
 
 var PreferAsConstRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-as-const",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-
 		compareTypes := func(valueNode *ast.Node, typeNode *ast.Node, canFix bool) {
-			if valueNode == nil || typeNode == nil {
+			if valueNode == nil || typeNode == nil ||
+				!isComparableLiteral(valueNode) || typeNode.Kind != ast.KindLiteralType {
 				return
 			}
-
-			// Check if valueNode is a literal and typeNode is a literal type
-			if !ast.IsLiteralExpression(valueNode) {
-				return
-			}
-
-			var isLiteralType bool
-			var literalNode *ast.Node
-
-			if ast.IsLiteralTypeNode(typeNode) {
-				literalTypeNode := typeNode.AsLiteralTypeNode()
-				if literalTypeNode == nil {
-					return
-				}
-				literalNode = literalTypeNode.Literal
-				isLiteralType = true
-			} else {
-				return
-			}
-
-			if !isLiteralType || literalNode == nil {
-				return
-			}
-
-			// Check if both are literals and have the same raw value
-			if !ast.IsLiteralExpression(literalNode) {
-				return
-			}
-
-			// Skip template literal types - they are different from regular literal types
-			if literalNode.Kind == ast.KindNoSubstitutionTemplateLiteral {
-				return
-			}
-
-			valueRange := utils.TrimNodeTextRange(ctx.SourceFile, valueNode)
-			valueText := ctx.SourceFile.Text()[valueRange.Pos():valueRange.End()]
-			typeRange := utils.TrimNodeTextRange(ctx.SourceFile, literalNode)
-			typeText := ctx.SourceFile.Text()[typeRange.Pos():typeRange.End()]
-
-			if valueText == typeText {
-				if canFix {
-					// For type assertions, we can directly fix to 'const'
-					ctx.ReportNodeWithFixes(literalNode, buildPreferConstAssertionMessage(),
-						rule.RuleFixReplace(ctx.SourceFile, typeNode, "const"))
-				} else {
-					// For variable declarations, suggest replacing with 'as const'
-					// We need to find the colon token before the type annotation
-					// and remove from there to the end of the type annotation
-					parent := typeNode.Parent
-					if parent != nil {
-						// Find the colon token between the variable name and type
-						s := scanner.GetScannerForSourceFile(ctx.SourceFile, parent.Pos())
-						colonStart := -1
-						for s.TokenStart() < typeNode.Pos() {
-							if s.Token() == ast.KindColonToken {
-								colonStart = s.TokenStart()
-							}
-							s.Scan()
-						}
-
-						if colonStart != -1 {
-							ctx.ReportNodeWithSuggestions(literalNode, buildVariableConstAssertionMessage(),
-								rule.RuleSuggestion{
-									Message: buildVariableSuggestMessage(),
-									FixesArr: []rule.RuleFix{
-										rule.RuleFixReplaceRange(
-											core.NewTextRange(colonStart, typeNode.End()),
-											"",
-										),
-										rule.RuleFixInsertAfter(valueNode, " as const"),
-									},
-								})
-						}
-					}
-				}
-			}
+			compareLiteralTypes(&ctx, ctx.SourceFile.Text(), valueNode, typeNode, canFix)
 		}
-
 		return rule.RuleListeners{
-			// PropertyDefinition in TypeScript corresponds to PropertyDeclaration in Go AST
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if node.Kind != ast.KindPropertyDeclaration {
-					return
-				}
-				propDecl := node.AsPropertyDeclaration()
-				if propDecl == nil {
-					return
-				}
-				if propDecl.Initializer != nil && propDecl.Type != nil {
-					compareTypes(propDecl.Initializer, propDecl.Type, false)
-				}
+				declaration := node.AsPropertyDeclaration()
+				compareTypes(declaration.Initializer, declaration.Type, false)
 			},
-
 			ast.KindAsExpression: func(node *ast.Node) {
-				if node.Kind != ast.KindAsExpression {
-					return
-				}
-				asExpr := node.AsAsExpression()
-				if asExpr == nil {
-					return
-				}
-				compareTypes(asExpr.Expression, asExpr.Type, true)
+				expression := node.AsAsExpression()
+				compareTypes(expression.Expression, expression.Type, true)
 			},
-
 			ast.KindTypeAssertionExpression: func(node *ast.Node) {
-				if node.Kind != ast.KindTypeAssertionExpression {
-					return
-				}
-				typeAssertion := node.AsTypeAssertion()
-				if typeAssertion == nil {
-					return
-				}
-				compareTypes(typeAssertion.Expression, typeAssertion.Type, true)
+				expression := node.AsTypeAssertion()
+				compareTypes(expression.Expression, expression.Type, true)
 			},
-
-			// VariableDeclarator in TypeScript corresponds to VariableDeclaration in Go AST
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				if node.Kind != ast.KindVariableDeclaration {
-					return
-				}
-				varDecl := node.AsVariableDeclaration()
-				if varDecl == nil {
-					return
-				}
-				if varDecl.Initializer != nil && varDecl.Type != nil {
-					compareTypes(varDecl.Initializer, varDecl.Type, false)
-				}
+				declaration := node.AsVariableDeclaration()
+				compareTypes(declaration.Initializer, declaration.Type, false)
 			},
 		}
 	},
