@@ -1,3 +1,20 @@
+// Package no_conditional_expect holds the framework-neutral traversal shared by
+// jest/no-conditional-expect and rstest/no-conditional-expect.
+//
+// Known deliberate divergences from eslint-plugin-jest's no-conditional-expect.
+// Both fix cases where upstream loses nesting state; do not "restore parity" by
+// turning either back into a bool.
+//
+//  1. Test-case tracking is a depth counter, not a bool. Upstream sets
+//     `inTestCase = true` and clears it on any test call's exit, so a nested
+//     test registration ends the enclosing one early.
+//  2. Promise-catch tracking is a depth counter, not a bool. Upstream clears
+//     `inPromiseCatch` when an inner `.catch` exits, so assertions later in an
+//     outer `.catch` body go unreported.
+//
+// Behavior intentionally kept identical to upstream: an `expect` that is both
+// inside a conditional and inside a `.catch` is reported twice at the same
+// range, because the two checks are independent.
 package no_conditional_expect
 
 import (
@@ -65,11 +82,15 @@ func NewRule(config Config) rule.Rule {
 			runtime := config.Prepare(ctx)
 			testCaseDepth := 0
 			conditionalDepth := 0
-			inPromiseCatch := false
+			promiseCatchDepth := 0
 			callExpressionFrames := map[*ast.Node]callExpressionFrame{}
 
 			inTestCase := func() bool {
 				return testCaseDepth > 0
+			}
+
+			inPromiseCatch := func() bool {
+				return promiseCatchDepth > 0
 			}
 
 			enterTestCase := func() {
@@ -141,7 +162,7 @@ func NewRule(config Config) rule.Rule {
 						enterTestCase()
 					}
 					if isCatch {
-						inPromiseCatch = true
+						promiseCatchDepth++
 					}
 					if !isExpect {
 						return
@@ -149,7 +170,7 @@ func NewRule(config Config) rule.Rule {
 					if inTestCase() && conditionalDepth > 0 {
 						ctx.ReportNode(node, buildConditionalExpectMessage())
 					}
-					if inPromiseCatch {
+					if inPromiseCatch() {
 						ctx.ReportNode(node, buildConditionalExpectMessage())
 					}
 				},
@@ -161,8 +182,8 @@ func NewRule(config Config) rule.Rule {
 					if frame.isTest {
 						exitTestCase()
 					}
-					if frame.isCatch {
-						inPromiseCatch = false
+					if frame.isCatch && promiseCatchDepth > 0 {
+						promiseCatchDepth--
 					}
 				},
 			}

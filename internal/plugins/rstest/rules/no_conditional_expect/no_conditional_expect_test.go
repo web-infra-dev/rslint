@@ -271,6 +271,19 @@ forCase("case", (row, context) => {
 				},
 			},
 			{
+				// Leaving the inner catch must not clear the outer one.
+				Code: `test("case", async () => {
+  await a().catch(() => {
+    b().catch(() => { expect(1).toBe(1); });
+    expect(2).toBe(2);
+  });
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				Code: `test("case", () => {
   if (condition) log(expect(value).toBe(1));
 });`,

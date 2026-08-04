@@ -665,6 +665,27 @@ func TestNoConditionalExpectRule(t *testing.T) {
 				},
 			},
 			{
+				// Nested catches: leaving the inner one must not clear the outer.
+				// Upstream misses the second assertion; we track catch depth.
+				Code: `
+        it('works', async () => {
+          await a().catch(() => {
+            b().catch(() => { expect(1).toBe(1); });
+            expect(2).toBe(2);
+          });
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				// Chained catches nest in the AST, so upstream's bool is cleared
+				// by every inner exit and it reports only one of the three. Each
+				// callback is its own conditional assertion, so we report all
+				// three. Deliberate divergence: see the package doc comment on
+				// internal/utils/test_framework/rules/no_conditional_expect.
 				Code: `
         it('works', async () => {
           await Promise.resolve()
@@ -678,9 +699,12 @@ func TestNoConditionalExpectRule(t *testing.T) {
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
 				},
 			},
 			{
+				// Same divergence as above.
 				Code: `
         it('works', async () => {
           await Promise.resolve()
@@ -690,6 +714,8 @@ func TestNoConditionalExpectRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
 					{MessageId: "conditionalExpect"},
 				},
 			},
