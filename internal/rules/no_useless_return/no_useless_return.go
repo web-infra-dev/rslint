@@ -234,6 +234,11 @@ func clears(node *ast.Node) bool {
 		// `export = x` is TypeScript's own; `export default x` is not.
 		return !node.AsExportAssignment().IsExportEquals
 
+	case ast.KindNamespaceExportDeclaration:
+		// `export as namespace X` spells its own `export`, so it stays a
+		// TypeScript-only node rather than moving inside an export wrapper.
+		return false
+
 	case ast.KindFunctionDeclaration, ast.KindInterfaceDeclaration,
 		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
 		ast.KindModuleDeclaration, ast.KindImportEqualsDeclaration,

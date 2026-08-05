@@ -298,6 +298,16 @@ export = 1;`},
 			// ---- A TypeScript-only declaration is not one of the ESTree types ESLint lists, so it does not clear the return. ----
 			{
 				Code: `if (c) { return; }
+export as namespace Lib;`,
+				Output: []string{`if (c) {  }
+export as namespace Lib;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// ---- A TypeScript-only declaration is not one of the ESTree types ESLint lists, so it does not clear the return. ----
+			{
+				Code: `if (c) { return; }
 declare global {}`,
 				Output: []string{`if (c) {  }
 declare global {}`},
