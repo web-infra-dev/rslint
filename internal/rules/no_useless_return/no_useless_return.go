@@ -6,9 +6,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 
-	"github.com/web-infra-dev/rslint/internal/cfg"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
 var unnecessaryReturn = rule.RuleMessage{
@@ -85,7 +85,7 @@ func reportUselessReturns(ctx *rule.RuleContext, byRoot map[*ast.Node][]*ast.Nod
 }
 
 // reachableStatements lays out one code path and collects the statements
-// control can reach. internal/cfg stops laying a path out where it ends, so a
+// control can reach. internal/utils/cfg stops laying a path out where it ends, so a
 // statement the hook never sees is one ESLint's code path analysis would place
 // on an unreachable segment.
 func reachableStatements(root *ast.Node) map[*ast.Node]bool {
@@ -166,7 +166,7 @@ const (
 // segment and letting any statement on a segment the return can reach clear it
 // again — deliberately walking through the unreachable segments the return
 // itself created, which simulates the path the code would take without it.
-// internal/cfg stops laying a path out at a `return`, so that continuation has
+// internal/utils/cfg stops laying a path out at a `return`, so that continuation has
 // no edges in the graph and is followed over the syntax tree instead: from the
 // return outwards through its enclosing statements, into the statements that
 // follow each of them.
