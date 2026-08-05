@@ -40,10 +40,13 @@ type rstestResolvedAPI struct {
 	originalNode *ast.Node
 	mode         RstestImportMode
 	profile      rstestAPIProfile
-	// members collects every chain member applied to the resolved API,
-	// including members consumed while following same-file const aliases.
-	members           []string
+	// Semantic conclusions, applied on both the call-site chain and the chain
+	// consumed while following same-file const aliases. Members deliberately
+	// carries no alias-internal information, so anything that has to hold
+	// across an alias belongs here instead.
 	parameterizedKind RstestParameterizedKind
+	skipped           bool
+	todo              bool
 }
 
 type rstestAPIProfile uint8
@@ -130,10 +133,16 @@ func parseRstestFnCall(
 		return nil
 	}
 
-	// MemberEntries only covers members written at the call site, because
-	// members resolved through an alias have no node in this expression.
+	// Members and MemberEntries are the syntactic view: both cover exactly the
+	// members written at the call site, in order, so Members[i] equals
+	// MemberEntries[i].Name. Members resolved through an alias are deliberately
+	// absent from both — they have no node in this expression, and a rule
+	// cannot tell them apart from call-site members. Conclusions that must hold
+	// across an alias are exposed as semantic fields instead.
+	members := make([]string, 0, len(parts)-consumed)
 	memberEntries := make([]ParsedRstestFnMemberEntry, 0, len(parts)-consumed)
 	for _, part := range parts[consumed:] {
+		members = append(members, part.name)
 		memberEntries = append(memberEntries, ParsedRstestFnMemberEntry{
 			Name: part.name,
 			Node: part.node,
@@ -149,7 +158,7 @@ func parseRstestFnCall(
 			Name:          resolved.name,
 			LocalName:     localName,
 			Kind:          resolved.kind,
-			Members:       resolved.members,
+			Members:       members,
 			MemberEntries: memberEntries,
 			Head: ParsedRstestFnCallHead{
 				Type: resolved.mode,
@@ -164,6 +173,8 @@ func parseRstestFnCall(
 			},
 		},
 		ParameterizedKind: resolved.parameterizedKind,
+		Skipped:           resolved.skipped,
+		Todo:              resolved.todo,
 	}
 }
 
@@ -552,12 +563,19 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 		return false
 	}
 	resolved.state = state
-	resolved.members = append(resolved.members, part.name)
+	// Only semantic conclusions are recorded here. This runs on the alias chain
+	// as well as the call-site chain, so anything accumulated becomes visible
+	// across aliases — which is why the member names themselves are collected
+	// by the caller from parts[consumed:] instead.
 	switch part.name {
 	case "each":
 		resolved.parameterizedKind = RstestParameterizedEach
 	case "for":
 		resolved.parameterizedKind = RstestParameterizedFor
+	case "skip":
+		resolved.skipped = true
+	case "todo":
+		resolved.todo = true
 	}
 	return true
 }

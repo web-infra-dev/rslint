@@ -25,6 +25,11 @@ const (
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
 	ParameterizedKind RstestParameterizedKind
+	// Skipped and Todo report whether the call carries `.skip` / `.todo`.
+	// Like ParameterizedKind these are semantic conclusions that survive alias
+	// resolution, so prefer them over scanning Members, which is call-site only.
+	Skipped bool
+	Todo    bool
 }
 
 // IsParameterized reports whether the call was registered through `.each` or
