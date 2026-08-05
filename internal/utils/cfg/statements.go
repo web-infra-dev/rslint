@@ -240,9 +240,15 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 	body := b.newBlock()
 	b.link(testEnd, body)
 
+	// The incrementor runs after the body and is laid out before it, so a body
+	// that always leaves abruptly does not make it unreachable and lose the
+	// fork a throwable node in it makes.
 	update := test
 	if stmt.Incrementor != nil {
 		update = b.newBlock()
+		b.enterDisconnected(update)
+		b.expr(stmt.Incrementor)
+		b.link(b.cur, test)
 	}
 
 	b.pushJump(node, after, update, node)
@@ -251,12 +257,6 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 	b.loop(node)
 	b.link(b.cur, update)
 	b.popJump()
-
-	if stmt.Incrementor != nil {
-		b.enter(update)
-		b.expr(stmt.Incrementor)
-		b.link(b.cur, test)
-	}
 
 	b.enter(after)
 }
