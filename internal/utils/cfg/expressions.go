@@ -5,7 +5,7 @@ import (
 )
 
 func (b *Builder[E]) expr(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 
@@ -63,7 +63,7 @@ func (b *Builder[E]) expr(node *ast.Node) {
 // for. Statements and expressions are handled by their own walkers so control
 // flow inside them is still modelled.
 func (b *Builder[E]) visitUnknown(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 	if ast.IsStatement(node) {
@@ -208,13 +208,13 @@ func (b *Builder[E]) accessOrCall(node *ast.Node) {
 }
 
 func (b *Builder[E]) forkOptionalChain(node *ast.Node) {
-	if b.cur == nil || len(b.chainJoins) == 0 || !ast.IsOptionalChainRoot(node) {
+	if len(b.chainJoins) == 0 || !ast.IsOptionalChainRoot(node) {
 		return
 	}
 	b.link(b.cur, b.chainJoins[len(b.chainJoins)-1])
 	next := b.newBlock()
 	b.link(b.cur, next)
-	b.cur = next
+	b.enter(next)
 }
 
 // typeArguments walks an explicit `<T>` argument list, so a `typeof x` inside
