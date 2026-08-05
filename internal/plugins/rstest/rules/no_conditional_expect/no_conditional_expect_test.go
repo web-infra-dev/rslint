@@ -121,6 +121,30 @@ let state;`},
 				},
 			},
 			{
+				// An unresolvable timeout in the third position must not stop the
+				// second argument from being treated as the callback.
+				Code: `test("case", ({ expect }) => { if (condition) expect(value).toBe(1); }, TIMEOUT);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `const TIMEOUT = 5000;
+test("case", ({ expect }) => { if (condition) expect(value).toBe(1); }, TIMEOUT);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				// The `(name, options, fn)` shape still resolves the third argument
+				// through the pending walk.
+				Code: `test("case", { timeout: 1 }, handler);
+function handler({ expect }) { if (condition) expect(value).toBe(1); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				Code: `import { expect as check, test } from "@rstest/core";
 test("case", () => { if (condition) check(value).toBe(1); });`,
 				Errors: []rule_tester.InvalidTestCaseError{

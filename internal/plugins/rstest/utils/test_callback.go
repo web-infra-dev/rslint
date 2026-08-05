@@ -100,14 +100,25 @@ func resolveRstestTestCallback(
 	}
 
 	arguments := call.Arguments.Nodes
+	// The third argument is the callback only in the `(name, options, fn)` shape.
+	// In `(name, fn, timeout)` it is a timeout, and an unresolvable identifier
+	// there must not shadow the real callback in the second position.
 	if len(arguments) >= 3 {
-		if info := resolveRstestCallbackArgument(ctx, arguments[2]); info.functionNode != nil || info.name != "" {
+		if info := resolveRstestCallbackArgument(ctx, arguments[2]); info.functionNode != nil {
 			info.parsed = parsed
 			return info
 		}
 	}
 
 	info := resolveRstestCallbackArgument(ctx, arguments[1])
+	if info.functionNode == nil && info.name == "" && len(arguments) >= 3 {
+		// The second argument is not a callback at all, so an unresolved name in
+		// the third position is still worth deferring to the pending walk.
+		if third := resolveRstestCallbackArgument(ctx, arguments[2]); third.name != "" {
+			third.parsed = parsed
+			return third
+		}
+	}
 	info.parsed = parsed
 	return info
 }
