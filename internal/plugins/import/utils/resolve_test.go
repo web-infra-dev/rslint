@@ -108,7 +108,8 @@ func contextForRequire(t *testing.T, files map[string]string, fileName string) (
 	t.Helper()
 
 	// Every file outside node_modules is a root, the way a tsconfig covering the
-	// project would load them. The specifier probe only reaches loaded files.
+	// project would load them, so a relative specifier is answered by the probe
+	// over loaded files rather than falling through to the resolver.
 	rootFiles := make([]string, 0, len(files))
 	for path := range files {
 		if !strings.Contains(path, "/node_modules/") {
