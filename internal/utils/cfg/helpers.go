@@ -50,8 +50,7 @@ func isAlwaysTruthyTest(node *ast.Node) bool {
 	case ast.KindNumericLiteral:
 		return utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) != "0"
 	case ast.KindBigIntLiteral:
-		text := node.AsBigIntLiteral().Text
-		return text != "0n" && text != "0"
+		return utils.NormalizeBigIntLiteral(node.AsBigIntLiteral().Text) != "0"
 	case ast.KindStringLiteral:
 		return node.AsStringLiteral().Text != ""
 	}
