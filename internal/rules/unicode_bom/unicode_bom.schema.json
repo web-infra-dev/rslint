@@ -2,7 +2,7 @@
   "type": "array",
   "items": [
     {
-      "enum": ["never"]
+      "enum": ["always", "never"]
     }
   ],
   "minItems": 0,

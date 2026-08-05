@@ -67,6 +67,16 @@ func TestUnicodeBomExtras(t *testing.T) {
 			// The CLI hands a single positional option through as `["never"]`;
 			// this asserts the rule survives options that are not an array.
 			{Code: "var a = 123;", Options: "never"},
+
+			// ---- `always`: the mark is present, which is all the mode asks ----
+			{Code: "\uFEFFvar a = 123;", Options: []interface{}{"always"}},
+			// A file that is nothing but the mark still carries one.
+			{Code: "\uFEFF", Options: []interface{}{"always"}},
+			// Doubled: the first is the file's mark, the second is text behind
+			// it, and the mode is satisfied by the first.
+			{Code: "\uFEFF\uFEFFvar a = 123;", Options: []interface{}{"always"}},
+			// A mark ahead of a shebang, the shape Windows editors write.
+			{Code: "\uFEFF#!/usr/bin/env node\nvar a = 123;", Options: []interface{}{"always"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: graceful degradation — file is nothing but a mark ----
@@ -167,19 +177,107 @@ func TestUnicodeBomExtras(t *testing.T) {
 					MessageId: "unexpected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
 				}},
 			},
+
+			// ---- `always`: graceful degradation \u2014 an empty file ----
+			// There is nothing for the mark to precede, and writing it in is
+			// the whole of the fixed file.
+			{
+				Code:    "",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFF"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected",
+					Message:   "Expected Unicode BOM (Byte Order Mark).",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+
+			// ---- `always`: a U+FEFF present but not in the first position ----
+			// Mid-file it is ordinary text, so the file still has no mark.
+			{
+				Code:    "var a = 123; \uFEFFvar b = 1;",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFFvar a = 123; \uFEFFvar b = 1;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+			// After a leading newline \u2014 position 0 is the newline, not a mark.
+			{
+				Code:    "\n\uFEFFvar a = 123;",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFF\n\uFEFFvar a = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+
+			// ---- `always`: the mark goes ahead of a shebang ----
+			{
+				Code:    "#!/usr/bin/env node\nvar a = 123;",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFF#!/usr/bin/env node\nvar a = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+
+			// ---- `always`: CRLF line endings ----
+			{
+				Code:    "var a = 123;\r\nvar b = 1;\r\n",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFFvar a = 123;\r\nvar b = 1;\r\n"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+
+			// ---- `always`: multibyte content, and .tsx source ----
+			{
+				Code:    "var 日本 = '𝟘';",
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFFvar 日本 = '𝟘';"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+			{
+				Code:    "const a = <div />;\n",
+				Tsx:     true,
+				Options: []interface{}{"always"},
+				Output:  []string{"\uFEFFconst a = <div />;\n"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
+
+			// ---- `always` via the JSON path: bare string rather than array ----
+			{
+				Code:    "var a = 123;",
+				Options: "always",
+				Output:  []string{"\uFEFFvar a = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expected", Line: 1, Column: 1, EndLine: 1, EndColumn: 1,
+				}},
+			},
 		},
 	)
 }
 
-// TestUnicodeBomRejectsAlways locks in that `always` is refused where every
-// other unusable configuration is refused — schema validation, before the rule
-// runs — rather than accepted and then silently ignored.
-func TestUnicodeBomRejectsAlways(t *testing.T) {
+// TestUnicodeBomSchema locks in the option surface: both modes are accepted,
+// and anything else is refused where every other unusable configuration is
+// refused — schema validation, before the rule runs — rather than accepted and
+// then silently ignored.
+func TestUnicodeBomSchema(t *testing.T) {
 	t.Parallel()
 
-	assert.Assert(t, UnicodeBomRule.Schema.Validate([]any{"always"}) != nil,
-		"the schema must reject the always option")
+	assert.NilError(t, UnicodeBomRule.Schema.Validate([]any{"always"}))
 	assert.NilError(t, UnicodeBomRule.Schema.Validate([]any{"never"}))
+	assert.NilError(t, UnicodeBomRule.Schema.Validate([]any{}))
+	assert.Assert(t, UnicodeBomRule.Schema.Validate([]any{"sometimes"}) != nil,
+		"the schema must reject a mode that is neither always nor never")
+	assert.Assert(t, UnicodeBomRule.Schema.Validate([]any{"never", "never"}) != nil,
+		"the schema must reject a second option")
 }
 
 // TestUnicodeBomTextNeverCarriesTheMark locks in the contract the rule rests
