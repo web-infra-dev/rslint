@@ -1052,6 +1052,10 @@ func lintSingleFile(
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
+		// A unicode-bom fix is not expressible as an editor text edit, so skip it.
+		if d.RuleName == "unicode-bom" {
+			d.FixesPtr = nil
+		}
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
