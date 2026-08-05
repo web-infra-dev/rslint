@@ -77,6 +77,9 @@ func resolvePendingTestCallbackNames(
 			if !names[name] {
 				break
 			}
+			if vd.Initializer == nil {
+				break
+			}
 			init := ast.SkipParentheses(vd.Initializer)
 			if ast.IsFunctionExpressionOrArrowFunction(init) {
 				callbacks[init] = true

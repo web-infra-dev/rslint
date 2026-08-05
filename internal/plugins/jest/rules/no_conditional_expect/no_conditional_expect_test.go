@@ -15,6 +15,12 @@ func TestNoConditionalExpectRule(t *testing.T) {
 		t,
 		&no_conditional_expect.NoConditionalExpectRule,
 		[]rule_tester.ValidTestCase{
+			// A callback name that resolves to an uninitialized declaration must
+			// not reach SkipParentheses in the pending-name walk.
+			{Code: `it("case", cb);
+let cb;`},
+			{Code: `let cb;
+it("case", cb);`},
 			{Code: `
       it('foo', () => {
         expect(1).toBe(2);
