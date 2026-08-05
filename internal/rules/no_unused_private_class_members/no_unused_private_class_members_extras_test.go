@@ -213,7 +213,7 @@ class C {
     }
 }`},
 
-			// ---- tsgo AST quirk: nested destructuring computed keys are reads ----
+			// ---- Nested destructuring computed keys are reads ----
 			{Code: `
 class C {
     #key;

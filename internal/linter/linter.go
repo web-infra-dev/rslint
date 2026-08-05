@@ -287,6 +287,12 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			case ast.KindSpreadElement, ast.KindSpreadAssignment:
 				patternVisitor(node.Expression())
 			case ast.KindPropertyAssignment:
+				// A computed property name is evaluated as an expression; it is
+				// not part of the assignment target. Visit it through the normal
+				// path before propagating pattern context to the initializer.
+				if name := node.Name(); name != nil && ast.IsComputedPropertyName(name) {
+					childVisitor(name)
+				}
 				patternVisitor(node.Initializer())
 			default:
 				node.ForEachChild(childVisitor)

@@ -133,9 +133,9 @@ var NoUselessComputedKeyRule = rule.Rule{
 		// PropertyDeclaration / BindingElement), determines whether it has
 		// a useless computed key, and reports + fixes accordingly.
 		//
-		// Listening on containers (not ComputedPropertyName) is required so
-		// the rule also fires inside destructuring patterns: rslint's
-		// `patternVisitor` does not recurse into property-name positions.
+		// Listening on containers (not ComputedPropertyName) keeps the node to
+		// report and fix available and lets the rule distinguish object,
+		// destructuring, and class-member semantics directly.
 		check := func(container *ast.Node, cpn *ast.Node) {
 			computed := cpn.AsComputedPropertyName()
 			if computed == nil || computed.Expression == nil {
