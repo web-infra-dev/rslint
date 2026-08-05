@@ -45,12 +45,16 @@ func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
 		}}, nil, program)
 	}
 
-	// The package name is tested against the resolved package name without
-	// anchors, so any substring of "demo-pkg" matches it.
+	// The package name becomes an unanchored JavaScript pattern, so any substring
+	// of "demo-pkg" matches it, and regular expression syntax applies.
 	assert.Equal(t, matches("demo-pkg"), true)
 	assert.Equal(t, matches("demo"), true)
 	assert.Equal(t, matches("emo-pk"), true)
+	assert.Equal(t, matches("demo.pkg"), true)
+	assert.Equal(t, matches("d[ei]mo"), true)
 	assert.Equal(t, matches("other"), false)
+	// An unparsable pattern matches nothing.
+	assert.Equal(t, matches("("), false)
 }
 
 func TestResolvedPackageName(t *testing.T) {

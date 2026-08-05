@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -202,23 +204,40 @@ func resolvedPackageName(fileName string) string {
 	return packageDirectory[idx+len("/node_modules/"):]
 }
 
+// packageMatchers caches the compiled matcher per `package` specifier, which
+// comes from the rule options and so takes only a handful of distinct values.
+var packageMatchers sync.Map // package name -> *regexp2.Regexp, nil when the pattern is invalid
+
+// packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
+// pattern carries no anchors, so "demo" matches "demo-pkg" as well.
+func packageMatcher(packageName string) *regexp2.Regexp {
+	if cached, ok := packageMatchers.Load(packageName); ok {
+		matcher, _ := cached.(*regexp2.Regexp)
+		return matcher
+	}
+	matcher, err := CompileRegexp2(packageName+"|"+module.MangleScopedPackageName(packageName), JSRegexOptions)
+	if err != nil {
+		matcher = nil
+	}
+	packageMatchers.Store(packageName, matcher)
+	return matcher
+}
+
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
 	program *compiler.Program,
 ) bool {
-	// The specifier is tested against the resolved package name without anchors,
-	// so "demo" matches "demo-pkg" as well.
-	typesPackageName := module.MangleScopedPackageName(packageName)
+	matcher := packageMatcher(packageName)
+	if matcher == nil {
+		return false
+	}
 	for _, file := range declarationFiles {
 		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
 		name := resolvedPackageName(file.FileName())
-		if name == "" {
-			continue
-		}
-		if strings.Contains(name, packageName) || strings.Contains(name, typesPackageName) {
+		if name != "" && Regexp2MatchString(matcher, name) {
 			return true
 		}
 	}
