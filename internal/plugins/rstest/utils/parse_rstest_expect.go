@@ -54,6 +54,24 @@ const (
 	RstestExpectParseReasonModifierUnknown  RstestExpectParseReason = "modifier-unknown"
 )
 
+// RstestExpectMatcherKind records whether an assertion executes through a
+// method call or through a Chai property getter.
+type RstestExpectMatcherKind string
+
+const (
+	RstestExpectMatcherCall     RstestExpectMatcherKind = "call"
+	RstestExpectMatcherProperty RstestExpectMatcherKind = "property"
+)
+
+// ParsedRstestExpectMatcher describes one matcher in an assertion chain.
+// Chai permits multiple assertions in one chain, so callers that need the
+// complete chain should use ParsedRstestExpectCall.Matchers.
+type ParsedRstestExpectMatcher struct {
+	Name  string
+	Entry ParsedRstestFnMemberEntry
+	Kind  RstestExpectMatcherKind
+}
+
 // ParsedRstestExpectCall describes one Rstest expect call.
 //
 // Contract: ParseRstestExpectCall returns nil if and only if the node is not a
@@ -63,6 +81,10 @@ const (
 // deliberately improves on jest's ParseJestFnCall, which returns nil for
 // broken chains and forces valid-expect to re-derive the reason.
 type ParsedRstestExpectCall struct {
+	// Expression is the outermost assertion expression. It is a call for
+	// method-style chains and a member access for property-style Chai
+	// assertions such as expect(value).to.be.ok.
+	Expression *ast.Node
 	// Head is the assertion factory call: expect(x), expect.soft(x),
 	// expect.poll(fn) or expect.element(loc). It is nil for static member
 	// calls such as expect.assertions(1) and for bare modifier chains such as
@@ -72,6 +94,12 @@ type ParsedRstestExpectCall struct {
 	Head *ast.Node
 	// Entry classifies the ExpectStatic surface the call goes through.
 	Entry RstestExpectEntry
+	// Members contains the complete source chain after the resolved expect
+	// root, including assertion factories, Chai language chains, modifiers and
+	// every matcher.
+	Members []string
+	// MemberEntries parallels Members and carries the AST nodes.
+	MemberEntries []ParsedRstestFnMemberEntry
 	// Modifiers holds the modifier names before the matcher, in source order.
 	Modifiers []string
 	// ModifierEntries parallels Modifiers and carries the AST nodes.
@@ -82,6 +110,9 @@ type ParsedRstestExpectCall struct {
 	Matcher string
 	// MatcherEntry carries the matcher's AST node; nil when Reason is set.
 	MatcherEntry *ParsedRstestFnMemberEntry
+	// Matchers contains every matcher in source order. Matcher and MatcherEntry
+	// mirror the first element for compatibility with matcher-consuming rules.
+	Matchers []ParsedRstestExpectMatcher
 	// Reason explains why no matcher was resolved.
 	Reason RstestExpectParseReason
 
@@ -114,12 +145,13 @@ func ParseRstestExpectCall(
 	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
 		return nil
 	}
-	entries := testFramework.GetMemberEntries(node)
+	expression := findTopMostRstestExpectExpression(node)
+	entries := testFramework.GetMemberEntries(expression)
 	expectIndex, ok := rstestExpectMemberIndex(node, entries, ctx, callbacks)
 	if !ok {
 		return nil
 	}
-	return classifyRstestExpectCall(node, entries, expectIndex)
+	return classifyRstestExpectCall(expression, entries, expectIndex)
 }
 
 // IsStaticRstestExpectCall reports calls of a single static member on the
@@ -183,6 +215,34 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 	return top
 }
 
+// findTopMostRstestExpectExpression extends the outermost call through a
+// trailing static member chain. This lets the CallExpression-only parser see
+// property-style Chai assertions such as expect(value).to.be.ok without
+// requiring rules to listen for member-access nodes.
+func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
+	top := node
+	current := node
+	for parent := current.Parent; parent != nil; {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+		case ast.KindPropertyAccessExpression:
+			if parent.AsPropertyAccessExpression().Expression != current {
+				return top
+			}
+			top = parent
+		case ast.KindElementAccessExpression:
+			if parent.AsElementAccessExpression().Expression != current {
+				return top
+			}
+			top = parent
+		default:
+			return top
+		}
+		current, parent = parent, parent.Parent
+	}
+	return top
+}
+
 // rstestExpectMemberIndex resolves whether node is an expect call and where
 // the expect member sits in entries: 0 when the root identifier itself is
 // expect (imports, globals, destructured context), 1 when the root is a
@@ -213,17 +273,26 @@ func rstestExpectMemberIndex(
 }
 
 func classifyRstestExpectCall(
-	node *ast.Node,
+	expression *ast.Node,
 	entries []testFramework.MemberEntry,
 	expectIndex int,
 ) *ParsedRstestExpectCall {
 	expectEntry := entries[expectIndex]
 	rest := entries[expectIndex+1:]
 	parsed := &ParsedRstestExpectCall{
+		Expression:      expression,
 		Entry:           RstestExpectEntryCall,
 		Head:            expectEntry.Call,
 		rootInvoked:     expectEntry.Call != nil,
 		trailingMembers: len(rest),
+	}
+	if len(rest) > 0 {
+		parsed.Members = make([]string, len(rest))
+		parsed.MemberEntries = make([]ParsedRstestFnMemberEntry, len(rest))
+		for i, entry := range rest {
+			parsed.Members[i] = entry.Name
+			parsed.MemberEntries[i] = entry
+		}
 	}
 
 	chain := rest
@@ -249,14 +318,21 @@ func classifyRstestExpectCall(
 		}
 	}
 
-	modifierEntries, matcher, reason := findRstestExpectModifiersAndMatcher(chain)
+	modifierEntries, matchers, reason := findRstestExpectModifiersAndMatchers(
+		chain,
+		!parsed.rootInvoked && parsed.Head == nil,
+	)
 	parsed.Reason = reason
-	if reason == RstestExpectParseReasonMatcherNotFound && isMemberAccessNode(node.Parent) {
+	if reason == RstestExpectParseReasonMatcherNotFound &&
+		len(chain) > 0 &&
+		isMemberAccessNode(expression) &&
+		!hasComputedDynamicRstestExpectMember(chain) {
 		parsed.Reason = RstestExpectParseReasonMatcherNotCalled
 	}
-	if matcher != nil {
-		parsed.Matcher = matcher.Name
-		parsed.MatcherEntry = matcher
+	if len(matchers) > 0 {
+		parsed.Matchers = matchers
+		parsed.Matcher = matchers[0].Name
+		parsed.MatcherEntry = &parsed.Matchers[0].Entry
 		parsed.ModifierEntries = modifierEntries
 		if len(modifierEntries) > 0 {
 			parsed.Modifiers = make([]string, len(modifierEntries))
@@ -266,6 +342,15 @@ func classifyRstestExpectCall(
 		}
 	}
 	return parsed
+}
+
+func hasComputedDynamicRstestExpectMember(entries []testFramework.MemberEntry) bool {
+	for _, entry := range entries {
+		if entry.Node != nil && isComputedDynamicMemberName(entry.Node) {
+			return true
+		}
+	}
+	return false
 }
 
 // classifyStaticExpectEntry names the ExpectStatic surface behind a not-invoked
@@ -299,47 +384,84 @@ func classifyStaticExpectEntry(rest []testFramework.MemberEntry) RstestExpectEnt
 	}
 }
 
-// findRstestExpectModifiersAndMatcher locates the matcher — the first chain
-// member whose enclosing member access is invoked — and validates the
-// modifiers before it, mirroring Vitest's expect-chain validation: not may
-// appear at most once, and resolves / rejects may appear at most once in
-// total, regardless of their order.
-func findRstestExpectModifiersAndMatcher(entries []testFramework.MemberEntry) (
+type rstestExpectChainKind uint8
+
+const (
+	rstestExpectChainUnknown rstestExpectChainKind = iota
+	rstestExpectChainLanguage
+	rstestExpectChainModifier
+	rstestExpectChainMatcher
+)
+
+type rstestExpectChainEntry struct {
+	Entry       ParsedRstestFnMemberEntry
+	Kind        rstestExpectChainKind
+	MatcherKind RstestExpectMatcherKind
+}
+
+// findRstestExpectModifiersAndMatchers classifies the complete assertion
+// chain, returns every matcher in source order and validates the language and
+// modifier members around them. Matcher and MatcherEntry on the public result
+// continue to expose the first matcher for compatibility.
+func findRstestExpectModifiersAndMatchers(
+	entries []testFramework.MemberEntry,
+	isStaticExpectChain bool,
+) (
 	[]ParsedRstestFnMemberEntry,
-	*ParsedRstestFnMemberEntry,
+	[]ParsedRstestExpectMatcher,
 	RstestExpectParseReason,
 ) {
 	if len(entries) == 0 {
 		return nil, nil, RstestExpectParseReasonMatcherNotFound
 	}
 
-	modifiers := make([]ParsedRstestFnMemberEntry, 0, len(entries))
-	notCount := 0
-	promiseModifierCount := 0
-	for _, member := range entries {
+	chains := make([]rstestExpectChainEntry, len(entries))
+	matcherIndex := -1
+	for i, member := range entries {
 		if member.Node == nil {
 			return nil, nil, RstestExpectParseReasonModifierUnknown
 		}
 		if isComputedDynamicMemberName(member.Node) {
-			// expect(x)[matcherName](1): the member name cannot be resolved
-			// statically, so no matcher can be located.
 			return nil, nil, RstestExpectParseReasonMatcherNotFound
 		}
-		parent := member.Node.Parent
-		if parent == nil {
+		chains[i] = classifyRstestExpectChainEntry(
+			member,
+			isStaticExpectChain && i == 0,
+		)
+		if matcherIndex == -1 && chains[i].Kind == rstestExpectChainMatcher {
+			matcherIndex = i
+		}
+	}
+
+	modifierEnd := matcherIndex
+	if modifierEnd == -1 {
+		modifierEnd = len(chains)
+	}
+	modifiers := make([]ParsedRstestFnMemberEntry, 0, modifierEnd)
+	notCount := 0
+	promiseModifierCount := 0
+	for i := range modifierEnd {
+		chain := chains[i]
+		if chain.Kind == rstestExpectChainUnknown {
+			// With no matcher, an unknown terminal member may simply be a
+			// matcher whose call was omitted. Earlier unknown members make the
+			// chain invalid.
+			if matcherIndex == -1 && i == len(chains)-1 {
+				continue
+			}
+			return nil, nil, RstestExpectParseReasonModifierUnknown
+		}
+		if chain.Kind == rstestExpectChainLanguage {
+			if chain.Entry.Call != nil {
+				return nil, nil, RstestExpectParseReasonModifierUnknown
+			}
+			continue
+		}
+		if chain.Kind != rstestExpectChainModifier {
 			return nil, nil, RstestExpectParseReasonModifierUnknown
 		}
 
-		grandparent := ast.WalkUpParenthesizedExpressions(parent.Parent)
-		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
-			return modifiers, &member, RstestExpectParseReasonNone
-		}
-
-		if !RSTEST_EXPECT_MODIFIER_NAMES[member.Name] {
-			return nil, nil, RstestExpectParseReasonModifierUnknown
-		}
-
-		if member.Name == "not" {
+		if chain.Entry.Name == "not" {
 			notCount++
 			if notCount > 1 {
 				return nil, nil, RstestExpectParseReasonModifierUnknown
@@ -351,10 +473,89 @@ func findRstestExpectModifiersAndMatcher(entries []testFramework.MemberEntry) (
 			}
 		}
 
-		modifiers = append(modifiers, member)
+		modifiers = append(modifiers, chain.Entry)
 	}
 
-	return nil, nil, RstestExpectParseReasonMatcherNotFound
+	if matcherIndex == -1 {
+		return nil, nil, RstestExpectParseReasonMatcherNotFound
+	}
+
+	matchers := make([]ParsedRstestExpectMatcher, 0, len(chains)-matcherIndex)
+	for i := matcherIndex; i < len(chains); i++ {
+		chain := chains[i]
+		switch chain.Kind {
+		case rstestExpectChainMatcher:
+			matchers = append(matchers, ParsedRstestExpectMatcher{
+				Name:  chain.Entry.Name,
+				Entry: chain.Entry,
+				Kind:  chain.MatcherKind,
+			})
+		case rstestExpectChainLanguage:
+			if chain.Entry.Call != nil {
+				return nil, nil, RstestExpectParseReasonModifierUnknown
+			}
+		case rstestExpectChainModifier:
+			// Chai permits modifiers between assertions in a multi-matcher
+			// chain, e.g. .a("string").that.does.not.contain("x").
+		case rstestExpectChainUnknown:
+			return nil, nil, RstestExpectParseReasonModifierUnknown
+		}
+	}
+
+	return modifiers, matchers, RstestExpectParseReasonNone
+}
+
+func classifyRstestExpectChainEntry(
+	entry ParsedRstestFnMemberEntry,
+	isFirstStaticMember bool,
+) rstestExpectChainEntry {
+	name := entry.Name
+	if entry.Call != nil {
+		if isFirstStaticMember && name == "any" {
+			return rstestExpectChainEntry{
+				Entry:       entry,
+				Kind:        rstestExpectChainMatcher,
+				MatcherKind: RstestExpectMatcherCall,
+			}
+		}
+		if rstestChaiPropertyMatchers[name] ||
+			RSTEST_EXPECT_MODIFIER_NAMES[name] ||
+			(rstestChaiChainableMembers[name] && !rstestChaiDualRoleChains[name]) {
+			return rstestExpectChainEntry{
+				Entry: entry,
+				Kind:  rstestExpectChainLanguage,
+			}
+		}
+		return rstestExpectChainEntry{
+			Entry:       entry,
+			Kind:        rstestExpectChainMatcher,
+			MatcherKind: RstestExpectMatcherCall,
+		}
+	}
+
+	if rstestChaiPropertyMatchers[name] {
+		return rstestExpectChainEntry{
+			Entry:       entry,
+			Kind:        rstestExpectChainMatcher,
+			MatcherKind: RstestExpectMatcherProperty,
+		}
+	}
+	if rstestChaiChainableMembers[name] {
+		return rstestExpectChainEntry{
+			Entry: entry,
+			Kind:  rstestExpectChainLanguage,
+		}
+	}
+	if RSTEST_EXPECT_MODIFIER_NAMES[name] {
+		return rstestExpectChainEntry{
+			Entry: entry,
+			Kind:  rstestExpectChainModifier,
+		}
+	}
+	return rstestExpectChainEntry{
+		Entry: entry,
+		Kind:  rstestExpectChainUnknown,
+	}
 }
 
 // isComputedDynamicMemberName reports member name nodes that came from a

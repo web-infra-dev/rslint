@@ -31,6 +31,45 @@ func describeParsedExpect(parsed *rstestUtils.ParsedRstestExpectCall) string {
 	)
 }
 
+func describeParsedExpectChain(parsed *rstestUtils.ParsedRstestExpectCall) string {
+	reason := string(parsed.Reason)
+	if reason == "" {
+		reason = "none"
+	}
+	matchers := make([]string, len(parsed.Matchers))
+	for i, matcher := range parsed.Matchers {
+		matchers[i] = fmt.Sprintf("%s:%s", matcher.Name, matcher.Kind)
+	}
+	return fmt.Sprintf(
+		"entry=%s head=%t expression=%s members=[%s] modifiers=[%s] matcher=%s matchers=[%s] reason=%s static=%t",
+		parsed.Entry,
+		parsed.Head != nil,
+		expectExpressionKind(parsed.Expression),
+		strings.Join(parsed.Members, " "),
+		strings.Join(parsed.Modifiers, " "),
+		parsed.Matcher,
+		strings.Join(matchers, " "),
+		reason,
+		rstestUtils.IsStaticRstestExpectCall(parsed),
+	)
+}
+
+func expectExpressionKind(node *ast.Node) string {
+	if node == nil {
+		return "nil"
+	}
+	switch node.Kind {
+	case ast.KindCallExpression:
+		return "call"
+	case ast.KindPropertyAccessExpression:
+		return "property"
+	case ast.KindElementAccessExpression:
+		return "element"
+	default:
+		return "other"
+	}
+}
+
 // expectParseProbe reports every parsed expect call with its canonical
 // description, so invalid test cases assert exact parse results and valid test
 // cases assert that ParseRstestExpectCall returned nil.
@@ -46,6 +85,23 @@ var expectParseProbe = rule.Rule{
 					return
 				}
 				ctx.ReportNode(node, probeMessage("parsedExpect", describeParsedExpect(parsed)))
+			},
+		}
+	},
+}
+
+var expectChainParseProbe = rule.Rule{
+	Name:             "rstest/expect-chain-parse-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				if parsed == nil {
+					return
+				}
+				ctx.ReportNode(node, probeMessage("parsedExpect", describeParsedExpectChain(parsed)))
 			},
 		}
 	},
@@ -101,6 +157,10 @@ func TestParseRstestExpectCallEntries(t *testing.T) {
 			{
 				Code:   `expect.anything();`,
 				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=anything reason=none static=true"),
+			},
+			{
+				Code:   `expect.any(String);`,
+				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=any reason=none static=true"),
 			},
 			// ExpectStatic.not.<asymmetric> is the static negation, not the
 			// Assertion.not modifier; upstream parses it as modifier + matcher
@@ -242,6 +302,246 @@ func TestParseRstestExpectCallModifiersAndMatcher(t *testing.T) {
 	)
 }
 
+func TestParseRstestExpectCallChaiMethods(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `expect(x).to.equal(y);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to equal] modifiers=[] matcher=equal matchers=[equal:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).to.have.property("name");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to have property] modifiers=[] matcher=property matchers=[property:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).to.deep.equal(y);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to deep equal] modifiers=[] matcher=equal matchers=[equal:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).to.have.any.keys("a", "b");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to have any keys] modifiers=[] matcher=keys matchers=[keys:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).to.include("x");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to include] modifiers=[] matcher=include matchers=[include:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(xs).to.include.members([x]);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to include members] modifiers=[] matcher=members matchers=[members:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(xs).to.have.lengthOf(3);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to have lengthOf] modifiers=[] matcher=lengthOf matchers=[lengthOf:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(xs).to.have.lengthOf.above(2);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to have lengthOf above] modifiers=[] matcher=above matchers=[above:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(Foo).itself.to.respondTo("bar");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[itself to respondTo] modifiers=[] matcher=respondTo matchers=[respondTo:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect("hello").to.be.a("string").and.contain("hell");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to be a and contain] modifiers=[] matcher=a matchers=[a:call contain:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect("hello").to.be.a("string").that.does.not.contain("world");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to be a that does not contain] modifiers=[] matcher=a matchers=[a:call contain:call] reason=none static=false",
+				),
+			},
+		},
+	)
+}
+
+func TestParseRstestExpectCallChaiProperties(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `expect(value).to.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to be ok] modifiers=[] matcher=ok matchers=[ok:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(value).to.not.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to not be ok] modifiers=[not] matcher=ok matchers=[ok:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(value).not.to.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[not to be ok] modifiers=[not] matcher=ok matchers=[ok:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(value).to.be.true;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to be true] modifiers=[] matcher=true matchers=[true:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(value).to.exist;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to exist] modifiers=[] matcher=exist matchers=[exist:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(spy).to.have.been.called;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to have been called] modifiers=[] matcher=called matchers=[called:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(spy).to.have.been.calledOnce;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to have been calledOnce] modifiers=[] matcher=calledOnce matchers=[calledOnce:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(value)["to"]["be"]["ok"];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=element members=[to be ok] modifiers=[] matcher=ok matchers=[ok:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(1).to.equal(1).and.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[to equal and be ok] modifiers=[] matcher=equal matchers=[equal:call ok:property] reason=none static=false",
+				),
+			},
+		},
+	)
+}
+
+func TestParseRstestExpectCallChaiPromiseModifiers(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `expect(p).resolves.to.equal(x);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[resolves to equal] modifiers=[resolves] matcher=equal matchers=[equal:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(p).not.resolves.to.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[not resolves to be ok] modifiers=[not resolves] matcher=ok matchers=[ok:property] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(p).resolves.to.not.equal(x);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[resolves to not equal] modifiers=[resolves not] matcher=equal matchers=[equal:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(p).to.resolves.equal(x);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to resolves equal] modifiers=[resolves] matcher=equal matchers=[equal:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(p).rejects.to.have.property("message");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[rejects to have property] modifiers=[rejects] matcher=property matchers=[property:call] reason=none static=false",
+				),
+			},
+		},
+	)
+}
+
+func TestParseRstestExpectCallChaiInvalidChains(t *testing.T) {
+	invalid := "entry=expect head=true expression=call members=[%s] modifiers=[] matcher= matchers=[] reason=modifier-unknown static=false"
+	propertyInvalid := "entry=expect head=true expression=property members=[%s] modifiers=[] matcher= matchers=[] reason=modifier-unknown static=false"
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `expect(x).to.be("string").that.does.not.contain("world");`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "to be that does not contain")),
+			},
+			{
+				Code:   `expect(x).to.have.foo.equal(y);`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "to have foo equal")),
+			},
+			{
+				Code:   `expect(x).to.be.a("string").that.foo.contain("x");`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "to be a that foo contain")),
+			},
+			{
+				Code:   `expect(x).not().to.equal(y);`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "not to equal")),
+			},
+			{
+				Code:   `expect(x).to();`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "to")),
+			},
+			{
+				Code:   `expect(x).any(y);`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "any")),
+			},
+			{
+				Code:   `expect(x).to.be.ok();`,
+				Errors: parsedExpectError(fmt.Sprintf(invalid, "to be ok")),
+			},
+			{
+				Code:   `expect(x).not.not.to.be.ok;`,
+				Errors: parsedExpectError(fmt.Sprintf(propertyInvalid, "not not to be ok")),
+			},
+			{
+				Code:   `expect(x).resolves.rejects.to.be.ok;`,
+				Errors: parsedExpectError(fmt.Sprintf(propertyInvalid, "resolves rejects to be ok")),
+			},
+			{
+				Code: `expect(x).unknownMatcher;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[unknownMatcher] modifiers=[] matcher= matchers=[] reason=matcher-not-called static=false",
+				),
+			},
+			{
+				Code:   `expect(x).foo.bar;`,
+				Errors: parsedExpectError(fmt.Sprintf(propertyInvalid, "foo bar")),
+			},
+			{
+				Code: `expect(x)[matcherName];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=element members=[matcherName] modifiers=[] matcher= matchers=[] reason=matcher-not-found static=false",
+				),
+			},
+		},
+	)
+}
+
 func TestParseRstestExpectCallSources(t *testing.T) {
 	chain := "entry=expect head=true modifiers=[] matcher=toBe reason=none static=false"
 	rule_tester.RunRuleTester(
@@ -309,6 +609,30 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 				Code:   `import.meta.rstest.expect.assertions(1);`,
 				Errors: parsedExpectError("entry=assertions head=false modifiers=[] matcher=assertions reason=none static=false"),
 			},
+			{
+				Code: `import { expect as check } from '@rstest/core'; check(1).to.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=ok reason=none static=false",
+				),
+			},
+			{
+				Code: `import * as rstest from '@rstest/core'; rstest.expect(1).to.equal(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=equal reason=none static=false",
+				),
+			},
+			{
+				Code: `import.meta.rstest.expect(1).to.be.ok;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=ok reason=none static=false",
+				),
+			},
+			{
+				Code: `test("t", ({ expect }) => { expect(1).to.be.ok; });`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=ok reason=none static=false",
+				),
+			},
 		},
 	)
 }
@@ -326,6 +650,8 @@ func TestParseRstestExpectCallIgnoresForeignExpect(t *testing.T) {
 			{Code: `test("t", () => {});`},
 			{Code: `describe("suite", () => {});`},
 			{Code: `Math.max(1, 2);`},
+			{Code: `import { expect } from 'vitest'; expect(1).to.be.ok;`},
+			{Code: `import { expect } from '@jest/globals'; expect(1).to.equal(1);`},
 		},
 		[]rule_tester.InvalidTestCase{},
 	)
@@ -353,6 +679,34 @@ var expectAwaitProbe = rule.Rule{
 	},
 }
 
+var expectIdentityProbe = rule.Rule{
+	Name:             "rstest/expect-identity-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				if rstestUtils.IsRstestExpectCall(node, ctx, callbacks) {
+					ctx.ReportNode(node, probeMessage("expectCall", "expect=true"))
+				}
+			},
+		}
+	},
+}
+
+func TestIsRstestExpectCallRecognizesChaiPropertyStyleOnce(t *testing.T) {
+	expectCall := []rule_tester.InvalidTestCaseError{{MessageId: "expectCall", Message: "expect=true"}}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectIdentityProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{Code: `expect(value).to.be.ok;`, Errors: expectCall},
+			{Code: `expect(spy).to.have.been.calledOnce;`, Errors: expectCall},
+			{Code: `expect(value).to.equal(expected);`, Errors: expectCall},
+		},
+	)
+}
+
 func TestShouldRstestExpectBeAwaited(t *testing.T) {
 	awaited := []rule_tester.InvalidTestCaseError{{MessageId: "awaited", Message: "await=true"}}
 	notAwaited := []rule_tester.InvalidTestCaseError{{MessageId: "awaited", Message: "await=false"}}
@@ -364,7 +718,11 @@ func TestShouldRstestExpectBeAwaited(t *testing.T) {
 			{Code: `expect(x).rejects.not.toThrow();`, Errors: awaited},
 			{Code: `expect(x).not.resolves.toBe(1);`, Errors: awaited},
 			{Code: `expect(x).not.rejects.toThrow();`, Errors: awaited},
+			{Code: `expect(x).resolves.to.equal(1);`, Errors: awaited},
+			{Code: `expect(x).not.resolves.to.be.ok;`, Errors: awaited},
+			{Code: `expect(x).rejects.to.have.property("message");`, Errors: awaited},
 			{Code: `expect(x).toResolve();`, Errors: awaited},
+			{Code: `expect(x).to.be.ok;`, Errors: notAwaited},
 			{Code: `expect(x).not.toBe(1);`, Errors: notAwaited},
 			{Code: `expect(x).toBe(1);`, Errors: notAwaited},
 		},
@@ -410,5 +768,48 @@ func TestRstestMatcherTables(t *testing.T) {
 		if !rstestUtils.RSTEST_POLL_EXCLUDED_MEMBERS[name] {
 			t.Errorf("poll-excluded members must contain %q", name)
 		}
+	}
+
+	propertyMatchers := []string{
+		"ok",
+		"true",
+		"numeric",
+		"callable",
+		"false",
+		"null",
+		"undefined",
+		"NaN",
+		"exist",
+		"exists",
+		"empty",
+		"arguments",
+		"Arguments",
+		"iterable",
+		"extensible",
+		"sealed",
+		"frozen",
+		"finite",
+		"called",
+		"calledOnce",
+		"calledTwice",
+		"calledThrice",
+	}
+	for _, matcher := range propertyMatchers {
+		t.Run("property-"+matcher, func(t *testing.T) {
+			code := fmt.Sprintf("expect(value).to.%s;", matcher)
+			rule_tester.RunRuleTester(
+				fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+				[]rule_tester.ValidTestCase{},
+				[]rule_tester.InvalidTestCase{{
+					Code: code,
+					Errors: parsedExpectError(fmt.Sprintf(
+						"entry=expect head=true expression=property members=[to %s] modifiers=[] matcher=%s matchers=[%s:property] reason=none static=false",
+						matcher,
+						matcher,
+						matcher,
+					)),
+				}},
+			)
+		})
 	}
 }

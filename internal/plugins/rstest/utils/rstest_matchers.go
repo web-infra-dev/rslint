@@ -7,6 +7,7 @@ package utils
 // Baselines:
 //   - rstest commit c4b67c72
 //   - @vitest/expect 4.1.10 (rstest packages/core/package.json declares ^4.1.10)
+//   - Chai 6.2.2
 
 // RSTEST_EXPECT_MODIFIER_NAMES lists the assertion chain modifiers.
 // Source: rstest c4b67c72 packages/core/src/types/expect.ts:72-143 (Assertion
@@ -16,6 +17,103 @@ var RSTEST_EXPECT_MODIFIER_NAMES = map[string]bool{
 	"not":      true,
 	"rejects":  true,
 	"resolves": true,
+}
+
+// rstestChaiLanguageChains lists Chai's no-op language chains plus `itself`,
+// which sets a flag consumed by respondTo. They connect assertions but are
+// never matchers by themselves.
+// Source: chai@6.2.2 lib/chai/core/assertions.js (language chains and itself),
+// cross-checked against eslint-plugin-vitest@1.6.26
+// src/utils/parse-vitest-fn-call.ts.
+var rstestChaiLanguageChains = map[string]bool{
+	"also":   true,
+	"and":    true,
+	"at":     true,
+	"be":     true,
+	"been":   true,
+	"but":    true,
+	"does":   true,
+	"has":    true,
+	"have":   true,
+	"is":     true,
+	"itself": true,
+	"of":     true,
+	"same":   true,
+	"still":  true,
+	"that":   true,
+	"to":     true,
+	"which":  true,
+	"with":   true,
+}
+
+// rstestChaiFlagChains lists Chai properties that alter later matchers without
+// performing an assertion themselves.
+// Source: chai@6.2.2 lib/chai/core/assertions.js, cross-checked against
+// eslint-plugin-vitest@1.6.26 src/utils/parse-vitest-fn-call.ts.
+var rstestChaiFlagChains = map[string]bool{
+	"all":     true,
+	"any":     true,
+	"deep":    true,
+	"nested":  true,
+	"ordered": true,
+	"own":     true,
+}
+
+// rstestChaiDualRoleChains lists Chai chainable methods: an uncalled property
+// access configures or connects a later assertion, while invoking the same
+// member makes it the matcher.
+// Source: chai@6.2.2 lib/chai/core/assertions.js, cross-checked against
+// eslint-plugin-vitest@1.6.26 src/utils/parse-vitest-fn-call.ts.
+var rstestChaiDualRoleChains = map[string]bool{
+	"a":         true,
+	"an":        true,
+	"contain":   true,
+	"contains":  true,
+	"include":   true,
+	"includes":  true,
+	"length":    true,
+	"lengthOf":  true,
+	"respondTo": true,
+}
+
+// rstestChaiChainableMembers is the union of the language, flag and dual-role
+// tables. The source tables remain separate because classification depends on
+// whether a dual-role member is invoked.
+var rstestChaiChainableMembers = mergeRstestExpectNameSets(
+	rstestChaiLanguageChains,
+	rstestChaiFlagChains,
+	rstestChaiDualRoleChains,
+)
+
+// rstestChaiPropertyMatchers lists official getter assertions that execute
+// without a call expression. Unknown terminal properties are deliberately not
+// accepted because they may be misspelled method matchers.
+// Sources:
+//   - chai@6.2.2 lib/chai/core/assertions.js (core property assertions)
+//   - @vitest/expect@4.1.10 src/chai-style-assertions.ts (called properties)
+var rstestChaiPropertyMatchers = map[string]bool{
+	"Arguments":    true,
+	"NaN":          true,
+	"arguments":    true,
+	"callable":     true,
+	"called":       true,
+	"calledOnce":   true,
+	"calledThrice": true,
+	"calledTwice":  true,
+	"empty":        true,
+	"exist":        true,
+	"exists":       true,
+	"extensible":   true,
+	"false":        true,
+	"finite":       true,
+	"frozen":       true,
+	"iterable":     true,
+	"null":         true,
+	"numeric":      true,
+	"ok":           true,
+	"sealed":       true,
+	"true":         true,
+	"undefined":    true,
 }
 
 // RSTEST_MATCHER_ALIASES maps alias matchers to their canonical names.
@@ -153,4 +251,18 @@ var rstestExpectConfigMembers = map[string]bool{
 	"getState":              true,
 	"setState":              true,
 	"extend":                true,
+}
+
+func mergeRstestExpectNameSets(sets ...map[string]bool) map[string]bool {
+	size := 0
+	for _, set := range sets {
+		size += len(set)
+	}
+	merged := make(map[string]bool, size)
+	for _, set := range sets {
+		for name := range set {
+			merged[name] = true
+		}
+	}
+	return merged
 }
