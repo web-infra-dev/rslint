@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -40,16 +41,17 @@ func ResolveSourceFileFromSourceFile(ctx rule.RuleContext, sourceFile *ast.Sourc
 // therefore absent from that cache even though upstream resolves both. Those
 // fall through to a probe of the relative specifier against the files already
 // loaded into the Program, which also covers the extension-substitution cases
-// upstream still treats as edges. A package specifier carries no relative path
-// to probe, so a `require('some-package')` in a TypeScript file stays unresolved.
+// upstream still treats as edges, and then to TypeScript's own resolver, which
+// is what reaches a package specifier.
 func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if ctx.Program == nil || sourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
 
+	cached := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
 	resolvedPath := ""
-	if module := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier); module != nil {
-		resolvedPath = module.ResolvedFileName
+	if cached != nil {
+		resolvedPath = cached.ResolvedFileName
 	}
 	if resolvedPath != "" {
 		if target := ctx.Program.GetSourceFileForResolvedModule(resolvedPath); target != nil {
@@ -61,12 +63,35 @@ func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpeci
 		return target.FileName(), target, true
 	}
 
+	// A nil cache entry means TypeScript never collected this specifier, rather
+	// than that it tried and failed, so resolving it costs a walk TypeScript has
+	// not already done. Specifiers TypeScript did try and fail on stay failed.
+	if cached == nil {
+		if resolved := resolveWithModuleResolver(ctx, sourceFile, moduleSpecifier); resolved != "" {
+			return resolved, ctx.Program.GetSourceFileForResolvedModule(resolved), true
+		}
+	}
+
 	// TypeScript named a file the Program never loaded, such as one outside the
 	// project. Callers that only need the path can still use it.
 	if resolvedPath != "" {
 		return resolvedPath, nil, true
 	}
 	return "", nil, false
+}
+
+// resolveWithModuleResolver runs TypeScript's own module resolution for a
+// specifier the Program never collected. Package specifiers reach it, since
+// they carry no relative path to probe against the loaded files.
+func resolveWithModuleResolver(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) string {
+	resolver := module.NewResolver(ctx.Program.Host(), ctx.Program.Options(), "", "")
+	mode := ctx.Program.GetModeForUsageLocation(sourceFile, moduleSpecifier)
+
+	resolved, _ := resolver.ResolveModuleName(moduleSpecifier.Text(), sourceFile.FileName(), mode, nil)
+	if !resolved.IsResolved() {
+		return ""
+	}
+	return resolved.ResolvedFileName
 }
 
 // resolveRelativeFromLoadedFiles finds the file a relative specifier names by

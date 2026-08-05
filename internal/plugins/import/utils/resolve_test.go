@@ -49,17 +49,17 @@ func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 // TestResolveFromSourceFileRequire covers the three `require()` shapes that
 // differ in how their specifier reaches a file: TypeScript's own resolution
 // records the call in a JavaScript file, while the same call in a TypeScript
-// file has to reach a relative target through the specifier probe and has no
-// way at all to reach a package.
+// file reaches a relative target through the specifier probe and a package
+// through the resolver.
 func TestResolveFromSourceFileRequire(t *testing.T) {
 	t.Parallel()
 
 	const packageFile = "/require-fixture/node_modules/some-package/index.d.ts"
 	files := map[string]string{
-		packageFile:                    "declare const jq: unknown;\nexport = jq;\n",
+		packageFile:                    "declare const value: unknown;\nexport = value;\n",
 		"/require-fixture/dep.ts":      "export const dep = 1;\n",
-		"/require-fixture/consumer.js": `const jq = require("some-package");`,
-		"/require-fixture/package.ts":  `const jq = require("some-package");`,
+		"/require-fixture/consumer.js": `const pkg = require("some-package");`,
+		"/require-fixture/package.ts":  `const pkg = require("some-package");`,
 		"/require-fixture/relative.ts": `const dep = require("./dep");`,
 	}
 
@@ -79,11 +79,9 @@ func TestResolveFromSourceFileRequire(t *testing.T) {
 			wantPath: "/require-fixture/dep.ts",
 		},
 		{
-			// A package specifier has no relative path to probe, so it stays
-			// unresolved until TypeScript records the call itself.
 			name:     "package specifier in a TypeScript file",
 			fileName: "/require-fixture/package.ts",
-			wantPath: "",
+			wantPath: packageFile,
 		},
 	}
 
