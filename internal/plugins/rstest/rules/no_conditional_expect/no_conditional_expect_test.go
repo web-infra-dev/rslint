@@ -66,6 +66,9 @@ test.beforeEach(() => {
 			// while the expect root is being resolved.
 			{Code: `let logger;
 export function run() { logger(); }`},
+			// Same, for a callback argument that resolves to an uninitialized
+			// declaration.
+			{Code: `let cb; cb = () => {}; test("case", cb);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

@@ -113,6 +113,9 @@ func resolveRstestTestCallback(
 }
 
 func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rstestCallbackInfo {
+	if argument == nil {
+		return rstestCallbackInfo{}
+	}
 	argument = ast.SkipParentheses(argument)
 	if argument == nil {
 		return rstestCallbackInfo{}
@@ -133,7 +136,11 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	case ast.KindFunctionDeclaration:
 		return rstestCallbackInfo{functionNode: declaration, name: name}
 	case ast.KindVariableDeclaration:
-		initializer := ast.SkipParentheses(declaration.AsVariableDeclaration().Initializer)
+		initializer := declaration.AsVariableDeclaration().Initializer
+		if initializer == nil {
+			return rstestCallbackInfo{}
+		}
+		initializer = ast.SkipParentheses(initializer)
 		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 			return rstestCallbackInfo{functionNode: initializer, name: name}
 		}
