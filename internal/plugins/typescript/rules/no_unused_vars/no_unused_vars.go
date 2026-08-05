@@ -40,11 +40,14 @@ type analysisContext struct {
 	seenMergedSymbols  map[*ast.Symbol]bool
 	reportedUnused     map[*ast.Node]bool
 	explicitExports    map[*ast.Node]explicitExportResult
-	parameterBounds    map[*ast.Node]parameterBoundary
+	parameterOwner     *ast.Node
+	parameterBoundary  parameterBoundary
 	fallbackInfos      map[*ast.Symbol]referenceInfo
 	fallbackCandidates map[string][]*ast.Node
 	jsxScanned         bool
 	globalSourceFile   bool
+	declarationFile    bool
+	sourceFile         *ast.SourceFile
 	firstJsx           *ast.Node
 	firstFragment      *ast.Node
 }
@@ -791,6 +794,12 @@ func isParameterInWithoutBodyDeclaration(node *ast.Node) bool {
 // (export =, export default, or export { ... }), non-exported declarations are
 // private and should be checked — return false for them.
 func isInsideAmbientModuleBlock(node *ast.Node, ac *analysisContext) bool {
+	// The parser propagates NodeFlagsAmbient to every node in a declaration
+	// file or `declare` context. Ordinary source nodes can therefore avoid all
+	// ancestor and source-file walks here.
+	if node == nil || node.Flags&ast.NodeFlagsAmbient == 0 {
+		return false
+	}
 	moduleBlock := ast.FindAncestorKind(node, ast.KindModuleBlock)
 	if moduleBlock == nil {
 		return false
@@ -801,11 +810,10 @@ func isInsideAmbientModuleBlock(node *ast.Node, ac *analysisContext) bool {
 		return false
 	}
 
-	// Check if the module declaration has the Ambient (declare) flag.
+	// Retain the explicit checks as a defensive guard around the parser flag:
+	// a declaration carrying its own `declare` modifier inside a non-ambient
+	// namespace must not make the whole namespace ambient.
 	isAmbient := ast.GetCombinedModifierFlags(moduleDecl)&ast.ModifierFlagsAmbient != 0
-	// Also check if any ancestor is a global scope augmentation (declare global { ... }).
-	// GetCombinedModifierFlags doesn't walk up through ModuleBlock→ModuleDeclaration,
-	// so we need to check ancestors explicitly.
 	if !isAmbient {
 		if ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
 			return ast.IsGlobalScopeAugmentation(n)
@@ -813,7 +821,6 @@ func isInsideAmbientModuleBlock(node *ast.Node, ac *analysisContext) bool {
 			isAmbient = true
 		}
 	}
-	// Also check if any ancestor ModuleDeclaration has the Ambient flag.
 	if !isAmbient {
 		if ast.FindAncestor(moduleDecl.Parent, func(n *ast.Node) bool {
 			return n.Kind == ast.KindModuleDeclaration &&
@@ -822,12 +829,8 @@ func isInsideAmbientModuleBlock(node *ast.Node, ac *analysisContext) bool {
 			isAmbient = true
 		}
 	}
-	// In .d.ts files, all declarations are implicitly ambient.
-	if !isAmbient {
-		sf := ast.GetSourceFileOfNode(node)
-		if sf != nil && sf.IsDeclarationFile {
-			isAmbient = true
-		}
+	if !isAmbient && ac.declarationFile {
+		isAmbient = true
 	}
 
 	if !isAmbient {
@@ -877,8 +880,7 @@ func containerHasExplicitExports(container *ast.Node, ac *analysisContext) bool 
 // - Top-level declarations with explicit exports are module-scoped → check
 // - Declarations inside namespaces are handled by isInsideAmbientModuleBlock
 func isInDtsWithoutExplicitExports(node *ast.Node, ac *analysisContext) bool {
-	sf := ast.GetSourceFileOfNode(node)
-	if sf == nil || !sf.IsDeclarationFile {
+	if !ac.declarationFile {
 		return false
 	}
 	// Find the containing scope: either a ModuleBlock or the SourceFile
@@ -889,7 +891,7 @@ func isInDtsWithoutExplicitExports(node *ast.Node, ac *analysisContext) bool {
 	}
 	// We're at the top level of a .d.ts file.
 	// Check if the source file has explicit exports.
-	return !containerHasExplicitExports(sf.AsNode(), ac)
+	return !containerHasExplicitExports(ac.sourceFile.AsNode(), ac)
 }
 
 func isTopLevelDeclaration(node *ast.Node) bool {
@@ -1030,10 +1032,10 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 	return true, true
 }
 
-// isBeforeLastUsedParam checks if an unused parameter appears before a later
-// parameter that is used (or has a default value). Used for the "after-used"
-// args option: unused parameters before the last used one are allowed because
-// they serve as positional placeholders.
+// isBeforeLastUsedParam checks if a parameter appears before a later parameter
+// that is used (or has a default value). Used for the "after-used" args option:
+// parameters before the last used one cannot produce an unused diagnostic
+// because they serve as positional placeholders.
 func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, ac *analysisContext) bool {
 	if paramNode == nil || paramNode.Parent == nil {
 		return false
@@ -1045,24 +1047,30 @@ func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, ac *analys
 		return false
 	}
 
-	if boundary, ok := ac.parameterBounds[funcLike]; ok {
-		return boundary.lastUsed != nil && paramNode.Pos() < boundary.lastUsed.Pos()
+	if ac.parameterOwner == funcLike {
+		lastUsed := ac.parameterBoundary.lastUsed
+		return lastUsed != nil && paramNode.Pos() < lastUsed.Pos()
 	}
 
 	var lastUsed *ast.Node
-	for _, p := range params {
+	// Only the last used/defaulted parameter matters. Scanning backwards lets
+	// the common case (the final parameter is used) stop after one lookup.
+	for i := len(params) - 1; i >= 0; i-- {
+		p := params[i]
 		// A parameter with a default value (initializer) counts as a
 		// meaningful position marker. ESLint's after-used skips params
 		// before a later param that has a default value.
 		if p.AsNode().Initializer() != nil || isParamUsed(ctx, p.Name(), ac) {
 			lastUsed = p.AsNode()
+			break
 		}
 	}
 
-	if ac.parameterBounds == nil {
-		ac.parameterBounds = make(map[*ast.Node]parameterBoundary)
-	}
-	ac.parameterBounds[funcLike] = parameterBoundary{lastUsed: lastUsed}
+	// Parameters are normally visited consecutively. A single-entry cache
+	// avoids a per-file map; if a nested function in a default initializer
+	// interrupts that order, the outer boundary is simply recomputed.
+	ac.parameterOwner = funcLike
+	ac.parameterBoundary = parameterBoundary{lastUsed: lastUsed}
 	return lastUsed != nil && paramNode.Pos() < lastUsed.Pos()
 }
 
@@ -1897,6 +1905,15 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if !opts.ReportUsedIgnorePattern && isDirectlyExported(definition) {
 		return
 	}
+	// Under after-used, a direct parameter before the last used/defaulted one
+	// cannot produce a diagnostic. Determine that boundary before resolving the
+	// current parameter's references. Reporting used ignored names is the one
+	// exception: it still needs the current parameter's usage information.
+	if !opts.ReportUsedIgnorePattern && opts.Args == "after-used" &&
+		definition != nil && definition.Kind == ast.KindParameter &&
+		isBeforeLastUsedParam(ctx, definition, ac) {
+		return
+	}
 
 	varInfo := &VariableInfo{
 		Variable:       nameNode,
@@ -1935,7 +1952,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		onlyUsedAsType := true
 		for _, usage := range info.usages {
 			if usage.Pos() == varInfo.Variable.Pos() ||
-				(sym != nil && isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode)) ||
+				(len(info.writeRefs) != 0 && sym != nil && isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode)) ||
 				isInsideAnyOwnDeclaration(usage, allDecls) {
 				continue
 			}
@@ -2063,7 +2080,11 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
-		ac := &analysisContext{globalSourceFile: ast.IsGlobalSourceFile(ctx.SourceFile.AsNode())}
+		ac := &analysisContext{
+			globalSourceFile: ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()),
+			declarationFile:  ctx.SourceFile.IsDeclarationFile,
+			sourceFile:       ctx.SourceFile,
+		}
 		exportsCollected := false
 
 		var seenWithoutBodyFuncSymbols map[*ast.Symbol]bool
