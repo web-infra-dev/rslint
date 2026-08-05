@@ -15,6 +15,12 @@ func TestNoConditionalExpectRule(t *testing.T) {
 		t,
 		&no_conditional_expect.NoConditionalExpectRule,
 		[]rule_tester.ValidTestCase{
+			// A callback name that resolves to an uninitialized declaration must
+			// not reach SkipParentheses in the pending-name walk.
+			{Code: `it("case", cb);
+let cb;`},
+			{Code: `let cb;
+it("case", cb);`},
 			{Code: `
       it('foo', () => {
         expect(1).toBe(2);
@@ -653,6 +659,39 @@ func TestNoConditionalExpectRule(t *testing.T) {
 				},
 			},
 			{
+				// The receiver of `.catch` need not resolve to a name: upstream
+				// `isCatchCall` only inspects the immediate property.
+				Code: `
+        it('works', async () => {
+          await promises[key].catch(error => expect(error).toBeInstanceOf(Error));
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				// Nested catches: leaving the inner one must not clear the outer.
+				// Upstream misses the second assertion; we track catch depth.
+				Code: `
+        it('works', async () => {
+          await a().catch(() => {
+            b().catch(() => { expect(1).toBe(1); });
+            expect(2).toBe(2);
+          });
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				// Chained catches nest in the AST, so upstream's bool is cleared
+				// by every inner exit and it reports only one of the three. Each
+				// callback is its own conditional assertion, so we report all
+				// three. Deliberate divergence: see the package doc comment on
+				// internal/utils/test_framework/rules/no_conditional_expect.
 				Code: `
         it('works', async () => {
           await Promise.resolve()
@@ -666,9 +705,12 @@ func TestNoConditionalExpectRule(t *testing.T) {
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
 				},
 			},
 			{
+				// Same divergence as above.
 				Code: `
         it('works', async () => {
           await Promise.resolve()
@@ -678,6 +720,8 @@ func TestNoConditionalExpectRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
 					{MessageId: "conditionalExpect"},
 				},
 			},

@@ -14,7 +14,7 @@ func parseRstestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
 	}
 	return &shared.ParsedCall{
 		Call:          &parsed.ParsedCall,
-		Parameterized: parsed.Parameterized,
+		Parameterized: parsed.IsParameterized(),
 	}
 }
 

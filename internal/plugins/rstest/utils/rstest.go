@@ -8,14 +8,34 @@ import (
 )
 
 const RstestImportModule = "@rstest/core"
+const RstestPlaywrightImportModule = "@rstest/playwright"
 
 type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode
 
+type RstestParameterizedKind string
+
+const (
+	RstestParameterizedNone RstestParameterizedKind = ""
+	RstestParameterizedEach RstestParameterizedKind = "each"
+	RstestParameterizedFor  RstestParameterizedKind = "for"
+)
+
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
-	Parameterized bool
+	ParameterizedKind RstestParameterizedKind
+	// Skipped and Todo report whether the call carries `.skip` / `.todo`.
+	// Like ParameterizedKind these are semantic conclusions that survive alias
+	// resolution, so prefer them over scanning Members, which is call-site only.
+	Skipped bool
+	Todo    bool
+}
+
+// IsParameterized reports whether the call was registered through `.each` or
+// `.for`. This survives alias resolution, unlike the call site's Members.
+func (parsed *ParsedRstestFnCall) IsParameterized() bool {
+	return parsed.ParameterizedKind != RstestParameterizedNone
 }
 
 type ParsedRstestFnCallHead = testFramework.ParsedCallHead

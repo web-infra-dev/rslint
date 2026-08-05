@@ -1,8 +1,6 @@
 package no_disabled_tests
 
 import (
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -15,9 +13,11 @@ func parseRstestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
 		return nil
 	}
 	return &shared.ParsedCall{
-		Call:    &parsed.ParsedCall,
-		HasSkip: slices.Contains(parsed.Members, "skip"),
-		HasTodo: slices.Contains(parsed.Members, "todo"),
+		Call: &parsed.ParsedCall,
+		// Semantic fields rather than Members, so `const skipped = test.skip`
+		// followed by `skipped('case', fn)` is still recognized.
+		HasSkip: parsed.Skipped,
+		HasTodo: parsed.Todo,
 	}
 }
 
