@@ -133,14 +133,18 @@ func typeDeclaredInFile(
 	program *compiler.Program,
 ) bool {
 	cwd := program.Host().GetCurrentDirectory()
+	useCaseSensitiveFileNames := program.Host().FS().UseCaseSensitiveFileNames()
+	canonical := func(fileName string) string {
+		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
+	}
 	if relativePath == "" {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
-			return strings.HasPrefix(f.FileName(), cwd)
+			return strings.HasPrefix(canonical(f.FileName()), canonical(cwd))
 		})
 	}
-	absPath := tspath.GetNormalizedAbsolutePath(relativePath, cwd)
+	absPath := canonical(tspath.GetNormalizedAbsolutePath(relativePath, cwd))
 	return Some(declarationFiles, func(f *ast.SourceFile) bool {
-		return f.FileName() == absPath
+		return canonical(f.FileName()) == absPath
 	})
 }
 
