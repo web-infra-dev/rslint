@@ -168,6 +168,9 @@ func parseRstestFnCall(
 }
 
 func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
+	if node == nil {
+		return nil, nil, false, false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return nil, nil, false, false
@@ -236,6 +239,9 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 }
 
 func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
+	if node == nil {
+		return nil, nil, false, false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return nil, nil, false, false
@@ -599,6 +605,9 @@ func isImportMetaRstest(node *ast.Node) bool {
 }
 
 func isImportMeta(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil || node.Kind != ast.KindMetaProperty {
 		return false
