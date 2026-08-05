@@ -258,6 +258,14 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 			},
 
 			// ---- Dimension 4: nesting / traversal boundaries ----
+			// Computed property names in assignment patterns are evaluated
+			// expressions, so loops inside them must reach this rule's listeners.
+			{
+				Code: `({ [(() => { for (;;) break; })()]: target } = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 14, EndLine: 1, EndColumn: 29},
+				},
+			},
 			// A loop in a nested function belongs to that function's code path,
 			// not the enclosing loop's, so neither verdict leaks into the other.
 			{
