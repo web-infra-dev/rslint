@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -50,7 +51,10 @@ var NoRestrictedPathsRule = rule.Rule{
 		}
 
 		basePath := resolveBasePath(ctx, opts.basePath)
-		caseSensitive := ctx.Program.Host().FS().UseCaseSensitiveFileNames()
+		// `path.relative` compares case-insensitively only in its win32 flavor,
+		// so this follows the platform rather than the host file system: a
+		// case-insensitive volume on macOS still gets a case-sensitive compare.
+		caseSensitive := runtime.GOOS != "windows"
 
 		currentFilename := import_utils.GetPhysicalFilename(ctx)
 		matchingZones := make([]zone, 0, len(opts.zones))
@@ -267,9 +271,11 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSens
 	for _, exception := range except {
 		absoluteException := tspath.ResolvePath(absoluteFrom, exception)
 		// Upstream classifies the `from`-relative exception path with
-		// importType and rejects it when it comes out as "parent", which is
-		// exactly the set of paths that escape `from`.
-		if !containsPath(absoluteException, absoluteFrom, caseSensitive) {
+		// importType and rejects it when it comes out as "parent", whose regex
+		// `^\.\.$|^\.\.[\\/]` matches only a leading `..` component. A name such
+		// as `..secret` therefore stays a valid exception, even though
+		// containsPath reads the same leftover as escaping `from`.
+		if !isPathWithin(absoluteException, absoluteFrom, caseSensitive) {
 			validator.hasValidExceptions = false
 			return validator
 		}
@@ -288,10 +294,27 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSens
 }
 
 // containsPath reports whether filePath is target itself or one of its
-// descendants, mirroring upstream's `path.relative(target, filePath)` check.
-// Components are compared the way the host file system resolves names, which
-// is what Node's `path.win32.relative` does on a case-insensitive platform.
+// descendants, mirroring upstream's `relative === '' || !relative.startsWith('..')`
+// check on `path.relative(target, filePath)`.
 func containsPath(filePath string, target string, caseSensitive bool) bool {
+	if !isPathWithin(filePath, target, caseSensitive) {
+		return false
+	}
+	// `path.relative` joins the components left over, and upstream's prefix test
+	// reads a leading `..` in that relative path as "outside target". A first
+	// leftover component such as `..secret.js` therefore keeps the file out of
+	// target even though it names a real child of it.
+	fileComponents := pathComponents(filePath)
+	targetComponents := pathComponents(target)
+	return len(fileComponents) == len(targetComponents) ||
+		!strings.HasPrefix(fileComponents[len(targetComponents)], "..")
+}
+
+// isPathWithin reports whether filePath resolves inside target, i.e. whether
+// `path.relative(target, filePath)` walks no `..` component upwards. Components
+// are compared the way the platform's `path.relative` does, so a leftover such
+// as `..secret.js` still counts as inside target.
+func isPathWithin(filePath string, target string, caseSensitive bool) bool {
 	fileComponents := pathComponents(filePath)
 	targetComponents := pathComponents(target)
 	if len(targetComponents) > len(fileComponents) {
@@ -301,14 +324,6 @@ func containsPath(filePath string, target string, caseSensitive bool) bool {
 		if !equalPathComponent(component, fileComponents[i], caseSensitive) {
 			return false
 		}
-	}
-	// `path.relative` joins the components left over, and upstream reads a
-	// leading `..` in that relative path as "outside target". A first leftover
-	// component such as `..secret.js` therefore keeps the file out of target
-	// even though it names a real child of it.
-	if len(fileComponents) > len(targetComponents) &&
-		strings.HasPrefix(fileComponents[len(targetComponents)], "..") {
-		return false
 	}
 	return true
 }
