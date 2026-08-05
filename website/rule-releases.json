@@ -642,5 +642,22 @@
       "eslint-plugin-jest:require-hook",
       "rstest:no-mocks-import"
     ]
+  },
+  {
+    "version": "0.7.3",
+    "rules": [
+      "eslint-plugin-jest:require-to-throw-message",
+      "eslint-plugin-jest:require-top-level-describe",
+      "eslint-plugin-unicorn:error-message",
+      "eslint-plugin-unicorn:prefer-array-some",
+      "eslint-plugin-unicorn:prefer-node-protocol",
+      "eslint-plugin-unicorn:prefer-set-has",
+      "eslint:no-unreachable-loop",
+      "eslint:no-useless-assignment",
+      "eslint:preserve-caught-error",
+      "rstest:no-commented-out-tests",
+      "rstest:no-disabled-tests",
+      "rstest:no-identical-title"
+    ]
   }
 ]
