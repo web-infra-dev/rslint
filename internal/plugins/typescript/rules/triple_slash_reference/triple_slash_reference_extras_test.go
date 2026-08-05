@@ -135,9 +135,11 @@ const value = 1;
 				Errors:  []rule_tester.InvalidTestCaseError{tripleSlashReferenceError(4, 1, "foo")},
 			},
 			{
+				// The mark is consumed when the source is decoded, so it occupies
+				// no column: the reference starts at column 1, as ESLint reports it.
 				Code:    "\ufeff/// <reference path=\"bom\" />\n",
 				Options: map[string]interface{}{"path": "never"},
-				Errors:  []rule_tester.InvalidTestCaseError{tripleSlashReferenceError(1, 2, "bom")},
+				Errors:  []rule_tester.InvalidTestCaseError{tripleSlashReferenceError(1, 1, "bom")},
 			},
 			{
 				Code:    "#!/usr/bin/env node\n/// <reference path=\"shebang\" />\n",

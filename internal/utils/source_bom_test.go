@@ -103,7 +103,9 @@ func TestSourceHasBOMThroughWrappers(t *testing.T) {
 	metadata := newProgramMetadataFS(overlay)
 	parallel := newParallelProgramFS(metadata)
 
-	for name, fs := range map[string]interface{ SourceHasBOM(string) bool }{
+	for name, fs := range map[string]interface {
+		SourceHasBOM(path string) bool
+	}{
 		"programMetadataFS": metadata,
 		"parallelProgramFS": parallel,
 	} {

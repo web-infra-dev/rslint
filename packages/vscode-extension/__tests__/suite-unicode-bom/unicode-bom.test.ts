@@ -109,26 +109,52 @@ suite('rslint unicode-bom over LSP', function () {
     await waitForCodeActionRegistryQuiescence();
 
     const before = doc.getText();
-    for (const kind of [
-      vscode.CodeActionKind.QuickFix,
-      vscode.CodeActionKind.SourceFixAll.append('rslint'),
+    const actionsOfKind = async (
+      kind: vscode.CodeActionKind,
+    ): Promise<vscode.CodeAction[]> =>
+      (await vscode.commands.executeCommand<vscode.CodeAction[]>(
+        'vscode.executeCodeActionProvider',
+        doc.uri,
+        new vscode.Range(0, 0, doc.lineCount, 0),
+        kind.value,
+      )) ?? [];
+
+    const quickFixes = await actionsOfKind(vscode.CodeActionKind.QuickFix);
+    const titles = quickFixes.map((action) => action.title);
+
+    // rslint titles a rule's own fix "Fix: <message>". That is the one the
+    // server withholds, because no text edit removes a mark the document never
+    // had. Matched on the message too, so a TypeScript quick fix on this file
+    // could neither satisfy nor trip the assertion.
+    assert.ok(
+      !titles.some(
+        (title) => title.startsWith('Fix:') && title.includes('Unicode BOM'),
+      ),
+      `no fix action should be offered, got: ${titles.join(' | ')}`,
+    );
+    // The disable-directive actions still appear. They are what make the
+    // absence above meaningful: quick fixes were computed for this diagnostic,
+    // and only the fix itself is missing.
+    for (const expected of [
+      'Disable unicode-bom for this line',
+      'Disable unicode-bom for entire file',
     ]) {
-      const actions =
-        (await vscode.commands.executeCommand<vscode.CodeAction[]>(
-          'vscode.executeCodeActionProvider',
-          doc.uri,
-          new vscode.Range(0, 0, doc.lineCount, 0),
-          kind.value,
-        )) ?? [];
-      const edits = actions.flatMap(
-        (action) => action.edit?.get(doc.uri) ?? [],
-      );
-      assert.deepStrictEqual(
-        edits.map((edit) => edit.newText),
-        [],
-        `${kind.value} should produce no edits for a marked file`,
+      assert.ok(
+        titles.includes(expected),
+        `expected ${JSON.stringify(expected)}, got: ${titles.join(' | ')}`,
       );
     }
+
+    // fixAll applies fixes only, never disable directives, so it has nothing
+    // to contribute at all.
+    const fixAll = await actionsOfKind(
+      vscode.CodeActionKind.SourceFixAll.append('rslint'),
+    );
+    assert.deepStrictEqual(
+      fixAll.flatMap((action) => action.edit?.get(doc.uri) ?? []),
+      [],
+      'fixAll should produce no edits for a marked file',
+    );
 
     assert.strictEqual(doc.getText(), before, 'the document must be untouched');
     assert.ok(!doc.isDirty, 'nothing should have modified the document');
