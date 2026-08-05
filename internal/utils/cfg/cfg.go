@@ -62,8 +62,14 @@ func (blk *Block[E]) Index() int {
 // Graph is the control-flow graph of one code path root, unreachable blocks
 // included. Blocks[0] is the entry block; the rest are in construction order,
 // which no analysis should depend on.
+//
+// EndReachable reports whether control can run off the end of the root — the
+// question ESLint answers with `isAnySegmentReachable(codePath.currentSegments)`
+// at the root's `:exit`. It is false when every path out of the root returns,
+// throws, or loops forever.
 type Graph[E any] struct {
-	Blocks []*Block[E]
+	Blocks       []*Block[E]
+	EndReachable bool
 }
 
 // Hooks are the points where a consumer turns a position in the walk into an
@@ -167,7 +173,7 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 		}
 	}
 
-	return &Graph[E]{Blocks: b.blocks}
+	return &Graph[E]{Blocks: b.blocks, EndReachable: b.cur.Reachable}
 }
 
 // parameter models a parameter binding: its default value is skipped when an

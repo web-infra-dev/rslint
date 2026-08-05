@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -221,7 +220,7 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, capIsConstructor b
 	if hasJSDocThisTag(node, sf) {
 		return true
 	}
-	if capIsConstructor && isES5Constructor(node) {
+	if capIsConstructor && utils.IsES5Constructor(node) {
 		return true
 	}
 	return !isDefaultThisBinding(node, capIsConstructor)
@@ -241,26 +240,6 @@ func hasThisParameter(node *ast.Node) bool {
 	return false
 }
 
-// isES5Constructor mirrors ESLint's `isES5Constructor`: a function with an
-// own name whose first character is an uppercase letter is treated as an
-// ES5 constructor under `capIsConstructor: true`. Anonymous functions
-// (no own name) fall through.
-func isES5Constructor(node *ast.Node) bool {
-	var name *ast.Node
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		name = node.AsFunctionDeclaration().Name()
-	case ast.KindFunctionExpression:
-		name = node.AsFunctionExpression().Name()
-	default:
-		return false
-	}
-	if name == nil || !ast.IsIdentifier(name) {
-		return false
-	}
-	return startsWithUpperCase(name.AsIdentifier().Text)
-}
-
 // hasOwnFunctionName reports whether the function has an `id`/name in
 // ESTree terms (used to gate ES5-constructor recognition for the uppercase-
 // variable / uppercase-assignment-target branches: a *named* function
@@ -272,18 +251,6 @@ func hasOwnFunctionName(node *ast.Node) bool {
 		return node.AsFunctionDeclaration().Name() != nil
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().Name() != nil
-	}
-	return false
-}
-
-// startsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`:
-// the first rune is uppercase iff it has a different lowercase form. In
-// Unicode terms that's category Lu, plus the rare title-case category Lt
-// (e.g. `Ǆ`). Everything else — lower-case letters, non-cased letters,
-// digits, `_`, `$` — returns false in both halves.
-func startsWithUpperCase(s string) bool {
-	for _, r := range s {
-		return unicode.IsUpper(r) || unicode.IsTitle(r)
 	}
 	return false
 }
@@ -458,7 +425,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 					return false
 				}
 				if capIsConstructor && isAnonymous && ast.IsIdentifier(left) &&
-					startsWithUpperCase(left.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(left.AsIdentifier().Text) {
 					// Foo = function(){} — assignment to an uppercase variable
 					// (anonymous function) is treated as an ES5 constructor.
 					return false
@@ -524,7 +491,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			}
 			name := spa.Name()
 			if capIsConstructor && isAnonymous && name != nil && ast.IsIdentifier(name) &&
-				startsWithUpperCase(name.AsIdentifier().Text) {
+				utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 				return false
 			}
 			return true
@@ -555,7 +522,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := vd.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}
@@ -569,7 +536,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := pd.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}
@@ -583,7 +550,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := be.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}

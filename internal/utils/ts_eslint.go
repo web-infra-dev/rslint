@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -468,6 +470,40 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	}
 
 	return strings.Join(tokens, " ")
+}
+
+// IsES5Constructor mirrors ESLint's `astUtils.isES5Constructor`: a function
+// with a name of its own whose first character differs from its own lowercase
+// form is treated as an ES5-style constructor. Only a function declaration or
+// function expression can carry such a name; every other function-like node
+// (arrow, method, accessor) reports false.
+func IsES5Constructor(node *ast.Node) bool {
+	var name *ast.Node
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		name = node.AsFunctionDeclaration().Name()
+	case ast.KindFunctionExpression:
+		name = node.AsFunctionExpression().Name()
+	default:
+		return false
+	}
+	if name == nil || !ast.IsIdentifier(name) {
+		return false
+	}
+	return StartsWithUpperCase(name.AsIdentifier().Text)
+}
+
+// StartsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`,
+// which reads the first UTF-16 code unit. A character counts when it has a
+// distinct lowercase form, so `Á` and the Roman numeral `Ⅰ` qualify while
+// `_` and `$` do not. A character outside the BMP is read as a lone surrogate,
+// which is its own lowercase form, so `𐐀` does not qualify.
+func StartsWithUpperCase(s string) bool {
+	r, _ := utf8.DecodeRuneInString(s)
+	if r > 0xFFFF {
+		return false
+	}
+	return unicode.ToLower(r) != r
 }
 
 // GetFunctionNameWithKindCore mirrors ESLint core's astUtils.getFunctionNameWithKind.
