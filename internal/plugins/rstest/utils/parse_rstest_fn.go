@@ -38,6 +38,9 @@ type rstestResolvedAPI struct {
 	state        rstestAPIState
 	originalNode *ast.Node
 	mode         RstestImportMode
+	// members collects every chain member applied to the resolved API,
+	// including members consumed while following same-file const aliases.
+	members []string
 }
 
 // ParseRstestFnCall parses a final Rstest test/describe registration call.
@@ -59,16 +62,14 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		return nil
 	}
 
-	state := resolved.state
 	for _, part := range parts[consumed:] {
-		state = applyRstestChainPart(state, part)
-		if state == rstestAPIInvalid {
+		if !applyResolvedRstestChainPart(&resolved, part) {
 			return nil
 		}
 	}
 
 	parameterized := false
-	switch state {
+	switch resolved.state {
 	case rstestAPITest, rstestAPITestWithExtend:
 		resolved.kind = RstestFnTypeTest
 	case rstestAPIDescribe:
@@ -83,10 +84,10 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 		return nil
 	}
 
+	// MemberEntries only covers members written at the call site, because
+	// members resolved through an alias have no node in this expression.
 	memberEntries := make([]ParsedRstestFnMemberEntry, 0, len(parts)-consumed)
-	members := make([]string, 0, len(parts)-consumed)
 	for _, part := range parts[consumed:] {
-		members = append(members, part.name)
 		memberEntries = append(memberEntries, ParsedRstestFnMemberEntry{
 			Name: part.name,
 			Node: part.node,
@@ -99,7 +100,7 @@ func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall
 			Name:          resolved.name,
 			LocalName:     localName,
 			Kind:          resolved.kind,
-			Members:       members,
+			Members:       resolved.members,
 			MemberEntries: memberEntries,
 			Head: ParsedRstestFnCallHead{
 				Type: resolved.mode,
@@ -259,17 +260,16 @@ func resolveRstestRoot(
 		if !ok {
 			continue
 		}
-		state := resolved.state
+		valid := true
 		for _, part := range aliasParts[consumed:] {
-			state = applyRstestChainPart(state, part)
-			if state == rstestAPIInvalid {
+			if !applyResolvedRstestChainPart(&resolved, part) {
+				valid = false
 				break
 			}
 		}
-		if state == rstestAPIInvalid {
+		if !valid {
 			continue
 		}
-		resolved.state = state
 		return resolved, 0, true
 	}
 
@@ -334,4 +334,15 @@ func applyRstestChainPart(state rstestAPIState, part rstestChainPart) rstestAPIS
 		}
 	}
 	return rstestAPIInvalid
+}
+
+func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainPart) bool {
+	state := applyRstestChainPart(resolved.state, part)
+	if state == rstestAPIInvalid {
+		return false
+	}
+
+	resolved.state = state
+	resolved.members = append(resolved.members, part.name)
+	return true
 }
