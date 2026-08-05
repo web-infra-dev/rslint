@@ -11,7 +11,7 @@ import (
 // node shapes ESTree has no analog for, the code path roots and try/finally
 // layouts internal/utils/cfg lays out differently, every arm of the upstream
 // source its own tests leave untouched, and code shapes real projects write.
-// Every verdict below was taken from ESLint itself, except the six marked as
+// Every verdict below was taken from ESLint itself, except those marked as
 // intentional differences.
 func TestNoUnreachableLoopExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -82,24 +82,31 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 			{Code: `function find(items, t) { for (const x of items) { if (x === t) return x; } }`},
 			{Code: `async function retry(n) { for (let i = 0; i < n; i++) { try { return await run(); } catch (e) { continue; } } }`},
 
-			// ---- Intentional difference from ESLint ----
-			// A `continue` naming a label the loop carries alongside another one
-			// still starts a new iteration, so the loop is not limited to one.
-			// ESLint reports these: its code path analysis attaches only the
-			// innermost label to the loop, so the jump misses the loop it names.
-			{Code: `outer: inner: while (a) { continue outer; }`},
-			{Code: `outer: inner: do { continue outer; } while (a);`},
+			// ESLint 10.8.0 accepts these related edge cases. Keep them separate
+			// from the narrower differences below so the boundary stays explicit.
 			{Code: `a: b: c: for (;;) { continue a; }`},
 			{Code: `outer: inner: for (const x of arr) { continue outer; }`},
+			{Code: `for (;;) { try { throw e; } finally { continue; } }`},
+
+			// ---- Intentional difference from ESLint ----
+			// ESLint 10.8.0 reports the double-labelled `while` and `do` forms
+			// when `continue` names the outer label. The jump still starts a new
+			// iteration, so rslint consistently accepts them.
+			{Code: `outer: inner: while (a) { continue outer; }`},
+			{Code: `outer: inner: do { continue outer; } while (a);`},
 
 			// ---- Intentional difference from ESLint ----
 			// A `continue` in a `finally` block overrides the `return` or `throw`
 			// that left the `try`, so control really does flow back into the loop
-			// and a second iteration begins. ESLint reports these; its code path
-			// analysis leaves the loop out of the jump's target segments once the
-			// `try` can only be left abruptly.
+			// and a second iteration begins. ESLint 10.8.0 reports these function
+			// code paths, while rslint keeps the actual control-flow edge.
 			{Code: `function f() { for (;;) { try { return; } finally { continue; } } }`},
-			{Code: `for (;;) { try { throw e; } finally { continue; } }`},
+			{Code: `function f() { for (;;) { try { return value; } finally { continue; } } }`},
+			{Code: `function f() { for (;;) { try { throw e; } finally { continue; } } }`},
+			{Code: `function f() { for (;;) { try { return; } catch (e) {} finally { continue; } } }`},
+			{Code: `function f() { for (;;) { try { throw e; } catch (e) { return; } finally { continue; } } }`},
+			{Code: `function* f() { for (;;) { try { yield value; return; } finally { continue; } } }`},
+			{Code: `async function f() { for (;;) { try { await value; return; } finally { continue; } } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized and type-wrapped iterables ----
@@ -382,6 +389,14 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 					{MessageId: "invalid", Line: 1, Column: 1, EndLine: 1, EndColumn: 47},
 				},
 			},
+			// ESLint and rslint currently agree on a pending `break`, unlike the
+			// intentional return/throw differences above.
+			{
+				Code: `function f() { for (;;) { try { break; } finally { continue; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 16, EndLine: 1, EndColumn: 65},
+				},
+			},
 
 			// ---- Labelled jump targets ----
 			{
@@ -436,6 +451,13 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 			},
 
 			// ---- Every arm of the `ignore` option ----
+			{
+				Code:    `while (a) break;`,
+				Options: map[string]interface{}{},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 1, EndLine: 1, EndColumn: 17},
+				},
+			},
 			{
 				Code:    `while (a) break;`,
 				Options: map[string]interface{}{"ignore": []interface{}{}},
