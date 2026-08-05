@@ -150,28 +150,3 @@ func TestIsTypeOfRstestFnCall(t *testing.T) {
 		},
 	)
 }
-
-func TestRstestHookOrder(t *testing.T) {
-	if len(rstestUtils.RSTEST_HOOKS_ORDER) != 4 {
-		t.Errorf("expected 4 hooks in order table, got %d", len(rstestUtils.RSTEST_HOOKS_ORDER))
-	}
-	for i, name := range []string{"beforeAll", "beforeEach", "afterEach", "afterAll"} {
-		if got := rstestUtils.RstestHookOrderIndex(name); got != i {
-			t.Errorf("RstestHookOrderIndex(%q) = %d, expected %d", name, got, i)
-		}
-		if !rstestUtils.RSTEST_HOOK_NAMES[name] {
-			t.Errorf("RSTEST_HOOK_NAMES missing %q", name)
-		}
-	}
-	if len(rstestUtils.RSTEST_HOOK_NAMES) != 4 {
-		t.Errorf("expected 4 hook names, got %d", len(rstestUtils.RSTEST_HOOK_NAMES))
-	}
-	for _, name := range []string{"onTestFinished", "onTestFailed", "test", "describe"} {
-		if rstestUtils.RstestHookOrderIndex(name) != -1 {
-			t.Errorf("RstestHookOrderIndex(%q) should be -1", name)
-		}
-		if rstestUtils.RSTEST_HOOK_NAMES[name] {
-			t.Errorf("RSTEST_HOOK_NAMES must not contain %q", name)
-		}
-	}
-}

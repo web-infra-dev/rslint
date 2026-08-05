@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -74,16 +72,16 @@ func ParseRstestFnCallWithOfficialExtensions(
 }
 
 // IsTypeOfRstestFnCall reports whether node parses as a Rstest registration
-// call of one of the given kinds. Mirrors jest's IsTypeOfJestFnCall
-// (parse_jest_fn.go:32); it parses with official extensions enabled
-// (import.meta + playwright), the same choice RstestTestCallbacks.ParseFnCall
-// makes.
+// call of one of the given kinds. What this plugin owns is the entry point:
+// parsing runs with official extensions enabled (import.meta + playwright),
+// the same choice RstestTestCallbacks.ParseFnCall makes. The kind matching
+// itself is shared with jest through testFramework.IsCallOfKind.
 func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
 	parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
-	if parsed == nil || len(kinds) == 0 {
+	if parsed == nil {
 		return false
 	}
-	return slices.Contains(kinds, parsed.Kind)
+	return testFramework.IsCallOfKind(&parsed.ParsedCall, kinds...)
 }
 
 func parseRstestFnCall(
@@ -526,7 +524,7 @@ func directRstestAPIState(profile rstestAPIProfile, name string) rstestAPIState 
 		// re-exports them (packages/playwright/src/index.ts:2-9). Hooks accept
 		// no chained members, which holds by construction: applyRstestChainPart
 		// has no rstestAPIHook branch, so any member invalidates the chain.
-		if RSTEST_HOOK_NAMES[name] {
+		if testFramework.IsHookName(name) {
 			return rstestAPIHook
 		}
 		return rstestAPIInvalid

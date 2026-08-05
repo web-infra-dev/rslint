@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -29,13 +28,16 @@ const (
 	jestGlobalsModule                = "@jest/globals"
 )
 
+// IsTypeOfJestFnCall reports whether node parses as a Jest call of one of the
+// given kinds. The kind matching is shared with rstest through
+// testFramework.IsCallOfKind; this owns the parse entry point.
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
 	parsed := ParseJestFnCall(node, ctx)
-	if parsed == nil || len(kinds) == 0 {
+	if parsed == nil {
 		return false
 	}
 
-	return slices.Contains(kinds, parsed.Kind)
+	return testFramework.IsCallOfKind(&parsed.ParsedCall, kinds...)
 }
 
 func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {

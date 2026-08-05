@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 func buildReorderHooksMessage(currentHook, previousHook string) rule.RuleMessage {
@@ -38,10 +39,10 @@ var PreferHooksInOrderRule = rule.Rule{
 
 				inHook = true
 				currentHook := jestFnCall.Name
-				currentHookIndex := utils.JestHookOrderIndex(currentHook)
+				currentHookIndex := testFramework.HookOrderIndex(currentHook)
 
 				if currentHookIndex < previousHookIndex {
-					ctx.ReportNode(node, buildReorderHooksMessage(currentHook, utils.JEST_HOOKS_ORDER[previousHookIndex]))
+					ctx.ReportNode(node, buildReorderHooksMessage(currentHook, testFramework.HooksOrder[previousHookIndex]))
 					return
 				}
 
