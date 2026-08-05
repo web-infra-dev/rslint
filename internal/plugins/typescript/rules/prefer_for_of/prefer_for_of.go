@@ -66,7 +66,7 @@ var PreferForOfRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Step 4: Get symbol for the index variable
-				sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+				sym := utils.BindingNameSymbol(nameNode)
 				if sym == nil {
 					return
 				}
@@ -216,6 +216,11 @@ func isIncrement(node *ast.Node, name string) bool {
 
 // isIndexOnlyUsedWithArray checks that all references to the index symbol within the
 // body are only used as arr[i] (read-only element access on the matching array).
+//
+// Resolve is what decides whether an identifier is a reference at all: a
+// property key, a member name, a label, and a declaration name all spell the
+// index without referencing it, while the name of a shorthand property (`{i}`)
+// references it even though it also declares a property.
 func isIndexOnlyUsedWithArray(ctx rule.RuleContext, body *ast.Node, indexSym *ast.Symbol, arrayText string) bool {
 	result := true
 	var walk func(n *ast.Node)
@@ -224,8 +229,7 @@ func isIndexOnlyUsedWithArray(ctx rule.RuleContext, body *ast.Node, indexSym *as
 			return
 		}
 		if n.Kind == ast.KindIdentifier {
-			sym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if sym == indexSym {
+			if ctx.Refs.Resolve(n) == indexSym {
 				// This identifier references the index variable.
 				// It must be used as arr[i] with matching array text and not as assignee.
 				if !isValidIndexUsage(ctx, n, arrayText) {
