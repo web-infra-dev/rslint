@@ -40,7 +40,8 @@ func ResolveSourceFileFromSourceFile(ctx rule.RuleContext, sourceFile *ast.Sourc
 // therefore absent from that cache even though upstream resolves both. Those
 // fall through to a probe of the relative specifier against the files already
 // loaded into the Program, which also covers the extension-substitution cases
-// upstream still treats as edges.
+// upstream still treats as edges. A package specifier carries no relative path
+// to probe, so a `require('some-package')` in a TypeScript file stays unresolved.
 func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if ctx.Program == nil || sourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
