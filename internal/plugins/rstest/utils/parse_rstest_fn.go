@@ -574,6 +574,11 @@ func rstestProfiles(includePlaywright bool) []rstestAPIProfile {
 }
 
 func isImportMetaRstest(node *ast.Node) bool {
+	// SkipParentheses dereferences its argument, so the nil check has to come
+	// first: callers pass initializers, which are nil for a bare `let x;`.
+	if node == nil {
+		return false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return false

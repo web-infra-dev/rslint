@@ -62,6 +62,10 @@ test.beforeEach(() => {
 			{Code: `import.meta.rstest?.test("case", () => {
   if (condition) import.meta.rstest?.expect(value).toBe(1);
 });`},
+			// A declaration without an initializer must not reach SkipParentheses
+			// while the expect root is being resolved.
+			{Code: `let logger;
+export function run() { logger(); }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
