@@ -69,6 +69,10 @@ export function run() { logger(); }`},
 			// Same, for a callback argument that resolves to an uninitialized
 			// declaration.
 			{Code: `let cb; cb = () => {}; test("case", cb);`},
+			// An unresolvable callback name starts the pending walk, which visits
+			// every declaration in the file including uninitialized ones.
+			{Code: `test("case", callback);
+let state;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

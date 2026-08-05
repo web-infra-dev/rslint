@@ -172,9 +172,11 @@ func resolvePendingRstestCallbacks(
 			declaration := node.AsVariableDeclaration()
 			if declaration != nil && declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier {
 				name = declaration.Name().AsIdentifier().Text
-				initializer := ast.SkipParentheses(declaration.Initializer)
-				if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-					function = initializer
+				if declaration.Initializer != nil {
+					initializer := ast.SkipParentheses(declaration.Initializer)
+					if ast.IsFunctionExpressionOrArrowFunction(initializer) {
+						function = initializer
+					}
 				}
 			}
 		}
