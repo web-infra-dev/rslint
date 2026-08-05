@@ -246,9 +246,6 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 	if node == nil {
 		return nil, nil, false, false
 	}
-	if ast.IsOptionalChain(node) {
-		return nil, nil, false, false
-	}
 	if isImportMetaRstest(node) {
 		return node, nil, false, true
 	}

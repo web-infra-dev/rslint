@@ -59,9 +59,6 @@ test.describe("suite", () => {
 test.beforeEach(() => {
   if (condition) expect(value).toBe(1);
 });`},
-			{Code: `import.meta.rstest?.test("case", () => {
-  if (condition) import.meta.rstest?.expect(value).toBe(1);
-});`},
 			// A declaration without an initializer must not reach SkipParentheses
 			// while the expect root is being resolved.
 			{Code: `let logger;
@@ -75,6 +72,25 @@ export function run() { logger(); }`},
 let state;`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// `import.meta.rstest` is typed optional, so `?.` is the idiomatic
+			// access and must not disable recognition of either the test call or
+			// the expect call.
+			{
+				Code: `import.meta.rstest.test("case", () => {
+  if (condition) import.meta.rstest?.expect(value).toBe(1);
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `import.meta.rstest?.test("case", () => {
+  if (condition) import.meta.rstest?.expect(value).toBe(1);
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
 			{
 				Code: `test("case", () => {
   if (condition) expect(value).toBe(1);
