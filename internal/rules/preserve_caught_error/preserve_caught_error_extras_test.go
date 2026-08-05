@@ -611,10 +611,10 @@ func preserveCaughtErrorConfiguredRules(options []any) func(*ast.SourceFile) []l
 func createPreserveCaughtErrorProgram(t testing.TB, fileName string, code string) (*compiler.Program, *ast.SourceFile) {
 	t.Helper()
 
-	rootDir := fixtures.GetRootDir()
-	fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-	host := utils.CreateCompilerHost(rootDir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir, "tsconfig.json", host)
+	root := fixtures.GetRootDir()
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): code})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
 	if err != nil {
 		t.Fatalf("failed to create program: %v", err)
 	}
