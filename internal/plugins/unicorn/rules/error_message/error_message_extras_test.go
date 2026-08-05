@@ -74,10 +74,30 @@ func TestErrorMessageExtras(t *testing.T) {
 			jsValid("new Error({...foo}.msg)"),
 			jsValid("new Error(msg += '')"),
 			jsValid("new Error(['a', 'b'].join(''))"),
+			jsValid("new Error([].join(separator))"),
 			jsValid("let Object = {freeze: x => x};\nnew Error(Object.freeze({msg: ''}).msg)"),
+
+			// ---- Mutable aggregate bindings are not stale-folded ----
+			jsValid("const message = [''];\nmessage[0] = 'ok';\nnew Error(message[0])"),
+			jsValid("const message = [''];\nmessage.fill('ok');\nnew Error(message[0])"),
+			jsValid("const method = 'fill';\nconst message = [''];\nmessage[method]('ok');\nnew Error(message[0])"),
+			jsValid("const message = [''];\nmessage[0] += 'ok';\nnew Error(message[0])"),
+			jsValid("const message = [''];\nmessage.join = () => 'ok';\nnew Error(message.join())"),
+			jsValid("const data = {message: ''};\ndata.message = 'ok';\nnew Error(data.message)"),
+
+			// ---- Object literal __proto__ keeps prototype-setter semantics ----
+			jsValid("new Error(({__proto__: {message: 'ok'}}).message)"),
+			jsValid("new Error(({\"__proto__\": {message: 'ok'}}).message)"),
+			jsValid("new Error(String(({__proto__: null})))"),
+			jsValid("new Error(String(({__proto__: 1})))"),
+			jsValid("new Error(({__proto__: /ok/}).source)"),
+
+			// ---- Aggregate assignment snapshots are not folded across later arguments ----
+			jsValid("let value;\nnew Error((value = ['']).join(value[0] = 'ok'))"),
 
 			// ---- A folded array in a template coerces via Array.prototype.join ----
 			jsValid("new Error(`${[1, 2]}`)"),
+			jsValid("new Error([null, undefined].join())"),
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: Parenthesized receiver ----
@@ -108,6 +128,11 @@ func TestErrorMessageExtras(t *testing.T) {
 			invalid("throw new Error({1e3: ''}[1000])", "{1e3: ''}[1000]", messageIDEmpty, msgEmpty),
 			invalid("throw new Error(Object.seal({msg: ''}).msg)", "Object.seal({msg: ''}).msg", messageIDEmpty, msgEmpty),
 			invalid("throw new Error(Object.preventExtensions({msg: 1}).msg)", "Object.preventExtensions({msg: 1}).msg", messageIDNotString, msgNotString),
+			invalid("throw new Error(String?.(''))", "String?.('')", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(Object?.freeze({msg: ''}).msg)", "Object?.freeze({msg: ''}).msg", messageIDEmpty, msgEmpty),
+			invalid("const S = String;\nthrow new Error(S(''))", "S('')", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(Object['freeze']({msg: ''}).msg)", "Object['freeze']({msg: ''}).msg", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(String['raw']``)", "String['raw']``", messageIDEmpty, msgEmpty),
 
 			// ---- Reading a key that is not there folds to `undefined` ----
 			invalid("throw new Error({}.msg)", "{}.msg", messageIDNotString, msgNotString),
@@ -117,6 +142,26 @@ func TestErrorMessageExtras(t *testing.T) {
 
 			// ---- A folded array in a template coerces via Array.prototype.join ----
 			invalid("throw new Error(`${[]}`)", "`${[]}`", messageIDEmpty, msgEmpty),
+
+			// ---- Static Array#join calls ----
+			invalid("throw new Error([].join())", "[].join()", messageIDEmpty, msgEmpty),
+			invalid("throw new Error([''].join())", "[''].join()", messageIDEmpty, msgEmpty),
+			invalid("throw new Error([null, undefined].join(''))", "[null, undefined].join('')", messageIDEmpty, msgEmpty),
+			invalid("const parts = [''];\nthrow new Error(parts.join())", "parts.join()", messageIDEmpty, msgEmpty),
+			invalid("const parts = [''];\nparts.slice();\nthrow new Error(parts[0])", "parts[0]", messageIDEmpty, msgEmpty),
+			invalid("throw new Error([[]].join())", "[[]].join()", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(['', '', ''].join(''))", "['', '', ''].join('')", messageIDEmpty, msgEmpty),
+			invalid("throw new Error([].join(undefined))", "[].join(undefined)", messageIDEmpty, msgEmpty),
+
+			// ---- Object literal __proto__ prototype lookup ----
+			invalid("throw new Error(({__proto__: {message: ''}}).message)", "({__proto__: {message: ''}}).message", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(({__proto__: {__proto__: {message: ''}}}).message)", "({__proto__: {__proto__: {message: ''}}}).message", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(({__proto__: {message: 1}}).message)", "({__proto__: {message: 1}}).message", messageIDNotString, msgNotString),
+			invalid("throw new Error(({__proto__: null}).message)", "({__proto__: null}).message", messageIDNotString, msgNotString),
+			invalid("throw new Error(({__proto__: 1}).message)", "({__proto__: 1}).message", messageIDNotString, msgNotString),
+			invalid("throw new Error(({__proto__: ['']})[0])", "({__proto__: ['']})[0]", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(({__proto__: {message: 'ok'}, message: ''}).message)", "({__proto__: {message: 'ok'}, message: ''}).message", messageIDEmpty, msgEmpty),
+			invalid("throw new Error(({['__proto__']: {message: 'ok'}}).message)", "({['__proto__']: {message: 'ok'}}).message", messageIDNotString, msgNotString),
 
 			// ---- A non-canonical index string is an ordinary property, not an array index ----
 			invalid("throw new Error(['msg']['00'])", "['msg']['00']", messageIDNotString, msgNotString),

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -60,7 +61,43 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"let letValue = \"then\";\n" +
 		"const letUse = letValue;\n" +
 		"const numeric = 1 + 2;\n" +
-		"const unknownUse = unknownValue;\n"
+		"const unknownUse = unknownValue;\n" +
+		"const stableArray = [\"\", \"message\"];\n" +
+		"const stableArrayUse = stableArray[0];\n" +
+		"const writtenArray = [\"\"];\n" +
+		"writtenArray[0] = \"message\";\n" +
+		"const writtenArrayUse = writtenArray[0];\n" +
+		"const filledArray = [\"\"];\n" +
+		"filledArray.fill(\"message\");\n" +
+		"const filledArrayUse = filledArray[0];\n" +
+		"const mutationMethod = \"fill\";\n" +
+		"const computedMutatedArray = [\"\"];\n" +
+		"computedMutatedArray[mutationMethod](\"message\");\n" +
+		"const computedMutatedArrayUse = computedMutatedArray[0];\n" +
+		"const updatedArray = [\"\"];\n" +
+		"updatedArray[0] += \"message\";\n" +
+		"const updatedArrayUse = updatedArray[0];\n" +
+		"const slicedArray = [\"\"];\n" +
+		"slicedArray.slice();\n" +
+		"const slicedArrayUse = slicedArray[0];\n" +
+		"const writtenObject = {message: \"\"};\n" +
+		"writtenObject.message = \"message\";\n" +
+		"const writtenObjectUse = writtenObject.message;\n" +
+		"const protoMessage = ({__proto__: {message: \"message\"}}).message;\n" +
+		"const quotedProtoMessage = ({\"__proto__\": {message: \"message\"}}).message;\n" +
+		"const ownProtoMessage = ({__proto__: {message: \"message\"}, message: \"\"}).message;\n" +
+		"const computedProtoMessage = ({[\"__proto__\"]: {message: \"message\"}}).message;\n" +
+		"const nullProtoString = String(({__proto__: null}));\n" +
+		"const emptyJoin = [].join();\n" +
+		"const joined = [\"error\", \"message\"].join(\": \");\n" +
+		"const nestedEmptyJoin = [[]].join();\n" +
+		"const overflowEmptyJoin = [\"\", \"\", \"\"].join(\"\");\n" +
+		"const undefinedSeparatorJoin = [].join(undefined);\n" +
+		"const boundJoinArray = [\"\"];\n" +
+		"const boundJoin = boundJoinArray.join();\n" +
+		"const mutatedJoinArray = [\"\"];\n" +
+		"mutatedJoinArray.fill(\"message\");\n" +
+		"const mutatedJoin = mutatedJoinArray.join();\n"
 
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
@@ -117,6 +154,25 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "letUse", want: "then", ok: true},
 		{name: "numeric"},
 		{name: "unknownUse"},
+		{name: "stableArrayUse", want: "", ok: true},
+		{name: "writtenArrayUse"},
+		{name: "filledArrayUse"},
+		{name: "computedMutatedArrayUse"},
+		{name: "updatedArrayUse"},
+		{name: "slicedArrayUse", want: "", ok: true},
+		{name: "writtenObjectUse"},
+		{name: "protoMessage", want: "message", ok: true},
+		{name: "quotedProtoMessage", want: "message", ok: true},
+		{name: "ownProtoMessage", want: "", ok: true},
+		{name: "computedProtoMessage"},
+		{name: "nullProtoString"},
+		{name: "emptyJoin", want: "", ok: true},
+		{name: "joined", want: "error: message", ok: true},
+		{name: "nestedEmptyJoin", want: "", ok: true},
+		{name: "overflowEmptyJoin", want: "", ok: true},
+		{name: "undefinedSeparatorJoin", want: "", ok: true},
+		{name: "boundJoin", want: "", ok: true},
+		{name: "mutatedJoin"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,7 +184,43 @@ func TestStaticStringEvaluator(t *testing.T) {
 	}
 }
 
-func findVariableInitializer(t *testing.T, sourceFile *ast.SourceFile, bindingName string) *ast.Node {
+func TestIsMutatingArrayMethod(t *testing.T) {
+	for _, name := range []string{
+		"copyWithin",
+		"fill",
+		"pop",
+		"push",
+		"reverse",
+		"shift",
+		"sort",
+		"splice",
+		"unshift",
+	} {
+		if !isMutatingArrayMethod(name) {
+			t.Errorf("isMutatingArrayMethod(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"", "concat", "join", "map", "slice"} {
+		if isMutatingArrayMethod(name) {
+			t.Errorf("isMutatingArrayMethod(%q) = true, want false", name)
+		}
+	}
+}
+
+func TestStaticArrayJoinRejectsExcessiveOutput(t *testing.T) {
+	value := &staticArrayValue{
+		length:   2048,
+		overflow: make([]any, 2046),
+	}
+	for index := range value.length {
+		value.set(index, staticUndefinedValue{})
+	}
+	if _, ok := staticArrayJoin(value, strings.Repeat("x", 1024)); ok {
+		t.Fatal("staticArrayJoin accepted output above the static string limit")
+	}
+}
+
+func findVariableInitializer(t testing.TB, sourceFile *ast.SourceFile, bindingName string) *ast.Node {
 	t.Helper()
 
 	var initializer *ast.Node

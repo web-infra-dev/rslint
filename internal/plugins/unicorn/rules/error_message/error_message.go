@@ -69,7 +69,7 @@ var ErrorMessageRule = rule.Rule{
 	Name:   "unicorn/error-message",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		staticStrings := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		staticStrings := utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 
 		checkExpression := func(node *ast.Node) {
 			if ast.IsOptionalChain(node) {
@@ -145,13 +145,12 @@ var ErrorMessageRule = rule.Rule{
 				return
 			}
 
-			val, ok := staticStrings.EvalValue(argNode)
-			if !ok {
+			strVal, valueKind := staticStrings.EvalStringValue(argNode)
+			if valueKind == utils.StaticEvalUnknown {
 				return
 			}
 
-			strVal, isString := val.(string)
-			if !isString {
+			if valueKind == utils.StaticEvalNonString {
 				ctx.ReportNode(argNode, notStringMessage)
 				return
 			}
