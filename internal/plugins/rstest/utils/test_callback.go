@@ -44,7 +44,6 @@ func (callbacks RstestTestCallbacks) ParseFnCall(node *ast.Node) *ParsedRstestFn
 type rstestCallbackInfo struct {
 	functionNode *ast.Node
 	name         string
-	parsed       *ParsedRstestFnCall
 }
 
 func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
@@ -67,7 +66,7 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 		if node.Kind == ast.KindCallExpression {
 			parsed := result.fnCalls.parse(node)
 			if parsed != nil && parsed.Kind == RstestFnTypeTest {
-				info := resolveRstestTestCallback(ctx, parsed, node.AsCallExpression())
+				info := resolveRstestTestCallback(ctx, node.AsCallExpression())
 				if info.functionNode != nil {
 					recordRstestCallback(ctx, &result, info.functionNode, parsed)
 				} else if info.name != "" {
@@ -92,7 +91,6 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 
 func resolveRstestTestCallback(
 	ctx rule.RuleContext,
-	parsed *ParsedRstestFnCall,
 	call *ast.CallExpression,
 ) rstestCallbackInfo {
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
@@ -105,7 +103,6 @@ func resolveRstestTestCallback(
 	// there must not shadow the real callback in the second position.
 	if len(arguments) >= 3 {
 		if info := resolveRstestCallbackArgument(ctx, arguments[2]); info.functionNode != nil {
-			info.parsed = parsed
 			return info
 		}
 	}
@@ -115,11 +112,9 @@ func resolveRstestTestCallback(
 		// The second argument is not a callback at all, so an unresolved name in
 		// the third position is still worth deferring to the pending walk.
 		if third := resolveRstestCallbackArgument(ctx, arguments[2]); third.name != "" {
-			third.parsed = parsed
 			return third
 		}
 	}
-	info.parsed = parsed
 	return info
 }
 
