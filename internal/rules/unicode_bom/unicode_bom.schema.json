@@ -1,0 +1,10 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["never"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

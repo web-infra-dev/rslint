@@ -64,7 +64,11 @@ type RuleContext struct {
 	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
 	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
 	// Nil when no program is available.
-	Refs           *RefStore
+	Refs *RefStore
+	// BOM lazily answers whether this file's source text began with a byte
+	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
+	// false, which is what a context with no program can say.
+	BOM            *SourceBOM
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager

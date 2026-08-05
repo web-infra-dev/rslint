@@ -431,12 +431,11 @@ func TestEslintPluginSourceFile(t *testing.T) {
 	if got, ok := eslintPluginSourceFile(EslintPluginFileInput{SourceFile: sf}); !ok || got != sf {
 		t.Errorf("SourceFile branch must reuse the provided frame verbatim")
 	}
-	// (b) LSP overlay: the frame keeps the BOM VERBATIM (it must match the
-	// BOM-inclusive editor document + native frame; the worker's BOM-stripped
-	// offsets are shifted back past the BOM during rebuild).
+	// (b) LSP overlay: the frame drops a leading BOM, so its offsets are the
+	// worker's and the native frame's.
 	withBOM := "\ufeff" + code
-	if got, ok := eslintPluginSourceFile(EslintPluginFileInput{Text: &withBOM}); !ok || got.Text() != withBOM {
-		t.Errorf("overlay frame must keep the BOM verbatim: text = %q, want %q", got.Text(), withBOM)
+	if got, ok := eslintPluginSourceFile(EslintPluginFileInput{Text: &withBOM}); !ok || got.Text() != code {
+		t.Errorf("overlay frame must drop the BOM: text = %q, want %q", got.Text(), code)
 	}
 	plain := code
 	if got, ok := eslintPluginSourceFile(EslintPluginFileInput{Text: &plain}); !ok || got.Text() != code {
@@ -481,12 +480,10 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 		t.Errorf("range over reused frame: want [6,12], got [%d,%d]", diags[0].Range.Pos(), diags[0].Range.End())
 	}
 
-	// (b) LSP overlay with a leading BOM. The frame KEEPS the BOM (matching the
-	// BOM-inclusive editor document + native diagnostics + the with-BOM content
-	// source.fixAll splices into). The worker reports BOM-stripped offsets [6,7]
-	// (the 'x'); Go shifts them +3 past the BOM into this frame \u2192 [9,10], so the
-	// fix splices the 'x' (NOT the BOM). Pre-fix this rebuilt against a BOM-
-	// stripped frame and corrupted source.fixAll on well-formed BOM files.
+	// (b) LSP overlay with a leading BOM. The frame drops the mark, matching the
+	// worker, the native diagnostics and source.fixAll: an offset never counts
+	// a byte order mark. The worker's [6,7] (the 'x') therefore lands as it
+	// stands, and the fix splices the 'x' rather than the mark.
 	const code = "const x = 1;"
 	bomText := "\ufeff" + code
 	files2 := []EslintPluginFileInput{
@@ -508,15 +505,15 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	if len(diags2) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(diags2))
 	}
-	if diags2[0].SourceFile.Text() != bomText {
-		t.Errorf("overlay frame must keep the BOM: got %q, want %q", diags2[0].SourceFile.Text(), bomText)
+	if diags2[0].SourceFile.Text() != code {
+		t.Errorf("overlay frame must drop the BOM: got %q, want %q", diags2[0].SourceFile.Text(), code)
 	}
-	if diags2[0].Range.Pos() != 9 || diags2[0].Range.End() != 10 {
-		t.Errorf("overlay range: worker [6,7] + BOM shift \u2192 want [9,10], got [%d,%d]", diags2[0].Range.Pos(), diags2[0].Range.End())
+	if diags2[0].Range.Pos() != 6 || diags2[0].Range.End() != 7 {
+		t.Errorf("overlay range: worker [6,7] \u2192 want [6,7], got [%d,%d]", diags2[0].Range.Pos(), diags2[0].Range.End())
 	}
 	fx := diags2[0].Fixes()
-	if len(fx) != 1 || fx[0].Range.Pos() != 9 || fx[0].Range.End() != 10 || fx[0].Text != "y" {
-		t.Errorf("overlay fix: worker [6,7] + BOM shift \u2192 want [9,10]='y', got %+v", fx)
+	if len(fx) != 1 || fx[0].Range.Pos() != 6 || fx[0].Range.End() != 7 || fx[0].Text != "y" {
+		t.Errorf("overlay fix: worker [6,7] \u2192 want [6,7]='y', got %+v", fx)
 	}
 	// End-to-end: applying the fix to the with-BOM overlay must replace the 'x'
 	// and PRESERVE the BOM \u2014 no off-by-3 corruption.

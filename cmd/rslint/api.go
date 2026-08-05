@@ -43,6 +43,13 @@ func (fs *canonicalPathVFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
+// SourceHasBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
+// that interface's methods, so this layer has to pass [utils.BOMSource]
+// through by hand or every overlay identity below it becomes invisible.
+func (fs *canonicalPathVFS) SourceHasBOM(filePath string) bool {
+	return utils.SourceHasBOM(fs.FS, filePath)
+}
+
 // programCache holds a cached Program instance for AST info requests
 type programCache struct {
 	mu              sync.RWMutex
@@ -749,7 +756,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if req.Fix && len(diagnosticsByFile) > 0 {
 		output = make(map[string]string)
 		for filePath, fileDiags := range diagnosticsByFile {
+			// The parsed text has no byte order mark — reading the file
+			// consumed it — so put it back before fixing. Output is what the
+			// JS side writes to disk, and it has to be the whole file.
 			originalContent := fileDiags[0].SourceFile.Text()
+			if utils.SourceHasBOM(buildContext.FS(), filePath) {
+				originalContent = utils.BOM + originalContent
+			}
 			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)
 			if didFix {
 				output[tspath.ConvertToRelativePath(filePath, comparePathOptions)] = fixedContent
@@ -1045,7 +1058,13 @@ func buildTsConfigContent(fileName string, compilerOptions map[string]any) strin
 // which counts UTF-16 units from a line start); fix ranges are flat offsets
 // from the start of the file.
 func byteOffsetToUTF16(text string, byteOffset int) int {
-	if byteOffset <= 0 {
+	if byteOffset < 0 {
+		// A fix reaching back before the text — ESLint's [-1, 0] for removing
+		// a byte order mark. There is nothing to measure, and the position is
+		// meaningful as it stands.
+		return byteOffset
+	}
+	if byteOffset == 0 {
 		return 0
 	}
 	if byteOffset >= len(text) {

@@ -150,6 +150,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
+	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -306,5 +307,6 @@ func GetAllRules() []rule.Rule {
 		require_yield.RequireYieldRule,
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
+		unicode_bom.UnicodeBomRule,
 	}
 }

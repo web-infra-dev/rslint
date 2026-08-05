@@ -208,6 +208,15 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker)
 		}
 
+		// One lazy byte-order-mark answer shared by every rule in this file.
+		// The mark is gone from the text by the time the file is parsed, so
+		// answering means going back to whatever produced that text; a file no
+		// rule asks about never does.
+		var sourceBOM *rule.SourceBOM
+		if opts.Program != nil {
+			sourceBOM = rule.NewSourceBOM(opts.Program.Host().FS(), file.FileName())
+		}
+
 		for ruleIndex, r := range rules {
 			ctx := rule.RuleContext{
 				SourceFile:     file,
@@ -218,6 +227,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				Comments:       comments,
 				Refs:           refs,
+				BOM:            sourceBOM,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 			}.WithDiagnosticConsumer(

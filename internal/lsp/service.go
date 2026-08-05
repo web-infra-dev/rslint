@@ -41,9 +41,12 @@ type lintPassResult struct {
 }
 
 // ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
-// source file's line map for position encoding.
+// source file's line map for position encoding. A fix reaching back before the
+// text — ESLint's [-1, 0] for a byte order mark — starts at the document's
+// first position: an editor document holds decoded text, and the mark is part
+// of the file's encoding rather than of that text.
 func ruleFixToTextEdit(sourceFile ast.SourceFileLike, fix rule.RuleFix) *lsproto.TextEdit {
-	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
+	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, max(0, fix.Range.Pos()))
 	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
 	return &lsproto.TextEdit{
 		Range: lsproto.Range{
