@@ -86,7 +86,7 @@
     "@rslint/core": "workspace:*",
     "@types/mocha": "catalog:",
     "@types/node": "catalog:",
-    "@types/vscode": "catalog:",
+    "@types/vscode": "^1.125.0",
     "@vscode/test-cli": "catalog:",
     "@vscode/test-electron": "catalog:",
     "@vscode/vsce": "catalog:",
