@@ -301,8 +301,9 @@ func classifyStaticExpectEntry(rest []testFramework.MemberEntry) RstestExpectEnt
 
 // findRstestExpectModifiersAndMatcher locates the matcher — the first chain
 // member whose enclosing member access is invoked — and validates the
-// modifiers before it, mirroring jest's FindExpectModifiersAndMatcher: no
-// modifier may repeat, and not may only follow resolves or rejects.
+// modifiers before it, mirroring Vitest's expect-chain validation: not may
+// appear at most once, and resolves / rejects may appear at most once in
+// total, regardless of their order.
 func findRstestExpectModifiersAndMatcher(entries []testFramework.MemberEntry) (
 	[]ParsedRstestFnMemberEntry,
 	*ParsedRstestFnMemberEntry,
@@ -313,6 +314,8 @@ func findRstestExpectModifiersAndMatcher(entries []testFramework.MemberEntry) (
 	}
 
 	modifiers := make([]ParsedRstestFnMemberEntry, 0, len(entries))
+	notCount := 0
+	promiseModifierCount := 0
 	for _, member := range entries {
 		if member.Node == nil {
 			return nil, nil, RstestExpectParseReasonModifierUnknown
@@ -332,21 +335,20 @@ func findRstestExpectModifiersAndMatcher(entries []testFramework.MemberEntry) (
 			return modifiers, &member, RstestExpectParseReasonNone
 		}
 
-		switch len(modifiers) {
-		case 0:
-			if !RSTEST_EXPECT_MODIFIER_NAMES[member.Name] {
-				return nil, nil, RstestExpectParseReasonModifierUnknown
-			}
-		case 1:
-			if member.Name != "not" {
-				return nil, nil, RstestExpectParseReasonModifierUnknown
-			}
-			first := modifiers[0].Name
-			if first != "rejects" && first != "resolves" {
-				return nil, nil, RstestExpectParseReasonModifierUnknown
-			}
-		default:
+		if !RSTEST_EXPECT_MODIFIER_NAMES[member.Name] {
 			return nil, nil, RstestExpectParseReasonModifierUnknown
+		}
+
+		if member.Name == "not" {
+			notCount++
+			if notCount > 1 {
+				return nil, nil, RstestExpectParseReasonModifierUnknown
+			}
+		} else {
+			promiseModifierCount++
+			if promiseModifierCount > 1 {
+				return nil, nil, RstestExpectParseReasonModifierUnknown
+			}
 		}
 
 		modifiers = append(modifiers, member)

@@ -10,8 +10,8 @@ package utils
 
 // RSTEST_EXPECT_MODIFIER_NAMES lists the assertion chain modifiers.
 // Source: rstest c4b67c72 packages/core/src/types/expect.ts:72-143 (Assertion
-// exposes not / resolves / rejects); the set and the legal combinations are
-// identical to Jest's.
+// exposes not / resolves / rejects). Legal combinations follow Vitest's
+// count-based validation: at most one not and one promise modifier.
 var RSTEST_EXPECT_MODIFIER_NAMES = map[string]bool{
 	"not":      true,
 	"rejects":  true,

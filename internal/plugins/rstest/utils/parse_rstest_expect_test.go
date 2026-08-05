@@ -159,15 +159,27 @@ func TestParseRstestExpectCallModifiersAndMatcher(t *testing.T) {
 				Errors: parsedExpectError("entry=expect head=true modifiers=[rejects not] matcher=toThrow reason=none static=false"),
 			},
 			{
+				Code:   `expect(x).not.resolves.toBe(1);`,
+				Errors: parsedExpectError("entry=expect head=true modifiers=[not resolves] matcher=toBe reason=none static=false"),
+			},
+			{
+				Code:   `expect(x).not.rejects.toThrow();`,
+				Errors: parsedExpectError("entry=expect head=true modifiers=[not rejects] matcher=toThrow reason=none static=false"),
+			},
+			{
 				Code:   `expect(x).not.not.toBe(1);`,
 				Errors: parsedExpectError("entry=expect head=true modifiers=[] matcher= reason=modifier-unknown static=false"),
 			},
 			{
-				Code:   `expect(x).not.resolves.toBe(1);`,
+				Code:   `expect(x).resolves.rejects.toBe(1);`,
 				Errors: parsedExpectError("entry=expect head=true modifiers=[] matcher= reason=modifier-unknown static=false"),
 			},
 			{
-				Code:   `expect(x).resolves.rejects.toBe(1);`,
+				Code:   `expect(x).resolves.resolves.toBe(1);`,
+				Errors: parsedExpectError("entry=expect head=true modifiers=[] matcher= reason=modifier-unknown static=false"),
+			},
+			{
+				Code:   `expect(x).rejects.rejects.toThrow();`,
 				Errors: parsedExpectError("entry=expect head=true modifiers=[] matcher= reason=modifier-unknown static=false"),
 			},
 			{
@@ -350,6 +362,8 @@ func TestShouldRstestExpectBeAwaited(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{Code: `expect(x).resolves.toBe(1);`, Errors: awaited},
 			{Code: `expect(x).rejects.not.toThrow();`, Errors: awaited},
+			{Code: `expect(x).not.resolves.toBe(1);`, Errors: awaited},
+			{Code: `expect(x).not.rejects.toThrow();`, Errors: awaited},
 			{Code: `expect(x).toResolve();`, Errors: awaited},
 			{Code: `expect(x).not.toBe(1);`, Errors: notAwaited},
 			{Code: `expect(x).toBe(1);`, Errors: notAwaited},
