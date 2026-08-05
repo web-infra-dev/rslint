@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -17,6 +19,7 @@ const (
 	rstestAPIDescribe
 	rstestAPIParameterizedTest
 	rstestAPIParameterizedDescribe
+	rstestAPIHook
 )
 
 type rstestInvocation uint8
@@ -68,6 +71,19 @@ func ParseRstestFnCallWithOfficialExtensions(
 	ctx rule.RuleContext,
 ) *ParsedRstestFnCall {
 	return parseRstestFnCall(node, ctx, true, true)
+}
+
+// IsTypeOfRstestFnCall reports whether node parses as a Rstest registration
+// call of one of the given kinds. Mirrors jest's IsTypeOfJestFnCall
+// (parse_jest_fn.go:32); it parses with official extensions enabled
+// (import.meta + playwright), the same choice RstestTestCallbacks.ParseFnCall
+// makes.
+func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
+	parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
+	if parsed == nil || len(kinds) == 0 {
+		return false
+	}
+	return slices.Contains(kinds, parsed.Kind)
 }
 
 func parseRstestFnCall(
@@ -129,6 +145,8 @@ func parseRstestFnCall(
 		resolved.kind = RstestFnTypeTest
 	case rstestAPIDescribe, rstestAPIParameterizedDescribe:
 		resolved.kind = RstestFnTypeDescribe
+	case rstestAPIHook:
+		resolved.kind = RstestFnTypeHook
 	default:
 		return nil
 	}
@@ -504,6 +522,13 @@ func directRstestAPIState(profile rstestAPIProfile, name string) rstestAPIState 
 	case "describe":
 		return rstestAPIDescribe
 	default:
+		// Both profiles expose the same four hooks: @rstest/playwright
+		// re-exports them (packages/playwright/src/index.ts:2-9). Hooks accept
+		// no chained members, which holds by construction: applyRstestChainPart
+		// has no rstestAPIHook branch, so any member invalidates the chain.
+		if RSTEST_HOOK_NAMES[name] {
+			return rstestAPIHook
+		}
 		return rstestAPIInvalid
 	}
 }
