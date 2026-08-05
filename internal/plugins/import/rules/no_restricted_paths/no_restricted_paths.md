@@ -135,6 +135,7 @@ reports `Unexpected path "../server/bar" imported in restricted zone. Use the AP
 
 - Glob patterns support `*`, `**`, `?`, `[abc]` character classes and `{a,b}` alternatives. Extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — is matched as literal text and therefore matches no real path. A `target` such as `./client/!(sub-module)/**/*` leaves the zone inactive, and a `from` such as `./src/@(server|shared)/**/*` restricts nothing. Write `{server,shared}` instead of `@(server|shared)`, and name the directories you want to cover instead of excluding one with `!(...)`.
 - A `*` matches path segments that begin with a dot, so `./src/*` covers `./src/.hidden.ts` as well.
+- A zone is matched against the file a specifier resolves to, and a specifier resolves through the module resolution TypeScript recorded for it. TypeScript records `require('./x')` calls in JavaScript files, so in a TypeScript file write the import as an `import` declaration or a dynamic `import('./x')` for the zone to cover it.
 
 ## Original Documentation
 
