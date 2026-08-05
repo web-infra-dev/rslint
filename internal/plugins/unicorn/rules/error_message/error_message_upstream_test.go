@@ -1,6 +1,6 @@
 // TestErrorMessageUpstream migrates the full valid/invalid suite from upstream
-// test/error-message.js 1:1. Position assertions cover line/column for every
-// invalid case. rslint-specific lock-in cases live in the
+// v73.0.0 test/error-message.js 1:1. Position assertions cover line/column for
+// every invalid case. rslint-specific lock-in cases live in the
 // error_message_extras_test.go file.
 package error_message_test
 
