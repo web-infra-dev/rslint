@@ -29,7 +29,7 @@ var NoUselessAssignmentRule = rule.Rule{
 		var byRoot map[*ast.Node][]rawAssignment
 		var rootOrder []*ast.Node
 		collect := func(node *ast.Node) {
-			collectAssignment(&ctx, node, func(raw rawAssignment) {
+			collectAssignmentNode(&ctx, node, func(raw rawAssignment) {
 				if byRoot == nil {
 					byRoot = make(map[*ast.Node][]rawAssignment)
 				}
@@ -96,19 +96,9 @@ func reportAssignments(
 	}
 }
 
-// collectAssignment reports every variable write represented by node. The
-// shared linter traversal supplies each candidate node, avoiding a second
-// rule-owned walk over the file.
-func collectAssignment(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
-	collectAssignmentNode(ctx, node, emit)
-	if node.Kind == ast.KindBinaryExpression {
-		binary := node.AsBinaryExpression()
-		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
-			collectSkippedPatternAssignments(ctx, binary.Left, emit)
-		}
-	}
-}
-
+// collectAssignmentNode reports every variable write represented by node. The
+// shared linter traversal supplies each candidate node, including assignments
+// inside computed property names of assignment patterns.
 func collectAssignmentNode(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
 	add := func(target *ast.Node) {
 		forEachTargetIdentifier(target, func(identifier *ast.Node) {
@@ -142,46 +132,6 @@ func collectAssignmentNode(ctx *rule.RuleContext, node *ast.Node, emit func(rawA
 	case ast.KindPostfixUnaryExpression:
 		add(node.AsPostfixUnaryExpression().Operand)
 	}
-}
-
-// The linter's pattern traversal deliberately skips computed property names
-// on assignment targets. Collect writes inside those expressions here; every
-// other target subtree is already dispatched through the shared traversal.
-func collectSkippedPatternAssignments(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
-	if node == nil {
-		return
-	}
-	switch node.Kind {
-	case ast.KindObjectLiteralExpression:
-		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-			switch property.Kind {
-			case ast.KindPropertyAssignment:
-				assignment := property.AsPropertyAssignment()
-				if name := assignment.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-					collectAssignmentSubtree(ctx, name.AsComputedPropertyName().Expression, emit)
-				}
-				collectSkippedPatternAssignments(ctx, assignment.Initializer, emit)
-			case ast.KindSpreadAssignment:
-				collectSkippedPatternAssignments(ctx, property.AsSpreadAssignment().Expression, emit)
-			}
-		}
-	case ast.KindArrayLiteralExpression:
-		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-			collectSkippedPatternAssignments(ctx, element, emit)
-		}
-	case ast.KindSpreadElement:
-		collectSkippedPatternAssignments(ctx, node.AsSpreadElement().Expression, emit)
-	}
-}
-
-func collectAssignmentSubtree(ctx *rule.RuleContext, node *ast.Node, emit func(rawAssignment)) {
-	var visit func(*ast.Node) bool
-	visit = func(current *ast.Node) bool {
-		collectAssignmentNode(ctx, current, emit)
-		current.ForEachChild(visit)
-		return false
-	}
-	visit(node)
 }
 
 // forEachTargetIdentifier yields every identifier an assignment target writes

@@ -455,9 +455,7 @@ var NoUnusedPrivateClassMembersRule = rule.CreateRule(rule.Rule{
 
 		// handlePropAccess and handleElemAccess process a single
 		// PropertyAccessExpression / ElementAccessExpression as a reference
-		// to a tracked class member. Extracted so the BinaryExpression /
-		// PropertyAssignment workaround below can re-trigger them on
-		// computed-key subtrees that the linter's patternVisitor skips.
+		// to a tracked class member.
 		var handlePropAccess func(node *ast.Node)
 		var handleElemAccess func(node *ast.Node)
 		handlePropAccess = func(node *ast.Node) {
@@ -510,28 +508,6 @@ var NoUnusedPrivateClassMembersRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
-		// scanComputedKey walks `node` looking for member accesses the
-		// linter's patternVisitor would have skipped (it never descends
-		// into the *key* of a `[ expr ]: target` element when the parent
-		// OLE is an assignment target). Each PropertyAccess / ElementAccess
-		// encountered is replayed through the normal handlers.
-		var scanComputedKey func(*ast.Node)
-		scanComputedKey = func(n *ast.Node) {
-			if n == nil {
-				return
-			}
-			switch n.Kind {
-			case ast.KindPropertyAccessExpression:
-				handlePropAccess(n)
-			case ast.KindElementAccessExpression:
-				handleElemAccess(n)
-			}
-			n.ForEachChild(func(child *ast.Node) bool {
-				scanComputedKey(child)
-				return false
-			})
-		}
-
 		return rule.RuleListeners{
 			// Class scopes.
 			ast.KindClassDeclaration:                      pushClassScope,
@@ -572,34 +548,6 @@ var NoUnusedPrivateClassMembersRule = rule.CreateRule(rule.Rule{
 			// tracked member.
 			ast.KindPropertyAccessExpression: handlePropAccess,
 			ast.KindElementAccessExpression:  handleElemAccess,
-
-			// Workaround for the linter's destructuring walker. patternVisitor
-			// on a PropertyAssignment visits only the *Initializer* (target);
-			// the *Name* (e.g. `[this.#x]:` ) is silently dropped. Without
-			// this listener, member accesses inside a computed destructuring
-			// key would never reach the standard PAE / EAE handlers above.
-			// We scan the name ONLY when the surrounding OLE is itself an
-			// assignment target — value-context property assignments
-			// continue to be walked by the linter as usual, so no
-			// double-counting occurs.
-			ast.KindPropertyAssignment: func(node *ast.Node) {
-				pa := node.AsPropertyAssignment()
-				if pa == nil {
-					return
-				}
-				name := pa.Name()
-				if name == nil || name.Kind != ast.KindComputedPropertyName {
-					return
-				}
-				parent := node.Parent
-				if parent == nil || parent.Kind != ast.KindObjectLiteralExpression {
-					return
-				}
-				if !ast.IsAssignmentTarget(parent) {
-					return
-				}
-				scanComputedKey(name)
-			},
 
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				vd := node.AsVariableDeclaration()

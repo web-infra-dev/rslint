@@ -84,43 +84,12 @@ var NoUnusedPrivateClassMembersRule = rule.Rule{
 			member.isUsed = true
 		}
 
-		var scanComputedKey func(node *ast.Node)
-		scanComputedKey = func(node *ast.Node) {
-			if node == nil {
-				return
-			}
-			if node.Kind == ast.KindPrivateIdentifier {
-				handlePrivateIdentifier(node)
-			}
-			node.ForEachChild(func(child *ast.Node) bool {
-				scanComputedKey(child)
-				return false
-			})
-		}
-
 		return rule.RuleListeners{
 			ast.KindClassDeclaration:                      pushClass,
 			rule.ListenerOnExit(ast.KindClassDeclaration): popClass,
 			ast.KindClassExpression:                       pushClass,
 			rule.ListenerOnExit(ast.KindClassExpression):  popClass,
 			ast.KindPrivateIdentifier:                     handlePrivateIdentifier,
-			ast.KindPropertyAssignment: func(node *ast.Node) {
-				property := node.AsPropertyAssignment()
-				if property == nil {
-					return
-				}
-				name := property.Name()
-				if name == nil || name.Kind != ast.KindComputedPropertyName {
-					return
-				}
-				parent := node.Parent
-				if parent == nil || parent.Kind != ast.KindObjectLiteralExpression || !ast.IsAssignmentTarget(parent) {
-					return
-				}
-				// The generic PrivateIdentifier listener can miss computed keys in
-				// destructuring assignment patterns, so scan that key explicitly.
-				scanComputedKey(name)
-			},
 		}
 	},
 }
