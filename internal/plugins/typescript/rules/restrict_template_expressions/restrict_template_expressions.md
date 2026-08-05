@@ -67,7 +67,6 @@ To require every interpolated value to be a `string`, empty the `allow` list and
 ## Differences from ESLint
 
 - An `allow` entry with `from: 'package'` matches the package name exactly. ESLint matches any package whose name contains the given string, so `{ from: 'package', package: 'demo' }` also permits types declared in `demo-pkg` there. Write the package name in full to permit the same types in both.
-- The type name in the message may order union constituents differently. Given `declare const input: object | undefined;` and `const value = input ?? 'fallback';`, interpolating `value` reports `Invalid type ""fallback" | object" of template literal expression.` here and `Invalid type "object | "fallback"" of template literal expression.` in ESLint.
 
 ## Original Documentation
 
