@@ -17,20 +17,20 @@ Examples of **incorrect** code for this rule:
 
 ```javascript
 for (let i = 0; i < arr.length; i++) {
-	console.log(arr[i]);
-	break;
+  console.log(arr[i]);
+  break;
 }
 
 while (foo) {
-	doSomething(foo);
-	foo = foo.parent;
-	return;
+  doSomething(foo);
+  foo = foo.parent;
+  return;
 }
 
 function find(arr, target) {
-	for (const item of arr) {
-		return item === target;
-	}
+  for (const item of arr) {
+    return item === target;
+  }
 }
 ```
 
@@ -38,22 +38,22 @@ Examples of **correct** code for this rule:
 
 ```javascript
 for (let i = 0; i < arr.length; i++) {
-	console.log(arr[i]);
+  console.log(arr[i]);
 }
 
 while (foo) {
-	if (bar) {
-		break;
-	}
-	foo = foo.parent;
+  if (bar) {
+    break;
+  }
+  foo = foo.parent;
 }
 
 function find(arr, target) {
-	for (const item of arr) {
-		if (item === target) {
-			return item;
-		}
-	}
+  for (const item of arr) {
+    if (item === target) {
+      return item;
+    }
+  }
 }
 ```
 
@@ -67,16 +67,36 @@ An array of loop types to leave unchecked. Each entry is one of
 `"WhileStatement"`, `"DoWhileStatement"`, `"ForStatement"`,
 `"ForInStatement"`, or `"ForOfStatement"`. It defaults to an empty array.
 
-`{ "ignore": ["ForInStatement", "ForOfStatement"] }` allows the idiom that
-reads only the first entry of a collection:
+The following configuration allows the idiom that reads only the first entry
+of a collection:
 
-```javascript
-/* eslint no-unreachable-loop: ["error", { "ignore": ["ForInStatement", "ForOfStatement"] }] */
-
-function firstKey(obj) {
-	for (const key in obj) {
-		return key;
-	}
-	return null;
+```json
+{
+  "no-unreachable-loop": [
+    "error",
+    { "ignore": ["ForInStatement", "ForOfStatement"] }
+  ]
 }
 ```
+
+```javascript
+function firstKey(obj) {
+  for (const key in obj) {
+    return key;
+  }
+  return null;
+}
+```
+
+## Differences from ESLint
+
+- rslint accepts double-labelled `while` and `do-while` loops when `continue`
+  targets the outer label. ESLint 10.8.0 reports those two forms even though
+  the jump starts another iteration.
+- rslint accepts an enclosing loop when `continue` in a `finally` block
+  overrides a pending `return` or `throw`. ESLint 10.8.0 reports some of these
+  code paths even though control starts another iteration.
+
+## Original Documentation
+
+- [ESLint no-unreachable-loop](https://eslint.org/docs/latest/rules/no-unreachable-loop)
