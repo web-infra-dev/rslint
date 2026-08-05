@@ -1,8 +1,15 @@
-// TestNoRestrictedPathsPackageSpecifiers exercises zones that reach into
-// node_modules, which the embedded fixture tree cannot carry, so this file
-// builds its own fixture root instead. It covers both halves of what a package
-// specifier does here: that it reaches a zone at all, and which file inside the
-// package it resolves to, since that differs from upstream's resolver.
+// TestNoRestrictedPathsPackageSpecifiers runs every module reference shape
+// against every zone shape that can name an installed package. Zones reaching
+// into node_modules need a fixture root the embedded tree cannot carry, so this
+// file builds its own.
+//
+// The expectations mirror a run of eslint-plugin-import over the same tree,
+// except for the one divergence the matrix is built to pin down: the resolvers
+// disagree on which file inside a package a specifier names. Upstream's node
+// resolver follows `main` to `index.js`; TypeScript follows `types` to
+// `index.d.ts`. Zones naming the package, an ancestor of it or a glob over it
+// cover the import either way, and only zones naming a single file inside the
+// package can tell the two apart.
 package no_restricted_paths_test
 
 import (
@@ -17,10 +24,8 @@ import (
 
 const packageRootDir = "/restricted-package"
 
-// packageRoot builds a fixture root holding one installed package. `main` and
-// `types` name different files on purpose: upstream's node resolver follows
-// `main` to `index.js`, while TypeScript's resolution follows `types` to
-// `index.d.ts`, and the rule matches zones against whichever file that is.
+// packageRoot builds a fixture root holding one installed package whose `main`
+// and `types` name different files, so a zone can name either one.
 func packageRoot() rule_tester.Root {
 	files := map[string]string{
 		packageRootDir + "/tsconfig.json":                          `{"compilerOptions":{"module":"commonjs","target":"esnext","allowJs":true,"esModuleInterop":true}}`,
@@ -37,100 +42,114 @@ func packageRoot() rule_tester.Root {
 	}
 }
 
+// packageShape is one way of writing a module reference to the package.
+type packageShape struct {
+	name      string
+	code      string
+	fileName  string
+	specifier string
+	// column is where the specifier literal starts, and 0 marks a shape that is
+	// not a module reference at all, so no zone can ever restrict it.
+	column int
+}
+
+// reachingShapes name the package through a specifier the rule resolves.
+var reachingShapes = []packageShape{
+	{name: "default import", code: `import x from "some-package"`, fileName: "client/a.ts", specifier: "some-package", column: 15},
+	{name: "side effect import", code: `import "some-package"`, fileName: "client/a.ts", specifier: "some-package", column: 8},
+	{name: "star re-export", code: `export * from "some-package"`, fileName: "client/a.ts", specifier: "some-package", column: 15},
+	{name: "dynamic import", code: `const p = import("some-package")`, fileName: "client/a.ts", specifier: "some-package", column: 18},
+	{name: "require in TypeScript", code: `const x = require("some-package")`, fileName: "client/a.ts", specifier: "some-package", column: 19},
+	{name: "parenthesized require", code: `const x = (require)("some-package")`, fileName: "client/a.ts", specifier: "some-package", column: 21},
+	{name: "require of a subpath", code: `const x = require("some-package/index.js")`, fileName: "client/a.ts", specifier: "some-package/index.js", column: 19},
+	{name: "require in JavaScript", code: `const x = require("some-package")`, fileName: "client/consumer.js", specifier: "some-package", column: 19},
+}
+
+// silentShapes never reach a zone, whichever files it names.
+var silentShapes = []packageShape{
+	// Neither upstream's module visitor nor this one reads an import-equals
+	// declaration as a module reference.
+	{name: "import equals require", code: `import x = require("some-package"); export { x };`, fileName: "client/a.ts"},
+	// A `require` call is a module reference only with exactly one argument.
+	{name: "require with an extra argument", code: `const x = require("some-package", 1)`, fileName: "client/a.ts"},
+	// An unresolvable specifier is skipped before any zone is consulted.
+	{name: "require of a missing package", code: `const x = require("does-not-exist")`, fileName: "client/a.ts"},
+}
+
+// coveringZones name the package in a way that covers it under either
+// resolver, so every reaching shape is restricted.
+var coveringZones = []struct {
+	name string
+	from string
+}{
+	{name: "the package directory", from: "./node_modules/some-package"},
+	{name: "an ancestor of the package", from: "./node_modules"},
+	{name: "a glob over the package", from: "./node_modules/some-package/*"},
+	// Upstream's resolver never reaches `index.d.ts`, so upstream reports
+	// nothing for this zone.
+	{name: "the file TypeScript resolves to", from: "./node_modules/some-package/index.d.ts"},
+}
+
+// missingZones name a file no specifier resolves to here, so nothing is
+// restricted.
+var missingZones = []struct {
+	name string
+	from string
+}{
+	// Upstream's resolver follows `main` here and reports every reaching shape.
+	{name: "the file upstream's resolver picks", from: "./node_modules/some-package/index.js"},
+	{name: "a package that is not installed", from: "./node_modules/other-package"},
+}
+
 func TestNoRestrictedPathsPackageSpecifiers(t *testing.T) {
-	rule_tester.RunRuleTester(
-		packageRoot(),
-		"tsconfig.json",
-		t,
-		&no_restricted_paths.NoRestrictedPathsRule,
-		[]rule_tester.ValidTestCase{
-			// ---- Differences from ESLint: the resolvers disagree on which file a
-			// package specifier names. Upstream's node resolver follows `main`, so a
-			// zone naming `index.js` restricts the import there; TypeScript follows
-			// `types`, so the same zone matches nothing here ----
-			{
-				Code:     `import value from "some-package"`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package/index.js",
-				}),
-			},
-			{
-				Code:     `const value = require("some-package")`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package/index.js",
-				}),
-			},
+	valid := make([]rule_tester.ValidTestCase, 0, len(silentShapes)*(len(coveringZones)+len(missingZones))+len(reachingShapes)*len(missingZones)+len(reachingShapes))
+	invalid := make([]rule_tester.InvalidTestCase, 0, len(reachingShapes)*len(coveringZones))
 
-			// A package outside every zone stays allowed.
-			{
-				Code:     `const value = require("some-package")`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/other-package",
-				}),
-			},
-		},
-		[]rule_tester.InvalidTestCase{
-			// ---- A zone naming the package directory covers it whichever file the
-			// specifier resolves to, which is the shape a real config uses ----
-			{
-				Code:     `import value from "some-package"`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package",
-				}),
-				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("some-package", 1, 19)},
-			},
+	zoneFor := func(from string) any {
+		return zones(map[string]interface{}{"target": "./client", "from": from})
+	}
 
-			// ---- TypeScript records no resolution for a `require()` call in a
-			// TypeScript file, and a package specifier carries no relative path to
-			// probe, so this one reaches the package through the module resolver ----
-			{
-				Code:     `const value = require("some-package")`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package",
-				}),
-				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("some-package", 1, 23)},
-			},
-			{
-				Code:     `const value = (require)("some-package")`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package",
-				}),
-				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("some-package", 1, 25)},
-			},
-			{
-				Code:     `const value = require("some-package")`,
-				FileName: "client/consumer.js",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package",
-				}),
-				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("some-package", 1, 23)},
-			},
+	for _, zone := range coveringZones {
+		for _, shape := range reachingShapes {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     shape.code,
+				FileName: shape.fileName,
+				Options:  zoneFor(zone.from),
+				Errors:   []rule_tester.InvalidTestCaseError{unexpectedPath(shape.specifier, 1, shape.column)},
+			})
+		}
+		for _, shape := range silentShapes {
+			valid = append(valid, rule_tester.ValidTestCase{
+				Code:     shape.code,
+				FileName: shape.fileName,
+				Options:  zoneFor(zone.from),
+			})
+		}
+	}
 
-			// ---- Differences from ESLint, the other half: a zone naming the file
-			// TypeScript resolves to does restrict the import, where upstream's
-			// resolver never reaches `index.d.ts` and reports nothing ----
-			{
-				Code:     `import value from "some-package"`,
-				FileName: "client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./client",
-					"from":   "./node_modules/some-package/index.d.ts",
-				}),
-				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("some-package", 1, 19)},
-			},
-		},
-	)
+	for _, zone := range missingZones {
+		for _, shape := range append(append([]packageShape{}, reachingShapes...), silentShapes...) {
+			valid = append(valid, rule_tester.ValidTestCase{
+				Code:     shape.code,
+				FileName: shape.fileName,
+				Options:  zoneFor(zone.from),
+			})
+		}
+	}
+
+	// An `except` naming the package lifts the restriction an ancestor zone
+	// would otherwise impose, the same way upstream reports nothing here.
+	for _, shape := range append(append([]packageShape{}, reachingShapes...), silentShapes...) {
+		valid = append(valid, rule_tester.ValidTestCase{
+			Code:     shape.code,
+			FileName: shape.fileName,
+			Options: zones(map[string]interface{}{
+				"target": "./client",
+				"from":   "./node_modules",
+				"except": list("./some-package"),
+			}),
+		})
+	}
+
+	rule_tester.RunRuleTester(packageRoot(), "tsconfig.json", t, &no_restricted_paths.NoRestrictedPathsRule, valid, invalid)
 }
