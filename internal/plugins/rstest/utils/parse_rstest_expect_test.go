@@ -111,6 +111,72 @@ func parsedExpectError(message string) []rule_tester.InvalidTestCaseError {
 	return []rule_tester.InvalidTestCaseError{{MessageId: "parsedExpect", Message: message}}
 }
 
+// expectEntryInvariantProbe reports only when Entry and Head disagree, so the
+// corpus below passes as valid test cases and any violation surfaces as an
+// unexpected error rather than as a diff a reader has to spot.
+var expectEntryInvariantProbe = rule.Rule{
+	Name: "rstest/probe-expect-entry-invariant",
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				if parsed == nil {
+					return
+				}
+				isStatic := parsed.Entry == rstestUtils.RstestExpectEntryStatic
+				if isStatic == (parsed.Head == nil) {
+					return
+				}
+				ctx.ReportNode(node, probeMessage("parsedExpect", fmt.Sprintf(
+					"invariant broken: entry=%s head=%t", parsed.Entry, parsed.Head != nil,
+				)))
+			},
+		}
+	},
+}
+
+// TestParseRstestExpectCallEntryInvariant pins the contract the entry kinds
+// exist to carry: Entry names a factory that actually ran, so it is static
+// exactly when there is no head. Rules rely on either field alone to decide
+// whether they are looking at a real assertion.
+func TestParseRstestExpectCallEntryInvariant(t *testing.T) {
+	shapes := []string{
+		`expect(x).toBe(1);`,
+		`expect(x).not.toBe(1);`,
+		`expect(x).resolves.not.toBe(1);`,
+		`expect(x).to.be.ok;`,
+		`expect(x);`,
+		`expect(x).not;`,
+		`expect.soft(x).toBe(1);`,
+		`expect.poll(fn).toBe(1);`,
+		`expect.element(l).toBeVisible();`,
+		`expect.soft.foo(1);`,
+		`expect.assertions(1);`,
+		`expect.hasAssertions();`,
+		`expect.unreachable();`,
+		`expect.getState();`,
+		`expect.extend({});`,
+		`expect.stringContaining("a");`,
+		`expect.not.stringContaining("a");`,
+		`expect.not.toBeDividedBy(5);`,
+		`expect.toBeFoo(1);`,
+		`expect.resolves.toBe(1);`,
+		`expect.not.resolves.toBe(1);`,
+		`expect.not.not.toBe(1);`,
+		`expect.not;`,
+	}
+	cases := make([]rule_tester.ValidTestCase, len(shapes))
+	for i, shape := range shapes {
+		cases[i] = rule_tester.ValidTestCase{Code: shape}
+	}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectEntryInvariantProbe,
+		cases,
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
 func TestParseRstestExpectCallEntries(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(), "tsconfig.json", t, &expectParseProbe,
@@ -138,56 +204,75 @@ func TestParseRstestExpectCallEntries(t *testing.T) {
 			},
 			{
 				Code:   `expect.unreachable();`,
-				Errors: parsedExpectError("entry=unreachable head=false modifiers=[] matcher=unreachable reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=unreachable reason=none static=true"),
 			},
 			// assertion-count declarations are the one static form
 			// no-standalone-expect still reports, hence static=false.
 			{
 				Code:   `expect.assertions(1);`,
-				Errors: parsedExpectError("entry=assertions head=false modifiers=[] matcher=assertions reason=none static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=assertions reason=none static=false"),
 			},
 			{
 				Code:   `expect.hasAssertions();`,
-				Errors: parsedExpectError("entry=assertions head=false modifiers=[] matcher=hasAssertions reason=none static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=hasAssertions reason=none static=false"),
 			},
 			{
 				Code:   `expect.stringContaining("a");`,
-				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=stringContaining reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=stringContaining reason=none static=true"),
 			},
 			{
 				Code:   `expect.anything();`,
-				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=anything reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=anything reason=none static=true"),
 			},
 			{
 				Code:   `expect.any(String);`,
-				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=any reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=any reason=none static=true"),
 			},
 			// ExpectStatic.not.<asymmetric> is the static negation, not the
 			// Assertion.not modifier; upstream parses it as modifier + matcher
 			// and its two members keep it reportable by no-standalone-expect.
 			{
 				Code:   `expect.not.stringContaining("a");`,
-				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[not] matcher=stringContaining reason=none static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[not] matcher=stringContaining reason=none static=false"),
+			},
+			// A negated custom matcher parses identically to a negated
+			// built-in one. The parser does not consult
+			// RSTEST_ASYMMETRIC_MATCHERS, so a name it has never seen is not
+			// classified differently from one it has.
+			{
+				Code:   `expect.not.toBeDividedBy(5);`,
+				Errors: parsedExpectError("entry=static head=false modifiers=[not] matcher=toBeDividedBy reason=none static=false"),
 			},
 			{
 				Code:   `expect.addEqualityTesters([]);`,
-				Errors: parsedExpectError("entry=config head=false modifiers=[] matcher=addEqualityTesters reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=addEqualityTesters reason=none static=true"),
 			},
 			{
 				Code:   `expect.extend({});`,
-				Errors: parsedExpectError("entry=config head=false modifiers=[] matcher=extend reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=extend reason=none static=true"),
 			},
 			// Unknown static members may be custom asymmetric matchers
 			// registered through expect.extend.
 			{
 				Code:   `expect.toBeFoo(1);`,
-				Errors: parsedExpectError("entry=asymmetric head=false modifiers=[] matcher=toBeFoo reason=none static=true"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=toBeFoo reason=none static=true"),
 			},
-			// A bare modifier chain parses like a plain chain with no head,
-			// mirroring vitest's null expectCall.
+			// A bare modifier chain is static too: no assertion factory ran,
+			// mirroring vitest's null expectCall. Entry never claims a factory
+			// that was not invoked.
 			{
 				Code:   `expect.resolves.toBe(1);`,
-				Errors: parsedExpectError("entry=expect head=false modifiers=[resolves] matcher=toBe reason=none static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[resolves] matcher=toBe reason=none static=false"),
+			},
+			{
+				Code:   `expect.not.resolves.toBe(1);`,
+				Errors: parsedExpectError("entry=static head=false modifiers=[not resolves] matcher=toBe reason=none static=false"),
+			},
+			// A factory member that is never called does not make the chain a
+			// factory chain either.
+			{
+				Code:   `expect.soft.toBe(1);`,
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher= reason=modifier-unknown static=false"),
 			},
 		},
 	)
@@ -293,10 +378,12 @@ func TestParseRstestExpectCallModifiersAndMatcher(t *testing.T) {
 				Code:   `expect.soft(x);`,
 				Errors: parsedExpectError("entry=soft head=true modifiers=[] matcher= reason=matcher-not-found static=true"),
 			},
-			// A factory member that is never invoked cannot start a chain.
+			// A factory member that is never invoked cannot start a chain, so
+			// the entry stays static rather than claiming a factory that never
+			// ran.
 			{
 				Code:   `expect.soft.foo(1);`,
-				Errors: parsedExpectError("entry=soft head=false modifiers=[] matcher= reason=modifier-unknown static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher= reason=modifier-unknown static=false"),
 			},
 		},
 	)
@@ -607,7 +694,7 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 			},
 			{
 				Code:   `import.meta.rstest.expect.assertions(1);`,
-				Errors: parsedExpectError("entry=assertions head=false modifiers=[] matcher=assertions reason=none static=false"),
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher=assertions reason=none static=false"),
 			},
 			{
 				Code: `import { expect as check } from '@rstest/core'; check(1).to.be.ok;`,
@@ -757,8 +844,34 @@ func TestRstestMatcherTables(t *testing.T) {
 	if len(rstestUtils.RSTEST_BROWSER_ELEMENT_MATCHERS) != 21 {
 		t.Errorf("expected 21 browser element matchers, got %d", len(rstestUtils.RSTEST_BROWSER_ELEMENT_MATCHERS))
 	}
-	if len(rstestUtils.RSTEST_ASYMMETRIC_MATCHERS) != 10 {
-		t.Errorf("expected 10 asymmetric matchers, got %d", len(rstestUtils.RSTEST_ASYMMETRIC_MATCHERS))
+	// The asymmetric table answers "is this static member a known built-in
+	// value constructor". A count assertion would only ever be updated to
+	// match whatever the table says, so pin membership on both sides instead:
+	// value constructors in, assertion matchers and modifiers out.
+	for _, name := range []string{"stringContaining", "arrayContaining", "any", "anything"} {
+		if !rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[name] {
+			t.Errorf("asymmetric matchers must contain %q", name)
+		}
+	}
+	for _, name := range []string{"toBe", "toEqual", "not", "resolves", "assertions", "soft"} {
+		if rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[name] {
+			t.Errorf("asymmetric matchers must not contain %q", name)
+		}
+	}
+
+	for _, name := range []string{"assertions", "hasAssertions"} {
+		if !rstestUtils.RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS[name] {
+			t.Errorf("assertion-count members must contain %q", name)
+		}
+	}
+	if len(rstestUtils.RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS) != 2 {
+		t.Errorf("expected 2 assertion-count members, got %d", len(rstestUtils.RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS))
+	}
+
+	for _, name := range []string{"extend", "getState", "setState", "addEqualityTesters", "addSnapshotSerializer"} {
+		if !rstestUtils.RSTEST_EXPECT_CONFIG_MEMBERS[name] {
+			t.Errorf("config members must contain %q", name)
+		}
 	}
 
 	if len(rstestUtils.RSTEST_POLL_EXCLUDED_MEMBERS) != 11 {

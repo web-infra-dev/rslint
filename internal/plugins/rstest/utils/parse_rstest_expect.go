@@ -8,14 +8,23 @@ import (
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
-// RstestExpectEntry classifies which ExpectStatic surface a parsed expect call
-// goes through.
+// RstestExpectEntry names the assertion factory a parsed expect call went
+// through. The four factory values mirror eslint-plugin-vitest's
+// expectApiMethods plus its default expect(x) case.
+//
+// Everything the expect object exposes that is not an assertion factory —
+// expect.assertions(n), expect.unreachable(), expect.stringContaining(...),
+// expect.getState() — is RstestExpectEntryStatic. The parser deliberately does
+// not sub-classify those: telling a custom asymmetric matcher registered
+// through expect.extend apart from a forgotten expect(x) is not decidable from
+// one file, so the distinction is left to consumers, which have the member
+// name in Matcher and the tables in rstest_matchers.go to query. Jest and
+// vitest make the same call: neither classifies static members, both detect
+// them structurally (vitest's expectCall == null, our Head == nil).
 type RstestExpectEntry string
 
 const (
-	// RstestExpectEntryCall covers plain expect(x) chains, and also bare
-	// modifier chains such as expect.resolves.toBe(1) where the expect head was
-	// never invoked; the latter parse with Head == nil.
+	// RstestExpectEntryCall covers plain expect(x) chains.
 	RstestExpectEntryCall RstestExpectEntry = "expect"
 	// RstestExpectEntrySoft covers expect.soft(x) chains.
 	RstestExpectEntrySoft RstestExpectEntry = "soft"
@@ -23,19 +32,14 @@ const (
 	RstestExpectEntryPoll RstestExpectEntry = "poll"
 	// RstestExpectEntryElement covers expect.element(locator) chains.
 	RstestExpectEntryElement RstestExpectEntry = "element"
-	// RstestExpectEntryUnreachable covers expect.unreachable(...).
-	RstestExpectEntryUnreachable RstestExpectEntry = "unreachable"
-	// RstestExpectEntryAssertions covers expect.assertions(n) and
-	// expect.hasAssertions().
-	RstestExpectEntryAssertions RstestExpectEntry = "assertions"
-	// RstestExpectEntryAsymmetric covers static matcher value constructors:
-	// expect.stringContaining(...), expect.not.arrayContaining(...), and
-	// unknown static members, which may be custom asymmetric matchers
-	// registered through expect.extend.
-	RstestExpectEntryAsymmetric RstestExpectEntry = "asymmetric"
-	// RstestExpectEntryConfig covers runtime configuration members such as
-	// expect.extend(...) or expect.getState().
-	RstestExpectEntryConfig RstestExpectEntry = "config"
+	// RstestExpectEntryStatic covers every chain where no assertion factory was
+	// invoked: static members of the expect object such as
+	// expect.assertions(1), expect.stringContaining("a") and
+	// expect.not.arrayContaining([]), and bare modifier chains such as
+	// expect.resolves.toBe(1) whose expect(x) call the author forgot.
+	//
+	// Invariant: Entry == RstestExpectEntryStatic if and only if Head == nil.
+	RstestExpectEntryStatic RstestExpectEntry = "static"
 )
 
 // RstestExpectParseReason explains why a parsed expect call carries no
@@ -92,7 +96,10 @@ type ParsedRstestExpectCall struct {
 	// with a null expectCall. Consumers that need the factory arguments must
 	// check for nil.
 	Head *ast.Node
-	// Entry classifies the ExpectStatic surface the call goes through.
+	// Entry names the assertion factory, or RstestExpectEntryStatic when none
+	// was invoked. Head is nil exactly when Entry is RstestExpectEntryStatic,
+	// so either field answers "is this a real assertion"; Entry additionally
+	// says which factory.
 	Entry RstestExpectEntry
 	// Members contains the complete source chain after the resolved expect
 	// root, including assertion factories, Chai language chains, modifiers and
@@ -162,11 +169,15 @@ func ParseRstestExpectCall(
 // no-standalone-expect (src/rules/no-standalone-expect.ts:89-98). The member
 // count condition is upstream's members.length === 1: two-member forms such as
 // expect.not.stringContaining(...) or expect.soft(x).toBe(1) stay reportable.
+//
+// The check is structural on purpose and never consults a matcher-name table,
+// so a custom asymmetric matcher registered through expect.extend behaves like
+// a built-in one.
 func IsStaticRstestExpectCall(parsed *ParsedRstestExpectCall) bool {
 	return parsed != nil &&
 		!parsed.rootInvoked &&
 		parsed.trailingMembers == 1 &&
-		parsed.Entry != RstestExpectEntryAssertions
+		!RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS[parsed.Matcher]
 }
 
 // ShouldRstestExpectBeAwaited reports whether the assertion produces a promise
@@ -314,7 +325,7 @@ func classifyRstestExpectCall(
 			// Static member access on the expect object. The chain keeps the
 			// member: the walk resolves it as the matcher (expect.assertions(1)
 			// yields Matcher "assertions"), matching jest and vitest.
-			parsed.Entry = classifyStaticExpectEntry(rest)
+			parsed.Entry = RstestExpectEntryStatic
 		}
 	}
 
@@ -351,37 +362,6 @@ func hasComputedDynamicRstestExpectMember(entries []testFramework.MemberEntry) b
 		}
 	}
 	return false
-}
-
-// classifyStaticExpectEntry names the ExpectStatic surface behind a not-invoked
-// expect root. rest is never empty here.
-func classifyStaticExpectEntry(rest []testFramework.MemberEntry) RstestExpectEntry {
-	name := rest[0].Name
-	switch {
-	case name == "unreachable":
-		return RstestExpectEntryUnreachable
-	case name == "assertions", name == "hasAssertions":
-		return RstestExpectEntryAssertions
-	case rstestExpectConfigMembers[name]:
-		return RstestExpectEntryConfig
-	case name == "not" && len(rest) > 1 && RSTEST_ASYMMETRIC_MATCHERS[rest[1].Name]:
-		// ExpectStatic.not.stringContaining(...): the static negation of an
-		// asymmetric matcher, unrelated to the Assertion.not modifier.
-		return RstestExpectEntryAsymmetric
-	case RSTEST_EXPECT_MODIFIER_NAMES[name]:
-		// expect.resolves.toBe(1) and friends: a bare modifier chain whose
-		// expect head was never invoked. It parses like a plain chain with a
-		// nil Head, mirroring vitest's null expectCall.
-		return RstestExpectEntryCall
-	case rstestExpectFactoryEntries[name] != "":
-		// A factory member that was not invoked, e.g. expect.soft.foo(1); the
-		// walk rejects the chain with modifier-unknown.
-		return rstestExpectFactoryEntries[name]
-	default:
-		// Known asymmetric matchers, plus unknown static members that may be
-		// custom asymmetric matchers registered through expect.extend.
-		return RstestExpectEntryAsymmetric
-	}
 }
 
 type rstestExpectChainKind uint8

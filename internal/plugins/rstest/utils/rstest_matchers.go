@@ -186,9 +186,18 @@ var RSTEST_BROWSER_ELEMENT_MATCHERS = map[string]bool{
 	"toHaveJSProperty": true,
 }
 
-// RSTEST_ASYMMETRIC_MATCHERS lists the static value constructors on the expect
-// object: expect.<name>(...) builds a matcher value to pass into another
-// assertion instead of asserting by itself.
+// RSTEST_ASYMMETRIC_MATCHERS lists the built-in static value constructors on
+// the expect object: expect.<name>(...) builds a matcher value to pass into
+// another assertion instead of asserting by itself.
+//
+// The parser does not consult this table — a static member it does not
+// recognize could be a custom asymmetric matcher registered through
+// expect.extend or a forgotten expect(x), and one file cannot tell them apart.
+// The table is how a consumer asks the question the parser refuses to guess
+// at: given Entry == RstestExpectEntryStatic, is Matcher a *known* value
+// constructor? A miss means "unknown", not "not asymmetric" — including for
+// the negated form, where Modifiers is ["not"] and Matcher is the constructor
+// name (expect.not.arrayContaining([])).
 // Source: @vitest/expect@4.1.10 dist/index.d.ts:183-262 — ExpectStatic
 // (anything / any), AsymmetricMatchersContaining (stringContaining /
 // stringMatching / objectContaining / arrayContaining / closeTo /
@@ -239,13 +248,25 @@ var rstestExpectFactoryEntries = map[string]RstestExpectEntry{
 	"element": RstestExpectEntryElement,
 }
 
-// rstestExpectConfigMembers lists the ExpectStatic members that configure the
-// expect runtime rather than asserting or building matcher values.
+// RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS lists the ExpectStatic members that
+// declare how many assertions a test must run. They are the one group of
+// static members that is misplaced outside a test block, which is why
+// IsStaticRstestExpectCall excludes them and why they are a table rather than
+// two string literals at the one call site.
+// Source: rstest c4b67c72 packages/core/src/types/expect.ts:147-175.
+var RSTEST_EXPECT_ASSERTION_COUNT_MEMBERS = map[string]bool{
+	"assertions":    true,
+	"hasAssertions": true,
+}
+
+// RSTEST_EXPECT_CONFIG_MEMBERS lists the ExpectStatic members that configure
+// the expect runtime rather than asserting or building matcher values.
+// Consumers reach it through Matcher when Entry is RstestExpectEntryStatic.
 // Source: rstest c4b67c72 packages/core/src/types/expect.ts:147-175
 // (addEqualityTesters / addSnapshotSerializer / getState / setState) and
 // @vitest/expect@4.1.10 dist/index.d.ts:183-191 (extend, inherited through
 // VitestExpectProperties).
-var rstestExpectConfigMembers = map[string]bool{
+var RSTEST_EXPECT_CONFIG_MEMBERS = map[string]bool{
 	"addEqualityTesters":    true,
 	"addSnapshotSerializer": true,
 	"getState":              true,
