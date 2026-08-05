@@ -70,6 +70,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 			// ---- Locks in upstream checkLastSegment() arm 4: isClassConstructor ----
 			{Code: `class C { constructor() { if (a) return 1; } }`},
 			{Code: `const C = class { constructor() { if (a) return 1; } };`},
+			{Code: `class C { "constructor"() { if (a) return 1; } }`},
 
 			// ---- Locks in upstream ReturnStatement() arm: treatUndefinedAsUnspecified off by default ----
 			{Code: `function foo() { if (a) return undefined; return; }`, Options: map[string]interface{}{"treatUndefinedAsUnspecified": true}},
@@ -1041,6 +1042,53 @@ func TestConsistentReturnExtras(t *testing.T) {
 					Column:    44,
 					EndLine:   1,
 					EndColumn: 51,
+				}},
+			},
+
+			// A static member named `constructor` is an ordinary static method:
+			// tsgo parses it as a ConstructorDeclaration all the same.
+			{
+				Code: `class C { static constructor() { if (a) return 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingReturn",
+					Message:   "Expected to return a value at the end of static method 'constructor'.",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 29,
+				}},
+			},
+			{
+				Code: `class C { static "constructor"() { if (a) return 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingReturn",
+					Message:   "Expected to return a value at the end of static method 'constructor'.",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 31,
+				}},
+			},
+			{
+				Code: `class C { static async constructor() { if (a) return 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingReturn",
+					Message:   "Expected to return a value at the end of static async method 'constructor'.",
+					Line:      1,
+					Column:    24,
+					EndLine:   1,
+					EndColumn: 35,
+				}},
+			},
+			{
+				Code: `class C { static constructor() { if (a) return 1; return; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingReturnValue",
+					Message:   "Static method 'constructor' expected a return value.",
+					Line:      1,
+					Column:    51,
+					EndLine:   1,
+					EndColumn: 58,
 				}},
 			},
 

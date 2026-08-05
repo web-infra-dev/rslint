@@ -207,7 +207,15 @@ func returnsValue(node *ast.Node, opts options) bool {
 // name starts with an uppercase letter, which ESLint reads as an ES5-style
 // constructor.
 func allowsImplicitReturn(node *ast.Node) bool {
-	return node.Kind == ast.KindConstructor || utils.IsES5Constructor(node)
+	return isClassConstructor(node) || utils.IsES5Constructor(node)
+}
+
+// isClassConstructor reports whether node is the class's own constructor. tsgo
+// parses a `static` member named `constructor` as a ConstructorDeclaration
+// too, and that one is an ordinary static method.
+func isClassConstructor(node *ast.Node) bool {
+	return node.Kind == ast.KindConstructor &&
+		!ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic)
 }
 
 func implicitReturnName(node *ast.Node) string {
@@ -238,10 +246,16 @@ func implicitReturnRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRa
 	case ast.KindArrowFunction:
 		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.AsArrowFunction().EqualsGreaterThanToken.Pos())
 
-	case ast.KindMethodDeclaration, ast.KindConstructor:
+	case ast.KindMethodDeclaration:
 		// A class method and an object-literal shorthand method are both a
 		// keyed member upstream, reported on that key.
 		return memberKeyRange(sourceFile, node)
+
+	case ast.KindConstructor:
+		// A ConstructorDeclaration carries no name node, so its key is the
+		// token the modifiers end at: the `constructor` keyword, or the
+		// string that spells it.
+		return constructorKeyRange(sourceFile, node)
 
 	case ast.KindGetAccessor, ast.KindSetAccessor:
 		if node.Parent != nil && ast.IsClassLike(node.Parent) {
@@ -258,6 +272,14 @@ func implicitReturnRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRa
 		return utils.TrimNodeTextRange(sourceFile, name)
 	}
 	return openingKeywordRange(sourceFile, node)
+}
+
+func constructorKeyRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	pos := node.Pos()
+	if modifiers := node.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
+		pos = modifiers.Nodes[len(modifiers.Nodes)-1].End()
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos)
 }
 
 func memberKeyRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {

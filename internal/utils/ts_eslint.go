@@ -512,7 +512,19 @@ func StartsWithUpperCase(s string) bool {
 // as complexity and max-params rely on that narrower behavior for message text.
 func GetFunctionNameWithKindCore(node *ast.Node) string {
 	if node.Kind == ast.KindConstructor {
-		return "constructor"
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return "constructor"
+		}
+		// tsgo parses a `static` member named `constructor` as a
+		// ConstructorDeclaration too, which every JS parser reads as an
+		// ordinary static method keyed `constructor`. A constructor's
+		// modifiers are not what ast.GetFunctionFlags looks at, so `async` is
+		// read here; `*constructor` parses as a method and never lands here.
+		tokens := []string{"static"}
+		if ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync) {
+			tokens = append(tokens, "async")
+		}
+		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
 	parent := node.Parent
