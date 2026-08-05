@@ -30,19 +30,23 @@ import (
 )
 
 // Block is one basic block: the events its consumer recorded, in evaluation
-// order, and the edges to and from it.
+// order, and the blocks led to from it.
 //
-// Both edge lists span the whole graph, unreachable blocks included, so a walk
-// that only wants the code that runs skips the blocks whose Reachable is false.
+// Successors spans the whole graph, unreachable blocks included, so a walk that
+// only wants the code that runs skips the blocks whose Reachable is false.
 type Block[E any] struct {
-	Events       []E
-	Successors   []*Block[E]
-	Predecessors []*Block[E]
+	Events     []E
+	Successors []*Block[E]
 
 	// Reachable reports whether control can arrive here. The code after an
 	// abrupt exit is laid out in unreachable blocks rather than dropped, and a
 	// consumer's hooks run in them, so a rule can ask what would have run had
 	// the exit not been there.
+	//
+	// It is settled when the block is entered, from the edges that lead into
+	// it by then. Every block is entered after the edges that could make it
+	// reachable exist: a block only ever gains an edge afterwards from code
+	// laid out inside it, which is unreachable whenever the block itself is.
 	Reachable bool
 
 	index       int
@@ -206,14 +210,13 @@ func (b *Builder[E]) link(from, to *Block[E]) {
 		return
 	}
 	from.Successors = append(from.Successors, to)
-	to.Predecessors = append(to.Predecessors, from)
 	if from.Reachable {
 		to.hasIncoming = true
 	}
 }
 
-// enter makes blk the current block, reachable when something that runs leads
-// into it.
+// enter makes blk the current block and settles its reachability, so every edge
+// that could make it reachable has to be linked before it is entered.
 func (b *Builder[E]) enter(blk *Block[E]) {
 	blk.Reachable = blk.hasIncoming
 	b.cur = blk
@@ -222,11 +225,11 @@ func (b *Builder[E]) enter(blk *Block[E]) {
 // makeUnreachable ends the path at the current block and carries the walk on in
 // a fresh block nothing reaches. The edge into it is recorded, but — unlike
 // every other edge — it does not make its target something control arrives at,
-// which is what leaving through it meant in the first place.
+// which is what leaving through it meant in the first place. That is why the
+// block is never entered: its reachability is settled here, as false.
 func (b *Builder[E]) makeUnreachable() {
 	next := b.newBlock()
 	b.cur.Successors = append(b.cur.Successors, next)
-	next.Predecessors = append(next.Predecessors, b.cur)
 	b.cur = next
 }
 

@@ -125,13 +125,17 @@ func uselessReturns(root *ast.Node) []*ast.Node {
 		},
 	})
 
+	w := walk{
+		root:        root,
+		leftThrough: make([]bool, len(graph.Blocks)),
+		seen:        make([]int, len(graph.Blocks)),
+	}
 	// A block that holds a bare return is one control left through, which is
 	// what lets the walk step from it into the code that no longer runs.
-	leftThrough := make(map[*block]bool)
 	for _, blk := range graph.Blocks {
 		for _, e := range blk.Events {
 			if e.kind == eventReturn {
-				leftThrough[blk] = true
+				w.leftThrough[blk.Index()] = true
 				break
 			}
 		}
@@ -140,7 +144,7 @@ func uselessReturns(root *ast.Node) []*ast.Node {
 	var reports []*ast.Node
 	for _, blk := range graph.Blocks {
 		for i, e := range blk.Events {
-			if e.kind == eventReturn && !runsAfter(root, blk, i, leftThrough) {
+			if e.kind == eventReturn && !w.runsAfter(blk, i) {
 				reports = append(reports, e.node)
 			}
 		}
@@ -148,43 +152,55 @@ func uselessReturns(root *ast.Node) []*ast.Node {
 	return reports
 }
 
+// walk answers one graph's returns. Its scratch is kept across them: seen holds
+// the round each block was last reached in, so a round costs no clearing pass
+// of its own, and frontier is refilled rather than reallocated.
+type walk struct {
+	root        *ast.Node
+	leftThrough []bool
+	seen        []int
+	round       int
+	frontier    []*block
+}
+
 // runsAfter reports whether a clearing statement stands anywhere the return
 // recorded at start.Events[index] leads to.
-func runsAfter(root *ast.Node, start *block, index int, leftThrough map[*block]bool) bool {
-	shields := shieldsOf(start.Events[index].node, root)
+func (w *walk) runsAfter(start *block, index int) bool {
+	shields := shieldsOf(start.Events[index].node, w.root)
 	if clearedBy(start.Events[index+1:], shields) {
 		return true
 	}
 
-	visited := map[*block]bool{start: true}
-	frontier := stepsFrom(start, leftThrough)
-	for len(frontier) > 0 {
-		blk := frontier[len(frontier)-1]
-		frontier = frontier[:len(frontier)-1]
-		if visited[blk] {
+	w.round++
+	w.seen[start.Index()] = w.round
+	w.frontier = w.frontier[:0]
+	w.step(start)
+	for len(w.frontier) > 0 {
+		blk := w.frontier[len(w.frontier)-1]
+		w.frontier = w.frontier[:len(w.frontier)-1]
+		if w.seen[blk.Index()] == w.round {
 			continue
 		}
-		visited[blk] = true
+		w.seen[blk.Index()] = w.round
 		if clearedBy(blk.Events, shields) {
 			return true
 		}
-		frontier = append(frontier, stepsFrom(blk, leftThrough)...)
+		w.step(blk)
 	}
 	return false
 }
 
-// stepsFrom returns the blocks the returns standing at blk still stand at. Code
+// step queues the blocks the returns standing at blk still stand at. Code
 // control reaches carries them along as usual; the code after an abrupt exit
 // carries them only where that exit was a return, so a `break` does not hand
 // them on to the statements it skips.
-func stepsFrom(blk *block, leftThrough map[*block]bool) []*block {
-	var steps []*block
+func (w *walk) step(blk *block) {
+	carries := !blk.Reachable || w.leftThrough[blk.Index()]
 	for _, next := range blk.Successors {
-		if next.Reachable || !blk.Reachable || leftThrough[blk] {
-			steps = append(steps, next)
+		if next.Reachable || carries {
+			w.frontier = append(w.frontier, next)
 		}
 	}
-	return steps
 }
 
 func clearedBy(events []event, shields []shield) bool {
