@@ -278,14 +278,13 @@ export class Rslint {
    * Lint a string of code as if it lived at `filePath` (default a synthetic
    * `.ts` path).
    *
-   * ESLint-alignment note: if `code` begins with a UTF-8 BOM, the reported
-   * offsets (`fix.range`, `column`) are relative to the BOM-included input you
-   * passed — self-consistent within that input (result `output`, line/column,
-   * and re-applying `fix` all line up), but one unit ahead of ESLint v10, which
-   * strips a leading BOM from its in-memory source. (The overlay keeps the BOM
-   * and Go's offsets include it; lintFiles is unaffected because Go reads disk
-   * files BOM-stripped.) Strip a leading `U+FEFF` first for ESLint-identical
-   * offsets.
+   * A leading `U+FEFF` in `code` is a byte order mark, and a byte order mark is
+   * never part of the text an offset indexes — the mark is stripped before
+   * parsing, exactly as reading the same bytes off disk would strip it. So
+   * `column` and `fix.range` are measured from the character after it, the way
+   * ESLint measures them, and `lintText` and `lintFiles` agree on the same
+   * source. Result `output` is the whole file and carries the mark through,
+   * unless a fix asked for its removal.
    */
   async lintText(
     code: string,
@@ -764,10 +763,11 @@ function toLintMessage(d: Diagnostic, sourceText?: string): LintMessage {
  * sourceText (e.g. a diagnosed file whose source could not be read), a
  * multi-edit fix degrades to its first edit rather than guessing across a gap.
  *
- * Offsets are flat UTF-16, in the same BOM-stripped space as Go's fix ranges
- * (matching ESLint v10, whose `fix.range` is relative to BOM-stripped source).
- * The caller passes a BOM-stripped sourceText for disk files so the gap-fill
- * slices line up; the BOM is re-applied only to the per-file Output.
+ * Offsets are flat UTF-16, in the same byte-order-mark-free space as Go's fix
+ * ranges (matching ESLint v10, whose `fix.range` is relative to BOM-stripped
+ * source). The caller passes a BOM-stripped sourceText so the gap-fill slices
+ * line up. An edit can start at -1, where the mark sits, one position ahead of
+ * the text; there is nothing to gap-fill from before position 0.
  */
 function mergeFixes(
   fixes: Fix[] | undefined,
