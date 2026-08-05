@@ -11,51 +11,69 @@ func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) (stri
 	return ResolveFromSourceFile(ctx, ctx.SourceFile, moduleSpecifier)
 }
 
-// ResolveFromSourceFile resolves a module specifier using TypeScript's cached
-// resolution result for the provided origin file.
+// ResolveFromSourceFile resolves a module specifier to the file it names, from
+// the perspective of the provided origin file.
 func ResolveFromSourceFile(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, bool) {
-	if ctx.Program == nil || sourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
-		return "", false
-	}
-
-	module := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
-	if module != nil && module.ResolvedFileName != "" {
-		return module.ResolvedFileName, true
-	}
-
-	return "", false
+	resolvedPath, _, ok := resolveModule(ctx, sourceFile, moduleSpecifier)
+	return resolvedPath, ok
 }
 
 // ResolveSourceFileFromSourceFile resolves a module specifier and returns the
-// source file TypeScript associated with the resolved path.
+// Program's source file for the resolved path.
 func ResolveSourceFileFromSourceFile(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
-	resolvedPath, ok := ResolveFromSourceFile(ctx, sourceFile, moduleSpecifier)
-	if !ok {
-		return "", nil, false
-	}
-
-	target := ctx.Program.GetSourceFileForResolvedModule(resolvedPath)
-	if target == nil {
+	resolvedPath, target, ok := resolveModule(ctx, sourceFile, moduleSpecifier)
+	if !ok || target == nil {
 		return "", nil, false
 	}
 	return resolvedPath, target, true
 }
 
-// ResolveModuleReferenceFromSourceFile resolves lint graph edges. It first uses
-// TypeScript resolution, then falls back to already-loaded relative source files
-// for extension-substitution cases eslint-plugin-import still treats as edges.
-func ResolveModuleReferenceFromSourceFile(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
+// resolveModule resolves a module specifier the way eslint-plugin-import's
+// resolver does, and reports the Program's source file for the result when it
+// has one.
+//
+// TypeScript's own resolution is the first source of truth, but it only covers
+// specifiers TypeScript collected while building the Program: every `import`
+// and `export`, plus `import()` and — in JavaScript files only — `require()`
+// calls written as a bare `require` identifier with exactly one argument. A
+// `require('./x')` in a TypeScript file, or a `(require)('./x')` anywhere, is
+// therefore absent from that cache even though upstream resolves both. Those
+// fall through to a probe of the relative specifier against the files already
+// loaded into the Program, which also covers the extension-substitution cases
+// upstream still treats as edges.
+func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if ctx.Program == nil || sourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
 
-	if resolvedPath, target, ok := ResolveSourceFileFromSourceFile(ctx, sourceFile, moduleSpecifier); ok {
-		return resolvedPath, target, true
+	resolvedPath := ""
+	if module := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier); module != nil {
+		resolvedPath = module.ResolvedFileName
+	}
+	if resolvedPath != "" {
+		if target := ctx.Program.GetSourceFileForResolvedModule(resolvedPath); target != nil {
+			return resolvedPath, target, true
+		}
 	}
 
-	specifier := moduleSpecifier.Text()
+	if target := resolveRelativeFromLoadedFiles(ctx, sourceFile, moduleSpecifier.Text()); target != nil {
+		return target.FileName(), target, true
+	}
+
+	// TypeScript named a file the Program never loaded, such as one outside the
+	// project. Callers that only need the path can still use it.
+	if resolvedPath != "" {
+		return resolvedPath, nil, true
+	}
+	return "", nil, false
+}
+
+// resolveRelativeFromLoadedFiles finds the file a relative specifier names by
+// probing the candidates TypeScript's own resolution would try, against the
+// files the Program has already loaded.
+func resolveRelativeFromLoadedFiles(ctx rule.RuleContext, sourceFile *ast.SourceFile, specifier string) *ast.SourceFile {
 	if specifier == "" || !tspath.IsExternalModuleNameRelative(specifier) {
-		return "", nil, false
+		return nil
 	}
 
 	basePath := specifier
@@ -67,11 +85,11 @@ func ResolveModuleReferenceFromSourceFile(ctx rule.RuleContext, sourceFile *ast.
 
 	for _, candidate := range moduleResolutionFallbackCandidates(basePath) {
 		if target := ctx.Program.GetSourceFile(candidate); target != nil {
-			return target.FileName(), target, true
+			return target
 		}
 	}
 
-	return "", nil, false
+	return nil
 }
 
 func moduleResolutionFallbackCandidates(basePath string) []string {

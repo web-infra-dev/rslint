@@ -29,12 +29,12 @@ func TestResolveSourceFileFromSourceFile(t *testing.T) {
 	}
 }
 
-func TestResolveModuleReferenceFromSourceFileInvalidInput(t *testing.T) {
+func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 	t.Parallel()
 
 	ctx, _ := contextForImport(t, "./bar")
 
-	if resolvedPath, target, ok := import_utils.ResolveModuleReferenceFromSourceFile(ctx, ctx.SourceFile, nil); ok || resolvedPath != "" || target != nil {
-		t.Fatalf("ResolveModuleReferenceFromSourceFile(nil) = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
+	if resolvedPath, target, ok := import_utils.ResolveSourceFileFromSourceFile(ctx, ctx.SourceFile, nil); ok || resolvedPath != "" || target != nil {
+		t.Fatalf("ResolveSourceFileFromSourceFile(nil) = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
 	}
 }

@@ -123,7 +123,7 @@ func addModuleReference(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *
 		OnlyTypes:  onlyTypes,
 	}
 
-	ref.ResolvedPath, ref.Target, _ = ResolveModuleReferenceFromSourceFile(ctx, sourceFile, source)
+	ref.ResolvedPath, ref.Target, _ = ResolveSourceFileFromSourceFile(ctx, sourceFile, source)
 	if ref.Target != nil && IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
 		return
 	}
