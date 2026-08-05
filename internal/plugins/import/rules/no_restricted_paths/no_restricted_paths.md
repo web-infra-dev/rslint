@@ -135,6 +135,7 @@ reports `Unexpected path "../server/bar" imported in restricted zone. Use the AP
 
 - Glob patterns support `*`, `**`, `?`, `[abc]` character classes and `{a,b}` alternatives. Extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — is matched as the literal text it is written as, so `./src/?(server)/**/*` covers a directory named `?(server)` rather than one named `server`. Write `{server,shared}` instead of `@(server|shared)`, and name the directories you want to cover instead of excluding one with `!(...)`.
 - A `*` matches path segments that begin with a dot, so `./src/*` covers `./src/.hidden.ts` as well.
+- A package specifier resolves the way TypeScript resolves it, which follows a package's `types` entry rather than its `main`. Name the package directory — `./node_modules/some-package` — in a zone that covers an installed package, so it applies whichever file inside the package the specifier lands on.
 
 ## Original Documentation
 
