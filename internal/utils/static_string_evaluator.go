@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -38,6 +39,26 @@ func NewStaticStringEvaluatorWithSourceFile(typeChecker *checker.Checker, source
 type staticNullValue struct{}
 type staticUndefinedValue struct{}
 
+// staticObjectValue and staticArrayValue hold folded object and array literals.
+// They exist so member access can be resolved on them; neither converts to a
+// string, so a rule that asks for a string value still gets "not statically
+// known".
+type staticObjectValue struct {
+	properties map[string]any
+}
+
+type staticArrayValue struct {
+	elements []any
+}
+
+// objectPassThroughMethods are the `Object` methods that return their argument
+// unchanged, so folding can see through them.
+var objectPassThroughMethods = map[string]bool{
+	"freeze":            true,
+	"preventExtensions": true,
+	"seal":              true,
+}
+
 type staticEvalResult struct {
 	value any
 	ok    bool
@@ -59,6 +80,20 @@ func (staticEvaluator *StaticStringEvaluator) Eval(node *ast.Node) (string, bool
 	}
 	value, ok := result.value.(string)
 	return value, ok
+}
+
+// EvalValue returns the static value of node if it can be determined, regardless
+// of its type. It allows rules to check if a value is statically known to be a
+// non-string (like a boolean or number).
+func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bool) {
+	if staticEvaluator == nil || node == nil {
+		return nil, false
+	}
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return nil, false
+	}
+	return result.value, true
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEvalResult {
@@ -96,8 +131,23 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 		return staticEvaluator.evalConditionalExpression(node)
 	case ast.KindVoidExpression:
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	case ast.KindObjectLiteralExpression:
+		if result := staticEvaluator.evalObjectLiteral(node); result.ok {
+			return result
+		}
+	case ast.KindArrayLiteralExpression:
+		if result := staticEvaluator.evalArrayLiteral(node); result.ok {
+			return result
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if result := staticEvaluator.evalMemberAccess(node); result.ok {
+			return result
+		}
 	case ast.KindCallExpression:
 		if result := staticEvaluator.evalStringCall(node); result.ok {
+			return result
+		}
+		if result := staticEvaluator.evalObjectPassThroughCall(node); result.ok {
 			return result
 		}
 	case ast.KindTaggedTemplateExpression:
@@ -210,6 +260,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 	}
 
 	switch binary.OperatorToken.Kind {
+	case ast.KindEqualsToken:
+		return staticEvaluator.evalValue(binary.Right)
 	case ast.KindBarBarToken:
 		left := staticEvaluator.evalValue(binary.Left)
 		if !left.ok {
@@ -309,6 +361,232 @@ func (staticEvaluator *StaticStringEvaluator) evalConditionalExpression(node *as
 		return staticEvaluator.evalValue(conditional.WhenTrue)
 	}
 	return staticEvaluator.evalValue(conditional.WhenFalse)
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalObjectLiteral(node *ast.Node) staticEvalResult {
+	object := node.AsObjectLiteralExpression()
+	if object == nil || object.Properties == nil {
+		return staticEvalResult{}
+	}
+
+	properties := map[string]any{}
+	for _, property := range object.Properties.Nodes {
+		var valueNode *ast.Node
+		switch property.Kind {
+		case ast.KindPropertyAssignment:
+			valueNode = property.AsPropertyAssignment().Initializer
+		case ast.KindShorthandPropertyAssignment:
+			valueNode = property.Name()
+		default:
+			return staticEvalResult{}
+		}
+
+		key, ok := staticEvaluator.evalPropertyKey(property.Name())
+		if !ok {
+			return staticEvalResult{}
+		}
+		value := staticEvaluator.evalValue(valueNode)
+		if !value.ok {
+			return staticEvalResult{}
+		}
+		properties[key] = value.value
+	}
+	return staticEvalResult{value: staticObjectValue{properties: properties}, ok: true}
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalArrayLiteral(node *ast.Node) staticEvalResult {
+	array := node.AsArrayLiteralExpression()
+	if array == nil || array.Elements == nil {
+		return staticEvalResult{}
+	}
+
+	elements := make([]any, 0, len(array.Elements.Nodes))
+	for _, element := range array.Elements.Nodes {
+		if element.Kind == ast.KindOmittedExpression {
+			elements = append(elements, staticUndefinedValue{})
+			continue
+		}
+		if element.Kind == ast.KindSpreadElement {
+			return staticEvalResult{}
+		}
+		value := staticEvaluator.evalValue(element)
+		if !value.ok {
+			return staticEvalResult{}
+		}
+		elements = append(elements, value.value)
+	}
+	return staticEvalResult{value: staticArrayValue{elements: elements}, ok: true}
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalPropertyKey(name *ast.Node) (string, bool) {
+	if name == nil {
+		return "", false
+	}
+
+	switch name.Kind {
+	case ast.KindIdentifier:
+		return name.AsIdentifier().Text, true
+	case ast.KindStringLiteral:
+		return name.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return name.AsNoSubstitutionTemplateLiteral().Text, true
+	case ast.KindNumericLiteral:
+		// Not the source text: `{1e3: x}` has the key "1000", which is what an
+		// index expression folds to.
+		result := staticEvaluator.evalValue(name)
+		if !result.ok {
+			return "", false
+		}
+		return staticValueToString(result.value)
+	case ast.KindComputedPropertyName:
+		computed := name.AsComputedPropertyName()
+		if computed == nil {
+			return "", false
+		}
+		result := staticEvaluator.evalValue(computed.Expression)
+		if !result.ok {
+			return "", false
+		}
+		return staticValueToString(result.value)
+	}
+	return "", false
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) staticEvalResult {
+	var objectNode *ast.Node
+	var key string
+
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		access := node.AsPropertyAccessExpression()
+		if access == nil || access.QuestionDotToken != nil ||
+			access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
+			return staticEvalResult{}
+		}
+		objectNode = access.Expression
+		key = access.Name().AsIdentifier().Text
+	case ast.KindElementAccessExpression:
+		access := node.AsElementAccessExpression()
+		if access == nil || access.QuestionDotToken != nil {
+			return staticEvalResult{}
+		}
+		argument := staticEvaluator.evalValue(access.ArgumentExpression)
+		if !argument.ok {
+			return staticEvalResult{}
+		}
+		value, ok := staticValueToString(argument.value)
+		if !ok {
+			return staticEvalResult{}
+		}
+		objectNode = access.Expression
+		key = value
+	default:
+		return staticEvalResult{}
+	}
+
+	object := staticEvaluator.evalValue(objectNode)
+	if !object.ok {
+		return staticEvalResult{}
+	}
+	return staticMemberValue(object.value, key)
+}
+
+// staticMemberValue reads key off a folded object or array literal. Reading a
+// key that isn't there yields `undefined`, as it would at runtime. A key an
+// array inherits — `length`, `join` — stays unresolved, because folding it
+// would need a numeric or callable value representation this evaluator doesn't
+// carry.
+func staticMemberValue(object any, key string) staticEvalResult {
+	switch object := object.(type) {
+	case staticObjectValue:
+		if value, ok := object.properties[key]; ok {
+			return staticEvalResult{value: value, ok: true}
+		}
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	case staticArrayValue:
+		index, ok := staticArrayIndex(key)
+		if !ok {
+			if staticNumberShapedKey(key) {
+				return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+			}
+			return staticEvalResult{}
+		}
+		if index >= len(object.elements) {
+			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		}
+		return staticEvalResult{value: object.elements[index], ok: true}
+	}
+	return staticEvalResult{}
+}
+
+// staticNumberShapedKey reports whether key opens the way a number's string
+// form can. Such a key is neither an own property of an array literal nor one
+// it inherits, so reading it yields `undefined`.
+func staticNumberShapedKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	switch key[0] {
+	case '-', '+', '.':
+		return true
+	default:
+		return key[0] >= '0' && key[0] <= '9'
+	}
+}
+
+// staticArrayIndex parses key as a canonical array index string: decimal
+// digits only, with no leading zero unless key is exactly "0". JavaScript
+// treats any other shape (`"00"`, `"1e3"`, `"-1"`) as an ordinary property
+// name, which array literals don't have.
+func staticArrayIndex(key string) (int, bool) {
+	if key == "0" {
+		return 0, true
+	}
+	if key == "" || key[0] < '1' || key[0] > '9' {
+		return 0, false
+	}
+	for i := 1; i < len(key); i++ {
+		if key[i] < '0' || key[i] > '9' {
+			return 0, false
+		}
+	}
+	index, err := strconv.Atoi(key)
+	if err != nil {
+		return 0, false
+	}
+	return index, true
+}
+
+// evalObjectPassThroughCall folds `Object.freeze(x)` and its siblings to the
+// value of x.
+func (staticEvaluator *StaticStringEvaluator) evalObjectPassThroughCall(node *ast.Node) staticEvalResult {
+	call := node.AsCallExpression()
+	if call == nil || call.QuestionDotToken != nil {
+		return staticEvalResult{}
+	}
+
+	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
+		return staticEvalResult{}
+	}
+
+	propertyAccess := callee.AsPropertyAccessExpression()
+	if propertyAccess == nil || propertyAccess.QuestionDotToken != nil ||
+		propertyAccess.Name() == nil || propertyAccess.Name().Kind != ast.KindIdentifier ||
+		!objectPassThroughMethods[propertyAccess.Name().AsIdentifier().Text] {
+		return staticEvalResult{}
+	}
+
+	object := ast.SkipOuterExpressions(propertyAccess.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	if !isIdentifierWithText(object, "Object") || IsShadowed(object, "Object") {
+		return staticEvalResult{}
+	}
+
+	args := node.Arguments()
+	if len(args) == 0 || ast.IsSpreadElement(args[0]) {
+		return staticEvalResult{}
+	}
+	return staticEvaluator.evalValue(args[0])
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalStringCall(node *ast.Node) staticEvalResult {
@@ -447,7 +725,7 @@ func (staticEvaluator *StaticStringEvaluator) computeWriteRefs() {
 
 func staticValueIsTsgoSafe(value any) bool {
 	switch value.(type) {
-	case bool, staticNullValue, staticUndefinedValue:
+	case bool, staticNullValue, staticUndefinedValue, staticObjectValue, staticArrayValue:
 		return false
 	default:
 		return value != nil
@@ -471,6 +749,8 @@ func staticValueTruthy(value any) (truthy bool, ok bool) {
 		return value, true
 	case staticNullValue, staticUndefinedValue:
 		return false, true
+	case staticObjectValue, staticArrayValue:
+		return true, true
 	default:
 		return evaluatorBool(func() bool { return evaluator.IsTruthy(value) })
 	}
@@ -489,9 +769,35 @@ func staticValueToString(value any) (string, bool) {
 		return "null", true
 	case staticUndefinedValue:
 		return "undefined", true
+	case staticArrayValue:
+		return staticArrayToString(value)
+	case staticObjectValue:
+		// A plain object's default ToString is "[object Object]", but a
+		// folded object literal can't tell whether a property overrides
+		// toString/Symbol.toPrimitive; callers only need to know that the
+		// value is not a string.
+		return "", false
 	default:
 		return evaluatorString(func() string { return evaluator.AnyToString(value) })
 	}
+}
+
+// staticArrayToString implements `Array.prototype.join(',')`, which is what
+// an array coerces to via the default ToString. Nullish elements fold to "",
+// not "null"/"undefined" as a direct string conversion would give.
+func staticArrayToString(value staticArrayValue) (string, bool) {
+	parts := make([]string, len(value.elements))
+	for i, element := range value.elements {
+		if staticValueNullish(element) {
+			continue
+		}
+		part, ok := staticValueToString(element)
+		if !ok {
+			return "", false
+		}
+		parts[i] = part
+	}
+	return strings.Join(parts, ","), true
 }
 
 func evaluatorBool(fn func() bool) (value bool, ok bool) {
