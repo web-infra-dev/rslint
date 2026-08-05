@@ -6,6 +6,7 @@ import (
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 func buildUseJestSpyOnMessage() rule.RuleMessage {
@@ -51,7 +52,7 @@ func getJestFnCall(node *ast.Node) *ast.Node {
 
 	if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "jest" {
 		if node.Kind == ast.KindCallExpression &&
-			jestUtils.CalleeChainName(node.AsCallExpression().Expression) == "jest.fn" {
+			testFramework.CalleeChainName(node.AsCallExpression().Expression) == "jest.fn" {
 			return node
 		}
 		return nil

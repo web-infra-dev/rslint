@@ -1,11 +1,11 @@
 package require_hook
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	"strings"
 )
 
 func buildUseHookMessage() rule.RuleMessage {
@@ -72,7 +72,7 @@ func isJestFnCall(node *ast.Node, ctx rule.RuleContext) bool {
 	if utils.ParseJestFnCall(node, ctx) != nil {
 		return true
 	}
-	name := utils.CalleeChainName(node)
+	name := testFramework.CalleeChainName(node)
 	return strings.HasPrefix(name, "jest.")
 }
 
@@ -103,7 +103,7 @@ func shouldBeInHook(node *ast.Node, ctx rule.RuleContext, allowedFunctionCalls [
 		if isJestFnCall(node, ctx) {
 			return false
 		}
-		name := utils.CalleeChainName(node)
+		name := testFramework.CalleeChainName(node)
 		return !containsString(allowedFunctionCalls, name)
 	case ast.KindVariableStatement:
 		if ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
@@ -130,7 +130,7 @@ func shouldBeInHook(node *ast.Node, ctx rule.RuleContext, allowedFunctionCalls [
 }
 
 func getFunctionBodyBlock(fn *ast.Node) *ast.Node {
-	if fn == nil || !utils.IsFunction(fn) {
+	if fn == nil || !testFramework.IsFunction(fn) {
 		return nil
 	}
 	switch fn.Kind {

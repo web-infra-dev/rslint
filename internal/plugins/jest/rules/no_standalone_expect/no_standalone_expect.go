@@ -2,10 +2,10 @@ package no_standalone_expect
 
 import (
 	_ "embed"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 //go:embed no_standalone_expect.schema.json
@@ -63,7 +63,7 @@ func parseOptions(rawOptions []any) options {
 
 func getBlockType(block *ast.Node, ctx rule.RuleContext) blockType {
 	fn := block.Parent
-	if !utils.IsFunction(fn) {
+	if !testFramework.IsFunction(fn) {
 		return ""
 	}
 
@@ -156,7 +156,7 @@ var NoStandaloneExpectRule = rule.Rule{
 			if callExpr == nil {
 				return false
 			}
-			name := utils.CalleeChainName(callExpr.Expression)
+			name := testFramework.CalleeChainName(callExpr.Expression)
 			if name == "" {
 				return false
 			}
