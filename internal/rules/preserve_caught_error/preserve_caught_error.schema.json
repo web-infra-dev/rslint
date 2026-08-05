@@ -1,0 +1,43 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "requireCatchParameter": {
+          "type": "boolean",
+          "description": "Requires the catch blocks to always have the caught error parameter so it is not discarded."
+        },
+        "errorClassNames": {
+          "type": "array",
+          "description": "Additional error class names to check for cause preservation.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": ["name", "argumentPosition"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "argumentPosition": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

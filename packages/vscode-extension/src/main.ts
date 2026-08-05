@@ -20,6 +20,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
       throw new AggregateError(
         [activationError, closeError],
         'Rslint activation and partial-start cleanup both failed',
+        { cause: activationError },
       );
     }
     throw activationError;
