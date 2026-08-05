@@ -64,10 +64,6 @@ To require every interpolated value to be a `string`, empty the `allow` list and
 }
 ```
 
-## Differences from ESLint
-
-- An `allow` entry with `from: 'package'` matches the package name exactly. ESLint matches any package whose name contains the given string, so `{ from: 'package', package: 'demo' }` also permits types declared in `demo-pkg` there. Write the package name in full to permit the same types in both.
-
 ## Original Documentation
 
 - [typescript-eslint restrict-template-expressions](https://typescript-eslint.io/rules/restrict-template-expressions)

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
@@ -190,25 +191,34 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
+// resolvedPackageName returns the package a declaration file belongs to, such as
+// "demo-pkg" or "@scope/pkg" for a file under node_modules.
+func resolvedPackageName(fileName string) string {
+	packageDirectory := module.ParseNodeModuleFromPath(fileName, false)
+	idx := strings.LastIndex(packageDirectory, "/node_modules/")
+	if idx == -1 {
+		return ""
+	}
+	return packageDirectory[idx+len("/node_modules/"):]
+}
+
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
 	program *compiler.Program,
 ) bool {
-	// Check if any declaration file path contains the package name
-	// This handles cases like node_modules/package-name/...
+	// The specifier is tested against the resolved package name without anchors,
+	// so "demo" matches "demo-pkg" as well.
+	typesPackageName := module.MangleScopedPackageName(packageName)
 	for _, file := range declarationFiles {
-		if file == nil {
+		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		fileName := file.FileName()
-		// Check if the file is from node_modules and matches the package name
-		if strings.Contains(fileName, "node_modules/"+packageName+"/") ||
-			strings.Contains(fileName, "node_modules\\"+packageName+"\\") {
-			return true
+		name := resolvedPackageName(file.FileName())
+		if name == "" {
+			continue
 		}
-		// Handle @types packages
-		if strings.Contains(fileName, "node_modules/@types/"+strings.TrimPrefix(packageName, "@types/")+"/") {
+		if strings.Contains(name, packageName) || strings.Contains(name, typesPackageName) {
 			return true
 		}
 	}
