@@ -67,6 +67,58 @@ For automatically discovered configs, relative `files`, `ignores`, and `language
 
 For a config supplied with `--config`, those patterns are resolved from the current working directory.
 
+### basePath
+
+- **Type:** `string`
+
+Optional subdirectory root for one config entry, matching ESLint flat-config `basePath`. A relative value is resolved from the config match root (config-file directory for auto-discovered configs, cwd for `--config`). That entry's `files`, `ignores`, and `languageOptions.parserOptions.project` are then interpreted relative to the resolved base.
+
+```ts
+export default defineConfig([
+  {
+    basePath: 'packages/foo',
+    files: ['src/**/*.ts'],
+    ignores: ['fixtures/**'],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.json'],
+      },
+    },
+    rules: {
+      'no-console': 'error',
+    },
+  },
+]);
+```
+
+This is equivalent to writing the paths relative to the config match root:
+
+```ts
+{
+  files: ['packages/foo/src/**/*.ts'],
+  ignores: ['packages/foo/fixtures/**'],
+  languageOptions: {
+    parserOptions: {
+      project: ['packages/foo/tsconfig.json'],
+    },
+  },
+  rules: {
+    'no-console': 'error',
+  },
+}
+```
+
+`{ basePath, ignores }` (plus optional `name`) remains a **global ignore** entry, scoped under that base:
+
+```ts
+{
+  basePath: 'packages/foo',
+  ignores: ['fixtures/**'], // ≈ packages/foo/fixtures/**
+}
+```
+
+When `basePath` is set on a scoped entry that omits `files`, the entry is limited to that subtree (as if `files: ['<base>/**']` were written).
+
 To generate a default config, run:
 
 ```bash

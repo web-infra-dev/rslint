@@ -4,12 +4,20 @@
 
 - **Type:** `string[]`
 
-Glob patterns for files to exclude. An entry containing **only** `ignores` and an optional `name` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
+Glob patterns for files to exclude. An entry containing **only** `ignores` and optional meta fields (`name`, `basePath`) acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
+
+When `basePath` is set, ignore patterns are relative to that base (see [Configuration → basePath](/config/index#basepath)).
 
 ```ts
 // Global ignore entry
 {
   ignores: ['**/dist/**', '**/fixtures/**'],
+}
+
+// Global ignore scoped under a package
+{
+  basePath: 'packages/foo',
+  ignores: ['fixtures/**'], // ≈ packages/foo/fixtures/**
 }
 
 // Entry-level ignore (only applies to this entry)

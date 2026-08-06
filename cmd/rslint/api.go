@@ -234,6 +234,15 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
+	// Low-level API configs may still carry basePath (e.g. raw JSON). Desugar
+	// against the request match root before matching/project resolution.
+	if len(rslintConfig) > 0 {
+		var err error
+		rslintConfig, err = rslintconfig.ResolveBasePaths(rslintConfig, configDirectory, fs)
+		if err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
+		}
+	}
 	if len(fileContents) > 0 {
 		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
 		fs = utils.NewOverlayVFS(fs, fileContents)
@@ -267,6 +276,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
 			}
 			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
+				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
+			}
+			// overrideConfig is rooted at the invocation cwd (same as
+			// ESLint overrideConfig / --config match root).
+			var err error
+			overrideConfig, err = rslintconfig.ResolveBasePaths(overrideConfig, currentDirectory, fs)
+			if err != nil {
 				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
 			}
 		}

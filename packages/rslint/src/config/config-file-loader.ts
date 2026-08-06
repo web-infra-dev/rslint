@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { applyBasePathToEntry } from './base-path.js';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
@@ -110,9 +111,30 @@ function extractDefault(mod: unknown): unknown {
 }
 
 /**
- * Validate and strip non-serializable fields from the config.
+ * Options for {@link normalizeConfig}.
+ *
+ * `configDirectory` is the match root used to resolve relative `basePath`
+ * values: config-file directory for auto-discovered configs, cwd for
+ * `--config` / explicit override configs. Production callers must pass it —
+ * the API's `overrideConfig` is rooted at the instance cwd, not
+ * `process.cwd()` — so the `process.cwd()` default below only serves
+ * basePath-free test configs.
  */
-export function normalizeConfig(config: unknown): Record<string, unknown>[] {
+export interface NormalizeConfigOptions {
+  configDirectory?: string;
+}
+
+/**
+ * Validate and strip non-serializable fields from the config.
+ *
+ * Per-entry `basePath` is desugared here into ordinary relative `files` /
+ * `ignores` / `parserOptions.project` patterns so the Go engine keeps its
+ * single match-root model.
+ */
+export function normalizeConfig(
+  config: unknown,
+  options: NormalizeConfigOptions = {},
+): Record<string, unknown>[] {
   if (!Array.isArray(config)) {
     throw new Error(
       `rslint config must export an array (flat config format), got ${typeof config}`,
@@ -126,6 +148,8 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       );
     }
   }
+
+  const configDirectory = options.configDirectory ?? process.cwd();
 
   return config.map((rawEntry: unknown, index: number) => {
     if (rawEntry === null) {
@@ -145,6 +169,18 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     }
 
     const entry = rawEntry;
+
+    const hasBasePath = Object.prototype.hasOwnProperty.call(entry, 'basePath');
+    if (hasBasePath && typeof entry.basePath !== 'string') {
+      throw new Error(
+        `[rslint] Config entry at index ${index}: "basePath" must be a string, got ${typeof entry.basePath}`,
+      );
+    }
+    if (hasBasePath && entry.basePath === '') {
+      throw new Error(
+        `[rslint] Config entry at index ${index}: "basePath" must be a non-empty string`,
+      );
+    }
 
     const hasFiles = Object.prototype.hasOwnProperty.call(entry, 'files');
     if (hasFiles && !Array.isArray(entry.files)) {
@@ -280,10 +316,12 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       : [];
     const plugins = [...new Set([...stringPlugins, ...pluginPrefixes])];
     // ESLint decides whether an ignores-bearing object is global from its
-    // authored keys, including keys whose value is undefined. Preserve that
-    // distinction when normalization omits an undefined or unsupported field.
+    // authored keys, including keys whose value is undefined. `basePath` and
+    // `name` are meta fields and do not make an ignores-only entry non-global.
+    // Preserve that distinction when normalization omits an undefined or
+    // unsupported field.
     const authoredNonGlobalKey = Object.keys(entry).some(
-      (key) => key !== 'name' && key !== 'ignores',
+      (key) => key !== 'name' && key !== 'ignores' && key !== 'basePath',
     );
     const serializesNonGlobalKey =
       hasFiles ||
@@ -291,11 +329,15 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       entry.rules !== undefined ||
       hasPlugins ||
       entry.settings !== undefined;
+    // basePath on a scoped (non-global-ignore) entry may inject a catch-all
+    // files selector during desugaring; that alone does not need a settings
+    // shape marker because files will be present after applyBasePathToEntry.
     const needsNonGlobalShapeMarker =
       authoredNonGlobalKey && !serializesNonGlobalKey;
 
-    return {
+    const serializable: Record<string, unknown> = {
       ...(entry.name !== undefined ? { name: entry.name } : {}),
+      ...(hasBasePath ? { basePath: entry.basePath } : {}),
       ...(hasFiles ? { files: entry.files } : {}),
       ...(entry.ignores !== undefined ? { ignores: entry.ignores } : {}),
       ...(entry.languageOptions !== undefined
@@ -310,6 +352,10 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
           : {}),
       ...(pluginPrefixes.length > 0 ? { eslintPlugins: eslintPluginMeta } : {}),
     };
+
+    // Desugar basePath into ordinary relative patterns before the payload
+    // crosses to Go. The Go engine keeps a single match root per config.
+    return applyBasePathToEntry(serializable, configDirectory);
   });
 }
 

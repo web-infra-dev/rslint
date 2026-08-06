@@ -29,6 +29,15 @@ type RslintConfig []ConfigEntry
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
 	Name string `json:"name,omitempty"`
+	// BasePath is the optional ESLint flat-config subdirectory root for this
+	// entry. Relative values resolve from the config match root (config-file
+	// directory for auto-discovered configs, cwd for --config). JS/TS configs
+	// desugar basePath in Node before the payload reaches Go; JSON/JSONC configs
+	// keep BasePath intact through the loader and are desugared by callers
+	// (CLI/LSP/API) via ResolveBasePaths with the appropriate match root. The
+	// field is cleared after desugaring so matching always sees ordinary
+	// relative files/ignores/project patterns.
+	BasePath string `json:"basePath,omitempty"`
 	// Files retains the established Go construction API for top-level OR
 	// patterns. FilePatternGroups stores nested arrays, each of which is an AND
 	// group. JSON encoding combines both fields back into one mixed `files`
@@ -176,6 +185,15 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(entryForDecode, &decoded); err != nil {
 			return err
 		}
+		// A present-but-empty (or null) "basePath" decodes to the same Go
+		// zero value as an absent key, so it must be rejected here while raw
+		// still distinguishes "key absent" from "key present". Mirrors
+		// normalizeConfig's rejection of "basePath": "" on the JS/TS config
+		// path, and also covers callers (e.g. the low-level API's Config
+		// field) that hand Go raw JSON without going through normalizeConfig.
+		if _, ok := raw["basePath"]; ok && decoded.BasePath == "" {
+			return fmt.Errorf("config entry at index %d: key \"basePath\": expected value to be a non-empty string", index)
+		}
 		if err := validateConfigRules(decoded.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
@@ -186,7 +204,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" {
+			if key != "ignores" && key != "name" && key != "basePath" {
 				hasNonGlobalKey = true
 				break
 			}
@@ -797,9 +815,11 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 	return config.mergeConfigEntries(key)
 }
 
-// isGlobalIgnoreEntry returns true if the entry has only ignores and an
-// optional name. Empty config objects are still present and make ignores local
-// to the entry, matching ESLint flat config semantics.
+// isGlobalIgnoreEntry returns true if the entry has only ignores and optional
+// meta fields (name, basePath). Empty config objects are still present and make
+// ignores local to the entry, matching ESLint flat config semantics. After
+// ResolveBasePaths desugars basePath, BasePath is cleared and only ignores
+// (+ optional name) remain for global-ignore entries.
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return entry.Files == nil &&
 		entry.FilePatternGroups == nil &&

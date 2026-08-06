@@ -126,6 +126,7 @@ describedby
 destabilising
 destructures
 desugars
+desugared
 desync
 dirxml
 disqualifier

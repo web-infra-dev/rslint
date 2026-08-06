@@ -60,9 +60,13 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 
 	// Normalize JSON config: inject core rules and plugin rules into each entry's Rules map.
 	// User-specified rules take precedence (they are applied after the defaults).
+	// BasePath is left intact here: the caller must run ResolveBasePaths with the
+	// correct match root (config-file directory for auto-discovered configs, cwd
+	// for --config) before matching.
 	config = normalizeJSONConfig(config)
 
-	// Update current directory to the config file's directory
+	// Physical config-file directory. Callers that apply --config flat-config
+	// semantics replace the match root with cwd after loading.
 	configDirectory := tspath.GetDirectoryPath(configFileName)
 	return config, configDirectory, nil
 }
@@ -286,6 +290,12 @@ func (loader *ConfigLoader) LoadRslintConfiguration(configPath string) (RslintCo
 // LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations.
 func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, []string, string, error) {
 	rslintConfig, configDirectory, err := loader.LoadRslintConfiguration(configPath)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	// Convenience path assumes auto-discovery match root = config-file directory.
+	rslintConfig, err = ResolveBasePaths(rslintConfig, configDirectory, loader.fs)
 	if err != nil {
 		return nil, nil, "", err
 	}

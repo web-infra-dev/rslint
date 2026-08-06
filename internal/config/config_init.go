@@ -327,8 +327,10 @@ func extractGlobalIgnores(entries RslintConfig) RslintConfig {
 		return entries
 	}
 
-	// Create a global ignore entry and remove ignores from the original
-	globalIgnore := ConfigEntry{Ignores: entries[targetIdx].Ignores}
+	// Create a global ignore entry and remove ignores from the original.
+	// basePath is meta for global-ignore entries and must carry over so the
+	// extracted ignores stay scoped to the original entry's subtree.
+	globalIgnore := ConfigEntry{BasePath: entries[targetIdx].BasePath, Ignores: entries[targetIdx].Ignores}
 	entries[targetIdx].Ignores = nil
 
 	// Prepend global ignore entry
@@ -370,9 +372,9 @@ func (ic *importCollector) buildImportLine() string {
 // generateEntryCode generates the JS/TS config code for a single JSON config entry.
 // It inserts recommended preset references and deduplicates rules.
 func generateEntryCode(entry ConfigEntry, imports *importCollector, hasTSConfig bool) string {
-	// Global ignore entry — output as-is
+	// Global ignore entry — output as-is (basePath scope included)
 	if isGlobalIgnoreEntry(entry) {
-		return formatIgnoreEntry(entry.Ignores)
+		return formatIgnoreEntry(entry)
 	}
 
 	// Determine which presets apply to this entry
@@ -522,6 +524,13 @@ func normalizeSeverity(s string) string {
 func buildOverrideFields(entry ConfigEntry, remainingRules Rules, hasTS bool) string {
 	var fields []string
 
+	// basePath (ESLint flat-config entry scope). Dropping it would silently
+	// widen a basePath-scoped entry to the repo root after migration deletes
+	// the source JSON.
+	if entry.BasePath != "" {
+		fields = append(fields, "    basePath: '"+escapeJSString(entry.BasePath)+"'")
+	}
+
 	// files (skip empty arrays)
 	if hasFileSelectors(entry) {
 		fields = append(fields, "    files: "+formatFilesSelectors(entry))
@@ -554,12 +563,17 @@ func buildOverrideFields(entry ConfigEntry, remainingRules Rules, hasTS bool) st
 	return "  {\n" + strings.Join(fields, ",\n") + ",\n  }"
 }
 
-// formatIgnoreEntry formats a global ignore entry.
-func formatIgnoreEntry(ignores []string) string {
-	if len(ignores) <= 3 {
-		return "  { ignores: " + formatStringArray(ignores) + " }"
+// formatIgnoreEntry formats a global ignore entry, preserving a basePath scope
+// when present. Dropping it would silently widen a basePath-scoped ignore to
+// the repo root after migration deletes the source JSON.
+func formatIgnoreEntry(entry ConfigEntry) string {
+	if entry.BasePath != "" {
+		return "  {\n    basePath: '" + escapeJSString(entry.BasePath) + "',\n    ignores: " + formatStringArray(entry.Ignores) + ",\n  }"
 	}
-	return "  {\n    ignores: " + formatStringArray(ignores) + ",\n  }"
+	if len(entry.Ignores) <= 3 {
+		return "  { ignores: " + formatStringArray(entry.Ignores) + " }"
+	}
+	return "  {\n    ignores: " + formatStringArray(entry.Ignores) + ",\n  }"
 }
 
 // formatStringArray formats a string slice as a JS array literal.

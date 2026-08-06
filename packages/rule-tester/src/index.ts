@@ -28,7 +28,11 @@ async function getBaseConfig(
   const cached = baseConfigCache.get(baseConfigPath);
   if (cached) return cached;
   const raw = await loadConfigFile(baseConfigPath);
-  const normalized = normalizeConfig(raw);
+  // Desugar any basePath against the base config file's directory — the same
+  // match root later handed to lint() — not process.cwd().
+  const normalized = normalizeConfig(raw, {
+    configDirectory: path.dirname(baseConfigPath),
+  });
   baseConfigCache.set(baseConfigPath, normalized);
   return normalized;
 }
