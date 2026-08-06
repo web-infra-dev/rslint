@@ -340,7 +340,8 @@ func isStringRawTag(ctx rule.RuleContext, tag *ast.Node) bool {
 	return object != nil &&
 		object.Kind == ast.KindIdentifier &&
 		object.AsIdentifier().Text == "String" &&
-		!utils.IsShadowed(object, "String")
+		!utils.IsShadowed(object, "String") &&
+		ctx.Globals.Access("String").IsDeclared()
 }
 
 func isRegexLiteral(node *ast.Node) bool {
@@ -371,7 +372,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		// un-declares the builtin, so it no longer resolves to a known global —
 		// ESLint's `getVariableByName(scope, "RegExp")` would be undefined and
 		// the rule stays silent.
-		return !isGlobalOff(ctx, "RegExp")
+		return ctx.Globals.Access("RegExp").IsDeclared()
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
 		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
@@ -396,10 +397,6 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 	return false
 }
 
-func isGlobalOff(ctx rule.RuleContext, name string) bool {
-	return ctx.Globals[name] == utils.GlobalAccessOff
-}
-
 func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil || node.Kind != ast.KindIdentifier {
@@ -408,7 +405,7 @@ func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	name := node.AsIdentifier().Text
 	switch name {
 	case "globalThis", "window", "self", "global":
-		return !utils.IsShadowed(node, name) && !isGlobalOff(ctx, name)
+		return !utils.IsShadowed(node, name) && ctx.Globals.Access(name).IsDeclared()
 	default:
 		return false
 	}

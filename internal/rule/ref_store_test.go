@@ -874,6 +874,33 @@ func TestRefStoreResolveCheckerFallback(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolveInFileNeverUsesCheckerFallback(t *testing.T) {
+	// ResolveInFile must preserve local/import scope resolution while refusing
+	// the same lib.dom symbol that Resolve finds through its checker fallback.
+	sourceFile, refs, done := newCheckedRefStore(t, "export {}; const local = 1; local; window;")
+	defer done()
+
+	localOccurrences := identifiers(sourceFile.AsNode(), "local")
+	if len(localOccurrences) != 2 {
+		t.Fatalf("expected declaration + reference for local, got %d", len(localOccurrences))
+	}
+	if got := refs.ResolveInFile(localOccurrences[1]); got == nil {
+		t.Fatal("ResolveInFile(local reference) = nil, want the current-file binding")
+	}
+
+	windowOccurrences := identifiers(sourceFile.AsNode(), "window")
+	if len(windowOccurrences) != 1 {
+		t.Fatalf("expected one window reference, got %d", len(windowOccurrences))
+	}
+	window := windowOccurrences[0]
+	if got := refs.ResolveInFile(window); got != nil {
+		t.Fatalf("ResolveInFile(window) = %v, want nil for a lib.d.ts binding", got)
+	}
+	if got := refs.Resolve(window); got == nil {
+		t.Fatal("Resolve(window) = nil, want proof that the checker fallback is available")
+	}
+}
+
 func TestRefStoreResolveCheckerFallbackExcludedPositions(t *testing.T) {
 	// A TypeChecker resolves a property key's own declaration name to the
 	// property's symbol (its only declaration is that very key), not to

@@ -1259,27 +1259,14 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 			strings.HasSuffix(filename, ".d.cts") ||
 			strings.HasSuffix(filename, ".d.mts")
 
-		// Pre-compute the set of default-library globals. We seed with a
-		// hard-coded ECMAScript list (so the rule works without a
-		// TypeChecker, and so it still flags `var Object = 0` at module
-		// scope where TypeChecker would resolve `Object` to the local
-		// binding), then union in whatever the default library exposes.
+		// Pre-compute the set of default-library globals. The framework applies
+		// the selected ECMAScript edition and authored overrides after the
+		// TypeScript library seed, so a future-edition standard name cannot leak
+		// into an older ecmaVersion through the TypeChecker.
 		builtinGlobals := map[string]bool{}
 		if opts.builtinGlobals {
-			utils.AddECMAScriptGlobals(builtinGlobals)
 			utils.AddDefaultLibraryGlobals(builtinGlobals, ctx.Program, ctx.TypeChecker)
-			// Config `languageOptions.globals` and `/* global */` comments
-			// declare additional globals beyond the ECMAScript/lib set. An
-			// explicit `off` setting un-declares the builtin from the global
-			// scope (ESLint removes the variable entirely), so shadowing it
-			// no longer reports.
-			for name, access := range ctx.Globals {
-				if access.IsDeclared() {
-					builtinGlobals[name] = true
-				} else {
-					delete(builtinGlobals, name)
-				}
-			}
+			ctx.Globals.ApplyTo(builtinGlobals)
 		}
 		b.builtinGlobals = builtinGlobals
 

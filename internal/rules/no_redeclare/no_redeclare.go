@@ -404,7 +404,7 @@ func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinG
 		builtinGlobals: o.builtinGlobals,
 	}
 
-	for _, declaration := range ctx.InlineGlobals {
+	for _, declaration := range ctx.Globals.InlineDeclarations() {
 		// ESLint removes a name from the global scope when its final inline
 		// setting is off, including all earlier comments for that name.
 		if !declaration.Access.IsDeclared() || len(declaration.NameRanges) == 0 {
@@ -436,8 +436,8 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 			}
 		}
 		isTypeScriptTypeGlobal := declarations.defaultLibraryTypeGlobals[name]
-		if utils.IsECMAScriptGlobal(name) || isTypeScriptTypeGlobal {
-			if declarations.ctx.ConfigGlobals[name] == utils.GlobalAccessOff {
+		if declarations.ctx.Globals.LanguageAccess(name).IsDeclared() || isTypeScriptTypeGlobal {
+			if declarations.ctx.Globals.ConfigOverride(name) == utils.GlobalAccessOff {
 				if _, hasActiveDirective := declarations.inlineByName[name]; hasActiveDirective {
 					// With an active directive, typescript-eslint exposes the
 					// config's `off` setting as the variable's implicit setting.
@@ -449,31 +449,14 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 				// TypeScript type variable from scope-manager's merged variable.
 				return true
 			}
-			if declarations.ctx.Globals[name] == utils.GlobalAccessOff {
-				return false
-			}
-			if configured := declarations.ctx.ConfigGlobals[name]; configured != utils.GlobalAccessUnset {
-				return configured.IsDeclared()
-			}
-			// ECMAScript language globals use their implicit readonly setting
-			// unless an explicit config or directive replaces it.
-			return true
 		}
 	}
 
-	if declarations.ctx.Globals[name] == utils.GlobalAccessOff {
-		// A final inline `:off` suppresses both configured and language globals.
-		return false
-	}
-	if configured := declarations.ctx.ConfigGlobals[name]; configured != utils.GlobalAccessUnset {
-		// Explicit config replaces the language-provided setting.
-		return configured.IsDeclared()
-	}
-
-	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {
-		return false
-	}
-	return utils.IsECMAScriptGlobal(name)
+	// ESLint marks a name as an implicit builtin only when it exists both in
+	// the pre-inline config globals and in the final scope. This excludes an
+	// inline-only global, an explicit config `off`, and a final inline `off`.
+	return declarations.ctx.Globals.ConfiguredAccess(name).IsDeclared() &&
+		declarations.ctx.Globals.Access(name).IsDeclared()
 }
 
 func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool, variant ruleVariant) {

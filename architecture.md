@@ -275,9 +275,7 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
-    ConfigGlobals  map[string]utils.GlobalAccess
-    InlineGlobals  []InlineGlobal
-    Globals        map[string]utils.GlobalAccess
+    Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
     Program        *compiler.Program
@@ -325,15 +323,29 @@ trip for that identifier, and `References` picks up that same fallback
 automatically when queried with a symbol `Resolve` obtained that way. Without
 a TypeChecker (`NewRefStore`'s third argument is `nil`), that fallback is a
 no-op and both methods only ever see symbols declared in the current file.
-`ConfigGlobals` preserves the effective `languageOptions.globals` source,
-`InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
-resolved map after inline settings override configuration. Rules consume this
-context data instead of scanning comments independently. Every authored alias
-is normalized to one of ESLint's three access levels — `utils.GlobalAccess`,
-whose zero value means neither source mentioned the name, so a rule that
-indexes it falls back to what it already knows about the name. Booleans follow
-the `globals` package: `true` is writable, `false` is read-only. The Node
-plugin scope seeds the same levels into its scope manager for
+`ResolveInFile` is the explicit binder-only forward lookup: it never takes the
+TypeChecker fallback even when one is available. ESLint scope rules such as
+`no-undef` use this path so DOM/lib, ambient `.d.ts`, and cross-file TypeScript
+symbols cannot make their result depend on whether the file happened to receive
+a checker.
+Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
+its zero value means the moving `latest` edition. The linter uses it to build
+one `Globals` value for each native rule context. `Globals` owns the
+ESLint-versioned language-global set, the authored
+`languageOptions.globals` source, inline `/* global */` settings and ranges,
+and the effective access after applying their precedence. Rules use
+`Globals.Access` for standard language-global decisions and its narrower source
+accessors only when upstream behavior depends on provenance, instead of
+rebuilding the merge. A rule whose upstream semantics add another source, such
+as TypeScript library globals, applies this view last so `ecmaVersion` and
+authored overrides remain authoritative. This keeps the language-global
+composition point extensible for future language options such as `sourceType`
+without exposing those options directly to every rule; non-global wrapper
+bindings remain a scope/`RefStore` concern.
+Every authored alias is normalized to one of ESLint's three access levels —
+`utils.GlobalAccess`, whose zero value means no source mentioned the name.
+Booleans follow the `globals` package: `true` is writable, `false` is read-only.
+The Node plugin scope seeds the same levels into its scope manager for
 ESLint-compatible scope APIs.
 The linter binds immutable rule name, severity, and diagnostic-sink metadata to
 each context once. The reporting methods use that state directly rather than
@@ -530,7 +542,7 @@ Each entry in the config array supports:
 | ----------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `files`           | `(string \| string[])[]`                   | Non-empty selector list; top-level selectors are ORed and nested selectors are ANDed |
 | `ignores`         | `string[]`                                 | Glob patterns excluded by this entry                                                 |
-| `languageOptions` | `object`                                   | Parser options such as `project` and `projectService`                                |
+| `languageOptions` | `object`                                   | `ecmaVersion`, globals, and parser options such as project settings                  |
 | `rules`           | `Record<string, …>`                        | Rule level or `[level, options]`                                                     |
 | `plugins`         | `string[] \| Record<string, ESLintPlugin>` | Native plugin declarations or third-party plugin instances                           |
 | `settings`        | `Record<string, …>`                        | Shared settings available in `RuleContext`                                           |
@@ -1210,7 +1222,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 
 ### Key Interfaces
 
-- **Config → Registry**: map merged config into enabled `ConfiguredRule` values
+- **Config → Registry**: map merged config into enabled `ConfiguredRule` values, including normalized per-file language options
 - **Programs → Linter**: ts-go `Program` instances define the compilation contexts the linter runs against
 - **Rules → RuleContext**: rules interact only through the framework-provided context/reporting API
 - **Integrations → Linter / Inspector**:
@@ -1323,7 +1335,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Code Action**: LSP action derived from diagnostics, suggestions, or bulk-fix operations such as quick fix and fix all
 - **Comment Store**: short-lived per-file provider that lazily computes and shares the canonical source comment list
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
-- **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
+- **ConfiguredRule**: Rule implementation plus resolved severity, settings, language options, globals, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
 - **Fallback Program**: Extra non-project-backed `Program` created from selected lint targets that are not covered by a tsconfig Program associated with their governing config; fallback files do not enable type-aware rules or participate in program-wide type-check
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file

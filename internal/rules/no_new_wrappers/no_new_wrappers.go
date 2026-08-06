@@ -45,7 +45,7 @@ var NoNewWrappersRule = rule.Rule{
 				// entry un-declares the builtin, so it no longer resolves to a
 				// known global — ESLint's `getVariableByName` would return
 				// undefined and the rule stays silent.
-				if ctx.Globals[name] == utils.GlobalAccessOff {
+				if !ctx.Globals.Access(name).IsDeclared() {
 					return
 				}
 

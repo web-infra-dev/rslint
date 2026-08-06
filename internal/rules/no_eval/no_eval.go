@@ -160,7 +160,7 @@ func (state *noEvalState) checkMemberAccess(object *ast.Node, reportNode *ast.No
 }
 
 func (state *noEvalState) isGlobalEvalReference(node *ast.Node) bool {
-	if state.ctx.Globals["eval"] == utils.GlobalAccessOff {
+	if !state.ctx.Globals.Access("eval").IsDeclared() {
 		return false
 	}
 	// A full-file miss is cached because IsShadowed's SourceFile check scans
@@ -233,7 +233,7 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 }
 
 func (state *noEvalState) isGlobalObjectReference(identifier *ast.Node, name string) bool {
-	if state.ctx.Globals[name] == utils.GlobalAccessOff {
+	if state.ctx.Globals.Override(name) == utils.GlobalAccessOff {
 		return false
 	}
 
@@ -310,8 +310,10 @@ func (state *noEvalState) isKnownGlobalObject(name string, status *globalObjectS
 		return status.known
 	}
 	status.knownChecked = true
-	if access, ok := state.ctx.Globals[name]; ok {
+	if access := state.ctx.Globals.Override(name); access != utils.GlobalAccessUnset {
 		status.known = access.IsDeclared()
+	} else if name == "globalThis" {
+		status.known = state.ctx.Globals.Access(name).IsDeclared()
 	} else if state.ctx.TypeChecker != nil {
 		status.known = state.ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsValue, nil) != nil
 	} else {

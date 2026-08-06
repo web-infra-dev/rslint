@@ -527,7 +527,7 @@ func (tracker *regexpCallTracker) disableRoot(name string) {
 }
 
 func (tracker *regexpCallTracker) isGlobalOff(name string) bool {
-	return tracker.ctx.Globals[name] == utils.GlobalAccessOff
+	return tracker.ctx.Globals.Override(name) == utils.GlobalAccessOff
 }
 
 func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {
@@ -826,7 +826,7 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 	}
 
 	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals[name].IsDeclared() {
+	if tracker.ctx.Globals.Override(name).IsDeclared() {
 		// The initial index contains only built-in roots. Indexing this
 		// configured-global name also records namespace-only declarations
 		// before deciding whether the assignment target is truly global.

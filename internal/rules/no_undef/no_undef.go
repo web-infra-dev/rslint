@@ -10,12 +10,11 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-undef
 //
-// ctx.Refs.Resolve() walks the binder's lexical scope chain first — the same
-// model ESLint's own no-undef uses, and enough on its own, which is what
-// makes this rule useful on plain JS and other files no type checker runs
-// on. When a TypeChecker is available for the file, Resolve() falls back to
-// it for anything the scope walk can't place, so this rule also recognizes
-// DOM/Node globals and other names known only to the type checker there.
+// Like ESLint, this rule is deliberately independent of TypeScript's type
+// environment. It resolves declarations in the current file, then applies the
+// versioned globals selected by languageOptions and the config/inline globals
+// exposed on RuleContext. DOM, Node, ambient .d.ts, and cross-file declarations
+// are not silently supplied by a TypeChecker.
 
 type options struct {
 	checkTypeof bool
@@ -50,31 +49,13 @@ var NoUndefRule = rule.Rule{
 				}
 
 				name := node.Text()
-
-				// languageOptions.globals / /* global */ comments (merged into
-				// ctx.Globals) take priority over built-ins and over the
-				// checker's lib knowledge; both map lookups come before the
-				// resolver so references to declared or built-in globals never
-				// pay for a failing scope walk plus a checker round trip.
-				if access, ok := ctx.Globals[name]; ok {
-					if access.IsDeclared() {
-						return
-					}
-					// An explicit "off" entry un-declares the global: only a
-					// binding this file itself declares can still satisfy the
-					// reference. A symbol the checker fallback found in lib or
-					// ambient declarations elsewhere is the very global that
-					// was switched off, so it still reports.
-					if sym := ctx.Refs.Resolve(node); utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
-						return
-					}
-				} else {
-					if utils.IsECMAScriptGlobal(name) {
-						return
-					}
-					if ctx.Refs.Resolve(node) != nil {
-						return
-					}
+				if ctx.Globals.Access(name).IsDeclared() {
+					return
+				}
+				// An explicit `off` removes only implicit globals. A declaration or
+				// import authored in this file still defines its references.
+				if ctx.Refs.ResolveInFile(node) != nil {
+					return
 				}
 
 				ctx.ReportNode(node, rule.RuleMessage{

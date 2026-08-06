@@ -124,7 +124,7 @@ var ValidTypeofRule = rule.Rule{
 
 				case sibling.Kind == ast.KindIdentifier:
 					isUndefinedOff := false
-					if ctx.Globals["undefined"] == utils.GlobalAccessOff {
+					if !ctx.Globals.Access("undefined").IsDeclared() {
 						isUndefinedOff = true
 					}
 					if sibling.Text() == "undefined" && !utils.IsShadowed(sibling, "undefined") && !isUndefinedOff {

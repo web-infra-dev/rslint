@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1170,6 +1171,30 @@ func TestNoImpliedEvalRule(t *testing.T) {
 				Code: `const key = 'x'; const o = { x: 'y' }; setTimeout(o[key]);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "impliedEval", Line: 1, Column: 40},
+				},
+			},
+		},
+	)
+}
+
+func TestNoImpliedEvalECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoImpliedEvalRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `globalThis.setTimeout('code')`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `globalThis.setTimeout('code')`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "impliedEval", Line: 1, Column: 1},
 				},
 			},
 		},

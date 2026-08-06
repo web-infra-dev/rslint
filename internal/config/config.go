@@ -252,7 +252,7 @@ func ValidateConfig(config RslintConfig) error {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
-		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
+		if err := validateLanguageOptions(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
 		if err := validateConfigRules(entry.Rules); err != nil {
@@ -260,6 +260,44 @@ func ValidateConfig(config RslintConfig) error {
 		}
 	}
 	return nil
+}
+
+func validateLanguageOptions(languageOptions *LanguageOptions) error {
+	if err := validateConfigGlobals(languageOptions); err != nil {
+		return err
+	}
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+
+	if value, present := languageOptions.Raw["ecmaVersion"]; present {
+		if _, ok := normalizeConfigECMAVersion(value); !ok {
+			return fmt.Errorf(
+				"key \"languageOptions.ecmaVersion\": invalid value %v; expected \"latest\", 3, 5, an edition from 6 through %d, or a year from 2015 through %d",
+				value,
+				rule.LatestECMAScriptVersion-2009,
+				rule.LatestECMAScriptVersion,
+			)
+		}
+	}
+
+	return nil
+}
+
+func normalizeConfigECMAVersion(value any) (int, bool) {
+	if text, ok := value.(string); ok {
+		if text == "latest" {
+			// Keep `latest` semantic instead of freezing the config to this
+			// release's numeric edition. rule.LanguageOptions uses zero for latest.
+			return 0, true
+		}
+		return 0, false
+	}
+	version, ok := utils.CoerceIntegral(value)
+	if !ok {
+		return 0, false
+	}
+	return rule.NormalizeECMAScriptVersion(version)
 }
 
 func validateConfigGlobals(languageOptions *LanguageOptions) error {
@@ -302,10 +340,10 @@ func validateConfigRules(rules Rules) error {
 type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
 	// Raw retains the full languageOptions object as authored (sourceType,
-	// globals, parserOptions.ecmaFeatures, …) — fields the Go core does not
-	// model but the Node eslint-plugin worker needs. Go computes the
-	// per-file merged value via GetConfigForFile and forwards it on the
-	// wire; it is not (de)serialized through this struct's own field tags.
+	// ecmaVersion, globals, parserOptions.ecmaFeatures, …). Go normalizes
+	// ecmaVersion for native globals and forwards the full value to the Node
+	// eslint-plugin worker. It is not (de)serialized through this struct's own
+	// field tags.
 	Raw map[string]any `json:"-"`
 }
 
@@ -964,6 +1002,22 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 		}
 	}
 	return globals
+}
+
+// ExtractLanguageOptions normalizes the effective per-file language options
+// for native rules. The zero value deliberately represents ESLint flat-config
+// defaults, so a missing languageOptions object needs no allocation.
+func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
+	var result rule.LanguageOptions
+	if langOpts == nil || langOpts.Raw == nil {
+		return result
+	}
+	if value, present := langOpts.Raw["ecmaVersion"]; present {
+		if version, ok := normalizeConfigECMAVersion(value); ok {
+			result.ECMAVersion = version
+		}
+	}
+	return result
 }
 
 // RulePluginPrefix extracts the plugin prefix from a rule name.

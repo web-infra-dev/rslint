@@ -31,7 +31,7 @@ ruleTester.run('no-undef', {
     // === Labels ===
     'loop: for (var i = 0; i < 10; i++) { break loop; }',
 
-    // === Built-in globals via lib ===
+    // === ECMAScript language globals ===
     'var p = new Promise<void>((resolve) => resolve());',
 
     // === Type-only positions: type annotations ===

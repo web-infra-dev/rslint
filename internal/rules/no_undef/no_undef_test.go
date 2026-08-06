@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -42,10 +43,10 @@ func TestNoUndefRule(t *testing.T) {
 			// === Labels ===
 			{Code: `loop: for (var i = 0; i < 10; i++) { break loop; }`},
 
-			// === Built-in globals via lib ===
-			{Code: `console.log("test");`},
+			// === Host globals must be configured explicitly ===
+			{Code: `console.log("test");`, Globals: map[string]any{"console": "readonly"}},
 			{Code: `var p = new Promise<void>((resolve) => resolve());`},
-			{Code: `setTimeout(() => {}, 100);`},
+			{Code: `setTimeout(() => {}, 100);`, Globals: map[string]any{"setTimeout": "readonly"}},
 
 			// === Type-only positions: type annotations ===
 			{Code: `type MyType = string; var x: MyType;`},
@@ -55,6 +56,7 @@ func TestNoUndefRule(t *testing.T) {
 			// === Type-only positions: generic type arguments ===
 			{Code: `function identity<T>(val: T): T { return val; }`},
 			{Code: `function constrained<T extends object>(val: T) { return val; }`},
+			{Code: `declare let stream: AsyncIterator<string>;`},
 
 			// === Type-only positions: as / satisfies (type part is type-only) ===
 			{Code: `var x = 1; var y = x as any;`},
@@ -111,9 +113,24 @@ func TestNoUndefRule(t *testing.T) {
 
 			// === "off" global with a same-file declaration: the binding wins ===
 			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]any{"myOffGlobal123": "off"}},
+			{Code: `import Promise from "pkg"; Promise;`, Globals: map[string]any{"Promise": "off"}},
 
-			// === ES2025 built-in ===
-			{Code: `var buf = new Float16Array(8);`},
+			// === ECMAScript language globals are selected by ecmaVersion ===
+			{Code: `Object; toString; hasOwnProperty;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 3}},
+			{Code: `JSON;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 5}},
+			{Code: `Promise;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
+			{
+				Code:            `Promise;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
+				Globals:         map[string]any{"Promise": "readonly"},
+			},
+			{Code: `Atomics;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
+			{Code: `BigInt;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}},
+			{Code: `WeakRef;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2021}},
+			{Code: `Float16Array; Iterator;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025}},
+			{Code: `Temporal; AsyncDisposableStack;`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2026}},
+			// Zero value means the moving `latest` edition.
+			{Code: `Temporal;`},
 
 			// === JSX: intrinsic (lowercase) tags are not identifier references ===
 			{Code: `function C() { return <div />; }`, Tsx: true},
@@ -212,6 +229,7 @@ func TestNoUndefRule(t *testing.T) {
 
 			// === arguments inside function ===
 			{Code: `function f() { return arguments; }`},
+			{Code: `function f() { return arguments; }`, Globals: map[string]any{"arguments": "off"}},
 
 			// === this in class method ===
 			{Code: `class C { x = 1; m() { return this.x; } }`},
@@ -292,6 +310,60 @@ func TestNoUndefRule(t *testing.T) {
 				},
 			},
 
+			// === ecmaVersion boundary attacks ===
+			{
+				Code:            `JSON;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `Promise;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `Atomics;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2016},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `BigInt;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `WeakRef;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `Float16Array;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `Temporal;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			// TypeScript exposes AsyncIterator only as a type; ESLint 10.8
+			// does not provide it as a runtime language global.
+			{
+				Code:   `AsyncIterator;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+
+			// === TypeChecker environment must not define host/ambient names ===
+			{
+				Code: "console;\nwindow;\nsetTimeout;\nprocess;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 2, Column: 1},
+					{MessageId: "undef", Line: 3, Column: 1},
+					{MessageId: "undef", Line: 4, Column: 1},
+				},
+			},
+
 			// === typeof with checkTypeof: true ===
 			{
 				Code:    `typeof anUndefinedVar === 'string'`,
@@ -352,6 +424,14 @@ func TestNoUndefRule(t *testing.T) {
 			{
 				Code:    `myOffGlobal123;`,
 				Globals: map[string]any{"myOffGlobal123": "off"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+				},
+			},
+			// Explicit globals:off replaces the selected language-global set.
+			{
+				Code:    `Promise;`,
+				Globals: map[string]any{"Promise": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
 				},
@@ -506,7 +586,8 @@ func TestNoUndefRule(t *testing.T) {
 
 			// === Function argument ===
 			{
-				Code: `console.log(undeclaredArg123);`,
+				Code:    `console.log(undeclaredArg123);`,
+				Globals: map[string]any{"console": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 13},
 				},

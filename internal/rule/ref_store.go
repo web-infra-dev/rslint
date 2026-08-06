@@ -202,6 +202,23 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	return s.checkerReferenceSymbol(node, meaning)
 }
 
+// ResolveInFile returns the symbol a reference-position identifier resolves to
+// using only the binder's lexical scope walk. Unlike Resolve, it never asks the
+// TypeChecker to supply a declaration from lib files, ambient .d.ts files, or
+// another source file.
+//
+// Imported bindings and declarations authored in this source file are still
+// visible because their binder symbols live in the file's own scope graph.
+// This distinction is required by ESLint-compatible rules such as no-undef:
+// their answer must not change merely because rslint happened to construct a
+// TypeChecker for the file.
+func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
 // binderReferenceSymbol resolves one reference without checker work. A named
 // export nested in a namespace needs one extra guard: the binder exposes that
 // export's own alias in the namespace's Exports table. If no local declaration

@@ -126,8 +126,7 @@ const x = 1;
 			`},
 
 			// ---- ignoreTypeValueShadow + builtinGlobals interaction ----
-			// SKIP equivalent: rslint doesn't model `languageOptions.globals` configuration,
-			// but the no-globals form is the same as `type Foo = 1` at module scope.
+			// The no-globals form is the same as `type Foo = 1` at module scope.
 			{Code: `type Foo = 1;`},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"ignoreTypeValueShadow": true}},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"builtinGlobals": false, "ignoreTypeValueShadow": false}},

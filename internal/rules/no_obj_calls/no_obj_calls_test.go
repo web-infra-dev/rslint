@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -571,6 +572,41 @@ func TestNoObjCallsRule(t *testing.T) {
 				Code: `Math.member = replacement; Math();`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCall"},
+				},
+			},
+		},
+	)
+}
+
+func TestNoObjCallsECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoObjCallsRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `Temporal();`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+			},
+			{
+				Code:            `globalThis.Math();`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `Temporal();`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2026},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCall", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code:            `globalThis.Math();`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCall", Line: 1, Column: 1},
 				},
 			},
 		},

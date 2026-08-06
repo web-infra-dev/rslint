@@ -174,7 +174,7 @@ var NoAsyncPromiseExecutorRule = rule.Rule{
 		if !sourceMayUsePromise(ctx.SourceFile) {
 			return nil
 		}
-		if ctx.Globals["Promise"] == utils.GlobalAccessOff {
+		if !ctx.Globals.Access("Promise").IsDeclared() {
 			return nil
 		}
 		return noAsyncPromiseExecutorListeners(ctx)

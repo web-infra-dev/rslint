@@ -141,7 +141,7 @@ func isBuiltInGlobalError(ctx rule.RuleContext, callee *ast.Node) bool {
 	if !builtInErrorTypes[name] || utils.IsShadowed(callee, name) {
 		return false
 	}
-	return ctx.Globals[name] != utils.GlobalAccessOff
+	return ctx.Globals.Access(name).IsDeclared()
 }
 
 // thrownError describes a `throw` of a newly constructed error the rule checks.

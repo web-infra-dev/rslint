@@ -51,9 +51,7 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `function foo(RegExp) { new RegExp('\\1(a)'); }`},
 			{Code: `if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`},
 			{Code: `namespace RegExp {} RegExp('\\1(a)');`},
-			// SKIP: rslint does not support ESLint's /*globals*/ directive comments
-			// `/* globals RegExp:off */ new RegExp('\\1(a)');`
-			// `RegExp('\\1(a)');` with languageOptions.globals { RegExp: "off" }
+			{Code: `/* globals RegExp:off */ new RegExp('\\1(a)');`},
 
 			// ---- no capturing groups ----
 			{Code: `/(?:)/`},

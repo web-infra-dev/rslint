@@ -60,14 +60,7 @@ func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
 // two sources says otherwise. `writable` lifts the restriction and `off`
 // removes the global entirely, so neither reports.
 func isReadonlyGlobal(ctx rule.RuleContext, name string) bool {
-	switch ctx.Globals[name] {
-	case utils.GlobalAccessReadonly:
-		return true
-	case utils.GlobalAccessUnset:
-		return utils.IsECMAScriptGlobal(name)
-	default:
-		return false
-	}
+	return ctx.Globals.Access(name) == utils.GlobalAccessReadonly
 }
 
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables

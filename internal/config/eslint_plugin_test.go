@@ -65,6 +65,14 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 		t.Error("typed ParserOptions.Project should still parse")
 	}
 
+	var ecmaVersion LanguageOptions
+	if err := json.Unmarshal([]byte(`{"ecmaVersion":"latest"}`), &ecmaVersion); err != nil {
+		t.Fatalf("unmarshal ecmaVersion: %v", err)
+	}
+	if ecmaVersion.Raw["ecmaVersion"] != "latest" {
+		t.Errorf("Raw should capture ecmaVersion, got %v", ecmaVersion.Raw["ecmaVersion"])
+	}
+
 	// mergeLanguageOptions: override wins per key; base-only keys retained;
 	// base map not mutated (per-file merge must not corrupt the shared base).
 	base := &LanguageOptions{Raw: map[string]any{"sourceType": "script", "ecmaVersion": float64(2020)}}

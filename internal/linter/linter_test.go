@@ -149,15 +149,20 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		"/*global configOn:off, inlineOn, repeated:off */\n" +
 		"/*global repeated, inlineOn:off */"
 	program, paths := createTestProgramWithFiles(t, map[string]string{"globals.ts": source})
-	configGlobals := map[string]utils.GlobalAccess{"configOn": utils.GlobalAccessWritable, "configOff": utils.GlobalAccessOff}
+	configGlobals := map[string]utils.GlobalAccess{
+		"configOn":  utils.GlobalAccessWritable,
+		"configOff": utils.GlobalAccessOff,
+	}
+	languageOptions := rule.LanguageOptions{ECMAVersion: 2020}
 
 	var captured *rule.RuleContext
 	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
 		func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
-				Name:     "capture-globals",
-				Globals:  configGlobals,
-				Severity: rule.SeverityWarning,
+				Name:            "capture-globals",
+				LanguageOptions: languageOptions,
+				Globals:         configGlobals,
+				Severity:        rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					captured = &ctx
 					return nil
@@ -174,8 +179,13 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		return
 	}
 
-	if !reflect.DeepEqual(captured.ConfigGlobals, configGlobals) {
-		t.Errorf("ConfigGlobals = %#v, want %#v", captured.ConfigGlobals, configGlobals)
+	for name, want := range configGlobals {
+		if got := captured.Globals.ConfigOverride(name); got != want {
+			t.Errorf("Globals.ConfigOverride(%q) = %v, want %v", name, got, want)
+		}
+	}
+	if !captured.Globals.Access("Promise").IsDeclared() || captured.Globals.Access("WeakRef").IsDeclared() {
+		t.Error("Globals did not retain the configured ES2020 language edition")
 	}
 	wantGlobals := map[string]utils.GlobalAccess{
 		"configOn":  utils.GlobalAccessOff,
@@ -183,8 +193,10 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		"inlineOn":  utils.GlobalAccessOff,
 		"repeated":  utils.GlobalAccessReadonly,
 	}
-	if !reflect.DeepEqual(captured.Globals, wantGlobals) {
-		t.Errorf("Globals = %#v, want %#v", captured.Globals, wantGlobals)
+	for name, want := range wantGlobals {
+		if got := captured.Globals.Override(name); got != want {
+			t.Errorf("Globals.Override(%q) = %v, want %v", name, got, want)
+		}
 	}
 
 	wantInline := []struct {
@@ -196,11 +208,12 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		{name: "inlineOn", access: utils.GlobalAccessOff, positions: []int{strings.Index(source, "inlineOn"), strings.LastIndex(source, "inlineOn")}},
 		{name: "repeated", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "repeated"), strings.LastIndex(source, "repeated")}},
 	}
-	if len(captured.InlineGlobals) != len(wantInline) {
-		t.Fatalf("InlineGlobals has %d entries, want %d: %#v", len(captured.InlineGlobals), len(wantInline), captured.InlineGlobals)
+	inlineDeclarations := captured.Globals.InlineDeclarations()
+	if len(inlineDeclarations) != len(wantInline) {
+		t.Fatalf("Globals.InlineDeclarations() has %d entries, want %d: %#v", len(inlineDeclarations), len(wantInline), inlineDeclarations)
 	}
 	for i, want := range wantInline {
-		got := captured.InlineGlobals[i]
+		got := inlineDeclarations[i]
 		if got.Name != want.name || got.Access != want.access {
 			t.Errorf("InlineGlobals[%d] = (%q, %v), want (%q, %v)", i, got.Name, got.Access, want.name, want.access)
 		}

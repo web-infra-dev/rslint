@@ -203,26 +203,6 @@ func matchInlineGlobalsDirectiveRange(text string, start int, end int) (int, boo
 	return 0, false
 }
 
-// MergeGlobals combines config-declared globals with inline `/* global */`
-// comment globals into the single set exposed to rules as ctx.Globals. Inline
-// settings win on conflict. Returns nil if both inputs are empty.
-func MergeGlobals(configGlobals, inlineGlobals map[string]utils.GlobalAccess) map[string]utils.GlobalAccess {
-	if len(configGlobals) == 0 {
-		return inlineGlobals
-	}
-	if len(inlineGlobals) == 0 {
-		return configGlobals
-	}
-	merged := make(map[string]utils.GlobalAccess, len(configGlobals)+len(inlineGlobals))
-	for name, access := range configGlobals {
-		merged[name] = access
-	}
-	for name, access := range inlineGlobals {
-		merged[name] = access
-	}
-	return merged
-}
-
 // parseGlobalNameList parses ESLint's comma-and/or-whitespace separated
 // "name[:setting]" syntax. It is kept as a map helper for focused parser tests.
 func parseGlobalNameList(s string) map[string]string {

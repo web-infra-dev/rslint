@@ -120,8 +120,11 @@ func TestNewForBuiltinsUpstream(t *testing.T) {
 		jsValid("const isObject = v => Object(v) === v;"),
 		jsValid("const isObject = v => globalThis.Object(v) === v;"),
 		jsValid("(x) !== Object(x)"),
-		// SKIP: rslint does not support ESLint's languageOptions.globals override.
-		rule_tester.ValidTestCase{Code: `new Symbol("")`, Skip: true},
+		rule_tester.ValidTestCase{
+			Code:     `new Symbol("")`,
+			FileName: "file.js",
+			Globals:  map[string]any{"Symbol": "off"},
+		},
 	)
 
 	invalid := []rule_tester.InvalidTestCase{
@@ -254,10 +257,14 @@ func TestNewForBuiltinsUpstream(t *testing.T) {
 			"const {Array: RenamedArray} = globalThis;",
 			"RenamedArray();",
 		), "RenamedArray()", "Array"),
-		// SKIP: rslint does not support ESLint's languageOptions.globals override.
-		{Code: "globalThis.Array()", Skip: true},
-		// SKIP: rslint does not support ESLint's languageOptions.globals override.
-		{Code: lines("const {Array} = globalThis;", "Array();"), Skip: true},
+		invalidWithGlobals(
+			enforceInvalid("globalThis.Array()", "globalThis.Array()", "Array"),
+			map[string]any{"Array": "off"},
+		),
+		invalidWithGlobals(
+			enforceInvalid(lines("const {Array} = globalThis;", "Array();"), "Array()", "Array"),
+			map[string]any{"Symbol": "off"},
+		),
 	}
 
 	for _, name := range []string{
@@ -489,6 +496,11 @@ func lines(parts ...string) string {
 
 func jsValid(code string) rule_tester.ValidTestCase {
 	return rule_tester.ValidTestCase{Code: code, FileName: "file.js"}
+}
+
+func invalidWithGlobals(testCase rule_tester.InvalidTestCase, globals map[string]any) rule_tester.InvalidTestCase {
+	testCase.Globals = globals
+	return testCase
 }
 
 func enforceInvalid(code string, target string, name string) rule_tester.InvalidTestCase {
