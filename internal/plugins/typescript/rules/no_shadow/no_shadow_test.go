@@ -67,7 +67,7 @@ function foo() {
 			// `builtinGlobals: true` ----
 			{Code: `
 function fn(Array: number) {}
-			`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"Array": false}},
+			`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"Array": "off"}},
 			{Code: `
 /* global Array: off */
 declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
@@ -1603,7 +1603,7 @@ declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
 function foo(top: number) {}
 				`,
 				Options: map[string]interface{}{"builtinGlobals": true},
-				Globals: map[string]bool{"top": true},
+				Globals: map[string]any{"top": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "noShadowGlobal",
@@ -1619,7 +1619,7 @@ function foo(top: number) {}
 function fn(Array: number) {}
 				`,
 				Options: map[string]interface{}{"builtinGlobals": true},
-				Globals: map[string]bool{"Array": false},
+				Globals: map[string]any{"Array": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "noShadowGlobal",

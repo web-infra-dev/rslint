@@ -67,6 +67,7 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 // runProgramOptions is the internal per-program input to runLintRulesInProgram.
 type runProgramOptions struct {
 	Program          *compiler.Program
+	Cwd              string
 	Scope            FileScope
 	ExcludePaths     []string
 	FileFilter       FileFilter
@@ -208,9 +209,19 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker)
 		}
 
+		// One lazy byte-order-mark answer shared by every rule in this file.
+		// The mark is gone from the text by the time the file is parsed, so
+		// answering means going back to whatever produced that text; a file no
+		// rule asks about never does.
+		var sourceBOM *rule.SourceBOM
+		if opts.Program != nil {
+			sourceBOM = rule.NewSourceBOM(opts.Program.Host().FS(), file.FileName())
+		}
+
 		for ruleIndex, r := range rules {
 			ctx := rule.RuleContext{
 				SourceFile:     file,
+				Cwd:            opts.Cwd,
 				Program:        opts.Program,
 				Settings:       r.Settings,
 				ConfigGlobals:  r.Globals,
@@ -218,6 +229,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				Comments:       comments,
 				Refs:           refs,
+				BOM:            sourceBOM,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 			}.WithDiagnosticConsumer(
@@ -511,6 +523,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 			programOpts := runProgramOptions{
 				Program:              program,
+				Cwd:                  opts.Cwd,
 				Scope:                opts.Scope,
 				ExcludePaths:         opts.ExcludePaths,
 				FileFilter:           filter,
@@ -758,6 +771,7 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	}
 	runLintRulesInProgram(runProgramOptions{
 		Program:          opts.Program,
+		Cwd:              opts.Cwd,
 		ExcludePaths:     opts.ExcludePaths,
 		TargetFiles:      []string{opts.File},
 		HasTargetFiles:   true,

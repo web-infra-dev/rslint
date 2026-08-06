@@ -218,6 +218,11 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
       tests: path.resolve(__dirname, './suite-eslint-plugins'),
     },
+    {
+      name: 'unicode-bom tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-unicode-bom'),
+      tests: path.resolve(__dirname, './suite-unicode-bom'),
+    },
   ];
 
   const failures: unknown[] = [];

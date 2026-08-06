@@ -155,8 +155,8 @@ func TestNoAlertRule(t *testing.T) {
 			// Config `off` un-declares `globalThis` (only the globalThis
 			// receiver path consults globals in ESLint)
 			// ================================================================
-			{Code: `globalThis.alert("x");`, Globals: map[string]bool{"globalThis": false}},
-			{Code: `globalThis["alert"]("x");`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `globalThis.alert("x");`, Globals: map[string]any{"globalThis": "off"}},
+			{Code: `globalThis["alert"]("x");`, Globals: map[string]any{"globalThis": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ================================================================
@@ -567,14 +567,14 @@ func TestNoAlertRule(t *testing.T) {
 			// `window` receiver has no existence check (unlike `globalThis`).
 			{
 				Code:    `alert("x");`,
-				Globals: map[string]bool{"alert": false},
+				Globals: map[string]any{"alert": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `window.alert("x");`,
-				Globals: map[string]bool{"window": false},
+				Globals: map[string]any{"window": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},

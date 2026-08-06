@@ -1,10 +1,14 @@
 package config
 
-import "testing"
+import (
+	"testing"
 
-// ExtractGlobals preserves the declared/disabled state needed by native rules.
-// Access aliases, including null-as-readonly, remain declared; only "off"
-// explicitly disables a name.
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+// ExtractGlobals resolves every alias ESLint accepts to one of its three access
+// levels. Booleans follow the `globals` npm package: true is writable, false is
+// readonly.
 func TestExtractGlobals(t *testing.T) {
 	langOpts := &LanguageOptions{
 		Raw: map[string]any{
@@ -19,23 +23,25 @@ func TestExtractGlobals(t *testing.T) {
 				"readable":       "readable",
 				"nullReadonly":   nil,
 				"stringDisabled": "off",
+				"invalid":        "nonsense",
 			},
 		},
 	}
 
 	globals := ExtractGlobals(langOpts)
 
-	cases := map[string]bool{
-		"boolTrue":       true,
-		"stringTrue":     true,
-		"writable":       true,
-		"writeable":      true,
-		"boolFalse":      true,
-		"stringFalse":    true,
-		"readonly":       true,
-		"readable":       true,
-		"nullReadonly":   true,
-		"stringDisabled": false,
+	cases := map[string]utils.GlobalAccess{
+		"boolTrue":       utils.GlobalAccessWritable,
+		"stringTrue":     utils.GlobalAccessWritable,
+		"writable":       utils.GlobalAccessWritable,
+		"writeable":      utils.GlobalAccessWritable,
+		"boolFalse":      utils.GlobalAccessReadonly,
+		"stringFalse":    utils.GlobalAccessReadonly,
+		"readonly":       utils.GlobalAccessReadonly,
+		"readable":       utils.GlobalAccessReadonly,
+		"nullReadonly":   utils.GlobalAccessReadonly,
+		"stringDisabled": utils.GlobalAccessOff,
+		"invalid":        utils.GlobalAccessUnset,
 	}
 	for name, want := range cases {
 		if got := globals[name]; got != want {
@@ -85,7 +91,7 @@ func TestMergeLanguageOptions_MergesGlobalsByName(t *testing.T) {
 	if got := rawGlobals["shared"]; got != "off" {
 		t.Errorf("shared = %v, want off", got)
 	}
-	if got := ExtractGlobals(merged)["shared"]; got {
-		t.Error("later off value should undeclare shared")
+	if got := ExtractGlobals(merged)["shared"]; got != utils.GlobalAccessOff {
+		t.Errorf("later off value should undeclare shared, got %v", got)
 	}
 }

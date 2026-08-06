@@ -1645,7 +1645,7 @@ func TestApplyFixPassReturnsWriteError(t *testing.T) {
 
 	fixed, err := applyFixPass(map[string][]rule.RuleDiagnostic{
 		directoryPath: {diagnostic},
-	})
+	}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 	if err == nil {
 		t.Fatal("expected a write error")
 		return

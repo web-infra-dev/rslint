@@ -61,7 +61,7 @@ func TestNoNewSymbolRule(t *testing.T) {
 
 			// Config `/* global Symbol: off */` un-declares the builtin, so it
 			// no longer resolves to a known global.
-			{Code: `new Symbol();`, Globals: map[string]bool{"Symbol": false}},
+			{Code: `new Symbol();`, Globals: map[string]any{"Symbol": "off"}},
 		},
 		// Invalid cases — Symbol refers to the global built-in
 		[]rule_tester.InvalidTestCase{
@@ -178,7 +178,7 @@ func TestNoNewSymbolRule(t *testing.T) {
 			// Config declares Symbol as a writable global — still the builtin.
 			{
 				Code:    `new Symbol();`,
-				Globals: map[string]bool{"Symbol": true},
+				Globals: map[string]any{"Symbol": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noNewSymbol", Line: 1, Column: 5},
 				},

@@ -3,14 +3,14 @@ package valid_expect
 import (
 	_ "embed"
 	"fmt"
-	"slices"
-	"strconv"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	"slices"
+	"strconv"
 )
 
 //go:embed valid_expect.schema.json
@@ -227,7 +227,7 @@ func isPromiseMethodCall(node *ast.Node) bool {
 		return false
 	}
 
-	return utils.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
+	return testFramework.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
 }
 
 func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {

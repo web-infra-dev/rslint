@@ -397,8 +397,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 }
 
 func isGlobalOff(ctx rule.RuleContext, name string) bool {
-	declared, ok := ctx.Globals[name]
-	return ok && !declared
+	return ctx.Globals[name] == utils.GlobalAccessOff
 }
 
 func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {

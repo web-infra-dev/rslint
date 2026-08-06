@@ -387,19 +387,11 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 			continue
 		}
 		text := tsf.Text()
-		// The worker computes every offset against the BOM-STRIPPED source (it
-		// slices a leading BOM before parsing). When the rebuild frame KEEPS a
-		// leading BOM — the LSP overlay, whose frame must match the BOM-inclusive
-		// editor document + native diagnostics + the with-BOM content source.fix-
-		// All splices into — shift every worker offset past the BOM into this
-		// frame. The CLI frame (ts-go SourceFile) is already BOM-stripped, so the
-		// shift is 0 there.
-		bomShift := 0
-		if strings.HasPrefix(text, utf8BOM) {
-			bomShift = len(utf8BOM)
-		}
+		// The worker computes every offset against the BOM-stripped source (it
+		// slices a leading BOM before parsing), which is the one coordinate
+		// space rslint uses as well — see eslintPluginSourceFile. So worker
+		// offsets land in this frame as they stand.
 		clamp := func(p int) int {
-			p += bomShift
 			if p < 0 {
 				return 0
 			}
@@ -471,14 +463,12 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 //     divergence can be byte-shifted (the clamp keeps it in-bounds — never a
 //     panic). The LSP path is immune: it ships req.text and rebuilds against
 //     that identical string.
-//   - LSP: f.Text is the overlay string the worker linted, kept VERBATIM
-//     (including any leading BOM). The LSP editor document and the native
-//     diagnostics are BOM-inclusive (ts-go's scanner treats a leading BOM as
-//     whitespace but keeps it in the text with inclusive positions), and
-//     source.fixAll splices into the with-BOM overlay \u2014 so the plugin frame must
-//     keep the BOM too. The worker reports BOM-stripped offsets (it slices the
-//     BOM before parsing); applyEslintPluginResults shifts them back past the
-//     BOM into this frame (see bomShift).
+//   - LSP: f.Text is the overlay string the worker linted, minus a leading
+//     BOM. A byte order mark is never part of the text an offset indexes \u2014 the
+//     worker slices it before parsing, ts-go decodes it away, and rslint strips
+//     it from caller-supplied source for the same reason \u2014 so stripping it here
+//     puts plugin diagnostics, native diagnostics and source.fixAll in one
+//     coordinate space.
 //
 // ok=false only if the caller supplied neither (defensive).
 func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) {
@@ -486,7 +476,7 @@ func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) 
 		return f.SourceFile, true
 	}
 	if f.Text != nil {
-		return newTextSourceFile(*f.Text), true
+		return newTextSourceFile(strings.TrimPrefix(*f.Text, utf8BOM)), true
 	}
 	return nil, false
 }

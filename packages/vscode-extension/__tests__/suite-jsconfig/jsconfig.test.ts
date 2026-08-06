@@ -332,10 +332,10 @@ export default [{
     const rootConfigPath = path.join(root, 'rslint.config.js');
     const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
     const nestedDir = path.join(root, 'parent-ignore-catalog-probe');
-    const nestedConfigPath = path.join(nestedDir, 'rslint.config.mjs');
     const nestedFilePath = path.join(nestedDir, 'index.ts');
     const loadMarkerPath = path.join(nestedDir, 'config-loads.txt');
     const rootDoc = await openFixture('index.ts');
+    let nestedDoc: vscode.TextDocument | undefined;
 
     const ignoredRootConfig = originalRootConfig
       .replace(
@@ -349,25 +349,19 @@ export default [{
 
     await withFailClosedCleanup(
       async () => {
-        fs.mkdirSync(nestedDir, { recursive: true });
-        fs.writeFileSync(nestedFilePath, 'console.log("nested");\n', 'utf8');
-        fs.writeFileSync(
-          nestedConfigPath,
-          `import fs from 'node:fs';
-fs.appendFileSync(${JSON.stringify(loadMarkerPath)}, 'x');
-export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
-`,
-          'utf8',
-        );
-
-        const nestedDoc =
-          await vscode.workspace.openTextDocument(nestedFilePath);
+        nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
         await vscode.window.showTextDocument(nestedDoc);
         await waitForDiagnostics(nestedDoc, (diagnostics) =>
           diagnostics.some((diagnostic) =>
             diagnostic.message.includes('Unexpected console statement'),
           ),
         );
+        assert.notStrictEqual(
+          fs.readFileSync(loadMarkerPath, 'utf8'),
+          '',
+          'The nested config evaluation probe must be armed before refresh',
+        );
+        fs.writeFileSync(loadMarkerPath, '', 'utf8');
 
         await vscode.window.showTextDocument(rootDoc);
         const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
@@ -388,7 +382,7 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
 
         assert.strictEqual(
           fs.readFileSync(loadMarkerPath, 'utf8'),
-          'x',
+          '',
           'The ignored nested candidate must not be evaluated again',
         );
         assert.ok(
@@ -401,19 +395,32 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
         );
       },
       async () => {
-        const restored = waitForDiagnostics(
-          rootDoc,
-          (diagnostics) =>
-            diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-unsafe-member-access'),
-            ) &&
-            !diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-explicit-any'),
-            ),
+        await withFailClosedCleanup(
+          async () => closeTextEditor(nestedDoc),
+          async () => {
+            await withFailClosedCleanup(
+              async () => {
+                const restored = waitForDiagnostics(
+                  rootDoc,
+                  (diagnostics) =>
+                    diagnostics.some((diagnostic) =>
+                      diagnostic.message.includes('no-unsafe-member-access'),
+                    ) &&
+                    !diagnostics.some((diagnostic) =>
+                      diagnostic.message.includes('no-explicit-any'),
+                    ),
+                );
+                fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+                await restored;
+              },
+              async () => {
+                fs.rmSync(loadMarkerPath, { force: true });
+              },
+              'Parent-ignore catalog state cleanup',
+            );
+          },
+          'Parent-ignore catalog resource cleanup',
         );
-        fs.rmSync(nestedDir, { recursive: true, force: true });
-        fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-        await restored;
       },
       'Parent-ignore catalog test',
     );

@@ -19,6 +19,7 @@ export default defineConfig({
     './tests/cli/js-config/config-discovery.test.ts',
     './tests/cli/js-config/dir-args.test.ts',
     './tests/cli/js-config/config-ignores-filter.test.ts',
+    './tests/cli/js-config/language-options-globals.test.ts',
     './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',
@@ -139,6 +140,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-cycle.test.ts',
     './tests/eslint-plugin-import/rules/no-default-export.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
+    './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
@@ -495,6 +497,7 @@ export default defineConfig({
     './tests/eslint/rules/require-await.test.ts',
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
+    './tests/eslint/rules/unicode-bom.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',

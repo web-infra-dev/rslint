@@ -65,7 +65,7 @@ func TestNoAsyncPromiseExecutorRule(t *testing.T) {
 			{Code: `new Promise(...[async () => {}])`},
 			// Only global Promise references are checked.
 			{Code: `/* global Promise:off */ new Promise(async (resolve, reject) => {})`},
-			{Code: `new Promise(async (resolve, reject) => {})`, Globals: map[string]bool{"Promise": false}},
+			{Code: `new Promise(async (resolve, reject) => {})`, Globals: map[string]any{"Promise": "off"}},
 			{Code: `let Promise; new Promise(async (resolve, reject) => {})`},
 			{Code: `function f() { new Promise(async (resolve, reject) => {}); var Promise; }`},
 			{Code: `function f(Promise) { new Promise(async (resolve, reject) => {}); }`},

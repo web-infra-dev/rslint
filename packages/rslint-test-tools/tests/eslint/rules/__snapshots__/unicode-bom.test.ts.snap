@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`unicode-bom > invalid 1`] = `
+{
+  "code": "﻿ var a = 123;",
+  "diagnostics": [
+    {
+      "message": "Unexpected Unicode BOM (Byte Order Mark).",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "unicode-bom",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unicode-bom > invalid 2`] = `
+{
+  "code": "﻿ var a = 123;",
+  "diagnostics": [
+    {
+      "message": "Unexpected Unicode BOM (Byte Order Mark).",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "unicode-bom",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unicode-bom > invalid 3`] = `
+{
+  "code": " var a = 123;",
+  "diagnostics": [
+    {
+      "message": "Expected Unicode BOM (Byte Order Mark).",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "unicode-bom",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

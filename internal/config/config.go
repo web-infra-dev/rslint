@@ -278,7 +278,7 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 		if name != strings.TrimSpace(name) {
 			return fmt.Errorf("key \"languageOptions.globals\": global %q has leading or trailing whitespace", name)
 		}
-		if !isValidGlobalAccess(access) {
+		if _, valid := utils.NormalizeGlobalAccess(access); !valid {
 			return fmt.Errorf(
 				"key \"languageOptions.globals\": global %q has invalid access %v; expected a boolean, null, \"true\", \"false\", \"readonly\", \"readable\", \"writable\", \"writeable\", or \"off\"",
 				name,
@@ -287,19 +287,6 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 		}
 	}
 	return nil
-}
-
-func isValidGlobalAccess(value any) bool {
-	switch value := value.(type) {
-	case nil, bool:
-		return true
-	case string:
-		switch value {
-		case "true", "writable", "writeable", "false", "readonly", "readable", "off":
-			return true
-		}
-	}
-	return false
 }
 
 func validateConfigRules(rules Rules) error {
@@ -958,11 +945,11 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 }
 
 // ExtractGlobals reads the effective `languageOptions.globals` for a merged
-// config and normalizes it to a simple "is this name declared" set.
+// config and normalizes every authored alias to its access level.
 //
-// Writable and readonly aliases both declare the name. As in ESLint v10, null
-// normalizes to readonly; only the string "off" disables a declaration.
-func ExtractGlobals(langOpts *LanguageOptions) map[string]bool {
+// Values ValidateConfig rejects are dropped here rather than guessed at, so a
+// config that skipped validation behaves as if it never mentioned the name.
+func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 	if langOpts == nil || langOpts.Raw == nil {
 		return nil
 	}
@@ -970,9 +957,11 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]bool {
 	if !ok {
 		return nil
 	}
-	globals := make(map[string]bool, len(raw))
+	globals := make(map[string]utils.GlobalAccess, len(raw))
 	for name, value := range raw {
-		globals[name] = value != "off"
+		if access, ok := utils.NormalizeGlobalAccess(value); ok {
+			globals[name] = access
+		}
 	}
 	return globals
 }

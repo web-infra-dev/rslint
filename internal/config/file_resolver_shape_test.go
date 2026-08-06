@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestConfigShapeResolutionMatchesLegacyAlgorithm(t *testing.T) {
@@ -288,7 +289,7 @@ func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 type configuredRuleView struct {
 	name               string
 	settings           map[string]interface{}
-	globals            map[string]bool
+	globals            map[string]utils.GlobalAccess
 	severity           int
 	requiresTypeInfo   bool
 	isEslintPluginRule bool
