@@ -110,7 +110,7 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `myConfiguredGlobal;`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
 
 			// === "off" global with a same-file declaration: the binding wins ===
-			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]bool{"myOffGlobal123": false}},
+			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]any{"myOffGlobal123": "off"}},
 
 			// === ES2025 built-in ===
 			{Code: `var buf = new Float16Array(8);`},
@@ -374,7 +374,7 @@ func TestNoUndefRule(t *testing.T) {
 			},
 			{
 				Code:    `setTimeout(() => {}, 100);`,
-				Globals: map[string]bool{"setTimeout": false},
+				Globals: map[string]any{"setTimeout": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
 				},
