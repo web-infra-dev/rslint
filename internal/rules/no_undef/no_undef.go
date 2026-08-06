@@ -9,6 +9,13 @@ import (
 )
 
 // https://eslint.org/docs/latest/rules/no-undef
+//
+// ctx.Refs.Resolve() walks the binder's lexical scope chain first — the same
+// model ESLint's own no-undef uses, and enough on its own, which is what
+// makes this rule useful on plain JS and other files no type checker runs
+// on. When a TypeChecker is available for the file, Resolve() falls back to
+// it for anything the scope walk can't place, so this rule also recognizes
+// DOM/Node globals and other names known only to the type checker there.
 
 type options struct {
 	checkTypeof bool
@@ -26,16 +33,12 @@ func parseOptions(opts any) options {
 }
 
 var NoUndefRule = rule.Rule{
-	Name:             "no-undef",
-	RequiresTypeInfo: true,
+	Name: "no-undef",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
-		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
-		// gap files / inferred-project files, but if a future caller bypasses
-		// the filter we still want to no-op rather than nil-deref.
-		if ctx.TypeChecker == nil {
+		if ctx.Refs == nil {
 			return rule.RuleListeners{}
 		}
 
@@ -46,27 +49,32 @@ var NoUndefRule = rule.Rule{
 					return
 				}
 
-				// For ShorthandPropertyAssignment ({x}), GetSymbolAtLocation
-				// returns the property symbol which always exists. Use
-				// GetShorthandAssignmentValueSymbol to check the value reference.
-				if node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-					valueSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-					if valueSym != nil {
+				name := node.Text()
+
+				// languageOptions.globals / /* global */ comments (merged into
+				// ctx.Globals) take priority over built-ins and over the
+				// checker's lib knowledge; both map lookups come before the
+				// resolver so references to declared or built-in globals never
+				// pay for a failing scope walk plus a checker round trip.
+				if configured, ok := ctx.Globals[name]; ok {
+					if configured {
+						return
+					}
+					// An explicit "off" entry un-declares the global: only a
+					// binding this file itself declares can still satisfy the
+					// reference. A symbol the checker fallback found in lib or
+					// ambient declarations elsewhere is the very global that
+					// was switched off, so it still reports.
+					if sym := ctx.Refs.Resolve(node); utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
 						return
 					}
 				} else {
-					sym := ctx.TypeChecker.GetSymbolAtLocation(node)
-					if sym != nil {
+					if utils.IsECMAScriptGlobal(name) {
 						return
 					}
-				}
-
-				name := node.Text()
-
-				// Skip identifiers declared via languageOptions.globals or
-				// /* global */ comments (merged into ctx.Globals by the linter).
-				if ctx.Globals[name] {
-					return
+					if ctx.Refs.Resolve(node) != nil {
+						return
+					}
 				}
 
 				ctx.ReportNode(node, rule.RuleMessage{
@@ -89,10 +97,15 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	parent := node.Parent
 
 	// Skip declaration names (var x, function x, class x, import x, etc.)
-	// Exception: ShorthandPropertyAssignment names ({x}) are declaration names
-	// but also value references, so they must NOT be skipped.
+	// Exceptions: ShorthandPropertyAssignment names ({x}) and the name of a
+	// non-aliased local export (export { x }) are declaration names but also
+	// value references, so they must NOT be skipped. Re-exports
+	// (export { x } from 'mod') reference the other module's binding instead,
+	// and the alias label of export { x as y } is only a label.
 	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment {
-		return true
+		if parent.Kind != ast.KindExportSpecifier || parent.PropertyName() != nil || utils.IsReExportSpecifier(parent) {
+			return true
+		}
 	}
 
 	// Skip property names in member access (obj.prop -> skip "prop")
@@ -155,6 +168,35 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	// Skip enum member names
 	if parent.Kind == ast.KindEnumMember && parent.Name() == node {
 		return true
+	}
+
+	// Skip meta-property names (`target` in `new.target`, `meta` in
+	// `import.meta`, `defer` in `import.defer`) — syntactic, not identifiers
+	// that reference a variable.
+	if parent.Kind == ast.KindMetaProperty {
+		return true
+	}
+
+	// Skip import attribute keys (`type` in `with { type: "json" }`) —
+	// syntactic names, not references to same-named variables.
+	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
+		return true
+	}
+
+	// Skip the namespace/name parts of a namespaced JSX tag or attribute
+	// (`<foo:bar attr:name="v" />`) — syntactic, never variable references.
+	if parent.Kind == ast.KindJsxNamespacedName {
+		return true
+	}
+
+	// Skip lowercase JSX tag names (`<div>`): these are JSX intrinsics, not
+	// identifier references. Uppercase tag names (`<Foo>`) reference a
+	// component value and are checked normally.
+	if ast.IsJsxTagName(node) {
+		text := node.Text()
+		if len(text) == 0 || (text[0] >= 'a' && text[0] <= 'z') {
+			return true
+		}
 	}
 
 	return false
