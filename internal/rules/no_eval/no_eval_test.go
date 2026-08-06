@@ -397,7 +397,7 @@ func TestNoEvalRule(t *testing.T) {
 			// does not declare them.
 			{
 				Code:    `global.eval('foo')`,
-				Globals: map[string]bool{"global": true},
+				Globals: map[string]any{"global": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 8},
 				},
