@@ -434,8 +434,8 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			},
 
 			// ---- Dimension 4: TypeScript records no module resolution for either of
-			// these `require` shapes, so both reach their target through the relative
-			// specifier probe. ESTree has no parenthesized-expression node, so
+			// these `require` shapes, so both reach their target through TypeScript's
+			// resolver instead. ESTree has no parenthesized-expression node, so
 			// upstream reads through the parentheses and reports the call. ----
 			{
 				Code:     `const b = (require)("../server/b")`,

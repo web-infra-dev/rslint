@@ -33,26 +33,32 @@ func ResolveSourceFileFromSourceFile(ctx rule.RuleContext, sourceFile *ast.Sourc
 // resolver does, and reports the Program's source file for the result when it
 // has one.
 //
-// TypeScript's own resolution is the first source of truth, but it only covers
-// specifiers TypeScript collected while building the Program: every `import`
+// TypeScript's own resolution is the source of truth, but the Program's cache
+// only covers specifiers TypeScript collected while building it: every `import`
 // and `export`, plus `import()` and — in JavaScript files only — `require()`
 // calls written as a bare `require` identifier with exactly one argument. A
 // `require('./x')` in a TypeScript file, or a `(require)('./x')` anywhere, is
-// therefore absent from that cache even though upstream resolves both. Those
-// fall through to a probe of the relative specifier against the files already
-// loaded into the Program, which also covers the extension-substitution cases
-// upstream still treats as edges, and then to TypeScript's own resolver, which
-// is what reaches a package specifier.
+// therefore absent from that cache even though upstream resolves both, so those
+// run through TypeScript's resolver here instead, under the same compiler
+// options the Program was built with. Only a specifier neither answers with a
+// loaded file falls back to probing the relative specifier against the files
+// already in the Program, which covers the extension-substitution cases
+// upstream still treats as edges.
 func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	if ctx.Program == nil || sourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
 
-	cached := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
 	resolvedPath := ""
-	if cached != nil {
+	if cached := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier); cached != nil {
 		resolvedPath = cached.ResolvedFileName
+	} else {
+		// A nil cache entry means TypeScript never collected this specifier, rather
+		// than that it tried and failed, so resolving it costs a walk TypeScript has
+		// not already done. Specifiers TypeScript did try and fail on stay failed.
+		resolvedPath = resolveWithModuleResolver(ctx, sourceFile, moduleSpecifier)
 	}
+
 	if resolvedPath != "" {
 		if target := ctx.Program.GetSourceFileForResolvedModule(resolvedPath); target != nil {
 			return resolvedPath, target, true
@@ -61,15 +67,6 @@ func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpeci
 
 	if target := resolveRelativeFromLoadedFiles(ctx, sourceFile, moduleSpecifier.Text()); target != nil {
 		return target.FileName(), target, true
-	}
-
-	// A nil cache entry means TypeScript never collected this specifier, rather
-	// than that it tried and failed, so resolving it costs a walk TypeScript has
-	// not already done. Specifiers TypeScript did try and fail on stay failed.
-	if cached == nil {
-		if resolved := resolveWithModuleResolver(ctx, sourceFile, moduleSpecifier); resolved != "" {
-			return resolved, ctx.Program.GetSourceFileForResolvedModule(resolved), true
-		}
 	}
 
 	// TypeScript named a file the Program never loaded, such as one outside the
@@ -81,8 +78,9 @@ func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpeci
 }
 
 // resolveWithModuleResolver runs TypeScript's own module resolution for a
-// specifier the Program never collected. Package specifiers reach it, since
-// they carry no relative path to probe against the loaded files.
+// specifier the Program never collected, so that it answers under the same
+// compiler options — `moduleSuffixes`, `paths`, `rootDirs` — every specifier
+// TypeScript did collect was resolved under.
 func resolveWithModuleResolver(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) string {
 	resolver := module.NewResolver(ctx.Program.Host(), ctx.Program.Options(), "", "")
 	mode := ctx.Program.GetModeForUsageLocation(sourceFile, moduleSpecifier)
