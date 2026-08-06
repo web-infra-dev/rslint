@@ -427,18 +427,28 @@ func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
 	return cleanupDeprecatedReason(lastMatch[1])
 }
 
-type noDeprecatedOptions struct {
-	Allow []utils.TypeOrValueSpecifier `json:"allow"`
-}
-
-func parseAllowSpecifiers(options any) []utils.TypeOrValueSpecifier {
-	opts := noDeprecatedOptions{Allow: []utils.TypeOrValueSpecifier{}}
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
+// parseAllowSpecifiers decodes the `allow` option — type specifiers written
+// either in the string shorthand or in object form — through
+// TypeOrValueSpecifier's own UnmarshalJSON rather than re-deriving both shapes
+// by hand.
+func parseAllowSpecifiers(options []any) []utils.TypeOrValueSpecifier {
+	optsMap := utils.GetOptionsMap(options)
+	if optsMap == nil {
+		return nil
 	}
-	return opts.Allow
+	raw, ok := optsMap["allow"]
+	if !ok {
+		return nil
+	}
+	rawJSON, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var allow []utils.TypeOrValueSpecifier
+	if err := json.Unmarshal(rawJSON, &allow); err != nil {
+		return nil
+	}
+	return allow
 }
 
 func mostSpecificNodeContainingRange(node *ast.Node, position int, end int) *ast.Node {
@@ -1689,8 +1699,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 	Name:             "no-deprecated",
 	RequiresTypeInfo: true,
 	Schema:           rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
