@@ -52,6 +52,11 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`},
 			{Code: `namespace RegExp {} RegExp('\\1(a)');`},
 			{Code: `/* globals RegExp:off */ new RegExp('\\1(a)');`},
+			{Code: `new RegExp('(\\1)')`, Globals: map[string]any{"RegExp": "off"}},
+			{Code: `window.RegExp('(\\1)')`},
+			{Code: `window.RegExp('(\\1)')`, Globals: map[string]any{"window": "off"}},
+			{Code: `globalThis.RegExp('(\\1)')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: `const window = { RegExp }; window.RegExp('(\\1)')`, Globals: map[string]any{"window": "readonly"}},
 
 			// ---- no capturing groups ----
 			{Code: `/(?:)/`},
@@ -228,6 +233,26 @@ RegExp(new String('\\1(a)'));`},
 
 			// ---- nested ----
 			{Code: `new RegExp('(\\1)')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
+			{
+				Code:     `new RegExp('(\\1)')`,
+				TSConfig: "tsconfig.noLib.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `globalThis.RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `window.RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off", "window": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `window['RegExp']('(\\1)')`,
+				Globals: map[string]any{"window": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
 			{Code: `/^(a\1)$/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
 			{Code: `/^((a)\1)$/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
 			{Code: `new RegExp('^(a\\1b)$')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},

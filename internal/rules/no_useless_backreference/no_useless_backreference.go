@@ -249,46 +249,35 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *
 	if callee == nil {
 		return false
 	}
-	// Config `off` un-declares `RegExp`: the constructor path goes dead and
-	// regex-literal arguments fall back to the plain literal listener, matching
-	// ESLint's ReferenceTracker walk over the global scope.
-	if !ctx.Globals.Access("RegExp").IsDeclared() {
-		return false
-	}
 	if callee.Kind == ast.KindIdentifier {
 		name := callee.AsIdentifier().Text
 		if name == "RegExp" {
-			// Direct `RegExp` reference — must not be shadowed.
-			// RefStore resolves same-file bindings with the binder's scope walk,
-			// avoiding IsShadowed's repeated scans of enclosing statements. Its
-			// checker fallback still recognizes the standard-library global and
-			// ambient augmentations.
-			if ctx.Refs != nil {
-				if sym := ctx.Refs.Resolve(callee); sym != nil {
-					return !utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)
-				}
-				// With a checker, failure to resolve is authoritative. Without one,
-				// globals are outside RefStore's binder-only scope, so retain the
-				// syntactic fallback below.
-				if ctx.TypeChecker != nil {
-					return false
-				}
-			}
-			if utils.IsShadowed(callee, "RegExp") {
+			// A direct reference starts from the `RegExp` variable in ESLint's
+			// effective global scope. Config/inline `off` removes that binding,
+			// while a declaration in this file shadows it even when TypeScript's
+			// checker merges the declaration with lib.d.ts.
+			if !ctx.Globals.Access("RegExp").IsDeclared() {
 				return false
 			}
-			if ctx.TypeChecker != nil {
-				sym := ctx.TypeChecker.GetSymbolAtLocation(callee)
-				if sym == nil {
+			if ctx.Refs != nil {
+				if ctx.Refs.ResolveInFile(callee) != nil {
 					return false
 				}
-				return !utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile)
 			}
-			return true
+			// NameResolver does not surface every TypeScript value declaration
+			// here (notably an identifier-named namespace), so retain the
+			// syntactic check as the binder-only fallback.
+			return !utils.IsShadowed(callee, "RegExp")
 		}
 		// Identifier alias such as `const r = RegExp; new r(...)` — only the
 		// type check can recognize this. No syntactic fallback to avoid
 		// over-matching arbitrary identifiers when type info is unavailable.
+		// Retain the bare binding's availability gate for type-only/flow aliases:
+		// the checker can prove constructor identity, but cannot create an ESLint
+		// global variable that config or an inline directive removed.
+		if !ctx.Globals.Access("RegExp").IsDeclared() {
+			return false
+		}
 		if ctx.TypeChecker != nil && ctx.Program != nil {
 			t := ctx.TypeChecker.GetTypeAtLocation(callee)
 			if t == nil {
@@ -306,13 +295,24 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *
 		}
 		return false
 	}
-	if callee.Kind == ast.KindPropertyAccessExpression {
-		pae := callee.AsPropertyAccessExpression()
-		if pae.Name() != nil && pae.Name().Kind == ast.KindIdentifier && pae.Name().AsIdentifier().Text == "RegExp" {
-			if pae.Expression != nil && pae.Expression.Kind == ast.KindIdentifier {
-				name := pae.Expression.AsIdentifier().Text
-				return name == "globalThis" || name == "window" || name == "self" || name == "global"
-			}
+
+	// `globalThis.RegExp` and host equivalents start from the global-object
+	// variable, not from the bare `RegExp` variable. Turning `RegExp` off does
+	// not remove that object's property; conversely, a host root such as
+	// `window` exists only when the effective globals declare it.
+	if ast.IsAccessExpression(callee) {
+		property, ok := utils.AccessExpressionStaticName(callee)
+		if !ok || property != "RegExp" {
+			return false
+		}
+		object := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(callee))
+		if object == nil || object.Kind != ast.KindIdentifier {
+			return false
+		}
+		name := object.AsIdentifier().Text
+		switch name {
+		case "globalThis", "window", "self", "global":
+			return ctx.Globals.Access(name).IsDeclared() && !utils.IsShadowed(object, name)
 		}
 	}
 	return false

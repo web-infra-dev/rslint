@@ -21,6 +21,23 @@ ruleTester.run('no-useless-backreference', {
     String.raw`function foo() { var RegExp; RegExp('\\1(a)', 'u'); }`,
     String.raw`function foo(RegExp) { new RegExp('\\1(a)'); }`,
     String.raw`if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`,
+    {
+      code: String.raw`new RegExp('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+    },
+    String.raw`window.RegExp('(\\1)')`,
+    {
+      code: String.raw`window.RegExp('(\\1)')`,
+      languageOptions: { globals: { window: 'off' } },
+    },
+    {
+      code: String.raw`globalThis.RegExp('(\\1)')`,
+      languageOptions: { ecmaVersion: 2019 },
+    },
+    {
+      code: String.raw`const window = { RegExp }; window.RegExp('(\\1)')`,
+      languageOptions: { globals: { window: 'readonly' } },
+    },
 
     // No capturing groups
     '/(?:)/',
@@ -240,6 +257,25 @@ ruleTester.run('no-useless-backreference', {
     {
       code: String.raw`/((?<foo>bar)|(?<foo>baz\k<foo>)|(?<foo>qux\k<foo>))/`,
       errors: [{ messageId: 'nested' }, { messageId: 'nested' }],
+    },
+
+    // Effective global bindings and global-object properties are independent.
+    {
+      code: String.raw`globalThis.RegExp('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`window.RegExp('(\\1)')`,
+      languageOptions: {
+        globals: { RegExp: 'off', window: 'readonly' },
+      },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`window['RegExp']('(\\1)')`,
+      languageOptions: { globals: { window: 'readonly' } },
+      errors: [{ messageId: 'nested' }],
     },
   ],
 });

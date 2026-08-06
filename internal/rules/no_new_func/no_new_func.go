@@ -49,7 +49,9 @@ var NoNewFuncRule = rule.Rule{
 			if ctx.TypeChecker != nil {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(id)
 				if symbol == nil {
-					return false
+					// The effective ESLint globals remain authoritative when the
+					// TypeScript program omits its default libraries (`noLib`).
+					return true
 				}
 				return !utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 			}
