@@ -56,8 +56,8 @@ var NoUndefRule = rule.Rule{
 				// checker's lib knowledge; both map lookups come before the
 				// resolver so references to declared or built-in globals never
 				// pay for a failing scope walk plus a checker round trip.
-				if configured, ok := ctx.Globals[name]; ok {
-					if configured {
+				if access, ok := ctx.Globals[name]; ok {
+					if access.IsDeclared() {
 						return
 					}
 					// An explicit "off" entry un-declares the global: only a

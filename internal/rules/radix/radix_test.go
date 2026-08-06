@@ -139,7 +139,7 @@ func TestRadixRule(t *testing.T) {
 
 			// ---- Config-declared / `/* global */` comment `off` un-declares the builtin ----
 			{Code: `/* globals parseInt:off */ parseInt(foo);`},
-			{Code: `Number.parseInt(foo);`, Globals: map[string]bool{"Number": false}},
+			{Code: `Number.parseInt(foo);`, Globals: map[string]any{"Number": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Missing parameters (+ exact message + full range) ----
@@ -838,7 +838,7 @@ func TestRadixRule(t *testing.T) {
 			// ---- Config declares parseInt as a writable global — still the builtin. ----
 			{
 				Code:    `parseInt("10");`,
-				Globals: map[string]bool{"parseInt": true},
+				Globals: map[string]any{"parseInt": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "missingRadix",

@@ -76,7 +76,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `function fake(pattern: string, flags: string) {} (RegExp, fake)("[👍]", "");`},
 			{Code: `function run(RegExp = RegExp) { RegExp("[👍]", ""); }`},
 			{Code: `const key = "RegExp"; globalThis[key]("[👍]", "");`},
-			{Code: `RegExp("[👍]", "");`, Globals: map[string]bool{"RegExp": false}},
+			{Code: `RegExp("[👍]", "");`, Globals: map[string]any{"RegExp": "off"}},
 			{Code: `const R = RegExp; R(/[👍]/, "u");`},
 			{Code: `const R = RegExp; const flags = getFlags(); R(/[👍]/, flags);`},
 
@@ -921,7 +921,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			},
 			{
 				Code:    `Alias = RegExp; Alias("[Á]", "");`,
-				Globals: map[string]bool{"Alias": true},
+				Globals: map[string]any{"Alias": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
@@ -972,14 +972,14 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			},
 			{
 				Code:    `Alias = RegExp; { namespace Alias {} Alias("[Á]", ""); } Alias("[Á]", "");`,
-				Globals: map[string]bool{"Alias": true},
+				Globals: map[string]any{"Alias": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
 			},
 			{
 				Code:    `globalThis.RegExp("[Á]", "");`,
-				Globals: map[string]bool{"RegExp": false},
+				Globals: map[string]any{"RegExp": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},

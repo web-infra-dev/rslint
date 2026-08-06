@@ -407,7 +407,7 @@ func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinG
 	for _, declaration := range ctx.InlineGlobals {
 		// ESLint removes a name from the global scope when its final inline
 		// setting is off, including all earlier comments for that name.
-		if !declaration.Declared || len(declaration.NameRanges) == 0 {
+		if !declaration.Access.IsDeclared() || len(declaration.NameRanges) == 0 {
 			continue
 		}
 		if result.inlineByName == nil {
@@ -437,7 +437,7 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 		}
 		isTypeScriptTypeGlobal := declarations.defaultLibraryTypeGlobals[name]
 		if utils.IsECMAScriptGlobal(name) || isTypeScriptTypeGlobal {
-			if configured, exists := declarations.ctx.ConfigGlobals[name]; exists && !configured {
+			if declarations.ctx.ConfigGlobals[name] == utils.GlobalAccessOff {
 				if _, hasActiveDirective := declarations.inlineByName[name]; hasActiveDirective {
 					// With an active directive, typescript-eslint exposes the
 					// config's `off` setting as the variable's implicit setting.
@@ -449,11 +449,11 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 				// TypeScript type variable from scope-manager's merged variable.
 				return true
 			}
-			if finalSetting, exists := declarations.ctx.Globals[name]; exists && !finalSetting {
+			if declarations.ctx.Globals[name] == utils.GlobalAccessOff {
 				return false
 			}
-			if configured, exists := declarations.ctx.ConfigGlobals[name]; exists {
-				return configured
+			if configured := declarations.ctx.ConfigGlobals[name]; configured != utils.GlobalAccessUnset {
+				return configured.IsDeclared()
 			}
 			// ECMAScript language globals use their implicit readonly setting
 			// unless an explicit config or directive replaces it.
@@ -461,13 +461,13 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 		}
 	}
 
-	if finalSetting, exists := declarations.ctx.Globals[name]; exists && !finalSetting {
+	if declarations.ctx.Globals[name] == utils.GlobalAccessOff {
 		// A final inline `:off` suppresses both configured and language globals.
 		return false
 	}
-	if configured, exists := declarations.ctx.ConfigGlobals[name]; exists {
+	if configured := declarations.ctx.ConfigGlobals[name]; configured != utils.GlobalAccessUnset {
 		// Explicit config replaces the language-provided setting.
-		return configured
+		return configured.IsDeclared()
 	}
 
 	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {

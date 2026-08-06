@@ -19,6 +19,7 @@ export default defineConfig({
     './tests/cli/js-config/config-discovery.test.ts',
     './tests/cli/js-config/dir-args.test.ts',
     './tests/cli/js-config/config-ignores-filter.test.ts',
+    './tests/cli/js-config/language-options-globals.test.ts',
     './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',

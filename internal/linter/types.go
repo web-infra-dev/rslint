@@ -4,18 +4,19 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type ConfiguredRule struct {
 	Name     string
 	Settings map[string]interface{}
 	// Globals is the config-declared `languageOptions.globals` for this file
-	// (name → declared). The linter merges this with inline `/* global */`
+	// (name → access level). The linter merges this with inline `/* global */`
 	// comments before exposing the combined result to rules as ctx.Globals.
 	// Inline globals and disable directives use candidate-gated lazy comment
 	// collection, so rules never parse either source themselves. Nil when the
 	// config declares none.
-	Globals          map[string]bool
+	Globals          map[string]utils.GlobalAccess
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint

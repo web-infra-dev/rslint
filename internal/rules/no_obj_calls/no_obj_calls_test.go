@@ -66,8 +66,8 @@ func TestNoObjCallsRule(t *testing.T) {
 			{Code: `enum JSON {} JSON();`},
 			// Explicitly disabling a global removes the direct reference, but
 			// does not remove the same-named property from globalThis.
-			{Code: `Temporal();`, Globals: map[string]bool{"Temporal": false}},
-			{Code: `const value = Temporal; value();`, Globals: map[string]bool{"Temporal": false}},
+			{Code: `Temporal();`, Globals: map[string]any{"Temporal": "off"}},
+			{Code: `const value = Temporal; value();`, Globals: map[string]any{"Temporal": "off"}},
 			// Property values are not lexical aliases followed by ESLint's
 			// ReferenceTracker.
 			{Code: `const obj = { foo: JSON }; obj.foo();`},
@@ -358,7 +358,7 @@ func TestNoObjCallsRule(t *testing.T) {
 			},
 			{
 				Code:    `globalThis.Temporal();`,
-				Globals: map[string]bool{"Temporal": false},
+				Globals: map[string]any{"Temporal": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCall", Line: 1, Column: 1},
 				},

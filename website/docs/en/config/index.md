@@ -234,7 +234,7 @@ Declares globals available to matching files. Values are normalized before rules
 - Read-only: `false`, `null`, `'false'`, `'readonly'`, `'readable'`
 - Disabled: `'off'`
 
-A disabled value removes a declaration inherited from an earlier matching entry, including an ECMAScript built-in in the third-party plugin scope.
+A disabled value removes a declaration inherited from an earlier matching entry, including an ECMAScript built-in. The read-only and writable levels are distinct wherever a rule acts on assignment: `no-global-assign` reports writes to a read-only global and allows them on a writable one.
 
 ```ts
 {
@@ -246,6 +246,25 @@ A disabled value removes a declaration inherited from an earlier matching entry,
   },
 }
 ```
+
+ECMAScript built-ins such as `Array` and `Promise` are always declared. Globals a runtime adds on top of those — `window` and `document` in a browser, `process` and `__dirname` in Node.js — are not, so declare the ones your files use. The [`globals`](https://www.npmjs.com/package/globals) package collects them per environment; spread in every environment the matched files run in:
+
+```ts
+import globals from 'globals';
+
+export default [
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
+];
+```
+
+:::tip
+TypeScript files resolve globals from the declaration files their tsconfig pulls in — `lib.dom.d.ts` for `window` and `document`, `@types/node` for `process` and `__dirname`, and any `.d.ts` in the project that declares one. Reach for `globals` on the entries covering plain JavaScript files.
+:::
 
 ### settings
 

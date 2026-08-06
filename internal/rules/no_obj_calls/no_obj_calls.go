@@ -200,8 +200,7 @@ func (state *ruleState) collectRootCalls(name string, value trackedValue) {
 }
 
 func (state *ruleState) isGlobalOff(name string) bool {
-	declared, ok := state.ctx.Globals[name]
-	return ok && !declared
+	return state.ctx.Globals[name] == utils.GlobalAccessOff
 }
 
 func (state *ruleState) globalRootReferences(name string) []*ast.Node {
@@ -560,8 +559,8 @@ func (state *ruleState) trackVariable(symbol *ast.Symbol, value trackedValue, wa
 }
 
 func (state *ruleState) isKnownGlobal(name string) bool {
-	if declared, ok := state.ctx.Globals[name]; ok {
-		return declared
+	if access := state.ctx.Globals[name]; access != utils.GlobalAccessUnset {
+		return access.IsDeclared()
 	}
 	return nonCallableGlobals[name] || globalObjects[name]
 }

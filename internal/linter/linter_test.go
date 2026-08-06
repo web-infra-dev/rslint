@@ -149,7 +149,7 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		"/*global configOn:off, inlineOn, repeated:off */\n" +
 		"/*global repeated, inlineOn:off */"
 	program, paths := createTestProgramWithFiles(t, map[string]string{"globals.ts": source})
-	configGlobals := map[string]bool{"configOn": true, "configOff": false}
+	configGlobals := map[string]utils.GlobalAccess{"configOn": utils.GlobalAccessWritable, "configOff": utils.GlobalAccessOff}
 
 	var captured *rule.RuleContext
 	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
@@ -177,8 +177,11 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	if !reflect.DeepEqual(captured.ConfigGlobals, configGlobals) {
 		t.Errorf("ConfigGlobals = %#v, want %#v", captured.ConfigGlobals, configGlobals)
 	}
-	wantGlobals := map[string]bool{
-		"configOn": false, "configOff": false, "inlineOn": false, "repeated": true,
+	wantGlobals := map[string]utils.GlobalAccess{
+		"configOn":  utils.GlobalAccessOff,
+		"configOff": utils.GlobalAccessOff,
+		"inlineOn":  utils.GlobalAccessOff,
+		"repeated":  utils.GlobalAccessReadonly,
 	}
 	if !reflect.DeepEqual(captured.Globals, wantGlobals) {
 		t.Errorf("Globals = %#v, want %#v", captured.Globals, wantGlobals)
@@ -186,20 +189,20 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 
 	wantInline := []struct {
 		name      string
-		declared  bool
+		access    utils.GlobalAccess
 		positions []int
 	}{
-		{name: "configOn", declared: false, positions: []int{strings.Index(source, "configOn")}},
-		{name: "inlineOn", declared: false, positions: []int{strings.Index(source, "inlineOn"), strings.LastIndex(source, "inlineOn")}},
-		{name: "repeated", declared: true, positions: []int{strings.Index(source, "repeated"), strings.LastIndex(source, "repeated")}},
+		{name: "configOn", access: utils.GlobalAccessOff, positions: []int{strings.Index(source, "configOn")}},
+		{name: "inlineOn", access: utils.GlobalAccessOff, positions: []int{strings.Index(source, "inlineOn"), strings.LastIndex(source, "inlineOn")}},
+		{name: "repeated", access: utils.GlobalAccessReadonly, positions: []int{strings.Index(source, "repeated"), strings.LastIndex(source, "repeated")}},
 	}
 	if len(captured.InlineGlobals) != len(wantInline) {
 		t.Fatalf("InlineGlobals has %d entries, want %d: %#v", len(captured.InlineGlobals), len(wantInline), captured.InlineGlobals)
 	}
 	for i, want := range wantInline {
 		got := captured.InlineGlobals[i]
-		if got.Name != want.name || got.Declared != want.declared {
-			t.Errorf("InlineGlobals[%d] = (%q, %v), want (%q, %v)", i, got.Name, got.Declared, want.name, want.declared)
+		if got.Name != want.name || got.Access != want.access {
+			t.Errorf("InlineGlobals[%d] = (%q, %v), want (%q, %v)", i, got.Name, got.Access, want.name, want.access)
 		}
 		if len(got.NameRanges) != len(want.positions) {
 			t.Fatalf("InlineGlobals[%d].NameRanges has %d entries, want %d", i, len(got.NameRanges), len(want.positions))

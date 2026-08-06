@@ -2482,7 +2482,7 @@ func newRule() rule.Rule {
 			ensureCollected(ctx.SourceFile.AsNode())
 			if opts.Vars != "local" {
 				for _, inlineGlobal := range ctx.InlineGlobals {
-					if !inlineGlobal.Declared || len(inlineGlobal.NameRanges) == 0 {
+					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
 						continue
 					}
 					if hasInlineGlobalUse(ctx.SourceFile, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {

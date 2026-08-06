@@ -98,7 +98,7 @@ func TestNoNewFuncRule(t *testing.T) {
 			{Code: "Function`code`"},
 
 			// --- Config `/* global Function: off */` un-declares the builtin ---
-			{Code: `new Function("code");`, Globals: map[string]bool{"Function": false}},
+			{Code: `new Function("code");`, Globals: map[string]any{"Function": "off"}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -328,7 +328,7 @@ func TestNoNewFuncRule(t *testing.T) {
 			// Config declares Function as a writable global — still the builtin.
 			{
 				Code:    `new Function("code");`,
-				Globals: map[string]bool{"Function": true},
+				Globals: map[string]any{"Function": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
 
