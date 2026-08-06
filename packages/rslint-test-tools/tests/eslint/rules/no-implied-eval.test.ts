@@ -15,29 +15,41 @@ const noImpliedEvalGlobals = {
   window: 'readonly',
 } as const;
 
-function withNoImpliedEvalGlobals<T extends ValidTestCase | InvalidTestCase>(
-  testCases: T[],
-): T[] {
-  return testCases.map((testCase) => {
-    const languageOptions =
-      typeof testCase === 'string' ? undefined : testCase.languageOptions;
-    const normalized =
-      typeof testCase === 'string' ? { code: testCase } : testCase;
-    return {
-      ...normalized,
-      languageOptions: {
-        ...languageOptions,
-        globals: {
-          ...noImpliedEvalGlobals,
-          ...languageOptions?.globals,
-        },
+type ObjectValidTestCase = Exclude<ValidTestCase, string>;
+
+function withNoImpliedEvalGlobals<
+  T extends ObjectValidTestCase | InvalidTestCase,
+>(testCase: T) {
+  return {
+    ...testCase,
+    languageOptions: {
+      ...testCase.languageOptions,
+      globals: {
+        ...noImpliedEvalGlobals,
+        ...testCase.languageOptions?.globals,
       },
-    } as T;
-  });
+    },
+  };
+}
+
+function withNoImpliedEvalGlobalsValid(
+  testCases: ValidTestCase[],
+): ValidTestCase[] {
+  return testCases.map((testCase) =>
+    withNoImpliedEvalGlobals(
+      typeof testCase === 'string' ? { code: testCase } : testCase,
+    ),
+  );
+}
+
+function withNoImpliedEvalGlobalsInvalid(
+  testCases: InvalidTestCase[],
+): InvalidTestCase[] {
+  return testCases.map(withNoImpliedEvalGlobals);
 }
 
 ruleTester.run('no-implied-eval', {
-  valid: withNoImpliedEvalGlobals([
+  valid: withNoImpliedEvalGlobalsValid([
     // ---- Direct references without a call ----
     'setTimeout();',
     'setTimeout;',
@@ -287,7 +299,7 @@ ruleTester.run('no-implied-eval', {
     "setTimeout(Array.from('x'));",
     'setTimeout(tag`x`);',
   ]),
-  invalid: withNoImpliedEvalGlobals([
+  invalid: withNoImpliedEvalGlobalsInvalid([
     // ---- Direct calls with string literal ----
     {
       code: 'setTimeout("x = 1;");',

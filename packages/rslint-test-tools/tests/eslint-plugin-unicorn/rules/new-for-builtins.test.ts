@@ -14,7 +14,7 @@ const js = (code: string) => ({
       self: 'readonly',
       WebAssembly: 'readonly',
       window: 'readonly',
-    },
+    } as const,
   },
 });
 const invalid = (code: string, message: string) => ({

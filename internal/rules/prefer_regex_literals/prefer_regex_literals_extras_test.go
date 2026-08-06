@@ -54,6 +54,7 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
 			{Code: "new RegExp('a');", Globals: map[string]any{"RegExp": "off"}},
 			{Code: "new globalThis.RegExp('a');", Globals: map[string]any{"globalThis": "off"}},
+			{Code: "new window['RegExp']('a');"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callee ----
@@ -149,7 +150,8 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 				}},
 			},
 			{
-				Code: "new window['RegExp']('a');",
+				Code:    "new window['RegExp']('a');",
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unexpectedRegExp",
 					Line:      1,

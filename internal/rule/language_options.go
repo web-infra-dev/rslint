@@ -8,7 +8,7 @@ package rule
 // 6 (ES2015), 17 (ES2026), and "latest" are normalized before this reaches a
 // rule.
 type LanguageOptions struct {
-	ECMAVersion int
+	ECMAVersion int `json:"ecmaVersion"`
 }
 
 // NormalizeECMAScriptVersion normalizes an Espree/ESLint-compatible numeric
