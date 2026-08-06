@@ -20,7 +20,7 @@ import (
 func TestNoUndefRuleNilTypeChecker(t *testing.T) {
 	t.Parallel()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir, "no-undef-nil-tc.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, "no-undef-nil-tc.ts")
 	code := `var declaredLocal = 1; declaredLocal;
 console.log(1);
 Promise.resolve();
@@ -30,9 +30,9 @@ myOffGlobal;
 var myOffLocal = 1; myOffLocal;
 undeclaredName123;
 `
-	fs := utils.NewOverlayVFSForFile(filePath, code)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(
-		true, fs, rootDir, "tsconfig.json", utils.CreateCompilerHost(rootDir, fs),
+		true, fs, rootDir.Dir, "tsconfig.json", utils.CreateCompilerHost(rootDir.Dir, fs),
 	)
 	if err != nil {
 		t.Fatalf("CreateProgram: %v", err)
