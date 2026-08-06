@@ -243,11 +243,26 @@ func clears(node *ast.Node) bool {
 		ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
 		ast.KindModuleDeclaration, ast.KindImportEqualsDeclaration,
 		ast.KindMissingDeclaration:
-		return ast.HasSyntacticModifier(node, ast.ModifierFlagsExport)
+		return hasExportKeyword(node)
 
 	default:
 		return true
 	}
+}
+
+// hasExportKeyword reports whether the declaration spells `export` in the
+// source. A dotted namespace such as `namespace N.M {}` nests a declaration of
+// its own for each name after the first, and tsgo gives those an `export`
+// modifier it synthesizes rather than one the source writes; only a written
+// `export` moves a declaration inside an `ExportNamedDeclaration`.
+func hasExportKeyword(node *ast.Node) bool {
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	return slices.ContainsFunc(modifiers.Nodes, func(modifier *ast.Node) bool {
+		return modifier.Kind == ast.KindExportKeyword && modifier.Flags&ast.NodeFlagsReparsed == 0
+	})
 }
 
 // shield is one `try` block a return stands in. ESLint keeps such a return in

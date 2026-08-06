@@ -127,6 +127,9 @@ export enum E {}`},
 export namespace N {}`},
 			// ---- An `export` modifier puts the declaration back into an ESTree export node, which does clear it. ----
 			{Code: `if (c) { return; }
+export namespace N.M {}`},
+			// ---- An `export` modifier puts the declaration back into an ESTree export node, which does clear it. ----
+			{Code: `if (c) { return; }
 export import q = require('y');`},
 			// ---- An `export` modifier puts the declaration back into an ESTree export node, which does clear it. ----
 			{Code: `if (c) { return; }
@@ -331,6 +334,26 @@ namespace N {}`},
 namespace N { type T = 1; }`,
 				Output: []string{`if (c) {  }
 namespace N { type T = 1; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// ---- The declaration a dotted namespace nests for each name after the first carries a synthesized `export`, not a written one. ----
+			{
+				Code: `if (c) { return; }
+namespace N.M {}`,
+				Output: []string{`if (c) {  }
+namespace N.M {}`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// ---- The declaration a dotted namespace nests for each name after the first carries a synthesized `export`, not a written one. ----
+			{
+				Code: `if (c) { return; }
+declare namespace A.B.C {}`,
+				Output: []string{`if (c) {  }
+declare namespace A.B.C {}`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryReturn", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
 				},
