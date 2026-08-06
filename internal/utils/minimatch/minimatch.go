@@ -1,8 +1,12 @@
-// Package minimatch ports the npm package minimatch, the glob matcher ESLint
-// and its plugins compare paths with. It covers the extended glob syntax —
-// `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — that the general-purpose Go glob
-// libraries leave out, so a rule ported from an ESLint plugin can accept the
-// same patterns its upstream does.
+// Package minimatch ports minimatch 3.1.5 and the brace-expansion 1.1.16 it
+// pulls in, the glob matcher an ESLint plugin compares paths with. It covers
+// the extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — that
+// the general-purpose Go glob libraries leave out, so a rule ported from an
+// ESLint plugin can accept the same patterns its upstream does.
+//
+// Plugins are what this is for, so 3.x is the version to answer like. ESLint
+// itself moved on to minimatch 10 for the paths it matches on its own behalf,
+// which reads a handful of patterns differently.
 //
 // Patterns compile to regexp2 rather than the standard library's regexp,
 // because a negated list needs the lookahead RE2 has no syntax for.

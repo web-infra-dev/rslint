@@ -251,7 +251,8 @@ func TestMatchOptions(t *testing.T) {
 	}
 }
 
-// TestBraceExpand pins the brace expansion against brace-expansion 1.1.11.
+// TestBraceExpand pins the brace expansion against brace-expansion 1.1.16,
+// the version minimatch 3.1.5 resolves its `^1.1.7` dependency to.
 func TestBraceExpand(t *testing.T) {
 	tests := []struct {
 		pattern string
