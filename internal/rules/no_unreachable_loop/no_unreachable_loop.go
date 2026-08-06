@@ -121,8 +121,9 @@ func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts ruleOptions)
 
 // singleIterationLoops returns the loops in root whose body allows only one
 // iteration: control reaches the loop, but never flows back into it for a
-// second one. A loop the code path never reaches is left alone — whether its
-// body could repeat says nothing useful about code that does not run.
+// second one. Unreachable blocks are skipped — whether a loop that never runs
+// could repeat says nothing useful, and neither does a `continue` that never
+// runs.
 //
 // NOTE: A loop wrapped in more than one label repeats when a `continue` names
 // any of them. ESLint 10.8.0 reports the double-labelled `while` and `do` forms
@@ -143,7 +144,10 @@ func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
 	cfg.Build(root, cfg.Hooks[struct{}]{
-		Statement: func(_ *cfg.Builder[struct{}], node *ast.Node) {
+		Statement: func(b *cfg.Builder[struct{}], node *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			bit := loopBitForKind(node.Kind)
 			if bit == 0 || opts.ignored&bit != 0 {
 				return
@@ -155,9 +159,12 @@ func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
 				repeats[node] = false
 			}
 		},
-		Loop: func(_ *cfg.Builder[struct{}], loop *ast.Node) {
+		Loop: func(b *cfg.Builder[struct{}], loop *ast.Node) {
 			// Ignored loops are not candidates, so retaining their repeat edge
 			// is harmless and avoids another option lookup on this hot hook.
+			if !b.Current().Reachable {
+				return
+			}
 			repeats[loop] = true
 		},
 	})
@@ -168,8 +175,8 @@ func singleIterationLoopsDefault(root *ast.Node) []*ast.Node {
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
 	cfg.Build(root, cfg.Hooks[struct{}]{
-		Statement: func(_ *cfg.Builder[struct{}], node *ast.Node) {
-			if !isLoop(node) {
+		Statement: func(b *cfg.Builder[struct{}], node *ast.Node) {
+			if !b.Current().Reachable || !isLoop(node) {
 				return
 			}
 			if _, known := repeats[node]; !known {
@@ -179,7 +186,10 @@ func singleIterationLoopsDefault(root *ast.Node) []*ast.Node {
 				repeats[node] = false
 			}
 		},
-		Loop: func(_ *cfg.Builder[struct{}], loop *ast.Node) {
+		Loop: func(b *cfg.Builder[struct{}], loop *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			repeats[loop] = true
 		},
 	})

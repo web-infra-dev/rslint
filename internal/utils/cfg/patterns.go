@@ -9,7 +9,7 @@ import (
 // target, and the throwable fork ESLint records for naming the target inside a
 // `try` block. Destructuring targets are laid out by patternBind instead.
 func (b *Builder[E]) patternReads(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 	switch node.Kind {
@@ -48,7 +48,7 @@ func (b *Builder[E]) patternReads(node *ast.Node) {
 // patternWrites emits the write of an identifier assignment target after its
 // assigned expression. Member targets write no variable.
 func (b *Builder[E]) patternWrites(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 	switch node.Kind {
@@ -77,7 +77,7 @@ func (b *Builder[E]) patternWrites(node *ast.Node) {
 // source order evaluates its computed key, forks around its default, and
 // writes its target.
 func (b *Builder[E]) patternBind(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 	switch node.Kind {
@@ -165,7 +165,7 @@ func (b *Builder[E]) patternBind(node *ast.Node) {
 // value, which only runs when the incoming value is undefined, then the
 // target's own binding.
 func (b *Builder[E]) bindWithDefault(target *ast.Node, fallback *ast.Node) {
-	if fallback != nil && b.cur != nil {
+	if fallback != nil {
 		join := b.newBlock()
 		b.link(b.cur, join)
 		withFallback := b.newBlock()

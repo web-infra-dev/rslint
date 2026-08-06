@@ -1,0 +1,773 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-return > invalid 1`] = `
+{
+  "code": "function foo() { return; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 2`] = `
+{
+  "code": "function foo() { doSomething(); return; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 3`] = `
+{
+  "code": "function foo() { if (condition) { bar(); return; } else { baz(); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 4`] = `
+{
+  "code": "function foo() { if (foo) return; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 5`] = `
+{
+  "code": "function foo() { bar(); return/**/; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 6`] = `
+{
+  "code": "function foo() { bar(); return//
+; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 7`] = `
+{
+  "code": "foo(); return;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 8`] = `
+{
+  "code": "if (foo) { bar(); return; } else { baz(); }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 9`] = `
+{
+  "code": "
+        function foo() {
+          if (foo) {
+            return;
+          }
+          return;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 10`] = `
+{
+  "code": "
+        function foo() {
+          switch (bar) {
+            case 1:
+              doSomething();
+            default:
+              doSomethingElse();
+              return;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 11`] = `
+{
+  "code": "
+        function foo() {
+          switch (bar) {
+            default:
+              doSomething();
+            case 1:
+              doSomething();
+              return;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 12`] = `
+{
+  "code": "
+        function foo() {
+          switch (bar) {
+            case 1:
+              if (a) {
+                doSomething();
+                return;
+              }
+              break;
+            default:
+              doSomethingElse();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 13`] = `
+{
+  "code": "
+        function foo() {
+          switch (bar) {
+            case 1:
+              if (a) {
+                doSomething();
+                return;
+              } else {
+                doSomething();
+              }
+              break;
+            default:
+              doSomethingElse();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 14`] = `
+{
+  "code": "
+        function foo() {
+          switch (bar) {
+            case 1:
+              if (a) {
+                doSomething();
+                return;
+              }
+            default:
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 15`] = `
+{
+  "code": "
+        function foo() {
+          try {} catch (err) { return; }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 32,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 16`] = `
+{
+  "code": "
+        function foo() {
+          try {
+            foo();
+            return;
+          } catch (err) {
+            return 5;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 17`] = `
+{
+  "code": "
+        function foo() {
+          if (something) {
+            try {
+              bar();
+              return;
+            } catch (err) {}
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 18`] = `
+{
+  "code": "
+        function foo() {
+          try {
+            return;
+          } catch (err) {
+            foo();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 19`] = `
+{
+  "code": "
+        function foo() {
+          try {
+            return;
+          } finally {
+            bar();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 20`] = `
+{
+  "code": "
+        function foo() {
+          try {
+            bar();
+          } catch (e) {
+            try {
+              baz();
+              return;
+            } catch (e) {
+              qux();
+            }
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 21`] = `
+{
+  "code": "
+        function foo() {
+          try {} finally {}
+          return;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 22`] = `
+{
+  "code": "
+        function foo() {
+          try {
+            return 5;
+          } finally {
+            function bar() {
+              return;
+            }
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 15,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 23`] = `
+{
+  "code": "() => { return; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-return > invalid 24`] = `
+{
+  "code": "function foo() { return; return; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary return statement.",
+      "messageId": "unnecessaryReturn",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

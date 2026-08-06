@@ -20,9 +20,14 @@ func isBreakableStatement(node *ast.Node) bool {
 
 // labelsOf collects every label wrapped directly around a loop or switch, so
 // `outer: inner: while (…)` resolves `continue outer` and `break outer` as
-// well as `inner`. (ESLint's code path analysis attaches only the innermost
-// label and loses the back edge of a `continue` naming an outer one; this
-// builder keeps the edge.)
+// well as `inner`.
+//
+// Keeping the outer label is a known deviation. ESLint attaches only the
+// innermost one, so a `continue` naming an outer label finds no loop there and
+// its back edge is dropped. It surfaces where a loop's exit hangs off that edge
+// — a `do…while`, whose test runs only from it — leaving what follows the loop
+// reachable here and unreachable in ESLint, which `no-useless-return`,
+// `no-unreachable-loop` and `no-useless-assignment` all read.
 func labelsOf(node *ast.Node) []string {
 	var labels []string
 	current := node

@@ -16,7 +16,7 @@ func (b *Builder[E]) statements(list *ast.NodeList) {
 }
 
 func (b *Builder[E]) statement(node *ast.Node) {
-	if node == nil || b.cur == nil {
+	if node == nil {
 		return
 	}
 	b.reachedStatement(node)
@@ -206,12 +206,10 @@ func (b *Builder[E]) doStatement(node *ast.Node) {
 
 	b.enter(test)
 	b.expr(stmt.Expression)
-	if b.cur != nil {
-		b.loop(node)
-		b.link(b.cur, body)
-		if !isAlwaysTruthyTest(stmt.Expression) {
-			b.link(b.cur, after)
-		}
+	b.loop(node)
+	b.link(b.cur, body)
+	if !isAlwaysTruthyTest(stmt.Expression) {
+		b.link(b.cur, after)
 	}
 
 	b.enter(after)
@@ -330,26 +328,18 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 			defaultIndex = i
 			continue
 		}
-		if testCur == nil {
-			break
-		}
 		b.cur = testCur
 		b.expr(clause.AsCaseOrDefaultClause().Expression)
 		b.link(b.cur, bodies[i])
-		if b.cur == nil {
-			testCur = nil
-			continue
-		}
 		nextTest := b.newBlock()
 		b.link(b.cur, nextTest)
-		testCur = nextTest
+		b.enter(nextTest)
+		testCur = b.cur
 	}
-	if testCur != nil {
-		if defaultIndex >= 0 {
-			b.link(testCur, bodies[defaultIndex])
-		} else {
-			b.link(testCur, after)
-		}
+	if defaultIndex >= 0 {
+		b.link(testCur, bodies[defaultIndex])
+	} else {
+		b.link(testCur, after)
 	}
 
 	b.pushJump(node, after, nil, nil)
@@ -382,14 +372,15 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 
 	b.statement(stmt.TryBlock)
 
+	// The normal completion of a `try` statement carries on from the end of its
+	// `try` block and from the end of its `catch` block, whether or not either
+	// of them is somewhere control arrives.
 	var normalEnds []*Block[E]
 	if hasCatch {
-		if b.cur != nil {
-			// ESLint routes the end of a `try` block into the `catch` block as
-			// well as past the statement.
-			b.link(b.cur, frame.catchEntry)
-			normalEnds = append(normalEnds, b.cur)
-		}
+		// ESLint routes the end of a `try` block into the `catch` block as well
+		// as past the statement.
+		b.link(b.cur, frame.catchEntry)
+		normalEnds = append(normalEnds, b.cur)
 		frame.position = posCatch
 		frame.thrownForked = false
 		b.enter(frame.catchEntry)
@@ -398,12 +389,8 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 			b.patternBind(catchClause.VariableDeclaration.Name())
 		}
 		b.statement(catchClause.Block)
-		if b.cur != nil {
-			normalEnds = append(normalEnds, b.cur)
-		}
-	} else if b.cur != nil {
-		normalEnds = append(normalEnds, b.cur)
 	}
+	normalEnds = append(normalEnds, b.cur)
 
 	b.tryStack = b.tryStack[:len(b.tryStack)-1]
 
@@ -417,15 +404,13 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 	}
 
 	snapshot := b.snapshotForks()
-	if len(normalEnds) > 0 {
-		normalEntry := b.newBlock()
-		for _, end := range normalEnds {
-			b.link(end, normalEntry)
-		}
-		b.enter(normalEntry)
-		b.statement(stmt.FinallyBlock)
-		b.link(b.cur, after)
+	normalEntry := b.newBlock()
+	for _, end := range normalEnds {
+		b.link(end, normalEntry)
 	}
+	b.enter(normalEntry)
+	b.statement(stmt.FinallyBlock)
+	b.link(b.cur, after)
 
 	if frame.finallyEntry.hasIncoming {
 		// The `finally` block also runs on the path that leaves the statement
@@ -434,7 +419,7 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 		b.restoreForks(snapshot)
 		b.enter(frame.finallyEntry)
 		b.statement(stmt.FinallyBlock)
-		if b.cur != nil {
+		if b.cur.Reachable {
 			// A `return` inside this `try`/`catch` still needs to run every
 			// enclosing `finally` on its way out, not just this one — so this
 			// second copy's own abrupt exit must keep propagating outward.
@@ -483,7 +468,7 @@ func (b *Builder[E]) popJump() {
 }
 
 func (b *Builder[E]) makeBreak(label *ast.Node) {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	name := ""
@@ -502,11 +487,11 @@ func (b *Builder[E]) makeBreak(label *ast.Node) {
 		b.link(b.cur, target.breakTo)
 		break
 	}
-	b.cur = nil
+	b.makeUnreachable()
 }
 
 func (b *Builder[E]) makeContinue(label *ast.Node) {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	name := ""
@@ -524,11 +509,11 @@ func (b *Builder[E]) makeContinue(label *ast.Node) {
 			break
 		}
 	}
-	b.cur = nil
+	b.makeUnreachable()
 }
 
 func (b *Builder[E]) makeReturn() {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	if i := b.returnFrame(); i >= 0 {
@@ -536,11 +521,11 @@ func (b *Builder[E]) makeReturn() {
 		frame.returnedAny = true
 		b.link(b.cur, frame.finallyEntry)
 	}
-	b.cur = nil
+	b.makeUnreachable()
 }
 
 func (b *Builder[E]) makeThrow() {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	if i := b.throwFrame(); i >= 0 {
@@ -548,14 +533,14 @@ func (b *Builder[E]) makeThrow() {
 		frame.thrownAny = true
 		b.link(b.cur, throwTarget(frame))
 	}
-	b.cur = nil
+	b.makeUnreachable()
 }
 
 // makeYield mirrors ESLint's handling of a suspended generator: the caller may
 // resume it with `.return()` or `.throw()`, so both leaving paths are recorded
 // before the normal continuation resumes in a fresh block.
 func (b *Builder[E]) makeYield() {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	if i := b.returnFrame(); i >= 0 {
@@ -570,5 +555,5 @@ func (b *Builder[E]) makeYield() {
 	}
 	next := b.newBlock()
 	b.link(b.cur, next)
-	b.cur = next
+	b.enter(next)
 }
