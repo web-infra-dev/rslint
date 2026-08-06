@@ -2,6 +2,7 @@ package prefer_const
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -32,9 +33,8 @@ func parseOptions(opts any) preferConstOptions {
 
 // candidateInfo holds information about a single binding name candidate.
 type candidateInfo struct {
-	nameNode       *ast.Node
-	hasInitializer bool
-	reportNode     *ast.Node // node to report on (may differ from nameNode for uninitialized vars)
+	nameNode   *ast.Node
+	reportNode *ast.Node // node to report on (may differ from nameNode for uninitialized vars)
 }
 
 // https://eslint.org/docs/latest/rules/prefer-const
@@ -43,6 +43,8 @@ var PreferConstRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
+		destructuringAll := opts.destructuring == "all"
+		sourceText := ctx.SourceFile.Text()
 
 		return rule.RuleListeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
@@ -61,7 +63,9 @@ var PreferConstRule = rule.Rule{
 
 				// Collect candidates across ALL declarators in the VDL to determine
 				// if the entire VDL can be auto-fixed (let → const).
-				var allConstCandidates []*candidateInfo
+				// Keep the common small declaration list on the stack.
+				var candidateBuffer [4]candidateInfo
+				allConstCandidates := candidateBuffer[:0]
 				totalBindings := 0
 				totalConstBindings := 0
 				allHaveInit := true
@@ -77,29 +81,44 @@ var PreferConstRule = rule.Rule{
 						allHaveInit = false
 					}
 
-					// Collect all candidate binding names from this declaration
-					candidates := collectBindingNames(varDecl.Name(), hasInit)
-					if len(candidates) == 0 {
+					// Collect reportable candidates directly into the declaration-list
+					// result. The overwhelmingly common identifier case avoids the
+					// temporary binding and reportable-candidate slices entirely.
+					nameNode := varDecl.Name()
+					candidateStart := len(allConstCandidates)
+					candidateCount := 0
+					if nameNode.Kind == ast.KindIdentifier {
+						if nameNode.Text() == "" {
+							continue
+						}
+						candidateCount = 1
+						candidate := candidateInfo{nameNode: nameNode}
+						if shouldReport(&candidate, decl, &ctx, opts, hasInit) {
+							allConstCandidates = append(allConstCandidates, candidate)
+						}
+					} else {
+						utils.CollectBindingNames(nameNode, func(ident *ast.Node, _ string) {
+							candidateCount++
+							candidate := candidateInfo{nameNode: ident}
+							if shouldReport(&candidate, decl, &ctx, opts, hasInit) {
+								allConstCandidates = append(allConstCandidates, candidate)
+							}
+						})
+					}
+					if candidateCount == 0 {
 						continue
 					}
 
-					totalBindings += len(candidates)
-
-					// Check each candidate
-					var constCandidates []*candidateInfo
-					for i := range candidates {
-						c := &candidates[i]
-						if shouldReport(c, decl, &ctx, opts) {
-							constCandidates = append(constCandidates, c)
-						}
-					}
+					totalBindings += candidateCount
+					constCandidateCount := len(allConstCandidates) - candidateStart
 
 					// Apply destructuring option
-					isDestructuring := varDecl.Name().Kind == ast.KindObjectBindingPattern ||
-						varDecl.Name().Kind == ast.KindArrayBindingPattern
-					if isDestructuring && opts.destructuring == "all" {
+					isDestructuring := nameNode.Kind == ast.KindObjectBindingPattern ||
+						nameNode.Kind == ast.KindArrayBindingPattern
+					if isDestructuring && destructuringAll {
 						// Only report if ALL candidates in the destructuring can be const
-						if len(constCandidates) != len(candidates) {
+						if constCandidateCount != candidateCount {
+							allConstCandidates = allConstCandidates[:candidateStart]
 							continue
 						}
 					}
@@ -108,42 +127,40 @@ var PreferConstRule = rule.Rule{
 					// whose write is in a destructuring assignment where not all targets
 					// can be const. ESLint groups by the destructuring write, not just
 					// the declaration pattern.
-					if opts.destructuring == "all" {
-						var filtered []*candidateInfo
-						for _, c := range constCandidates {
+					if destructuringAll {
+						writeIndex := candidateStart
+						for _, c := range allConstCandidates[candidateStart:] {
 							if c.reportNode != nil && !allDestructuringWriteTargetsConst(c.reportNode, &ctx) {
 								continue
 							}
-							filtered = append(filtered, c)
+							allConstCandidates[writeIndex] = c
+							writeIndex++
 						}
-						constCandidates = filtered
+						allConstCandidates = allConstCandidates[:writeIndex]
 					}
 
-					totalConstBindings += len(constCandidates)
-					allConstCandidates = append(allConstCandidates, constCandidates...)
+					totalConstBindings += len(allConstCandidates) - candidateStart
 				}
 
 				// Determine if auto-fix is possible: ALL bindings in the VDL must be
 				// const-eligible AND all declarators must have initializers.
 				// ESLint only auto-fixes when the entire `let` can become `const`.
+				// reportNode is set only for an uninitialized binding, so a candidate
+				// that would need its later assignment merged can never reach canFix.
 				canFix := allHaveInit && totalBindings > 0 && totalConstBindings == totalBindings
 
-				// Additionally, suppress fix for uninitialized candidates whose write
-				// is in a destructuring with non-let targets (var/const in same scope,
-				// member expressions, or cross-scope identifiers).
+				// Report the const candidates
+				var buildFix func() []rule.RuleFix
 				if canFix {
-					firstDecl := declList.Declarations.Nodes[0]
-					for _, c := range allConstCandidates {
-						if c.reportNode != nil {
-							if isInUnfixableDestructuring(c.reportNode, firstDecl) {
-								canFix = false
-								break
-							}
+					letStart := -1
+					buildFix = func() []rule.RuleFix {
+						if letStart < 0 {
+							letStart = scanner.SkipTrivia(sourceText, node.Pos())
 						}
+						letRange := node.Loc.WithPos(letStart).WithEnd(letStart + len("let"))
+						return []rule.RuleFix{rule.RuleFixReplaceRange(letRange, "const")}
 					}
 				}
-
-				// Report the const candidates
 				for _, c := range allConstCandidates {
 					name := c.nameNode.Text()
 					reportOn := c.nameNode
@@ -154,12 +171,11 @@ var PreferConstRule = rule.Rule{
 						Id:          "useConst",
 						Description: "'" + name + "' is never reassigned. Use 'const' instead.",
 					}
+					reportRange := reportOn.Loc.WithPos(scanner.SkipTrivia(sourceText, reportOn.Pos()))
 					if canFix {
-						letRange := utils.GetVarKeywordRange(node, ctx.SourceFile)
-						ctx.ReportNodeWithFixes(reportOn, msg,
-							rule.RuleFixReplaceRange(letRange, "const"))
+						ctx.ReportRangeWithDeferredFixes(reportRange, msg, buildFix)
 					} else {
-						ctx.ReportNode(reportOn, msg)
+						ctx.ReportRange(reportRange, msg)
 					}
 				}
 			},
@@ -168,29 +184,24 @@ var PreferConstRule = rule.Rule{
 }
 
 // shouldReport determines whether a candidate should be reported as "use const".
-func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, opts preferConstOptions) bool {
-	// The binder attaches the symbol to the enclosing declaration
-	// (VariableDeclaration or BindingElement). ctx.Refs is keyed by that
-	// binder symbol, not by checker.GetSymbolAtLocation results.
-	decl := c.nameNode.Parent
-	if decl == nil || decl.Name() != c.nameNode {
-		return false
-	}
-	sym := decl.Symbol()
+func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, opts preferConstOptions, hasInitializer bool) bool {
+	sym := utils.BindingNameSymbol(c.nameNode)
 	if sym == nil {
 		return false
 	}
 	refs := ctx.Refs.References(sym)
 
-	if c.hasInitializer {
-		// For initialized candidates: report if 0 writes after declaration (never reassigned)
-		return countWriteReferences(refs) == 0
+	if hasInitializer {
+		// Initialized candidates only need to know whether any later write
+		// exists, so stop at the first one.
+		return !hasWriteReference(refs)
 	}
 
-	// For uninitialized candidates (let x;):
-	// Count write references (excluding declaration)
-	writeCount := countWriteReferences(refs)
-	if writeCount != 1 {
+	// Uninitialized candidates need the write count, first write, and whether
+	// a read precedes the first post-declaration write. Derive all three in a
+	// single pass over the source-ordered RefStore result.
+	references := summarizeReferences(refs, declNode.Pos())
+	if references.writeCount != 1 {
 		// 0 writes: never assigned, "let x;" alone is fine - don't report
 		// 2+ writes: truly reassigned - don't report
 		return false
@@ -200,13 +211,13 @@ func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, o
 	// But only if the write is at the same block level as the declaration.
 	// If the write is inside a nested block (if, for, try, function, etc.),
 	// we can't safely convert to "const x = ..." because it would change semantics.
-	writeNode := findWriteInSameBlock(refs, declNode, ctx)
+	writeNode := findWriteInSameBlock(references.firstWrite, declNode, ctx)
 	if writeNode == nil {
 		return false
 	}
 	// ESLint reports uninitialized variables at the write location when there's no read
 	// between declaration and write. If there IS a read before write, report at the declaration.
-	readBeforeAssign := isReadBeforeFirstAssign(refs, declNode.Pos())
+	readBeforeAssign := references.readBeforeFirstAssign
 	if !readBeforeAssign {
 		c.reportNode = writeNode
 	}
@@ -216,19 +227,6 @@ func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, o
 		return false
 	}
 	return true
-}
-
-// collectBindingNames collects all identifier nodes from a binding pattern
-// using the public utils.CollectBindingNames utility.
-func collectBindingNames(nameNode *ast.Node, hasInitializer bool) []candidateInfo {
-	var result []candidateInfo
-	utils.CollectBindingNames(nameNode, func(ident *ast.Node, _ string) {
-		result = append(result, candidateInfo{
-			nameNode:       ident,
-			hasInitializer: hasInitializer,
-		})
-	})
-	return result
 }
 
 // isInForStatement checks if a VariableDeclarationList is the initializer of a regular for statement.
@@ -247,40 +245,66 @@ func isInForInOrOf(node *ast.Node) bool {
 	return node.Parent.Kind == ast.KindForInStatement || node.Parent.Kind == ast.KindForOfStatement
 }
 
-// countWriteReferences counts the number of write references among refs (as
-// returned by ctx.Refs.References(sym)). Binding names are not reference
-// positions, so refs naturally excludes the declaration itself; the one
-// declaration name refs does keep is the shorthand in `({ x } = obj)`, which
-// is a genuine write. A write inside the same declaration's initializer
-// (e.g. `let x = (x = 1)`) is a descendant of the initializer rather than of
-// the binding name, so it is still counted.
-func countWriteReferences(refs []*ast.Node) int {
-	count := 0
+// hasWriteReference reports whether RefStore found any write after excluding
+// declaration names. Shorthand destructuring names remain genuine writes.
+func hasWriteReference(refs []*ast.Node) bool {
 	for _, ref := range refs {
 		if utils.IsWriteReference(ref) {
-			count++
+			return true
 		}
 	}
-	return count
+	return false
 }
 
-// isReadBeforeFirstAssign checks if a variable is read (among refs occurring
-// at or after declPos) before its first write. This is used for uninitialized
-// variables (let x;) when ignoreReadBeforeAssign is true. refs must be in
-// source order, as returned by ctx.Refs.References(sym).
-func isReadBeforeFirstAssign(refs []*ast.Node, declPos int) bool {
-	foundRead := false
+func hasMultipleWriteReferences(refs []*ast.Node) bool {
+	foundWrite := false
 	for _, ref := range refs {
-		if ref.Pos() < declPos {
+		if utils.IsWriteReference(ref) {
+			if foundWrite {
+				return true
+			}
+			foundWrite = true
+		}
+	}
+	return false
+}
+
+type referenceSummary struct {
+	firstWrite            *ast.Node
+	writeCount            int
+	readBeforeFirstAssign bool
+}
+
+// summarizeReferences classifies source-ordered references to an
+// uninitialized binding. Declaration names are absent from RefStore; shorthand
+// destructuring assignment names remain because they are genuine writes.
+func summarizeReferences(refs []*ast.Node, declPos int) referenceSummary {
+	var result referenceSummary
+	readAfterDeclaration := false
+	foundPostDeclWrite := false
+	for _, ref := range refs {
+		if utils.IsWriteReference(ref) {
+			result.writeCount++
+			if result.firstWrite == nil {
+				result.firstWrite = ref
+			}
+			if result.writeCount > 1 {
+				return result
+			}
+			if ref.Pos() >= declPos && !foundPostDeclWrite {
+				result.readBeforeFirstAssign = readAfterDeclaration
+				foundPostDeclWrite = true
+			}
 			continue
 		}
-		if utils.IsWriteReference(ref) {
-			// Found the first write at or after the declaration - stop looking.
-			return foundRead
+		if ref.Pos() >= declPos && !foundPostDeclWrite {
+			readAfterDeclaration = true
 		}
-		foundRead = true
 	}
-	return foundRead
+	if !foundPostDeclWrite {
+		result.readBeforeFirstAssign = readAfterDeclaration
+	}
+	return result
 }
 
 // findContainingBlock finds the nearest Block, SourceFile, ModuleBlock, CaseClause, or DefaultClause ancestor.
@@ -325,21 +349,9 @@ func isDirectChildOfBlock(writeNode *ast.Node, declBlock *ast.Node) bool {
 // ESLint only suggests const for uninitialized variables when the write can be merged
 // into the declaration (i.e., same block level). Writes inside nested blocks (if, for,
 // try, function bodies, etc.) cannot be safely merged.
-func findWriteInSameBlock(refs []*ast.Node, declNode *ast.Node, ctx *rule.RuleContext) *ast.Node {
+func findWriteInSameBlock(writeNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) *ast.Node {
 	declBlock := findContainingBlock(declNode)
-	if declBlock == nil {
-		return nil
-	}
-
-	var writeNode *ast.Node
-	for _, ref := range refs {
-		if utils.IsWriteReference(ref) {
-			writeNode = ref
-			break
-		}
-	}
-
-	if writeNode == nil {
+	if declBlock == nil || writeNode == nil {
 		return nil
 	}
 
@@ -393,7 +405,7 @@ func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContex
 		if sym == nil {
 			return
 		}
-		if countWriteReferences(ctx.Refs.References(sym)) > 1 {
+		if hasMultipleWriteReferences(ctx.Refs.References(sym)) {
 			allConst = false
 		}
 	})
@@ -488,126 +500,6 @@ func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleC
 			be := child.AsBinaryExpression()
 			if be != nil && be.Left != nil {
 				if hasNonReportableTarget(be.Left, declBlock, ctx) {
-					found = true
-					return true
-				}
-			}
-		}
-		return false
-	})
-	return found
-}
-
-// isInUnfixableDestructuring checks if a write node is inside a destructuring
-// assignment that should suppress AUTO-FIX. This is stricter than the reporting
-// check — it also rejects same-scope var/const targets (can't change `let` to
-// `const` if the destructuring also writes to a non-let variable).
-func isInUnfixableDestructuring(writeNode *ast.Node, declNode *ast.Node) bool {
-	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
-		return ast.IsDestructuringAssignment(n)
-	})
-	if assignExpr == nil {
-		return false
-	}
-
-	left := assignExpr.AsBinaryExpression().Left
-	return hasUnmergeableTarget(left, declNode)
-}
-
-// hasUnmergeableTarget checks if a destructuring target contains elements that
-// prevent merging into a const declaration: member expressions, or identifiers
-// declared in a different block scope than the candidate.
-// ESLint reports cross-declaration destructuring when all targets are in the same
-// block scope (with output: null for no auto-fix), but skips when targets span
-// different scopes.
-func hasUnmergeableTarget(lhs *ast.Node, declNode *ast.Node) bool {
-	declBlock := findContainingBlock(declNode)
-	if declBlock == nil {
-		return true
-	}
-	blockNames := collectBlockLetNames(declBlock)
-	return hasTargetNotInSet(lhs, blockNames)
-}
-
-// collectBlockLetNames collects all variable names from let declarations that are
-// direct children of the given block. Used for the auto-fix check (only let
-// declarations can be converted to const).
-func collectBlockLetNames(block *ast.Node) map[string]bool {
-	names := make(map[string]bool)
-	block.ForEachChild(func(child *ast.Node) bool {
-		if child.Kind == ast.KindVariableStatement {
-			child.ForEachChild(func(grandchild *ast.Node) bool {
-				if grandchild.Kind == ast.KindVariableDeclarationList && grandchild.Flags&ast.NodeFlagsLet != 0 {
-					declList := grandchild.AsVariableDeclarationList()
-					if declList != nil && declList.Declarations != nil {
-						for _, decl := range declList.Declarations.Nodes {
-							varDecl := decl.AsVariableDeclaration()
-							if varDecl != nil && varDecl.Name() != nil {
-								utils.CollectBindingNames(varDecl.Name(), func(_ *ast.Node, name string) {
-									names[name] = true
-								})
-							}
-						}
-					}
-				}
-				return false
-			})
-		}
-		return false
-	})
-	return names
-}
-
-// hasTargetNotInSet recursively checks if any target in a destructuring pattern
-// is a member expression or an identifier NOT in the given name set.
-func hasTargetNotInSet(node *ast.Node, names map[string]bool) bool {
-	// Handle leaf Identifier nodes directly (reached via PropertyAssignment or
-	// BinaryExpression default-value recursion).
-	if node.Kind == ast.KindIdentifier {
-		return !names[node.Text()]
-	}
-
-	found := false
-	node.ForEachChild(func(child *ast.Node) bool {
-		if found {
-			return true
-		}
-		switch child.Kind {
-		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			found = true
-			return true
-		case ast.KindIdentifier:
-			if !names[child.Text()] {
-				found = true
-				return true
-			}
-		case ast.KindShorthandPropertyAssignment:
-			shorthand := child.AsShorthandPropertyAssignment()
-			if shorthand != nil && shorthand.Name() != nil {
-				if !names[shorthand.Name().Text()] {
-					found = true
-					return true
-				}
-			}
-		case ast.KindPropertyAssignment:
-			// Only check the value (target), not the key
-			pa := child.AsPropertyAssignment()
-			if pa != nil && pa.Initializer != nil {
-				if hasTargetNotInSet(pa.Initializer, names) {
-					found = true
-					return true
-				}
-			}
-		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindSpreadElement, ast.KindSpreadAssignment:
-			if hasTargetNotInSet(child, names) {
-				found = true
-				return true
-			}
-		case ast.KindBinaryExpression:
-			// Default value: [x = 5] → check left side only
-			be := child.AsBinaryExpression()
-			if be != nil && be.Left != nil {
-				if hasTargetNotInSet(be.Left, names) {
 					found = true
 					return true
 				}

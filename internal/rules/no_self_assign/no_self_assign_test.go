@@ -81,6 +81,12 @@ func TestNoSelfAssignRule(t *testing.T) {
 					{MessageId: "selfAssignment", Line: 1, Column: 5},
 				},
 			},
+			{
+				Code: `\u0061 = \u0061`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Message: "'\\u0061' is assigned to itself.", Line: 1, Column: 10},
+				},
+			},
 
 			// Array destructuring
 			{
@@ -221,6 +227,61 @@ func TestNoSelfAssignRule(t *testing.T) {
 				Code: `({a, b} = {a, ...x, b})`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 21},
+				},
+			},
+			// Continue past an earlier same-name property whose value differs.
+			// ESLint compares every matching right-hand property, including duplicates.
+			{
+				Code: `({a} = {a: other, a, a})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Message: "'a' is assigned to itself.", Line: 1, Column: 19},
+					{MessageId: "selfAssignment", Message: "'a' is assigned to itself.", Line: 1, Column: 22},
+				},
+			},
+			// Only properties after the final spread have a statically known value.
+			{
+				Code: `({a} = {a, ...source, a: other, a})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 33},
+				},
+			},
+			// An empty string is a valid static property name, not the sentinel for
+			// an unknown computed property.
+			{
+				Code: `({"": value} = {"": value})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Message: "'value' is assigned to itself.", Line: 1, Column: 21},
+				},
+			},
+			// Exercise the allocation-free cached path with reversed properties.
+			// Message text verifies that report order still follows left-hand
+			// property order.
+			{
+				Code: `({p00: v00, p01: v01, p02: v02, p03: v03, p04: v04, p05: v05, p06: v06, p07: v07, p08: v08, p09: v09, p10: v10, p11: v11, p12: v12, p13: v13, p14: v14, p15: v15} = {p15: v15, p14: v14, p13: v13, p12: v12, p11: v11, p10: v10, p09: v09, p08: v08, p07: v07, p06: v06, p05: v05, p04: v04, p03: v03, p02: v02, p01: v01, p00: v00})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Message: "'v00' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v01' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v02' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v03' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v04' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v05' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v06' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v07' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v08' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v09' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v10' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v11' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v12' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v13' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v14' is assigned to itself."},
+					{MessageId: "selfAssignment", Message: "'v15' is assigned to itself."},
+				},
+			},
+			// Thirty-three right-hand properties cross the indexing threshold.
+			{
+				Code: `({target} = {p00: v00, p01: v01, p02: v02, p03: v03, p04: v04, p05: v05, p06: v06, p07: v07, p08: v08, p09: v09, p10: v10, p11: v11, p12: v12, p13: v13, p14: v14, p15: v15, p16: v16, p17: v17, p18: v18, p19: v19, p20: v20, p21: v21, p22: v22, p23: v23, p24: v24, p25: v25, p26: v26, p27: v27, p28: v28, p29: v29, p30: v30, p31: v31, target})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Message: "'target' is assigned to itself."},
 				},
 			},
 

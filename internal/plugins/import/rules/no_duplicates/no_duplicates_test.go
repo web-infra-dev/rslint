@@ -825,6 +825,73 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 	}
 }
 
+func TestNoDuplicatesResolutionModeOverrides(t *testing.T) {
+	t.Parallel()
+
+	rootDir := fixtures.GetRootDir()
+	const fileName = "resolution-mode.ts"
+	filePath := tspath.ResolvePath(rootDir.Dir, fileName)
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
+		filePath: `import type { ImportType } from "conditional-package" with { "resolution-mode": "import" };
+import type { RequireType } from "conditional-package" with { "resolution-mode": "require" };`,
+		tspath.ResolvePath(rootDir.Dir, "tsconfig.resolution-mode.json"): `{
+  "compilerOptions": {"module": "node16", "moduleResolution": "node16", "target": "es2020"},
+  "files": ["resolution-mode.ts"]
+}`,
+		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/package.json"): `{
+  "name": "conditional-package",
+  "exports": {".": {"import": "./import.d.ts", "require": "./require.d.ts"}}
+}`,
+		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/import.d.ts"):  `export interface ImportType { kind: "import" }`,
+		tspath.ResolvePath(rootDir.Dir, "node_modules/conditional-package/require.d.ts"): `export interface RequireType { kind: "require" }`,
+	})
+	program, err := utils.CreateProgram(
+		true,
+		fs,
+		rootDir.Dir,
+		"tsconfig.resolution-mode.json",
+		utils.CreateCompilerHost(rootDir.Dir, fs),
+	)
+	if err != nil {
+		t.Fatalf("failed to create program: %v", err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatalf("source file %q not found", filePath)
+	}
+
+	var resolvedPaths []string
+	for _, statement := range sourceFile.Statements.Nodes {
+		moduleSpecifier := statement.AsImportDeclaration().ModuleSpecifier
+		resolved := program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
+		if resolved == nil {
+			t.Fatalf("import on line %d did not resolve", len(resolvedPaths)+1)
+		}
+		resolvedPaths = append(resolvedPaths, resolved.ResolvedFileName)
+	}
+	if len(resolvedPaths) != 2 || resolvedPaths[0] == resolvedPaths[1] {
+		t.Fatalf("resolution-mode overrides did not select distinct targets: %v", resolvedPaths)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:         program,
+		File:            sourceFile.FileName(),
+		HasTypeInfo:     true,
+		GetRulesForFile: noDuplicatesConfiguredRules,
+		ExcludePaths:    []string{},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandNone,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("imports resolved with different modes were reported as duplicates: %#v", diagnostics)
+	}
+}
+
 type diagnosticIdentity struct {
 	Range    [2]int
 	RuleName string

@@ -19,6 +19,7 @@ export default defineConfig({
     './tests/cli/js-config/config-discovery.test.ts',
     './tests/cli/js-config/dir-args.test.ts',
     './tests/cli/js-config/config-ignores-filter.test.ts',
+    './tests/cli/js-config/language-options-globals.test.ts',
     './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',
@@ -139,6 +140,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-cycle.test.ts',
     './tests/eslint-plugin-import/rules/no-default-export.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
+    './tests/eslint-plugin-import/rules/no-restricted-paths.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
@@ -433,6 +435,7 @@ export default defineConfig({
     './tests/eslint/rules/no-regex-spaces.test.ts',
     './tests/eslint/rules/no-redeclare.test.ts',
     './tests/eslint/rules/prefer-regex-literals.test.ts',
+    './tests/eslint/rules/preserve-caught-error.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-restricted-globals.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
@@ -440,6 +443,7 @@ export default defineConfig({
     './tests/eslint/rules/no-obj-calls.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',
     './tests/eslint/rules/no-unreachable.test.ts',
+    './tests/eslint/rules/no-unreachable-loop.test.ts',
     './tests/eslint/rules/no-unsafe-finally.test.ts',
     './tests/eslint/rules/no-unsafe-negation.test.ts',
     './tests/eslint/rules/no-throw-literal.test.ts',
@@ -493,6 +497,7 @@ export default defineConfig({
     './tests/eslint/rules/require-await.test.ts',
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
+    './tests/eslint/rules/unicode-bom.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
@@ -545,6 +550,8 @@ export default defineConfig({
 
     // rstest
     './tests/rstest/rules/no-commented-out-tests.test.ts',
+    './tests/rstest/rules/no-conditional-expect.test.ts',
+    './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
 
@@ -565,6 +572,7 @@ export default defineConfig({
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-unicorn
+    './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',

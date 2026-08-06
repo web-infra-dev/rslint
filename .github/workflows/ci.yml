@@ -24,6 +24,7 @@ jobs:
   test-go:
     name: Test Go
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -45,7 +46,7 @@ jobs:
         uses: ./.github/actions/windows-disable-cpu-hogs
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
 

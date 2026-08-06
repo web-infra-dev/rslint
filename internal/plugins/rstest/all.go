@@ -2,6 +2,8 @@ package rstest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -10,6 +12,8 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		no_commented_out_tests.NoCommentedOutTestsRule,
+		no_conditional_expect.NoConditionalExpectRule,
+		no_disabled_tests.NoDisabledTestsRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_mocks_import.NoMocksImportRule,
 	}

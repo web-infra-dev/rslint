@@ -229,7 +229,7 @@ func preferTypeScriptDiagnostic(candidate rule.RuleDiagnostic, current rule.Rule
 // applyFixPass applies auto-fixes for all files in diagnosticsByFile,
 // writes fixed content to disk, and returns the number of issues fixed. Write
 // failures are returned after all independent files have been attempted.
-func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) (int, error) {
+func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic, fsys vfs.FS) (int, error) {
 	fixed := 0
 	fileNames := make([]string, 0, len(diagnosticsByFile))
 	for fileName := range diagnosticsByFile {
@@ -250,7 +250,13 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) (int, erro
 			continue
 		}
 
+		// The parsed text has no byte order mark — decoding the file consumed
+		// it — so put it back before fixing. ApplyRuleFixes carries it through
+		// to the bytes written here, and drops it only for a fix that asks.
 		originalContent := diagnosticsWithFixes[0].SourceFile.Text()
+		if utils.SourceHasBOM(fsys, fileName) {
+			originalContent = utils.BOM + originalContent
+		}
 		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
 
 		if wasFixed {
@@ -962,6 +968,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
+		Cwd:                   cwd,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 		TargetFiles:           targetsByProgram,
 		GetRulesForFile:       rulesForFile,
@@ -1034,7 +1041,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	const maxFixPasses = 10
 	if fix && len(allDiags) > 0 {
 		diagnosticsByFile := groupDiagsByFile(allDiags)
-		passFixed, fixErr := applyFixPass(diagnosticsByFile)
+		passFixed, fixErr := applyFixPass(diagnosticsByFile, fs)
 		// Replace the entire source generation after every write attempt and
 		// before any Program rebuild. os.WriteFile may truncate or partially
 		// mutate a file even when it ultimately returns an error, and whole-
@@ -1109,6 +1116,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
+				Cwd:                   cwd,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 				TargetFiles:           fixTargetsByProgram,
 				GetRulesForFile:       fixRulesForFile,
@@ -1164,7 +1172,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				break
 			}
 
-			passFixed, fixErr := applyFixPass(groupDiagsByFile(passDiags))
+			passFixed, fixErr := applyFixPass(groupDiagsByFile(passDiags), fs)
 			// See the first fix pass above: invalidate before inspecting the
 			// result so a partially successful write can never feed a rebuild.
 			buildContext.InvalidateSourceSnapshots()

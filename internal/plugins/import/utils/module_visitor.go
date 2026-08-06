@@ -38,6 +38,12 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			return
 		}
 
+		// A recovered parse of incomplete source can leave `import()` with no
+		// arguments at all.
+		if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			return
+		}
+
 		modulePath := call.Arguments.Nodes[0]
 		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
 			return
@@ -48,17 +54,19 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 
 	// for CommonJS `require` calls
 	checkCommon := func(call *ast.CallExpression) {
-		if call.Expression.Kind != ast.KindIdentifier {
+		// ESTree has no parenthesized-expression node, so upstream sees a bare
+		// `require` identifier through any number of parentheses.
+		callee := ast.SkipParentheses(call.Expression)
+
+		if !ast.IsIdentifier(callee) {
 			return
 		}
 
-		callee := call.Expression.AsIdentifier()
-
-		if callee.Text != "require" {
+		if callee.AsIdentifier().Text != "require" {
 			return
 		}
 
-		if len(call.Arguments.Nodes) < 1 {
+		if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 			return
 		}
 

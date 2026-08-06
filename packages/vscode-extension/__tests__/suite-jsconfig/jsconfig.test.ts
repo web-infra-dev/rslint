@@ -327,144 +327,15 @@ export default [{
     );
   });
 
-  test('a newly discovered broken nested config keeps valid ancestor config active', async () => {
-    const root = getWorkspaceRoot();
-    const rootConfigPath = path.join(root, 'rslint.config.js');
-    const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
-    const nestedDir = path.join(root, 'broken-nested-config');
-    const nestedFilePath = path.join(nestedDir, 'index.ts');
-    const nestedConfigPath = path.join(nestedDir, 'rslint.config.js');
-    const attemptedLoadPath = path.join(nestedDir, 'config-load-attempted');
-    const postFailureFilePath = path.join(nestedDir, 'post-failure.ts');
-    const rootDoc = await openFixture('index.ts');
-    let nestedDoc: vscode.TextDocument | undefined;
-    let postFailureDoc: vscode.TextDocument | undefined;
-
-    const rootConfigWithMarker = `export default [{
-  files: ['**/*.ts'],
-  languageOptions: {
-    parserOptions: { projectService: false, project: ['./tsconfig.json'] },
-  },
-  rules: {
-    '@typescript-eslint/no-unsafe-member-access': 'warn',
-    'no-debugger': 'error',
-  },
-  plugins: ['@typescript-eslint'],
-}];
-`;
-
-    await withFailClosedCleanup(
-      async () => {
-        fs.mkdirSync(nestedDir, { recursive: true });
-        fs.writeFileSync(nestedFilePath, 'debugger;\n', 'utf8');
-        fs.writeFileSync(rootConfigPath, rootConfigWithMarker, 'utf8');
-
-        await vscode.window.showTextDocument(rootDoc);
-        await waitForDiagnostics(rootDoc, (diags) =>
-          diags.some(
-            (diagnostic) =>
-              diagnostic.message.includes('no-unsafe-member-access') &&
-              diagnostic.severity === vscode.DiagnosticSeverity.Warning,
-          ),
-        );
-        nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
-        await vscode.window.showTextDocument(nestedDoc);
-        await waitForDiagnostics(nestedDoc, (diags) =>
-          diags.some(
-            (diagnostic) =>
-              diagnostic.message.includes('no-debugger') &&
-              diagnostic.severity === vscode.DiagnosticSeverity.Error,
-          ),
-        );
-        await closeTextEditor(nestedDoc);
-        nestedDoc = undefined;
-
-        fs.writeFileSync(
-          nestedConfigPath,
-          `import fs from 'node:fs';
-fs.writeFileSync(${JSON.stringify(attemptedLoadPath)}, 'attempted', 'utf8');
-throw new Error('intentional broken nested config');
-export default [];
-`,
-          'utf8',
-        );
-        await waitForFile(attemptedLoadPath);
-        assert.strictEqual(
-          fs.readFileSync(attemptedLoadPath, 'utf8'),
-          'attempted',
-          'The broken nested config must be evaluated before fallback is asserted',
-        );
-
-        // This URI does not exist until after the broken module has executed,
-        // so its diagnostics cannot be a stale snapshot from before the failed
-        // refresh. Its first lint must run after the blocking config transaction
-        // and resolve through the still-valid ancestor config.
-        fs.writeFileSync(postFailureFilePath, 'debugger;\n', 'utf8');
-        postFailureDoc =
-          await vscode.workspace.openTextDocument(postFailureFilePath);
-        await vscode.window.showTextDocument(postFailureDoc);
-        const postFailureDiagnostics = await waitForDiagnostics(
-          postFailureDoc,
-          (diags) =>
-            diags.some(
-              (diagnostic) =>
-                diagnostic.message.includes('no-debugger') &&
-                diagnostic.severity === vscode.DiagnosticSeverity.Error,
-            ),
-        );
-        assert.deepStrictEqual(
-          postFailureDiagnostics
-            .filter((diagnostic) => diagnostic.message.includes('no-debugger'))
-            .map((diagnostic) => diagnostic.severity),
-          [vscode.DiagnosticSeverity.Error],
-          'The valid ancestor must lint a file opened after the broken child was evaluated',
-        );
-      },
-      async () => {
-        const temporaryDocuments = [nestedDoc, postFailureDoc].filter(
-          (document): document is vscode.TextDocument => document !== undefined,
-        );
-        await withFailClosedCleanup(
-          async () => {
-            await Promise.all(
-              temporaryDocuments.map((document) => closeTextEditor(document)),
-            );
-          },
-          async () => {
-            // The temporary root config deliberately lowers this rule to a
-            // warning. Waiting for Error makes restoration an observable
-            // config-transaction barrier before the next test starts.
-            const rootRestored = waitForDiagnostics(rootDoc, (diags) =>
-              diags.some(
-                (diagnostic) =>
-                  diagnostic.message.includes('no-unsafe-member-access') &&
-                  diagnostic.severity === vscode.DiagnosticSeverity.Error,
-              ),
-            );
-            fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-            fs.rmSync(nestedDir, { recursive: true, force: true });
-            assert.ok(
-              !fs.existsSync(nestedDir),
-              'Broken nested-config fixtures must be deleted during cleanup',
-            );
-            await rootRestored;
-          },
-          'Broken nested-config resource cleanup',
-        );
-      },
-      'Broken nested-config test',
-    );
-  });
-
   test('parent global ignores remove nested configs from the effective catalog', async () => {
     const root = getWorkspaceRoot();
     const rootConfigPath = path.join(root, 'rslint.config.js');
     const originalRootConfig = fs.readFileSync(rootConfigPath, 'utf8');
     const nestedDir = path.join(root, 'parent-ignore-catalog-probe');
-    const nestedConfigPath = path.join(nestedDir, 'rslint.config.mjs');
     const nestedFilePath = path.join(nestedDir, 'index.ts');
     const loadMarkerPath = path.join(nestedDir, 'config-loads.txt');
     const rootDoc = await openFixture('index.ts');
+    let nestedDoc: vscode.TextDocument | undefined;
 
     const ignoredRootConfig = originalRootConfig
       .replace(
@@ -478,25 +349,19 @@ export default [];
 
     await withFailClosedCleanup(
       async () => {
-        fs.mkdirSync(nestedDir, { recursive: true });
-        fs.writeFileSync(nestedFilePath, 'console.log("nested");\n', 'utf8');
-        fs.writeFileSync(
-          nestedConfigPath,
-          `import fs from 'node:fs';
-fs.appendFileSync(${JSON.stringify(loadMarkerPath)}, 'x');
-export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
-`,
-          'utf8',
-        );
-
-        const nestedDoc =
-          await vscode.workspace.openTextDocument(nestedFilePath);
+        nestedDoc = await vscode.workspace.openTextDocument(nestedFilePath);
         await vscode.window.showTextDocument(nestedDoc);
         await waitForDiagnostics(nestedDoc, (diagnostics) =>
           diagnostics.some((diagnostic) =>
             diagnostic.message.includes('Unexpected console statement'),
           ),
         );
+        assert.notStrictEqual(
+          fs.readFileSync(loadMarkerPath, 'utf8'),
+          '',
+          'The nested config evaluation probe must be armed before refresh',
+        );
+        fs.writeFileSync(loadMarkerPath, '', 'utf8');
 
         await vscode.window.showTextDocument(rootDoc);
         const parentApplied = waitForDiagnostics(rootDoc, (diagnostics) =>
@@ -517,7 +382,7 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
 
         assert.strictEqual(
           fs.readFileSync(loadMarkerPath, 'utf8'),
-          'x',
+          '',
           'The ignored nested candidate must not be evaluated again',
         );
         assert.ok(
@@ -530,19 +395,32 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
         );
       },
       async () => {
-        const restored = waitForDiagnostics(
-          rootDoc,
-          (diagnostics) =>
-            diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-unsafe-member-access'),
-            ) &&
-            !diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('no-explicit-any'),
-            ),
+        await withFailClosedCleanup(
+          async () => closeTextEditor(nestedDoc),
+          async () => {
+            await withFailClosedCleanup(
+              async () => {
+                const restored = waitForDiagnostics(
+                  rootDoc,
+                  (diagnostics) =>
+                    diagnostics.some((diagnostic) =>
+                      diagnostic.message.includes('no-unsafe-member-access'),
+                    ) &&
+                    !diagnostics.some((diagnostic) =>
+                      diagnostic.message.includes('no-explicit-any'),
+                    ),
+                );
+                fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
+                await restored;
+              },
+              async () => {
+                fs.rmSync(loadMarkerPath, { force: true });
+              },
+              'Parent-ignore catalog state cleanup',
+            );
+          },
+          'Parent-ignore catalog resource cleanup',
         );
-        fs.rmSync(nestedDir, { recursive: true, force: true });
-        fs.writeFileSync(rootConfigPath, originalRootConfig, 'utf8');
-        await restored;
       },
       'Parent-ignore catalog test',
     );

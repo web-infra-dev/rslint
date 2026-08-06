@@ -260,6 +260,60 @@ func TestApplyRuleFixes(t *testing.T) {
 			expectedUnapplied:   1,
 			expectedFixedStatus: true,
 		},
+		{
+			// ESLint's unicode-bom fix: a range starting one position ahead of
+			// the text, where the mark lives.
+			name: "fix reaching before the text removes the byte order mark",
+			code: "\uFEFFvar a = 123;",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(-1, 0, "")),
+			},
+			expectedCode:        "var a = 123;",
+			expectedUnapplied:   0,
+			expectedFixedStatus: true,
+		},
+		{
+			name: "a fix elsewhere leaves the byte order mark in place",
+			code: "\uFEFFconst x = 1",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newInsertFix(11, ";")),
+			},
+			expectedCode:        "\uFEFFconst x = 1;",
+			expectedUnapplied:   0,
+			expectedFixedStatus: true,
+		},
+		{
+			name: "the mark is dropped once and the other fixes still land",
+			code: "\uFEFFconst foo = bar",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(-1, 0, "")),
+				newMockDiagnostic(newReplaceFix(6, 9, "baz")),
+				newMockDiagnostic(newInsertFix(15, ";")),
+			},
+			expectedCode:        "const baz = bar;",
+			expectedUnapplied:   0,
+			expectedFixedStatus: true,
+		},
+		{
+			name: "removing an absent mark changes nothing",
+			code: "var a = 123;",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(-1, 0, "")),
+			},
+			expectedCode:        "var a = 123;",
+			expectedUnapplied:   0,
+			expectedFixedStatus: true,
+		},
+		{
+			name: "inverted range is left for a later pass",
+			code: "var a = 123;",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(9, 4, "x")),
+			},
+			expectedCode:        "var a = 123;",
+			expectedUnapplied:   1,
+			expectedFixedStatus: false,
+		},
 	}
 
 	for _, tt := range tests {

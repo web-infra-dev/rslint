@@ -1,8 +1,6 @@
 package no_thenable
 
 import (
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -35,10 +33,7 @@ var NoThenableRule = rule.Rule{
 	Name:   "unicorn/no-thenable",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		state := &ruleState{
-			ctx:           ctx,
-			staticStrings: utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile),
-		}
+		state := &ruleState{ctx: ctx}
 
 		return rule.RuleListeners{
 			ast.KindObjectLiteralExpression: state.checkObjectExpression,
@@ -57,8 +52,16 @@ var NoThenableRule = rule.Rule{
 }
 
 type ruleState struct {
-	ctx           rule.RuleContext
-	staticStrings *utils.StaticStringEvaluator
+	ctx               rule.RuleContext
+	staticStrings     *utils.StaticStringEvaluator
+	staticStringCache *staticStringCacheEntry
+}
+
+type staticStringCacheEntry struct {
+	name       string
+	identifier *ast.Node
+	symbol     *ast.Symbol
+	value      string
 }
 
 func (state *ruleState) checkObjectExpression(node *ast.Node) {
@@ -107,17 +110,33 @@ func (state *ruleState) checkAssignmentExpression(node *ast.Node) {
 }
 
 func (state *ruleState) checkCallExpression(node *ast.Node) {
-	state.checkDefinePropertyCall(node)
-	state.checkFromEntriesCall(node)
-}
-
-func (state *ruleState) checkDefinePropertyCall(node *ast.Node) {
-	if !isNonOptionalMethodCall(node, []string{"Object", "Reflect"}, "defineProperty", 3, -1) {
+	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{})
+	if !ok {
 		return
 	}
 
+	methodName := call.Property.AsIdentifier().Text
+	if methodName != "defineProperty" && methodName != "fromEntries" {
+		return
+	}
+
+	object := ast.SkipParentheses(call.Object)
+	if object == nil || object.Kind != ast.KindIdentifier {
+		return
+	}
+	objectName := object.AsIdentifier().Text
 	args := node.Arguments()
-	if ast.IsSpreadElement(args[0]) {
+
+	switch methodName {
+	case "defineProperty":
+		state.checkDefinePropertyCall(objectName, args)
+	case "fromEntries":
+		state.checkFromEntriesCall(objectName, args)
+	}
+}
+
+func (state *ruleState) checkDefinePropertyCall(objectName string, args []*ast.Node) {
+	if (objectName != "Object" && objectName != "Reflect") || len(args) < 3 || ast.IsSpreadElement(args[0]) {
 		return
 	}
 
@@ -129,13 +148,8 @@ func (state *ruleState) checkDefinePropertyCall(node *ast.Node) {
 	state.ctx.ReportNode(reportExpressionNode(secondArgument), messageObject)
 }
 
-func (state *ruleState) checkFromEntriesCall(node *ast.Node) {
-	if !isNonOptionalMethodCall(node, []string{"Object"}, "fromEntries", -1, 1) {
-		return
-	}
-
-	args := node.Arguments()
-	if len(args) != 1 || ast.IsSpreadElement(args[0]) {
+func (state *ruleState) checkFromEntriesCall(objectName string, args []*ast.Node) {
+	if objectName != "Object" || len(args) != 1 || ast.IsSpreadElement(args[0]) {
 		return
 	}
 
@@ -262,7 +276,7 @@ func (state *ruleState) staticPropertyName(name *ast.Node) (string, bool) {
 	}
 
 	if name.Kind == ast.KindComputedPropertyName {
-		return state.staticStrings.Eval(name.AsComputedPropertyName().Expression)
+		return state.staticString(name.AsComputedPropertyName().Expression)
 	}
 
 	return utils.GetStaticPropertyName(name)
@@ -290,8 +304,79 @@ func (state *ruleState) thenAccessReportNode(node *ast.Node) (*ast.Node, bool) {
 }
 
 func (state *ruleState) isStringThen(node *ast.Node) bool {
-	value, ok := state.staticStrings.Eval(node)
+	value, ok := state.staticString(node)
 	return ok && value == "then"
+}
+
+func (state *ruleState) staticString(node *ast.Node) (string, bool) {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return "", false
+	}
+
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text, true
+	case ast.KindIdentifier:
+		return state.staticIdentifierString(node)
+	default:
+		return state.staticStringEvaluator().Eval(node)
+	}
+}
+
+func (state *ruleState) staticIdentifierString(identifier *ast.Node) (string, bool) {
+	if value, ok := state.cachedStaticIdentifier(identifier); ok {
+		return value, true
+	}
+
+	value, ok := state.staticStringEvaluator().Eval(identifier)
+	if ok && state.ctx.Refs != nil {
+		state.rememberStaticIdentifier(identifier, value)
+	}
+	return value, ok
+}
+
+func (state *ruleState) cachedStaticIdentifier(identifier *ast.Node) (string, bool) {
+	if state.ctx.Refs == nil || state.staticStringCache == nil {
+		return "", false
+	}
+
+	// Keep the first occurrence on the canonical evaluator path. Only a
+	// same-spelled subsequent candidate pays for RefStore resolution, which
+	// confirms the binding identity before reusing the last result. A single
+	// entry bounds memory on generated files with many one-off static keys.
+	entry := state.staticStringCache
+	if entry.name != identifier.AsIdentifier().Text {
+		return "", false
+	}
+	currentSymbol := state.ctx.Refs.Resolve(identifier)
+	if currentSymbol == nil {
+		return "", false
+	}
+	if entry.symbol == nil {
+		entry.symbol = state.ctx.Refs.Resolve(entry.identifier)
+	}
+	return entry.value, entry.symbol == currentSymbol
+}
+
+func (state *ruleState) rememberStaticIdentifier(identifier *ast.Node, value string) {
+	if state.staticStringCache == nil {
+		state.staticStringCache = &staticStringCacheEntry{}
+	}
+	*state.staticStringCache = staticStringCacheEntry{
+		name:       identifier.AsIdentifier().Text,
+		identifier: identifier,
+		value:      value,
+	}
+}
+
+func (state *ruleState) staticStringEvaluator() *utils.StaticStringEvaluator {
+	if state.staticStrings == nil {
+		state.staticStrings = utils.NewStaticStringEvaluatorWithSourceFile(state.ctx.TypeChecker, state.ctx.SourceFile)
+	}
+	return state.staticStrings
 }
 
 func reportPropertyNameNode(name *ast.Node) *ast.Node {
@@ -307,28 +392,6 @@ func reportExpressionNode(node *ast.Node) *ast.Node {
 		return unwrapped
 	}
 	return node
-}
-
-// isNonOptionalMethodCall mirrors unicorn's isMethodCall with computed:false,
-// optionalCall:false, and optionalMember:false. The wider
-// utils.IsSpecificMemberAccess intentionally accepts bracket access and
-// optional chains, which would diverge from this rule's upstream matcher.
-func isNonOptionalMethodCall(node *ast.Node, objects []string, method string, minimumArguments int, argumentsLength int) bool {
-	options := unicornutil.DotMethodCallOptions{Method: method}
-	if minimumArguments >= 0 {
-		options.MinimumArguments = &minimumArguments
-	}
-	if argumentsLength >= 0 {
-		options.ArgumentsLength = &argumentsLength
-	}
-	call, ok := unicornutil.MatchDotMethodCall(node, options)
-	if !ok {
-		return false
-	}
-
-	object := ast.SkipParentheses(call.Object)
-	return object != nil && object.Kind == ast.KindIdentifier &&
-		slices.Contains(objects, object.AsIdentifier().Text)
 }
 
 func isIdentifierNamed(node *ast.Node, name string) bool {

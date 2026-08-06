@@ -37,13 +37,13 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			{Code: `function f(Object) { return Object.assign({}, a); }`},
 
 			// ---- Branch lock-in: "Object" declared off via languageOptions.globals ----
-			{Code: `Object.assign({}, foo)`, Globals: map[string]bool{"Object": false}},
+			{Code: `Object.assign({}, foo)`, Globals: map[string]any{"Object": "off"}},
 
 			// ---- Branch lock-in: "globalThis" declared off via languageOptions.globals ----
-			{Code: `globalThis.Object.assign({}, foo)`, Globals: map[string]bool{"globalThis": false}},
+			{Code: `globalThis.Object.assign({}, foo)`, Globals: map[string]any{"globalThis": "off"}},
 
 			// ---- Branch lock-in: "window" declared off via languageOptions.globals ----
-			{Code: `window.Object.assign({}, foo)`, Globals: map[string]bool{"window": false}},
+			{Code: `window.Object.assign({}, foo)`, Globals: map[string]any{"window": "off"}},
 
 			// ---- Branch lock-in: "window" shadowed by a function parameter ----
 			{Code: `function f(window) { return window.Object.assign({}, a); }`},

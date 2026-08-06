@@ -111,6 +111,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
@@ -142,12 +143,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
+	"github.com/web-infra-dev/rslint/internal/rules/preserve_caught_error"
 	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
+	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -257,6 +260,7 @@ func GetAllRules() []rule.Rule {
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_object_spread.PreferObjectSpreadRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+		preserve_caught_error.PreserveCaughtErrorRule,
 		prefer_regex_literals.PreferRegexLiteralsRule,
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
@@ -280,6 +284,7 @@ func GetAllRules() []rule.Rule {
 		no_unsafe_finally.NoUnsafeFinallyRule,
 		no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule,
 		no_unreachable.NoUnreachableRule,
+		no_unreachable_loop.NoUnreachableLoopRule,
 		require_atomic_updates.RequireAtomicUpdatesRule,
 		object_shorthand.ObjectShorthandRule,
 		no_unused_expressions.NoUnusedExpressionsRule,
@@ -302,5 +307,6 @@ func GetAllRules() []rule.Rule {
 		require_yield.RequireYieldRule,
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
+		unicode_bom.UnicodeBomRule,
 	}
 }

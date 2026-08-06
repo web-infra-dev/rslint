@@ -2,13 +2,13 @@ package no_done_callback
 
 import (
 	"fmt"
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	"slices"
 )
 
 // Message Builders
@@ -86,7 +86,7 @@ var NoDoneCallbackRule = rule.Rule{
 				callback := findCallbackArgument(callExpr, jestFnCall, isJestEach)
 				callbackArgIndex := boolToInt(isJestEach)
 				if callback == nil ||
-					!utils.IsFunction(callback) ||
+					!testFramework.IsFunction(callback) ||
 					len(callback.Parameters()) == 0 ||
 					len(callback.Parameters()) != 1+callbackArgIndex {
 					return

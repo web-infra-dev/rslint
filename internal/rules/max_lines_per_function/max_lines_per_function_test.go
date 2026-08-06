@@ -604,7 +604,7 @@ return 1;
 			// --- Tagged template: function expression as tag is NOT IIFE
 			//     (TaggedTemplateExpression, not CallExpression).
 			{
-				Code: "(function f() {\nreturn 1;\n})`tpl`;",
+				Code:    "(function f() {\nreturn 1;\n})`tpl`;",
 				Options: map[string]interface{}{"max": 3, "IIFEs": false},
 			},
 
@@ -1005,6 +1005,46 @@ if ( x === y ) {
 					{
 						MessageId: "exceed",
 						Message:   "Function 'nested' has too many lines (4). Maximum allowed is 2.",
+					},
+				},
+			},
+			// Exercise the lazy line-count cache across a disjoint function range,
+			// a nested range, and a directly adjacent range. Comment-only and blank
+			// lines must remain excluded from both the parent and child counts.
+			{
+				Code: `function first() {
+return 1;
+}
+
+const gap = 1;
+
+function outer() {
+// comment
+function inner() {
+
+return 1;
+}
+}
+function last() {
+return 1;
+}`,
+				Options: map[string]interface{}{"max": 2, "skipComments": true, "skipBlankLines": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'first' has too many lines (3). Maximum allowed is 2.",
+					},
+					{
+						MessageId: "exceed",
+						Message:   "Function 'outer' has too many lines (5). Maximum allowed is 2.",
+					},
+					{
+						MessageId: "exceed",
+						Message:   "Function 'inner' has too many lines (3). Maximum allowed is 2.",
+					},
+					{
+						MessageId: "exceed",
+						Message:   "Function 'last' has too many lines (3). Maximum allowed is 2.",
 					},
 				},
 			},

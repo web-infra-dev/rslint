@@ -1273,8 +1273,8 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 			// explicit `off` setting un-declares the builtin from the global
 			// scope (ESLint removes the variable entirely), so shadowing it
 			// no longer reports.
-			for name, declared := range ctx.Globals {
-				if declared {
+			for name, access := range ctx.Globals {
+				if access.IsDeclared() {
 					builtinGlobals[name] = true
 				} else {
 					delete(builtinGlobals, name)

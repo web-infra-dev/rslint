@@ -227,8 +227,8 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			// ---- String() with unresolvable arg → not flagged ----
 			{Code: `setTimeout(String(x));`},
 			{Code: `setTimeout(String(x + y));`},
-			{Code: `setTimeout(Number('x'));`},   // Number() produces a number
-			{Code: `setTimeout(Boolean('x'));`},  // Boolean() produces a boolean
+			{Code: `setTimeout(Number('x'));`},  // Number() produces a number
+			{Code: `setTimeout(Boolean('x'));`}, // Boolean() produces a boolean
 			{Code: `function String(){} setTimeout(String('x'));`},
 
 			// ---- String.raw with unresolvable sub → not flagged ----
@@ -267,8 +267,8 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			// ---- Method on unresolvable receiver → not flagged ----
 			{Code: `setTimeout(foo().toString());`},
 			{Code: `setTimeout((typeof x).toUpperCase());`}, // typeof of unresolvable
-			{Code: `setTimeout(Array.from('x'));`}, // Array.from not in whitelist
-			{Code: "setTimeout(tag`x`);"}, // unknown tagged template
+			{Code: `setTimeout(Array.from('x'));`},          // Array.from not in whitelist
+			{Code: "setTimeout(tag`x`);"},                   // unknown tagged template
 
 			// SKIP upstream cases that depend on ESLint's `languageOptions.globals` /
 			// `sourceType` configuration, which rslint does not model. rslint's
@@ -291,12 +291,12 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			//   "self.setTimeout('code');"          { globals: {} }
 
 			// Config `off` un-declares the builtin
-			{Code: `setTimeout("x = 1;");`, Globals: map[string]bool{"setTimeout": false}},
-			{Code: `setInterval("x = 1;");`, Globals: map[string]bool{"setInterval": false}},
-			{Code: `execScript("x = 1;");`, Globals: map[string]bool{"execScript": false}},
-			{Code: `window.setTimeout("x = 1;");`, Globals: map[string]bool{"window": false}},
-			{Code: `globalThis.setTimeout("x = 1;");`, Globals: map[string]bool{"globalThis": false}},
-			{Code: `self.setTimeout("x = 1;");`, Globals: map[string]bool{"self": false}},
+			{Code: `setTimeout("x = 1;");`, Globals: map[string]any{"setTimeout": "off"}},
+			{Code: `setInterval("x = 1;");`, Globals: map[string]any{"setInterval": "off"}},
+			{Code: `execScript("x = 1;");`, Globals: map[string]any{"execScript": "off"}},
+			{Code: `window.setTimeout("x = 1;");`, Globals: map[string]any{"window": "off"}},
+			{Code: `globalThis.setTimeout("x = 1;");`, Globals: map[string]any{"globalThis": "off"}},
+			{Code: `self.setTimeout("x = 1;");`, Globals: map[string]any{"self": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Direct calls with string literal ----

@@ -1,9 +1,12 @@
 package utils
 
+// cspell:ignore synctest
+
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -130,51 +133,136 @@ func TestParallelProgramFSDoesNotSerializeDifferentPaths(t *testing.T) {
 func TestParallelProgramFSPanicReleasesWaitersAndRetries(t *testing.T) {
 	t.Parallel()
 
+	synctest.Test(t, func(t *testing.T) {
+		testParallelProgramFSPanicRemovesFailedFlight(t)
+		testParallelProgramFSPanicReleasesWaiterAndRetries(t)
+	})
+}
+
+func testParallelProgramFSPanicRemovesFailedFlight(t *testing.T) {
+	const (
+		path          = "/panic-probe"
+		injectedPanic = "injected filesystem panic"
+	)
+
+	cached := newParallelProgramFS(&parallelProgramTestFS{
+		realpath: func(string) string { panic(injectedPanic) },
+	})
+	var ownerPanic any
+	func() {
+		defer func() { ownerPanic = recover() }()
+		cached.Realpath(path)
+	}()
+
+	if ownerPanic != injectedPanic {
+		t.Errorf("owner panic = %v, want %q", ownerPanic, injectedPanic)
+	}
+	if entry, loaded := cached.realpathCache.Load(path); loaded {
+		t.Errorf("panicking owner retained failed cache entry %T", entry)
+		cached.realpathCache.Delete(path)
+	}
+}
+
+func testParallelProgramFSPanicReleasesWaiterAndRetries(t *testing.T) {
+	const (
+		path          = "/panic-waiter"
+		injectedPanic = "injected filesystem panic"
+	)
+
 	var calls atomic.Int32
 	firstStarted := make(chan struct{})
 	panicNow := make(chan struct{})
+	ownerReleased := false
+	defer func() {
+		if !ownerReleased {
+			close(panicNow)
+		}
+	}()
 	base := &parallelProgramTestFS{
 		realpath: func(path string) string {
 			if calls.Add(1) == 1 {
 				close(firstStarted)
 				<-panicNow
-				panic("injected filesystem panic")
+				panic(injectedPanic)
 			}
 			return path
 		},
 	}
 	cached := newParallelProgramFS(base)
-	ownerPanicked := make(chan bool, 1)
+	ownerPanic := make(chan any, 1)
 	go func() {
-		panicked := false
-		func() {
-			defer func() { panicked = recover() != nil }()
-			cached.Realpath("/panic")
-		}()
-		ownerPanicked <- panicked
+		defer func() { ownerPanic <- recover() }()
+		cached.Realpath(path)
 	}()
 	<-firstStarted
 
-	waiterResult := make(chan string, 1)
-	go func() { waiterResult <- cached.Realpath("/panic") }()
-	time.Sleep(25 * time.Millisecond)
-	close(panicNow)
-
-	if !<-ownerPanicked {
-		t.Fatal("owner panic was not preserved")
+	entry, loaded := cached.realpathCache.Load(path)
+	if !loaded {
+		t.Fatal("owner flight is missing from the cache")
 	}
+	ownerFlight, ok := entry.(*realpathFlight)
+	if !ok {
+		t.Fatalf("owner cache entry = %T, want *realpathFlight", entry)
+	}
+
+	waiterResult := make(chan string, 1)
+	go func() { waiterResult <- cached.Realpath(path) }()
+	// Once the bubble is idle, an empty result, one underlying call, and the
+	// original cache entry prove that the waiter is blocked on ownerFlight.
+	synctest.Wait()
+
+	waiterReturnedEarly := false
+	var result string
 	select {
-	case result := <-waiterResult:
-		if result != "/panic" {
-			t.Fatalf("retry after panic = %q", result)
+	case result = <-waiterResult:
+		waiterReturnedEarly = true
+		t.Errorf("waiter returned before owner panic: %q", result)
+	default:
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("underlying calls before owner panic = %d, want 1", got)
+	}
+	if actual, stillLoaded := cached.realpathCache.Load(path); !stillLoaded {
+		t.Error("owner flight disappeared before owner panic")
+	} else if actual != ownerFlight {
+		t.Errorf("cache entry before owner panic = %T, want original owner flight", actual)
+	}
+
+	// The probe above verifies that production panic cleanup deletes a failed
+	// flight. Delete this phase's flight first so this waiter isolates and tests
+	// the cleanup's release-and-retry behavior without a broken delete making it spin forever.
+	if !cached.realpathCache.CompareAndDelete(path, ownerFlight) {
+		t.Error("failed to remove owner flight before panic")
+		cached.realpathCache.Delete(path)
+	}
+	close(panicNow)
+	ownerReleased = true
+	if got := <-ownerPanic; got != injectedPanic {
+		t.Errorf("owner panic = %v, want %q", got, injectedPanic)
+	}
+
+	if !waiterReturnedEarly {
+		synctest.Wait()
+		select {
+		case result = <-waiterResult:
+		default:
+			t.Fatal("panic stranded a concurrent waiter")
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("panic stranded a concurrent waiter")
+	}
+	if result != path {
+		t.Fatalf("retry after panic = %q", result)
 	}
 	if got := calls.Load(); got != 2 {
 		t.Fatalf("underlying calls after retry = %d, want 2", got)
 	}
-	if cached.Realpath("/panic") != "/panic" || calls.Load() != 2 {
+	cachedValue, loaded := cached.realpathCache.Load(path)
+	if !loaded {
+		t.Fatal("successful retry was not cached")
+	}
+	if value, ok := cachedValue.(string); !ok || value != path {
+		t.Fatalf("cache entry after retry = %#v (%T), want plain string %q", cachedValue, cachedValue, path)
+	}
+	if cached.Realpath(path) != path || calls.Load() != 2 {
 		t.Fatal("successful retry was not cached")
 	}
 }

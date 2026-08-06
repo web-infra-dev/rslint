@@ -623,6 +623,11 @@ ruleTester.run('no-conditional-expect', {} as never, {
       errors: [{ messageId: 'conditionalExpect' }],
     },
     {
+      // Chained catches nest in the AST, so upstream's bool is cleared by every
+      // inner exit and it reports only one of the three. Each callback is its
+      // own conditional assertion, so we report all three. Deliberate
+      // divergence: see the package doc comment on
+      // internal/utils/test_framework/rules/no_conditional_expect.
       code: `
         it('works', async () => {
           await Promise.resolve()
@@ -634,9 +639,14 @@ ruleTester.run('no-conditional-expect', {} as never, {
             .catch(error => expect(error).toBeInstanceOf(Error));
         });
       `,
-      errors: [{ messageId: 'conditionalExpect' }],
+      errors: [
+        { messageId: 'conditionalExpect' },
+        { messageId: 'conditionalExpect' },
+        { messageId: 'conditionalExpect' },
+      ],
     },
     {
+      // Same divergence as above.
       code: `
         it('works', async () => {
           await Promise.resolve()
@@ -645,7 +655,11 @@ ruleTester.run('no-conditional-expect', {} as never, {
             .catch(error => expect(error).toBeInstanceOf(Error));
         });
       `,
-      errors: [{ messageId: 'conditionalExpect' }],
+      errors: [
+        { messageId: 'conditionalExpect' },
+        { messageId: 'conditionalExpect' },
+        { messageId: 'conditionalExpect' },
+      ],
     },
     {
       code: `

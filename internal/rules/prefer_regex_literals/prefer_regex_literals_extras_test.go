@@ -52,8 +52,8 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// N/A: body-absent TS declarations are not RegExp call expressions.
 
 			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
-			{Code: "new RegExp('a');", Globals: map[string]bool{"RegExp": false}},
-			{Code: "new globalThis.RegExp('a');", Globals: map[string]bool{"globalThis": false}},
+			{Code: "new RegExp('a');", Globals: map[string]any{"RegExp": "off"}},
+			{Code: "new globalThis.RegExp('a');", Globals: map[string]any{"globalThis": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callee ----
@@ -285,7 +285,7 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// Config declares RegExp/globalThis as writable globals — still the builtins.
 			{
 				Code:    "new RegExp('a');",
-				Globals: map[string]bool{"RegExp": true},
+				Globals: map[string]any{"RegExp": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unexpectedRegExp",
 					Line:      1,

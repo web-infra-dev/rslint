@@ -34,9 +34,18 @@ func (vfs *OverlayVFS) FileExists(path string) bool {
 
 func (vfs *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
 	if src, ok := vfs.virtualFile(path); ok {
-		return src, ok
+		return strings.TrimPrefix(src, BOM), ok
 	}
 	return vfs.fs.ReadFile(path)
+}
+
+// SourceHasBOM answers for content this overlay supplies; anything else is the
+// underlying file system's to answer. See [BOMSource].
+func (vfs *OverlayVFS) SourceHasBOM(path string) bool {
+	if src, ok := vfs.virtualFile(path); ok {
+		return strings.HasPrefix(src, BOM)
+	}
+	return SourceHasBOM(vfs.fs, path)
 }
 
 func (vfs *OverlayVFS) DirectoryExists(path string) bool {
@@ -124,7 +133,7 @@ func (vfs *OverlayVFS) Stat(path string) vfs.FileInfo {
 	if src, ok := vfs.virtualFile(path); ok {
 		return &overlayVFSFileInfo{
 			name: path,
-			size: int64(len(src)),
+			size: int64(len(strings.TrimPrefix(src, BOM))),
 		}
 	}
 	return vfs.fs.Stat(path)

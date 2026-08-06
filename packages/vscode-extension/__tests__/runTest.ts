@@ -167,6 +167,13 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
       tests: path.resolve(__dirname, './suite-jsconfig'),
     },
+    // This regression intentionally leaves watched files in place. Give it a
+    // dedicated Host so cleanup starts only after every watcher has stopped.
+    {
+      name: 'Broken nested JS config tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
+      tests: path.resolve(__dirname, './suite-jsconfig-broken-nested'),
+    },
     {
       name: 'Monorepo config tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-monorepo'),
@@ -210,6 +217,11 @@ async function main(): Promise<void> {
       name: 'eslintPlugins tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
       tests: path.resolve(__dirname, './suite-eslint-plugins'),
+    },
+    {
+      name: 'unicode-bom tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-unicode-bom'),
+      tests: path.resolve(__dirname, './suite-unicode-bom'),
     },
   ];
 

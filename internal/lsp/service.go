@@ -964,16 +964,21 @@ type lintProgramLoader func(
 ) (*compiler.Program, *ast.SourceFile, error)
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, enforcePlugins, tsConfigPaths, fs, nil)
+	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
 	return result.Diagnostics, err
 }
 
+// runLintWithProgramLoader resolves one document against two distinct
+// directories: configCwd is the config's own path space, which a nested JS
+// config moves to its own directory, while processCwd is the server's working
+// directory that rules see as RuleContext.Cwd.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,
 	ctx context.Context,
 	rslintConfig config.RslintConfig,
 	cwd string,
+	processCwd string,
 	enforcePlugins bool,
 	tsConfigPaths []string,
 	fs vfs.FS,
@@ -1007,6 +1012,7 @@ func runLintWithProgramLoader(
 		program,
 		sourceFile,
 		configFilePath,
+		processCwd,
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
@@ -1014,10 +1020,43 @@ func runLintWithProgramLoader(
 	), nil
 }
 
+// rulesSkippedInEditors names the rules the language server never runs. A rule
+// belongs here when what it checks is a property of the file's bytes rather
+// than of its text: an editor's document holds text that has already been
+// decoded, so such a property is neither visible in the document nor reachable
+// by a text edit.
+var rulesSkippedInEditors = map[string]bool{
+	// unicode-bom checks for a leading byte order mark. An editor decodes the
+	// mark into the document's encoding — VS Code shows it in the status bar as
+	// "UTF-8 with BOM" — so the document text never carries it and no text edit
+	// adds or removes it. The file on disk is the only remaining witness, and an
+	// unsaved buffer may already disagree with it. `rslint --fix`, which rewrites
+	// the file itself, is where the rule applies.
+	"unicode-bom": true,
+}
+
+// rulesServedToEditors drops the rules the language server never runs. The
+// input is a cached slice shared across files, so filtering builds a new one
+// and an unaffected configuration keeps the original.
+func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
+	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+	if !slices.ContainsFunc(rules, skipped) {
+		return rules
+	}
+	served := make([]linter.ConfiguredRule, 0, len(rules))
+	for _, configured := range rules {
+		if !skipped(configured) {
+			served = append(served, configured)
+		}
+	}
+	return served
+}
+
 func lintSingleFile(
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
 	configFilePath string,
+	processCwd string,
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
@@ -1057,9 +1096,10 @@ func lintSingleFile(
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program:     program,
 		File:        sourceFile.FileName(),
+		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
+			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1244,6 +1284,7 @@ func (s *Server) runConfiguredLint(
 		ctx,
 		rslintConfig,
 		cwd,
+		s.cwd,
 		enforcePlugins,
 		tsConfigPaths,
 		s.fs,
@@ -1289,6 +1330,7 @@ func (s *Server) runConfiguredLintForContent(
 				program,
 				sourceFile,
 				configFilePath,
+				s.cwd,
 				true,
 				resolver,
 				rule.EditDemandAutofix,
@@ -1305,6 +1347,7 @@ func (s *Server) runConfiguredLintForContent(
 		program,
 		sourceFileForPath(program, filename, overlayFS),
 		configFilePath,
+		s.cwd,
 		false,
 		resolver,
 		rule.EditDemandAutofix,

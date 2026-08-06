@@ -190,6 +190,23 @@ func TestConstructorSuperRule(t *testing.T) {
 					{MessageId: "duplicate", Line: 1, Column: 67},
 				},
 			},
+			// Calls in later branch statements are each duplicates once an
+			// earlier branch has guaranteed the first super() call.
+			{
+				Code: `class A extends B { constructor() { if (a) { super(); } else { super(); } if (b) { super(); } else { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate"},
+					{MessageId: "duplicate"},
+				},
+			},
+			// The loop call is a duplicate both because super() was already
+			// called and because the loop can revisit it; report it only once.
+			{
+				Code: `class A extends B { constructor() { super(); while (true) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate"},
+				},
+			},
 
 			// super() inside a loop without a guaranteed break right after it
 			// can be revisited on a later iteration - a duplicate, regardless

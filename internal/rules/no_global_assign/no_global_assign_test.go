@@ -246,15 +246,52 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			// Var with computed property destructuring shadows
 			{Code: `const k = "x"; var {[k]: Object}: any = {}; Object = 1;`},
 
+			// A later parameter already owns the binding used by an earlier default.
+			{Code: `function f(x = (Object = 1), Object: any) {}`},
+
+			// Switch clauses share one lexical scope.
+			{Code: `switch (0) { case 0: Object = 1; break; case 1: let Object: any; }`},
+
+			// Var declarations are hoisted within class static blocks.
+			{Code: `class C { static { Object = 1; var Object: any; } }`},
+
 			// Config `off` un-declares the builtin
-			{Code: `Object = 1;`, Globals: map[string]bool{"Object": false}},
-			{Code: `String = 'test';`, Globals: map[string]bool{"String": false}},
+			{Code: `Object = 1;`, Globals: map[string]any{"Object": "off"}},
+			{Code: `String = 'test';`, Globals: map[string]any{"String": "off"}},
+
+			// `writable` lifts a builtin's implicit readonly setting
+			{Code: `Object = 1;`, Globals: map[string]any{"Object": "writable"}},
+			{Code: `String = 'test';`, Globals: map[string]any{"String": true}},
+			{Code: `/* global Object: writable */ Object = 1;`},
+			{Code: `/* global Object: writable */ Object = 1;`, Globals: map[string]any{"Object": "readonly"}},
+
+			// A writable project global is assignable
+			{Code: `myGlobal = 1;`, Globals: map[string]any{"myGlobal": "writable"}},
+			{Code: `/* global myGlobal: writable */ myGlobal = 1;`},
+
+			// A project global the config never declares is not this rule's concern
+			{Code: `myGlobal = 1;`},
+			{Code: `myGlobal = 1;`, Globals: map[string]any{"myGlobal": "off"}},
+
+			// A readonly declaration a local binding shadows
+			{Code: `function f() { let myGlobal = 0; myGlobal = 1; }`, Globals: map[string]any{"myGlobal": "readonly"}},
+
+			// An unusable setting leaves the earlier `off` in place
+			{Code: `/* global Object: off */ /* global Object: bogus */ Object = 1;`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
 			// Direct assignment to builtin
 			{
 				Code: `String = 'hello world';`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// eval is a read-only ECMAScript built-in
+			{
+				Code: `eval = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
 				},
@@ -326,10 +363,11 @@ func TestNoGlobalAssignRule(t *testing.T) {
 
 			// Multiple globals assigned
 			{
-				Code: `String = 1; Array = 2;`,
+				Code: `String = 1; Array = 2; String = 3;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
-					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 13},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'String' should not be modified.", Line: 1, Column: 1},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'Array' should not be modified.", Line: 1, Column: 13},
+					{MessageId: "globalShouldNotBeModified", Message: "Read-only global 'String' should not be modified.", Line: 1, Column: 24},
 				},
 			},
 
@@ -939,6 +977,39 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				},
 			},
 
+			// A body var does not shadow a write in a parameter default.
+			{
+				Code: `function f(x = (Object = 1)) { var Object: any; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 17},
+				},
+			},
+
+			// A switch-local binding does not escape the switch.
+			{
+				Code: `switch (0) { case 0: let Object: any; } Object = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 41},
+				},
+			},
+
+			// Local shadowing suppresses only writes within that scope.
+			{
+				Code: "Object = 1;\n{ let Object: any; Object = 2; }\nObject = 3;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+					{MessageId: "globalShouldNotBeModified", Line: 3, Column: 1},
+				},
+			},
+
+			// A nested type-only declaration does not shadow the value global.
+			{
+				Code: "function f() {\ninterface Object {}\nObject = 1;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 3, Column: 1},
+				},
+			},
+
 			// Iterator is a read-only global
 			{
 				Code: `Iterator = 1;`,
@@ -960,6 +1031,49 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Code: `DisposableStack = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// A readonly project global is read-only like a builtin
+			{
+				Code:    `myGlobal = 1;`,
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// The `globals` package spells readonly as false
+			{
+				Code:    `myGlobal = 1;`,
+				Globals: map[string]any{"myGlobal": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+
+			// A bare `/* global */` name is readonly
+			{
+				Code: `/* global myGlobal */ myGlobal = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 23},
+				},
+			},
+
+			// An inline `readonly` overrides a writable config setting
+			{
+				Code:    `/* global Object: readonly */ Object = 1;`,
+				Globals: map[string]any{"Object": "writable"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 31},
+				},
+			},
+
+			// An unusable setting leaves the earlier `readonly` in place
+			{
+				Code: `/* global myGlobal: readonly */ /* global myGlobal: bogus */ myGlobal = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 62},
 				},
 			},
 		},

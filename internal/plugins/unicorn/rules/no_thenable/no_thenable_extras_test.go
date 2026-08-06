@@ -8,6 +8,21 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+const repeatedStaticKeyCode = `const key = "then";
+const object = {[key]: 1};
+object[key] = 2;
+Object.defineProperty(object, key, {value: 3});
+Object.fromEntries([[key, 4]]);
+class Box {[key]() {}}`
+
+const shadowedStaticKeyCode = `const key = "then";
+const first = {[key]: 1};
+{
+	const key = "other";
+	const ignored = {[key]: 2};
+}
+const last = {[key]: 3};`
+
 // TestNoThenableExtras locks in branches and edge shapes that the upstream test
 // suite doesn't exercise. Each case carries an inline comment pointing at the
 // specific branch / Dimension 4 row / upstream issue it covers, so future
@@ -49,6 +64,9 @@ func TestNoThenableExtras(t *testing.T) {
 			tsValid("{ const String = { raw: () => \"then\" }; const foo = {[String.raw`then`]: 1} }"),
 			tsValid("let RawString = String; RawString = {raw: () => \"then\"} as any; const foo = {[RawString.raw`then`]: 1}"),
 			tsValid(`let key = "then"; key = "other"; const foo = {[key]: 1}`),
+			tsValid(`let key = "then"; key = "other"; const foo = {[key]: 1}; bar[key] = 2`),
+			tsValid(`var key = "then"; var key = "other"; const foo = {[key]: 1}`),
+			tsValid(`const first = second; const second = first; const foo = {[first]: 1}`),
 
 			// ---- Dimension 4: non-assignment member access is allowed ----
 			tsValid(`const value = foo.then`),
@@ -121,6 +139,28 @@ func TestNoThenableExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					expectedError(`const prefix = "th"; const foo = {[prefix + "en"]: {nested: {[prefix + "en"]: 1}}}`, `prefix + "en"`, messageIDObject, messageObject),
 					expectedError(`const prefix = "th"; const foo = {[prefix + "en"]: {nested: {[prefix + "en"]: 1}}}`, `prefix + "en"`, messageIDObject, messageObject, 2),
+				},
+			},
+			{
+				// Repeated references share one cached static value without
+				// changing diagnostic ranges, messages, or source order.
+				Code:     repeatedStaticKeyCode,
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					expectedError(repeatedStaticKeyCode, `key`, messageIDObject, messageObject, 2),
+					expectedError(repeatedStaticKeyCode, `key`, messageIDObject, messageObject, 3),
+					expectedError(repeatedStaticKeyCode, `key`, messageIDObject, messageObject, 4),
+					expectedError(repeatedStaticKeyCode, `key`, messageIDObject, messageObject, 5),
+					expectedError(repeatedStaticKeyCode, `key`, messageIDClass, messageClass, 6),
+				},
+			},
+			{
+				// Same-spelling bindings must never reuse each other's cached value.
+				Code:     shadowedStaticKeyCode,
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					expectedError(shadowedStaticKeyCode, `key`, messageIDObject, messageObject, 2),
+					expectedError(shadowedStaticKeyCode, `key`, messageIDObject, messageObject, 5),
 				},
 			},
 

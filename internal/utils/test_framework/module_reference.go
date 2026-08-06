@@ -200,6 +200,10 @@ func resolveModuleRequireBinding(declaration *ast.Node, importModule string) (st
 
 // IsModuleRequireCall reports whether node is require(importModule).
 func IsModuleRequireCall(node *ast.Node, importModule string) bool {
+	if node == nil {
+		return false
+	}
+
 	node = ast.SkipParentheses(node)
 	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
 		return false

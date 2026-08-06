@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 //go:embed prefer_ending_with_an_expect.schema.json
@@ -69,7 +70,7 @@ func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*regexp.Re
 		return true
 	}
 	return jestUtils.MatchesAssertFunctionName(
-		jestUtils.CalleeChainName(node.AsCallExpression().Expression),
+		testFramework.CalleeChainName(node.AsCallExpression().Expression),
 		patterns,
 	)
 }
@@ -88,7 +89,7 @@ var PreferEndingWithAnExpectRule = rule.Rule{
 					return
 				}
 
-				calleeName := jestUtils.CalleeChainName(call.Expression)
+				calleeName := testFramework.CalleeChainName(call.Expression)
 				parsedCall := jestUtils.ParseJestFnCall(node, ctx)
 				isJestTest := parsedCall != nil && parsedCall.Kind == jestUtils.JestFnTypeTest
 				isAdditionalTest := slices.Contains(parsedOptions.AdditionalTestBlockFunctions, calleeName)

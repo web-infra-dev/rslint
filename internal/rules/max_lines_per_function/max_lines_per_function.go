@@ -22,7 +22,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 		if opts.skipComments {
 			comments = ctx.Comments.All()
 		}
-		state := newLineState(ctx.SourceFile, comments, opts.skipComments)
+		state := newLineState(ctx.SourceFile, comments, opts.skipComments, opts.skipBlankLines)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -36,21 +36,12 @@ var MaxLinesPerFunctionRule = rule.Rule{
 				return
 			}
 
-			startLine, endLine := state.nodeLineRange(node)
-			lineCount := 0
-			for i := startLine; i <= endLine; i++ {
-				if opts.skipComments && state.isFullLineCommentLine(i) {
-					continue
-				}
-				if opts.skipBlankLines && utils.IsECMABlankLine(state.lineContent(i)) {
-					continue
-				}
-				lineCount++
-			}
+			textRange, startLine, endLine := state.nodeLineRange(node)
+			lineCount := state.countLines(startLine, endLine)
 
 			if lineCount > opts.max {
 				name := upperCaseFirst(utils.GetFunctionNameWithKind(node))
-				ctx.ReportNode(node, rule.RuleMessage{
+				ctx.ReportRange(textRange, rule.RuleMessage{
 					Id: "exceed",
 					Description: fmt.Sprintf(
 						"%s has too many lines (%d). Maximum allowed is %d.",
@@ -92,13 +83,13 @@ func parseOptions(opts any) maxLinesPerFunctionOptions {
 		}
 		opts = arr[0]
 	}
-	if n, ok := toInt(opts); ok {
+	if n, ok := utils.CoerceInt(opts); ok {
 		result.max = n
 		return result
 	}
 	if m, ok := opts.(map[string]interface{}); ok {
 		if v, ok := m["max"]; ok {
-			if n, ok := toInt(v); ok {
+			if n, ok := utils.CoerceInt(v); ok {
 				result.max = n
 			}
 		}
@@ -113,22 +104,6 @@ func parseOptions(opts any) maxLinesPerFunctionOptions {
 		}
 	}
 	return result
-}
-
-func toInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int32:
-		return int(n), true
-	case int64:
-		return int(n), true
-	case float64:
-		return int(n), true
-	case float32:
-		return int(n), true
-	}
-	return 0, false
 }
 
 // upperCaseFirst mirrors ESLint's shared/string-utils upperCaseFirst — used to
@@ -166,21 +141,27 @@ func isIIFE(node *ast.Node) bool {
 }
 
 // lineState caches per-source-file derived data shared across every function
-// visited by the rule (line starts, comment-line table). Computing these
-// eagerly per-file is cheaper than re-deriving them per function in files with
-// many small functions.
+// visited by the rule. When a skip option is enabled, countedLinePrefix turns
+// each function's line count into a pair of indexed lookups. This is especially
+// important for nested functions, whose source ranges overlap.
 type lineState struct {
-	sourceFile *ast.SourceFile
-	text       string
-	lineStarts []core.TextPos
-	nLines     int
-	// lineComment[i] is the last comment whose range touches line i (1-indexed)
-	// — mirroring ESLint's `getCommentLineNumbers` map. nil entries mean no
-	// comment on that line.
-	lineComment []*ast.CommentRange
+	sourceFile        *ast.SourceFile
+	text              string
+	lineStarts        []core.TextPos
+	nLines            int
+	fullLineComment   []bool
+	skipBlankLines    bool
+	prefixStartLine   int
+	prefixEndLine     int
+	countedLinePrefix []int
 }
 
-func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange, includeComments bool) *lineState {
+func newLineState(
+	sourceFile *ast.SourceFile,
+	sourceComments []*ast.CommentRange,
+	skipComments bool,
+	skipBlankLines bool,
+) *lineState {
 	text := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)
 	if len(lineStarts) == 0 {
@@ -188,46 +169,59 @@ func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange
 	}
 	nLines := len(lineStarts)
 	state := &lineState{
-		sourceFile: sourceFile,
-		text:       text,
-		lineStarts: lineStarts,
-		nLines:     nLines,
+		sourceFile:     sourceFile,
+		text:           text,
+		lineStarts:     lineStarts,
+		nLines:         nLines,
+		skipBlankLines: skipBlankLines,
 	}
-	if !includeComments {
+	if !skipComments && !skipBlankLines {
 		return state
 	}
 
-	var comments []*ast.CommentRange
-	// ESLint's sourceCode.getAllComments() includes the hashbang (`#!`) line,
-	// but tsgo's ForEachComment skips past it. Synthesize a comment range so
-	// skipComments filters it the same way ESLint does.
-	if shebang := scanner.GetShebang(text); shebang != "" {
-		comments = append(comments, &ast.CommentRange{
-			TextRange: core.NewTextRange(0, len(shebang)),
-			Kind:      ast.KindSingleLineCommentTrivia,
-		})
-	}
-	comments = append(comments, sourceComments...)
-	// CommentStore guarantees that sourceComments is ordered and deduplicated;
-	// the optional synthesized hashbang is at position zero.
-
-	// nLines lines (0-indexed) → store at index = line. We use 0-indexed lines
-	// throughout this rule for consistency with scanner.ComputeLineOfPosition.
-	lineComment := make([]*ast.CommentRange, nLines)
-	for _, cmt := range comments {
-		if cmt.End() <= cmt.Pos() {
-			continue
+	if skipComments {
+		var comments []*ast.CommentRange
+		// ESLint's sourceCode.getAllComments() includes the hashbang (`#!`) line,
+		// but tsgo's ForEachComment skips past it. Synthesize a comment range so
+		// skipComments filters it the same way ESLint does.
+		if shebang := scanner.GetShebang(text); shebang != "" {
+			comments = append(comments, &ast.CommentRange{
+				TextRange: core.NewTextRange(0, len(shebang)),
+				Kind:      ast.KindSingleLineCommentTrivia,
+			})
 		}
-		startLine := scanner.ComputeLineOfPosition(lineStarts, cmt.Pos())
-		endLine := scanner.ComputeLineOfPosition(lineStarts, cmt.End()-1)
-		for l := startLine; l <= endLine && l < nLines; l++ {
-			if l >= 0 {
-				lineComment[l] = cmt
+		comments = append(comments, sourceComments...)
+		if len(comments) == 0 {
+			return state
+		}
+
+		fullLineComment := make([]bool, nLines)
+		fullLineCommentCount := 0
+		// CommentStore guarantees that sourceComments is ordered and
+		// deduplicated. Assigning rather than accumulating is intentional:
+		// ESLint only consults the last comment touching a line.
+		for _, cmt := range comments {
+			if cmt.End() <= cmt.Pos() {
+				continue
+			}
+			startLine := scanner.ComputeLineOfPosition(lineStarts, cmt.Pos())
+			endLine := scanner.ComputeLineOfPosition(lineStarts, cmt.End()-1)
+			for line := max(startLine, 0); line <= endLine && line < nLines; line++ {
+				coversWholeLine := state.commentCoversWholeLine(cmt, startLine, endLine, line)
+				if coversWholeLine != fullLineComment[line] {
+					if coversWholeLine {
+						fullLineCommentCount++
+					} else {
+						fullLineCommentCount--
+					}
+					fullLineComment[line] = coversWholeLine
+				}
 			}
 		}
+		if fullLineCommentCount > 0 {
+			state.fullLineComment = fullLineComment
+		}
 	}
-
-	state.lineComment = lineComment
 	return state
 }
 
@@ -235,8 +229,8 @@ func newLineState(sourceFile *ast.SourceFile, sourceComments []*ast.CommentRange
 // excluding any leading trivia. Mirrors ESLint's `node.loc.start.line` /
 // `node.loc.end.line` (which are based on the first / last source token of
 // the node).
-func (s *lineState) nodeLineRange(node *ast.Node) (int, int) {
-	startPos := utils.TrimNodeTextRange(s.sourceFile, node).Pos()
+func (s *lineState) nodeLineRange(node *ast.Node) (core.TextRange, int, int) {
+	startPos := scanner.GetTokenPosOfNode(node, s.sourceFile, false)
 	endPos := node.End()
 	startLine := scanner.ComputeLineOfPosition(s.lineStarts, startPos)
 	endLineIdx := endPos - 1
@@ -244,7 +238,88 @@ func (s *lineState) nodeLineRange(node *ast.Node) (int, int) {
 		endLineIdx = startPos
 	}
 	endLine := scanner.ComputeLineOfPosition(s.lineStarts, endLineIdx)
-	return startLine, endLine
+	return core.NewTextRange(startPos, endPos), startLine, endLine
+}
+
+func (s *lineState) countLines(startLine, endLine int) int {
+	if !s.skipBlankLines && len(s.fullLineComment) == 0 {
+		return endLine - startLine + 1
+	}
+
+	if len(s.countedLinePrefix) == 0 || startLine > s.prefixEndLine+1 {
+		s.resetCountedLinePrefix(startLine, endLine)
+	} else if startLine < s.prefixStartLine {
+		// Listener traversal is source-ordered, so this is only reachable for a
+		// synthetic or manually invoked node. Keep that uncommon path correct
+		// without making the normal cache more complex.
+		return s.countLinesDirect(startLine, endLine)
+	} else if endLine > s.prefixEndLine {
+		s.extendCountedLinePrefix(endLine)
+	}
+
+	startIndex := startLine - s.prefixStartLine
+	endIndex := endLine - s.prefixStartLine + 1
+	return s.countedLinePrefix[endIndex] - s.countedLinePrefix[startIndex]
+}
+
+func (s *lineState) resetCountedLinePrefix(startLine, endLine int) {
+	needed := endLine - startLine + 2
+	if cap(s.countedLinePrefix) < needed {
+		s.countedLinePrefix = make([]int, needed)
+	} else {
+		s.countedLinePrefix = s.countedLinePrefix[:needed]
+	}
+	s.countedLinePrefix[0] = 0
+	for line := startLine; line <= endLine; line++ {
+		index := line - startLine + 1
+		s.countedLinePrefix[index] = s.countedLinePrefix[index-1]
+		if s.lineIsCounted(line) {
+			s.countedLinePrefix[index]++
+		}
+	}
+	s.prefixStartLine = startLine
+	s.prefixEndLine = endLine
+}
+
+func (s *lineState) extendCountedLinePrefix(endLine int) {
+	additional := endLine - s.prefixEndLine
+	needed := len(s.countedLinePrefix) + additional
+	if needed > cap(s.countedLinePrefix) {
+		// Once adjacent function ranges reveal a dense cluster, grow in chunks
+		// instead of reallocating for every short function. Disjoint ranges reset
+		// and reuse this buffer, so sparse files do not reserve for their gaps.
+		newCapacity := max(cap(s.countedLinePrefix)*2, 1024, needed)
+		maxCapacity := s.nLines - s.prefixStartLine + 1
+		newCapacity = min(newCapacity, maxCapacity)
+		prefix := make([]int, len(s.countedLinePrefix), newCapacity)
+		copy(prefix, s.countedLinePrefix)
+		s.countedLinePrefix = prefix
+	}
+	for line := s.prefixEndLine + 1; line <= endLine; line++ {
+		count := s.countedLinePrefix[len(s.countedLinePrefix)-1]
+		if s.lineIsCounted(line) {
+			count++
+		}
+		s.countedLinePrefix = append(s.countedLinePrefix, count)
+	}
+	s.prefixEndLine = endLine
+}
+
+func (s *lineState) countLinesDirect(startLine, endLine int) int {
+	count := 0
+	for line := startLine; line <= endLine; line++ {
+		if s.lineIsCounted(line) {
+			count++
+		}
+	}
+	return count
+}
+
+func (s *lineState) lineIsCounted(line int) bool {
+	if len(s.fullLineComment) > 0 && s.fullLineComment[line] {
+		return false
+	}
+	return !s.skipBlankLines || !utils.IsECMABlankLine(s.lineContent(line))
 }
 
 // lineContent returns the content of the i-th 0-indexed line, without its
@@ -260,30 +335,19 @@ func (s *lineState) lineContent(i int) string {
 	return s.text[start:utils.LineContentEnd(s.text, int(s.lineStarts[i+1]))]
 }
 
-// isFullLineCommentLine reports whether the given 0-indexed line is entirely
-// covered by a single comment (i.e. there is no source code on it). Mirrors
-// ESLint's `isFullLineComment` via the `getCommentLineNumbers` map: only the
-// LAST comment touching this line is consulted, so a line like
-// `/* a */ /* b */` is treated as having code (because /* a */ precedes /* b */).
-func (s *lineState) isFullLineCommentLine(i int) bool {
-	if i < 0 || i >= s.nLines {
-		return false
-	}
-	cmt := s.lineComment[i]
-	if cmt == nil {
-		return false
-	}
-	startLine := scanner.ComputeLineOfPosition(s.lineStarts, cmt.Pos())
-	endLine := scanner.ComputeLineOfPosition(s.lineStarts, cmt.End()-1)
-	line := s.lineContent(i)
+// commentCoversWholeLine reports whether cmt is the only non-whitespace source
+// on line. The caller processes comments in source order and retains the last
+// result for each line, matching ESLint's getCommentLineNumbers map.
+func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, endLine, lineIndex int) bool {
+	line := s.lineContent(lineIndex)
 
 	// Mimics ESLint's two arms:
 	//   isFirstTokenOnLine: comment starts on this line && nothing before it
 	//   isLastTokenOnLine : comment ends on this line && nothing after it
 	// Either arm passes when the comment crosses past this line on that side.
-	startOK := startLine < i
-	if !startOK && startLine == i {
-		col := cmt.Pos() - int(s.lineStarts[i])
+	startOK := startLine < lineIndex
+	if !startOK && startLine == lineIndex {
+		col := cmt.Pos() - int(s.lineStarts[lineIndex])
 		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[:col]) {
 			startOK = true
 		}
@@ -292,11 +356,11 @@ func (s *lineState) isFullLineCommentLine(i int) bool {
 		return false
 	}
 
-	if endLine > i {
+	if endLine > lineIndex {
 		return true
 	}
-	if endLine == i {
-		col := cmt.End() - int(s.lineStarts[i])
+	if endLine == lineIndex {
+		col := cmt.End() - int(s.lineStarts[lineIndex])
 		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[col:]) {
 			return true
 		}

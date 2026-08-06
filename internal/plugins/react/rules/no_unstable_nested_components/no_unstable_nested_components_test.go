@@ -2223,6 +2223,82 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
 	})
 }
 
+func TestNoUnstableNestedComponentsAncestorTracking(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnstableNestedComponentsRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+        function FirstParent() {
+          function FirstNested() { return <div />; }
+          return <FirstNested />;
+        }
+        function SecondParent() {
+          function SecondNested() { return <span />; }
+          return <SecondNested />;
+        }
+      `,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: generateErrorMessageWithParentName("FirstParent"), Line: 3, Column: 11},
+					{Message: generateErrorMessageWithParentName("SecondParent"), Line: 7, Column: 11},
+				},
+			},
+			{
+				Code: `
+        function OuterParent() {
+          const InnerClass = class NamedInner extends React.Component {
+            render() {
+              function NestedComponent() { return <div />; }
+              return <NestedComponent />;
+            }
+          };
+          return <InnerClass />;
+        }
+      `,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: generateErrorMessageWithParentName("NamedInner"), Line: 5, Column: 15},
+				},
+			},
+			{
+				Code: `
+        function OuterParent() {
+          const Legacy = createReactClass({
+            render() {
+              function NestedComponent() { return <div />; }
+              return <NestedComponent />;
+            }
+          });
+          return <Legacy />;
+        }
+      `,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: errorMessageWithoutName, Line: 5, Column: 15},
+				},
+			},
+			{
+				Code: `
+        function ParentComponent() {
+          /** nested component */
+          function NestedComponent() { return <div />; }
+          return <NestedComponent />;
+        }
+      `,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: errorMessage, Line: 4, Column: 11},
+				},
+			},
+		},
+	)
+}
+
 // TestNilCheckerFallback locks down the contract that every Identifier-
 // resolving entry point used by this rule degrades safely when no
 // TypeChecker is available — the case for tooling that runs the rule on

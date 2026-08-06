@@ -4,9 +4,13 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -54,12 +58,15 @@ function MyComponent({ theme }: { theme: string }) {
 		return
 	}
 
+	diagnosticCount := 0
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
 		Program:     program,
 		Settings:    nil,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
+		diagnosticCount++
+	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -84,4 +91,111 @@ function MyComponent({ theme }: { theme: string }) {
 		return false
 	}
 	walk(sourceFile.AsNode())
+	if diagnosticCount != 1 {
+		t.Fatalf("reported %d diagnostics with nil TypeChecker, want 1", diagnosticCount)
+	}
+}
+
+func TestSourceMayUseHooks(t *testing.T) {
+	if !sourceMayUseHooks(nil) || !sourceMayUseHooks(&ast.SourceFile{}) {
+		t.Fatal("missing parser identifier metadata must conservatively keep listeners")
+	}
+
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "ordinary call", code: `service.render(value)`, want: false},
+		{name: "string only", code: `const marker = "useState()"`, want: false},
+		{name: "lowercase suffix", code: `useful()`, want: false},
+		{name: "computed property is conservative", code: `React["useState"]()`, want: true},
+		{name: "bare use", code: `use(value)`, want: true},
+		{name: "identifier hook", code: `useState(value)`, want: true},
+		{name: "property hook", code: `React.useState(value)`, want: true},
+		{name: "digit suffix", code: `use1(value)`, want: true},
+		{name: "escaped identifier", code: `u\u0073eState(value)`, want: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/source.tsx",
+				Path:     "/source.tsx",
+			}, testCase.code, core.ScriptKindTSX)
+			if got := sourceMayUseHooks(sourceFile); got != testCase.want {
+				t.Fatalf("sourceMayUseHooks(%q) = %v, want %v", testCase.code, got, testCase.want)
+			}
+			listeners := RulesOfHooksRule.Run(rule.RuleContext{SourceFile: sourceFile}, nil)
+			if got := len(listeners) != 0; got != testCase.want {
+				t.Fatalf("listener presence for %q = %v, want %v", testCase.code, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestHookNameShapeMatchesSharedClassifier(t *testing.T) {
+	names := []string{"", "use", "UseState", "useful", "useState", "use1"}
+	for next := byte(0); next < 128; next++ {
+		names = append(names, "use"+string(next)+"Tail")
+	}
+	for _, name := range names {
+		if got, want := hasHookNameShape(name), react_hooksutil.IsHookName(name); got != want {
+			t.Fatalf("hasHookNameShape(%q) = %v, shared classifier = %v", name, got, want)
+		}
+	}
+}
+
+func TestReportRangeMatchesNodeTrimming(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/source.tsx",
+		Path:     "/source.tsx",
+	}, `
+function Component() {
+  const value = (
+    /* leading trivia */ React.useState
+  )();
+  return value;
+}
+`, core.ScriptKindTSX)
+
+	checked := 0
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindCallExpression, ast.KindPropertyAccessExpression, ast.KindIdentifier:
+			got := reportRange(sourceFile.Text(), node)
+			want := utils.TrimNodeTextRange(sourceFile, node)
+			if got.Pos() != want.Pos() || got.End() != want.End() {
+				t.Fatalf("range for %v = [%d,%d), want [%d,%d)", node.Kind, got.Pos(), got.End(), want.Pos(), want.End())
+			}
+			checked++
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	visit(sourceFile.AsNode())
+	if checked == 0 {
+		t.Fatal("expected representative report nodes")
+	}
+}
+
+func TestRulesOfHooksEffectEventShadowing(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RulesOfHooksRule,
+		[]rule_tester.ValidTestCase{{
+			Code: `
+function MyComponent() {
+  const onClick = useEffectEvent(() => {});
+  function nested(onClick) {
+    consume(onClick);
+  }
+  useEffect(() => { onClick(); });
+}
+`,
+			Tsx: true,
+		}},
+		nil,
+	)
 }
