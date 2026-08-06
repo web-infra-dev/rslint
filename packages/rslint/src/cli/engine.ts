@@ -339,9 +339,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       let createPluginLintHost = opts.createPluginLintHost;
       if (!createPluginLintHost) {
         const pluginEntry: string = './eslint-plugin/index.js';
-        const mod: unknown = await import(
-          /* webpackIgnore: true */ pluginEntry
-        );
+        const mod: unknown = await import(/* rspackIgnore: true */ pluginEntry);
         if (!isPluginHostFactoryModule(mod)) {
           throw new Error(
             'rslint ESLint-plugin entry does not export createPluginLintHost',
