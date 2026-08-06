@@ -233,6 +233,15 @@ func (b *Builder[E]) makeUnreachable() {
 	b.cur = next
 }
 
+// enterDisconnected makes blk current when the position the walk stands at is
+// one control arrives at, rather than when an edge into blk already is. It is
+// how a block whose only edge in is laid out later still gets laid out here,
+// which is the order ESLint traverses one in.
+func (b *Builder[E]) enterDisconnected(blk *Block[E]) {
+	blk.hasIncoming = blk.hasIncoming || b.cur.Reachable
+	b.enter(blk)
+}
+
 func (b *Builder[E]) read(node *ast.Node) {
 	if b.hooks.Read != nil {
 		b.hooks.Read(b, node)
