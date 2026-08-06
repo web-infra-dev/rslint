@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -16,5 +17,6 @@ func GetAllRules() []rule.Rule {
 		no_disabled_tests.NoDisabledTestsRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_mocks_import.NoMocksImportRule,
+		valid_title.ValidTitleRule,
 	}
 }

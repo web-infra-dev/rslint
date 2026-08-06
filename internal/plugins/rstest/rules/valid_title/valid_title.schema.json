@@ -1,0 +1,94 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignoreSpaces": {
+          "type": "boolean",
+          "default": false
+        },
+        "ignoreTypeOfDescribeName": {
+          "type": "boolean",
+          "default": false
+        },
+        "ignoreTypeOfTestName": {
+          "type": "boolean",
+          "default": false
+        },
+        "disallowedWords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mustMatch": {
+          "$ref": "#/definitions/matcher"
+        },
+        "mustNotMatch": {
+          "$ref": "#/definitions/matcher"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1,
+  "definitions": {
+    "matcher": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/patternWithMessage"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "describe": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            },
+            "test": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            },
+            "it": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/patternWithMessage"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "patternWithMessage": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "additionalItems": false
+    }
+  }
+}

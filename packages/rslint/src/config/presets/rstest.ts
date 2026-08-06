@@ -8,6 +8,7 @@ const recommended: RslintConfigEntry = {
     'rstest/no-disabled-tests': 'warn',
     'rstest/no-identical-title': 'error',
     'rstest/no-mocks-import': 'error',
+    'rstest/valid-title': 'error',
   },
 };
 
