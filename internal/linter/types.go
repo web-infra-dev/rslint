@@ -17,9 +17,8 @@ type ConfiguredRule struct {
 	// collection, so rules never parse either source themselves. Nil when the
 	// config declares none.
 	Globals map[string]utils.GlobalAccess
-	// SourceType is the authored `languageOptions.sourceType` (or legacy
-	// `parserOptions.sourceType`) for this file. Empty when unset. Forwarded
-	// to RuleContext.SourceType.
+	// SourceType is the authored `languageOptions.sourceType` for this file.
+	// Empty when unset. Forwarded to RuleContext.SourceType.
 	SourceType       string
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool

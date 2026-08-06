@@ -33,9 +33,9 @@ type ValidTestCase struct {
 	// Code are picked up automatically by the linter and merged with this — no
 	// separate field needed for those.
 	Globals map[string]any `json:"globals"`
-	// SourceType simulates `languageOptions.sourceType` ("module", "script",
-	// "commonjs"). Empty leaves RuleContext.SourceType unset so rules fall
-	// back to structural ESM detection.
+	// SourceType simulates top-level `languageOptions.sourceType`
+	// ("module", "script", "commonjs"). Empty leaves RuleContext.SourceType
+	// unset so rules fall back to structural ESM detection.
 	SourceType string `json:"sourceType"`
 	TSConfig   string `json:"tsConfig"`
 	Tsx        bool   `json:"tsx"`
@@ -73,9 +73,9 @@ type InvalidTestCase struct {
 	// Code are picked up automatically by the linter and merged with this — no
 	// separate field needed for those.
 	Globals map[string]any `json:"globals"`
-	// SourceType simulates `languageOptions.sourceType` ("module", "script",
-	// "commonjs"). Empty leaves RuleContext.SourceType unset so rules fall
-	// back to structural ESM detection.
+	// SourceType simulates top-level `languageOptions.sourceType`
+	// ("module", "script", "commonjs"). Empty leaves RuleContext.SourceType
+	// unset so rules fall back to structural ESM detection.
 	SourceType string `json:"sourceType"`
 	TSConfig   string `json:"tsConfig"`
 	Options    any    `json:"options"`
