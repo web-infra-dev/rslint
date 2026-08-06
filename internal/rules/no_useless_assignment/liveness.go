@@ -47,22 +47,28 @@ type assignment struct {
 
 // hooks turns the graph builder's reference positions into events. An
 // identifier absent from both maps belongs to a variable this code path does
-// not track.
+// not track, and a reference in an unreachable block belongs to code that never
+// runs — neither says anything about the value an assignment leaves behind.
 func hooks(readNodes map[*ast.Node]*ast.Symbol, assignByIdent map[*ast.Node]*assignment) cfg.Hooks[event] {
 	return cfg.Hooks[event]{
 		Read: func(b *cfg.Builder[event], node *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			if sym, ok := readNodes[node]; ok {
 				b.Emit(event{kind: eventRead, sym: sym})
 			}
 		},
 		Write: func(b *cfg.Builder[event], node *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			a, ok := assignByIdent[node]
 			if !ok {
 				return
 			}
-			if blk, index := b.Emit(event{kind: eventWrite, sym: a.sym, assign: a}); blk != nil {
-				a.sites = append(a.sites, writeSite{blk: blk, index: index})
-			}
+			blk, index := b.Emit(event{kind: eventWrite, sym: a.sym, assign: a})
+			a.sites = append(a.sites, writeSite{blk: blk, index: index})
 		},
 	}
 }
@@ -135,6 +141,11 @@ func computeLiveness(blocks []*block, states []blockState, sym *ast.Symbol) {
 			state := &states[i]
 			liveOut := false
 			for _, successor := range blocks[i].Successors {
+				if !successor.Reachable {
+					// The code after an abrupt exit never runs, so a read in
+					// it keeps nothing alive.
+					continue
+				}
 				if states[successor.Index()].liveIn {
 					liveOut = true
 					break
