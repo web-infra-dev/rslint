@@ -227,6 +227,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				ConfigGlobals:  r.Globals,
 				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
+				SourceType:     r.SourceType,
 				Comments:       comments,
 				Refs:           refs,
 				BOM:            sourceBOM,

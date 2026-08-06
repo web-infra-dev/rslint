@@ -166,10 +166,6 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
 				},
 			},
 			{
-				// SKIP: rslint does not support ESLint's parserOptions.sourceType;
-				// without import/export, IsExternalModule is false so the autofix
-				// would emit require() rather than the upstream import form.
-				Skip: true,
 				Code: `
         jest.useFakeTimers();
         describe("suite", () => {
@@ -185,7 +181,8 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
-				Options: []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				SourceType: `module`,
+				Options:    []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
 				},
@@ -560,10 +557,6 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
 				},
 			},
 			{
-				// SKIP: rslint does not support ESLint's parserOptions.sourceType;
-				// without import/export the autofix emits require(), matching the
-				// preceding case rather than this upstream import form.
-				Skip: true,
 				Code: `
         console.log('hello');
         const onClick = jest.fn();
@@ -581,6 +574,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(onClick).toHaveBeenCalled();
         })
       `},
+				SourceType: `module`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 25, EndColumn: 29},
 				},

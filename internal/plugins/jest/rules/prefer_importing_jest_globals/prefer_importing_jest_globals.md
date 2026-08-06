@@ -76,3 +76,14 @@ describe('suite', () => {
 ## Original Documentation
 
 - [jest/prefer-importing-jest-globals](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-importing-jest-globals.md)
+
+## Differences from ESLint
+
+- When `languageOptions.sourceType` is unset and the file has no `import` /
+  `export`, autofix inserts `require('@jest/globals')` instead of
+  `import { ... } from '@jest/globals'`. Set `sourceType: "module"` to get the
+  ESLint `import` form.
+- For `const x = 1, { expect } = require('@jest/globals')`, autofix keeps the
+  existing `expect` binding when merging new names. ESLint only reads the first
+  declarator, so it can drop that binding. Sibling declarators such as `x = 1`
+  are still removed on both sides.

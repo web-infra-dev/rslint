@@ -207,7 +207,6 @@ ruleTester.run('prefer-importing-jest-globals', {} as never, {
       ],
     },
     {
-      // rslint picks require() when the file has no import/export (no sourceType).
       code: `
         jest.useFakeTimers();
         describe("suite", () => {

@@ -2,7 +2,6 @@ package prefer_importing_jest_globals
 
 import (
 	_ "embed"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -82,18 +81,14 @@ type options struct {
 }
 
 func parseOptions(rawOptions []any) options {
-	opts := options{types: make(map[utils.JestFnType]struct{}, len(allJestFnTypes))}
-	for _, kind := range allJestFnTypes {
-		opts.types[kind] = struct{}{}
-	}
 	if len(rawOptions) == 0 {
-		return opts
+		return options{types: defaultTypesSet()}
 	}
 
 	optsMap, _ := rawOptions[0].(map[string]interface{})
 	rawTypes, ok := optsMap["types"].([]interface{})
 	if !ok {
-		return opts
+		return options{types: defaultTypesSet()}
 	}
 
 	parsed := make(map[utils.JestFnType]struct{}, len(rawTypes))
@@ -107,8 +102,15 @@ func parseOptions(rawOptions []any) options {
 			parsed[kind] = struct{}{}
 		}
 	}
-	opts.types = parsed
-	return opts
+	return options{types: parsed}
+}
+
+func defaultTypesSet() map[utils.JestFnType]struct{} {
+	types := make(map[utils.JestFnType]struct{}, len(allJestFnTypes))
+	for _, kind := range allJestFnTypes {
+		types[kind] = struct{}{}
+	}
+	return types
 }
 
 func (o options) allows(kind utils.JestFnType) bool {
@@ -118,39 +120,39 @@ func (o options) allows(kind utils.JestFnType) bool {
 
 func createFixerImports(isModule bool, names string) string {
 	if isModule {
-		return fmt.Sprintf("import { %s } from '%s';", names, jestGlobalsModule)
+		return "import { " + names + " } from '" + jestGlobalsModule + "';"
 	}
-	return fmt.Sprintf("const { %s } = require('%s');", names, jestGlobalsModule)
+	return "const { " + names + " } = require('" + jestGlobalsModule + "');"
 }
 
-func isSupportedAccessor(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier,
-		ast.KindStringLiteral,
-		ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindNumericLiteral:
+// preferModuleImport mirrors upstream's
+// `parserOptions/languageOptions.sourceType === 'module'` check, with a
+// structural ESM fallback when sourceType is unset (rslint default).
+func preferModuleImport(ctx rule.RuleContext) bool {
+	switch ctx.SourceType {
+	case "module":
 		return true
-	default:
+	case "script", "commonjs":
 		return false
+	default:
+		return ctx.SourceFile != nil && ast.IsExternalModule(ctx.SourceFile)
 	}
 }
 
-// getAccessorValue mirrors eslint-plugin-jest's getAccessorValue for identifiers
-// and static string/numeric accessors. String literals reuse GetStaticStringValue.
-func getAccessorValue(node *ast.Node) string {
+// accessorValue mirrors eslint-plugin-jest's isSupportedAccessor + getAccessorValue.
+func accessorValue(node *ast.Node) (string, bool) {
 	if node == nil {
-		return ""
+		return "", false
 	}
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return node.AsIdentifier().Text
+		return node.AsIdentifier().Text, true
 	case ast.KindNumericLiteral:
-		return node.AsNumericLiteral().Text
+		return node.AsNumericLiteral().Text, true
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		return rslintUtils.GetStaticStringValue(node), true
 	default:
-		return rslintUtils.GetStaticStringValue(node)
+		return "", false
 	}
 }
 
@@ -167,7 +169,7 @@ func importNameFromSpecifier(spec *ast.ImportSpecifier) string {
 		return ""
 	}
 
-	local := getAccessorValue(spec.Name())
+	local, _ := accessorValue(spec.Name())
 	if spec.PropertyName == nil {
 		return local
 	}
@@ -175,13 +177,13 @@ func importNameFromSpecifier(spec *ast.ImportSpecifier) string {
 	imported := spec.PropertyName
 	switch imported.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		// Upstream builds "'value'" + optional " as local".
+		importedName := rslintUtils.GetStaticStringValue(imported)
 		if local == "" {
-			return "'" + getAccessorValue(imported) + "'"
+			return "'" + importedName + "'"
 		}
-		return "'" + getAccessorValue(imported) + "' as " + local
+		return "'" + importedName + "' as " + local
 	default:
-		importName := getAccessorValue(imported)
+		importName, _ := accessorValue(imported)
 		if local != "" && local != importName {
 			return importName + " as " + local
 		}
@@ -235,17 +237,12 @@ func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
 		if keyNode == nil {
 			keyNode = be.Name()
 		}
-		if !isSupportedAccessor(keyNode) {
+		importName, ok := accessorValue(keyNode)
+		if !ok {
 			continue
 		}
-
-		importName := getAccessorValue(keyNode)
-		valueNode := be.Name()
-		if isSupportedAccessor(valueNode) {
-			local := getAccessorValue(valueNode)
-			if importName != local {
-				importName += ": " + local
-			}
+		if local, ok := accessorValue(be.Name()); ok && importName != local {
+			importName += ": " + local
 		}
 		names.add(importName)
 	}
@@ -265,9 +262,6 @@ func findJestGlobalsImport(statements []*ast.Node) *ast.Node {
 	return nil
 }
 
-// jestGlobalsRequire holds the VariableStatement to replace and the specific
-// declarator that is require('@jest/globals'), so multi-declarator statements
-// still merge the correct ObjectPattern bindings.
 type jestGlobalsRequire struct {
 	stmt *ast.Node
 	decl *ast.VariableDeclaration
@@ -337,7 +331,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 	statements := ctx.SourceFile.Statements.Nodes
 	firstNode := statements[0]
 	names := newNameSetFrom(collected)
-	isModule := ast.IsExternalModule(ctx.SourceFile)
+	isModule := preferModuleImport(ctx)
 
 	if isUseStrictDirective(firstNode) {
 		indent := lineIndentOfToken(ctx, firstNode)

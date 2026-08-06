@@ -31,7 +31,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 			// N/A: type assertion wrappers on the callee are stripped by ParseJestFnCall for member resolution.
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Branch lock-in: types=["jest"] without import/export → require autofix ----
+			// ---- Branch lock-in: types=["jest"] without sourceType / import → require autofix ----
 			{
 				Code: `
         jest.useFakeTimers();
@@ -51,6 +51,49 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
+				},
+			},
+			// ---- Branch lock-in: languageOptions.sourceType=module → import autofix ----
+			{
+				Code: `
+        jest.useFakeTimers();
+        describe("suite", () => {
+          test("foo");
+          expect(true).toBeDefined();
+        })
+      `,
+				Output: []string{`
+        import { jest } from '@jest/globals';
+        jest.useFakeTimers();
+        describe("suite", () => {
+          test("foo");
+          expect(true).toBeDefined();
+        })
+      `},
+				SourceType: `module`,
+				Options:    []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
+				},
+			},
+			// ---- Branch lock-in: languageOptions.sourceType=script forces require even with import ----
+			{
+				Code: `
+        import fs from 'fs';
+        describe("suite", () => {
+          test("foo");
+        })
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        import fs from 'fs';
+        describe("suite", () => {
+          test("foo");
+        })
+      `},
+				SourceType: `script`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
 			// ---- Dimension 4: parenthesized call still reports the head identifier ----
