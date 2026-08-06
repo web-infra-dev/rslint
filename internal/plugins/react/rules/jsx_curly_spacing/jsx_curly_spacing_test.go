@@ -2255,19 +2255,17 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 
 		// ===== BOM + Unicode invalid lock-in =====
 
-		// BOM at file start — tsgo's scanner counts the BOM as 1 UTF-16
-		// character on line 1 (not stripped during position calculation),
-		// so columns shift by +1 vs the BOM-less equivalent: `{` at col 11,
-		// `}` at col 17. Locked in as observable rslint behaviour; if
-		// upstream ESLint differs here that is a framework-level position-
-		// calc divergence, not a rule-logic issue.
+		// BOM at file start — the mark is consumed when the source is decoded,
+		// so it occupies no column and positions match the BOM-less equivalent:
+		// `{` at col 10, `}` at col 16. ESLint reports the same. The fix leaves
+		// the mark in place, since nothing asked to remove it.
 		{
 			Code:   "\uFEFF<App foo={ bar } />",
 			Tsx:    true,
 			Output: []string{"\uFEFF<App foo={bar} />"},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noSpaceAfter", Line: 1, Column: 11},
-				{MessageId: "noSpaceBefore", Line: 1, Column: 17},
+				{MessageId: "noSpaceAfter", Line: 1, Column: 10},
+				{MessageId: "noSpaceBefore", Line: 1, Column: 16},
 			},
 		},
 		// BMP non-ASCII identifier — `中` and `文` each count as 1 UTF-16

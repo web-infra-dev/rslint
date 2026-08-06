@@ -1020,6 +1020,38 @@ func runLintWithProgramLoader(
 	), nil
 }
 
+// rulesSkippedInEditors names the rules the language server never runs. A rule
+// belongs here when what it checks is a property of the file's bytes rather
+// than of its text: an editor's document holds text that has already been
+// decoded, so such a property is neither visible in the document nor reachable
+// by a text edit.
+var rulesSkippedInEditors = map[string]bool{
+	// unicode-bom checks for a leading byte order mark. An editor decodes the
+	// mark into the document's encoding — VS Code shows it in the status bar as
+	// "UTF-8 with BOM" — so the document text never carries it and no text edit
+	// adds or removes it. The file on disk is the only remaining witness, and an
+	// unsaved buffer may already disagree with it. `rslint --fix`, which rewrites
+	// the file itself, is where the rule applies.
+	"unicode-bom": true,
+}
+
+// rulesServedToEditors drops the rules the language server never runs. The
+// input is a cached slice shared across files, so filtering builds a new one
+// and an unaffected configuration keeps the original.
+func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
+	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+	if !slices.ContainsFunc(rules, skipped) {
+		return rules
+	}
+	served := make([]linter.ConfiguredRule, 0, len(rules))
+	for _, configured := range rules {
+		if !skipped(configured) {
+			served = append(served, configured)
+		}
+	}
+	return served
+}
+
 func lintSingleFile(
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
@@ -1067,7 +1099,7 @@ func lintSingleFile(
 		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo)
+			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
