@@ -421,6 +421,14 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
+	// Heritage clauses parse dotted names as PropertyAccessExpressions rather
+	// than QualifiedNames. In a type-only heritage position, the root of that
+	// property-access chain still names a namespace and must skip a same-named
+	// value binding. A class `extends` expression is not part of a type node, so
+	// it deliberately continues to the value-space branch below.
+	if isTypeOnlyPropertyAccessQualifier(n) {
+		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
 	if ast.IsExpressionNode(n) {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
 	}
@@ -433,4 +441,20 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsType | ast.SymbolFlagsAlias
 	}
 	return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+}
+
+// isTypeOnlyPropertyAccessQualifier reports whether n is the lexical root of
+// an expression-shaped qualified name used as a type. TypeScript represents
+// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
+// PropertyAccessExpression, even though N has namespace meaning there.
+func isTypeOnlyPropertyAccessQualifier(n *ast.Node) bool {
+	entity := n
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	return entity != n && ast.IsPartOfTypeNode(entity)
 }
