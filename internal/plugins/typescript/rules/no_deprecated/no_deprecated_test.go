@@ -76,7 +76,84 @@ try {
 }
 `,
 		},
+		{
+			// A computed access is allowed by the type at its receiver.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+declare const thing: Thing;
+thing['oldProp'];
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "Thing"},
+					},
+				},
+			},
+		},
+		{
+			// The receiver is written as the type parameter, not its constraint.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+function g<T extends Thing>(t: T) {
+  t['oldProp'];
+}
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "T"},
+					},
+				},
+			},
+		},
 	}, []rule_tester.InvalidTestCase{
+		{
+			// A computed key names no value, so it never matches a specifier.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+declare const thing: Thing;
+thing['oldProp'];
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{"oldProp"},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated"},
+			},
+		},
+		{
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+function g<T extends Thing>(t: T) {
+  t['oldProp'];
+}
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "Thing"},
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated"},
+			},
+		},
 		{
 			Code: `/** @deprecated */ const oldValue = 1; oldValue;`,
 			Errors: []rule_tester.InvalidTestCaseError{

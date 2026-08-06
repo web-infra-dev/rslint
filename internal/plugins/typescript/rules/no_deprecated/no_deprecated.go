@@ -1702,12 +1702,14 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				utils.ValueMatchesSomeSpecifier(node, allowSpecifiers, ctx.Program, nodeType)
 		}
 		// A computed access names no value of its own, so only the type carrying
-		// the deprecated property can be allowed there.
+		// the deprecated property can be allowed there. That type is the one
+		// written at the receiver: a specifier matches the type parameter of a
+		// generic receiver, not the constraint the property comes from.
 		isObjectTypeAllowed := func(expression *ast.Node) bool {
 			if len(allowSpecifiers) == 0 || expression == nil {
 				return false
 			}
-			objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
+			objectType := ctx.TypeChecker.GetTypeAtLocation(expression)
 			return utils.TypeMatchesSomeSpecifier(objectType, allowSpecifiers, nil, ctx.Program)
 		}
 		sourceFile := ctx.SourceFile
@@ -1861,10 +1863,11 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if promotedRange := promotedDynamicImportDefaultRange(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker); promotedRange != nil {
 					diagnosticRange = *promotedRange
 				}
-				if isAllowed(node) {
-					continue
-				}
-				if elementAccess != nil && isObjectTypeAllowed(elementAccess.Expression) {
+				if elementAccess != nil {
+					if isObjectTypeAllowed(elementAccess.Expression) {
+						continue
+					}
+				} else if isAllowed(node) {
 					continue
 				}
 				message := buildDeprecatedMessage(name)
