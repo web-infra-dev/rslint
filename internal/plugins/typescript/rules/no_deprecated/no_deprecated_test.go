@@ -16,48 +16,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func sourceFileFromCode(t *testing.T, code string) *ast.SourceFile {
-	t.Helper()
-	rootDir := fixtures.GetRootDir()
-	fileName := "file.ts"
-	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{tspath.ResolvePath(rootDir.Dir, fileName): code})
-	host := utils.CreateCompilerHost(rootDir.Dir, fs)
-	program, err := utils.CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", host)
-	if err != nil {
-		t.Fatalf("failed to create program: %v", err)
-	}
-	sourceFile := program.GetSourceFile(fileName)
-	if sourceFile == nil {
-		t.Fatalf("failed to resolve source file for %s", fileName)
-	}
-	return sourceFile
-}
-
-func TestNameImportedFromPackage(t *testing.T) {
-	sourceFile := sourceFileFromCode(t, `
-import { oldValue } from 'pkg';
-const another = 1;
-`)
-	if !nameImportedFromPackage(sourceFile, "oldValue", "pkg") {
-		t.Fatalf("expected static import to match package allow entry")
-	}
-	if nameImportedFromPackage(sourceFile, "oldValue", "other-pkg") {
-		t.Fatalf("did not expect import to match other package")
-	}
-}
-
-func TestNameImportedFromPackageDynamicImport(t *testing.T) {
-	sourceFile := sourceFileFromCode(t, `
-async function run() {
-  const { oldValue } = await import('pkg');
-  oldValue();
-}
-`)
-	if !nameImportedFromPackage(sourceFile, "oldValue", "pkg") {
-		t.Fatalf("expected dynamic import binding to match package allow entry")
-	}
-}
-
 func TestNoDeprecatedRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDeprecatedRule, []rule_tester.ValidTestCase{
 		{Code: `const value = 1; value;`},
@@ -118,7 +76,84 @@ try {
 }
 `,
 		},
+		{
+			// A computed access is allowed by the type at its receiver.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+declare const thing: Thing;
+thing['oldProp'];
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "Thing"},
+					},
+				},
+			},
+		},
+		{
+			// The receiver is written as the type parameter, not its constraint.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+function g<T extends Thing>(t: T) {
+  t['oldProp'];
+}
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "T"},
+					},
+				},
+			},
+		},
 	}, []rule_tester.InvalidTestCase{
+		{
+			// A computed key names no value, so it never matches a specifier.
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+declare const thing: Thing;
+thing['oldProp'];
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{"oldProp"},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated"},
+			},
+		},
+		{
+			Code: `
+interface Thing {
+  /** @deprecated */
+  oldProp: string;
+}
+function g<T extends Thing>(t: T) {
+  t['oldProp'];
+}
+`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allow": []interface{}{
+						map[string]interface{}{"from": "file", "name": "Thing"},
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated"},
+			},
+		},
 		{
 			Code: `/** @deprecated */ const oldValue = 1; oldValue;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -163,6 +198,31 @@ oldValue;
 			},
 		},
 	})
+}
+
+// A specifier that decodes into nothing would otherwise drop the whole allow
+// list, leaving the rule reporting everything it was configured to permit.
+func TestNoDeprecatedSchemaRejectsUnknownFrom(t *testing.T) {
+	t.Parallel()
+	allow := func(entry map[string]any) []any {
+		return []any{map[string]any{"allow": []any{entry}}}
+	}
+
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "package", "name": "oldValue", "package": "demo-pkg",
+	})); err != nil {
+		t.Fatalf("expected a well-formed specifier to validate, got %v", err)
+	}
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "module", "name": "oldValue",
+	})); err == nil {
+		t.Fatal("expected an unknown `from` to be rejected")
+	}
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "package", "name": "oldValue",
+	})); err == nil {
+		t.Fatal("expected `from: package` without a package to be rejected")
+	}
 }
 
 func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, entryFile string, options any) []rule.RuleDiagnostic {
@@ -216,7 +276,10 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	return diagnostics
 }
 
-func TestAllowFromFileImportedValue(t *testing.T) {
+// The deprecated value's type is the literal `1`, which carries no name, so
+// every one of these specifiers can only match the referenced value. Matching a
+// value narrows past its name for `from: "package"` alone.
+func TestAllowSpecifierMatchesImportedValue(t *testing.T) {
 	t.Parallel()
 	files := map[string]string{
 		"deprecated.ts": `
@@ -229,41 +292,49 @@ oldValue;
 		`,
 	}
 
-	t.Run("allow-from-file-does-not-suppress-imported-value", func(t *testing.T) {
-		t.Parallel()
-		diagnostics := runNoDeprecatedDiagnosticsForFiles(
-			t,
-			files,
-			"main.ts",
-			[]interface{}{
-				map[string]interface{}{
-					"allow": []interface{}{
-						map[string]interface{}{
-							"from": "file",
-							"name": "oldValue",
-						},
-					},
-				},
-			},
-		)
-		if len(diagnostics) != 1 {
-			t.Fatalf("expected 1 diagnostic, got %d", len(diagnostics))
-		}
-		if diagnostics[0].Message.Id != "deprecated" {
-			t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
-		}
-	})
+	allow := func(entries ...interface{}) []interface{} {
+		return []interface{}{map[string]interface{}{"allow": entries}}
+	}
 
-	t.Run("without-allow-reports-imported-value", func(t *testing.T) {
-		t.Parallel()
-		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, files, "main.ts", nil)
-		if len(diagnostics) != 1 {
-			t.Fatalf("expected 1 diagnostic, got %d", len(diagnostics))
-		}
-		if diagnostics[0].Message.Id != "deprecated" {
-			t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
-		}
-	})
+	for _, testCase := range []struct {
+		name     string
+		options  []interface{}
+		reported bool
+	}{
+		{name: "without-allow", options: nil, reported: true},
+		{name: "shorthand-name", options: allow("oldValue")},
+		{name: "from-file", options: allow(map[string]interface{}{"from": "file", "name": "oldValue"})},
+		{
+			name:    "from-file-with-unrelated-path",
+			options: allow(map[string]interface{}{"from": "file", "path": "./nope.ts", "name": "oldValue"}),
+		},
+		{name: "from-lib", options: allow(map[string]interface{}{"from": "lib", "name": "oldValue"})},
+		{
+			name:     "from-package",
+			options:  allow(map[string]interface{}{"from": "package", "package": "nope-pkg", "name": "oldValue"}),
+			reported: true,
+		},
+		{
+			name:     "unrelated-name",
+			options:  allow(map[string]interface{}{"from": "file", "name": "other"}),
+			reported: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			diagnostics := runNoDeprecatedDiagnosticsForFiles(t, files, "main.ts", testCase.options)
+			expected := 0
+			if testCase.reported {
+				expected = 1
+			}
+			if len(diagnostics) != expected {
+				t.Fatalf("expected %d diagnostics, got %d", expected, len(diagnostics))
+			}
+			if testCase.reported && diagnostics[0].Message.Id != "deprecated" {
+				t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
+			}
+		})
+	}
 }
 
 func TestNoDeprecatedReportsLetInitializedToUndefinedInTsxFixture(t *testing.T) {
