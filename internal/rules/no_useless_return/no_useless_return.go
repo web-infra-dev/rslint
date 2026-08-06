@@ -331,9 +331,9 @@ func isFunction(node *ast.Node) bool {
 // fix
 // ---------------------------------------------------------------------------
 
-// buildFix removes the return statement. The edit spans the whole enclosing
-// function even though only the return is dropped from it, which is how ESLint
-// keeps this fix from being applied in the same pass as an overlapping one.
+// buildFix removes the return statement. The edit spans the enclosing function
+// even though only the return is dropped from it, which is how ESLint keeps
+// this fix from being applied in the same pass as an overlapping one.
 func buildFix(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 	if !isRemovable(node) || utils.HasCommentInsideNode(sourceFile, node) {
 		return nil
@@ -361,11 +361,24 @@ func isRemovable(node *ast.Node) bool {
 	return false
 }
 
+// retainedRange spans the enclosing function, matching the range ESLint keeps
+// for the edit. tsgo folds a method's name and its function value into one
+// node, where ESTree splits them across a definition and an inner
+// FunctionExpression, so for those the range runs from the parameter list to
+// the end of the body: a computed key or a decorator holds its own functions,
+// and their returns get to be fixed in the same pass.
 func retainedRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	for current := node; current != nil; current = current.Parent {
-		if isFunction(current) {
-			return utils.TrimNodeTextRange(sourceFile, current)
+		if !isFunction(current) {
+			continue
 		}
+		switch current.Kind {
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+			if pos, end, ok := utils.BodyLikeRange(current); ok {
+				return core.NewTextRange(pos, end)
+			}
+		}
+		return utils.TrimNodeTextRange(sourceFile, current)
 	}
 	return core.NewTextRange(0, len(sourceFile.Text()))
 }

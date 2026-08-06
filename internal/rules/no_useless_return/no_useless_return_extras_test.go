@@ -229,6 +229,182 @@ func TestNoUselessReturnExtras(t *testing.T) {
 					{MessageId: "unnecessaryReturn", Line: 1, Column: 34, EndLine: 1, EndColumn: 41},
 				},
 			},
+			// ---- Dimension 4: fix range — a computed key sits outside the method's retained range, so both returns go in one pass ----
+			{
+				Code:   `class K { [(() => { return; })()]() { return; } }`,
+				Output: []string{`class K { [(() => {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 21, EndLine: 1, EndColumn: 28},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 39, EndLine: 1, EndColumn: 46},
+				},
+			},
+			// ---- Dimension 4: fix range — a computed key sits outside the method's retained range, so both returns go in one pass ----
+			{
+				Code:   `const o = { [(() => { return; })()]() { return; } };`,
+				Output: []string{`const o = { [(() => {  })()]() {  } };`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 23, EndLine: 1, EndColumn: 30},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 41, EndLine: 1, EndColumn: 48},
+				},
+			},
+			// ---- Dimension 4: fix range — a computed key sits outside the method's retained range, so both returns go in one pass ----
+			{
+				Code:   `class K { get [(() => { return; })()]() { return; } }`,
+				Output: []string{`class K { get [(() => {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 25, EndLine: 1, EndColumn: 32},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 43, EndLine: 1, EndColumn: 50},
+				},
+			},
+			// ---- Dimension 4: fix range — a computed key sits outside the method's retained range, so both returns go in one pass ----
+			{
+				Code:   `class K { set [(() => { return; })()](v) { return; } }`,
+				Output: []string{`class K { set [(() => {  })()](v) {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 25, EndLine: 1, EndColumn: 32},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 44, EndLine: 1, EndColumn: 51},
+				},
+			},
+			// ---- Dimension 4: fix range — a decorator sits outside the method's retained range, so both returns go in one pass ----
+			{
+				Code:   `class K { @dec(() => { return; }) m() { return; } }`,
+				Output: []string{`class K { @dec(() => {  }) m() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 24, EndLine: 1, EndColumn: 31},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 41, EndLine: 1, EndColumn: 48},
+				},
+			},
+			// ---- Dimension 4: fix range — a parameter decorator is inside the retained range, so its return waits for the next pass, as upstream does ----
+			{
+				Code: `class K { constructor(@dec(() => { return; }) x) { return; } }`,
+				Output: []string{
+					`class K { constructor(@dec(() => { return; }) x) {  } }`,
+					`class K { constructor(@dec(() => {  }) x) {  } }`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 36, EndLine: 1, EndColumn: 43},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 52, EndLine: 1, EndColumn: 59},
+				},
+			},
+			// ---- Dimension 4: fix range — a property's arrow keeps its own range, which never covered the computed key ----
+			{
+				Code:   `class K { [(() => { return; })()] = () => { return; }; }`,
+				Output: []string{`class K { [(() => {  })()] = () => {  }; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 21, EndLine: 1, EndColumn: 28},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 45, EndLine: 1, EndColumn: 52},
+				},
+			},
+			// ---- Dimension 4: fix range — a chain of computed keys stays one pass however deep it goes ----
+			{
+				Code:   `class A { [(() => { class B { [(() => { class C { [(() => { return; })()]() { return; } } })()]() { return; } } })()]() { return; } }`,
+				Output: []string{`class A { [(() => { class B { [(() => { class C { [(() => {  })()]() {  } } })()]() {  } } })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 61, EndLine: 1, EndColumn: 68},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 79, EndLine: 1, EndColumn: 86},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 101, EndLine: 1, EndColumn: 108},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 123, EndLine: 1, EndColumn: 130},
+				},
+			},
+			// ---- Dimension 4: fix range — the key's own return retains the whole key expression, so its nested method waits a pass, as upstream does ----
+			{
+				Code: `class K { [(() => { class I { [(() => { return; })()]() { return; } } return; })()]() { return; } }`,
+				Output: []string{
+					`class K { [(() => { class I { [(() => { return; })()]() { return; } }  })()]() {  } }`,
+					`class K { [(() => { class I { [(() => {  })()]() {  } }  })()]() {  } }`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 41, EndLine: 1, EndColumn: 48},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 59, EndLine: 1, EndColumn: 66},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 71, EndLine: 1, EndColumn: 78},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 89, EndLine: 1, EndColumn: 96},
+				},
+			},
+			// ---- Dimension 4: fix range — a key holding a function expression ----
+			{
+				Code:   `class K { [(function () { return; })()]() { return; } }`,
+				Output: []string{`class K { [(function () {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 27, EndLine: 1, EndColumn: 34},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 45, EndLine: 1, EndColumn: 52},
+				},
+			},
+			// ---- Dimension 4: fix range — a key holding a method of its own ----
+			{
+				Code:   `class K { [({ m() { return; } }).m()]() { return; } }`,
+				Output: []string{`class K { [({ m() {  } }).m()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 21, EndLine: 1, EndColumn: 28},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 43, EndLine: 1, EndColumn: 50},
+				},
+			},
+			// ---- Dimension 4: fix range — type parameters sit between the key and the parameter list ----
+			{
+				Code:   `class K { [(() => { return; })()]<T>() { return; } }`,
+				Output: []string{`class K { [(() => {  })()]<T>() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 21, EndLine: 1, EndColumn: 28},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 42, EndLine: 1, EndColumn: 49},
+				},
+			},
+			// ---- Dimension 4: fix range — modifiers ahead of the key don't move the retained range ----
+			{
+				Code:   `class K { async [(() => { return; })()]() { return; } }`,
+				Output: []string{`class K { async [(() => {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 27, EndLine: 1, EndColumn: 34},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 45, EndLine: 1, EndColumn: 52},
+				},
+			},
+			// ---- Dimension 4: fix range — modifiers ahead of the key don't move the retained range ----
+			{
+				Code:   `class K { *[(() => { return; })()]() { return; } }`,
+				Output: []string{`class K { *[(() => {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 22, EndLine: 1, EndColumn: 29},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 40, EndLine: 1, EndColumn: 47},
+				},
+			},
+			// ---- Dimension 4: fix range — an object literal accessor with a computed key ----
+			{
+				Code:   `const o = { get [(() => { return; })()]() { return; } };`,
+				Output: []string{`const o = { get [(() => {  })()]() {  } };`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 27, EndLine: 1, EndColumn: 34},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 45, EndLine: 1, EndColumn: 52},
+				},
+			},
+			// ---- Dimension 4: fix range — a decorator and a computed key on the same accessor ----
+			{
+				Code:   `class K { @dec(() => { return; }) get [(() => { return; })()]() { return; } }`,
+				Output: []string{`class K { @dec(() => {  }) get [(() => {  })()]() {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 24, EndLine: 1, EndColumn: 31},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 49, EndLine: 1, EndColumn: 56},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 67, EndLine: 1, EndColumn: 74},
+				},
+			},
+			// ---- Dimension 4: fix range — a default parameter value is inside the retained range, so its return waits for the next pass, as upstream does ----
+			{
+				Code: `class K { m(x = () => { return; }) { return; } }`,
+				Output: []string{
+					`class K { m(x = () => { return; }) {  } }`,
+					`class K { m(x = () => {  }) {  } }`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 25, EndLine: 1, EndColumn: 32},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 38, EndLine: 1, EndColumn: 45},
+				},
+			},
+			// ---- Dimension 4: fix range — a return nested in the method body still retains the whole body ----
+			{
+				Code:   `class K { [(() => { return; })()]() { if (c) { return; } } }`,
+				Output: []string{`class K { [(() => {  })()]() { if (c) {  } } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 21, EndLine: 1, EndColumn: 28},
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 48, EndLine: 1, EndColumn: 55},
+				},
+			},
 		},
 	)
 }
