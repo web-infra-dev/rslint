@@ -37,7 +37,7 @@ func TestPreserveCaughtErrorExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// Locks in upstream isBuiltInGlobalError arm 2: a global turned off
 			// through the config un-declares the built-in error constructor.
-			{Code: `try {} catch (err) { throw new Error("m"); }`, Globals: map[string]bool{"Error": false}},
+			{Code: `try {} catch (err) { throw new Error("m"); }`, Globals: map[string]any{"Error": "off"}},
 			// ---- Dimension 4: parenthesized options argument already carrying the cause ----
 			{Code: `try {} catch (err) { throw new Error("m", ({ cause: err })); }`},
 			// ---- Dimension 4: parenthesized cause value matching the caught error ----

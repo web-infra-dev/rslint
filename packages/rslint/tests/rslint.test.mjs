@@ -1974,13 +1974,10 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles keeps fix.range BOM-stripped and re-prepends the BOM only to output', async () => {
-    // A disk file whose bytes start with a UTF-8 BOM: Go reads it BOM-stripped,
-    // so its fix offsets and Output carry no BOM. fix.range stays BOM-stripped
-    // (matching ESLint v10, whose fix.range is relative to BOM-stripped source,
-    // and the message column); only `output` gets the BOM re-prepended so
-    // outputFixes writes back the real on-disk file. (lintText is unaffected —
-    // its overlay keeps the BOM and Go's offsets already include it.)
+  test('lintFiles keeps fix.range BOM-stripped and keeps the BOM in output', async () => {
+    // A BOM is never part of the text a fix range indexes, so fix.range stays
+    // BOM-stripped — matching ESLint v10 and the message column. `output` is
+    // the whole file, so it keeps the mark a fix did not ask to remove.
     const BOM = String.fromCharCode(0xfeff);
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-'));
     try {
@@ -2016,7 +2013,7 @@ module.exports = config;`
     // no-extra-bind emits a multi-edit fix; on a BOM-prefixed disk file the
     // merged range must stay BOM-stripped (Go's coordinate space) so applying it
     // to the BOM-stripped body reproduces output minus its BOM. Exercises the
-    // multi-edit merge branch together with the strip-then-re-prepend path.
+    // multi-edit merge branch on a file that carries a mark.
     const BOM = String.fromCharCode(0xfeff);
     const body = 'const f = (function () { return 1; }).bind(this);\n';
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-multi-'));
@@ -2049,6 +2046,70 @@ module.exports = config;`
           m.fix.text +
           body.slice(m.fix.range[1]);
         expect(results[0].output).toBe(BOM + applied);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('unicode-bom fix removes the mark from a disk file through lintFiles', async () => {
+    // The mark reaches the rule as ctx.HasBOM rather than as text, and the fix
+    // is ESLint's [-1, 0] — a range one position ahead of the source. Output is
+    // the whole file, so this is where that range takes effect.
+    const BOM = String.fromCharCode(0xfeff);
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-rule-'));
+    try {
+      await writeFile(path.join(tmp, 'tsconfig.json'), '{}');
+      await writeFile(path.join(tmp, 'bom.ts'), BOM + 'let a = 1;\n');
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          { files: ['**/*.ts'], rules: { 'unicode-bom': 'error' } },
+        ],
+        fix: true,
+      });
+      try {
+        const results = await rslint.lintFiles('bom.ts');
+        expect(results[0].messages[0].ruleId).toBe('unicode-bom');
+        expect(results[0].messages[0].fix.range).toEqual([-1, 0]);
+        expect(results[0].messages[0].fix.text).toBe('');
+        expect(results[0].output).toBe('let a = 1;\n');
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('unicode-bom fix removes a mark the caller passed to lintText', async () => {
+    // Caller-supplied source is stripped of its mark before parsing exactly as
+    // a file read off disk is, so both routes reach the rule the same way and
+    // produce the same output.
+    const BOM = String.fromCharCode(0xfeff);
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-text-'));
+    try {
+      await writeFile(path.join(tmp, 'tsconfig.json'), '{}');
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          { files: ['**/*.ts'], rules: { 'unicode-bom': 'error' } },
+        ],
+        fix: true,
+      });
+      try {
+        const results = await rslint.lintText(BOM + 'let a = 1;\n', {
+          filePath: path.join(tmp, 'buffer.ts'),
+        });
+        expect(results[0].messages[0].ruleId).toBe('unicode-bom');
+        // Line 1, column 1 — the mark's own position, as ESLint reports it.
+        expect(results[0].messages[0].line).toBe(1);
+        expect(results[0].messages[0].column).toBe(1);
+        expect(results[0].output).toBe('let a = 1;\n');
       } finally {
         await rslint.close();
       }
@@ -2422,10 +2483,10 @@ module.exports = config;`
     }
   });
 
-  // lintText reports BOM-INCLUSIVE offsets for BOM-prefixed code (known
-  // limitation, one ahead of ESLint v10 which strips the BOM). Pinned without
-  // hardcoding offsets: the same code with a leading BOM shifts every offset +1.
-  test('lintText reports BOM-inclusive offsets for BOM-prefixed code (known limitation)', async () => {
+  // A leading BOM is not part of the text an offset indexes, matching ESLint
+  // v10. Pinned without hardcoding offsets: the same code with and without a
+  // BOM reports identical columns and fix ranges.
+  test('lintText reports BOM-stripped offsets for BOM-prefixed code', async () => {
     const rslint = new Rslint({
       cwd: '/',
       overrideConfigFile: true,
@@ -2455,10 +2516,11 @@ module.exports = config;`
       const pm = plain.messages[0];
       const bm = bom.messages[0];
       expect(pm.ruleId).toBe('@typescript-eslint/array-type');
-      // The BOM shifts every offset by exactly one UTF-16 unit.
-      expect(bm.column).toBe(pm.column + 1);
-      expect(bm.fix.range[0]).toBe(pm.fix.range[0] + 1);
-      expect(bm.fix.range[1]).toBe(pm.fix.range[1] + 1);
+      // The BOM leaves every offset untouched.
+      expect(bm.column).toBe(pm.column);
+      expect(bm.line).toBe(pm.line);
+      expect(bm.fix.range[0]).toBe(pm.fix.range[0]);
+      expect(bm.fix.range[1]).toBe(pm.fix.range[1]);
     } finally {
       await rslint.close();
     }

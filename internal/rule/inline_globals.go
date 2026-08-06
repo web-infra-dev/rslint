@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // inlineGlobalsKeywords lists the directive keywords that introduce a
@@ -15,23 +16,24 @@ import (
 var inlineGlobalsKeywords = [...]string{"globals", "global"}
 
 // InlineGlobal describes one name declared by `/* global */` comments.
-// Declared is the name's final inline state after all comments are applied.
+// Access is the name's final inline setting after all comments are applied.
 // NameRanges contains one exact name range per comment that mentions the name,
 // in source order. Repeating a name within one comment still contributes only
 // its first range, matching ESLint's comment metadata.
 type InlineGlobal struct {
 	Name       string
-	Declared   bool
+	Access     utils.GlobalAccess
 	NameRanges []core.TextRange
 }
 
 type inlineGlobalName struct {
-	name      string
-	setting   string
-	nameRange core.TextRange
+	name       string
+	setting    string
+	hasSetting bool
+	nameRange  core.TextRange
 }
 
-// ParseInlineGlobals returns both the final name -> declared map and ordered
+// ParseInlineGlobals returns both the final name -> access map and ordered
 // declaration metadata for `/* global ... */` / `/* globals ... */` comments.
 // A source-text candidate check keeps the shared comment store lazy unless such a
 // directive may be present.
@@ -40,8 +42,11 @@ type inlineGlobalName struct {
 // so lookalike text in strings, templates, regexes, or line comments is ignored.
 // Within a comment, duplicate names use the last setting and retain the first
 // name range. Across comments, the last setting wins and every comment range is
-// preserved. As in the existing globals API, only "off" un-declares a name.
-func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map[string]bool, []InlineGlobal) {
+// preserved. A name written without a setting is readonly; a setting that
+// spells none of ESLint's three levels is ignored along with its name range,
+// leaving the name's earlier inline setting — or the config or built-in
+// setting — in place.
+func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map[string]utils.GlobalAccess, []InlineGlobal) {
 	if sourceFile == nil || sourceFile.Text() == "" || !mayContainInlineGlobalDirective(sourceFile.Text()) {
 		return nil, nil
 	}
@@ -51,49 +56,60 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map
 	if len(sourceComments) == 0 {
 		return nil, nil
 	}
-	var values map[string]bool
 	var globals []InlineGlobal
-	var globalIndexes map[string]int
+	var entryIndexes map[string]int
 
 	for _, comment := range sourceComments {
-		entries := parseInlineGlobalComment(text, comment)
-		if len(entries) == 0 {
+		commentNames := parseInlineGlobalComment(text, comment)
+		if len(commentNames) == 0 {
 			continue
 		}
 
 		// ESLint's parseStringConfig returns an object, so a repeated name in
 		// one comment has one comment entry: its last setting and first range.
-		commentEntries := make([]inlineGlobalName, 0, len(entries))
-		commentIndexes := make(map[string]int, len(entries))
-		for _, entry := range entries {
+		commentEntries := make([]inlineGlobalName, 0, len(commentNames))
+		commentIndexes := make(map[string]int, len(commentNames))
+		for _, entry := range commentNames {
 			if index, exists := commentIndexes[entry.name]; exists {
 				commentEntries[index].setting = entry.setting
+				commentEntries[index].hasSetting = entry.hasSetting
 				continue
 			}
 			commentIndexes[entry.name] = len(commentEntries)
 			commentEntries = append(commentEntries, entry)
 		}
 
-		if values == nil {
-			values = make(map[string]bool)
-			globalIndexes = make(map[string]int)
+		if entryIndexes == nil {
+			entryIndexes = make(map[string]int)
 		}
 		for _, entry := range commentEntries {
-			declared := entry.setting != "off"
-			values[entry.name] = declared
+			// ESLint reports the bad directive and moves on, so an unusable
+			// setting contributes neither an access level nor a name range.
+			access, valid := utils.NormalizeInlineGlobalAccess(entry.setting, entry.hasSetting)
+			if !valid {
+				continue
+			}
 
-			if index, exists := globalIndexes[entry.name]; exists {
-				globals[index].Declared = declared
+			if index, exists := entryIndexes[entry.name]; exists {
+				globals[index].Access = access
 				globals[index].NameRanges = append(globals[index].NameRanges, entry.nameRange)
 				continue
 			}
-			globalIndexes[entry.name] = len(globals)
+			entryIndexes[entry.name] = len(globals)
 			globals = append(globals, InlineGlobal{
 				Name:       entry.name,
-				Declared:   declared,
+				Access:     access,
 				NameRanges: []core.TextRange{entry.nameRange},
 			})
 		}
+	}
+
+	if len(globals) == 0 {
+		return nil, nil
+	}
+	values := make(map[string]utils.GlobalAccess, len(globals))
+	for _, global := range globals {
+		values[global.Name] = global.Access
 	}
 
 	return values, globals
@@ -190,19 +206,19 @@ func matchInlineGlobalsDirectiveRange(text string, start int, end int) (int, boo
 // MergeGlobals combines config-declared globals with inline `/* global */`
 // comment globals into the single set exposed to rules as ctx.Globals. Inline
 // settings win on conflict. Returns nil if both inputs are empty.
-func MergeGlobals(configGlobals, inlineGlobals map[string]bool) map[string]bool {
+func MergeGlobals(configGlobals, inlineGlobals map[string]utils.GlobalAccess) map[string]utils.GlobalAccess {
 	if len(configGlobals) == 0 {
 		return inlineGlobals
 	}
 	if len(inlineGlobals) == 0 {
 		return configGlobals
 	}
-	merged := make(map[string]bool, len(configGlobals)+len(inlineGlobals))
-	for name, declared := range configGlobals {
-		merged[name] = declared
+	merged := make(map[string]utils.GlobalAccess, len(configGlobals)+len(inlineGlobals))
+	for name, access := range configGlobals {
+		merged[name] = access
 	}
-	for name, declared := range inlineGlobals {
-		merged[name] = declared
+	for name, access := range inlineGlobals {
+		merged[name] = access
 	}
 	return merged
 }
@@ -253,7 +269,8 @@ func parseGlobalNameListEntries(text string, start int, end int) []inlineGlobalN
 		}
 
 		setting := ""
-		if nameEnd < tokenEnd {
+		hasSetting := nameEnd < tokenEnd
+		if hasSetting {
 			settingStart, settingEnd := nameEnd+1, tokenEnd
 			for i := settingStart; i < tokenEnd; i++ {
 				if runes[i].value == ':' {
@@ -269,9 +286,10 @@ func parseGlobalNameListEntries(text string, start int, end int) []inlineGlobalN
 		nameStartPos := runes[tokenStart].start
 		nameEndPos := runes[nameEnd-1].end
 		entries = append(entries, inlineGlobalName{
-			name:      text[nameStartPos:nameEndPos],
-			setting:   setting,
-			nameRange: core.NewTextRange(nameStartPos, nameEndPos),
+			name:       text[nameStartPos:nameEndPos],
+			setting:    setting,
+			hasSetting: hasSetting,
+			nameRange:  core.NewTextRange(nameStartPos, nameEndPos),
 		})
 	}
 

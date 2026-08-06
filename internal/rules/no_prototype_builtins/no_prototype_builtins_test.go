@@ -213,7 +213,7 @@ func TestNoPrototypeBuiltinsRule(t *testing.T) {
 			// still fires, but without the suggestion.
 			{
 				Code:    `foo.hasOwnProperty('bar');`,
-				Globals: map[string]bool{"Object": false},
+				Globals: map[string]any{"Object": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "prototypeBuildIn"},
 				},
@@ -221,7 +221,7 @@ func TestNoPrototypeBuiltinsRule(t *testing.T) {
 			// Config declares Object as a writable global — suggestion still offered.
 			{
 				Code:    `foo.hasOwnProperty('bar')`,
-				Globals: map[string]bool{"Object": true},
+				Globals: map[string]any{"Object": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "prototypeBuildIn",

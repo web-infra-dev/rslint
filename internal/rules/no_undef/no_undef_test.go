@@ -104,12 +104,13 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `/*global myVar*/ myVar = 1;`},
 			{Code: `/*global a, b*/ a = 1; b = 2;`},
 			{Code: `/*global myVar:writable*/ myVar = 1;`},
+			{Code: `/*global myVar*/ /*global myVar:bogus*/ myVar;`},
 
 			// === languageOptions.globals (config) ===
-			{Code: `myConfiguredGlobal;`, Globals: map[string]bool{"myConfiguredGlobal": true}},
+			{Code: `myConfiguredGlobal;`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
 
 			// === "off" global with a same-file declaration: the binding wins ===
-			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]bool{"myOffGlobal123": false}},
+			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]any{"myOffGlobal123": "off"}},
 
 			// === ES2025 built-in ===
 			{Code: `var buf = new Float16Array(8);`},
@@ -122,7 +123,7 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `function Foo() { return null; } const el = <Foo />;`, Tsx: true},
 
 			// === languageOptions.globals + /*global*/ comment together ===
-			{Code: `/*global fromComment*/ fromConfig; fromComment;`, Globals: map[string]bool{"fromConfig": true}},
+			{Code: `/*global fromComment*/ fromConfig; fromComment;`, Globals: map[string]any{"fromConfig": "readonly"}},
 
 			// === Namespace ===
 			{Code: `namespace MyNS { export var x = 1; } MyNS.x;`},
@@ -350,7 +351,7 @@ func TestNoUndefRule(t *testing.T) {
 			// === languageOptions.globals explicitly "off" still reports ===
 			{
 				Code:    `myOffGlobal123;`,
-				Globals: map[string]bool{"myOffGlobal123": false},
+				Globals: map[string]any{"myOffGlobal123": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
 				},
@@ -373,7 +374,7 @@ func TestNoUndefRule(t *testing.T) {
 			},
 			{
 				Code:    `setTimeout(() => {}, 100);`,
-				Globals: map[string]bool{"setTimeout": false},
+				Globals: map[string]any{"setTimeout": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
 				},

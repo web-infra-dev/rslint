@@ -3,7 +3,8 @@ import type { RslintConfigEntry } from '../define-config.js';
 // Aligned with official eslint-plugin-unicorn@72.x recommended.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 // The official preset also injects `languageOptions.globals` (Array, Promise, Map, …);
-// rslint's config entry doesn't expose a `globals` field, so that part is omitted.
+// rslint declares those ECMAScript built-ins as readonly globals already, so that
+// part is omitted.
 const recommended: RslintConfigEntry = {
   plugins: ['unicorn'],
   rules: {

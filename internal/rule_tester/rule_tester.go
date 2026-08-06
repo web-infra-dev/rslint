@@ -26,13 +26,15 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
-	// Globals simulates a config-declared `languageOptions.globals` (name →
-	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
-	// `/* global */` comments in Code are picked up automatically by the
-	// linter and merged with this — no separate field needed for those.
-	Globals  map[string]bool `json:"globals"`
-	TSConfig string          `json:"tsConfig"`
-	Tsx      bool            `json:"tsx"`
+	// Globals simulates a config-declared `languageOptions.globals` for rules
+	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
+	// an ESLint config — "readonly", "writable", "off", or their aliases — and
+	// an unrecognized one fails the test. Inline `/* global */` comments in
+	// Code are picked up automatically by the linter and merged with this — no
+	// separate field needed for those.
+	Globals  map[string]any `json:"globals"`
+	TSConfig string         `json:"tsConfig"`
+	Tsx      bool           `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
@@ -60,14 +62,16 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
-	// Globals simulates a config-declared `languageOptions.globals` (name →
-	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
-	// `/* global */` comments in Code are picked up automatically by the
-	// linter and merged with this — no separate field needed for those.
-	Globals  map[string]bool `json:"globals"`
-	TSConfig string          `json:"tsConfig"`
-	Options  any             `json:"options"`
-	Tsx      bool            `json:"tsx"`
+	// Globals simulates a config-declared `languageOptions.globals` for rules
+	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
+	// an ESLint config — "readonly", "writable", "off", or their aliases — and
+	// an unrecognized one fails the test. Inline `/* global */` comments in
+	// Code are picked up automatically by the linter and merged with this — no
+	// separate field needed for those.
+	Globals  map[string]any `json:"globals"`
+	TSConfig string         `json:"tsConfig"`
+	Options  any            `json:"options"`
+	Tsx      bool           `json:"tsx"`
 }
 
 // TestSuite represents a complete test suite that can be loaded from JSON
@@ -151,14 +155,32 @@ func ResolveTestCaseOptions(t *testing.T, r *rule.Rule, rawOptions any) []any {
 	return options
 }
 
+// resolveTestCaseGlobals normalizes a test case's ESLint-authored globals the
+// way the config loader normalizes `languageOptions.globals`.
+func resolveTestCaseGlobals(t *testing.T, rawGlobals map[string]any) map[string]utils.GlobalAccess {
+	if len(rawGlobals) == 0 {
+		return nil
+	}
+	globals := make(map[string]utils.GlobalAccess, len(rawGlobals))
+	for name, value := range rawGlobals {
+		access, ok := utils.NormalizeGlobalAccess(value)
+		if !ok {
+			t.Fatalf("test case global %q has invalid access %#v; expected \"readonly\", \"writable\", or \"off\"", name, value)
+		}
+		globals[name] = access
+	}
+	return globals
+}
+
 func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	t.Parallel()
 
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, globals map[string]bool, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		options := ResolveTestCaseOptions(t, r, rawOptions)
+		globals := resolveTestCaseGlobals(t, rawGlobals)
 
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)

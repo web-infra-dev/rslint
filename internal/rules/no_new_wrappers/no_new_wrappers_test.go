@@ -64,7 +64,7 @@ func TestNoNewWrappersRule(t *testing.T) {
 			{Code: `function test() { for (let String of []) { new String(); } }`},
 
 			// --- Config `/* global String: off */` un-declares the builtin ---
-			{Code: `new String('a');`, Globals: map[string]bool{"String": false}},
+			{Code: `new String('a');`, Globals: map[string]any{"String": "off"}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -157,7 +157,7 @@ func TestNoNewWrappersRule(t *testing.T) {
 			// Config declares String as a writable global — still the builtin.
 			{
 				Code:    `new String('a');`,
-				Globals: map[string]bool{"String": true},
+				Globals: map[string]any{"String": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noConstructor", Line: 1, Column: 1}},
 			},
 		},

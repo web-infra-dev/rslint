@@ -46,7 +46,7 @@ func TestNoLabelVarRule(t *testing.T) {
 			{Code: `function* gen() { q: for(;;) { break q; } }`},
 
 			// ---- Declared global that does not clash with the label name ----
-			{Code: `q: for(;;) { break q; }`, Globals: map[string]bool{"myConfiguredGlobal": true}},
+			{Code: `q: for(;;) { break q; }`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -222,7 +222,7 @@ func TestNoLabelVarRule(t *testing.T) {
 			// ---- Config-declared / `/* global */` comment globals (strategy B path) ----
 			{
 				Code:    `myConfiguredGlobal: for(;;) { break myConfiguredGlobal; }`,
-				Globals: map[string]bool{"myConfiguredGlobal": true},
+				Globals: map[string]any{"myConfiguredGlobal": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},

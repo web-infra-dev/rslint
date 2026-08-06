@@ -105,7 +105,7 @@ func staticAccessObject(node *ast.Node) *ast.Node {
 // `languageOptions.globals` entry un-declares the name, so it no longer
 // resolves to a known global — mirrors ESLint's ReferenceTracker finding no
 // global-scope variable to track references through.
-func isGlobalNameReference(node *ast.Node, name string, globals map[string]bool) bool {
+func isGlobalNameReference(node *ast.Node, name string, globals map[string]utils.GlobalAccess) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil ||
 		node.Kind != ast.KindIdentifier ||
@@ -113,13 +113,13 @@ func isGlobalNameReference(node *ast.Node, name string, globals map[string]bool)
 		utils.IsShadowed(node, name) {
 		return false
 	}
-	if declared, ok := globals[name]; ok && !declared {
+	if globals[name] == utils.GlobalAccessOff {
 		return false
 	}
 	return true
 }
 
-func isGlobalMathExpression(node *ast.Node, globals map[string]bool) bool {
+func isGlobalMathExpression(node *ast.Node, globals map[string]utils.GlobalAccess) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
@@ -141,7 +141,7 @@ func isGlobalMathExpression(node *ast.Node, globals map[string]bool) bool {
 	return isGlobalNameReference(object, "globalThis", globals)
 }
 
-func isMathPowCall(node *ast.Node, globals map[string]bool) bool {
+func isMathPowCall(node *ast.Node, globals map[string]utils.GlobalAccess) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false

@@ -240,7 +240,7 @@ func TestNoUselessAssignmentUpstream(t *testing.T) {
                 // process
             } finally {
                 console = bk;
-            }`, Globals: map[string]bool{"console": false}},
+            }`, Globals: map[string]any{"console": "off"}},
 			{Code: `let message = 'init';
         try {
             const result = call();

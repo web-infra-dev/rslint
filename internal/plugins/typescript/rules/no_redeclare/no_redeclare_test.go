@@ -74,7 +74,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Value-only lib globals can be turned off. Names that also exist in
 			// TypeScript's type space (such as Object) remain implicit variables;
 			// their lock-ins live with the invalid builtin cases below.
-			{Code: "var document = 0;", Globals: map[string]bool{"document": false}},
+			{Code: "var document = 0;", Globals: map[string]any{"document": "off"}},
 			{Code: "/* globals top:off */ var top = 0;"},
 			// TypeScript scope-manager does not turn pure value declarations from
 			// lib.dom into implicit globals. They only participate when configured.
@@ -86,7 +86,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// the syntax declaration is module-local; neither declaration repeats.
 			{Code: "export {};\n/*globals top */ var top = 0;"},
 			// A final inline `off` wins over a config-declared global.
-			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]bool{"a": true}},
+			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]any{"a": "readonly"}},
 
 			// ====================================================================
 			// TypeScript declaration merging (default ignoreDeclarationMerge: true).
@@ -532,7 +532,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// ctx.Globals: a config-declared global collides like a builtin.
 			{
 				Code:    "var app = 0;",
-				Globals: map[string]bool{"app": true},
+				Globals: map[string]any{"app": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'app' is already defined as a built-in global variable.", Line: 1, Column: 5},
 				},
@@ -541,7 +541,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// turned off — the comment then collides with the declaration.
 			{
 				Code:    "/* globals Object */ var Object = 0;",
-				Globals: map[string]bool{"Object": false},
+				Globals: map[string]any{"Object": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 26, EndLine: 1, EndColumn: 32},
 				},
@@ -571,7 +571,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Type-space lib variables survive value-global `off` settings.
 			{
 				Code:    "var Object = 0;",
-				Globals: map[string]bool{"Object": false},
+				Globals: map[string]any{"Object": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5, EndLine: 1, EndColumn: 11},
 				},
@@ -586,7 +586,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// explicit globals setting or directive, matching scope-manager.
 			{
 				Code:    "var document = 0;",
-				Globals: map[string]bool{"document": true},
+				Globals: map[string]any{"document": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'document' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 13},
 				},

@@ -6,6 +6,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
@@ -665,11 +666,11 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 	}
 	for _, rules := range [][]linter.ConfiguredRule{cachedRules, registryRules} {
 		for _, rule := range rules {
-			if !rule.Globals["readonlyGlobal"] {
+			if rule.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
 				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
 			}
-			if rule.Globals["disabledGlobal"] {
-				t.Fatalf("expected resolver/registry rule %q to carry disabled global as false", rule.Name)
+			if rule.Globals["disabledGlobal"] != utils.GlobalAccessOff {
+				t.Fatalf("expected resolver/registry rule %q to carry disabled global as off", rule.Name)
 			}
 		}
 	}

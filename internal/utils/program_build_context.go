@@ -314,6 +314,13 @@ func (f *programMetadataFS) ReadFile(fileName string) (string, bool) {
 	return f.readAndPublish(generation, fileName, candidate)
 }
 
+// SourceHasBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
+// that interface's methods, so this layer has to pass [BOMSource] through by
+// hand or every overlay identity below it becomes invisible.
+func (f *programMetadataFS) SourceHasBOM(path string) bool {
+	return SourceHasBOM(f.FS, path)
+}
+
 func mustProgramMetadataRead(value any) *programMetadataRead {
 	read, ok := value.(*programMetadataRead)
 	if !ok {

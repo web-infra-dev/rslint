@@ -49,10 +49,10 @@ undeclaredName123;
 		Program:     program,
 		TypeChecker: nil, // explicitly nil — this is the path under test
 		Refs:        rule.NewRefStore(sourceFile, program.Options(), nil),
-		Globals: map[string]bool{
-			"myConfiguredGlobal": true,
-			"myOffGlobal":        false,
-			"myOffLocal":         false,
+		Globals: map[string]utils.GlobalAccess{
+			"myConfiguredGlobal": utils.GlobalAccessReadonly,
+			"myOffGlobal":        utils.GlobalAccessOff,
+			"myOffLocal":         utils.GlobalAccessOff,
 		},
 	}).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
 		reported = append(reported, d.Message.Description)

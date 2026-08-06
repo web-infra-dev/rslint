@@ -64,7 +64,7 @@ var NoImpliedEvalRule = rule.Rule{
 					if !slices.Contains(evalLikeFunctions, name) {
 						return
 					}
-					if declared, ok := ctx.Globals[name]; ok && !declared {
+					if ctx.Globals[name] == utils.GlobalAccessOff {
 						return
 					}
 					if utils.IsShadowed(callee, name) {
@@ -112,7 +112,7 @@ var NoImpliedEvalRule = rule.Rule{
 // as `window.global.setTimeout` or `self.window.setTimeout` are rejected, to
 // match ESLint's per-candidate scope-manager walk. Shadowed root identifiers
 // are also rejected.
-func isGlobalCandidateChain(node *ast.Node, globals map[string]bool) bool {
+func isGlobalCandidateChain(node *ast.Node, globals map[string]utils.GlobalAccess) bool {
 	node = ast.SkipOuterExpressions(node, calleeOuterKinds)
 	if node == nil {
 		return false
@@ -137,7 +137,7 @@ func isGlobalCandidateChain(node *ast.Node, globals map[string]bool) bool {
 	if !slices.Contains(globalCandidates, rootName) {
 		return false
 	}
-	if declared, ok := globals[rootName]; ok && !declared {
+	if globals[rootName] == utils.GlobalAccessOff {
 		return false
 	}
 	if utils.IsShadowed(root, rootName) {

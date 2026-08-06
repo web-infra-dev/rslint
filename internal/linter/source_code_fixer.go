@@ -5,13 +5,29 @@ import (
 	"strings"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type LintMessage interface {
 	Fixes() []rule.RuleFix
 }
 
+// ApplyRuleFixes applies non-conflicting fixes to a file's original text and
+// returns the result, the diagnostics whose fixes were left for a later pass,
+// and whether anything was applied.
+//
+// `code` is the text as it exists in the file, byte order mark included, while
+// fix ranges index the text without one — the mark is never part of what a
+// rule sees. That puts the mark at range position -1, which is how a rule asks
+// for it to be removed, and is ESLint's convention in SourceCodeFixer.
 func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, bool) {
+	bom := ""
+	text := code
+	if strings.HasPrefix(text, utils.BOM) {
+		bom = utils.BOM
+		text = text[len(utils.BOM):]
+	}
+
 	unapplied := []M{}
 	withFixes := []M{}
 
@@ -44,7 +60,9 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 
 	var builder strings.Builder
 
-	lastFixEnd := 0
+	// Below every legal fix position, including the byte order mark's -1, so
+	// the first fix is never mistaken for an overlap.
+	lastFixEnd := -1
 	lastWasInsertion := false
 	for _, diagnostic := range withFixes {
 		fixes := diagnostic.Fixes()
@@ -65,7 +83,12 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 			lastFixEnd == firstFix.Range.Pos() &&
 			(isCurrentFixInsertion || lastWasInsertion)
 
-		if isOverlapping || isAdjacentConflict {
+		// An inverted range is not a range this fixer can honor.
+		isInverted := slices.ContainsFunc(fixes, func(fix rule.RuleFix) bool {
+			return fix.Range.Pos() > fix.Range.End()
+		})
+
+		if isOverlapping || isAdjacentConflict || isInverted {
 			unapplied = append(unapplied, diagnostic)
 			continue
 		}
@@ -74,14 +97,22 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 			fixed = true
 			lastWasInsertion = fix.Range.Pos() == fix.Range.End()
 
-			builder.WriteString(code[lastFixEnd:fix.Range.Pos()])
+			// A fix reaching back before the text either cuts the mark out or
+			// writes over it; either way the mark does not survive. So does a
+			// fix that replaces the start of the text with one of its own.
+			if (fix.Range.Pos() < 0 && fix.Range.End() >= 0) ||
+				(fix.Range.Pos() == 0 && strings.HasPrefix(fix.Text, utils.BOM)) {
+				bom = ""
+			}
+
+			builder.WriteString(text[max(0, lastFixEnd):max(0, fix.Range.Pos())])
 			builder.WriteString(fix.Text)
 
 			lastFixEnd = fix.Range.End()
 		}
 	}
 
-	builder.WriteString(code[lastFixEnd:])
+	builder.WriteString(text[max(0, lastFixEnd):])
 
-	return builder.String(), unapplied, fixed
+	return bom + builder.String(), unapplied, fixed
 }

@@ -178,8 +178,8 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `/(|a)\1/`},
 
 			// Config `off` un-declares `RegExp` — the constructor path goes dead
-			{Code: `new RegExp("\\1(a)");`, Globals: map[string]bool{"RegExp": false}},
-			{Code: `RegExp("\\1(a)");`, Globals: map[string]bool{"RegExp": false}},
+			{Code: `new RegExp("\\1(a)");`, Globals: map[string]any{"RegExp": "off"}},
+			{Code: `RegExp("\\1(a)");`, Globals: map[string]any{"RegExp": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ambient augmentations extend the global RegExp, they do not shadow it ----
@@ -464,7 +464,7 @@ r('\\1(a)');`,
 			// with its own flags and reported at its own position.
 			{
 				Code:    `new RegExp(/\1(a)/, "u");`,
-				Globals: map[string]bool{"RegExp": false},
+				Globals: map[string]any{"RegExp": "off"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "forward", Line: 1, Column: 12},
 				},

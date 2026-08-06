@@ -275,9 +275,9 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
-    ConfigGlobals  map[string]bool
+    ConfigGlobals  map[string]utils.GlobalAccess
     InlineGlobals  []InlineGlobal
-    Globals        map[string]bool
+    Globals        map[string]utils.GlobalAccess
     Comments       *CommentStore
     Refs           *RefStore
     Program        *compiler.Program
@@ -328,10 +328,13 @@ no-op and both methods only ever see symbols declared in the current file.
 `ConfigGlobals` preserves the effective `languageOptions.globals` source,
 `InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
 resolved map after inline settings override configuration. Rules consume this
-context data instead of scanning comments independently. Configured access
-aliases are normalized consistently: writable and read-only aliases declare a
-name, `null` is read-only, and only `"off"` disables it. The Node plugin scope separately
-preserves writable versus read-only access for ESLint-compatible scope APIs.
+context data instead of scanning comments independently. Every authored alias
+is normalized to one of ESLint's three access levels — `utils.GlobalAccess`,
+whose zero value means neither source mentioned the name, so a rule that
+indexes it falls back to what it already knows about the name. Booleans follow
+the `globals` package: `true` is writable, `false` is read-only. The Node
+plugin scope seeds the same levels into its scope manager for
+ESLint-compatible scope APIs.
 The linter binds immutable rule name, severity, and diagnostic-sink metadata to
 each context once. The reporting methods use that state directly rather than
 allocating bound callback closures for every reporting variant.

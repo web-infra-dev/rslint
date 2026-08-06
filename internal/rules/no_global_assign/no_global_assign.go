@@ -54,6 +54,22 @@ func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
 	}
 }
 
+// isReadonlyGlobal reports whether name resolves to a global variable that may
+// not be assigned to: one the config or a `/* global */` comment declares
+// readonly, or an ECMAScript built-in, which is readonly unless one of those
+// two sources says otherwise. `writable` lifts the restriction and `off`
+// removes the global entirely, so neither reports.
+func isReadonlyGlobal(ctx rule.RuleContext, name string) bool {
+	switch ctx.Globals[name] {
+	case utils.GlobalAccessReadonly:
+		return true
+	case utils.GlobalAccessUnset:
+		return utils.IsECMAScriptGlobal(name)
+	default:
+		return false
+	}
+}
+
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
 	Name: "no-global-assign",
@@ -72,11 +88,7 @@ var NoGlobalAssignRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
-				if !utils.IsECMAScriptGlobal(name) || opts.exceptions[name] {
-					return
-				}
-
-				if declared, ok := ctx.Globals[name]; ok && !declared {
+				if opts.exceptions[name] || !isReadonlyGlobal(ctx, name) {
 					return
 				}
 

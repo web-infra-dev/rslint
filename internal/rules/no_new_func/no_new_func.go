@@ -43,7 +43,7 @@ var NoNewFuncRule = rule.Rule{
 			// entry un-declares the builtin, so `Function` no longer resolves
 			// to a known global — ESLint's `globalScope.set.get("Function")`
 			// would be undefined and the rule stays silent.
-			if declared, ok := ctx.Globals["Function"]; ok && !declared {
+			if ctx.Globals["Function"] == utils.GlobalAccessOff {
 				return false
 			}
 			if ctx.TypeChecker != nil {
