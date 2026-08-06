@@ -39,21 +39,29 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
+	// Cwd is the normalized working directory of the linting process, the
+	// counterpart of ESLint's `process.cwd()`. Rules that resolve configured
+	// relative paths should use it instead of the Program's current directory,
+	// which is the owning tsconfig's directory and therefore differs between
+	// Programs in the same run. Empty when the caller has no process directory
+	// to speak of, such as rule tests reading an in-memory fixture root.
+	Cwd string
 	// ConfigGlobals contains only globals from the effective
 	// `languageOptions.globals` configuration, before inline comments are
-	// applied. A false value is an explicit "off" setting.
-	ConfigGlobals map[string]bool
+	// applied.
+	ConfigGlobals map[string]utils.GlobalAccess
 	// InlineGlobals contains `/* global */` declaration metadata in first-name
 	// source order. Rules can use its exact name ranges without scanning source
 	// text again. Treat the slice and its nested ranges as read-only.
 	InlineGlobals []InlineGlobal
-	// Globals is the fully resolved set of declared global names for this
-	// file — config `languageOptions.globals` merged with inline
+	// Globals is the resolved access level of every global name this file
+	// mentions — config `languageOptions.globals` merged with inline
 	// `/* global */` comments, resolved once per file by the linter. Rules
-	// should read this instead of parsing comments or config themselves. Nil
-	// only when neither source mentions any globals; a name maps to false when
-	// its final setting is "off".
-	Globals map[string]bool
+	// should read this instead of parsing comments or config themselves. A name
+	// neither source mentions reads back as utils.GlobalAccessUnset, so rules
+	// can index it directly and fall back to what they already know about the
+	// name, e.g. utils.IsECMAScriptGlobal.
+	Globals map[string]utils.GlobalAccess
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every
@@ -64,7 +72,11 @@ type RuleContext struct {
 	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
 	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
 	// Nil when no program is available.
-	Refs           *RefStore
+	Refs *RefStore
+	// BOM lazily answers whether this file's source text began with a byte
+	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
+	// false, which is what a context with no program can say.
+	BOM            *SourceBOM
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager

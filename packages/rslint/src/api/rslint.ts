@@ -278,14 +278,13 @@ export class Rslint {
    * Lint a string of code as if it lived at `filePath` (default a synthetic
    * `.ts` path).
    *
-   * ESLint-alignment note: if `code` begins with a UTF-8 BOM, the reported
-   * offsets (`fix.range`, `column`) are relative to the BOM-included input you
-   * passed — self-consistent within that input (result `output`, line/column,
-   * and re-applying `fix` all line up), but one unit ahead of ESLint v10, which
-   * strips a leading BOM from its in-memory source. (The overlay keeps the BOM
-   * and Go's offsets include it; lintFiles is unaffected because Go reads disk
-   * files BOM-stripped.) Strip a leading `U+FEFF` first for ESLint-identical
-   * offsets.
+   * A leading `U+FEFF` in `code` is a byte order mark, and a byte order mark is
+   * never part of the text an offset indexes — the mark is stripped before
+   * parsing, exactly as reading the same bytes off disk would strip it. So
+   * `column` and `fix.range` are measured from the character after it, the way
+   * ESLint measures them, and `lintText` and `lintFiles` agree on the same
+   * source. Result `output` is the whole file and carries the mark through,
+   * unless a fix asked for its removal.
    */
   async lintText(
     code: string,
@@ -325,8 +324,10 @@ export class Rslint {
         },
         discoverySession?.handlers ?? {},
       );
+      // Go strips a leading BOM from caller-supplied source before parsing, so
+      // fix ranges index the code without it; strip it here to match.
       const results = this.#toLintResults(response, this.#cwd, [filePath], {
-        [filePath]: code,
+        [filePath]: stripBOM(code),
       });
       // ESLint's lintText returns exactly one result — for the linted buffer. An
       // in-memory overlay dependency file (pulled into the program and matching
@@ -461,10 +462,7 @@ export class Rslint {
         },
         discoverySession?.handlers ?? {},
       );
-      const { contents, bomFiles } = await this.#readDiagnosticContents(
-        response,
-        this.#cwd,
-      );
+      const contents = await this.#readDiagnosticContents(response, this.#cwd);
       // The multi-config native path returns absolute identities. Relative
       // values remain accepted for low-level/older implementations.
       const linted = response.lintedFiles
@@ -474,13 +472,9 @@ export class Rslint {
               : path.resolve(this.#cwd, file),
           )
         : files;
-      return this.#toLintResults(
-        response,
-        this.#cwd,
-        linted,
-        contents,
-        bomFiles,
-      ).sort((a, b) => nativePathIdentity.compare(a.filePath, b.filePath));
+      return this.#toLintResults(response, this.#cwd, linted, contents).sort(
+        (a, b) => nativePathIdentity.compare(a.filePath, b.filePath),
+      );
     } finally {
       await discoverySession?.shutdown();
     }
@@ -629,40 +623,28 @@ export class Rslint {
   async #readDiagnosticContents(
     response: LintResponse,
     configDirectory: string,
-  ): Promise<{ contents: Record<string, string>; bomFiles: Set<string> }> {
+  ): Promise<Record<string, string>> {
     // Read source for each file that produced a diagnostic so mergeFixes can
     // gap-fill multi-edit fixes (parity with lintText, which has the source
     // in-hand). Only diagnosed files are read; a lint with no findings reads
     // nothing.
     const contents: Record<string, string> = {};
-    // Disk files whose bytes start with a UTF-8 BOM. Go reads them through a
-    // decoder that strips the BOM, so its fix offsets AND Output are
-    // BOM-stripped. We strip the BOM from the source fed to mergeFixes so the
-    // gap-fill slices line up with those offsets — and `fix.range` therefore
-    // stays BOM-stripped, matching ESLint v10 and the message line/column —
-    // then re-prepend the BOM to Output (in toLintResults) so outputFixes writes
-    // back the real file. (lintText is unaffected: its overlay keeps the BOM and
-    // Go's offsets already include it, so no adjustment is needed there.)
-    const bomFiles = new Set<string>();
     for (const d of response.diagnostics ?? []) {
       const abs = path.isAbsolute(d.filePath)
         ? path.normalize(d.filePath)
         : path.resolve(configDirectory, d.filePath);
       if (!(abs in contents)) {
         try {
-          const raw = await readFile(abs, 'utf8');
-          if (raw.charCodeAt(0) === 0xfeff) {
-            bomFiles.add(nativePathIdentity.key(abs));
-            contents[abs] = raw.slice(1); // BOM-stripped, matching Go's offsets
-          } else {
-            contents[abs] = raw;
-          }
+          // A BOM is never part of the text a fix range indexes — Go strips it
+          // and reports it separately, matching ESLint's SourceCode — so strip
+          // it here too and the gap-fill slices line up.
+          contents[abs] = stripBOM(await readFile(abs, 'utf8'));
         } catch {
           // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
         }
       }
     }
-    return { contents, bomFiles };
+    return contents;
   }
 
   #toLintResults(
@@ -670,7 +652,6 @@ export class Rslint {
     configDirectory: string,
     files: string[],
     contents?: Record<string, string>,
-    bomFiles?: Set<string>,
   ): LintResult[] {
     const toAbs = (p: string): string =>
       path.isAbsolute(p) ? path.normalize(p) : path.resolve(configDirectory, p);
@@ -734,11 +715,9 @@ export class Rslint {
       };
       const output = outputByPath.get(key);
       if (output !== undefined) {
-        // Go's Output is BOM-stripped (ApplyRuleFixes runs over the decoded
-        // SourceFile text); re-prepend the BOM for a disk file that had one so
-        // outputFixes writes back a file identical to the original but for the
-        // fix.
-        result.output = bomFiles?.has(key) ? '\uFEFF' + output : output;
+        // Go's Output is the whole file, byte order mark included when the
+        // original had one and no fix removed it.
+        result.output = output;
       }
       results.push(result);
     }
@@ -784,10 +763,11 @@ function toLintMessage(d: Diagnostic, sourceText?: string): LintMessage {
  * sourceText (e.g. a diagnosed file whose source could not be read), a
  * multi-edit fix degrades to its first edit rather than guessing across a gap.
  *
- * Offsets are flat UTF-16, in the same BOM-stripped space as Go's fix ranges
- * (matching ESLint v10, whose `fix.range` is relative to BOM-stripped source).
- * The caller passes a BOM-stripped sourceText for disk files so the gap-fill
- * slices line up; the BOM is re-applied only to the per-file Output.
+ * Offsets are flat UTF-16, in the same byte-order-mark-free space as Go's fix
+ * ranges (matching ESLint v10, whose `fix.range` is relative to BOM-stripped
+ * source). The caller passes a BOM-stripped sourceText so the gap-fill slices
+ * line up. An edit can start at -1, where the mark sits, one position ahead of
+ * the text; there is nothing to gap-fill from before position 0.
  */
 function mergeFixes(
   fixes: Fix[] | undefined,
@@ -815,8 +795,16 @@ function mergeFixes(
     // rather than emitting corrupt merged text); rslint rules emit
     // non-overlapping edits per diagnostic, so this is a guard, not a path.
     if (f.startPos < lastPos) continue;
-    text += sourceText.slice(lastPos, f.startPos) + f.text;
+    // An edit can start ahead of the text at -1, where the byte order mark
+    // lives; there is nothing to gap-fill from before position 0.
+    text +=
+      sourceText.slice(Math.max(0, lastPos), Math.max(0, f.startPos)) + f.text;
     lastPos = f.endPos;
   }
   return { range: [start, end], text };
+}
+
+/** Drop a leading byte order mark, which is never part of a fix's coordinates. */
+function stripBOM(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }

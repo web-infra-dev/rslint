@@ -59,7 +59,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 	// un-declares the builtin, so it no longer resolves to a known global —
 	// ESLint's `getVariableByName` would return undefined and the rule stays
 	// silent.
-	if declared, ok := ctx.Globals["Symbol"]; ok && !declared {
+	if ctx.Globals["Symbol"] == utils.GlobalAccessOff {
 		return true
 	}
 	if ctx.TypeChecker == nil || ctx.Program == nil {

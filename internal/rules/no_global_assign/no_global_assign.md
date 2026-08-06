@@ -29,6 +29,20 @@ function foo(Array) {
 }
 ```
 
+Globals declared through `languageOptions.globals` or a `/* global */` comment carry their own access level: a `readonly` name is reported like a built-in, and a `writable` name may be reassigned — including a built-in whose declaration lifts the default.
+
+Examples of **incorrect** code with `globals: { BUILD_ID: 'readonly' }`:
+
+```javascript
+BUILD_ID = 'dev';
+```
+
+Examples of **correct** code with `globals: { Object: 'writable' }`:
+
+```javascript
+Object = {};
+```
+
 ## Options
 
 This rule accepts an optional object with an `exceptions` property, which is an array of global names that should be allowed to be reassigned:

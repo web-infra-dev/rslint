@@ -70,7 +70,7 @@ func TestValidTypeofRule(t *testing.T) {
 			{Code: `{ const undefined = "test"; typeof foo === undefined }`},
 
 			// Config `off` un-declares the builtin
-			{Code: `typeof foo === undefined`, Globals: map[string]bool{"undefined": false}},
+			{Code: `typeof foo === undefined`, Globals: map[string]any{"undefined": "off"}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{

@@ -76,7 +76,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			{Code: `(Object as any).prototype.p = 0`},
 
 			// Config `/* global Object: off */` un-declares the builtin.
-			{Code: `Object.prototype.p = 0`, Globals: map[string]bool{"Object": false}},
+			{Code: `Object.prototype.p = 0`, Globals: map[string]any{"Object": "off"}},
 		},
 		// Invalid cases — mirrors ESLint's `tests/lib/rules/no-extend-native.js`.
 		[]rule_tester.InvalidTestCase{
@@ -341,7 +341,7 @@ func TestNoExtendNativeRule(t *testing.T) {
 			// Config declares Object as a writable global — still the builtin.
 			{
 				Code:    `Object.prototype.p = 0`,
-				Globals: map[string]bool{"Object": true},
+				Globals: map[string]any{"Object": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},

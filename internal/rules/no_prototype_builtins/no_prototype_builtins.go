@@ -20,8 +20,7 @@ var disallowedProps = map[string]struct{}{
 // `off` setting (e.g. `/* global Object: off */`). A name absent from
 // ctx.Globals is not considered off.
 func isGlobalOff(ctx rule.RuleContext, name string) bool {
-	declared, ok := ctx.Globals[name]
-	return ok && !declared
+	return ctx.Globals[name] == utils.GlobalAccessOff
 }
 
 // isAfterOptional walks the member/call chain leftward from node, returning

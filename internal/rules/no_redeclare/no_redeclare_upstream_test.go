@@ -45,7 +45,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
-			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"top": true}, Skip: true},
+			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"top": "readonly"}, Skip: true},
 			// SKIP: rslint does not support ESLint's sourceType override plus browser globals.
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
 			{Code: "var self = 1", Options: map[string]interface{}{"builtinGlobals": true}},
@@ -56,10 +56,10 @@ func TestNoRedeclareUpstream(t *testing.T) {
 
 			// ---- upstream valid: directive comments and configured globals ----
 			{Code: "/*globals Array */", Options: map[string]interface{}{"builtinGlobals": false}},
-			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": false}, Globals: map[string]bool{"a": true}},
-			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": false}, Globals: map[string]bool{"a": true}},
-			{Code: "/*globals a:off */", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"a": true}},
-			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"a": false}},
+			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": false}, Globals: map[string]any{"a": "readonly"}},
+			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": false}, Globals: map[string]any{"a": "readonly"}},
+			{Code: "/*globals a:off */", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"a": "readonly"}},
+			{Code: "/*globals a */", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"a": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- upstream invalid: basic var/function redeclarations ----
@@ -96,7 +96,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 
 			// ---- upstream invalid: builtinGlobals ----
 			invalidBuiltin("var Object = 0;", "Object", 1, 5),
-			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"top": true}, Errors: []rule_tester.InvalidTestCaseError{builtinError("top", 1, 5)}},
+			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"top": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{builtinError("top", 1, 5)}},
 			{
 				Code:    "var a; var {a = 0, b: Object = 0} = {};",
 				Options: map[string]interface{}{"builtinGlobals": true},
@@ -164,7 +164,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 
 			// ---- upstream invalid: default options and browser globals ----
 			invalidBuiltin("var Object = 0;", "Object", 1, 5),
-			{Code: "var top = 0;", Globals: map[string]bool{"top": true}, Errors: []rule_tester.InvalidTestCaseError{builtinError("top", 1, 5)}},
+			{Code: "var top = 0;", Globals: map[string]any{"top": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{builtinError("top", 1, 5)}},
 
 			// ---- upstream invalid: directive comments and configured globals ----
 			invalidBuiltin("/*globals Array */", "Array", 1, 11),
@@ -182,7 +182,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			{
 				Code:    "/*globals a */",
 				Options: map[string]interface{}{"builtinGlobals": true},
-				Globals: map[string]bool{"a": true},
+				Globals: map[string]any{"a": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 11),
 				},
@@ -190,7 +190,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			{
 				Code:    "/*globals a */",
 				Options: map[string]interface{}{"builtinGlobals": true},
-				Globals: map[string]bool{"a": true},
+				Globals: map[string]any{"a": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 11),
 				},
@@ -204,7 +204,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			{
 				Code:    "/*globals a */ /*globals a */ var a = 0",
 				Options: map[string]interface{}{"builtinGlobals": true},
-				Globals: map[string]bool{"a": true},
+				Globals: map[string]any{"a": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 11),
 					builtinError("a", 1, 26),
