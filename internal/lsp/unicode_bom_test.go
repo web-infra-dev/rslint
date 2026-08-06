@@ -20,16 +20,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// markedProgram writes a file whose bytes begin with a byte order mark and
-// returns a Program over it, plus the normalized path. The mark is written as
-// an escape: a literal U+FEFF in a source file is invisible, and Go rejects one
-// in its own source outright.
-func markedProgram(t *testing.T, source string) (string, string, *compiler.Program, vfs.FS) {
+// bom is the Unicode byte order mark, U+FEFF, spelled as an escape: a literal
+// one in a source file is invisible.
+const bom = "\uFEFF"
+
+// programOver writes a file with exactly the given bytes and returns a Program
+// over it, plus the normalized path.
+func programOver(t *testing.T, content string) (string, string, *compiler.Program, vfs.FS) {
 	t.Helper()
 
 	dir := t.TempDir()
-	file := tspath.NormalizePath(filepath.Join(dir, "marked.ts"))
-	if err := os.WriteFile(file, []byte("\uFEFF"+source), 0o644); err != nil {
+	file := tspath.NormalizePath(filepath.Join(dir, "subject.ts"))
+	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
 
@@ -45,51 +47,10 @@ func markedProgram(t *testing.T, source string) (string, string, *compiler.Progr
 	return dir, file, program, fs
 }
 
-// The mark is real and the rule finds it, so the editor reports it — a user
-// who has `unicode-bom` on should see it flagged.
-//
-// What the editor cannot do is remove it. The fix is a range over [-1, 0], one
-// position ahead of the text, because the mark is not in the text; an editor's
-// document holds decoded text, with the mark already turned into the
-// document's encoding. So the diagnostic arrives without its fix, and no
-// quick fix or fixAll edit can be built from it.
-func TestUnicodeBomIsReportedWithoutItsFix(t *testing.T) {
-	config.RegisterAllRules()
-
-	dir, file, program, fs := markedProgram(t, "let a = 1;\n")
-	sourceFile := sourceFileForPath(program, file, fs)
-	if sourceFile == nil {
-		t.Fatal("fixture is not in the program")
-	}
-
-	cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": "error"}}}
-	resolver := config.NewFileConfigResolver(cfg, dir, false)
-
-	served := lintSingleFile(
-		program, sourceFile, file, true, resolver, rule.EditDemandAll, context.Background(),
-	).Diagnostics
-
-	if len(served) != 1 || served[0].RuleName != "unicode-bom" {
-		t.Fatalf("the editor should report the mark, got %+v", served)
-	}
-	if fixes := served[0].Fixes(); len(fixes) != 0 {
-		t.Errorf("the editor must not carry a fix it cannot apply, got %+v", fixes)
-	}
-	if action := createCodeActionFromRuleDiagnostic(served[0], "file:///marked.ts"); action != nil {
-		t.Errorf("a diagnostic with no fix must yield no quick fix, got %q", action.Title)
-	}
-}
-
-// Off the editor path the same rule on the same file keeps its fix, so the
-// withholding above is the language server's doing and not a broken rule.
-func TestUnicodeBomKeepsItsFixOffTheEditorPath(t *testing.T) {
-	config.RegisterAllRules()
-
-	dir, file, program, _ := markedProgram(t, "let a = 1;\n")
-	cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": "error"}}}
-	resolver := config.NewFileConfigResolver(cfg, dir, false)
-
-	var direct []rule.RuleDiagnostic
+// lintOffTheEditorPath runs the configured rules the way everything that is not
+// the language server does, with no filtering in between.
+func lintOffTheEditorPath(program *compiler.Program, file string, resolver *config.FileConfigResolver) []rule.RuleDiagnostic {
+	var reported []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: program,
 		File:    file,
@@ -98,33 +59,90 @@ func TestUnicodeBomKeepsItsFixOffTheEditorPath(t *testing.T) {
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
-			Report: func(d rule.RuleDiagnostic) { direct = append(direct, d) },
+			Report: func(d rule.RuleDiagnostic) { reported = append(reported, d) },
 		},
 	})
+	return reported
+}
 
-	if len(direct) != 1 || direct[0].RuleName != "unicode-bom" {
-		t.Fatalf("expected one unicode-bom diagnostic, got %+v", direct)
-	}
-	fixes := direct[0].Fixes()
-	if len(fixes) != 1 {
-		t.Fatalf("expected the removal fix, got %+v", fixes)
-	}
-	// ESLint's [-1, 0]: one position ahead of the text, which is exactly why
-	// an editor cannot express it.
-	if fixes[0].Range.Pos() != -1 || fixes[0].Range.End() != 0 || fixes[0].Text != "" {
-		t.Errorf("expected a removal over [-1, 0], got %+v", fixes[0])
+// The language server does not run unicode-bom, in either direction: a marked
+// file under `never` and an unmarked one under `always` both come back silent.
+// An editor's document holds decoded text, so the mark it would report on is
+// not in the document, cannot be reached by a text edit, and — for an unsaved
+// buffer — is only answerable from a file on disk the buffer may already
+// disagree with.
+//
+// Each case is run off the editor path too, where it does report: the silence
+// is the language server's doing, and not a rule that never had anything to say.
+func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
+	config.RegisterAllRules()
+
+	for _, test := range []struct {
+		name    string
+		content string
+		option  any
+		// The fix the rule reports off the editor path. Removal is ESLint's
+		// [-1, 0], one position ahead of the text, because the mark is not in
+		// the text; `rslint --fix` rewrites the file and can act on it.
+		fixPos, fixEnd int
+		fixText        string
+	}{
+		{
+			name:    "never on a marked file",
+			content: bom + "let a = 1;\n",
+			option:  "error",
+			fixPos:  -1, fixEnd: 0, fixText: "",
+		},
+		{
+			name:    "always on an unmarked file",
+			content: "let a = 1;\n",
+			option:  []any{"error", "always"},
+			fixPos:  0, fixEnd: 0, fixText: bom,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir, file, program, fs := programOver(t, test.content)
+			sourceFile := sourceFileForPath(program, file, fs)
+			if sourceFile == nil {
+				t.Fatal("fixture is not in the program")
+			}
+
+			cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": test.option}}}
+			resolver := config.NewFileConfigResolver(cfg, dir, false)
+
+			served := lintSingleFile(
+				program, sourceFile, file, true, resolver, rule.EditDemandAll, context.Background(),
+			).Diagnostics
+
+			if len(served) != 0 {
+				t.Errorf("the editor should be served nothing, got %+v", served)
+			}
+
+			direct := lintOffTheEditorPath(program, file, resolver)
+			if len(direct) != 1 || direct[0].RuleName != "unicode-bom" {
+				t.Fatalf("expected one unicode-bom diagnostic off the editor path, got %+v", direct)
+			}
+			fixes := direct[0].Fixes()
+			if len(fixes) != 1 {
+				t.Fatalf("expected one fix off the editor path, got %+v", fixes)
+			}
+			if fixes[0].Range.Pos() != test.fixPos || fixes[0].Range.End() != test.fixEnd || fixes[0].Text != test.fixText {
+				t.Errorf("expected a fix over [%d, %d] with %q, got %+v",
+					test.fixPos, test.fixEnd, test.fixText, fixes[0])
+			}
+		})
 	}
 }
 
-// Only unicode-bom is affected: another rule reporting on the same file in the
-// same pass keeps its fix.
-func TestOtherRulesKeepTheirFixesInTheEditor(t *testing.T) {
+// Only unicode-bom is held back: another rule configured for the same file in
+// the same pass reports and keeps its fix.
+func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 	config.RegisterAllRules()
 
 	// `export` makes this a module and the function gives the `var` a local
 	// scope: no-var declines to fix a global in script mode, and the point here
 	// is a second rule that really does carry a fix.
-	dir, file, program, fs := markedProgram(t, "export function f() {\n  var a = 1;\n  return a;\n}\n")
+	dir, file, program, fs := programOver(t, bom+"export function f() {\n  var a = 1;\n  return a;\n}\n")
 	sourceFile := sourceFileForPath(program, file, fs)
 	if sourceFile == nil {
 		t.Fatal("fixture is not in the program")
@@ -146,11 +164,8 @@ func TestOtherRulesKeepTheirFixesInTheEditor(t *testing.T) {
 	for _, d := range served {
 		byRule[d.RuleName] = d.Fixes()
 	}
-	if _, found := byRule["unicode-bom"]; !found {
-		t.Fatalf("expected a unicode-bom diagnostic, got %v", byRule)
-	}
-	if len(byRule["unicode-bom"]) != 0 {
-		t.Errorf("unicode-bom should have lost its fix, got %+v", byRule["unicode-bom"])
+	if fixes, found := byRule["unicode-bom"]; found {
+		t.Errorf("unicode-bom should not have run, got %+v", fixes)
 	}
 	fixes, found := byRule["no-var"]
 	if !found {

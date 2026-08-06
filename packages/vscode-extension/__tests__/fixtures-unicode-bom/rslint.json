@@ -8,7 +8,8 @@
       }
     },
     "rules": {
-      "unicode-bom": "error"
+      "unicode-bom": "error",
+      "no-var": "error"
     }
   }
 ]
