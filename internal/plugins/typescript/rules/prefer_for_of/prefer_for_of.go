@@ -219,7 +219,9 @@ func isIncrement(node *ast.Node, name string) bool {
 // Resolve is what decides whether an identifier is a reference at all: a
 // property key, a member name, a label, and a declaration name all spell the
 // index without referencing it, while the name of a shorthand property (`{i}`)
-// references it even though it also declares a property.
+// references it even though it also declares a property. A `var` redeclaration
+// of the index is the one declaration name that still matters, so it is checked
+// separately.
 func isIndexOnlyUsedWithArray(ctx rule.RuleContext, body *ast.Node, indexSym *ast.Symbol, arrayText string) bool {
 	result := true
 	var walk func(n *ast.Node)
@@ -235,6 +237,9 @@ func isIndexOnlyUsedWithArray(ctx rule.RuleContext, body *ast.Node, indexSym *as
 					result = false
 					return
 				}
+			} else if isIndexRedeclarationWrite(n, indexSym) {
+				result = false
+				return
 			}
 		}
 		n.ForEachChild(func(child *ast.Node) bool {
@@ -244,6 +249,31 @@ func isIndexOnlyUsedWithArray(ctx rule.RuleContext, body *ast.Node, indexSym *as
 	}
 	walk(body)
 	return result
+}
+
+// isIndexRedeclarationWrite checks if an identifier declares the index variable
+// again and assigns to it. A `var` inside the loop body redeclares the same
+// function-scoped variable, so `for (var i = 0; ...) { var i = 1; }` writes the
+// index the way a plain `i = 1` does, even though the name is a declaration
+// rather than a reference. A bare `var i;` assigns nothing and stays out of the
+// way, which is also how upstream's scope analysis records it.
+func isIndexRedeclarationWrite(id *ast.Node, indexSym *ast.Symbol) bool {
+	if utils.BindingNameSymbol(id) != indexSym {
+		return false
+	}
+	root := ast.GetRootDeclaration(id.Parent)
+	if root.Kind != ast.KindVariableDeclaration {
+		return false
+	}
+	if root.AsVariableDeclaration().Initializer != nil {
+		return true
+	}
+	// `for (var i of xs)` and `for (var i in obj)` assign on every iteration.
+	list := root.Parent
+	if list == nil || list.Parent == nil {
+		return false
+	}
+	return list.Parent.Kind == ast.KindForInStatement || list.Parent.Kind == ast.KindForOfStatement
 }
 
 // isValidIndexUsage checks if an index variable reference is a valid arr[i] usage:

@@ -306,7 +306,66 @@ for (let i = 0; i < arr.length; i++) {
 for (let i = 0; i < arr.length; i++) {
   const x: typeof i = arr[i];
 }`},
+		// ======== A `var` redeclaration writes the same function-scoped index ========
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var i = 1;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  {
+    var i = 1;
+  }
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var [i] = other;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var { a: i } = other;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  for (var i of other) {
+  }
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  for (var i in other) {
+  }
+  console.log(arr[i]);
+}`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- A `var` redeclaration that assigns nothing ----
+		{
+			Code: `
+for (var i = 0; i < arr.length; i++) {
+  var i;
+  console.log(arr[i]);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 5, EndColumn: 2},
+			},
+		},
+		// ---- A `var` in a nested function is a different variable ----
+		{
+			Code: `
+for (var i = 0; i < arr.length; i++) {
+  function f() {
+    var i = 1;
+  }
+  console.log(arr[i]);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 7, EndColumn: 2},
+			},
+		},
 		// ---- Names that only look like the index ----
 		// Property key
 		{
