@@ -414,7 +414,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/require-array-sort-compare.test.ts',
     './tests/typescript-eslint/rules/require-await.test.ts',
     // './tests/typescript-eslint/rules/restrict-plus-operands.test.ts',
-    // './tests/typescript-eslint/rules/restrict-template-expressions.test.ts',
+    './tests/typescript-eslint/rules/restrict-template-expressions.test.ts',
     // './tests/typescript-eslint/rules/return-await.test.ts',
     // './tests/typescript-eslint/rules/sort-type-constituents.test.ts',
     './tests/typescript-eslint/rules/strict-boolean-expressions.test.ts',
