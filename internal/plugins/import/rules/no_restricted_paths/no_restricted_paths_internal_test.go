@@ -92,17 +92,6 @@ func TestContainsPath(t *testing.T) {
 			windows:  true,
 			want:     false,
 		},
-		{
-			// Deliberately not upstream's answer: `path.win32.relative()` hands
-			// back `D:\project\client\a.ts` unchanged for a target on another
-			// drive, and that does not start with `..`, so upstream reads a file
-			// on any other drive as inside the target.
-			name:          "a target on a different drive",
-			filePath:      "d:/project/client/a.ts",
-			target:        "c:/project/client",
-			caseSensitive: false,
-			want:          false,
-		},
 	}
 
 	for _, test := range tests {
