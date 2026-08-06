@@ -257,11 +257,30 @@ func isAlphaSequence(body string) bool {
 	return len(parts) == 2 || isInteger(parts[2])
 }
 
-// hasCommaBeforeBrace reports whether post carries a comma that a later `}`
-// closes, which means the brace set continues past the `}` already consumed.
+// lineTerminators are the characters a JavaScript `.` refuses to match.
+const lineTerminators = "\n\r\u2028\u2029"
+
+// hasCommaBeforeBrace reports whether post carries a comma that a later `}` on
+// the same line closes, which means the brace set continues past the `}`
+// already consumed. Upstream spells this `,(?!,).*\}`, whose `.` stops where a
+// line does.
 func hasCommaBeforeBrace(post string) bool {
-	comma := strings.IndexByte(post, ',')
-	return comma >= 0 && strings.IndexByte(post[comma:], '}') >= 0
+	for index := range len(post) {
+		if post[index] != ',' {
+			continue
+		}
+		rest := post[index+1:]
+		if strings.HasPrefix(rest, ",") {
+			continue
+		}
+		if end := strings.IndexAny(rest, lineTerminators); end >= 0 {
+			rest = rest[:end]
+		}
+		if strings.IndexByte(rest, '}') >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isInteger(str string) bool {

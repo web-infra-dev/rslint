@@ -28,11 +28,17 @@
 // A class that names nothing, `[!]` or `[^]`, matches nothing. JavaScript
 // alone reads it as any character, and later minimatch dropped that too.
 //
+// A `/` separates the parts of a path and a `\` escapes the character after
+// it, on every platform. minimatch 3 rewrote a `\` to a `/` when it ran on
+// Windows, which spends the escape a pattern was written with — a rule option
+// naming `src/\*.ts` would pick up every `.ts` file there. Paths reach a rule
+// separated by `/` whatever the platform, so there is nothing to rewrite, and
+// later minimatch stopped rewriting by default too.
+//
 // See the LICENSE file in this directory for the upstream copyright notices.
 package minimatch
 
 import (
-	"runtime"
 	"strings"
 
 	"github.com/dlclark/regexp2"
@@ -115,11 +121,6 @@ type Matcher struct {
 // matches nothing rather than an error, which is how minimatch behaves.
 func New(pattern string, options Options) *Matcher {
 	pattern = strings.TrimSpace(pattern)
-
-	// windows: need to use /, not \
-	if runtime.GOOS == "windows" {
-		pattern = strings.ReplaceAll(pattern, `\`, "/")
-	}
 
 	m := &Matcher{options: options, pattern: pattern}
 	m.make()
@@ -526,10 +527,6 @@ func (m *Matcher) Match(path string) bool {
 		return path == ""
 	}
 
-	// windows: need to use /, not \
-	if runtime.GOOS == "windows" {
-		path = strings.ReplaceAll(path, `\`, "/")
-	}
 	parts := splitSlashes(path)
 
 	// the basename is the last non-empty part

@@ -133,8 +133,12 @@ func TestMatch(t *testing.T) {
 		{"/src/[é]", "/src/a", false},
 
 		// ---- escaping and negated patterns ----
+		// A `\` escapes on every platform: it is never a path separator, so
+		// these answer the same wherever the test runs.
 		{`/src/\*.ts`, "/src/*.ts", true},
 		{`/src/\*.ts`, "/src/a.ts", false},
+		{`a\*b/*`, "a*b/ooo", true},
+		{`[\\]`, `\`, true},
 		{"!/src/**", "/src/a.ts", false},
 		{"!/src/**", "/other/a.ts", true},
 
@@ -275,6 +279,8 @@ func TestBraceExpand(t *testing.T) {
 		// expansion that reduces to nothing drops out.
 		{"{{}},}", []string{"{}}"}},
 		{"{{}},,a}", []string{"{}}", "a"}},
+		// The `}` that rewrite looks for has to be on the comma's own line.
+		{"a{b}c,\n}", []string{"a{b}c,\n}"}},
 		// Invalid sets are left alone.
 		{"a{2..}b", []string{"a{2..}b"}},
 		{"a{b}c", []string{"a{b}c"}},
