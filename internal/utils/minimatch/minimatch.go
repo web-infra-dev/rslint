@@ -25,6 +25,9 @@
 // counts the UTF-16 units JavaScript strings are made of and so needs `??` for
 // a character outside the basic multilingual plane.
 //
+// A class that names nothing, `[!]` or `[^]`, matches nothing. JavaScript
+// alone reads it as any character, and later minimatch dropped that too.
+//
 // See the LICENSE file in this directory for the upstream copyright notices.
 package minimatch
 
