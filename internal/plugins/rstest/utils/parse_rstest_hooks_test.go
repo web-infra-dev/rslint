@@ -51,6 +51,11 @@ func TestParseRstestFnCallHooks(t *testing.T) {
 			// Hooks accept no chained members.
 			{Code: `beforeAll.skip(() => {});`},
 			{Code: `beforeEach.each([1])(() => {});`},
+			// Hooks on the test object are Playwright-only, and only while the
+			// receiver is still a PlaywrightTest.
+			{Code: `import { test } from '@rstest/core'; test.beforeEach(() => {});`},
+			{Code: `import { test } from '@rstest/playwright'; test.skip.beforeEach(() => {});`},
+			{Code: `import { test } from '@rstest/playwright'; test.beforeEach.only(() => {});`},
 			// Foreign frameworks and shadowed locals must not resolve.
 			{Code: `import { beforeAll } from 'vitest'; beforeAll(() => {});`},
 			{Code: `import { beforeEach } from '@jest/globals'; beforeEach(() => {});`},
@@ -92,6 +97,28 @@ func TestParseRstestFnCallHooks(t *testing.T) {
 			{
 				Code:   `import { beforeAll } from '@rstest/playwright'; beforeAll(() => {});`,
 				Errors: parsedHookError("hook", "beforeAll"),
+			},
+			// PlaywrightTest exposes the four hooks as members, and extend()
+			// returns another PlaywrightTest.
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.beforeAll(() => {});`,
+				Errors: parsedHookError("hook", "beforeAll"),
+			},
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.beforeEach(() => {});`,
+				Errors: parsedHookError("hook", "beforeEach"),
+			},
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.afterEach(() => {});`,
+				Errors: parsedHookError("hook", "afterEach"),
+			},
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.afterAll(() => {});`,
+				Errors: parsedHookError("hook", "afterAll"),
+			},
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.extend({}).beforeEach(() => {});`,
+				Errors: parsedHookError("hook", "beforeEach"),
 			},
 			// Test and describe parsing is unchanged.
 			{Code: `test("case", () => {});`, Errors: parsedHookError("test", "test")},
@@ -137,6 +164,10 @@ func TestIsTypeOfRstestFnCall(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:   `beforeEach(() => {});`,
+				Errors: kindsError("hook=true test=false testOrHook=true zeroKinds=false"),
+			},
+			{
+				Code:   `import { test } from '@rstest/playwright'; test.beforeEach(() => {});`,
 				Errors: kindsError("hook=true test=false testOrHook=true zeroKinds=false"),
 			},
 			{
