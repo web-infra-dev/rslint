@@ -2,6 +2,7 @@ package no_deprecated
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -422,59 +423,18 @@ func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
 	return cleanupDeprecatedReason(lastMatch[1])
 }
 
-type noDeprecatedAllowEntry struct {
-	From    string
-	Name    string
-	Package string
+type noDeprecatedOptions struct {
+	Allow []utils.TypeOrValueSpecifier `json:"allow"`
 }
 
-func parseAllowEntries(options any) []noDeprecatedAllowEntry {
-	entries := []noDeprecatedAllowEntry{}
-	var optionMap map[string]interface{}
-	switch value := options.(type) {
-	case map[string]interface{}:
-		optionMap = value
-	case []interface{}:
-		if len(value) > 0 {
-			if parsedMap, ok := value[0].(map[string]interface{}); ok {
-				optionMap = parsedMap
-			}
+func parseAllowSpecifiers(options any) []utils.TypeOrValueSpecifier {
+	opts := noDeprecatedOptions{Allow: []utils.TypeOrValueSpecifier{}}
+	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
 		}
 	}
-	if optionMap == nil {
-		return entries
-	}
-	rawAllowValue, exists := optionMap["allow"]
-	if !exists {
-		return entries
-	}
-	rawAllow, ok := rawAllowValue.([]interface{})
-	if !ok {
-		return entries
-	}
-	for _, raw := range rawAllow {
-		switch value := raw.(type) {
-		case string:
-			entries = append(entries, noDeprecatedAllowEntry{
-				Name: value,
-			})
-		case map[string]interface{}:
-			entry := noDeprecatedAllowEntry{}
-			if name, ok := value["name"].(string); ok {
-				entry.Name = name
-			}
-			if from, ok := value["from"].(string); ok {
-				entry.From = from
-			}
-			if pkg, ok := value["package"].(string); ok {
-				entry.Package = pkg
-			}
-			if entry.Name != "" {
-				entries = append(entries, entry)
-			}
-		}
-	}
-	return entries
+	return opts.Allow
 }
 
 func mostSpecificNodeContainingRange(node *ast.Node, position int, end int) *ast.Node {
@@ -520,21 +480,6 @@ func diagnosticNode(sourceFile *ast.SourceFile, position int, end int) *ast.Node
 	return nil
 }
 
-func symbolHierarchyNames(symbol *ast.Symbol) map[string]bool {
-	names := map[string]bool{}
-	for current := symbol; current != nil; current = current.Parent {
-		if current.Name == "" {
-			continue
-		}
-		names[current.Name] = true
-		unquoted := strings.Trim(current.Name, "\"'")
-		if unquoted != "" {
-			names[unquoted] = true
-		}
-	}
-	return names
-}
-
 func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
 	if symbol == nil || sourceFile == nil {
 		return false
@@ -554,30 +499,6 @@ func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bo
 	return false
 }
 
-func packageMatchesSymbol(entryPackage string, symbol *ast.Symbol) bool {
-	if entryPackage == "" || symbol == nil {
-		return false
-	}
-	hierarchy := symbolHierarchyNames(symbol)
-	if hierarchy[entryPackage] || hierarchy["@types/"+entryPackage] {
-		return true
-	}
-	for current := symbol; current != nil; current = current.Parent {
-		for _, declaration := range current.Declarations {
-			sourceFile := ast.GetSourceFileOfNode(declaration)
-			if sourceFile == nil {
-				continue
-			}
-			fileName := sourceFile.FileName()
-			if strings.Contains(fileName, "/node_modules/"+entryPackage+"/") ||
-				strings.Contains(fileName, "/node_modules/@types/"+entryPackage+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func walkAst(node *ast.Node, visitor func(*ast.Node) bool) bool {
 	if node == nil {
 		return false
@@ -588,25 +509,6 @@ func walkAst(node *ast.Node, visitor func(*ast.Node) bool) bool {
 	return node.ForEachChild(func(child *ast.Node) bool {
 		return walkAst(child, visitor)
 	})
-}
-
-func moduleSpecifierText(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Kind {
-	case ast.KindStringLiteral:
-		stringLiteral := node.AsStringLiteral()
-		if stringLiteral != nil {
-			return stringLiteral.Text
-		}
-	case ast.KindNoSubstitutionTemplateLiteral:
-		templateLiteral := node.AsNoSubstitutionTemplateLiteral()
-		if templateLiteral != nil {
-			return templateLiteral.Text
-		}
-	}
-	return stripQuotes(strings.TrimSpace(node.Text()))
 }
 
 func nodeNameText(node *ast.Node) string {
@@ -660,213 +562,6 @@ func nodeNameText(node *ast.Node) string {
 		// which can panic in typescript-go internals.
 		return ""
 	}
-}
-
-func importedNameMatches(targetName string, node *ast.Node) bool {
-	if targetName == "" || node == nil {
-		return false
-	}
-	return normalizeComparableName(targetName) == normalizeComparableName(nodeNameText(node))
-}
-
-func staticImportContainsName(importDeclaration *ast.ImportDeclaration, targetName string) bool {
-	if importDeclaration == nil || importDeclaration.ImportClause == nil || targetName == "" {
-		return false
-	}
-	importClause := importDeclaration.ImportClause.AsImportClause()
-	if importClause == nil {
-		return false
-	}
-	if importClause.Name() != nil && importedNameMatches(targetName, importClause.Name()) {
-		return true
-	}
-	if importClause.NamedBindings == nil {
-		return false
-	}
-	if importClause.NamedBindings.Kind == ast.KindNamespaceImport {
-		namespaceImport := importClause.NamedBindings.AsNamespaceImport()
-		if namespaceImport != nil && namespaceImport.Name() != nil && importedNameMatches(targetName, namespaceImport.Name()) {
-			return true
-		}
-		return false
-	}
-	if importClause.NamedBindings.Kind != ast.KindNamedImports {
-		return false
-	}
-	namedImports := importClause.NamedBindings.AsNamedImports()
-	if namedImports == nil || namedImports.Elements == nil {
-		return false
-	}
-	for _, elementNode := range namedImports.Elements.Nodes {
-		importSpecifier := elementNode.AsImportSpecifier()
-		if importSpecifier == nil {
-			continue
-		}
-		if importSpecifier.Name() != nil && importedNameMatches(targetName, importSpecifier.Name()) {
-			return true
-		}
-		if importSpecifier.PropertyName != nil && importedNameMatches(targetName, importSpecifier.PropertyName) {
-			return true
-		}
-	}
-	return false
-}
-
-func isImportCallFromPackage(initializer *ast.Node, pkg string) bool {
-	if initializer == nil || pkg == "" {
-		return false
-	}
-	current := ast.SkipParentheses(initializer)
-	if current == nil {
-		return false
-	}
-	if current.Kind == ast.KindAwaitExpression {
-		awaitExpression := current.AsAwaitExpression()
-		if awaitExpression == nil {
-			return false
-		}
-		current = ast.SkipParentheses(awaitExpression.Expression)
-	}
-	if current == nil || current.Kind != ast.KindCallExpression {
-		return false
-	}
-	callExpression := current.AsCallExpression()
-	if callExpression == nil || callExpression.Expression == nil || callExpression.Arguments == nil || len(callExpression.Arguments.Nodes) == 0 {
-		return false
-	}
-	callee := ast.SkipParentheses(callExpression.Expression)
-	if callee == nil || callee.Kind != ast.KindImportKeyword {
-		return false
-	}
-	return moduleSpecifierText(callExpression.Arguments.Nodes[0]) == pkg
-}
-
-func dynamicImportBindingContainsName(nameNode *ast.Node, targetName string) bool {
-	if nameNode == nil || targetName == "" || nameNode.Kind != ast.KindObjectBindingPattern {
-		return false
-	}
-	objectBindingPattern := nameNode.AsBindingPattern()
-	if objectBindingPattern == nil || objectBindingPattern.Elements == nil {
-		return false
-	}
-	for _, elementNode := range objectBindingPattern.Elements.Nodes {
-		bindingElement := elementNode.AsBindingElement()
-		if bindingElement == nil {
-			continue
-		}
-		propertyName := bindingElementPropertyName(bindingElement)
-		if propertyName != "" && normalizeComparableName(propertyName) == normalizeComparableName(targetName) {
-			return true
-		}
-		name := bindingElement.Name()
-		if name != nil && importedNameMatches(targetName, name) {
-			return true
-		}
-	}
-	return false
-}
-
-func nameImportedFromPackage(sourceFile *ast.SourceFile, name string, pkg string) bool {
-	if sourceFile == nil || name == "" || pkg == "" {
-		return false
-	}
-	if sourceFile.Statements == nil {
-		return false
-	}
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement == nil {
-			continue
-		}
-		if statement.Kind == ast.KindImportDeclaration {
-			importDeclaration := statement.AsImportDeclaration()
-			if importDeclaration == nil || importDeclaration.ModuleSpecifier == nil {
-				continue
-			}
-			if moduleSpecifierText(importDeclaration.ModuleSpecifier) != pkg {
-				continue
-			}
-			if staticImportContainsName(importDeclaration, name) {
-				return true
-			}
-			continue
-		}
-		if walkAst(statement, func(node *ast.Node) bool {
-			if node == nil || node.Kind != ast.KindVariableDeclaration {
-				return false
-			}
-			variableDeclaration := node.AsVariableDeclaration()
-			if variableDeclaration == nil || variableDeclaration.Initializer == nil || variableDeclaration.Name() == nil {
-				return false
-			}
-			if !isImportCallFromPackage(variableDeclaration.Initializer, pkg) {
-				return false
-			}
-			return dynamicImportBindingContainsName(variableDeclaration.Name(), name)
-		}) {
-			return true
-		}
-	}
-	// Fallback for parser edge cases where import binding nodes are not exposed as expected.
-	sourceText := sourceFile.Text()
-	if sourceText == "" {
-		return false
-	}
-	namePattern := regexp.QuoteMeta(name)
-	pkgPattern := regexp.QuoteMeta(pkg)
-	staticImportPattern := regexp.MustCompile(`(?s)import\s*\{[^}]*\b` + namePattern + `\b[^}]*\}\s*from\s*['"]` + pkgPattern + `['"]`)
-	if staticImportPattern.MatchString(sourceText) {
-		return true
-	}
-	dynamicImportPattern := regexp.MustCompile(`(?s)\{[^}]*\b` + namePattern + `\b[^}]*\}\s*=\s*(?:await\s+)?import\(\s*['"]` + pkgPattern + `['"]\s*\)`)
-	return dynamicImportPattern.MatchString(sourceText)
-}
-
-func allowEntryMatches(entry noDeprecatedAllowEntry, diagnosticName string, symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
-	if entry.Name != "" {
-		if normalizeComparableName(diagnosticName) == normalizeComparableName(entry.Name) {
-			// direct match
-		} else if symbol != nil {
-			hierarchy := symbolHierarchyNames(symbol)
-			nameMatched := false
-			for hierarchyName := range hierarchy {
-				if normalizeComparableName(hierarchyName) == normalizeComparableName(entry.Name) {
-					nameMatched = true
-					break
-				}
-			}
-			if !nameMatched {
-				return false
-			}
-		} else {
-			return false
-		}
-	}
-
-	switch entry.From {
-	case "":
-		return true
-	case "file":
-		if symbol == nil {
-			return entry.Name != "" && normalizeComparableName(diagnosticName) == normalizeComparableName(entry.Name)
-		}
-		return declarationInCurrentFile(symbol, sourceFile)
-	case "package":
-		if packageMatchesSymbol(entry.Package, symbol) {
-			return true
-		}
-		return nameImportedFromPackage(sourceFile, entry.Name, entry.Package)
-	default:
-		return false
-	}
-}
-
-func shouldAllowDiagnostic(entries []noDeprecatedAllowEntry, diagnosticName string, symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
-	for _, entry := range entries {
-		if allowEntryMatches(entry, diagnosticName, symbol, sourceFile) {
-			return true
-		}
-	}
-	return false
 }
 
 func symbolAtLocation(typeChecker *checker.Checker, node *ast.Node) *ast.Symbol {
@@ -1994,7 +1689,27 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
-		allowEntries := parseAllowEntries(options)
+		allowSpecifiers := parseAllowSpecifiers(options)
+		// A reference is allowed when the type at that location matches a
+		// specifier, or when the referenced value itself does — an export whose
+		// type carries a different name is only reachable through the latter.
+		isAllowed := func(node *ast.Node) bool {
+			if len(allowSpecifiers) == 0 || node == nil {
+				return false
+			}
+			nodeType := ctx.TypeChecker.GetTypeAtLocation(node)
+			return utils.TypeMatchesSomeSpecifier(nodeType, allowSpecifiers, nil, ctx.Program) ||
+				utils.ValueMatchesSomeSpecifier(node, allowSpecifiers, ctx.Program, nodeType)
+		}
+		// A computed access names no value of its own, so only the type carrying
+		// the deprecated property can be allowed there.
+		isObjectTypeAllowed := func(expression *ast.Node) bool {
+			if len(allowSpecifiers) == 0 || expression == nil {
+				return false
+			}
+			objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
+			return utils.TypeMatchesSomeSpecifier(objectType, allowSpecifiers, nil, ctx.Program)
+		}
 		sourceFile := ctx.SourceFile
 		if sourceFile.AsNode().Flags&ast.NodeFlagsAmbient != 0 {
 			// Avoid crashing TypeScript's suggestion diagnostics on ambient source files.
@@ -2135,7 +1850,8 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if isInImportStatementRange(sourceFile, diagnostic.Pos()) {
 					continue
 				}
-				if elementAccess := elementAccessForDiagnosticRange(node, diagnostic.Pos(), diagnostic.End()); elementAccess != nil && elementAccess.Expression != nil {
+				elementAccess := elementAccessForDiagnosticRange(node, diagnostic.Pos(), diagnostic.End())
+				if elementAccess != nil && elementAccess.Expression != nil {
 					rawObjectType := ctx.TypeChecker.GetTypeAtLocation(elementAccess.Expression)
 					if rawObjectType != nil && (utils.IsTypeAnyType(rawObjectType) || utils.IsTypeUnknownType(rawObjectType)) {
 						continue
@@ -2145,7 +1861,10 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if promotedRange := promotedDynamicImportDefaultRange(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker); promotedRange != nil {
 					diagnosticRange = *promotedRange
 				}
-				if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
+				if isAllowed(node) {
+					continue
+				}
+				if elementAccess != nil && isObjectTypeAllowed(elementAccess.Expression) {
 					continue
 				}
 				message := buildDeprecatedMessage(name)
@@ -2234,9 +1953,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if symbol != nil && symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement {
 				symbol = nil
 			}
-			// Only report if the deprecated symbol isn't just a local declaration in the current file.
-			// Allow reporting for deprecated locals (for example, symbol usage).
-			if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
+			if isAllowed(node) {
 				return
 			}
 			message := buildDeprecatedMessage(reportName)
@@ -2327,7 +2044,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, nameText, propertySymbol, ctx.SourceFile) {
+				if isAllowed(nameNode) {
 					return
 				}
 				message := buildDeprecatedMessage(nameText)
@@ -2368,7 +2085,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, propertyName, propertySymbol, ctx.SourceFile) {
+				if isObjectTypeAllowed(elementAccess.Expression) {
 					return
 				}
 				message := buildDeprecatedMessage(propertyName)
@@ -2404,7 +2121,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if !symbolIsDeprecated(ctx.TypeChecker, propertySymbol) {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, name, propertySymbol, ctx.SourceFile) {
+				if isAllowed(nameNode) {
 					return
 				}
 				_, reason := getDeprecationReason(ctx, nameNode)

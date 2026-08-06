@@ -357,3 +357,64 @@ func TypeMatchesSomeSpecifierWithCalleeNames(
 	}
 	return false
 }
+
+// specifierStaticName is the name a specifier compares against when it matches
+// the referenced value rather than its type.
+func specifierStaticName(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return node.Text()
+	case ast.KindPrivateIdentifier:
+		// A specifier names the member, so `#value` is spelled `value`.
+		return strings.TrimPrefix(node.Text(), "#")
+	}
+	return ""
+}
+
+func valueMatchesSpecifier(
+	node *ast.Node,
+	specifier TypeOrValueSpecifier,
+	program *compiler.Program,
+	t *checker.Type,
+) bool {
+	staticName := specifierStaticName(node)
+	if staticName == "" || !slices.Contains(specifier.Name, staticName) {
+		return false
+	}
+	if specifier.From != TypeOrValueSpecifierFromPackage {
+		return true
+	}
+
+	symbol := checker.Type_symbol(t)
+	if symbol == nil {
+		if alias := checker.Type_alias(t); alias != nil {
+			symbol = alias.Symbol()
+		}
+	}
+	var declarations []*ast.Node
+	if symbol != nil {
+		declarations = symbol.Declarations
+	}
+	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
+		return ast.GetSourceFileOfNode(d)
+	})
+	return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
+}
+
+// ValueMatchesSomeSpecifier matches the value a node references instead of its
+// type, so a specifier can name an export whose type carries a different name.
+// Only `from: "package"` narrows further than the name; `file` and `lib` value
+// specifiers match on the name alone.
+func ValueMatchesSomeSpecifier(
+	node *ast.Node,
+	specifiers []TypeOrValueSpecifier,
+	program *compiler.Program,
+	t *checker.Type,
+) bool {
+	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return valueMatchesSpecifier(node, s, program, t)
+	})
+}
