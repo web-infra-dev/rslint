@@ -50,6 +50,12 @@ func isPromiseCatchCall(node *ast.Node) bool {
 	return name == "catch" || strings.HasSuffix(name, ".catch")
 }
 
+// calleeChainName is deliberately member-entry based rather than
+// testFramework.CalleeChainName, which is a different function despite the
+// name: CalleeChainName drops a property segment whose left side failed to
+// resolve, so foo[dynamic]().catch(fn) yields "" there and would stop being
+// reported, while member entries still yield "catch". This rule only needs the
+// trailing segment, so keep it on GetMemberEntries.
 func calleeChainName(node *ast.Node) string {
 	entries := testFramework.GetMemberEntries(node)
 	return testFramework.JoinMemberEntries(entries)

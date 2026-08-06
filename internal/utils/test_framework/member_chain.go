@@ -95,6 +95,75 @@ func elementAccessName(node *ast.Node) string {
 	}
 }
 
+// IsFunction reports nodes that declare a callable body. Rules use it to find
+// the function a test callback or assertion sits in.
+func IsFunction(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return ast.IsFunctionDeclaration(node) ||
+		ast.IsFunctionExpressionOrArrowFunction(node) ||
+		node.Kind == ast.KindMethodDeclaration ||
+		node.Kind == ast.KindConstructor ||
+		node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor
+}
+
+// CalleeChainName returns a dotted name for a call callee expression,
+// mirroring eslint-plugin-jest's getNodeName for CallExpression callees.
+//
+// It differs from GetMemberEntries in two ways, both deliberate: bracket
+// notation contributes a segment only when the index is a supported accessor
+// name (identifier, string literal or no-substitution template) and an
+// unsupported key breaks the whole chain rather than truncating it; and
+// NewExpression is peeled, so new (require('x')).y becomes a chain. Rules that
+// match user-configured names against a call site (expect-expect's
+// assertFunctionNames, no-standalone-expect's additionalTestBlockFunctions)
+// need these semantics; rules that walk a framework call chain want
+// GetMemberEntries instead.
+func CalleeChainName(expr *ast.Node) string {
+	if expr == nil {
+		return ""
+	}
+	expr = ast.SkipParentheses(expr)
+	if expr == nil {
+		return ""
+	}
+
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return expr.AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		property := expr.AsPropertyAccessExpression()
+		left := CalleeChainName(property.Expression)
+		name := propertyName(property.Name())
+		if left == "" || name == "" {
+			return left
+		}
+		return left + "." + name
+	case ast.KindElementAccessExpression:
+		element := expr.AsElementAccessExpression()
+		left := CalleeChainName(element.Expression)
+		key := elementAccessName(element.ArgumentExpression)
+		if left == "" || key == "" {
+			return ""
+		}
+		return left + "." + key
+	case ast.KindCallExpression:
+		return CalleeChainName(expr.AsCallExpression().Expression)
+	case ast.KindNewExpression:
+		newExpression := expr.AsNewExpression()
+		if newExpression == nil {
+			return ""
+		}
+		return CalleeChainName(newExpression.Expression)
+	case ast.KindTaggedTemplateExpression:
+		return CalleeChainName(expr.AsTaggedTemplateExpression().Tag)
+	default:
+		return ""
+	}
+}
+
 func JoinMemberEntries(entries []MemberEntry) string {
 	if len(entries) == 0 {
 		return ""

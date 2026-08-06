@@ -108,6 +108,19 @@ func TestNoUndefRule(t *testing.T) {
 			// === languageOptions.globals (config) ===
 			{Code: `myConfiguredGlobal;`, Globals: map[string]bool{"myConfiguredGlobal": true}},
 
+			// === "off" global with a same-file declaration: the binding wins ===
+			{Code: `var myOffGlobal123 = 1; myOffGlobal123;`, Globals: map[string]bool{"myOffGlobal123": false}},
+
+			// === ES2025 built-in ===
+			{Code: `var buf = new Float16Array(8);`},
+
+			// === JSX: intrinsic (lowercase) tags are not identifier references ===
+			{Code: `function C() { return <div />; }`, Tsx: true},
+			{Code: `const el = <foo-bar />;`, Tsx: true},
+
+			// === JSX: uppercase tags reference a declared component ===
+			{Code: `function Foo() { return null; } const el = <Foo />;`, Tsx: true},
+
 			// === languageOptions.globals + /*global*/ comment together ===
 			{Code: `/*global fromComment*/ fromConfig; fromComment;`, Globals: map[string]bool{"fromConfig": true}},
 
@@ -208,6 +221,7 @@ func TestNoUndefRule(t *testing.T) {
 			// === Export declared ===
 			{Code: `var exportedVar = 1; export { exportedVar };`},
 			{Code: `var localVar = 2; export { localVar as renamedExport };`},
+			{Code: `type ExportedType = string; export type { ExportedType };`},
 
 			// === delete on declared ===
 			{Code: `var obj = { prop: 1 } as any; delete obj.prop;`},
@@ -347,6 +361,49 @@ func TestNoUndefRule(t *testing.T) {
 				Code: `/*global myOffComment123:off*/ myOffComment123;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 32},
+				},
+			},
+
+			// === "off" un-declares a global the checker knows from lib ===
+			{
+				Code: `/*global console:off*/ console.log(1);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 24},
+				},
+			},
+			{
+				Code:    `setTimeout(() => {}, 100);`,
+				Globals: map[string]bool{"setTimeout": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+				},
+			},
+
+			// === JSX: undeclared uppercase tag reports on opening and closing
+			// tags alike (typescript-eslint parity) ===
+			{
+				Code: `const el = <UndeclaredComp123 />;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `const el = <UndeclaredComp456></UndeclaredComp456>;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 13},
+					{MessageId: "undef", Line: 1, Column: 33},
+				},
+			},
+
+			// === JSX: hyphenated uppercase tag is still a component reference
+			// (typescript-eslint parity) ===
+			{
+				Code: `const el = <Foo-bar />;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 13},
 				},
 			},
 
@@ -909,6 +966,21 @@ func TestNoUndefRule(t *testing.T) {
 				Code: `export { undefLocalExport123 as aliased };`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+
+			// === Non-aliased local export of an undeclared name reads the
+			// local binding (typescript-eslint parity) ===
+			{
+				Code: `export { undefPlainExport123 };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code: `export type { UndefTypeExport123 };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 15},
 				},
 			},
 

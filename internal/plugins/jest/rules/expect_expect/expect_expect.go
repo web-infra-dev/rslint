@@ -2,13 +2,13 @@ package expect_expect
 
 import (
 	_ "embed"
-	"regexp"
-	"slices"
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	"regexp"
+	"slices"
+	"strings"
 )
 
 //go:embed expect_expect.schema.json
@@ -192,7 +192,7 @@ var ExpectExpectRule = rule.Rule{
 					return
 				}
 
-				calleeName := utils.CalleeChainName(callExpr.Expression)
+				calleeName := testFramework.CalleeChainName(callExpr.Expression)
 				jestFn := utils.ParseJestFnCall(node, ctx)
 				isJestTest := jestFn != nil && jestFn.Kind == utils.JestFnTypeTest
 				isExtraBlock := calleeName != "" && slices.Contains(additionalTestBlocks, calleeName)
