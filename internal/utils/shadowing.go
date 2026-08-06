@@ -95,9 +95,10 @@ func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbo
 	if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
 		shorthand := parent.AsShorthandPropertyAssignment()
 		if shorthand != nil && shorthand.Name() == node {
-			if symbol := typeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
-				return symbol
-			}
+			// GetSymbolAtLocation on a shorthand name always returns the
+			// property symbol, even when the value binding ({x} referencing
+			// an undeclared x) doesn't exist, so it cannot substitute here.
+			return typeChecker.GetShorthandAssignmentValueSymbol(parent)
 		}
 	}
 	if parent != nil && parent.Kind == ast.KindExportSpecifier &&
