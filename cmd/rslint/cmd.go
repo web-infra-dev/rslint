@@ -962,6 +962,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
+		Cwd:                   cwd,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 		TargetFiles:           targetsByProgram,
 		GetRulesForFile:       rulesForFile,
@@ -1109,6 +1110,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
+				Cwd:                   cwd,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 				TargetFiles:           fixTargetsByProgram,
 				GetRulesForFile:       fixRulesForFile,

@@ -67,6 +67,7 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 // runProgramOptions is the internal per-program input to runLintRulesInProgram.
 type runProgramOptions struct {
 	Program          *compiler.Program
+	Cwd              string
 	Scope            FileScope
 	ExcludePaths     []string
 	FileFilter       FileFilter
@@ -211,6 +212,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		for ruleIndex, r := range rules {
 			ctx := rule.RuleContext{
 				SourceFile:     file,
+				Cwd:            opts.Cwd,
 				Program:        opts.Program,
 				Settings:       r.Settings,
 				ConfigGlobals:  r.Globals,
@@ -511,6 +513,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 			programOpts := runProgramOptions{
 				Program:              program,
+				Cwd:                  opts.Cwd,
 				Scope:                opts.Scope,
 				ExcludePaths:         opts.ExcludePaths,
 				FileFilter:           filter,
@@ -758,6 +761,7 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	}
 	runLintRulesInProgram(runProgramOptions{
 		Program:          opts.Program,
+		Cwd:              opts.Cwd,
 		ExcludePaths:     opts.ExcludePaths,
 		TargetFiles:      []string{opts.File},
 		HasTargetFiles:   true,
