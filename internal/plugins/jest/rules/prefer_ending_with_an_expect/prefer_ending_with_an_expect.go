@@ -14,29 +14,18 @@ import (
 //go:embed prefer_ending_with_an_expect.schema.json
 var schemaJSON []byte
 
-func mustEndWithExpectMessage() rule.RuleMessage {
+func buildMustEndWithExpectMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "mustEndWithExpect",
 		Description: "Tests should end with an assertion",
 	}
 }
 
-func inlineFunctionBody(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsFunctionExpressionOrArrowFunction(node) {
-		return nil
-	}
-	if node.Kind == ast.KindArrowFunction {
-		return node.AsArrowFunction().Body
-	}
-	return node.AsFunctionExpression().Body
-}
-
 func lastFunctionStatement(fn *ast.Node) *ast.Node {
-	body := inlineFunctionBody(fn)
+	if fn == nil {
+		return nil
+	}
+	body := fn.Body()
 	if body == nil {
 		return nil
 	}
@@ -59,8 +48,7 @@ func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*regexp.Re
 	if node == nil {
 		return false
 	}
-	node = ast.SkipParentheses(node)
-	if node != nil && node.Kind == ast.KindAwaitExpression {
+	if node.Kind == ast.KindAwaitExpression {
 		node = ast.SkipParentheses(node.AsAwaitExpression().Expression)
 	}
 	if node == nil || node.Kind != ast.KindCallExpression {
@@ -75,44 +63,42 @@ func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*regexp.Re
 	)
 }
 
+func isTestBlockCall(node *ast.Node, call *ast.CallExpression, ctx rule.RuleContext, additional []string) bool {
+	if jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeTest) {
+		return true
+	}
+	if len(additional) == 0 {
+		return false
+	}
+	return slices.Contains(additional, testFramework.CalleeChainName(call.Expression))
+}
+
 var PreferEndingWithAnExpectRule = rule.Rule{
 	Name:   "jest/prefer-ending-with-an-expect",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		parsedOptions := jestUtils.ParseAssertionFunctionOptions(options)
 		patterns := jestUtils.CompileAssertFunctionNamePatterns(parsedOptions.AssertFunctionNames)
+		additional := parsedOptions.AdditionalTestBlockFunctions
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if call == nil {
+				if call == nil ||
+					!isTestBlockCall(node, call, ctx, additional) ||
+					call.Arguments == nil ||
+					len(call.Arguments.Nodes) < 2 {
 					return
 				}
 
-				calleeName := testFramework.CalleeChainName(call.Expression)
-				parsedCall := jestUtils.ParseJestFnCall(node, ctx)
-				isJestTest := parsedCall != nil && parsedCall.Kind == jestUtils.JestFnTypeTest
-				isAdditionalTest := slices.Contains(parsedOptions.AdditionalTestBlockFunctions, calleeName)
-				if !isJestTest && !isAdditionalTest {
-					return
-				}
-				if call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
+				callback := ast.SkipParentheses(call.Arguments.Nodes[1])
+				if callback == nil ||
+					!ast.IsFunctionExpressionOrArrowFunction(callback) ||
+					isAssertionCall(lastFunctionStatement(callback), ctx, patterns) {
 					return
 				}
 
-				callback := call.Arguments.Nodes[1]
-				if callback == nil {
-					return
-				}
-				callback = ast.SkipParentheses(callback)
-				if !ast.IsFunctionExpressionOrArrowFunction(callback) {
-					return
-				}
-				if isAssertionCall(lastFunctionStatement(callback), ctx, patterns) {
-					return
-				}
-
-				ctx.ReportNode(call.Expression, mustEndWithExpectMessage())
+				ctx.ReportNode(call.Expression, buildMustEndWithExpectMessage())
 			},
 		}
 	},
