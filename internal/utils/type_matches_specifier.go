@@ -172,15 +172,18 @@ func findParentModuleDeclaration(
 	switch node.Kind {
 	case ast.KindModuleDeclaration:
 		decl := node.AsModuleDeclaration()
-		if ast.IsStringLiteral(decl.Name()) {
-			return decl
+		// A namespace is transparent here: what it wraps still belongs to
+		// whichever `declare module "pkg"` encloses the namespace itself.
+		if decl.Keyword != ast.KindNamespaceKeyword {
+			if ast.IsStringLiteral(decl.Name()) {
+				return decl
+			}
+			return nil
 		}
-		return nil
 	case ast.KindSourceFile:
 		return nil
-	default:
-		return findParentModuleDeclaration(node.Parent)
 	}
+	return findParentModuleDeclaration(node.Parent)
 }
 
 func typeDeclaredInDeclareModule(
@@ -193,15 +196,38 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
-// resolvedPackageName returns the package a declaration file belongs to, such as
-// "demo-pkg" or "@scope/pkg" for a file under node_modules.
-func resolvedPackageName(fileName string) string {
-	packageDirectory := module.ParseNodeModuleFromPath(fileName, false)
-	idx := strings.LastIndex(packageDirectory, "/node_modules/")
-	if idx == -1 {
-		return ""
+// resolvedPackageName returns the package a declaration file belongs to, in the
+// "name/subpath" form module resolution records, such as "demo-pkg/index.d.ts"
+// or "@types/node/globals.d.ts". Workspace packages are symlinked into
+// node_modules and resolve to their real path, so the owning package is found
+// through the nearest enclosing package.json that names one instead of through
+// the file name.
+func resolvedPackageName(program *compiler.Program, fileName string) string {
+	directory := tspath.GetDirectoryPath(fileName)
+	for directory != "" {
+		packageDirectory := program.GetNearestAncestorDirectoryWithPackageJson(directory)
+		if packageDirectory == "" {
+			return ""
+		}
+		info := program.GetPackageJsonInfo(tspath.CombinePaths(packageDirectory, "package.json"))
+		if info.Exists() {
+			if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
+				if subpath, nested := strings.CutPrefix(fileName, packageDirectory+"/"); nested {
+					return name + "/" + subpath
+				}
+				return name
+			}
+		}
+		// A package.json without a name, such as the `{"type": "module"}` files
+		// dual-published packages drop into subdirectories, belongs to whichever
+		// named package encloses it.
+		parent := tspath.GetDirectoryPath(packageDirectory)
+		if parent == packageDirectory {
+			return ""
+		}
+		directory = parent
 	}
-	return packageDirectory[idx+len("/node_modules/"):]
+	return ""
 }
 
 // packageMatchers caches the compiled matcher per `package` specifier, which
@@ -236,46 +262,8 @@ func typeDeclaredInDeclarationFile(
 		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		name := resolvedPackageName(file.FileName())
+		name := resolvedPackageName(program, file.FileName())
 		if name != "" && Regexp2MatchString(matcher, name) {
-			return true
-		}
-	}
-	return false
-}
-
-// getImportModuleSpecifier traverses up from a declaration to find the import module specifier
-func getImportModuleSpecifier(declaration *ast.Node) string {
-	if declaration == nil {
-		return ""
-	}
-
-	// Walk up to find ImportDeclaration
-	current := declaration
-	for current != nil {
-		if ast.IsImportDeclaration(current) {
-			moduleSpec := current.AsImportDeclaration().ModuleSpecifier
-			if moduleSpec != nil && ast.IsStringLiteral(moduleSpec) {
-				return moduleSpec.Text()
-			}
-			return ""
-		}
-		current = current.Parent
-	}
-	return ""
-}
-
-// typeDeclaredFromImport checks if any declaration comes from an import with the specified package name
-func typeDeclaredFromImport(
-	packageName string,
-	declarations []*ast.Node,
-) bool {
-	for _, decl := range declarations {
-		if decl == nil {
-			continue
-		}
-		moduleSpec := getImportModuleSpecifier(decl)
-		if moduleSpec == packageName {
 			return true
 		}
 	}
@@ -289,7 +277,6 @@ func typeDeclaredInPackageDeclarationFile(
 	program *compiler.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
-		typeDeclaredFromImport(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
 }
 
