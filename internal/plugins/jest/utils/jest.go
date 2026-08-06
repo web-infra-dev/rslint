@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -252,6 +254,79 @@ func calleeChainLiteralElementKey(n *ast.Node) string {
 	default:
 		return ""
 	}
+}
+
+type AssertionFunctionOptions struct {
+	AssertFunctionNames          []string
+	AdditionalTestBlockFunctions []string
+}
+
+func ParseAssertionFunctionOptions(options []any) AssertionFunctionOptions {
+	parsed := AssertionFunctionOptions{
+		AssertFunctionNames:          []string{"expect"},
+		AdditionalTestBlockFunctions: []string{},
+	}
+
+	optsMap := internalUtils.GetOptionsMap(options)
+	if optsMap == nil {
+		return parsed
+	}
+	if raw, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
+		parsed.AssertFunctionNames = stringList(raw)
+	}
+	if raw, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
+		parsed.AdditionalTestBlockFunctions = stringList(raw)
+	}
+
+	return parsed
+}
+
+func stringList(raw []interface{}) []string {
+	out := make([]string, 0, len(raw))
+	for _, value := range raw {
+		if text, ok := value.(string); ok {
+			out = append(out, text)
+		}
+	}
+	return out
+}
+
+func CompileAssertFunctionNamePatterns(patterns []string) []*regexp.Regexp {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		compiled = append(compiled, compileAssertFunctionNamePattern(pattern))
+	}
+	return compiled
+}
+
+func compileAssertFunctionNamePattern(pattern string) *regexp.Regexp {
+	segments := strings.Split(pattern, ".")
+	parts := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if segment == "**" {
+			parts = append(parts, `[a-zA-Z0-9.]*`)
+		} else {
+			parts = append(parts, strings.ReplaceAll(segment, "*", `[a-zA-Z0-9]*`))
+		}
+	}
+
+	re, err := regexp.Compile(`(?i)^(?:` + strings.Join(parts, `\.`) + `)(?:\.|$)`)
+	if err != nil {
+		return nil
+	}
+	return re
+}
+
+func MatchesAssertFunctionName(name string, compiled []*regexp.Regexp) bool {
+	if name == "" {
+		return false
+	}
+	for _, re := range compiled {
+		if re != nil && re.MatchString(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultJestVersion is used when the Jest version cannot be resolved from settings or package.json.

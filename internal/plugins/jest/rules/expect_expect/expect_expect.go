@@ -2,7 +2,6 @@ package expect_expect
 
 import (
 	_ "embed"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -21,75 +20,6 @@ func buildErrorNoAssertionsMessage() rule.RuleMessage {
 		Id:          "noAssertions",
 		Description: "Test has no assertions",
 	}
-}
-
-func parseOptions(options []any) ([]string, []string) {
-	assertNames := []string{"expect"}
-	additional := []string{}
-
-	if len(options) == 0 {
-		return assertNames, additional
-	}
-	optsMap, _ := options[0].(map[string]interface{})
-
-	if arr, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
-		assertNames = stringList(arr)
-	}
-	if arr, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
-		additional = stringList(arr)
-	}
-
-	return assertNames, additional
-}
-
-func stringList(raw []interface{}) []string {
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		if s, ok := v.(string); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func compileAssertPatterns(patterns []string) []*regexp.Regexp {
-	out := make([]*regexp.Regexp, 0, len(patterns))
-	for _, p := range patterns {
-		out = append(out, compileAssertPattern(p))
-	}
-	return out
-}
-
-func compileAssertPattern(pattern string) *regexp.Regexp {
-	segs := strings.Split(pattern, ".")
-	parts := make([]string, 0, len(segs))
-	for _, s := range segs {
-		if s == "**" {
-			parts = append(parts, `[a-zA-Z0-9.]*`)
-		} else {
-			parts = append(parts, strings.ReplaceAll(s, "*", `[a-zA-Z0-9]*`))
-		}
-	}
-	joined := strings.Join(parts, `\.`)
-	// Segments follow eslint-plugin-jest: only `*` is expanded; other characters (e.g. `\$`)
-	// are copied into the Regexp source like JavaScript's RegExp constructor.
-	re, err := regexp.Compile(`(?i)^(?:` + joined + `)(?:\.|$)`)
-	if err != nil {
-		return nil
-	}
-	return re
-}
-
-func matchesAssertName(name string, compiled []*regexp.Regexp) bool {
-	if name == "" {
-		return false
-	}
-	for _, re := range compiled {
-		if re != nil && re.MatchString(name) {
-			return true
-		}
-	}
-	return false
 }
 
 func isTodoTestCall(jestFn *utils.ParsedJestFnCall) bool {
@@ -179,8 +109,9 @@ var ExpectExpectRule = rule.Rule{
 	Name:   "jest/expect-expect",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		assertNames, additionalTestBlocks := parseOptions(options)
-		compiled := compileAssertPatterns(assertNames)
+		parsedOptions := utils.ParseAssertionFunctionOptions(options)
+		additionalTestBlocks := parsedOptions.AdditionalTestBlockFunctions
+		compiled := utils.CompileAssertFunctionNamePatterns(parsedOptions.AssertFunctionNames)
 		var unchecked []*ast.Node
 		uncheckedByDecl := map[*ast.Node][]*ast.Node{}
 		uncheckedByName := map[string][]*ast.Node{}
@@ -214,7 +145,7 @@ var ExpectExpectRule = rule.Rule{
 					return
 				}
 
-				if !matchesAssertName(calleeName, compiled) {
+				if !utils.MatchesAssertFunctionName(calleeName, compiled) {
 					return
 				}
 				checkCallExpressionUsed(
