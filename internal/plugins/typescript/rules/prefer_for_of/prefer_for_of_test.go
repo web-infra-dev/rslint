@@ -269,7 +269,183 @@ for (let i = 0; i < arr.length; i++) {
     }
   }
 }`},
+
+		// ======== Extra edge cases: index escapes as a value ========
+		// Shorthand property — the index escapes just like `{ i: i }` below
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], { i });
+}`},
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], { i: i });
+}`},
+		// Shorthand property inside a nested closure
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  setTimeout(() => console.log({ i }));
+}`},
+		// Shorthand property in an assignment pattern — a write to the index
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  ({ i } = obj);
+}`},
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  ({ i = 1 } = obj);
+}`},
+		// Spread of the index
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], { ...i });
+}`},
+		// Index referenced from a type position
+		{Code: `
+for (let i = 0; i < arr.length; i++) {
+  const x: typeof i = arr[i];
+}`},
+		// ======== A `var` redeclaration writes the same function-scoped index ========
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var i = 1;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  {
+    var i = 1;
+  }
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var [i] = other;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  var { a: i } = other;
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  for (var i of other) {
+  }
+  console.log(arr[i]);
+}`},
+		{Code: `
+for (var i = 0; i < arr.length; i++) {
+  for (var i in other) {
+  }
+  console.log(arr[i]);
+}`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- A `var` redeclaration that assigns nothing ----
+		{
+			Code: `
+for (var i = 0; i < arr.length; i++) {
+  var i;
+  console.log(arr[i]);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 5, EndColumn: 2},
+			},
+		},
+		// ---- A `var` in a nested function is a different variable ----
+		{
+			Code: `
+for (var i = 0; i < arr.length; i++) {
+  function f() {
+    var i = 1;
+  }
+  console.log(arr[i]);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 7, EndColumn: 2},
+			},
+		},
+		// ---- Names that only look like the index ----
+		// Property key
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], { i: 1 });
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 4, EndColumn: 2},
+			},
+		},
+		// Shorthand method name
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], { i() {} });
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 4, EndColumn: 2},
+			},
+		},
+		// Property access name
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i], foo.i);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 4, EndColumn: 2},
+			},
+		},
+		// Label
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  i: for (;;) break i;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 5, EndColumn: 2},
+			},
+		},
+		// Enum member declared with the index's name
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  enum E {
+    i,
+  }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 7, EndColumn: 2},
+			},
+		},
+		// ---- Shadowing declaration inside the body ----
+		{
+			Code: `
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  {
+    let i = 1;
+    console.log({ i });
+  }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 8, EndColumn: 2},
+			},
+		},
+		// ---- A function-scoped index used after the loop ----
+		{
+			Code: `
+for (var i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+}
+console.log({ i });`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 2, Column: 1, EndLine: 4, EndColumn: 2},
+			},
+		},
 		// ---- Nested member access (obj.arr) ----
 		{
 			Code: `

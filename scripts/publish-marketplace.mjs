@@ -1,6 +1,6 @@
 #!/usr/bin/env zx
 import fs from 'fs';
-import { argv } from 'zx';
+import { $, argv } from 'zx';
 
 const marketplace = argv.marketplace || 'vsce';
 const prerelease = argv.prerelease || false;

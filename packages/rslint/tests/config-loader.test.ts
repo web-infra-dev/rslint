@@ -239,9 +239,26 @@ describe('normalizeConfig', () => {
     },
   );
 
-  test('rejects nested config arrays', () => {
-    expect(() => normalizeConfig([[{ rules: {} }]])).toThrow(
+  test('flattens one level of nesting, so a preset can be listed as-is', () => {
+    const preset = [{ rules: { 'no-var': 'error' } }, { files: ['**/*.ts'] }];
+    expect(
+      normalizeConfig([preset, { rules: { 'no-console': 'error' } }]),
+    ).toEqual([
+      { rules: { 'no-var': 'error' } },
+      { files: ['**/*.ts'] },
+      { rules: { 'no-console': 'error' } },
+    ]);
+  });
+
+  test('rejects config arrays nested deeper than one level', () => {
+    expect(() => normalizeConfig([[[{ rules: {} }]]])).toThrow(
       /unexpected array/,
+    );
+  });
+
+  test('rejects sparse nested config arrays', () => {
+    expect(() => normalizeConfig([new Array(1)])).toThrow(
+      /unexpected undefined config/,
     );
   });
 
