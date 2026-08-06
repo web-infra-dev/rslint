@@ -122,9 +122,9 @@ func TestMatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.pattern+" vs "+test.path, func(t *testing.T) {
-			got := minimatch.Match(test.path, test.pattern, minimatch.Options{})
+			got := minimatch.Match(test.pattern, test.path, minimatch.Options{})
 			if got != test.want {
-				t.Errorf("Match(%q, %q) = %v, want %v", test.path, test.pattern, got, test.want)
+				t.Errorf("Match(%q, %q) = %v, want %v", test.pattern, test.path, got, test.want)
 			}
 		})
 	}
@@ -220,9 +220,9 @@ func TestMatchOptions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := minimatch.Match(test.path, test.pattern, test.options)
+			got := minimatch.Match(test.pattern, test.path, test.options)
 			if got != test.want {
-				t.Errorf("Match(%q, %q, %+v) = %v, want %v", test.path, test.pattern, test.options, got, test.want)
+				t.Errorf("Match(%q, %q, %+v) = %v, want %v", test.pattern, test.path, test.options, got, test.want)
 			}
 		})
 	}

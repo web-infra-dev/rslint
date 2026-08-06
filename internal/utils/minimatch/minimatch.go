@@ -110,8 +110,9 @@ func New(pattern string, options Options) *Matcher {
 	return m
 }
 
-// Match reports whether path matches the compiled pattern.
-func Match(path string, pattern string, options Options) bool {
+// Match reports whether path matches pattern. Compile the pattern with New
+// instead when the same one is matched against more than one path.
+func Match(pattern string, path string, options Options) bool {
 	return New(pattern, options).Match(path)
 }
 

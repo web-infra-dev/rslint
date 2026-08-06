@@ -1,8 +1,8 @@
 // The table below is minimatch's own conformance corpus — the bash glob-test
 // cases in test/patterns.js of minimatch v3.1.2 — expanded to one expectation
-// per file. Every `matches` and `misses` entry is what `minimatch(path,
-// pattern, options)` answers on minimatch 3.1.5, so a divergence here is a
-// divergence from the matcher ESLint itself uses.
+// per file. Every `matches` and `misses` entry is what the npm package answers
+// on minimatch 3.1.5, so a divergence here is a divergence from the matcher
+// ESLint itself uses.
 //
 // Regenerate by running the corpus through minimatch and grouping per pattern;
 // do not hand-edit an expectation to make a change pass.
@@ -465,12 +465,12 @@ func TestCorpus(t *testing.T) {
 		matcher := minimatch.New(test.pattern, test.options)
 		for _, path := range test.matches {
 			if !matcher.Match(path) {
-				t.Errorf("Match(%q, %q, %+v) = false, want true", path, test.pattern, test.options)
+				t.Errorf("Match(%q, %q, %+v) = false, want true", test.pattern, path, test.options)
 			}
 		}
 		for _, path := range test.misses {
 			if matcher.Match(path) {
-				t.Errorf("Match(%q, %q, %+v) = true, want false", path, test.pattern, test.options)
+				t.Errorf("Match(%q, %q, %+v) = true, want false", test.pattern, path, test.options)
 			}
 		}
 	}
