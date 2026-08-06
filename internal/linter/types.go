@@ -16,7 +16,10 @@ type ConfiguredRule struct {
 	// Inline globals and disable directives use candidate-gated lazy comment
 	// collection, so rules never parse either source themselves. Nil when the
 	// config declares none.
-	Globals          map[string]utils.GlobalAccess
+	Globals map[string]utils.GlobalAccess
+	// SourceType is the authored `languageOptions.sourceType` for this file.
+	// Empty when unset. Forwarded to RuleContext.SourceType.
+	SourceType       string
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
