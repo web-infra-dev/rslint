@@ -10,28 +10,12 @@ import {
 } from '@rslint/core';
 
 describe('defineConfig and config presets', () => {
-  test('defineConfig should be importable and return the entry list', () => {
+  test('defineConfig should be importable and return input as-is', () => {
     const input = [
       { files: ['**/*.ts'], rules: { 'no-console': 'error' as const } },
     ];
     const result = defineConfig(input);
-    expect(result).toEqual(input);
-  });
-
-  test('defineConfig should flatten nested entries at any depth', () => {
-    const first = { rules: { 'no-var': 'error' as const } };
-    const second = { files: ['a'] };
-    const third = { rules: { 'no-console': 'error' as const } };
-    expect(defineConfig([first, [second, [third]]])).toEqual([
-      first,
-      second,
-      third,
-    ]);
-    expect(defineConfig(first, [second], third)).toEqual([
-      first,
-      second,
-      third,
-    ]);
+    expect(result).toBe(input);
   });
 
   test('config presets should be importable', () => {

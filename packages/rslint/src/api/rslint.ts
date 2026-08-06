@@ -32,7 +32,10 @@ import {
   stageNativeConfigActivation,
   type PluginLintHost,
 } from './native-config-activation.js';
-import type { RslintConfigEntry } from '../config/define-config.js';
+import type {
+  RslintConfig,
+  RslintConfigEntry,
+} from '../config/define-config.js';
 import type {
   Diagnostic,
   Fix,
@@ -44,7 +47,7 @@ export interface RslintOptions {
   /** Base directory for config discovery and relative path resolution. */
   cwd?: string;
   /** Extra config appended after the resolved/discovered config (ESLint's overrideConfig). */
-  overrideConfig?: RslintConfigEntry | RslintConfigEntry[] | null;
+  overrideConfig?: RslintConfigEntry | RslintConfig | null;
   /**
    * `string` — use this JS/TS config module (no discovery).
    * `true`   — use only `overrideConfig` (no file, no discovery).
@@ -256,7 +259,7 @@ async function classifyLintPatterns(
 export class Rslint {
   readonly #service: RSLintService;
   readonly #cwd: string;
-  readonly #overrideConfig?: RslintConfigEntry | RslintConfigEntry[] | null;
+  readonly #overrideConfig?: RslintConfigEntry | RslintConfig | null;
   readonly #overrideConfigFile?: string | true | null;
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
@@ -600,9 +603,13 @@ export class Rslint {
   #getNormalizedOverrideConfig(): Record<string, unknown>[] | null {
     if (this.#overrideConfig == null) return null;
     if (this.#normalizedOverrideConfig) return this.#normalizedOverrideConfig;
-    const override = Array.isArray(this.#overrideConfig)
-      ? this.#overrideConfig
-      : [this.#overrideConfig];
+    // Scanned the way normalizeConfig below sees it — one level of nesting
+    // flattened — so a preset listed in the override is checked entry by entry.
+    const override = (
+      Array.isArray(this.#overrideConfig)
+        ? this.#overrideConfig
+        : [this.#overrideConfig]
+    ).flat();
     for (const [index, entry] of override.entries()) {
       if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) {
         continue;
