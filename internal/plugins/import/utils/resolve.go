@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/module"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -40,8 +40,8 @@ func ResolveSourceFileFromSourceFile(ctx rule.RuleContext, sourceFile *ast.Sourc
 // `require('./x')` in a TypeScript file, or a `(require)('./x')` anywhere, is
 // therefore absent from that cache even though upstream resolves both, so those
 // run through TypeScript's resolver here instead, under the same compiler
-// options the Program was built with. Only a specifier neither answers with a
-// loaded file falls back to probing the relative specifier against the files
+// options the Program was built with. Only a specifier TypeScript resolves
+// nowhere falls back to probing the relative specifier against the files
 // already in the Program, which covers the extension-substitution cases
 // upstream still treats as edges.
 func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
@@ -49,44 +49,72 @@ func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpeci
 		return "", nil, false
 	}
 
+	specifier := moduleSpecifier.Text()
+	mode := resolutionMode(ctx, sourceFile, moduleSpecifier)
+
 	resolvedPath := ""
-	if cached := ctx.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier); cached != nil {
+	if cached := ctx.Program.GetResolvedModule(sourceFile, specifier, mode); cached != nil {
 		resolvedPath = cached.ResolvedFileName
 	} else {
-		// A nil cache entry means TypeScript never collected this specifier, rather
-		// than that it tried and failed, so resolving it costs a walk TypeScript has
-		// not already done. Specifiers TypeScript did try and fail on stay failed.
-		resolvedPath = resolveWithModuleResolver(ctx, sourceFile, moduleSpecifier)
+		// A missing cache entry means TypeScript never collected this specifier,
+		// rather than that it tried and failed, so resolving it costs a walk
+		// TypeScript has not already done. Specifiers TypeScript did try and fail on
+		// stay failed.
+		resolvedPath = resolveWithModuleResolver(ctx, sourceFile, specifier, mode)
 	}
 
 	if resolvedPath != "" {
 		if target := ctx.Program.GetSourceFileForResolvedModule(resolvedPath); target != nil {
 			return resolvedPath, target, true
 		}
+		// TypeScript named a file the Program never loaded, such as one outside the
+		// project. Callers that only need the path can still use it.
+		return resolvedPath, nil, true
 	}
 
-	if target := resolveRelativeFromLoadedFiles(ctx, sourceFile, moduleSpecifier.Text()); target != nil {
+	if target := resolveRelativeFromLoadedFiles(ctx, sourceFile, specifier); target != nil {
 		return target.FileName(), target, true
 	}
 
-	// TypeScript named a file the Program never loaded, such as one outside the
-	// project. Callers that only need the path can still use it.
-	if resolvedPath != "" {
-		return resolvedPath, nil, true
-	}
 	return "", nil, false
+}
+
+// resolutionMode answers with the mode a specifier resolves under. TypeScript
+// reads a call as a `require` only when its callee is written as a bare
+// `require` identifier, and answers `(require)('pkg')` with the format of the
+// file holding it instead. The module accessor reads both spellings as a
+// `require`, so an ES module's parenthesized call resolves as CommonJS here too,
+// and a package's `require` condition stays selected for both.
+func resolutionMode(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
+	mode := ctx.Program.GetModeForUsageLocation(sourceFile, moduleSpecifier)
+	if mode == core.ResolutionModeESM && isRequireCall(moduleSpecifier.Parent) {
+		return core.ResolutionModeCommonJS
+	}
+	return mode
+}
+
+func isRequireCall(node *ast.Node) bool {
+	if node == nil || !ast.IsCallExpression(node) {
+		return false
+	}
+
+	call := node.AsCallExpression()
+	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
+		return false
+	}
+
+	callee := ast.SkipParentheses(call.Expression)
+	return ast.IsIdentifier(callee) && callee.Text() == "require"
 }
 
 // resolveWithModuleResolver runs TypeScript's own module resolution for a
 // specifier the Program never collected, so that it answers under the same
 // compiler options — `moduleSuffixes`, `paths`, `rootDirs` — every specifier
-// TypeScript did collect was resolved under.
-func resolveWithModuleResolver(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) string {
-	resolver := module.NewResolver(ctx.Program.Host(), ctx.Program.Options(), "", "")
-	mode := ctx.Program.GetModeForUsageLocation(sourceFile, moduleSpecifier)
-
-	resolved, _ := resolver.ResolveModuleName(moduleSpecifier.Text(), sourceFile.FileName(), mode, nil)
-	if !resolved.IsResolved() {
+// TypeScript did collect was resolved under. It goes through the Program's own
+// resolver, so a specifier several rules ask about is walked once.
+func resolveWithModuleResolver(ctx rule.RuleContext, sourceFile *ast.SourceFile, specifier string, mode core.ResolutionMode) string {
+	resolved := ctx.Program.ResolveModuleName(specifier, sourceFile.FileName(), mode)
+	if resolved == nil || !resolved.IsResolved() {
 		return ""
 	}
 	return resolved.ResolvedFileName

@@ -133,6 +133,75 @@ func TestResolveFromSourceFileModuleSuffixes(t *testing.T) {
 	}
 }
 
+// TestResolveFromSourceFileUnloadedTarget covers a specifier TypeScript
+// resolves to a file the Program never loaded. Probing the loaded files would
+// answer `./dep` with dep.ts, since a probe knows nothing of `moduleSuffixes`;
+// dep.ios.ts is the file the import names, and the probe is reserved for a
+// specifier TypeScript resolves nowhere at all.
+func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
+	t.Parallel()
+
+	const consumer = "/unloaded-fixture/consumer.ts"
+	const loadedDep = "/unloaded-fixture/dep.ts"
+	files := map[string]string{
+		loadedDep:                      "export const dep = 1;\n",
+		"/unloaded-fixture/dep.ios.ts": "export const dep = 2;\n",
+		consumer:                       `const dep = require("./dep");`,
+	}
+
+	// dep.ios.ts stays out of the Program, the way `exclude` or a narrow `files`
+	// list would keep it out, so the resolved file has no source file to report.
+	ctx, specifier := contextForRequireRoots(t, files, []string{consumer, loadedDep}, consumer, &core.CompilerOptions{
+		Module:         core.ModuleKindCommonJS,
+		ModuleSuffixes: []string{".ios", ""},
+	})
+
+	resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+	if !ok {
+		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
+	}
+	if got, want := tspath.NormalizeSlashes(resolvedPath), "/unloaded-fixture/dep.ios.ts"; got != want {
+		t.Fatalf("resolvedPath = %q, want %q", got, want)
+	}
+
+	if resolvedPath, target, ok := import_utils.ResolveSourceFileFromSourceFile(ctx, ctx.SourceFile, specifier); ok || target != nil {
+		t.Fatalf("ResolveSourceFileFromSourceFile() = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
+	}
+}
+
+// TestResolveFromSourceFileParenthesizedRequireCondition covers a parenthesized
+// `require` in an ES module. TypeScript reads a call as a `require` only through
+// a bare `require` identifier, so it would answer this call with the file's own
+// ESM format and select the package's `import` condition; the call is a
+// `require` either way it is spelled, so the `require` condition is the one that
+// holds.
+func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
+	t.Parallel()
+
+	const consumer = "/condition-fixture/consumer.ts"
+	const requireFile = "/condition-fixture/node_modules/some-package/cjs.d.cts"
+	files := map[string]string{
+		"/condition-fixture/package.json":                           `{"name": "root", "type": "module"}`,
+		"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
+		"/condition-fixture/node_modules/some-package/esm.d.mts":    "export const value: unknown;\n",
+		requireFile: "declare const value: unknown;\nexport = value;\n",
+		consumer:    `const pkg = (require)("some-package");`,
+	}
+
+	ctx, specifier := contextForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
+		Module:           core.ModuleKindNodeNext,
+		ModuleResolution: core.ModuleResolutionKindNodeNext,
+	})
+
+	resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+	if !ok {
+		t.Fatal("ResolveFromSourceFile() did not resolve some-package")
+	}
+	if got := tspath.NormalizeSlashes(resolvedPath); got != requireFile {
+		t.Fatalf("resolvedPath = %q, want %q", got, requireFile)
+	}
+}
+
 // contextForRequire parses fileName out of an in-memory tree and returns the
 // argument of the first `require()` call in it.
 func contextForRequire(t *testing.T, files map[string]string, fileName string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
@@ -148,6 +217,15 @@ func contextForRequire(t *testing.T, files map[string]string, fileName string, o
 		}
 	}
 	slices.Sort(rootFiles)
+
+	return contextForRequireRoots(t, files, rootFiles, fileName, options)
+}
+
+// contextForRequireRoots parses fileName out of an in-memory tree the Program
+// loads rootFiles from, and returns the argument of the first `require()` call
+// in it.
+func contextForRequireRoots(t *testing.T, files map[string]string, rootFiles []string, fileName string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
+	t.Helper()
 
 	fs := rslint_utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
 	host := rslint_utils.CreateCompilerHost("/", fs)
@@ -167,7 +245,8 @@ func contextForRequire(t *testing.T, files map[string]string, fileName string, o
 	visit = func(node *ast.Node) bool {
 		if ast.IsCallExpression(node) {
 			call := node.AsCallExpression()
-			if ast.IsIdentifier(call.Expression) && call.Expression.Text() == "require" && len(call.Arguments.Nodes) == 1 {
+			callee := ast.SkipParentheses(call.Expression)
+			if ast.IsIdentifier(callee) && callee.Text() == "require" && len(call.Arguments.Nodes) == 1 {
 				specifier = call.Arguments.Nodes[0]
 				return true
 			}
