@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"weak"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -70,6 +71,10 @@ type TypeOrValueSpecifier struct {
 	Path string `json:"path"`
 	// Can be used when From == TypeOrValueSpecifierFromPackage
 	Package string `json:"package"`
+	// pathProvided distinguishes an omitted path from an explicitly empty one.
+	// Both decode to Path == "", but upstream treats only the omitted form as
+	// matching declarations anywhere in the current project.
+	pathProvided bool
 }
 
 // UnmarshalJSON handles both string shorthand ("Promise") and object form
@@ -78,9 +83,15 @@ type TypeOrValueSpecifier struct {
 func (s *TypeOrValueSpecifier) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err == nil {
-		s.From = TypeOrValueSpecifierFromString
-		s.Name = NameList{str}
+		*s = TypeOrValueSpecifier{
+			From: TypeOrValueSpecifierFromString,
+			Name: NameList{str},
+		}
 		return nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
 	}
 	type Alias TypeOrValueSpecifier
 	var alias Alias
@@ -88,21 +99,15 @@ func (s *TypeOrValueSpecifier) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = TypeOrValueSpecifier(alias)
+	_, s.pathProvided = fields["path"]
 	return nil
 }
 
-func typeMatchesStringSpecifierWithCalleeNames(
+func specifierNameMatchesWithCalleeNames(
 	t *checker.Type,
 	names []string,
 	calleeNames []string,
 ) bool {
-	// Handle union types: all constituents must match the specifier
-	if parts := UnionTypeParts(t); len(parts) > 1 {
-		return Every(parts, func(part *checker.Type) bool {
-			return typeMatchesStringSpecifierWithCalleeNames(part, names, calleeNames)
-		})
-	}
-
 	alias := checker.Type_alias(t)
 	var symbol *ast.Symbol
 	if alias == nil {
@@ -130,8 +135,33 @@ func typeMatchesStringSpecifierWithCalleeNames(
 	return false
 }
 
+func typeMatchesInlineSpecifierWithCalleeNames(
+	t *checker.Type,
+	names []string,
+	calleeNames []string,
+) bool {
+	if parts := UnionTypeParts(t); len(parts) > 1 {
+		return Every(parts, func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifierWithCalleeNames(part, names, calleeNames)
+		})
+	}
+	if IsIntrinsicErrorType(t) {
+		return false
+	}
+	if specifierNameMatchesWithCalleeNames(t, names, calleeNames) {
+		return true
+	}
+	if parts := IntersectionTypeParts(t); len(parts) > 1 {
+		return Some(parts, func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifierWithCalleeNames(part, names, calleeNames)
+		})
+	}
+	return false
+}
+
 func typeDeclaredInFile(
 	relativePath string,
+	pathProvided bool,
 	declarationFiles []*ast.SourceFile,
 	program *compiler.Program,
 ) bool {
@@ -140,7 +170,7 @@ func typeDeclaredInFile(
 	canonical := func(fileName string) string {
 		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
 	}
-	if relativePath == "" {
+	if !pathProvided {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
 			return strings.HasPrefix(canonical(f.FileName()), canonical(cwd))
 		})
@@ -196,38 +226,70 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
-// resolvedPackageName returns the package a declaration file belongs to, in the
-// "name/subpath" form module resolution records, such as "demo-pkg/index.d.ts"
-// or "@types/node/globals.d.ts". Workspace packages are symlinked into
-// node_modules and resolve to their real path, so the owning package is found
-// through the nearest enclosing package.json that names one instead of through
-// the file name.
-func resolvedPackageName(program *compiler.Program, fileName string) string {
-	directory := tspath.GetDirectoryPath(fileName)
-	for directory != "" {
-		packageDirectory := program.GetNearestAncestorDirectoryWithPackageJson(directory)
-		if packageDirectory == "" {
-			return ""
-		}
-		info := program.GetPackageJsonInfo(tspath.CombinePaths(packageDirectory, "package.json"))
-		if info.Exists() {
-			if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
-				if subpath, nested := strings.CutPrefix(fileName, packageDirectory+"/"); nested {
-					return name + "/" + subpath
-				}
-				return name
+type sourceFilePackageNamesCacheEntry struct {
+	once  sync.Once
+	names map[tspath.Path][]string
+}
+
+// sourceFilePackageNamesCache reconstructs TypeScript's sourceFileToPackageName
+// data from TypeScript-Go's resolution caches. Its weak Program keys keep
+// repeated rule matches cheap without retaining old Programs after an LSP
+// rebuild.
+var sourceFilePackageNamesCache = struct {
+	sync.Mutex
+	entries map[weak.Pointer[compiler.Program]]*sourceFilePackageNamesCacheEntry
+}{
+	entries: make(map[weak.Pointer[compiler.Program]]*sourceFilePackageNamesCacheEntry),
+}
+
+func sourceFilePackageNames(program *compiler.Program) map[tspath.Path][]string {
+	key := weak.Make(program)
+	sourceFilePackageNamesCache.Lock()
+	entry := sourceFilePackageNamesCache.entries[key]
+	if entry == nil {
+		// Weak keys do not remove themselves from a map. Opportunistically prune
+		// entries whose Programs have been collected whenever a new one appears.
+		for candidate := range sourceFilePackageNamesCache.entries {
+			if candidate.Value() == nil {
+				delete(sourceFilePackageNamesCache.entries, candidate)
 			}
 		}
-		// A package.json without a name, such as the `{"type": "module"}` files
-		// dual-published packages drop into subdirectories, belongs to whichever
-		// named package encloses it.
-		parent := tspath.GetDirectoryPath(packageDirectory)
-		if parent == packageDirectory {
-			return ""
-		}
-		directory = parent
+		entry = &sourceFilePackageNamesCacheEntry{}
+		sourceFilePackageNamesCache.entries[key] = entry
 	}
-	return ""
+	sourceFilePackageNamesCache.Unlock()
+
+	entry.once.Do(func() {
+		entry.names = make(map[tspath.Path][]string)
+		addResolution := func(fileName string, packageID module.PackageId) {
+			if packageID.Name == "" {
+				return
+			}
+			file := program.GetSourceFileForResolvedModule(fileName)
+			if file == nil {
+				return
+			}
+			packageName := packageID.PackageName()
+			if !slices.Contains(entry.names[file.Path()], packageName) {
+				entry.names[file.Path()] = append(entry.names[file.Path()], packageName)
+			}
+		}
+		for _, resolutions := range program.GetResolvedModules() {
+			for _, resolution := range resolutions {
+				if resolution != nil {
+					addResolution(resolution.ResolvedFileName, resolution.PackageId)
+				}
+			}
+		}
+		for _, resolutions := range program.GetResolvedTypeReferenceDirectives() {
+			for _, resolution := range resolutions {
+				if resolution != nil {
+					addResolution(resolution.ResolvedFileName, resolution.PackageId)
+				}
+			}
+		}
+	})
+	return entry.names
 }
 
 // packageMatchers caches the compiled matcher per `package` specifier, which
@@ -262,9 +324,10 @@ func typeDeclaredInDeclarationFile(
 		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		name := resolvedPackageName(program, file.FileName())
-		if name != "" && Regexp2MatchString(matcher, name) {
-			return true
+		for _, name := range sourceFilePackageNames(program)[file.Path()] {
+			if Regexp2MatchString(matcher, name) {
+				return true
+			}
 		}
 	}
 	return false
@@ -292,38 +355,54 @@ func typeMatchesSpecifier(
 			return typeMatchesSpecifier(part, specifier, program, calleeNames)
 		})
 	}
-
-	if !typeMatchesStringSpecifierWithCalleeNames(t, specifier.Name, calleeNames) {
+	if IsIntrinsicErrorType(t) {
 		return false
 	}
 
-	symbol := checker.Type_symbol(t)
-	if symbol == nil {
-		alias := checker.Type_alias(t)
-		if alias != nil {
-			symbol = alias.Symbol()
+	wholeTypeMatches := false
+	if specifierNameMatchesWithCalleeNames(t, specifier.Name, calleeNames) {
+		symbol := checker.Type_symbol(t)
+		if symbol == nil {
+			alias := checker.Type_alias(t)
+			if alias != nil {
+				symbol = alias.Symbol()
+			}
+		}
+		var declarations []*ast.Node
+		if symbol != nil {
+			declarations = symbol.Declarations
+		}
+		declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
+			return ast.GetSourceFileOfNode(d)
+		})
+
+		switch specifier.From {
+		case TypeOrValueSpecifierFromString:
+			wholeTypeMatches = true
+		case TypeOrValueSpecifierFromFile:
+			wholeTypeMatches = typeDeclaredInFile(
+				specifier.Path,
+				specifier.pathProvided || specifier.Path != "",
+				declarationFiles,
+				program,
+			)
+		case TypeOrValueSpecifierFromLib:
+			wholeTypeMatches = typeDeclaredInLib(declarationFiles, program)
+		case TypeOrValueSpecifierFromPackage:
+			wholeTypeMatches = typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
+		default:
+			panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
 		}
 	}
-	var declarations []*ast.Node
-	if symbol != nil {
-		declarations = symbol.Declarations
+	if wholeTypeMatches {
+		return true
 	}
-	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
-		return ast.GetSourceFileOfNode(d)
-	})
-
-	switch specifier.From {
-	case TypeOrValueSpecifierFromString:
-		return true // string shorthand matches any origin; name already matched above
-	case TypeOrValueSpecifierFromFile:
-		return typeDeclaredInFile(specifier.Path, declarationFiles, program)
-	case TypeOrValueSpecifierFromLib:
-		return typeDeclaredInLib(declarationFiles, program)
-	case TypeOrValueSpecifierFromPackage:
-		return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
-	default:
-		panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
+	if parts := IntersectionTypeParts(t); len(parts) > 1 {
+		return Some(parts, func(part *checker.Type) bool {
+			return typeMatchesSpecifier(part, specifier, program, calleeNames)
+		})
 	}
+	return false
 }
 
 func TypeMatchesSomeSpecifier(
@@ -345,17 +424,9 @@ func TypeMatchesSomeSpecifierWithCalleeNames(
 	program *compiler.Program,
 	calleeNames []string,
 ) bool {
-	for _, typePart := range IntersectionTypeParts(t) {
-		if IsIntrinsicErrorType(typePart) {
-			continue
-		}
-		if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-			return typeMatchesSpecifier(t, s, program, calleeNames)
-		}) || typeMatchesStringSpecifierWithCalleeNames(t, inlineSpecifiers, calleeNames) {
-			return true
-		}
-	}
-	return false
+	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return typeMatchesSpecifier(t, s, program, calleeNames)
+	}) || typeMatchesInlineSpecifierWithCalleeNames(t, inlineSpecifiers, calleeNames)
 }
 
 // specifierStaticName is the name a specifier compares against when it matches
