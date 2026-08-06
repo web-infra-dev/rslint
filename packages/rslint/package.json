@@ -72,6 +72,7 @@
     "espree": "catalog:",
     "esquery": "catalog:",
     "globals": "catalog:",
+    "picomatch": "catalog:",
     "tinyglobby": "catalog:",
     "typescript": "catalog:"
   },
@@ -92,8 +93,5 @@
     "@rslint/native-linux-x64-musl": "workspace:*",
     "@rslint/native-win32-arm64-msvc": "workspace:*",
     "@rslint/native-win32-x64-msvc": "workspace:*"
-  },
-  "dependencies": {
-    "picomatch": "catalog:"
   }
 }

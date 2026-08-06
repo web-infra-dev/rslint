@@ -12,12 +12,11 @@ import { defineConfig } from '@rslib/core';
  *    not share its `tsBuildInfoFile` with the tsgo `typecheck` over the same
  *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
  *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
- *    `tsconfig.build.json` (typecheck). `autoExternal` externalizes `dependencies`
- *    (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is a devDep so it
- *    bundles in. But `tinyglobby`'s `fdir` loads `picomatch` via `createRequire`,
- *    which rspack can't statically follow — so `picomatch` can't be bundled away
- *    and stays a runtime dep. One `lib` block with all entries: the surface
- *    modules share a graph, so shared chunks between entries are fine here.
+ *    `tsconfig.build.json` (typecheck). The implicit `autoExternal` (default for
+ *    esm/cjs) externalizes `dependencies` (`picomatch`) + `peerDependencies`
+ *    (`jiti`), so `picomatch` stays a runtime dep; `tinyglobby` is a devDep so it
+ *    bundles in. One `lib` block with all entries: the surface modules share a
+ *    graph, so shared chunks between entries are fine here.
  *
  * 2. eslint-plugin worker → `dist/eslint-plugin/` (`tsconfig.worker.json`,
  *    which includes `src/eslint-plugin/**`). Each entry is its own `lib` block
@@ -33,13 +32,6 @@ import { defineConfig } from '@rslib/core';
  *    rspack can't statically follow (so the binary is never inlined — intended).
  */
 const librarySurface = {
-  format: 'esm' as const,
-  bundle: true,
-  autoExternal: true,
-  output: {
-    target: 'node' as const,
-    distPath: { root: './dist' },
-  },
   source: {
     tsconfigPath: './tsconfig.lib.json',
     entry: {
@@ -54,11 +46,7 @@ const librarySurface = {
 };
 
 const workerBase = {
-  format: 'esm' as const,
-  bundle: true,
-  autoExternal: true,
   output: {
-    target: 'node' as const,
     distPath: { root: './dist/eslint-plugin' },
   },
   source: {
