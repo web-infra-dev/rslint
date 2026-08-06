@@ -62,6 +62,26 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
         name: 'ts.configs.recommended',
         description: 'TypeScript recommended rules',
       },
+      {
+        name: 'ts.configs.recommendedTypeChecked',
+        description: 'TypeScript recommended rules, including typed ones',
+      },
+      {
+        name: 'ts.configs.strict',
+        description: 'TypeScript recommended rules plus opinionated extras',
+      },
+      {
+        name: 'ts.configs.strictTypeChecked',
+        description: 'TypeScript strict rules, including typed ones',
+      },
+      {
+        name: 'ts.configs.stylistic',
+        description: 'TypeScript consistency rules',
+      },
+      {
+        name: 'ts.configs.stylisticTypeChecked',
+        description: 'TypeScript consistency rules, including typed ones',
+      },
     ],
   },
   {
