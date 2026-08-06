@@ -18,6 +18,10 @@
       "@typescript/source": "./src/config/config-loader.ts",
       "default": "./dist/config-loader.js"
     },
+    "./editor-runtime": {
+      "@typescript/source": "./src/editor-runtime/editor-runtime.ts",
+      "default": "./dist/editor-runtime.js"
+    },
     "./eslint-plugin": {
       "@typescript/source": "./src/eslint-plugin/index.ts",
       "default": "./dist/eslint-plugin/index.js"

@@ -145,8 +145,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host .node into its @rslint/native-{tuple} package;
-      # the worker loads it at test runtime.
+      # VS Code resolves the workspace-local @rslint/core during integration
+      # tests. Its core-owned plugin worker still needs the host native parser.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
@@ -157,6 +157,11 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: Package universal VSIX
+        # Runs the same artifact smoke check as release: the extension may
+        # contain only resolver/router code, never core/native/worker payloads.
+        run: pnpm publish:vsce --dry-run
 
       - name: Dogfooding
         run: pnpm run lint --format github
@@ -206,8 +211,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
-      # package; the worker loads it at test runtime.
+      # The workspace-local @rslint/core owns the plugin worker exercised by
+      # npm tests, so it still needs the host (win32) native parser.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
@@ -247,8 +252,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
-      # package; the worker loads it at test runtime.
+      # The extension resolves workspace-local @rslint/core. Its core-owned
+      # plugin worker still needs the host (win32) native parser for tests.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)

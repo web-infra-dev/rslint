@@ -24,6 +24,17 @@
     "vscode": "^1.131.0"
   },
   "main": "./dist/main.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
@@ -39,31 +50,18 @@
           "order": 0,
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Enable/disable rslint"
         },
-        "rslint.binPath": {
+        "rslint.runtime.path": {
           "order": 1,
           "type": "string",
-          "enum": [
-            "local",
-            "built-in",
-            "custom"
-          ],
-          "default": "built-in",
-          "markdownEnumDescriptions": [
-            "Use workspace node_modules Rslint binary (may have version incompatibility with extension)",
-            "Use extension's built-in Rslint binary (may differ from local @rslint/core diagnostics)",
-            "Customize the path to the Rslint binary, this is useful if you have a global installation of Rslint or if you want to use a specific version of Rslint"
-          ],
-          "description": "Path to Rslint executable binary"
-        },
-        "rslint.customBinPath": {
-          "order": 2,
-          "type": "string",
-          "description": "Custom path to Rslint executable. Only used when `rslint.binPath` is set to `custom`. Requires reloading VS Code to take effect."
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Optional path to a complete `@rslint/core` package directory. Relative paths are resolved from the VS Code workspace folder. When empty, Rslint resolves the nearest local `@rslint/core` separately for each document."
         },
         "rslint.trace.server": {
-          "order": 3,
+          "order": 2,
           "type": "string",
           "enum": [
             "off",
@@ -80,7 +78,7 @@
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
     "package": "vsce package",
-    "test": "tsgo -p tsconfig.spec.emit.json && node .vscode-test-out/__tests__/runTest.js"
+    "test": "rimraf .vscode-test-out && tsgo -p tsconfig.spec.emit.json && node .vscode-test-out/__tests__/runTest.js"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",

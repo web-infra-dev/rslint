@@ -9,7 +9,22 @@ The official VS Code extension for [Rslint](https://github.com/web-infra-dev/rsl
 
 ## ⚙️ Configuration
 
-The extension can be configured through VS Code settings:
+The extension uses the `@rslint/core` installed by your project; it does not
+bundle a separate linter. Install it in the package or monorepo root where you
+want it to apply:
+
+```bash
+pnpm add -D @rslint/core
+```
+
+Resolution is document-local, so nested packages may use different core
+versions. Within a workspace folder, documents that resolve the same physical
+installation share one language-server and worker pool. A monorepo with one
+root installation therefore uses one runtime. A Yarn PnP boundary is
+authoritative: declare `@rslint/core` in that dependency graph instead of
+falling through to an unrelated ancestor `node_modules` tree. Each PnP runtime
+starts from that boundary and does not evaluate configs inside a nested foreign
+PnP graph.
 
 ### rslint.enable
 
@@ -18,23 +33,24 @@ The extension can be configured through VS Code settings:
 
 Enable/disable Rslint.
 
-### rslint.binPath
-
-- **Type:** `"local"` | `"built-in"` | `"custom"`
-- **Default:** `"local"`
-
-Choose which Rslint binary to use:
-
-- `local`: Use workspace node_modules Rslint binary
-- `built-in`: Use extension's built-in Rslint binary
-- `custom`: Use a custom path to Rslint binary
-
-### rslint.customBinPath
+### rslint.runtime.path
 
 - **Type:** `string`
-- **Default:** `undefined`
+- **Default:** `""`
 
-Custom path to Rslint executable. Only used when `rslint.binPath` is set to `custom`. Requires reloading VS Code to take effect.
+Optional path to a complete `@rslint/core` package directory. Relative paths
+are resolved from the VS Code workspace folder. Leave it empty to use normal
+node_modules or Yarn PnP resolution for each document. The package must expose
+the `./editor-runtime` subpath supplied by current `@rslint/core` releases. This
+setting selects the core implementation only: project config and plugin imports
+still execute in each document's node_modules or Yarn PnP domain, so separate
+PnP dependency graphs do not leak into one another. The configured directory is
+watched even before it becomes a valid package, and all active generation files
+are watched inside or outside the workspace. The generation includes core's
+executable `dist`/`bin` payload, so a shared chunk or worker-only rebuild is not
+mistaken for the already-running version. Completing or replacing a local build
+therefore migrates open documents only after the new runtime finishes its
+initial config commit.
 
 ### rslint.trace.server
 

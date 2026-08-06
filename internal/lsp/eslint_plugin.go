@@ -14,14 +14,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// methodPluginLint is the server→client reverse request that asks the
-// VS Code extension to run a batch of ESLint-plugin rules in its worker pool
-// and return the diagnostics. It is the LSP equivalent of the CLI's
-// `pluginLint` IPC request.
+// methodPluginLint is the private request that asks @rslint/core's editor
+// runtime to run a batch of ESLint-plugin rules and return diagnostics.
 const methodPluginLint = lsproto.Method("rslint/pluginLint")
 
 // installEslintPluginDispatch lazily builds the dispatcher closure once. It
-// sends one plugin-lint batch over the reverse request and decodes the
+// sends one plugin-lint batch over the runtime request and decodes the
 // result. Reused across all files/keystrokes; only touches sendRequest
 // (goroutine-safe), so the closure itself may run off the dispatch loop.
 //
@@ -30,7 +28,7 @@ const methodPluginLint = lsproto.Method("rslint/pluginLint")
 func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 	if s.eslintPluginDispatch == nil {
 		s.eslintPluginDispatch = func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			raw, err := s.sendRequest(ctx, methodPluginLint, req)
+			raw, err := s.sendRuntimeRequest(ctx, methodPluginLint, req)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +50,7 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 
 // buildPluginFileInput assembles the single-file eslint-plugin dispatch input
 // for uri, or returns ok=false when the file has no plugin rules (so the
-// caller skips the reverse request entirely).
+// caller skips the private runtime request entirely).
 //
 // The plugin rules are the IsEslintPluginRule subset of the file's enabled
 // rules — exactly the rules the native pass treats as no-op placeholders.
@@ -201,7 +199,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	// rules (the file became globally ignored, or its plugin-rule set dropped to
 	// empty after a config refresh) must still cancel the prior dispatch so its Node
 	// worker stops instead of running to completion. Go-side frees the goroutine;
-	// a $/cancelRequest tells the client to stop the worker.
+	// private IPC cancellation tells the core sidecar to stop the worker.
 	s.cancelInflightPluginDispatch(uri)
 
 	input, ok := s.buildPluginFileInputWithConfig(uri, nil, rslintConfig, configCwd, isJSConfig)
@@ -211,7 +209,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	dispatch := s.pluginDispatchForGeneration(s.eslintPluginConfigGeneration)
 
 	// Bound the reverse request as a backstop: even with supersede-cancel, a
-	// client that neither answers nor is ever superseded (the user stops typing)
+	// runtime that neither answers nor is ever superseded (the user stops typing)
 	// would otherwise leak this goroutine + its pendingServerRequests entry.
 	timeout := s.pluginReverseTimeout
 	if timeout <= 0 {
@@ -220,7 +218,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	ctx, cancel := context.WithTimeout(s.backgroundCtx, timeout)
 
 	// Register so a later supersede or close can cancel the request. sendRequest
-	// forwards that context cancellation to the client.
+	// forwards that context cancellation to the core sidecar.
 	handle := &pluginDispatchHandle{cancel: cancel, done: make(chan struct{})}
 	s.inflightPluginDispatchMu.Lock()
 	s.inflightPluginDispatch[uri] = handle
@@ -250,7 +248,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 			func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		)
 		// Categorize like the fixAll sibling (lintPluginRulesSync): a superseded
-		// batch (context.Canceled) is silent; a client that never answered within
+		// batch (context.Canceled) is silent; a runtime that never answered within
 		// pluginReverseTimeout (context.DeadlineExceeded) is benign and expected —
 		// logging it at error severity would spam every debounced relint — so it
 		// gets an info-level note, not an error. Only a genuine failure is an
@@ -260,7 +258,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 			switch {
 			case errors.Is(err, context.Canceled):
 			case errors.Is(err, context.DeadlineExceeded):
-				log.Printf("[rslint] eslint-plugin lint for %s timed out (client unresponsive); leaving it native-only", uri)
+				log.Printf("[rslint] eslint-plugin lint for %s timed out (editor runtime unresponsive); leaving it native-only", uri)
 			default:
 				log.Printf("[rslint] eslint-plugin lint error for %s: %v", uri, err)
 			}
@@ -282,9 +280,10 @@ func (s *Server) dispatchPluginLintWithConfig(
 	}()
 }
 
-// cancelInflightPluginDispatch cancels and $/cancelRequests the in-flight
-// background plugin dispatch for uri, if any. Called when a newer keystroke
-// supersedes it (dispatchPluginLint) or the document closes (handleDidClose).
+// cancelInflightPluginDispatch cancels the in-flight private plugin request for
+// uri, if any. The IPC transport propagates that cancellation to the matching
+// Node handler. Called when a newer keystroke supersedes it
+// (dispatchPluginLint) or the document closes (handleDidClose).
 func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
 	s.inflightPluginDispatchMu.Lock()
 	handle, ok := s.inflightPluginDispatch[uri]
@@ -356,7 +355,7 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 // file has no plugin rules.
 //
 // The caller (computeFixAllContent) passes a ctx already bounded by a deadline
-// (pluginReverseTimeout) so a wedged or mid-rebuild client that never answers
+// (pluginReverseTimeout) so a wedged or mid-rebuild runtime that never answers
 // cannot stall the dispatch loop: on expiry DispatchEslintPluginRules returns a
 // context error and this returns nil, leaving the pass native-only.
 //
@@ -398,13 +397,13 @@ func (s *Server) lintPluginRulesSyncWithConfig(
 	if err != nil {
 		// context.Canceled means the editor aborted the fixAll request;
 		// context.DeadlineExceeded means the pluginReverseTimeout budget elapsed
-		// (an unresponsive client) — both leave this pass native-only. Other
+		// (an unresponsive runtime) — both leave this pass native-only. Other
 		// errors (worker crash, etc.) are logged but likewise leave the pass
 		// native-only rather than failing the whole fixAll; a per-file plugin
 		// crash is already surfaced on the diagnostics path.
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			log.Printf("[rslint] eslint-plugin fixAll for %s timed out (client unresponsive); applying native-only fixes", uri)
+			log.Printf("[rslint] eslint-plugin fixAll for %s timed out (editor runtime unresponsive); applying native-only fixes", uri)
 		case errors.Is(err, context.Canceled):
 		default:
 			log.Printf("[rslint] eslint-plugin fixAll lint error for %s: %v", uri, err)

@@ -29,6 +29,34 @@ async function activateAndRun(
   testPath: string,
   callback: (error: unknown, failures?: number) => void,
 ): Promise<void> {
+  const unhandledRejections = new Map<Promise<unknown>, unknown>();
+  const onUnhandledRejection = (
+    reason: unknown,
+    promise: Promise<unknown>,
+  ): void => {
+    unhandledRejections.set(promise, reason);
+  };
+  const onRejectionHandled = (promise: Promise<unknown>): void => {
+    unhandledRejections.delete(promise);
+  };
+  process.on('unhandledRejection', onUnhandledRejection);
+  process.on('rejectionHandled', onRejectionHandled);
+
+  let finished = false;
+  const finish = (error: unknown, failures?: number): void => {
+    if (finished) return;
+    finished = true;
+    process.off('unhandledRejection', onUnhandledRejection);
+    process.off('rejectionHandled', onRejectionHandled);
+    if (!error && unhandledRejections.size > 0) {
+      error = new AggregateError(
+        [...unhandledRejections.values()],
+        `${String(unhandledRejections.size)} unhandled rejection(s) escaped the VS Code test suite`,
+      );
+    }
+    callback(error, failures);
+  };
+
   try {
     // This deadline starts before any extension activation. Mocha has not been
     // created yet, so every asynchronous startup step must be independently
@@ -57,9 +85,13 @@ async function activateAndRun(
     }
     const mocha = new Mocha({ ui: 'tdd' });
     files.forEach((file) => mocha.addFile(path.join(testPath, file)));
-    mocha.run((failures) => callback(null, failures));
+    mocha.run((failures) => {
+      // Allow Node's unhandledRejection/rejectionHandled bookkeeping for the
+      // final test turn to settle before deciding whether the suite is green.
+      setImmediate(() => finish(undefined, failures));
+    });
   } catch (error) {
-    callback(error);
+    finish(error);
   }
 }
 

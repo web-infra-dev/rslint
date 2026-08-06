@@ -1,11 +1,10 @@
 /* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /**
  * Boundary helpers for the eslintPlugins lint protocol — the shape Go
- * sends down (`pluginLint` IPC request OR `rslint/pluginLint`
- * LSP request) and the shape it reads back.
+ * sends down in a private `pluginLint` IPC request and the shape it reads back.
  *
- * Both the CLI host (`packages/rslint/src/cli/engine.ts`) and the LSP host
- * (`packages/vscode-extension/src/PluginLintPool.ts`) receive an
+ * Both the CLI host (`packages/rslint/src/cli/engine.ts`) and the core editor
+ * runtime receive an
  * EslintPluginLintRequest from Go, build per-file LintTasks against the
  * WorkerPool, and project the results back. The boundary logic is
  * identical across the two paths — only the warning sink (stderr vs

@@ -1101,6 +1101,9 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	if err := builder.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
+	if builder.request.PruneDirectory != nil && builder.request.PruneDirectory(node.directory) {
+		return discoveryWalkResult{directoriesPruned: 1}
+	}
 	if builder.isGloballyIgnoredDirectory(node.ownerPath, node.directory, node.canonicalDirectory) {
 		return discoveryWalkResult{directoriesPruned: 1}
 	}

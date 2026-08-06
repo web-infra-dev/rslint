@@ -44,10 +44,27 @@ permissions:
   contents: read
 
 jobs:
+  resolve-revision:
+    name: Resolve immutable release revision
+    runs-on: ubuntu-22.04
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - name: Checkout requested branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Record release commit
+        id: revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   publish-npm:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [build, napi-build]
+    needs: [resolve-revision, build, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
@@ -70,7 +87,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-revision.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
@@ -112,13 +129,50 @@ jobs:
           git tag v$version -m "v$version"
           git push origin v$version
 
+  package-extension:
+    # Extension-only releases must not wait for native matrices. Combined
+    # releases, however, publish the editor only after npm succeeds so users
+    # can install the core runtime the new extension expects.
+    needs: [resolve-revision, publish-npm]
+    if: ${{ always() && needs.resolve-revision.result == 'success' && (inputs.to_release == 'extension' || (inputs.to_release == 'all' && needs.publish-npm.result == 'success')) }}
+    name: Package universal editor extension
+    runs-on: rspack-ubuntu-22.04-large
+    outputs:
+      sha: ${{ steps.packaged-revision.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.resolve-revision.outputs.sha }}
+          submodules: true
+
+      - name: Record packaged revision
+        id: packaged-revision
+        env:
+          RELEASE_REVISION: ${{ needs.resolve-revision.outputs.sha }}
+        run: echo "sha=$RELEASE_REVISION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build and validate the universal VSIX
+        run: |
+          if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
+            pnpm publish:vsce --prerelease --dry-run
+          else
+            pnpm publish:vsce --dry-run
+          fi
+      - name: Upload universal VSIX
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rslint-extension-vsix
+          path: packages/vscode-extension/rslint-*.vsix
+          if-no-files-found: error
+
   publish-extension-vscode:
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
-    # napi-build supplies the per-platform parser `.node` (downloaded into
-    # `binaries/native-<tuple>/`) that publish-marketplace.mjs stages into the
-    # eslint-plugin worker payload; without it the packaged plugin host can't load.
-    needs: [build, napi-build]
+    needs: [package-extension]
+    name: ${{ inputs.dry_run == true && 'Dry Run - VS Code Marketplace' || 'Publish VS Code Marketplace' }}
     runs-on: rspack-ubuntu-22.04-large
     environment: release
     steps:
@@ -126,83 +180,69 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.package-extension.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Download Artifact
+      - name: Download universal VSIX
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          path: binaries
+          name: rslint-extension-vsix
+          path: packages/vscode-extension
 
-      - name: Build and publish to Microsoft VS Code Marketplace
+      - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.RSLINT_VSCE_PAT }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🚀 DRY RUN: Building and packaging VS Code extension without publishing..."
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:vsce --prerelease --dry-run
-            else
-              pnpm publish:vsce --dry-run
-            fi
-          else
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:vsce --prerelease
-            else
-              pnpm publish:vsce
-            fi
+          flags="--skip-package"
+          if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
+            flags="$flags --prerelease"
           fi
-      - name: Upload VSCE artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          path: packages/vscode-extension/rslint-*.vsix
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            flags="$flags --dry-run"
+          fi
+          pnpm publish:vsce $flags
 
   publish-extension-open-vsx:
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    # Same as publish-extension-vscode: needs the per-platform parser `.node`.
-    needs: [build, napi-build]
-    runs-on: ubuntu-22.04
+    needs: [package-extension]
+    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Registry' || 'Publish Open VSX Registry' }}
+    runs-on: rspack-ubuntu-22.04-large
     environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.package-extension.outputs.sha }}
           submodules: true
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Download Artifact
+      - name: Download universal VSIX
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          path: binaries
+          name: rslint-extension-vsix
+          path: packages/vscode-extension
 
-      - name: Build and publish to Open VSX Registry
+      - name: Publish to Open VSX Registry
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🚀 DRY RUN: Building and packaging for Open VSX Registry without publishing..."
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:ovsx --prerelease --dry-run
-            else
-              pnpm publish:ovsx --dry-run
-            fi
-          else
-            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
-              pnpm publish:ovsx --prerelease
-            else
-              pnpm publish:ovsx
-            fi
+          flags="--skip-package"
+          if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
+            flags="$flags --prerelease"
           fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            flags="$flags --dry-run"
+          fi
+          pnpm publish:ovsx $flags
 
   build:
+    needs: [resolve-revision]
+    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     env:
       GOMAXPROCS: 8
     name: Build-Binaries
@@ -240,7 +280,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-revision.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js
@@ -306,6 +346,8 @@ jobs:
   # legs use --use-napi-cross (@napi-rs/cross-toolchain, gnu-only); musl uses
   # -x (cargo-zigbuild) since cross-toolchain has no musl sysroot.
   napi-build:
+    needs: [resolve-revision]
+    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: Build napi (${{ matrix.settings.target }})
     strategy:
       fail-fast: false
@@ -344,7 +386,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ needs.resolve-revision.outputs.sha }}
           submodules: true
 
       - name: Setup Node.js

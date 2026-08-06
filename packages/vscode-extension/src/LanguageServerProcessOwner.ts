@@ -1,10 +1,14 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import path from 'node:path';
 
-const GRACEFUL_EXIT_TIMEOUT_MS = 500;
+// The core editor sidecar gives its native Go child 500 ms before SIGKILL and
+// keeps a 1.5 s final self-exit bound. Do not kill the sidecar first: doing so
+// could orphan the native process it owns.
+const GRACEFUL_EXIT_TIMEOUT_MS = 1_750;
 const FORCED_EXIT_TIMEOUT_MS = 1_500;
 
-function hasExited(process: ChildProcessWithoutNullStreams): boolean {
-  return process.exitCode !== null || process.signalCode !== null;
+function hasExited(child: ChildProcessWithoutNullStreams): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
 }
 
 async function waitForClose(
@@ -29,31 +33,75 @@ async function waitForClose(
 }
 
 async function terminateProcess(
-  process: ChildProcessWithoutNullStreams,
+  child: ChildProcessWithoutNullStreams,
   closed: Promise<void>,
 ): Promise<void> {
-  if (!hasExited(process)) {
+  if (!hasExited(child)) {
     try {
-      process.kill('SIGTERM');
+      // EOF gives the LSP/Go child a portable graceful shutdown path. This is
+      // essential on Windows, where child.kill('SIGTERM') is an abrupt
+      // TerminateProcess and the sidecar never gets to reap its descendant.
+      child.stdin.end();
     } catch {
-      // The close check below distinguishes a process that raced to completion
-      // from one that still needs a forced termination attempt.
+      // The close check below handles a process that raced to completion.
+    }
+    if (process.platform !== 'win32') {
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // The close check below distinguishes a process that raced to completion
+        // from one that still needs a forced termination attempt.
+      }
     }
   }
   if (await waitForClose(closed, GRACEFUL_EXIT_TIMEOUT_MS)) return;
 
-  if (!hasExited(process)) {
-    try {
-      process.kill('SIGKILL');
-    } catch {
-      // Report only if the transport remains open after the bounded wait.
+  if (!hasExited(child)) {
+    if (process.platform === 'win32' && child.pid !== undefined) {
+      await forceKillWindowsTree(child.pid);
+    }
+    if (!hasExited(child)) {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // Report only if the transport remains open after the bounded wait.
+      }
     }
   }
   if (await waitForClose(closed, FORCED_EXIT_TIMEOUT_MS)) return;
 
   throw new Error(
-    `language server process ${String(process.pid)} did not close its transports after SIGKILL`,
+    `language server process ${String(child.pid)} did not close its transports after forced termination`,
   );
+}
+
+async function forceKillWindowsTree(pid: number): Promise<void> {
+  const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+  if (!systemRoot || !path.win32.isAbsolute(systemRoot)) return;
+  const taskkill = path.win32.join(systemRoot, 'System32', 'taskkill.exe');
+  await new Promise<void>((resolve) => {
+    const killer = spawn(taskkill, ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      try {
+        killer.kill('SIGKILL');
+      } catch {
+        // Completion is best-effort; the caller still verifies sidecar close.
+      }
+      finish();
+    }, FORCED_EXIT_TIMEOUT_MS);
+    killer.once('error', finish);
+    killer.once('close', finish);
+  });
 }
 
 /**
@@ -109,6 +157,7 @@ export class LanguageServerProcessOwner {
       cwd: this.cwd,
       env: this.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     const closed = new Promise<void>((resolve) => {
       child.once('close', () => {

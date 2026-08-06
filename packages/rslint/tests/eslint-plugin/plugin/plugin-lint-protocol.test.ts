@@ -1,6 +1,6 @@
 /**
  * Unit tests for the shared eslintPlugins lint boundary helpers used by
- * both the CLI host (engine.ts) and the LSP host (PluginLintPool.ts).
+ * both the CLI host (engine.ts) and the core-owned editor runtime.
  *
  * `buildPluginLintTasks` forwards each file's `configKey` verbatim — the
  * worker picks the right `LoadedPlugins` from its per-config map via that

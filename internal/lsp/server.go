@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -32,6 +33,19 @@ type ServerOptions struct {
 	In  Reader
 	Out Writer
 	Err io.Writer
+	// RuntimeRequest carries rslint's private Go↔Node requests (config
+	// evaluation and ESLint-plugin linting) outside the public LSP stream. The
+	// editor runtime supplied by @rslint/core installs this callback; ordinary
+	// LSP reverse requests such as capability registration continue to use
+	// stdin/stdout.
+	RuntimeRequest RuntimeRequestFunc
+	// RuntimeDone closes when the private editor-runtime transport is lost.
+	// Losing it invalidates config-generation atomicity, so the LSP process must
+	// exit and let the editor restart the complete sidecar generation.
+	RuntimeDone <-chan struct{}
+	// RuntimePnpPath is the active process-global Yarn PnP hook. Editor config
+	// discovery uses it to stop before nested, independently resolved domains.
+	RuntimePnpPath string
 
 	Cwd                string
 	FS                 vfs.FS
@@ -45,6 +59,10 @@ func NewServer(opts *ServerOptions) *Server {
 	if opts.Cwd == "" {
 		panic("Cwd is required")
 	}
+	runtimePnpPath := opts.RuntimePnpPath
+	if runtimePnpPath != "" {
+		runtimePnpPath = tspath.NormalizePath(runtimePnpPath)
+	}
 	return &Server{
 		r:                      opts.In,
 		w:                      opts.Out,
@@ -53,6 +71,9 @@ func NewServer(opts *ServerOptions) *Server {
 		outgoingQueue:          make(chan *lsproto.Message, 100),
 		pendingClientRequests:  make(map[jsonrpc.ID]pendingClientRequest),
 		pendingServerRequests:  make(map[jsonrpc.ID]chan *lsproto.ResponseMessage),
+		runtimeRequest:         opts.RuntimeRequest,
+		runtimeDone:            opts.RuntimeDone,
+		runtimePnpPath:         runtimePnpPath,
 		cwd:                    opts.Cwd,
 		fs:                     opts.FS,
 		defaultLibraryPath:     opts.DefaultLibraryPath,
@@ -70,6 +91,12 @@ func NewServer(opts *ServerOptions) *Server {
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}
 }
+
+// RuntimeRequestFunc is the private request boundary between the Go language
+// server and the Node editor runtime that owns config modules and JS workers.
+// It deliberately uses string method names and untyped JSON-shaped payloads so
+// the LSP package stays independent from a particular transport.
+type RuntimeRequestFunc func(ctx context.Context, method string, params any) (any, error)
 
 var (
 	_ project.Client = (*Server)(nil)
@@ -145,6 +172,9 @@ type Server struct {
 	pendingClientRequestsMu sync.Mutex
 	pendingServerRequests   map[jsonrpc.ID]chan *lsproto.ResponseMessage
 	pendingServerRequestsMu sync.Mutex
+	runtimeRequest          RuntimeRequestFunc
+	runtimeDone             <-chan struct{}
+	runtimePnpPath          string
 
 	cwd                string
 	fs                 vfs.FS
@@ -174,11 +204,8 @@ type Server struct {
 	// are the same filesystem paths stored in jsConfigs.
 	jsConfigOwnerResolver *config.ConfigOwnerResolver
 	// configDiscoveryActive becomes true after the first structurally valid
-	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
-	// config-scoped .gitignore watchers trigger a fresh transaction without
-	// sending reverse requests before the client installs its handlers. The
-	// extension remains the sole refresh owner for workspace/descendant JS and
-	// JSON changes.
+	// refresh. It lets watched config, dependency, and ignore changes trigger a
+	// fresh transaction only after the core runtime transport is ready.
 	configDiscoveryActive bool
 	// configDiscoveryHasLastGood distinguishes a committed catalog with at
 	// least one usable JS config from an empty catalog or the synthetic
@@ -189,6 +216,10 @@ type Server struct {
 	// the .gitignore view captured during its transaction. Before the first
 	// committed snapshot, the JSON startup config still uses the live policy.
 	configSnapshotIncludesGitignore bool
+	// runtimeDependencyRevision changes whenever package topology changes. It is
+	// carried only over the private editor-runtime transport so an unchanged
+	// config source cannot accidentally reuse workers after an install.
+	runtimeDependencyRevision uint64
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
@@ -216,13 +247,13 @@ type Server struct {
 	pendingLintURIs map[lsproto.DocumentUri]struct{}
 	lintTimer       *time.Timer
 
-	// eslintPluginDispatch sends one plugin-lint batch to the Node host over
-	// the `rslint/pluginLint` reverse request and decodes its result.
-	// nil until the first committed config transaction installs it. Safe to call from a
-	// goroutine (it only touches sendRequest, which is goroutine-safe).
+	// eslintPluginDispatch sends one plugin-lint batch to the Node runtime over
+	// the private pluginLint request and decodes its result.
+	// nil until the first committed config transaction installs it. Safe to call
+	// from a goroutine (RuntimeRequest is backed by the concurrent IPC channel).
 	eslintPluginDispatch linter.EslintPluginDispatcher
 	// eslintPluginConfigGeneration identifies the JS config and Node worker
-	// generation that must serve reverse plugin-lint requests. It changes only
+	// generation that must serve private plugin-lint requests. It changes only
 	// on a serialized config transaction and is captured before dispatching work
 	// to a goroutine.
 	eslintPluginConfigGeneration string
@@ -241,11 +272,11 @@ type Server struct {
 	// plugin-fix fold loop without spinning up a language service.
 	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error)
 
-	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
-	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across
+	// pluginReverseTimeout bounds each private eslint-plugin request to the
+	// runtime on BOTH paths: source.fixAll (summed across
 	// passes, where it runs on the dispatch loop as a blocking method) and the
 	// background diagnostics dispatch (per request). A wedged or mid-rebuild
-	// client that never answers would otherwise stall editor interaction or leak
+	// runtime that never answers would otherwise stall editor interaction or leak
 	// the dispatch goroutine + its pending-request entry. On expiry fixAll folds
 	// native-only fixes and the diagnostics dispatch is dropped. Zero means use
 	// defaultPluginReverseTimeout; tests set a small value to exercise the
@@ -260,8 +291,9 @@ type Server struct {
 
 	// inflightPluginDispatch tracks the in-flight background plugin dispatch per
 	// URI so a superseding keystroke (or a document close) can cancel it — both
-	// Go-side (free the goroutine + pending-request entry) and on the client (a
-	// $/cancelRequest so the Node worker stops instead of running to completion).
+	// Go-side (free the goroutine + pending-request entry) and in the core
+	// sidecar (a private cancel frame stops the worker instead of letting it run
+	// to completion).
 	// Guarded by inflightPluginDispatchMu.
 	inflightPluginDispatch   map[lsproto.DocumentUri]*pluginDispatchHandle
 	inflightPluginDispatchMu sync.Mutex
@@ -414,6 +446,16 @@ func (s *Server) Run() error {
 	s.backgroundCtx = ctx
 	g.Go(func() error { return s.dispatchLoop(ctx) })
 	g.Go(func() error { return s.writeLoop(ctx) })
+	if s.runtimeDone != nil {
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-s.runtimeDone:
+				return errors.New("private editor-runtime transport closed")
+			}
+		})
+	}
 
 	// Don't run readLoop in the group, as it blocks on stdin read and cannot be cancelled.
 	readLoopErr := make(chan error, 1)
@@ -594,7 +636,8 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 				if err := s.handleRequestOrNotification(requestCtx, req); err != nil {
 					if errors.Is(err, context.Canceled) {
 						s.sendError(req.ID, lsproto.ErrorCodeRequestCancelled)
-					} else if errors.Is(err, io.EOF) {
+					} else if errors.Is(err, io.EOF) || errors.Is(err, errRuntimeGenerationUncertain) || errors.Is(err, errRuntimeGenerationStuck) || errors.Is(err, errRuntimeInitializationFailed) {
+						s.Log("fatal runtime generation error", err)
 						lspExit()
 					} else {
 						s.sendError(req.ID, err)
@@ -666,17 +709,31 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 	}
 }
 
+func (s *Server) sendRuntimeRequest(ctx context.Context, method lsproto.Method, params any) (any, error) {
+	if s.runtimeRequest != nil {
+		return s.runtimeRequest(ctx, string(method), params)
+	}
+	return nil, fmt.Errorf("private editor-runtime transport is unavailable for %q", method)
+}
+
+func (s *Server) sendNotification(method lsproto.Method, params any) {
+	s.outgoingQueue <- (&lsproto.RequestMessage{
+		Method: method,
+		Params: params,
+	}).Message()
+}
+
 // pluginDispatchHandle is the cancel handle for an in-flight background plugin
-// dispatch. sendRequest forwards context cancellation to the client after the
-// reverse request has been queued.
+// dispatch. The private runtime transport forwards context cancellation after
+// the request has been queued.
 type pluginDispatchHandle struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 }
 
-// sendCancelRequest asks the client to cancel a reverse request so its worker
-// can stop instead of running to completion. It is best-effort: cancellation
-// must never block the caller when the outgoing queue is saturated.
+// sendCancelRequest asks the LSP client to cancel a standard reverse request.
+// It is best-effort: cancellation must never block the caller when the outgoing
+// queue is saturated. Private editor-runtime requests use ipc.KindCancel.
 func (s *Server) sendCancelRequest(id *jsonrpc.ID) {
 	var raw lsproto.IntegerOrString
 	if n, ok := id.TryInt(); ok {
@@ -746,22 +803,6 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
 
-	handlers[methodConfigRefresh] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
-		if req.ID == nil {
-			return fmt.Errorf("%w: rslint/configRefresh must be a request", lsproto.ErrorCodeInvalidRequest)
-		}
-		params, err := decodeParams[configRefreshRequest](req)
-		if err != nil {
-			return err
-		}
-		response, err := s.handleConfigRefresh(ctx, params)
-		if err != nil {
-			return err
-		}
-		s.sendResult(req.ID, response)
-		return nil
-	}
-
 	return handlers
 })
 
@@ -828,16 +869,15 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 	}
 }
 
-// defaultPluginReverseTimeout caps each eslint-plugin reverse request to the
-// client — the source.fixAll passes (summed) and each background diagnostics
+// defaultPluginReverseTimeout caps each eslint-plugin request to the core
+// editor runtime — the source.fixAll passes (summed) and each background diagnostics
 // dispatch. It is a generous BACKSTOP, not a precise budget: a superseded
 // diagnostics dispatch is already discarded by the generation stamp, so this
-// only has to bound a client that is genuinely wedged (never answers and is
+// only has to bound an editor runtime that is genuinely wedged (never answers and is
 // never superseded). 30s sits well above any legitimate single-file plugin lint
 // — so a slow-but-valid lint is never cut off — while still freeing a dead
-// client's goroutine and unblocking the fixAll dispatch loop in bounded time.
-// (Fine-grained supersede cancellation via $/cancelRequest, which would let this
-// be tightened, is a separate follow-up; see dispatchPluginLint.)
+// runtime's goroutine and unblocking the fixAll dispatch loop in bounded time.
+// Fine-grained supersede cancellation is forwarded over private IPC.
 const defaultPluginReverseTimeout = 30 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {
@@ -849,10 +889,7 @@ func isBlockingMethod(method lsproto.Method) bool {
 		lsproto.MethodTextDocumentDidSave,
 		lsproto.MethodTextDocumentDidClose,
 		lsproto.MethodWorkspaceDidChangeWatchedFiles,
-		lsproto.MethodTextDocumentCodeAction,
-		// Config commits write maps that document handlers read lock-free, so
-		// refresh transactions run on the same serialized dispatch loop.
-		methodConfigRefresh:
+		lsproto.MethodTextDocumentCodeAction:
 		return true
 	}
 	return false

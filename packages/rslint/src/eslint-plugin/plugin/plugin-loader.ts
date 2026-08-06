@@ -57,9 +57,8 @@ import {
  *      user at either upgrading Node or `npm install -D jiti`.
  *
  * Cache-busting `?t=Date.now()`: NOT used here. Worker init imports
- * each config once per worker lifetime; long-running LSP sessions
- * rebuild the worker pool via PluginLintPool when configs change
- * (host-side mtime + size fingerprint), so the host already controls
+ * each config once per worker lifetime; long-running editor sessions rebuild
+ * the core-owned worker generation when configs change, so the host controls
  * staleness. Re-importing with `?t=` would mean every reconfigure
  * pays a fresh module-graph build (≈300 ms for unicorn /
  * typescript-eslint per worker) instead of relying on Node's ESM

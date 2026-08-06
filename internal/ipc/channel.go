@@ -121,12 +121,17 @@ type Channel struct {
 	done     chan struct{}      // closed when the channel shuts down
 	inCtx    context.Context    // ctx passed to inbound handlers
 	inCancel context.CancelFunc // cancels inCtx on close
+	// Cancellation is best-effort, but it must also be memory-bounded under a
+	// rapid editor supersede storm. One worker preserves notification order and
+	// caps blocked-write concurrency at one goroutine.
+	cancelQueue chan int
 }
 
 // defaultWriteTimeout bounds a single frame write so a wedged (alive but
 // non-draining) peer can't block a write forever. Re-armed per write in
 // writeFrame; only applies to writers that support SetWriteDeadline.
 const defaultWriteTimeout = 30 * time.Second
+const cancelQueueCapacity = 256
 
 var (
 	errTerminalResponse = errors.New("ipc: writes sealed after terminal response")
@@ -147,6 +152,7 @@ func NewChannel(r io.Reader, w io.Writer) *Channel {
 		inCtx:          ctx,
 		inCancel:       cancel,
 		writeTimeout:   defaultWriteTimeout,
+		cancelQueue:    make(chan int, cancelQueueCapacity),
 	}
 }
 
@@ -178,9 +184,14 @@ func (c *Channel) RegisterNotification(kind MessageKind, h NotificationHandler) 
 // loop runs until EOF / transport error / Close.
 func (c *Channel) Start() {
 	c.mu.Lock()
+	if c.started || c.closed {
+		c.mu.Unlock()
+		return
+	}
 	c.started = true
 	c.mu.Unlock()
 	go c.readLoop()
+	go c.cancelLoop()
 }
 
 // Done returns a channel closed when the transport shuts down.
@@ -239,11 +250,39 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 		c.mu.Lock()
 		delete(c.pending, id)
 		c.mu.Unlock()
+		// The caller must return promptly even if the peer stopped draining its
+		// pipe. A bounded single-worker queue makes propagation best-effort without
+		// creating one blocked writer goroutine per superseded editor request.
+		c.queueCancellation(id)
 		return nil, ctx.Err()
 	case <-c.done:
 		// closeErr is set before close(c.done); the channel-close
 		// happens-before edge makes this read safe without the mutex.
 		return nil, c.closeErr
+	}
+}
+
+func (c *Channel) queueCancellation(id int) {
+	select {
+	case c.cancelQueue <- id:
+	default:
+		// Best-effort: the caller is already cancelled and stale-result generation
+		// guards preserve correctness if a saturated queue drops this hint.
+	}
+}
+
+func (c *Channel) cancelLoop() {
+	for {
+		select {
+		case <-c.done:
+			return
+		case id := <-c.cancelQueue:
+			if err := c.SendNotification(KindCancel, struct {
+				ID int `json:"id"`
+			}{ID: id}); err != nil {
+				return
+			}
+		}
 	}
 }
 

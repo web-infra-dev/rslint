@@ -47,6 +47,7 @@ const librarySurface = {
       service: './src/service/service.ts',
       internal: './src/internal/node.ts',
       'config-loader': './src/config/config-loader.ts',
+      'editor-runtime': './src/editor-runtime/editor-runtime.ts',
       cli: './src/cli/cli.ts',
     },
   },

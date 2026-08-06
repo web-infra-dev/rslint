@@ -20,14 +20,18 @@ import (
 )
 
 const (
-	methodConfigRefresh   = lsproto.Method("rslint/configRefresh")
 	methodLoadConfigs     = lsproto.Method("rslint/loadConfigs")
 	methodActivateConfigs = lsproto.Method("rslint/activateConfigs")
 	methodCommitConfigs   = lsproto.Method("rslint/commitConfigs")
 	methodAbortConfigs    = lsproto.Method("rslint/abortConfigs")
 
 	configTransactionControlTimeout = 5 * time.Second
+	configTransactionWorkTimeout    = 30 * time.Second
 )
+
+var errRuntimeGenerationUncertain = errors.New("editor-runtime generation commit is uncertain")
+var errRuntimeGenerationStuck = errors.New("editor-runtime config transaction timed out")
+var errRuntimeInitializationFailed = errors.New("editor-runtime initial config generation failed")
 
 type configRefreshRequest struct {
 	ProtocolVersion int    `json:"protocolVersion"`
@@ -49,6 +53,11 @@ type configTransactionControlRequest struct {
 	TransactionID   string `json:"transactionId"`
 }
 
+type runtimeConfigActivationRequest struct {
+	discovery.ConfigActivationRequest
+	DependencyRevision uint64 `json:"dependencyRevision"`
+}
+
 type configCommitWireResponse struct {
 	TransactionID string `json:"transactionId"`
 	Committed     bool   `json:"committed"`
@@ -60,7 +69,7 @@ type configAbortWireResponse struct {
 }
 
 // lspConfigModuleLoader adapts the shared discovery coordinator's loader
-// boundary to LSP reverse requests. One instance belongs to exactly one
+// boundary to private editor-runtime requests. One instance belongs to exactly one
 // configRefresh transaction.
 type lspConfigModuleLoader struct {
 	server         *Server
@@ -77,7 +86,7 @@ func (loader *lspConfigModuleLoader) LoadConfigs(
 	if err := loader.observeTransaction(request.TransactionID); err != nil {
 		return discovery.ConfigLoadBatchResponse{}, err
 	}
-	raw, err := loader.server.sendRequest(ctx, methodLoadConfigs, request)
+	raw, err := loader.server.sendRuntimeRequest(ctx, methodLoadConfigs, request)
 	if err != nil {
 		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("load config modules: %w", err)
 	}
@@ -103,7 +112,10 @@ func (loader *lspConfigModuleLoader) ActivateConfigs(
 	if err := loader.observeTransaction(request.TransactionID); err != nil {
 		return discovery.ConfigActivationResponse{}, err
 	}
-	raw, err := loader.server.sendRequest(ctx, methodActivateConfigs, request)
+	raw, err := loader.server.sendRuntimeRequest(ctx, methodActivateConfigs, runtimeConfigActivationRequest{
+		ConfigActivationRequest: request,
+		DependencyRevision:      loader.server.runtimeDependencyRevision,
+	})
 	if err != nil {
 		return discovery.ConfigActivationResponse{}, fmt.Errorf("activate config modules: %w", err)
 	}
@@ -122,7 +134,7 @@ func (loader *lspConfigModuleLoader) ActivateConfigs(
 		if !loader.server.configDiscoveryHasLastGood {
 			// On first startup, a valid JS catalog must not take down the entire
 			// language client merely because the optional community-plugin worker
-			// could not initialize. PluginLintPool staged a retryable no-host
+			// could not initialize. The core editor pool staged a retryable no-host
 			// generation; commit the native/semantic config atomically with it and
 			// expose no plugin metadata. Once any usable catalog exists, the
 			// normal last-good rule applies and a failed replacement aborts.
@@ -132,7 +144,7 @@ func (loader *lspConfigModuleLoader) ActivateConfigs(
 				TransactionID: response.TransactionID,
 			}, nil
 		}
-		return discovery.ConfigActivationResponse{}, errors.New("client could not prepare the config plugin host")
+		return discovery.ConfigActivationResponse{}, errors.New("editor runtime could not prepare the config plugin host")
 	}
 	loader.activated = true
 	return discovery.ConfigActivationResponse{
@@ -217,7 +229,7 @@ func (loader *lspConfigModuleLoader) commit(ctx context.Context, transactionID s
 		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 		TransactionID:   transactionID,
 	}
-	raw, err := loader.server.sendRequest(ctx, methodCommitConfigs, request)
+	raw, err := loader.server.sendRuntimeRequest(ctx, methodCommitConfigs, request)
 	if err != nil {
 		return fmt.Errorf("commit config transaction: %w", err)
 	}
@@ -243,7 +255,7 @@ func (loader *lspConfigModuleLoader) abort(ctx context.Context, transactionID st
 		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 		TransactionID:   transactionID,
 	}
-	raw, err := loader.server.sendRequest(ctx, methodAbortConfigs, request)
+	raw, err := loader.server.sendRuntimeRequest(ctx, methodAbortConfigs, request)
 	if err != nil {
 		return fmt.Errorf("abort config transaction: %w", err)
 	}
@@ -305,11 +317,14 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	default:
 		return configRefreshResponse{}, fmt.Errorf("unsupported config refresh reason %q", request.Reason)
 	}
+	if request.Reason == "dependency-change" {
+		s.runtimeDependencyRevision++
+	}
 	if s.fs == nil {
 		return configRefreshResponse{}, errors.New("config refresh requires a filesystem")
 	}
 	// Set this before doing fallible discovery: a failed initial transaction is
-	// still proof that the client installed the reverse handlers, and a later
+	// still proof that the runtime transport is installed, and a later
 	// config or config-scoped .gitignore event must retry while keeping last-good.
 	s.configDiscoveryActive = true
 
@@ -320,9 +335,10 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
 	catalog, err := discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
-		CWD:         tspath.NormalizePath(s.cwd),
-		ImplicitCWD: true,
-		Fresh:       true,
+		CWD:            tspath.NormalizePath(s.cwd),
+		ImplicitCWD:    true,
+		Fresh:          true,
+		PruneDirectory: s.runtimeConfigDirectoryPruner(),
 	})
 	recoveredUnavailable := false
 	var unavailableCause error
@@ -394,7 +410,11 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	controlCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), configTransactionControlTimeout)
 	defer cancel()
 	if err := loader.commit(controlCtx, catalog.TransactionID); err != nil {
-		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, catalog.TransactionID, err)
+		// commitConfigs mutates Node before its reply is observable. Any failure
+		// here could therefore mean Node committed while Go retained the previous
+		// catalog. Do not attempt to limp on or "abort" an already-active Node
+		// generation; terminate this sidecar generation so both halves restart.
+		return configRefreshResponse{}, errors.Join(errRuntimeGenerationUncertain, err)
 	}
 
 	s.commitDiscoveredConfigSnapshot(ctx, snapshot)
@@ -414,6 +434,60 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	return configRefreshResponse{
 		TransactionID: catalog.TransactionID,
 	}, nil
+}
+
+// A Yarn PnP hook is process-global. A sidecar may recursively discover only
+// the domain whose hook it started with; evaluating a nested domain's config
+// under the outer hook is both semantically wrong and a source of duplicate
+// plugin workers. Non-editor config discovery has no runtime transport and
+// retains the ordinary unbounded walk.
+func (s *Server) runtimeConfigDirectoryPruner() func(string) bool {
+	if s.runtimeRequest == nil {
+		return nil
+	}
+	return func(directory string) bool {
+		var boundary string
+		for _, name := range []string{".pnp.cjs", ".pnp.js"} {
+			candidate := tspath.CombinePaths(directory, name)
+			if s.fs.FileExists(candidate) {
+				boundary = s.fs.Realpath(candidate)
+				if boundary == "" {
+					boundary = candidate
+				}
+				break
+			}
+		}
+		if boundary == "" {
+			return false
+		}
+		if s.runtimePnpPath == "" {
+			return true
+		}
+		return !pathStringsEqual(
+			tspath.NormalizePath(boundary),
+			s.runtimePnpPath,
+			s.fs.UseCaseSensitiveFileNames(),
+		)
+	}
+}
+
+// A project config is executable code and can contain a non-settling import or
+// top-level await. Bound the whole load/activate transaction. If this deadline
+// wins, abort is best-effort but the Node import itself may still be alive, so
+// the coupled Go/Node generation must restart instead of accumulating detached
+// work while pretending the previous catalog is healthy.
+func (s *Server) handleRuntimeConfigRefresh(ctx context.Context, params any) (configRefreshResponse, error) {
+	return s.handleRuntimeConfigRefreshWithin(ctx, params, configTransactionWorkTimeout)
+}
+
+func (s *Server) handleRuntimeConfigRefreshWithin(ctx context.Context, params any, timeout time.Duration) (configRefreshResponse, error) {
+	refreshCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	response, err := s.handleConfigRefresh(refreshCtx, params)
+	if errors.Is(refreshCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+		return configRefreshResponse{}, errors.Join(errRuntimeGenerationStuck, err)
+	}
+	return response, err
 }
 
 func (s *Server) failureAtCommittedConfigBoundary(
@@ -630,7 +704,7 @@ func hasUsableLexicalConfigAncestor(
 }
 
 func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *lspDiscoveredConfigSnapshot) {
-	// No fallible work remains after the client commits its staged plugin host.
+	// No fallible work remains after the editor runtime commits its staged plugin host.
 	// The serialized dispatch loop makes this map swap atomic to every document
 	// and code-action handler.
 	s.invalidateOpenDocumentDiagnostics()

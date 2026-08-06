@@ -10,17 +10,13 @@ import { platformTuple } from '../../src/eslint-plugin/native/platform-tuple.js'
 /**
  * Packaged-layout isolation guard.
  *
- * The VS Code extension does NOT ship `@rslint/core`; instead `build.js` stages
- * the built `dist/eslint-plugin/` worker bundle into the vsix together with a
- * nested `node_modules/@rslint/native-<tuple>/` platform package (the napi
- * `.node` + a minimal package.json), so the worker's loader resolves it from
- * THERE rather than from a workspace `node_modules`. The original bug was that
- * this worked in dev (the dev host has the workspace package) but silently
- * produced zero diagnostics once packaged. The normal worker-pool e2e suites
- * can't catch a regression of this because they resolve the platform package
- * from the workspace.
+ * The VS Code extension deliberately ships no core or native payload. The
+ * installed `@rslint/core` package owns `dist/eslint-plugin/`, while its
+ * optional `@rslint/native-<tuple>` dependency is resolved from that package's
+ * surrounding `node_modules`. The normal worker-pool e2e suites cannot catch a
+ * broken published-package walk-up because they resolve through the workspace.
  *
- * This test reproduces the packaged layout under `os.tmpdir()` — OFF any
+ * This test reproduces the installed core layout under `os.tmpdir()` — OFF any
  * `@rslint/core` / workspace `node_modules` resolution path — and runs the host
  * in a SUBPROCESS (so it neither inherits this suite's `setWorkerEntryForTests`
  * override nor any in-process module cache). It asserts the worker loads the
@@ -60,16 +56,15 @@ const CONFIG = `import lp from './local-plugin.mjs';
 export default [{ plugins: { pkg: lp } }];
 `;
 
-// The runner imports the STAGED host by a path relative to its own location, so
-// the worker's loader resolves the platform package by walking up from the
-// staged worker into the staged nested node_modules — exactly the packaged
-// resolution path.
+// The runner imports the staged core host by a path relative to its own
+// location, so the worker's loader must find the package-level optional native
+// dependency through ordinary Node walk-up resolution.
 const RUNNER = `import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfgDir = path.join(here, 'cfg');
 const { createPluginLintHost } = await import(
-  pathToFileURL(path.join(here, 'eslint-plugin', 'index.js')).href
+  pathToFileURL(path.join(here, 'dist', 'eslint-plugin', 'index.js')).href
 );
 const host = await createPluginLintHost([
   { configPath: path.join(cfgDir, 'rslint.config.mjs'), configDirectory: cfgDir },
@@ -91,7 +86,7 @@ if (d.length === 1 && d[0].ruleName === 'pkg/no-null') {
 }
 `;
 
-/** Stage a packaged layout under `root`; omit the nested native for the negative control. */
+/** Stage an installed core layout; omit its optional native for the negative control. */
 function stage(root: string, opts: { withNative: boolean }): void {
   const coreEpDir = path.resolve(__dirname, '../../dist/eslint-plugin');
   if (!fs.existsSync(path.join(coreEpDir, 'index.js'))) {
@@ -100,10 +95,10 @@ function stage(root: string, opts: { withNative: boolean }): void {
         '`pnpm --filter @rslint/core build:js`) before this test',
     );
   }
-  const epDest = path.join(root, 'eslint-plugin');
+  const epDest = path.join(root, 'dist', 'eslint-plugin');
   fs.cpSync(coreEpDir, epDest, { recursive: true });
   fs.writeFileSync(
-    path.join(epDest, 'package.json'),
+    path.join(root, 'package.json'),
     JSON.stringify({ type: 'module' }),
   );
 
@@ -111,7 +106,7 @@ function stage(root: string, opts: { withNative: boolean }): void {
     // Stage the host platform package `@rslint/native-<tuple>` (minimal
     // package.json + the `.node` under its real name) — what the worker's
     // loader resolves at runtime.
-    const nativeDir = path.join(epDest, 'node_modules', '@rslint', PKG_BASE);
+    const nativeDir = path.join(root, 'node_modules', '@rslint', PKG_BASE);
     fs.mkdirSync(nativeDir, { recursive: true });
     const srcPkgDir = path.dirname(
       require.resolve(`@rslint/${PKG_BASE}/package.json`),
@@ -144,7 +139,7 @@ function stage(root: string, opts: { withNative: boolean }): void {
 // win32 kill-switch as the worker-pool e2e suites (flag is false → runs on
 // win32 too, validating the napi-teardown mitigation).
 describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
-  'packaged-layout isolation (vsix eslint-plugin worker)',
+  'packaged-layout isolation (@rslint/core eslint-plugin worker)',
   () => {
     let tmp: string;
     beforeAll(() => {
@@ -155,7 +150,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     });
 
     test(
-      'worker loads the platform package from the nested node_modules and a plugin rule fires',
+      'worker loads the package-level optional native and a plugin rule fires',
       () => {
         const root = path.join(tmp, 'ok');
         fs.mkdirSync(root, { recursive: true });
@@ -163,9 +158,9 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         // timeout + SIGKILL so a worker wedged in native teardown (the win32
         // abort this validates) fails loudly instead of hanging CI forever.
         // Clear NODE_PATH: rstest injects it pointing at the pnpm virtual store
-        // (which holds the workspace platform packages), but a packaged vsix has
-        // none. Clearing it reproduces the real packaged resolution — nested
-        // walk-up only — for this test and the negative control below.
+        // (which holds the workspace platform packages), but a consumer install
+        // must use core's optional dependency. Clearing it reproduces that
+        // package-local walk-up for this test and the negative control below.
         const result = spawnSync(process.execPath, ['runner.mjs'], {
           cwd: root,
           encoding: 'utf8',
@@ -184,7 +179,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     );
 
     test(
-      'without the nested platform package the host fails (no workspace fallback)',
+      'without the optional platform package the host fails (no workspace fallback)',
       () => {
         const root = path.join(tmp, 'no-native');
         fs.mkdirSync(root, { recursive: true });

@@ -25,8 +25,7 @@ export type MessageKind =
   | 'handshake'
   | 'exit'
   // ── CLI host-process IPC kinds ──
-  // (Go child ↔ Node parent over stdio. The LSP path is NOT wired
-  //  through these frames — it uses LSP custom requests instead.)
+  // (Go child ↔ Node parent over a private framed transport.)
   | 'init'
   | 'cancel'
   | 'output'
@@ -36,6 +35,8 @@ export type MessageKind =
   // logical payload is used by the API and LSP adapters.
   | 'loadConfigs'
   | 'activateConfigs'
+  | 'commitConfigs'
+  | 'abortConfigs'
   // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
   // files in the worker pool and return the diagnostics.
   | 'pluginLint';
@@ -66,6 +67,7 @@ export interface ErrorResponseData {
  */
 export type InboundRequestHandler<TIn = unknown, TOut = unknown> = (
   msg: IpcMessage<TIn>,
+  signal?: AbortSignal,
 ) => Promise<TOut> | TOut;
 
 /**

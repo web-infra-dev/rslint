@@ -45,6 +45,12 @@ type ConfigDiscoveryRequest struct {
 	CWD         string
 	Files       []DiscoveryFile
 	Directories []string
+	// PruneDirectory is an optional, concurrency-safe host boundary. Returning
+	// true prevents the directory's config and descendants from entering this
+	// catalog. The editor uses it to keep one process-global Yarn PnP hook from
+	// evaluating configs in a nested, independently resolved PnP domain; CLI/API
+	// leave it nil.
+	PruneDirectory func(string) bool
 	// LimitDirectoryWalkToFiles is used when a host has already expanded its
 	// directory/glob inputs to an exact target set. Only target-ancestor branches
 	// can govern that request. CLI/LSP directory roots leave this false and retain

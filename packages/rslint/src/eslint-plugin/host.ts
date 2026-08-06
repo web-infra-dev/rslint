@@ -1,10 +1,9 @@
 /**
  * Plugin-lint host: owns a {@link WorkerPool} and answers the reverse
  * `pluginLint` requests Go sends. Shared by BOTH hosts that own a
- * pool — the CLI engine (`packages/rslint/src/cli/engine.ts`, over the IPC
- * channel) and the VS Code extension's PluginLintPool (over the LSP
- * `rslint/pluginLint` request) — so the request→tasks→result
- * boundary lives in exactly one place.
+ * pool — the CLI engine (`packages/rslint/src/cli/engine.ts`) and the core
+ * editor runtime (over its private Go↔Node channel) — so the
+ * request→tasks→result boundary lives in exactly one place.
  */
 import { WorkerPool, type WorkerPoolOptions } from './worker-pool.js';
 import {
@@ -18,9 +17,8 @@ import type { ConfigDescriptor } from './types.js';
 export interface PluginLintHost {
   /**
    * Run one reverse batch: build per-file tasks, lint, project results. An
-   * optional AbortSignal cancels the dispatched worker tasks — the LSP path
-   * wires it to a superseding keystroke / document close so the worker stops
-   * instead of running to completion.
+   * optional AbortSignal cancels the dispatched worker tasks. The editor
+   * runtime wires it to a superseding keystroke or document close.
    */
   lint(
     req: EslintPluginLintRequest,

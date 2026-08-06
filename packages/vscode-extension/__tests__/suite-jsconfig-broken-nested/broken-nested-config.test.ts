@@ -101,7 +101,7 @@ export default [];
     );
 
     // This URI does not exist until after the broken module has executed, so
-    // its diagnostics cannot be a stale snapshot. configRefresh and didOpen
+    // its diagnostics cannot be a stale snapshot. Config discovery and didOpen
     // share the serialized server dispatch loop, so this later didOpen cannot
     // run until the transaction that observed the broken child has finished.
     fs.writeFileSync(postFailureFilePath, 'debugger;\n', 'utf8');

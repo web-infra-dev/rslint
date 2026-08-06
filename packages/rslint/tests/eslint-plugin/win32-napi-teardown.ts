@@ -8,10 +8,10 @@
  * which should remove that race.
  *
  * This flag is `false` so the suites RUN on win32 in CI, validating that
- * mitigation before the packaged VS Code extension ships the same addon in its
- * eslint-plugin worker on the win32 vsix (a forced terminate is reachable in
- * production via the per-task timeout / crash-respawn paths). If win32 CI shows
- * the abort returns, flip this to `true` to restore the skip and gate
- * eslintPlugins off on win32 in the extension's PluginLintPool.
+ * mitigation before the published core package runs the same addon in its
+ * editor/CLI workers (a forced terminate is reachable via per-task timeout or
+ * crash-respawn paths). If win32 CI shows the abort returns, flip this to
+ * `true` to restore the skip and gate eslintPlugins off on win32 in the core
+ * editor runtime's plugin pool.
  */
 export const SKIP_WIN32_NAPI_TEARDOWN = false;

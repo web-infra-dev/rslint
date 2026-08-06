@@ -13,6 +13,12 @@ if (enableCompileCache) {
 }
 
 async function main() {
+  if (process.argv[2] === '--lsp') {
+    const { runEditorRuntime, scheduleEditorRuntimeProcessExit } =
+      await import('../dist/editor-runtime.js');
+    scheduleEditorRuntimeProcessExit(await runEditorRuntime());
+    return;
+  }
   const { runCLI } = await import('../dist/cli.js');
   await runCLI();
 }

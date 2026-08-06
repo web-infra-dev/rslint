@@ -152,9 +152,23 @@ async function main(): Promise<void> {
   // Resolve the compatible stable release once so every suite explicitly uses
   // the same executable and repeated runTests() calls avoid redundant
   // compatibility/cache resolution.
-  const vscodeExecutablePath = await downloadAndUnzipVSCode({
+  let vscodeExecutablePath = await downloadAndUnzipVSCode({
     extensionDevelopmentPath,
   });
+  // VS Code 1.132 renamed the macOS launcher from Electron to Code before the
+  // current @vscode/test-electron path helper learned the new basename.
+  if (process.platform === 'darwin') {
+    try {
+      await fs.promises.access(vscodeExecutablePath, fs.constants.X_OK);
+    } catch {
+      const renamedExecutable = path.join(
+        path.dirname(vscodeExecutablePath),
+        'Code',
+      );
+      await fs.promises.access(renamedExecutable, fs.constants.X_OK);
+      vscodeExecutablePath = renamedExecutable;
+    }
+  }
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
   const suites: TestSuite[] = [
     {
@@ -224,9 +238,26 @@ async function main(): Promise<void> {
       tests: path.resolve(__dirname, './suite-unicode-bom'),
     },
   ];
+  const requestedSuites = new Set(
+    (process.env.RSLINT_VSCODE_TEST_SUITES ?? '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
+  );
+  const selectedSuites =
+    requestedSuites.size === 0
+      ? suites
+      : suites.filter((suite) => requestedSuites.has(suite.name));
+  if (selectedSuites.length !== (requestedSuites.size || suites.length)) {
+    const known = new Set(suites.map((suite) => suite.name));
+    const unknown = [...requestedSuites].filter((name) => !known.has(name));
+    throw new Error(
+      `Unknown RSLINT_VSCODE_TEST_SUITES value(s): ${unknown.join(', ')}`,
+    );
+  }
 
   const failures: unknown[] = [];
-  for (const suite of suites) {
+  for (const suite of selectedSuites) {
     try {
       await runIsolatedSuite(
         extensionDevelopmentPath,

@@ -448,9 +448,8 @@ export class WorkerPool {
    *   (cancelSlot acquired, `inflight` populated) but BEFORE the task
    *   is posted to the worker. Two use cases:
    *
-   *     1. **ID bookkeeping** — callers that need a list of dispatched
-   *        ids (e.g. the VS Code extension host mapping LSP
-   *        `$/cancelRequest` reqId → taskId) collect them here.
+   *     1. **ID bookkeeping** — callers that need a list of dispatched ids for
+   *        AbortSignal-to-worker cancellation collect them here.
    *
    *     2. **Cancel-before-start** — callers that have observed a
    *        cancel signal mid-dispatch can call `cancelTask(taskId)` from
@@ -484,9 +483,9 @@ export class WorkerPool {
       throw new Error('WorkerPool: not initialized');
 
     // Enqueue every task synchronously (no awaits before this loop
-    // finishes — `onTaskDispatched` runs in caller order so the
-    // VS Code extension's reqId→taskId map stays consistent with the
-    // input array). `cancelTask` works against in-queue entries too,
+    // finishes — `onTaskDispatched` runs in caller order so the host's
+    // cancellation bookkeeping stays consistent with the input array).
+    // `cancelTask` works against in-queue entries too,
     // so callers can cancel before the task ever hits a worker.
     const promises = tasks.map(
       async (task) =>
@@ -696,9 +695,11 @@ export class WorkerPool {
       if (w.exited) return;
       return new Promise<void>((resolveOk) => {
         const t = setTimeout(() => {
-          void terminateWorker(w.worker).finally(() => {
-            resolveOk();
-          });
+          const finishTermination = (): void => resolveOk();
+          void terminateWorker(w.worker).then(
+            finishTermination,
+            finishTermination,
+          );
         }, WORKER_EXIT_GRACE_MS);
         w.worker.once('exit', () => {
           clearTimeout(t);
@@ -1042,7 +1043,10 @@ export class WorkerPool {
         // the closed-branch teardown above) instead of returning while
         // the replacement thread is still booting.
         this.respawns.add(respawnP);
-        void respawnP.finally(() => this.respawns.delete(respawnP));
+        const forgetRespawn = (): void => {
+          this.respawns.delete(respawnP);
+        };
+        void respawnP.then(forgetRespawn, forgetRespawn);
       } else if (slot.crashCount >= this.opts.retryCap) {
         this.opts.onLog?.({
           level: 'error',

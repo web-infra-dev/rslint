@@ -304,6 +304,34 @@ func TestConfigDiscoveryReadsGitignoreAndPrunesHiddenConfig(t *testing.T) {
 	}
 }
 
+func TestConfigDiscoveryHostBoundaryPrunesConfigAndDescendants(t *testing.T) {
+	root := t.TempDir()
+	foreign := filepath.Join(root, "foreign")
+	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	foreignConfig := writeConfigCandidate(t, foreign, "rslint.config.js")
+	deeperConfig := writeConfigCandidate(t, filepath.Join(foreign, "deeper"), "rslint.config.js")
+	loader := newFixtureConfigLoader()
+	loader.configs[rootConfig] = namedConfig("root")
+	loader.configs[foreignConfig] = namedConfig("foreign")
+	loader.configs[deeperConfig] = namedConfig("deeper")
+	foreign = tspath.NormalizePath(foreign)
+
+	catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+		PruneDirectory: func(directory string) bool {
+			return tspath.NormalizePath(directory) == foreign
+		},
+	})
+
+	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{tspath.NormalizePath(root)}) {
+		t.Fatalf("config directories across host boundary = %v", got)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
+		t.Fatalf("host-pruned configs were evaluated: %v", got)
+	}
+}
+
 func TestConfigDiscoveryGitignoreDirectoryNegation(t *testing.T) {
 	for _, test := range []struct {
 		name       string

@@ -76,6 +76,12 @@ export interface IpcClientOptions {
    * traffic. Default 64 KiB.
    */
   readonly initialReadBufferBytes?: number;
+  /**
+   * Called once when the peer stream fails or violates the wire protocol.
+   * Owners of a real Duplex transport can destroy it here so the remote peer
+   * observes EOF; explicit local close() does not invoke this callback.
+   */
+  readonly onTransportFailure?: (error: Error) => void;
 }
 
 /**
@@ -88,6 +94,7 @@ export class IpcClient {
 
   // ── routing tables ──
   private readonly pending = new Map<number, PendingRequest>();
+  private readonly inboundRequests = new Map<number, AbortController>();
   private readonly notificationHandlers = new Map<
     MessageKind,
     NotificationHandler
@@ -105,11 +112,12 @@ export class IpcClient {
   private nextId = 1;
   private closed = false;
   private started = false;
+  private readonly onTransportFailure: ((error: Error) => void) | undefined;
 
   constructor(input: Readable, output: Writable, opts: IpcClientOptions = {}) {
     this.input = input;
     this.output = output;
-    void opts; // reserved for future use; signature stable
+    this.onTransportFailure = opts.onTransportFailure;
   }
 
   /**
@@ -146,11 +154,12 @@ export class IpcClient {
    * all pending and flip closed.
    */
   start(): void {
-    if (this.started) return;
+    if (this.started || this.closed) return;
     this.started = true;
 
     this.input.on('data', this.onChunk);
     this.input.on('end', this.onEnd);
+    this.input.on('close', this.onInputClose);
     this.input.on('error', this.onStreamError);
     this.output.on('error', this.onOutputError);
     // A CLEAN output close (peer ended its read side / pipe EOF /
@@ -167,19 +176,7 @@ export class IpcClient {
    * than hanging forever. Idempotent.
    */
   close(): void {
-    if (this.closed) return;
-    this.closed = true;
-
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
-
-    const err = new Error('IpcClient: closed');
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
+    this.finish(new Error('IpcClient: closed'), false);
   }
 
   /**
@@ -275,21 +272,9 @@ export class IpcClient {
    * trigger the regular close path. Idempotent.
    */
   private readonly onOutputError = (err: Error): void => {
-    if (this.closed) return;
     process.stderr.write(`rslint: output write error: ${err.message}\n`);
     const wrapped = new Error(`IpcClient: output write failed: ${err.message}`);
-    for (const [, p] of this.pending) p.reject(wrapped);
-    this.pending.clear();
-    this.closed = true;
-    // Detach listeners to mirror close() — close() itself is a no-op
-    // now (closed=true) but we should not leave the input listeners
-    // dangling.
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.finish(wrapped, true);
   };
 
   /**
@@ -302,19 +287,10 @@ export class IpcClient {
    * `onOutputError`. Idempotent.
    */
   private readonly onOutputClose = (): void => {
-    if (this.closed) return;
     const err = new Error(
       'IpcClient: output stream closed before response received',
     );
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.closed = true;
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.finish(err, true);
   };
 
   /**
@@ -364,14 +340,14 @@ export class IpcClient {
 
       let msg: IpcMessage;
       try {
-        msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+        msg = parseMessage(body);
       } catch (err) {
-        // Malformed frame — log and skip; framing is intact (we already
-        // consumed the body), so subsequent frames decode normally.
-        process.stderr.write(
-          `rslint: malformed JSON in frame (len=${len}): ${(err as Error).message}\n`,
+        this.onStreamError(
+          new Error(
+            `ipc-client: invalid frame (len=${len}): ${errorMessage(err)}`,
+          ),
         );
-        continue;
+        return;
       }
 
       this.dispatch(msg);
@@ -462,27 +438,44 @@ export class IpcClient {
     // stream may still be writable from our perspective, but we
     // surface "closed" so callers get a deterministic error
     // immediately instead of an indefinite hang.
-    if (this.closed) return;
-    this.closed = true;
     const err = new Error('IpcClient: peer closed input stream');
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    // Mirror close(): also detach the output 'close'/'finish' listeners
-    // (added for the Windows clean-close fix). onStreamError delegates
-    // here, so without this both teardown paths would leak the
-    // onOutputClose listener on the output stream.
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.finish(err, true);
+  };
+
+  private readonly onInputClose = (): void => {
+    const err = new Error('IpcClient: peer input stream closed');
+    this.finish(err, true);
   };
 
   private readonly onStreamError = (err: Error): void => {
     process.stderr.write(`rslint: stream error: ${err.message}\n`);
-    this.onEnd();
+    this.finish(err, true);
   };
+
+  private finish(reason: Error, notifyFailure: boolean): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.input.off('data', this.onChunk);
+    this.input.off('end', this.onEnd);
+    this.input.off('close', this.onInputClose);
+    this.input.off('error', this.onStreamError);
+    this.output.off('error', this.onOutputError);
+    this.output.off('close', this.onOutputClose);
+    this.output.off('finish', this.onOutputClose);
+    this.chunks.length = 0;
+    this.bufferedBytes = 0;
+    for (const [, pending] of this.pending) pending.reject(reason);
+    this.pending.clear();
+    this.abortInboundRequests(reason);
+    if (!notifyFailure || !this.onTransportFailure) return;
+    try {
+      this.onTransportFailure(reason);
+    } catch (error) {
+      process.stderr.write(
+        `rslint: transport failure callback threw: ${errorMessage(error)}\n`,
+      );
+    }
+  }
 
   /** Route a fully decoded frame. */
   private dispatch(msg: IpcMessage): void {
@@ -515,6 +508,19 @@ export class IpcClient {
   }
 
   private dispatchNotification(msg: IpcMessage): void {
+    if (msg.kind === 'cancel') {
+      const data = msg.data;
+      const id =
+        typeof data === 'object' && data !== null && 'id' in data
+          ? data.id
+          : undefined;
+      if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) {
+        this.inboundRequests
+          .get(id)
+          ?.abort(new Error(`IPC request ${id} was cancelled by the peer`));
+      }
+      return;
+    }
     const handler = this.notificationHandlers.get(msg.kind);
     if (!handler) {
       // A notification with no registered handler is unexpected — the peer
@@ -538,15 +544,31 @@ export class IpcClient {
     // Spawn the handler async so the data loop continues to consume frames
     // even while a handler awaits. This is what enables in-handler
     // sendRequest to receive its reply.
+    if (this.inboundRequests.has(msg.id)) {
+      this.onStreamError(
+        new Error(`ipc-client: duplicate inbound request id=${msg.id}`),
+      );
+      return;
+    }
     void (async () => {
+      const controller = new AbortController();
+      this.inboundRequests.set(msg.id, controller);
       try {
-        const result = await handler(msg);
+        const result = await handler(msg, controller.signal);
         this.sendResponse(msg.id, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.sendErrorResponse(msg.id, message);
+        this.sendErrorResponse(msg.id, errorMessage(err));
+      } finally {
+        this.inboundRequests.delete(msg.id);
       }
     })();
+  }
+
+  private abortInboundRequests(reason: Error): void {
+    for (const controller of this.inboundRequests.values()) {
+      controller.abort(reason);
+    }
+    this.inboundRequests.clear();
   }
 }
 
@@ -591,8 +613,41 @@ export function decodeFrame(
   }
   if (buf.length < HEADER_BYTES + len) return null;
   const body = buf.subarray(HEADER_BYTES, HEADER_BYTES + len);
-  const msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+  const msg = parseMessage(body);
   return { msg, consumed: HEADER_BYTES + len };
+}
+
+function parseMessage(body: Buffer): IpcMessage {
+  const value: unknown = JSON.parse(body.toString('utf8'));
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('IPC message must be an object');
+  }
+  const message = value as Record<string, unknown>;
+  if (typeof message.kind !== 'string' || message.kind.length === 0) {
+    throw new Error('IPC message kind must be a non-empty string');
+  }
+  if (
+    typeof message.id !== 'number' ||
+    !Number.isSafeInteger(message.id) ||
+    message.id < 0
+  ) {
+    throw new Error('IPC message id must be a non-negative safe integer');
+  }
+  if (
+    (message.kind === RESPONSE_KIND || message.kind === ERROR_KIND) &&
+    message.id === 0
+  ) {
+    throw new Error(`${message.kind} message id must be positive`);
+  }
+  return value as IpcMessage;
+}
+
+function errorMessage(error: unknown): string {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return 'unformattable thrown value';
+  }
 }
 
 /**
@@ -602,10 +657,10 @@ export function decodeFrame(
  */
 async function runSafely(fn: () => unknown, tag: string): Promise<void> {
   try {
-    const ret = fn();
-    if (ret instanceof Promise) await ret;
+    await fn();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`rslint: handler ${tag} threw: ${message}\n`);
+    process.stderr.write(
+      `rslint: handler ${tag} threw: ${errorMessage(err)}\n`,
+    );
   }
 }

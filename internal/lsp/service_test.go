@@ -533,7 +533,7 @@ func TestRapidChanges_VersionTracking(t *testing.T) {
 // PublishDiagnostics calls can be verified via the returned channel.
 func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	queue := make(chan *lsproto.Message, 10)
-	return &Server{
+	s := &Server{
 		jsConfigs:              make(map[string]config.RslintConfig),
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
@@ -545,7 +545,14 @@ func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
-	}, queue
+	}
+	// Config-transaction tests historically drive reverse requests through an
+	// in-memory LSP queue. Keep that adapter explicitly test-only: production
+	// config/plugin requests must have the dedicated editor-runtime transport.
+	s.runtimeRequest = func(ctx context.Context, method string, params any) (any, error) {
+		return s.sendRequest(ctx, lsproto.Method(method), params)
+	}
+	return s, queue
 }
 
 func TestHandleDidClose_NoPublishWhenSessionNil(t *testing.T) {

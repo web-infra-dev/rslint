@@ -86,34 +86,25 @@ func TestIsStrictAncestorAutoJSConfigPath(t *testing.T) {
 	}
 }
 
-func TestWorkspaceConfigEventsDoNotDuplicateTransactionalRefresh(t *testing.T) {
+func TestWorkspaceConfigWatcherRefreshesTransactionally(t *testing.T) {
 	workspace := tspath.NormalizePath(t.TempDir())
-	tests := []string{
-		filepath.Join(workspace, "rslint.config.js"),
-		filepath.Join(workspace, "packages", "app", "rslint.config.mjs"),
-		filepath.Join(workspace, "rslint.json"),
+	writeConfigCandidate(t, workspace)
+	configPath := filepath.Join(workspace, "rslint.config.js")
+
+	s, outgoing := newAncestorConfigWatchTestServer(workspace)
+	s.configDiscoveryActive = true
+	result := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeChanged)
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	completeConfigWatchActivation(t, s, outgoing)
+	if err := awaitConfigWatchEvent(t, result); err != nil {
+		t.Fatalf("workspace config refresh failed: %v", err)
 	}
-	for _, configPath := range tests {
-		t.Run(filepath.Base(configPath), func(t *testing.T) {
-			s, outgoing := newAncestorConfigWatchTestServer(workspace)
-			s.configDiscoveryActive = true
-			s.rslintConfigPath = "/committed/rslint.json"
-			result := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeChanged)
-			select {
-			case message := <-outgoing:
-				respondToConfigReverseRequest(t, s, message.AsRequest(), nil, errors.New("unexpected duplicate refresh"))
-				t.Fatalf("workspace event started a duplicate Go refresh: %+v", message)
-			case err := <-result:
-				if err != nil {
-					t.Fatalf("workspace config event: %v", err)
-				}
-			case <-time.After(time.Second):
-				t.Fatal("workspace config event did not complete")
-			}
-			if s.rslintConfigPath != "/committed/rslint.json" {
-				t.Fatalf("workspace event directly reloaded JSON config: %q", s.rslintConfigPath)
-			}
-		})
+	if got := s.jsConfigs[workspace][0].Rules["no-debugger"]; got != "error" {
+		t.Fatalf("workspace config was not committed: %+v", s.jsConfigs)
 	}
 }
 

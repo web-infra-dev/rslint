@@ -566,6 +566,7 @@ tspath
 tsutils
 typeparam
 typescriptutil
+taskkill
 unaliased
 unbnound
 uncast
@@ -575,6 +576,7 @@ undefinded
 undefinedish
 undefinedundefined
 undereferenced
+unformattable
 unicornutil
 uninit
 uninitialised
@@ -623,6 +625,7 @@ WCAG
 webauthn
 wellformed
 WHATWG
+WINDIR
 wordlist
 xdescribe
 xiang
@@ -634,6 +637,7 @@ xtest
 yutil
 zeebo
 zigbuild
+zipfs
 ZWNBSP
 ZWNJ
 ZWSP

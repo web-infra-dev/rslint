@@ -13,8 +13,8 @@ import {
 
 // End-to-end VS Code coverage for the object-form `plugins` reverse-dispatch
 // path: the LSP server lints natively but dispatches rules mounted via a
-// config's object-form `plugins` to the extension-side worker pool
-// (PluginLintPool), then merges + publishes. The Go merge/dispatch units are
+// config's object-form `plugins` to the resolved core sidecar's worker pool,
+// then merges + publishes. The Go merge/dispatch units are
 // covered in internal/lsp/eslint_plugin_test.go; this exercises the full loop.
 //
 // Fixture: rslint.config.mjs mounts ./local-plugin.mjs under object-form

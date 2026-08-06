@@ -73,6 +73,47 @@ func newConfigRefreshTestServer(t *testing.T) (*Server, <-chan *lsproto.Message,
 	return s, outgoing, root
 }
 
+func TestRuntimeConfigDirectoryPrunerKeepsOnlyActivePnpDomain(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	nested := tspath.CombinePaths(root, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rootPnp := tspath.CombinePaths(root, ".pnp.cjs")
+	nestedPnp := tspath.CombinePaths(nested, ".pnp.cjs")
+	for _, file := range []string{rootPnp, nestedPnp} {
+		if err := os.WriteFile(file, []byte("module.exports = {}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	s := &Server{
+		cwd:            root,
+		fs:             fsys,
+		runtimeRequest: func(context.Context, string, any) (any, error) { return struct{}{}, nil },
+		runtimePnpPath: tspath.NormalizePath(fsys.Realpath(rootPnp)),
+	}
+	prune := s.runtimeConfigDirectoryPruner()
+	if prune == nil {
+		t.Fatal("editor runtime did not install its PnP boundary pruner")
+	}
+	if prune(root) {
+		t.Fatal("active PnP root was pruned")
+	}
+	if !prune(nested) {
+		t.Fatal("nested foreign PnP domain was not pruned")
+	}
+
+	s.runtimePnpPath = ""
+	if !s.runtimeConfigDirectoryPruner()(root) {
+		t.Fatal("non-PnP runtime did not prune a nested PnP boundary")
+	}
+	s.runtimeRequest = nil
+	if s.runtimeConfigDirectoryPruner() != nil {
+		t.Fatal("ordinary LSP installed an editor-only PnP boundary")
+	}
+}
+
 func startConfigRefreshForTest(s *Server, reason string) <-chan configRefreshTestResult {
 	result := make(chan configRefreshTestResult, 1)
 	go func() {
@@ -135,6 +176,52 @@ func respondToConfigReverseRequest(
 	}
 }
 
+func TestRuntimeConfigRefreshTimeoutIsFatalToGeneration(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	if err := os.WriteFile(filepath.Join(root, "rslint.config.mjs"), []byte("export default []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result := make(chan configRefreshTestResult, 1)
+	go func() {
+		response, err := s.handleRuntimeConfigRefreshWithin(context.Background(), configRefreshRequest{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+			Reason:          "initial",
+		}, 50*time.Millisecond)
+		result <- configRefreshTestResult{response: response, err: err}
+	}()
+
+	load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, ok := load.Params.(discovery.ConfigLoadBatchRequest)
+	if !ok {
+		t.Fatalf("loadConfigs params type = %T", load.Params)
+	}
+
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case message := <-outgoing:
+			request := message.AsRequest()
+			if request.Method != methodAbortConfigs {
+				continue
+			}
+			respondToConfigReverseRequest(t, s, request, configAbortWireResponse{
+				TransactionID: loadRequest.TransactionID,
+				Aborted:       true,
+			}, nil)
+			goto aborted
+		case <-deadline:
+			t.Fatal("timed out waiting for abort after config work deadline")
+		}
+	}
+
+aborted:
+	got := <-result
+	if !errors.Is(got.err, errRuntimeGenerationStuck) {
+		t.Fatalf("error = %v, want fatal stuck-generation sentinel", got.err)
+	}
+}
+
 func loadedConfigResponse(
 	t *testing.T,
 	request *lsproto.RequestMessage,
@@ -191,11 +278,11 @@ func activationResponseForRequest(
 	pluginHostReady bool,
 ) (discovery.ConfigActivationRequest, configActivationWireResponse) {
 	t.Helper()
-	activation, ok := request.Params.(discovery.ConfigActivationRequest)
+	activation, ok := request.Params.(runtimeConfigActivationRequest)
 	if !ok {
 		t.Fatalf("activateConfigs params type = %T", request.Params)
 	}
-	return activation, configActivationWireResponse{
+	return activation.ConfigActivationRequest, configActivationWireResponse{
 		TransactionID:   activation.TransactionID,
 		PluginHostReady: pluginHostReady,
 	}
@@ -498,7 +585,7 @@ func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.
 	}
 }
 
-func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
+func TestHandleConfigRefreshCommitFailureIsFatalAndKeepsGoSnapshot(t *testing.T) {
 	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
@@ -518,15 +605,56 @@ func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
 	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
 	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, false), nil)
 
-	abortMessage := nextConfigReverseRequest(t, outgoing, methodAbortConfigs)
-	respondToConfigReverseRequest(t, s, abortMessage, abortResponseForRequest(t, abortMessage), nil)
-
 	completed := awaitConfigRefreshResult(t, result)
-	if completed.err == nil || !strings.Contains(completed.err.Error(), "invalid commitConfigs response") {
-		t.Fatalf("configRefresh error = %v, want commit failure", completed.err)
+	if !errors.Is(completed.err, errRuntimeGenerationUncertain) ||
+		!strings.Contains(completed.err.Error(), "invalid commitConfigs response") {
+		t.Fatalf("configRefresh error = %v, want fatal uncertain commit", completed.err)
 	}
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed commit replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
+	}
+}
+
+func TestWatchedConfigCommitFailurePropagatesFatalGenerationError(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	installLastGoodConfig(s, root)
+	s.configDiscoveryActive = true
+
+	result := make(chan error, 1)
+	go func() {
+		result <- s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+			Changes: []*lsproto.FileEvent{{
+				Uri:  documentURIFromPath(filepath.Join(root, "rslint.config.mjs")),
+				Type: lsproto.FileChangeTypeChanged,
+			}},
+		})
+	}()
+
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	_, loadResponse := loadedConfigResponse(t, loadMessage, config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, false), nil)
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, errRuntimeGenerationUncertain) {
+			t.Fatalf("watched config error = %v, want fatal uncertain generation", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("watched config refresh did not finish")
+	}
+	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
+		t.Fatalf("failed watched commit replaced Go snapshot: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
 }
 
@@ -1140,12 +1268,9 @@ func TestGitignoreWatcherRetriesRefreshAndPreservesLastGoodOnFailure(t *testing.
 	}
 }
 
-func TestConfigRefreshProtocolRegistration(t *testing.T) {
-	if !isBlockingMethod(methodConfigRefresh) {
-		t.Fatal("rslint/configRefresh must run on the serialized dispatch loop")
-	}
-	if handlers()[methodConfigRefresh] == nil {
-		t.Fatal("rslint/configRefresh handler is not registered")
+func TestConfigRefreshIsNotExposedOnLSP(t *testing.T) {
+	if handlers()[lsproto.Method("rslint/configRefresh")] != nil {
+		t.Fatal("private config refresh is exposed as a custom LSP method")
 	}
 	if handlers()[lsproto.Method("rslint/configUpdate")] != nil {
 		t.Fatal("deprecated rslint/configUpdate handler is still registered")

@@ -142,6 +142,88 @@ func TestChannel_ContextCancel(t *testing.T) {
 	}
 }
 
+func TestChannel_ContextCancelNotifiesPeer(t *testing.T) {
+	a, b := newChannelPair(t)
+	block := make(chan struct{})
+	entered := make(chan struct{})
+	b.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
+		close(entered)
+		<-block
+		return struct{}{}, nil
+	})
+	cancelled := make(chan int, 1)
+	b.RegisterNotification(KindCancel, func(msg *Message) {
+		var payload struct {
+			ID int `json:"id"`
+		}
+		if err := msg.Decode(&payload); err != nil {
+			t.Errorf("decode cancel: %v", err)
+			return
+		}
+		cancelled <- payload.ID
+	})
+	t.Cleanup(func() { close(block) })
+	a.Start()
+	b.Start()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := a.SendRequest(ctx, "hang", nil)
+		errCh <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request handler was not entered")
+	}
+	cancel()
+	if err := <-errCh; !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	select {
+	case id := <-cancelled:
+		if id <= 0 {
+			t.Fatalf("cancel request id = %d, want positive", id)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("peer did not receive cancel notification")
+	}
+}
+
+func TestChannel_CancellationQueueIsBounded(t *testing.T) {
+	c := NewChannel(strings.NewReader(""), io.Discard)
+	for id := 1; id <= cancelQueueCapacity*10; id++ {
+		c.queueCancellation(id)
+	}
+	if got := len(c.cancelQueue); got != cancelQueueCapacity {
+		t.Fatalf("cancel queue length = %d, want bounded capacity %d", got, cancelQueueCapacity)
+	}
+}
+
+func TestChannel_StartIsIdempotent(t *testing.T) {
+	a, b := newChannelPair(t)
+	b.SetInboundHandler(func(_ context.Context, msg *Message) (any, error) {
+		return map[string]any{"kind": msg.Kind}, nil
+	})
+	a.Start()
+	a.Start()
+	b.Start()
+	b.Start()
+
+	response, err := a.SendRequest(context.Background(), "once", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := response.Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["kind"] != "once" {
+		t.Fatalf("response = %#v", payload)
+	}
+}
+
 func TestChannel_CloseRejectsPending(t *testing.T) {
 	a, b := newChannelPair(t)
 	block := make(chan struct{})
@@ -192,6 +274,44 @@ func TestFrame_RoundTrip(t *testing.T) {
 	}
 	if err := got.Decode(&v); err != nil || v.X != 42 {
 		t.Fatalf("decode mismatch: v=%+v err=%v", v, err)
+	}
+}
+
+func TestFrame_RejectsInvalidMessageEnvelopes(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "null", body: `null`, want: "message kind must be non-empty"},
+		{name: "empty kind", body: `{"kind":"","id":1}`, want: "message kind must be non-empty"},
+		{name: "negative id", body: `{"kind":"lint","id":-1}`, want: "message id must be non-negative"},
+		{name: "notification response", body: `{"kind":"response","id":0}`, want: "response message id must be positive"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var framed bytes.Buffer
+			if err := binary.Write(&framed, binary.LittleEndian, uint32(len(test.body))); err != nil {
+				t.Fatal(err)
+			}
+			framed.WriteString(test.body)
+			_, err := ReadFrame(bufio.NewReader(&framed))
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("ReadFrame error = %v, want containing %q", err, test.want)
+			}
+		})
+	}
+
+	invalidWrites := []*Message{
+		nil,
+		{Kind: "", ID: 1},
+		{Kind: "lint", ID: -1},
+		{Kind: KindError, ID: 0},
+	}
+	for _, message := range invalidWrites {
+		if err := WriteFrame(io.Discard, message); err == nil {
+			t.Fatalf("WriteFrame(%#v) unexpectedly succeeded", message)
+		}
 	}
 }
 

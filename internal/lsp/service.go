@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -34,6 +35,12 @@ import (
 const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
 const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
 const ancestorJSConfigWatcherID project.WatcherID = "rslint-ancestor-js-config"
+const workspaceConfigWatcherID project.WatcherID = "rslint-workspace-config"
+const methodRuntimeReady = lsproto.Method("rslint/runtimeReady")
+
+type runtimeReadyNotification struct {
+	ProtocolVersion int `json:"protocolVersion"`
+}
 
 type lintPassResult struct {
 	Diagnostics     []rule.RuleDiagnostic
@@ -120,6 +127,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		)
 		gitignoreWatchers := gitignoreFileWatchers(s.cwd, relativePatterns)
 		ancestorConfigWatchers := ancestorJSConfigFileWatchers(s.cwd, relativePatterns)
+		workspaceConfigWatchers := runtimeConfigFileWatchers(s.cwd, relativePatterns)
 		go func() {
 			if err := s.WatchFiles(s.backgroundCtx, gitignoreWatcherID, gitignoreWatchers); err != nil {
 				if s.backgroundCtx.Err() == nil {
@@ -127,11 +135,18 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 				}
 			}
 			if len(ancestorConfigWatchers) == 0 {
-				return
-			}
-			if err := s.WatchFiles(s.backgroundCtx, ancestorJSConfigWatcherID, ancestorConfigWatchers); err != nil {
+				// Continue below: an editor runtime still needs workspace config and
+				// dependency topology events even when cwd is a filesystem root.
+			} else if err := s.WatchFiles(s.backgroundCtx, ancestorJSConfigWatcherID, ancestorConfigWatchers); err != nil {
 				if s.backgroundCtx.Err() == nil {
 					log.Printf("[rslint] Failed to register ancestor JS config watchers: %v", err)
+				}
+			}
+			if s.runtimeRequest != nil {
+				if err := s.WatchFiles(s.backgroundCtx, workspaceConfigWatcherID, workspaceConfigWatchers); err != nil {
+					if s.backgroundCtx.Err() == nil {
+						log.Printf("[rslint] Failed to register workspace config watchers: %v", err)
+					}
 				}
 			}
 		}()
@@ -169,6 +184,22 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		}
 	}
 
+	// The core-owned editor runtime has its private handlers installed before
+	// the Go child starts, so discovery no longer needs a custom client request
+	// from the VS Code extension. This also closes the listener gap where an
+	// edit could land between LanguageClient startup and handler registration.
+	if s.runtimeRequest != nil {
+		if _, err := s.handleRuntimeConfigRefresh(ctx, configRefreshRequest{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+			Reason:          "initial",
+		}); err != nil {
+			return errors.Join(errRuntimeInitializationFailed, err)
+		}
+		s.sendNotification(methodRuntimeReady, runtimeReadyNotification{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		})
+	}
+
 	return nil
 }
 
@@ -193,8 +224,8 @@ func gitignoreFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.F
 
 // ancestorJSConfigFileWatchers covers the strict lexical ancestors that Go's
 // automatic config discovery searches before walking the workspace. The
-// extension already owns a workspace-scoped RelativePattern watcher, so the
-// workspace itself is deliberately excluded to avoid duplicate refreshes.
+// Workspace descendants are covered by runtimeConfigFileWatchers; these exact
+// patterns cover only strict ancestors that a workspace-relative glob cannot.
 // Register every filename separately: creating a higher-priority sibling in an
 // ancestor directory can change the selected config even when another config
 // basename already exists there.
@@ -210,6 +241,34 @@ func ancestorJSConfigFileWatchers(cwd string, relativePatternSupport bool) []*ls
 			break
 		}
 		current = parent
+	}
+	return watchers
+}
+
+func runtimeConfigFileWatchers(cwd string, relativePatternSupport bool) []*lsproto.FileSystemWatcher {
+	patterns := make([]string, 0, len(discovery.AutoJSConfigFileNames)+14)
+	for _, configName := range discovery.AutoJSConfigFileNames {
+		patterns = append(patterns, "**/"+configName)
+	}
+	patterns = append(patterns,
+		"**/rslint.json",
+		"**/rslint.jsonc",
+		"**/package.json",
+		"**/package-lock.json",
+		"**/npm-shrinkwrap.json",
+		"**/pnpm-lock.yaml",
+		"**/pnpm-workspace.yaml",
+		"**/yarn.lock",
+		"**/bun.lock",
+		"**/bun.lockb",
+		"**/.pnp.cjs",
+		"**/.pnp.js",
+		"**/.pnp.loader.mjs",
+		"**/.pnp.data.json",
+	)
+	watchers := make([]*lsproto.FileSystemWatcher, 0, len(patterns))
+	for _, pattern := range patterns {
+		watchers = append(watchers, fileSystemWatcher(cwd, pattern, relativePatternSupport))
 	}
 	return watchers
 }
@@ -298,6 +357,8 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	needsTypeInfoRebuild := false
 	needsIgnoreRefresh := false
 	needsAncestorJSConfigRefresh := false
+	needsWorkspaceJSConfigRefresh := false
+	needsDependencyRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
 		if isRslintConfigURI(uri) {
@@ -312,24 +373,44 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		if isStrictAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
 			needsAncestorJSConfigRefresh = true
 		}
+		if isAutoJSConfigURI(uri) {
+			needsWorkspaceJSConfigRefresh = true
+		}
+		if isRuntimeDependencyURI(uri) {
+			needsDependencyRefresh = true
+		}
 	}
-	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryActive {
+	if (needsConfigReload || needsIgnoreRefresh || needsAncestorJSConfigRefresh || needsWorkspaceJSConfigRefresh || needsDependencyRefresh) && s.configDiscoveryActive {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
-		// cannot race an extension-initiated transaction. JSON fallback is part
+		// cannot race another watched-file transaction. JSON fallback is part
 		// of the candidate snapshot: never reload it directly while discovery is
 		// active, otherwise a later JS activation failure could leave half of a
 		// rejected generation live.
 		reason := "gitignore-change"
-		if needsAncestorJSConfigRefresh {
+		if needsConfigReload || needsAncestorJSConfigRefresh || needsWorkspaceJSConfigRefresh {
 			reason = "config-change"
 		}
-		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
+		// A single didChangeWatchedFiles notification may batch a config edit
+		// with a package-manager update. Dependency topology must win so the
+		// plugin fingerprint cannot reuse workers from the old install.
+		if needsDependencyRefresh {
+			reason = "dependency-change"
+		}
+		_, err := s.handleRuntimeConfigRefresh(ctx, configRefreshRequest{
 			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 			Reason:          reason,
 		})
 		if err == nil {
 			return nil
+		}
+		if errors.Is(err, errRuntimeGenerationUncertain) || errors.Is(err, errRuntimeGenerationStuck) {
+			// The Node side may have crossed its commit point or may still be
+			// executing a non-settling module. Propagate these sentinels to
+			// dispatchLoop so the coupled Go/Node generation exits; treating either
+			// like an ordinary last-good failure would leave detached or divergent
+			// runtime state alive.
+			return err
 		}
 		// Discovery/activation failure preserves the complete last-good
 		// generation, including its .gitignore view. Recompute diagnostics from
@@ -344,12 +425,6 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 	if s.configDiscoveryActive {
-		// The extension's direct workspace watcher is the sole owner for
-		// workspace/descendant JS configs and JSON fallback. tsgo can also report
-		// those paths through its recursive project watcher; treating that report
-		// as a second refresh would evaluate every fresh module twice. Go-owned
-		// didChange handling above is intentionally limited to .gitignore and
-		// strict-ancestor JS configs, which the extension watcher cannot cover.
 		needsConfigReload = false
 	}
 	if needsConfigReload {
@@ -379,6 +454,33 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 // isRslintConfigURI returns true if the URI points to an rslint config file.
 func isRslintConfigURI(uri string) bool {
 	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
+}
+
+func isAutoJSConfigURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	if idx < 0 {
+		return false
+	}
+	name := uri[idx+1:]
+	for _, configName := range discovery.AutoJSConfigFileNames {
+		if strings.EqualFold(name, configName) {
+			return true
+		}
+	}
+	return false
+}
+
+func isRuntimeDependencyURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	if idx < 0 {
+		return false
+	}
+	switch strings.ToLower(uri[idx+1:]) {
+	case "package.json", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "bun.lock", "bun.lockb", ".pnp.cjs", ".pnp.js", ".pnp.loader.mjs", ".pnp.data.json":
+		return true
+	default:
+		return false
+	}
 }
 
 func isGitignoreURI(uri string) bool {
@@ -803,12 +905,12 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 		nativeLint = s.defaultFixAllNativeLint
 	}
 
-	// Bound the eslint-plugin reverse requests across the WHOLE fixAll, not per
+	// Bound the eslint-plugin runtime requests across the WHOLE fixAll, not per
 	// pass: source.fixAll runs inline on the dispatch loop, so a wedged or
-	// mid-rebuild client that never answers rslint/pluginLint must not
+	// mid-rebuild sidecar that never answers private pluginLint must not
 	// freeze editor interaction — nor multiply the stall by maxFixPasses. Only
 	// the plugin pass gets this deadline; the native pass keeps the original ctx
-	// (it is in-process and does not depend on a client reply). Once the budget
+	// (it is in-process and does not depend on an editor-runtime reply). Once the budget
 	// expires lintPluginRulesSync returns nil and the remaining passes fold
 	// native-only fixes.
 	pluginTimeout := s.pluginReverseTimeout
@@ -836,7 +938,7 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 		// is "off" because fixAll applies only autofixes.
 		// Skip the plugin pass once the budget is spent: lintPluginRulesSync on an
 		// already-expired pluginCtx would still enqueue a (wasted) reverse request
-		// to the client before returning nil.
+		// to the editor runtime before returning nil.
 		if pluginCtx.Err() == nil {
 			if pluginDiags := s.lintPluginRulesSyncWithConfig(
 				pluginCtx,

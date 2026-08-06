@@ -124,6 +124,26 @@ describe('encode/decode round-trip', () => {
     expect(decodeFrame(Buffer.alloc(0))).toBeNull();
     expect(decodeFrame(Buffer.alloc(3))).toBeNull();
   });
+
+  test('rejects malformed message envelopes even when JSON framing is valid', () => {
+    const frame = (value: unknown): Buffer => {
+      const body = Buffer.from(JSON.stringify(value), 'utf8');
+      const encoded = Buffer.alloc(4 + body.length);
+      encoded.writeUInt32LE(body.length, 0);
+      body.copy(encoded, 4);
+      return encoded;
+    };
+    expect(() => decodeFrame(frame(null))).toThrow(/must be an object/);
+    expect(() => decodeFrame(frame({ kind: '', id: 1 }))).toThrow(
+      /kind must be a non-empty string/,
+    );
+    expect(() => decodeFrame(frame({ kind: 'lint', id: -1 }))).toThrow(
+      /non-negative safe integer/,
+    );
+    expect(() => decodeFrame(frame({ kind: 'response', id: 0 }))).toThrow(
+      /id must be positive/,
+    );
+  });
 });
 
 // The streaming decoder in `IpcClient.onChunk` must reassemble frames
@@ -457,6 +477,55 @@ describe('IpcClient request/response', () => {
     }
   });
 
+  test('an unformattable thrown value still produces a stable error reply', async () => {
+    const { a, b, cleanup } = pairClients();
+    try {
+      b.setInboundHandler(() => {
+        throw {
+          toString(): string {
+            throw new Error('hostile toString');
+          },
+        };
+      });
+      a.start();
+      b.start();
+      await expect(a.sendRequest('lint', {})).rejects.toThrow(
+        /unformattable thrown value/,
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('cancel notification aborts the matching inbound handler', async () => {
+    const { a, b, cleanup } = pairClients();
+    try {
+      let entered!: () => void;
+      const handlerEntered = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      b.setInboundHandler(async (_message, signal) => {
+        entered();
+        await new Promise<void>((resolve) => {
+          if (signal?.aborted) resolve();
+          else
+            signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return { aborted: signal?.aborted === true };
+      });
+      a.start();
+      b.start();
+
+      const pending = a.sendRequest('pluginLint', {}); // first request id is 1
+      await handlerEntered;
+      a.sendNotification('cancel', { id: 1 });
+      const response = await pending;
+      expect(response.data).toEqual({ aborted: true });
+    } finally {
+      cleanup();
+    }
+  });
+
   test('close() rejects pending requests', async () => {
     const { a, b, cleanup } = pairClients();
     try {
@@ -541,10 +610,68 @@ describe('Schema parity with Go (smoke)', () => {
       'shutdown',
     ];
     for (const k of kinds) {
-      const frame = encodeFrame({ kind: k, id: 0, data: null });
+      const frame = encodeFrame({
+        kind: k,
+        id: k === 'response' || k === 'error' ? 1 : 0,
+        data: null,
+      });
       const decoded = decodeFrame(frame);
       expect(decoded?.msg.kind).toBe(k);
     }
+  });
+
+  test('invalid framed JSON is terminal and reports the transport failure once', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const failures: Error[] = [];
+    const client = new IpcClient(input, output, {
+      onTransportFailure: (error) => failures.push(error),
+    });
+    client.start();
+    const pending = client.sendRequest('lint', {});
+    const body = Buffer.from('{', 'utf8');
+    const frame = Buffer.alloc(4 + body.length);
+    frame.writeUInt32LE(body.length, 0);
+    body.copy(frame, 4);
+    input.write(frame);
+
+    await expect(pending).rejects.toThrow(/invalid frame/);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].message).toMatch(/invalid frame/);
+    input.end();
+    output.end();
+    expect(failures).toHaveLength(1);
+  });
+
+  test('duplicate in-flight inbound IDs tear down the connection', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const failures: Error[] = [];
+    const client = new IpcClient(input, output, {
+      onTransportFailure: (error) => failures.push(error),
+    });
+    client.setInboundHandler(
+      async (_message, signal) =>
+        new Promise((resolve) => {
+          if (signal?.aborted) resolve({ aborted: true });
+          else
+            signal?.addEventListener(
+              'abort',
+              () => resolve({ aborted: true }),
+              { once: true },
+            );
+        }),
+    );
+    client.start();
+    const request = encodeFrame({ kind: 'lint', id: 7, data: {} });
+    input.write(request);
+    input.write(request);
+
+    expect(failures).toHaveLength(1);
+    expect(failures[0].message).toMatch(/duplicate inbound request id=7/);
+    await expect(client.sendRequest('lint', {})).rejects.toThrow(/closed/);
+    input.end();
+    output.end();
   });
 
   // Regression: a write failure on the output stream must NOT leave
@@ -607,7 +734,7 @@ describe('Schema parity with Go (smoke)', () => {
     // Await the actual teardown outcome. The suite's finite outer bound is the
     // deadlock sentinel if a mutation seals the client but forgets to reject
     // pending requests; no promise-layer count is part of this contract.
-    await expect(pending).rejects.toThrow(/peer closed input stream/);
+    await expect(pending).rejects.toThrow(/exceeds cap/);
 
     // The cap-specific diagnostic — emitted ONLY by the guard — must be
     // present. A deleted/disabled guard leaves stderr empty here.
@@ -693,6 +820,25 @@ describe('Schema parity with Go (smoke)', () => {
     }
     expect(rejected).toBe(true);
     expect(msg.toLowerCase()).toMatch(/closed|peer|input/);
+  });
+
+  test('input close without end rejects pending requests and reports one failure', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const failures: Error[] = [];
+    const client = new IpcClient(input, output, {
+      onTransportFailure: (error) => failures.push(error),
+    });
+    client.start();
+    const pending = client.sendRequest('lint', {});
+    const closed = once(input, 'close');
+    input.destroy();
+    await closed;
+
+    await expect(pending).rejects.toThrow(/input stream closed/);
+    expect(failures).toHaveLength(1);
+    output.destroy();
+    expect(failures).toHaveLength(1);
   });
 
   // A future sendRequest after output error must fail fast, not park.

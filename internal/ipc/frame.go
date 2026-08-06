@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -46,6 +47,9 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindExit requests termination.
 	KindExit MessageKind = "exit"
+	// KindCancel is a best-effort notification asking the peer to abort an
+	// in-flight request with the referenced positive ID.
+	KindCancel MessageKind = "cancel"
 )
 
 // Message is one decoded wire frame. `ID` is 0 for notifications and a
@@ -151,6 +155,9 @@ func ReadFrame(r *bufio.Reader) (*Message, error) {
 	if err := json.Unmarshal(body, &msg); err != nil {
 		return nil, fmt.Errorf("ipc: decode frame (len=%d): %w", length, err)
 	}
+	if err := validateMessage(&msg); err != nil {
+		return nil, fmt.Errorf("ipc: decode frame (len=%d): %w", length, err)
+	}
 	return &msg, nil
 }
 
@@ -158,6 +165,9 @@ func ReadFrame(r *bufio.Reader) (*Message, error) {
 // that share a writer across goroutines must serialize WriteFrame calls
 // (Channel does this via its write mutex).
 func WriteFrame(w io.Writer, msg *Message) error {
+	if err := validateMessage(msg); err != nil {
+		return fmt.Errorf("ipc: encode frame: %w", err)
+	}
 	body, err := marshalJSON(msg)
 	if err != nil {
 		return fmt.Errorf("ipc: encode frame (kind=%s): %w", msg.Kind, err)
@@ -172,6 +182,22 @@ func WriteFrame(w io.Writer, msg *Message) error {
 	}
 	if err := writeExact(w, body); err != nil {
 		return fmt.Errorf("ipc: write frame body: %w", err)
+	}
+	return nil
+}
+
+func validateMessage(msg *Message) error {
+	if msg == nil {
+		return errors.New("message must not be nil")
+	}
+	if msg.Kind == "" {
+		return errors.New("message kind must be non-empty")
+	}
+	if msg.ID < 0 {
+		return errors.New("message id must be non-negative")
+	}
+	if (msg.Kind == KindResponse || msg.Kind == KindError) && msg.ID == 0 {
+		return fmt.Errorf("%s message id must be positive", msg.Kind)
 	}
 	return nil
 }
