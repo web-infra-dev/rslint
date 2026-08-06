@@ -3,7 +3,20 @@ import { RuleTester } from '../rule-tester';
 const ruleTester = new RuleTester();
 
 const lines = (...parts: string[]) => parts.join('\n');
-const js = (code: string) => ({ code, filename: 'file.js' });
+const js = (code: string) => ({
+  code,
+  filename: 'file.js',
+  languageOptions: {
+    // Fixture environment only: production globals still come exclusively
+    // from each user's flat config.
+    globals: {
+      global: 'readonly',
+      self: 'readonly',
+      WebAssembly: 'readonly',
+      window: 'readonly',
+    },
+  },
+});
 const invalid = (code: string, message: string) => ({
   ...js(code),
   errors: [{ message }],

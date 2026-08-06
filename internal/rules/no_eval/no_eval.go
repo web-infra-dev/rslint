@@ -233,7 +233,10 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 }
 
 func (state *noEvalState) isGlobalObjectReference(identifier *ast.Node, name string) bool {
-	if state.ctx.Globals.Override(name) == utils.GlobalAccessOff {
+	// Scope/type resolution may prove that TypeScript knows a same-named lib or
+	// ambient symbol, but ESLint exposes a host global object only when it exists
+	// in the effective languageOptions.globals view.
+	if !state.ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
 
@@ -310,15 +313,7 @@ func (state *noEvalState) isKnownGlobalObject(name string, status *globalObjectS
 		return status.known
 	}
 	status.knownChecked = true
-	if access := state.ctx.Globals.Override(name); access != utils.GlobalAccessUnset {
-		status.known = access.IsDeclared()
-	} else if name == "globalThis" {
-		status.known = state.ctx.Globals.Access(name).IsDeclared()
-	} else if state.ctx.TypeChecker != nil {
-		status.known = state.ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsValue, nil) != nil
-	} else {
-		status.known = true
-	}
+	status.known = state.ctx.Globals.Access(name).IsDeclared()
 	return status.known
 }
 

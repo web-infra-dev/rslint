@@ -405,6 +405,39 @@ func TestNewForBuiltinsECMAVersion(t *testing.T) {
 	)
 }
 
+func TestNewForBuiltinsGlobalAvailability(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&new_for_builtins.NewForBuiltinsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `window.Array()`, FileName: "file.js"},
+			{Code: `self.Array()`, FileName: "file.js"},
+			{Code: `global.Array()`, FileName: "file.js"},
+			{Code: `WebAssembly.Module(buffer)`, FileName: "file.js"},
+		},
+		[]rule_tester.InvalidTestCase{
+			invalidWithExactGlobals(
+				enforceInvalid(`window.Array()`, `window.Array()`, "Array"),
+				map[string]any{"window": "readonly"},
+			),
+			invalidWithExactGlobals(
+				enforceInvalid(`self.Array()`, `self.Array()`, "Array"),
+				map[string]any{"self": "writable"},
+			),
+			invalidWithExactGlobals(
+				enforceInvalid(`global.Array()`, `global.Array()`, "Array"),
+				map[string]any{"global": "readonly"},
+			),
+			invalidWithExactGlobals(
+				enforceInvalid(`WebAssembly.Module(buffer)`, `WebAssembly.Module(buffer)`, "WebAssembly.Module"),
+				map[string]any{"WebAssembly": "readonly"},
+			),
+		},
+	)
+}
+
 func invalidWithLanguageOptions(testCase rule_tester.InvalidTestCase, languageOptions rule.LanguageOptions) rule_tester.InvalidTestCase {
 	testCase.LanguageOptions = languageOptions
 	return testCase

@@ -871,29 +871,11 @@ func (state *ruleState) globalReferenceInfoFromPath(path []string, root *ast.Nod
 }
 
 func (state *ruleState) isAvailableGlobalObject(name string) bool {
-	// globalThis is an ECMAScript language global and therefore follows the
-	// selected edition. Keep the rule's existing host-global behavior for
-	// window/self/global unless the user explicitly configures them.
-	if name == "globalThis" {
-		return state.ctx.Globals.Access(name).IsDeclared()
-	}
-	if access := state.ctx.Globals.Override(name); access != utils.GlobalAccessUnset {
-		return access.IsDeclared()
-	}
-	return true
+	return state.ctx.Globals.Access(name).IsDeclared()
 }
 
 func (state *ruleState) isAvailableBareGlobal(name string) bool {
-	if state.ctx.Globals.IsECMAScriptGlobalName(name) {
-		return state.ctx.Globals.Access(name).IsDeclared()
-	}
-	// WebAssembly is a host global rather than an ECMAScript language global.
-	// Preserve the rule's existing host behavior while honoring an authored
-	// declaration or `off` setting.
-	if access := state.ctx.Globals.Override(name); access != utils.GlobalAccessUnset {
-		return access.IsDeclared()
-	}
-	return true
+	return state.ctx.Globals.Access(name).IsDeclared()
 }
 
 func (state *ruleState) expressionPath(node *ast.Node) ([]string, *ast.Node, bool) {

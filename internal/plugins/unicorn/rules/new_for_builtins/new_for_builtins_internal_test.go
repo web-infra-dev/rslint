@@ -429,6 +429,12 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 		SourceFile:     sourceFile,
 		Comments:       comments,
 		DisableManager: rule.NewDisableManager(sourceFile, comments),
+		Globals: rule.NewGlobals(
+			rule.LanguageOptions{},
+			map[string]utils.GlobalAccess{"WebAssembly": utils.GlobalAccessReadonly},
+			nil,
+			nil,
+		),
 	}.WithDiagnosticConsumer(NewForBuiltinsRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
 		Demand: demand,
 		Report: func(diagnostic rule.RuleDiagnostic) {

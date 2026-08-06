@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -13,7 +14,7 @@ func TestNoEvalRule(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoEvalRule,
-		[]rule_tester.ValidTestCase{
+		withNoEvalWindowGlobalValid([]rule_tester.ValidTestCase{
 			// ================================================================
 			// Basic: not eval
 			// ================================================================
@@ -196,8 +197,8 @@ func TestNoEvalRule(t *testing.T) {
 			{Code: `(eval)?.('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
 			{Code: `window?.eval('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
 			{Code: `(window?.eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withNoEvalWindowGlobalInvalid([]rule_tester.InvalidTestCase{
 			// ================================================================
 			// Direct eval calls — always flagged regardless of scope
 			// ================================================================
@@ -945,6 +946,48 @@ func TestNoEvalRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 8},
 				},
 			},
+		}),
+	)
+}
+
+func noEvalWindowGlobal(overrides map[string]any) map[string]any {
+	globals := map[string]any{"window": "readonly"}
+	for name, access := range overrides {
+		globals[name] = access
+	}
+	return globals
+}
+
+func withNoEvalWindowGlobalValid(testCases []rule_tester.ValidTestCase) []rule_tester.ValidTestCase {
+	for index := range testCases {
+		testCases[index].Globals = noEvalWindowGlobal(testCases[index].Globals)
+	}
+	return testCases
+}
+
+func withNoEvalWindowGlobalInvalid(testCases []rule_tester.InvalidTestCase) []rule_tester.InvalidTestCase {
+	for index := range testCases {
+		testCases[index].Globals = noEvalWindowGlobal(testCases[index].Globals)
+	}
+	return testCases
+}
+
+func TestNoEvalGlobalAvailability(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoEvalRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `window.eval('code')`},
+			{Code: `global.eval('code')`},
+			{Code: `globalThis.eval('code')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `window.eval('code')`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
+			{Code: `global.eval('code')`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
+			{Code: `/* global window */ window.eval('code')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
+			{Code: `globalThis.eval('code')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
 		},
 	)
 }

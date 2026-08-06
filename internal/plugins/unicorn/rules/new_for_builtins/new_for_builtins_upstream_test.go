@@ -495,10 +495,35 @@ func lines(parts ...string) string {
 }
 
 func jsValid(code string) rule_tester.ValidTestCase {
-	return rule_tester.ValidTestCase{Code: code, FileName: "file.js"}
+	return rule_tester.ValidTestCase{
+		Code:     code,
+		FileName: "file.js",
+		Globals:  newForBuiltinsTestGlobals(nil),
+	}
 }
 
 func invalidWithGlobals(testCase rule_tester.InvalidTestCase, globals map[string]any) rule_tester.InvalidTestCase {
+	testCase.Globals = newForBuiltinsTestGlobals(globals)
+	return testCase
+}
+
+// The upstream suite runs each branch with the host globals used by its
+// fixtures. Keep that environment explicit so a valid case cannot pass merely
+// because a host root is absent from languageOptions.globals.
+func newForBuiltinsTestGlobals(overrides map[string]any) map[string]any {
+	globals := map[string]any{
+		"global":      "readonly",
+		"self":        "readonly",
+		"WebAssembly": "readonly",
+		"window":      "readonly",
+	}
+	for name, access := range overrides {
+		globals[name] = access
+	}
+	return globals
+}
+
+func invalidWithExactGlobals(testCase rule_tester.InvalidTestCase, globals map[string]any) rule_tester.InvalidTestCase {
 	testCase.Globals = globals
 	return testCase
 }
@@ -508,6 +533,7 @@ func enforceInvalid(code string, target string, name string) rule_tester.Invalid
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: "file.js",
+		Globals:  newForBuiltinsTestGlobals(nil),
 		Output:   []string{output},
 		Errors: []rule_tester.InvalidTestCaseError{
 			expectedError(code, target, messageIDEnforce, enforceMessage(name)),
@@ -519,6 +545,7 @@ func disallowInvalid(code string, target string, name string, output string) rul
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: "file.js",
+		Globals:  newForBuiltinsTestGlobals(nil),
 		Output:   []string{output},
 		Errors: []rule_tester.InvalidTestCaseError{
 			expectedError(code, target, messageIDDisallow, disallowMessage(name)),
@@ -536,6 +563,7 @@ func disallowNoFixInvalid(code string, target string, name string) rule_tester.I
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: "file.js",
+		Globals:  newForBuiltinsTestGlobals(nil),
 		Errors: []rule_tester.InvalidTestCaseError{
 			expectedError(code, target, messageIDDisallow, disallowMessage(name)),
 		},
@@ -546,6 +574,7 @@ func disallowCallOrNewInvalid(code string, target string, name string) rule_test
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: "file.js",
+		Globals:  newForBuiltinsTestGlobals(nil),
 		Errors: []rule_tester.InvalidTestCaseError{
 			expectedError(code, target, messageIDDisallowCallOrNew, disallowCallOrNewMessage(name)),
 		},

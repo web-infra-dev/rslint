@@ -499,7 +499,11 @@ func (tracker *regexpCallTracker) globalObjectRootCanReachRegExp(node *ast.Node)
 }
 
 func (tracker *regexpCallTracker) trackGlobalRoot(name string, value regexpTraceValue) {
-	if tracker.isGlobalOff(name) {
+	// ReferenceTracker starts only from variables that exist in the effective
+	// global scope. This gates globalThis by ecmaVersion and requires host roots
+	// such as window/self/global to be authored through languageOptions.globals
+	// or an inline global directive.
+	if !tracker.ctx.Globals.Access(name).IsDeclared() {
 		tracker.disableRoot(name)
 		return
 	}
@@ -524,10 +528,6 @@ func (tracker *regexpCallTracker) disableRoot(name string) {
 		tracker.disabledRoots = make(map[string]bool)
 	}
 	tracker.disabledRoots[name] = true
-}
-
-func (tracker *regexpCallTracker) isGlobalOff(name string) bool {
-	return tracker.ctx.Globals.Override(name) == utils.GlobalAccessOff
 }
 
 func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {

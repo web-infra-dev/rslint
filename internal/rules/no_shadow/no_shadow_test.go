@@ -121,6 +121,11 @@ func TestNoShadowRule(t *testing.T) {
 			{Code: `function foo() { var Object = 0; }`},
 			// A declared global does not shadow when `builtinGlobals` is off.
 			{Code: `function foo() { var top = 0; }`, Globals: map[string]any{"top": "readonly"}},
+			// TypeScript's default libraries are not ESLint environments. Host
+			// names remain absent until languageOptions.globals declares them.
+			{Code: `function foo() { var window = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var console = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ---- builtinGlobals + explicit `off` setting ----
 			// Config `Object: "off"` / `/* global Object: off */` un-declares

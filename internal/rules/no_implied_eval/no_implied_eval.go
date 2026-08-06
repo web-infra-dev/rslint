@@ -64,7 +64,7 @@ var NoImpliedEvalRule = rule.Rule{
 					if !slices.Contains(evalLikeFunctions, name) {
 						return
 					}
-					if ctx.Globals.Override(name) == utils.GlobalAccessOff {
+					if !ctx.Globals.Access(name).IsDeclared() {
 						return
 					}
 					if utils.IsShadowed(callee, name) {
@@ -137,8 +137,7 @@ func isGlobalCandidateChain(node *ast.Node, globals rule.Globals) bool {
 	if !slices.Contains(globalCandidates, rootName) {
 		return false
 	}
-	if globals.Override(rootName) == utils.GlobalAccessOff ||
-		(rootName == "globalThis" && !globals.Access(rootName).IsDeclared()) {
+	if !globals.Access(rootName).IsDeclared() {
 		return false
 	}
 	if utils.IsShadowed(root, rootName) {

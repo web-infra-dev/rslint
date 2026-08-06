@@ -15,7 +15,7 @@ func TestNoImpliedEvalRule(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoImpliedEvalRule,
-		[]rule_tester.ValidTestCase{
+		withNoImpliedEvalGlobalsValid([]rule_tester.ValidTestCase{
 			// ---- Direct references without a call (global name is not invoked as eval) ----
 			{Code: `setTimeout();`},
 			{Code: `setTimeout;`},
@@ -271,25 +271,9 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			{Code: `setTimeout(Array.from('x'));`},          // Array.from not in whitelist
 			{Code: "setTimeout(tag`x`);"},                   // unknown tagged template
 
-			// SKIP upstream cases that depend on ESLint's `languageOptions.globals` /
-			// `sourceType` configuration, which rslint does not model. rslint's
-			// `IsShadowed` treats any undeclared reference as global, so these
-			// upstream-valid cases become false positives here.
-			//
-			// Covered upstream cases:
-			//   "window.setTimeout('foo')"          { sourceType: "commonjs" }
-			//   "window.setInterval('foo')"         { sourceType: "commonjs" }
-			//   "window['setTimeout']('foo')"       { sourceType: "commonjs" }
-			//   "window['setInterval']('foo')"      { sourceType: "commonjs" }
-			//   "global.setTimeout('foo')"          { globals: browser }
-			//   "global.setInterval('foo')"         { globals: browser }
-			//   "global['setTimeout']('foo')"       { globals: browser }
-			//   "global['setInterval']('foo')"      { globals: browser }
-			//   "setTimeout('code');"               { globals: {} }
-			//   "setInterval('code');"              { globals: {} }
-			//   "execScript('code');"               { globals: {} }
-			//   "window.setTimeout('code');"        { globals: {} }
-			//   "self.setTimeout('code');"          { globals: {} }
+			// Environment-absence cases from upstream are exercised separately in
+			// TestNoImpliedEvalGlobalAvailability. This baseline suite supplies the
+			// host globals needed to keep its argument-analysis branches meaningful.
 
 			// Config `off` un-declares the builtin
 			{Code: `setTimeout("x = 1;");`, Globals: map[string]any{"setTimeout": "off"}},
@@ -298,8 +282,8 @@ func TestNoImpliedEvalRule(t *testing.T) {
 			{Code: `window.setTimeout("x = 1;");`, Globals: map[string]any{"window": "off"}},
 			{Code: `globalThis.setTimeout("x = 1;");`, Globals: map[string]any{"globalThis": "off"}},
 			{Code: `self.setTimeout("x = 1;");`, Globals: map[string]any{"self": "off"}},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withNoImpliedEvalGlobalsInvalid([]rule_tester.InvalidTestCase{
 			// ---- Direct calls with string literal ----
 			{
 				Code: `setTimeout("x = 1;");`,
@@ -1173,6 +1157,61 @@ func TestNoImpliedEvalRule(t *testing.T) {
 					{MessageId: "impliedEval", Line: 1, Column: 40},
 				},
 			},
+		}),
+	)
+}
+
+func noImpliedEvalTestGlobals(overrides map[string]any) map[string]any {
+	globals := map[string]any{
+		"execScript":  "readonly",
+		"global":      "readonly",
+		"self":        "readonly",
+		"setInterval": "readonly",
+		"setTimeout":  "readonly",
+		"window":      "readonly",
+	}
+	for name, access := range overrides {
+		globals[name] = access
+	}
+	return globals
+}
+
+func withNoImpliedEvalGlobalsValid(testCases []rule_tester.ValidTestCase) []rule_tester.ValidTestCase {
+	for index := range testCases {
+		testCases[index].Globals = noImpliedEvalTestGlobals(testCases[index].Globals)
+	}
+	return testCases
+}
+
+func withNoImpliedEvalGlobalsInvalid(testCases []rule_tester.InvalidTestCase) []rule_tester.InvalidTestCase {
+	for index := range testCases {
+		testCases[index].Globals = noImpliedEvalTestGlobals(testCases[index].Globals)
+	}
+	return testCases
+}
+
+func TestNoImpliedEvalGlobalAvailability(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoImpliedEvalRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `setTimeout('code')`},
+			{Code: `setInterval('code')`},
+			{Code: `execScript('code')`},
+			{Code: `window.setTimeout('code')`},
+			{Code: `self.setTimeout('code')`},
+			{Code: `global.setTimeout('code')`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `setTimeout('code')`, Globals: map[string]any{"setTimeout": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `setInterval('code')`, Globals: map[string]any{"setInterval": "writable"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `execScript('code')`, Globals: map[string]any{"execScript": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "execScript"}}},
+			{Code: `window.setTimeout('code')`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `self.setTimeout('code')`, Globals: map[string]any{"self": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `global.setTimeout('code')`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `/* global window */ window.setTimeout('code')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
 		},
 	)
 }
