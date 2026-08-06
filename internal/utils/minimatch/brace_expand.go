@@ -98,9 +98,11 @@ func expandBraces(str string, isTop bool) []string {
 	options := strings.Contains(match.body, ",")
 
 	if !sequence && !options {
-		// `{a},b}` — the brace set really starts after the first `}`.
+		// `{a},b}` — the brace set really starts after the first `}`. The
+		// rewritten pattern is expanded as a top-level one again, so that an
+		// expansion it reduces to nothing still drops out.
 		if hasCommaBeforeBrace(match.post) {
-			return expandBraces(match.pre+"{"+match.body+escClose+match.post, false)
+			return expandBraces(match.pre+"{"+match.body+escClose+match.post, true)
 		}
 		return []string{str}
 	}
@@ -168,15 +170,12 @@ func expandSequence(n []string, alpha bool) []string {
 	y := sequenceValue(n[1])
 	width := max(len(n[0]), len(n[1]))
 
+	// A step of zero would never reach the end of the range, so it counts as
+	// one, the same as a sequence that named no step at all.
 	incr := 1
 	if len(n) == 3 {
-		incr = sequenceValue(n[2])
-		if incr < 0 {
-			incr = -incr
-		}
-	}
-	if incr == 0 {
-		return nil
+		step := sequenceValue(n[2])
+		incr = max(step, -step, 1)
 	}
 
 	test := func(i int) bool { return i <= y }

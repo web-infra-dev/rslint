@@ -51,6 +51,11 @@ func TestMatch(t *testing.T) {
 		{"*.!(x).!(y|z)", "a.b.c", true},
 		{"*.!(x).!(y|z)", "a.x.y", false},
 
+		// A negated list nested in a list that never closes still compiles.
+		{"/src/!(a!(a|b)", "/src/x", false},
+		{"/src/!(a!(a|b)", "/src/!(ax", true},
+		{"/src/!(a*(*.js|!(*.json))", "/src/x", false},
+
 		// ---- extended glob: combined and nested lists ----
 		{"/src/@(a|b)/+(c|d)/*", "/src/a/c/x.ts", true},
 		{"/src/@(a|b)/+(c|d)/*", "/src/b/dd/x.ts", true},
@@ -108,6 +113,24 @@ func TestMatch(t *testing.T) {
 		{"/src/[z-a]/x", "/src/a/x", false},
 		{"/src/[abc/x", "/src/[abc/x", true},
 		{"/src/[abc/x", "/src/a/x", false},
+
+		// A class naming a character a regexp reads as syntax of its own is
+		// still a class, and names that character.
+		{"/src/[[]", "/src/[", true},
+		{"/src/[[]", "/src/a", false},
+		{`/src/[\z]`, "/src/z", true},
+		{`/src/[\z]`, "/src/a", false},
+		{"/src/[!-[]", "/src/a", true},
+		{"/src/[!-[]", "/src/[", false},
+
+		// ---- characters outside ASCII ----
+		{"/src/caf*", "/src/café", true},
+		{"/src/*é", "/src/café", true},
+		{"/src/?é", "/src/aé", true},
+		{"/src/日本*", "/src/日本語", true},
+		{"/src/*(é|a)", "/src/é", true},
+		{"/src/[é]", "/src/é", true},
+		{"/src/[é]", "/src/a", false},
 
 		// ---- escaping and negated patterns ----
 		{`/src/\*.ts`, "/src/*.ts", true},
@@ -245,6 +268,12 @@ func TestBraceExpand(t *testing.T) {
 		{"a{a..c}d", []string{"aad", "abd", "acd"}},
 		{"a{-3..-1}d", []string{"a-3d", "a-2d", "a-1d"}},
 		{"a{-03..-1}d", []string{"a-03d", "a-02d", "a-01d"}},
+		// A step of zero counts as one.
+		{"a{1..3..0}d", []string{"a1d", "a2d", "a3d"}},
+		// The `{a},b}` rewrite starts over at the top level, where an
+		// expansion that reduces to nothing drops out.
+		{"{{}},}", []string{"{}}"}},
+		{"{{}},,a}", []string{"{}}", "a"}},
 		// Invalid sets are left alone.
 		{"a{2..}b", []string{"a{2..}b"}},
 		{"a{b}c", []string{"a{b}c"}},

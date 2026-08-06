@@ -9,8 +9,17 @@
 //
 // The port covers matching only: brace expansion, extended glob syntax, `**`,
 // character classes and negated patterns. Partial matching and the filesystem
-// traversal helpers are left out, as is the recursion cap minimatch added to
-// bound pathological `**` patterns.
+// traversal helpers are left out.
+//
+// A `**` walks the path by recursion, the way minimatch did before it traded
+// that for a head/body/tail decomposition and a depth cap. Both answer the
+// same, and a pattern of the shape rules write costs microseconds either way,
+// but the recursion is exponential in how many `**` one pattern carries: past
+// roughly eight of them it stops being cheap.
+//
+// A `?` and a character class each match one whole character, where minimatch
+// counts the UTF-16 units JavaScript strings are made of and so needs `??` for
+// a character outside the basic multilingual plane.
 //
 // See the LICENSE file in this directory for the upstream copyright notices.
 package minimatch
@@ -272,11 +281,12 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 		stateChar = 0
 	}
 
-	for i := range len(pattern) {
-		c := pattern[i]
-
+	// The index a rune is reported at is its offset in bytes, which is what the
+	// character class slicing below wants: every character the parser gives a
+	// meaning to is ASCII, so an offset always lands on a rune boundary.
+	for i, c := range pattern {
 		// skip over any that are escaped.
-		if escaping && strings.IndexByte(reSpecials, c) >= 0 {
+		if escaping && strings.ContainsRune(reSpecials, c) {
 			re += `\` + string(c)
 			escaping = false
 			continue
@@ -309,7 +319,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// If we already have a state character then there was something
 			// like `**` or `+?`: handle that one first, then hold on to this.
 			clearStateChar()
-			stateChar = c
+			stateChar = byte(c)
 			// Without extended glob syntax `+(asdf|foo)` isn't a thing, so
 			// release the state character now rather than opening a list.
 			if m.options.NoExt {
@@ -383,8 +393,13 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// equivalent to `\[z-a\]`. Split where the last `[` was and re-walk
 			// the contents so any character that was passed through as-is gets
 			// translated.
-			class := pattern[classStart+1 : i]
-			if _, err := regexp2.Compile("["+class+"]", regexp2.None); err != nil {
+			//
+			// What decides that is whether the class compiles, so ask about the
+			// translated source rather than the pattern text it came from: a
+			// character such as `[` or `\` that a glob passes straight through
+			// carries a meaning of its own in a regexp character class.
+			if _, err := regexp2.Compile(re[reClassStart:]+"]", regexp2.None); err != nil {
+				class := pattern[classStart+1 : i]
 				source, sourceMagic, _ := m.parseSource(class, true)
 				re = re[:reClassStart] + `\[` + source + `\]`
 				hasMagic = hasMagic || sourceMagic
@@ -401,7 +416,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			clearStateChar()
 			if escaping {
 				escaping = false
-			} else if strings.IndexByte(reSpecials, c) >= 0 && (c != '^' || !inClass) {
+			} else if strings.ContainsRune(reSpecials, c) && (c != '^' || !inClass) {
 				re += `\`
 			}
 			re += string(c)
@@ -461,10 +476,10 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 	for n := len(negativeLists) - 1; n >= 0; n-- {
 		nl := negativeLists[n]
 
-		before := re[:nl.reStart]
-		first := re[nl.reStart : nl.reEnd-8]
-		last := re[nl.reEnd-8 : nl.reEnd]
-		after := re[nl.reEnd:]
+		before := jsSlice(re, 0, nl.reStart)
+		first := jsSlice(re, nl.reStart, nl.reEnd-8)
+		last := jsSlice(re, nl.reEnd-8, nl.reEnd)
+		after := jsSlice(re, nl.reEnd, len(re))
 
 		last += after
 
@@ -664,6 +679,16 @@ func escapeTailPipes(tail string) string {
 		}
 	}
 	return escaped.String()
+}
+
+// jsSlice takes a substring the way JavaScript's String.prototype.slice does,
+// clamping an offset that runs past the end instead of failing. Rewriting an
+// unclosed extended glob list shortens the source after a negated list already
+// recorded where it ended, so those offsets can point past the end.
+func jsSlice(source string, start int, end int) string {
+	start = min(max(start, 0), len(source))
+	end = min(max(end, start), len(source))
+	return source[start:end]
 }
 
 // dropFirstCloseParen removes the first `)` and any quantifier bound to it.
