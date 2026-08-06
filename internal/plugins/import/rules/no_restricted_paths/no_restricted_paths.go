@@ -12,6 +12,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -51,15 +52,15 @@ var NoRestrictedPathsRule = rule.Rule{
 		}
 
 		basePath := resolveBasePath(ctx, opts.basePath)
-		// `path.relative` compares case-insensitively only in its win32 flavor,
-		// so this follows the platform rather than the host file system: a
-		// case-insensitive volume on macOS still gets a case-sensitive compare.
-		caseSensitive := runtime.GOOS != "windows"
+		// `path.relative` and Minimatch both pick their win32 flavor from the
+		// platform rather than the host file system, so a case-insensitive
+		// volume on macOS still gets a case-sensitive compare.
+		windows := runtime.GOOS == "windows"
 
 		currentFilename := import_utils.GetPhysicalFilename(ctx)
 		matchingZones := make([]zone, 0, len(opts.zones))
 		for _, z := range opts.zones {
-			if isMatchingZone(z, basePath, currentFilename, caseSensitive) {
+			if isMatchingZone(z, basePath, currentFilename, windows) {
 				matchingZones = append(matchingZones, z)
 			}
 		}
@@ -79,7 +80,7 @@ var NoRestrictedPathsRule = rule.Rule{
 
 			for i := range matchingZones {
 				if !built[i] {
-					validators[i] = makePathValidators(matchingZones[i].fromPaths, matchingZones[i].except, basePath, caseSensitive)
+					validators[i] = makePathValidators(matchingZones[i].fromPaths, matchingZones[i].except, basePath, windows)
 					built[i] = true
 				}
 
@@ -170,23 +171,23 @@ func toStringSlice(raw any) []string {
 	return nil
 }
 
-func isMatchingZone(z zone, basePath string, currentFilename string, caseSensitive bool) bool {
+func isMatchingZone(z zone, basePath string, currentFilename string, windows bool) bool {
 	for _, target := range z.targets {
-		if isMatchingTargetPath(currentFilename, tspath.ResolvePath(basePath, target), caseSensitive) {
+		if isMatchingTargetPath(currentFilename, tspath.ResolvePath(basePath, target), windows) {
 			return true
 		}
 	}
 	return false
 }
 
-func isMatchingTargetPath(fileName string, targetPath string, caseSensitive bool) bool {
+func isMatchingTargetPath(fileName string, targetPath string, windows bool) bool {
 	if isGlob(targetPath) {
-		return utils.MatchGlob(targetPath, fileName)
+		return minimatch.Match(fileName, targetPath, minimatch.Options{})
 	}
-	return containsPath(fileName, targetPath, caseSensitive)
+	return containsPath(fileName, targetPath, windows)
 }
 
-func makePathValidators(fromPaths []string, except []string, basePath string, caseSensitive bool) []pathValidator {
+func makePathValidators(fromPaths []string, except []string, basePath string, windows bool) []pathValidator {
 	anyGlob := false
 	anyNonGlob := false
 	for _, from := range fromPaths {
@@ -214,7 +215,7 @@ func makePathValidators(fromPaths []string, except []string, basePath string, ca
 		if anyGlob {
 			validators = append(validators, computeGlobPatternPathValidator(absoluteFrom, except))
 		} else {
-			validators = append(validators, computeAbsolutePathValidator(absoluteFrom, except, caseSensitive))
+			validators = append(validators, computeAbsolutePathValidator(absoluteFrom, except, windows))
 		}
 	}
 	return validators
@@ -225,9 +226,10 @@ func makePathValidators(fromPaths []string, except []string, basePath string, ca
 // resolving them against `basePath` first, so only absolute exception patterns
 // can ever match a resolved import path.
 func computeGlobPatternPathValidator(absoluteFrom string, except []string) pathValidator {
+	fromMatcher := minimatch.New(absoluteFrom, minimatch.Options{})
 	validator := pathValidator{
 		isPathRestricted: func(absoluteImportPath string) bool {
-			return utils.MatchGlob(absoluteFrom, absoluteImportPath)
+			return fromMatcher.Match(absoluteImportPath)
 		},
 		hasValidExceptions: true,
 		invalidException: rule.RuleMessage{
@@ -243,10 +245,17 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string) pathV
 		}
 	}
 
-	exceptions := except
+	// The exception patterns stay unresolved, and a Windows-native one such as
+	// `C:\repo\server\allowed\**\*` keeps its backslashes. minimatch.New
+	// rewrites those to `/` on Windows, the same way upstream's Minimatch
+	// constructor does, so the pattern can still match a normalized import path.
+	exceptionMatchers := make([]*minimatch.Matcher, 0, len(except))
+	for _, exception := range except {
+		exceptionMatchers = append(exceptionMatchers, minimatch.New(exception, minimatch.Options{}))
+	}
 	validator.isPathException = func(absoluteImportPath string) bool {
-		for _, exception := range exceptions {
-			if utils.MatchGlob(exception, absoluteImportPath) {
+		for _, matcher := range exceptionMatchers {
+			if matcher.Match(absoluteImportPath) {
 				return true
 			}
 		}
@@ -255,10 +264,10 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string) pathV
 	return validator
 }
 
-func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSensitive bool) pathValidator {
+func computeAbsolutePathValidator(absoluteFrom string, except []string, windows bool) pathValidator {
 	validator := pathValidator{
 		isPathRestricted: func(absoluteImportPath string) bool {
-			return containsPath(absoluteImportPath, absoluteFrom, caseSensitive)
+			return containsPath(absoluteImportPath, absoluteFrom, windows)
 		},
 		hasValidExceptions: true,
 		invalidException: rule.RuleMessage{
@@ -275,7 +284,7 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSens
 		// `^\.\.$|^\.\.[\\/]` matches only a leading `..` component. A name such
 		// as `..secret` therefore stays a valid exception, even though
 		// containsPath reads the same leftover as escaping `from`.
-		if !isPathWithin(absoluteException, absoluteFrom, caseSensitive) {
+		if !isPathWithin(absoluteException, absoluteFrom, windows) {
 			validator.hasValidExceptions = false
 			return validator
 		}
@@ -284,7 +293,7 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSens
 
 	validator.isPathException = func(absoluteImportPath string) bool {
 		for _, absoluteException := range absoluteExceptions {
-			if containsPath(absoluteImportPath, absoluteException, caseSensitive) {
+			if containsPath(absoluteImportPath, absoluteException, windows) {
 				return true
 			}
 		}
@@ -296,9 +305,12 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, caseSens
 // containsPath reports whether filePath is target itself or one of its
 // descendants, mirroring upstream's `relative === '' || !relative.startsWith('..')`
 // check on `path.relative(target, filePath)`.
-func containsPath(filePath string, target string, caseSensitive bool) bool {
-	if !isPathWithin(filePath, target, caseSensitive) {
+func containsPath(filePath string, target string, windows bool) bool {
+	if !isPathWithin(filePath, target, windows) {
 		return false
+	}
+	if rootsDiverge(filePath, target, windows) {
+		return true
 	}
 	// `path.relative` joins the components left over, and upstream's prefix test
 	// reads a leading `..` in that relative path as "outside target". A first
@@ -314,25 +326,49 @@ func containsPath(filePath string, target string, caseSensitive bool) bool {
 // `path.relative(target, filePath)` walks no `..` component upwards. Components
 // are compared the way the platform's `path.relative` does, so a leftover such
 // as `..secret.js` still counts as inside target.
-func isPathWithin(filePath string, target string, caseSensitive bool) bool {
+func isPathWithin(filePath string, target string, windows bool) bool {
+	if rootsDiverge(filePath, target, windows) {
+		return true
+	}
 	fileComponents := pathComponents(filePath)
 	targetComponents := pathComponents(target)
 	if len(targetComponents) > len(fileComponents) {
 		return false
 	}
 	for i, component := range targetComponents {
-		if !equalPathComponent(component, fileComponents[i], caseSensitive) {
+		if !equalPathComponent(component, fileComponents[i], windows) {
 			return false
 		}
 	}
 	return true
 }
 
-func equalPathComponent(a string, b string, caseSensitive bool) bool {
-	if caseSensitive {
-		return a == b
+// rootsDiverge reports whether `path.win32.relative` gives up on the pair and
+// hands back its absolute second argument, which it does once the two paths
+// differ before their first separator: different drive letters, or different
+// UNC servers. That answer is neither empty nor `..`-prefixed, so upstream ends
+// up reading filePath as inside target. Two shares on one UNC server still
+// share that first segment and keep the ordinary component comparison.
+func rootsDiverge(filePath string, target string, windows bool) bool {
+	return windows && !strings.EqualFold(firstPathSegment(filePath), firstPathSegment(target))
+}
+
+// firstPathSegment returns the leading segment `path.win32.relative` compares
+// before it reaches a separator, skipping the separators a UNC path starts
+// with: the drive of `C:/repo/a`, or the server of `//server/share/a`.
+func firstPathSegment(p string) string {
+	p = strings.TrimLeft(p, "/")
+	if index := strings.IndexByte(p, '/'); index >= 0 {
+		return p[:index]
 	}
-	return strings.EqualFold(a, b)
+	return p
+}
+
+func equalPathComponent(a string, b string, windows bool) bool {
+	if windows {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 // pathComponents splits a path into its root plus segments, dropping the empty

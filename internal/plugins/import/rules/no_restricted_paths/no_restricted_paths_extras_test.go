@@ -114,14 +114,26 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 				}),
 			},
 
-			// ---- Differences from ESLint: extended glob syntax is matched literally, so a
-			// `!(...)` target selects no file and leaves the zone inactive ----
+			// ---- Extended glob: a `!(...)` target excludes the directory it names, so
+			// a file inside it leaves the zone inactive ----
 			{
-				Code:     `import b from "../server/b"`,
-				FileName: "restricted-paths/client/a.ts",
+				Code:     `import b from "./b"`,
+				FileName: "restricted-paths/server/c.ts",
 				Options: zones(map[string]interface{}{
 					"target": "./restricted-paths/!(server)/**/*",
 					"from":   "./restricted-paths/server",
+				}),
+			},
+
+			// ---- Extended glob: the `?` opening a `?(...)` list is part of the list
+			// rather than a single-character wildcard, so a directory that merely ends
+			// in `(server)` stays outside `from` ----
+			{
+				Code:     `import a from "../x(server)/a"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client",
+					"from":   "./restricted-paths/?(server)/**/*",
 				}),
 			},
 
@@ -195,6 +207,40 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			// inspects a module specifier string literal and the linted file's path.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Extended glob: `!(...)` selects every directory it does not name,
+			// so a client file lands in the zone ----
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/!(server)/**/*",
+					"from":   "./restricted-paths/server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
+			// ---- Extended glob: `@(a|b)` in `from` restricts either alternative ----
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client",
+					"from":   "./restricted-paths/@(server|other)/**/*",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
+			// ---- Extended glob: `?(...)` restricts the directory it names ----
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client",
+					"from":   "./restricted-paths/?(server)/**/*",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
 			// ---- Options: the bare single-object shape a CLI config passes ----
 			{
 				Code:     `import b from "../server/b"`,

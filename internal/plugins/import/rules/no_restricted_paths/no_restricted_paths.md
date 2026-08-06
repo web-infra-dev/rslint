@@ -17,6 +17,8 @@ Each zone accepts:
 
 `from` is matched against the resolved path of the imported file, not against the specifier text as written in the source.
 
+Glob patterns are matched with the same syntax ESLint uses: `*`, `**`, `?`, `[abc]` character classes, `{a,b}` alternatives and the extended forms `!(a)`, `@(a|b)`, `+(a)`, `?(a)` and `*(a)`. A wildcard leaves names that start with a dot alone, so `./src/*` does not cover `./src/.hidden.ts`.
+
 Given this folder structure:
 
 ```
@@ -133,8 +135,6 @@ reports `Unexpected path "../server/bar" imported in restricted zone. Use the AP
 
 ## Differences from ESLint
 
-- Glob patterns support `*`, `**`, `?`, `[abc]` character classes and `{a,b}` alternatives. Extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — is matched as literal text and therefore matches no real path. A `target` such as `./client/!(sub-module)/**/*` leaves the zone inactive, and a `from` such as `./src/@(server|shared)/**/*` restricts nothing. Write `{server,shared}` instead of `@(server|shared)`, and name the directories you want to cover instead of excluding one with `!(...)`.
-- A `*` matches path segments that begin with a dot, so `./src/*` covers `./src/.hidden.ts` as well.
 - A zone is matched against the file a specifier resolves to, and a specifier resolves through the module resolution TypeScript recorded for it. TypeScript records `require('./x')` calls in JavaScript files, so in a TypeScript file write the import as an `import` declaration or a dynamic `import('./x')` for the zone to cover it.
 
 ## Original Documentation
