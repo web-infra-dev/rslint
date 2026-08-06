@@ -150,6 +150,29 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 5, Column: 13, EndColumn: 19},
 				},
 			},
+			// ---- Branch lock-in: merge ObjectPattern from the matching declarator ----
+			// Replacing the VariableStatement drops sibling declarators (upstream parity).
+			{
+				Code: `
+        const x = 1, { describe: context } = require('@jest/globals');
+        describe("suite", () => {
+          context("inner", () => {
+            test("foo");
+          });
+        })
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => {
+          context("inner", () => {
+            test("foo");
+          });
+        })
+      `},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 		},
 	)
 }

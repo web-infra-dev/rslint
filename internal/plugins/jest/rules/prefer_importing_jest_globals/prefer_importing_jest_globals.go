@@ -37,12 +37,55 @@ func buildPreferImportingJestGlobalMessage(jestFunctions string) rule.RuleMessag
 	}
 }
 
+// nameSet preserves insertion order while de-duplicating import/require names,
+// matching upstream's Set semantics for both the diagnostic message and autofix.
+type nameSet struct {
+	seen  map[string]struct{}
+	order []string
+}
+
+func newNameSet(capacity int) *nameSet {
+	return &nameSet{seen: make(map[string]struct{}, capacity)}
+}
+
+func newNameSetFrom(names []string) *nameSet {
+	s := newNameSet(len(names))
+	for _, name := range names {
+		s.add(name)
+	}
+	return s
+}
+
+func (s *nameSet) add(name string) {
+	if name == "" {
+		return
+	}
+	if _, exists := s.seen[name]; exists {
+		return
+	}
+	s.seen[name] = struct{}{}
+	s.order = append(s.order, name)
+}
+
+func (s *nameSet) joined() string {
+	return strings.Join(s.order, ", ")
+}
+
+func (s *nameSet) sortedJoined() string {
+	sorted := slices.Clone(s.order)
+	slices.Sort(sorted)
+	return strings.Join(sorted, ", ")
+}
+
 type options struct {
-	types []utils.JestFnType
+	types map[utils.JestFnType]struct{}
 }
 
 func parseOptions(rawOptions []any) options {
-	opts := options{types: slices.Clone(allJestFnTypes)}
+	opts := options{types: make(map[utils.JestFnType]struct{}, len(allJestFnTypes))}
+	for _, kind := range allJestFnTypes {
+		opts.types[kind] = struct{}{}
+	}
 	if len(rawOptions) == 0 {
 		return opts
 	}
@@ -53,7 +96,7 @@ func parseOptions(rawOptions []any) options {
 		return opts
 	}
 
-	parsed := make([]utils.JestFnType, 0, len(rawTypes))
+	parsed := make(map[utils.JestFnType]struct{}, len(rawTypes))
 	for _, item := range rawTypes {
 		s, ok := item.(string)
 		if !ok {
@@ -61,19 +104,23 @@ func parseOptions(rawOptions []any) options {
 		}
 		kind := utils.JestFnType(s)
 		if slices.Contains(allJestFnTypes, kind) {
-			parsed = append(parsed, kind)
+			parsed[kind] = struct{}{}
 		}
 	}
 	opts.types = parsed
 	return opts
 }
 
-func createFixerImports(isModule bool, names []string) string {
-	formatted := strings.Join(names, ", ")
+func (o options) allows(kind utils.JestFnType) bool {
+	_, ok := o.types[kind]
+	return ok
+}
+
+func createFixerImports(isModule bool, names string) string {
 	if isModule {
-		return fmt.Sprintf("import { %s } from '%s';", formatted, jestGlobalsModule)
+		return fmt.Sprintf("import { %s } from '%s';", names, jestGlobalsModule)
 	}
-	return fmt.Sprintf("const { %s } = require('%s');", formatted, jestGlobalsModule)
+	return fmt.Sprintf("const { %s } = require('%s');", names, jestGlobalsModule)
 }
 
 func isSupportedAccessor(node *ast.Node) bool {
@@ -91,6 +138,8 @@ func isSupportedAccessor(node *ast.Node) bool {
 	}
 }
 
+// getAccessorValue mirrors eslint-plugin-jest's getAccessorValue for identifiers
+// and static string/numeric accessors. String literals reuse GetStaticStringValue.
 func getAccessorValue(node *ast.Node) string {
 	if node == nil {
 		return ""
@@ -98,14 +147,10 @@ func getAccessorValue(node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return node.AsIdentifier().Text
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
 	case ast.KindNumericLiteral:
 		return node.AsNumericLiteral().Text
 	default:
-		return ""
+		return rslintUtils.GetStaticStringValue(node)
 	}
 }
 
@@ -122,54 +167,38 @@ func importNameFromSpecifier(spec *ast.ImportSpecifier) string {
 		return ""
 	}
 
-	localNode := spec.Name()
-	local := getAccessorValue(localNode)
-
-	if spec.PropertyName != nil {
-		imported := spec.PropertyName
-		switch imported.Kind {
-		case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-			importName := ""
-			if local != importName {
-				importName = " as " + local
-			}
-			return "'" + getAccessorValue(imported) + "'" + importName
-		default:
-			importName := getAccessorValue(imported)
-			if local != importName {
-				importName = importName + " as " + local
-			}
-			return importName
-		}
+	local := getAccessorValue(spec.Name())
+	if spec.PropertyName == nil {
+		return local
 	}
 
-	return local
+	imported := spec.PropertyName
+	switch imported.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		// Upstream builds "'value'" + optional " as local".
+		if local == "" {
+			return "'" + getAccessorValue(imported) + "'"
+		}
+		return "'" + getAccessorValue(imported) + "' as " + local
+	default:
+		importName := getAccessorValue(imported)
+		if local != "" && local != importName {
+			return importName + " as " + local
+		}
+		return importName
+	}
 }
 
-func collectExistingImportNames(importDecl *ast.ImportDeclaration, into map[string]struct{}, order *[]string) {
+func collectExistingImportNames(importDecl *ast.ImportDeclaration, names *nameSet) {
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return
 	}
 
-	add := func(name string) {
-		if name == "" {
-			return
-		}
-		if _, exists := into[name]; exists {
-			return
-		}
-		into[name] = struct{}{}
-		*order = append(*order, name)
-	}
-
 	clause := importDecl.ImportClause.AsImportClause()
 	if clause.Name() != nil {
-		add(clause.Name().Text())
+		names.add(clause.Name().Text())
 	}
-	if clause.NamedBindings == nil {
-		return
-	}
-	if clause.NamedBindings.Kind != ast.KindNamedImports {
+	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
 		return
 	}
 	named := clause.NamedBindings.AsNamedImports()
@@ -180,24 +209,13 @@ func collectExistingImportNames(importDecl *ast.ImportDeclaration, into map[stri
 		if el == nil || el.Kind != ast.KindImportSpecifier {
 			continue
 		}
-		add(importNameFromSpecifier(el.AsImportSpecifier()))
+		names.add(importNameFromSpecifier(el.AsImportSpecifier()))
 	}
 }
 
-func collectExistingRequireNames(binding *ast.Node, into map[string]struct{}, order *[]string) {
+func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
 	if binding == nil || binding.Kind != ast.KindObjectBindingPattern {
 		return
-	}
-
-	add := func(name string) {
-		if name == "" {
-			return
-		}
-		if _, exists := into[name]; exists {
-			return
-		}
-		into[name] = struct{}{}
-		*order = append(*order, name)
 	}
 
 	pattern := binding.AsBindingPattern()
@@ -229,7 +247,7 @@ func collectExistingRequireNames(binding *ast.Node, into map[string]struct{}, or
 				importName += ": " + local
 			}
 		}
-		add(importName)
+		names.add(importName)
 	}
 }
 
@@ -247,7 +265,15 @@ func findJestGlobalsImport(statements []*ast.Node) *ast.Node {
 	return nil
 }
 
-func findJestGlobalsRequire(statements []*ast.Node) *ast.Node {
+// jestGlobalsRequire holds the VariableStatement to replace and the specific
+// declarator that is require('@jest/globals'), so multi-declarator statements
+// still merge the correct ObjectPattern bindings.
+type jestGlobalsRequire struct {
+	stmt *ast.Node
+	decl *ast.VariableDeclaration
+}
+
+func findJestGlobalsRequire(statements []*ast.Node) *jestGlobalsRequire {
 	for _, stmt := range statements {
 		if stmt == nil || stmt.Kind != ast.KindVariableStatement {
 			continue
@@ -274,32 +300,25 @@ func findJestGlobalsRequire(statements []*ast.Node) *ast.Node {
 				continue
 			}
 			if testFramework.IsModuleRequireCall(decl.Initializer, jestGlobalsModule) {
-				return stmt
+				return &jestGlobalsRequire{stmt: stmt, decl: decl}
 			}
 		}
 	}
 	return nil
 }
 
-func sortedNames(order []string) []string {
-	sorted := slices.Clone(order)
-	slices.Sort(sorted)
-	return sorted
-}
-
-// lineIndentOfToken returns the whitespace between the start of the line and
-// the first token of node. Used so inserted imports keep the surrounding
-// indentation of indented fixtures (upstream tests use dedent / column 0).
 func lineIndentOfToken(ctx rule.RuleContext, node *ast.Node) string {
 	if ctx.SourceFile == nil || node == nil {
 		return ""
 	}
+
 	text := ctx.SourceFile.Text()
 	trimmed := rslintUtils.TrimNodeTextRange(ctx.SourceFile, node)
 	pos := trimmed.Pos()
 	if pos < 0 || pos > len(text) {
 		return ""
 	}
+
 	lineStart := strings.LastIndex(text[:pos], "\n") + 1
 	indent := text[lineStart:pos]
 	for _, r := range indent {
@@ -310,61 +329,43 @@ func lineIndentOfToken(ctx rule.RuleContext, node *ast.Node) string {
 	return indent
 }
 
-func buildAutofix(
-	ctx rule.RuleContext,
-	namesOrder []string,
-) []rule.RuleFix {
+func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 	if ctx.SourceFile == nil || ctx.SourceFile.Statements == nil || len(ctx.SourceFile.Statements.Nodes) == 0 {
 		return nil
 	}
 
 	statements := ctx.SourceFile.Statements.Nodes
 	firstNode := statements[0]
-
-	into := make(map[string]struct{}, len(namesOrder))
-	order := slices.Clone(namesOrder)
-	for _, name := range namesOrder {
-		into[name] = struct{}{}
-	}
-
+	names := newNameSetFrom(collected)
 	isModule := ast.IsExternalModule(ctx.SourceFile)
-	imports := createFixerImports(isModule, sortedNames(order))
-	indent := lineIndentOfToken(ctx, firstNode)
 
 	if isUseStrictDirective(firstNode) {
+		indent := lineIndentOfToken(ctx, firstNode)
 		return []rule.RuleFix{
-			rule.RuleFixInsertAfter(firstNode, "\n"+indent+imports),
+			rule.RuleFixInsertAfter(firstNode, "\n"+indent+createFixerImports(isModule, names.sortedJoined())),
 		}
 	}
 
 	if importNode := findJestGlobalsImport(statements); importNode != nil {
-		collectExistingImportNames(importNode.AsImportDeclaration(), into, &order)
-		replacement := createFixerImports(isModule, sortedNames(order))
+		collectExistingImportNames(importNode.AsImportDeclaration(), names)
 		return []rule.RuleFix{
-			rule.RuleFixReplace(ctx.SourceFile, importNode, replacement),
+			rule.RuleFixReplace(ctx.SourceFile, importNode, createFixerImports(isModule, names.sortedJoined())),
 		}
 	}
 
-	if requireNode := findJestGlobalsRequire(statements); requireNode != nil {
-		vs := requireNode.AsVariableStatement()
-		if vs.DeclarationList != nil {
-			list := vs.DeclarationList.AsVariableDeclarationList()
-			if list.Declarations != nil && len(list.Declarations.Nodes) > 0 {
-				decl := list.Declarations.Nodes[0].AsVariableDeclaration()
-				if decl != nil && decl.Name() != nil && decl.Name().Kind == ast.KindObjectBindingPattern {
-					collectExistingRequireNames(decl.Name(), into, &order)
-				}
-			}
+	if req := findJestGlobalsRequire(statements); req != nil {
+		if req.decl.Name() != nil && req.decl.Name().Kind == ast.KindObjectBindingPattern {
+			collectExistingRequireNames(req.decl.Name(), names)
 		}
-		replacement := createFixerImports(isModule, sortedNames(order))
 		return []rule.RuleFix{
-			rule.RuleFixReplace(ctx.SourceFile, requireNode, replacement),
+			rule.RuleFixReplace(ctx.SourceFile, req.stmt, createFixerImports(isModule, names.sortedJoined())),
 		}
 	}
 
 	// Keep the following statement's indentation after the inserted newline.
+	indent := lineIndentOfToken(ctx, firstNode)
 	return []rule.RuleFix{
-		rule.RuleFixInsertBefore(ctx.SourceFile, firstNode, imports+"\n"+indent),
+		rule.RuleFixInsertBefore(ctx.SourceFile, firstNode, createFixerImports(isModule, names.sortedJoined())+"\n"+indent),
 	}
 }
 
@@ -373,45 +374,34 @@ var PreferImportingJestGlobalsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
-
-		functionsToImport := make(map[string]struct{})
-		var importOrder []string
+		names := newNameSet(4)
 		var reportingNode *ast.Node
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := utils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil {
-					return
-				}
-				if jestFnCall.Head.Type == utils.JEST_IMPORT_MODE {
-					return
-				}
-				if !slices.Contains(opts.types, jestFnCall.Kind) {
+				if jestFnCall == nil ||
+					jestFnCall.Head.Type == utils.JEST_IMPORT_MODE ||
+					!opts.allows(jestFnCall.Kind) {
 					return
 				}
 
-				name := jestFnCall.Name
-				if _, exists := functionsToImport[name]; !exists {
-					functionsToImport[name] = struct{}{}
-					importOrder = append(importOrder, name)
-				}
+				names.add(jestFnCall.Name)
 				if reportingNode == nil {
 					reportingNode = jestFnCall.Head.Local.Node
 				}
 			},
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
-				if reportingNode == nil || len(importOrder) == 0 {
+				if reportingNode == nil || len(names.order) == 0 {
 					return
 				}
 
-				namesForMessage := slices.Clone(importOrder)
-				msg := buildPreferImportingJestGlobalMessage(strings.Join(namesForMessage, ", "))
-				namesForFix := slices.Clone(importOrder)
-
+				// Snapshot order for the deferred fixer; collectExisting* mutates a copy.
+				collected := slices.Clone(names.order)
+				msg := buildPreferImportingJestGlobalMessage(names.joined())
 				ctx.ReportNodeWithDeferredFixes(reportingNode, msg, func() []rule.RuleFix {
-					return buildAutofix(ctx, namesForFix)
+					return buildAutofix(ctx, collected)
 				})
 			},
 		}
