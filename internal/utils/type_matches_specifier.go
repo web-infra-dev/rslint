@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
@@ -133,14 +136,18 @@ func typeDeclaredInFile(
 	program *compiler.Program,
 ) bool {
 	cwd := program.Host().GetCurrentDirectory()
+	useCaseSensitiveFileNames := program.Host().FS().UseCaseSensitiveFileNames()
+	canonical := func(fileName string) string {
+		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
+	}
 	if relativePath == "" {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
-			return strings.HasPrefix(f.FileName(), cwd)
+			return strings.HasPrefix(canonical(f.FileName()), canonical(cwd))
 		})
 	}
-	absPath := tspath.GetNormalizedAbsolutePath(relativePath, cwd)
+	absPath := canonical(tspath.GetNormalizedAbsolutePath(relativePath, cwd))
 	return Some(declarationFiles, func(f *ast.SourceFile) bool {
-		return f.FileName() == absPath
+		return canonical(f.FileName()) == absPath
 	})
 }
 
@@ -165,15 +172,18 @@ func findParentModuleDeclaration(
 	switch node.Kind {
 	case ast.KindModuleDeclaration:
 		decl := node.AsModuleDeclaration()
-		if ast.IsStringLiteral(decl.Name()) {
-			return decl
+		// A namespace is transparent here: what it wraps still belongs to
+		// whichever `declare module "pkg"` encloses the namespace itself.
+		if decl.Keyword != ast.KindNamespaceKeyword {
+			if ast.IsStringLiteral(decl.Name()) {
+				return decl
+			}
+			return nil
 		}
-		return nil
 	case ast.KindSourceFile:
 		return nil
-	default:
-		return findParentModuleDeclaration(node.Parent)
 	}
+	return findParentModuleDeclaration(node.Parent)
 }
 
 func typeDeclaredInDeclareModule(
@@ -186,63 +196,74 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
+// resolvedPackageName returns the package a declaration file belongs to, in the
+// "name/subpath" form module resolution records, such as "demo-pkg/index.d.ts"
+// or "@types/node/globals.d.ts". Workspace packages are symlinked into
+// node_modules and resolve to their real path, so the owning package is found
+// through the nearest enclosing package.json that names one instead of through
+// the file name.
+func resolvedPackageName(program *compiler.Program, fileName string) string {
+	directory := tspath.GetDirectoryPath(fileName)
+	for directory != "" {
+		packageDirectory := program.GetNearestAncestorDirectoryWithPackageJson(directory)
+		if packageDirectory == "" {
+			return ""
+		}
+		info := program.GetPackageJsonInfo(tspath.CombinePaths(packageDirectory, "package.json"))
+		if info.Exists() {
+			if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
+				if subpath, nested := strings.CutPrefix(fileName, packageDirectory+"/"); nested {
+					return name + "/" + subpath
+				}
+				return name
+			}
+		}
+		// A package.json without a name, such as the `{"type": "module"}` files
+		// dual-published packages drop into subdirectories, belongs to whichever
+		// named package encloses it.
+		parent := tspath.GetDirectoryPath(packageDirectory)
+		if parent == packageDirectory {
+			return ""
+		}
+		directory = parent
+	}
+	return ""
+}
+
+// packageMatchers caches the compiled matcher per `package` specifier, which
+// comes from the rule options and so takes only a handful of distinct values.
+var packageMatchers sync.Map // package name -> *regexp2.Regexp, nil when the pattern is invalid
+
+// packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
+// pattern carries no anchors, so "demo" matches "demo-pkg" as well.
+func packageMatcher(packageName string) *regexp2.Regexp {
+	if cached, ok := packageMatchers.Load(packageName); ok {
+		matcher, _ := cached.(*regexp2.Regexp)
+		return matcher
+	}
+	matcher, err := CompileRegexp2(packageName+"|"+module.MangleScopedPackageName(packageName), JSRegexOptions)
+	if err != nil {
+		matcher = nil
+	}
+	packageMatchers.Store(packageName, matcher)
+	return matcher
+}
+
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
 	program *compiler.Program,
 ) bool {
-	// Check if any declaration file path contains the package name
-	// This handles cases like node_modules/package-name/...
+	matcher := packageMatcher(packageName)
+	if matcher == nil {
+		return false
+	}
 	for _, file := range declarationFiles {
-		if file == nil {
+		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		fileName := file.FileName()
-		// Check if the file is from node_modules and matches the package name
-		if strings.Contains(fileName, "node_modules/"+packageName+"/") ||
-			strings.Contains(fileName, "node_modules\\"+packageName+"\\") {
-			return true
-		}
-		// Handle @types packages
-		if strings.Contains(fileName, "node_modules/@types/"+strings.TrimPrefix(packageName, "@types/")+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-// getImportModuleSpecifier traverses up from a declaration to find the import module specifier
-func getImportModuleSpecifier(declaration *ast.Node) string {
-	if declaration == nil {
-		return ""
-	}
-
-	// Walk up to find ImportDeclaration
-	current := declaration
-	for current != nil {
-		if ast.IsImportDeclaration(current) {
-			moduleSpec := current.AsImportDeclaration().ModuleSpecifier
-			if moduleSpec != nil && ast.IsStringLiteral(moduleSpec) {
-				return moduleSpec.Text()
-			}
-			return ""
-		}
-		current = current.Parent
-	}
-	return ""
-}
-
-// typeDeclaredFromImport checks if any declaration comes from an import with the specified package name
-func typeDeclaredFromImport(
-	packageName string,
-	declarations []*ast.Node,
-) bool {
-	for _, decl := range declarations {
-		if decl == nil {
-			continue
-		}
-		moduleSpec := getImportModuleSpecifier(decl)
-		if moduleSpec == packageName {
+		name := resolvedPackageName(program, file.FileName())
+		if name != "" && Regexp2MatchString(matcher, name) {
 			return true
 		}
 	}
@@ -256,7 +277,6 @@ func typeDeclaredInPackageDeclarationFile(
 	program *compiler.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
-		typeDeclaredFromImport(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
 }
 

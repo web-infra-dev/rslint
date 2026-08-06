@@ -45,7 +45,7 @@ describe('defineConfig and config presets', () => {
       { rules: { '@typescript-eslint/no-explicit-any': 'off' } },
     ]);
     const normalized = normalizeConfig(config);
-    expect(normalized.length).toBe(2);
+    expect(normalized.length).toBe(ts.configs.recommended.length + 1);
     const lastEntry = normalized[normalized.length - 1];
     expect(lastEntry.rules).toEqual({
       '@typescript-eslint/no-explicit-any': 'off',
@@ -53,9 +53,10 @@ describe('defineConfig and config presets', () => {
   });
 
   test('ts.configs.recommended should declare @typescript-eslint plugin', () => {
-    const rec = ts.configs.recommended;
-    expect(rec.plugins).toBeDefined();
-    expect(rec.plugins).toContain('@typescript-eslint');
+    const plugins = ts.configs.recommended.flatMap((entry) =>
+      Array.isArray(entry.plugins) ? entry.plugins : [],
+    );
+    expect(plugins).toContain('@typescript-eslint');
   });
 
   test('react.configs.recommended should declare react plugin', () => {

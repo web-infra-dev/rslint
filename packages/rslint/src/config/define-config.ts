@@ -217,8 +217,12 @@ export interface RslintConfigEntry {
   rules?: RulesRecord;
 }
 
-/** Top-level rslint config: an array of entries. */
-export type RslintConfig = RslintConfigEntry[];
+/**
+ * Top-level rslint config: an array of entries. A preset that expands to
+ * several entries may be listed as-is; the loader flattens one level of
+ * nesting when it reads the config.
+ */
+export type RslintConfig = (RslintConfigEntry | RslintConfigEntry[])[];
 
 /**
  * Type-safe config helper. Returns the config array as-is (identity function).

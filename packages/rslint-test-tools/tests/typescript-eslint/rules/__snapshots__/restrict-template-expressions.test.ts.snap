@@ -1,0 +1,546 @@
+// Rstest Snapshot v1
+
+exports[`restrict-template-expressions > invalid 1`] = `
+{
+  "code": "
+        const msg = \`arg = \${123}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "123" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 2`] = `
+{
+  "code": "
+        const msg = \`arg = \${false}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "false" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 3`] = `
+{
+  "code": "
+        const msg = \`arg = \${null}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "null" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 4`] = `
+{
+  "code": "
+        declare const arg: number[];
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "number[]" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 5`] = `
+{
+  "code": "
+        const msg = \`arg = \${[, 2]}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "(number | undefined)[]" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 6`] = `
+{
+  "code": "const msg = \`arg = \${Promise.resolve()}\`;",
+  "diagnostics": [
+    {
+      "message": "Invalid type "Promise<void>" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 7`] = `
+{
+  "code": "const msg = \`arg = \${new Error()}\`;",
+  "diagnostics": [
+    {
+      "message": "Invalid type "Error" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 8`] = `
+{
+  "code": "
+        declare const arg: [number | undefined, string];
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "[number | undefined, string]" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 9`] = `
+{
+  "code": "
+        declare const arg: number;
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "number" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 10`] = `
+{
+  "code": "
+        declare const arg: boolean;
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "boolean" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 11`] = `
+{
+  "code": "
+        const arg = {};
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "{}" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 12`] = `
+{
+  "code": "
+        declare const arg: { a: string } & { b: string };
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "{ a: string; } & { b: string; }" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 13`] = `
+{
+  "code": "
+        function test<T extends {}>(arg: T) {
+          return \`arg = \${arg}\`;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "{}" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 14`] = `
+{
+  "code": "
+        function test<TWithNoConstraint>(arg: T) {
+          return \`arg = \${arg}\`;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "T" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 15`] = `
+{
+  "code": "
+        function test(arg: any) {
+          return \`arg = \${arg}\`;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "any" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 16`] = `
+{
+  "code": "
+        const arg = new RegExp('foo');
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "RegExp" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 17`] = `
+{
+  "code": "
+        const arg = /foo/;
+        const msg = \`arg = \${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "RegExp" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 18`] = `
+{
+  "code": "
+        declare const value: never;
+        const stringy = \`\${value}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "never" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-template-expressions > invalid 19`] = `
+{
+  "code": "
+        function test<T extends any>(arg: T) {
+          return \`arg = \${arg}\`;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid type "unknown" of template literal expression.",
+      "messageId": "invalidType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-template-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
