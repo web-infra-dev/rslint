@@ -1,0 +1,547 @@
+// Rstest Snapshot v1
+
+exports[`consistent-return > invalid 1`] = `
+{
+  "code": "function foo() { if (true) return true; else return; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 2`] = `
+{
+  "code": "var foo = () => { if (true) return true; else return; }",
+  "diagnostics": [
+    {
+      "message": "Arrow function expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 3`] = `
+{
+  "code": "function foo() { if (true) return; else return false; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected no return value.",
+      "messageId": "unexpectedReturnValue",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 4`] = `
+{
+  "code": "f(function() { if (true) return true; else return; })",
+  "diagnostics": [
+    {
+      "message": "Function expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 5`] = `
+{
+  "code": "f(function() { if (true) return; else return false; })",
+  "diagnostics": [
+    {
+      "message": "Function expected no return value.",
+      "messageId": "unexpectedReturnValue",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 6`] = `
+{
+  "code": "f(a => { if (true) return; else return false; })",
+  "diagnostics": [
+    {
+      "message": "Arrow function expected no return value.",
+      "messageId": "unexpectedReturnValue",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 7`] = `
+{
+  "code": "function foo() { if (true) return true; return undefined; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 8`] = `
+{
+  "code": "function foo() { if (true) return true; return void 0; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 9`] = `
+{
+  "code": "function foo() { if (true) return undefined; return true; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected no return value.",
+      "messageId": "unexpectedReturnValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 10`] = `
+{
+  "code": "function foo() { if (true) return void 0; return true; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' expected no return value.",
+      "messageId": "unexpectedReturnValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 11`] = `
+{
+  "code": "if (true) { return 1; } return;",
+  "diagnostics": [
+    {
+      "message": "Program expected a return value.",
+      "messageId": "missingReturnValue",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 12`] = `
+{
+  "code": "function foo() { if (a) return true; }",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of function 'foo'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 13`] = `
+{
+  "code": "function _foo() { if (a) return true; }",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of function '_foo'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 14`] = `
+{
+  "code": "f(function foo() { if (a) return true; });",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of function 'foo'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 15`] = `
+{
+  "code": "f(function() { if (a) return true; });",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of function.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 16`] = `
+{
+  "code": "f(() => { if (a) return true; });",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of arrow function.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 17`] = `
+{
+  "code": "var obj = {foo() { if (a) return true; }};",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of method 'foo'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 18`] = `
+{
+  "code": "class A {foo() { if (a) return true; }};",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of method 'foo'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 19`] = `
+{
+  "code": "if (a) return true;",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of program.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 20`] = `
+{
+  "code": "class A { CapitalizedFunction() { if (a) return true; } }",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of method 'CapitalizedFunction'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-return > invalid 21`] = `
+{
+  "code": "({ constructor() { if (a) return true; } });",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value at the end of method 'constructor'.",
+      "messageId": "missingReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

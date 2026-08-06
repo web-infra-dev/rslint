@@ -463,6 +463,7 @@ export default defineConfig({
     './tests/eslint/rules/no-alert.test.ts',
     './tests/eslint/rules/no-bitwise.test.ts',
     './tests/eslint/rules/complexity.test.ts',
+    './tests/eslint/rules/consistent-return.test.ts',
     './tests/eslint/rules/max-depth.test.ts',
     './tests/eslint/rules/max-lines.test.ts',
     './tests/eslint/rules/max-lines-per-function.test.ts',
