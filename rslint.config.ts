@@ -1,4 +1,5 @@
 import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
+import globals from 'globals';
 
 export default defineConfig([
   globalIgnores([
@@ -78,7 +79,10 @@ export default defineConfig([
     },
   },
   {
-    files: ['**/*.js', '**/*.cjs'],
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },
