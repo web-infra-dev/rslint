@@ -191,7 +191,7 @@ func reportPreferToBe(ctx rule.RuleContext, kind preferKind, jestFnCall *utils.P
 	fixes = append(fixes, renameFix)
 
 	if dropArgs {
-		callFix, ok := utils.ReplaceCallSuffixFix(node, matcherExpr, "()")
+		callFix, ok := utils.ReplaceCallSuffixFix(ctx.SourceFile, node, "()")
 		if !ok {
 			reportWithoutFix()
 			return

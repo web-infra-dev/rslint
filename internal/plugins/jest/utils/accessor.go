@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -188,13 +189,18 @@ func InsertMemberBeforeAccessorFix(
 
 // ReplaceCallSuffixFix replaces a call's type arguments and arguments while
 // preserving an optional-call token owned by the call.
+//
+// The range is derived from the call node alone: it starts at the first token
+// after the callee (or after the call's optional token), so a comment sitting
+// between the callee and the type/argument list is preserved rather than
+// swallowed.
 func ReplaceCallSuffixFix(
+	sourceFile *ast.SourceFile,
 	callNode *ast.Node,
-	callee *ast.Node,
 	replacement string,
 ) (rule.RuleFix, bool) {
 	callExpr := callNode.AsCallExpression()
-	if callExpr == nil || callee == nil {
+	if callExpr == nil {
 		return rule.RuleFix{}, false
 	}
 
@@ -202,6 +208,8 @@ func ReplaceCallSuffixFix(
 	if callExpr.QuestionDotToken != nil {
 		start = callExpr.QuestionDotToken.End()
 	}
+	// Advance past trivia to the `<` or `(` that actually opens the suffix.
+	start = scanner.GetRangeOfTokenAtPosition(sourceFile, start).Pos()
 	return rule.RuleFixReplaceRange(
 		core.NewTextRange(start, callNode.End()),
 		replacement,

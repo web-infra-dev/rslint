@@ -83,7 +83,7 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 				}
 				fixes = append(fixes, matcherFix)
 
-				callFix, ok := jestUtils.ReplaceCallSuffixFix(node, matcherAccessor, "()")
+				callFix, ok := jestUtils.ReplaceCallSuffixFix(ctx.SourceFile, node, "()")
 				if !ok {
 					reportWithoutFix()
 					return
