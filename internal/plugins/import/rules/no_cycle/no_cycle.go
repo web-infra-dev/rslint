@@ -286,7 +286,7 @@ func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, o
 			Specifier:  source.Text(),
 			OnlyTypes:  onlyTypes,
 		}
-		ref.ResolvedPath, ref.Target, _ = import_utils.ResolveModuleReferenceFromSourceFile(ctx, sourceFile, source)
+		ref.ResolvedPath, ref.Target, _ = import_utils.ResolveSourceFileFromSourceFile(ctx, sourceFile, source)
 		if ref.Target != nil && import_utils.IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
 			continue
 		}
