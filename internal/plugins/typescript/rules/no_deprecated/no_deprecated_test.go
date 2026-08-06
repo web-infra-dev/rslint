@@ -200,6 +200,31 @@ oldValue;
 	})
 }
 
+// A specifier that decodes into nothing would otherwise drop the whole allow
+// list, leaving the rule reporting everything it was configured to permit.
+func TestNoDeprecatedSchemaRejectsUnknownFrom(t *testing.T) {
+	t.Parallel()
+	allow := func(entry map[string]any) []any {
+		return []any{map[string]any{"allow": []any{entry}}}
+	}
+
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "package", "name": "oldValue", "package": "demo-pkg",
+	})); err != nil {
+		t.Fatalf("expected a well-formed specifier to validate, got %v", err)
+	}
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "module", "name": "oldValue",
+	})); err == nil {
+		t.Fatal("expected an unknown `from` to be rejected")
+	}
+	if err := NoDeprecatedRule.Schema.Validate(allow(map[string]any{
+		"from": "package", "name": "oldValue",
+	})); err == nil {
+		t.Fatal("expected `from: package` without a package to be rejected")
+	}
+}
+
 func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, entryFile string, options any) []rule.RuleDiagnostic {
 	t.Helper()
 	rootDir := fixtures.GetRootDir()

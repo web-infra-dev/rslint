@@ -2,6 +2,7 @@ package no_deprecated
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"regexp"
 	"strconv"
@@ -13,6 +14,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_deprecated.schema.json
+var schemaJSON []byte
 
 var deprecatedReasonPattern = regexp.MustCompile(`(?s)@deprecated\s*([\s\S]*?)\*/`)
 
@@ -1684,6 +1688,7 @@ func isIdentifierTaggedTemplateTag(node *ast.Node) bool {
 var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 	Name:             "no-deprecated",
 	RequiresTypeInfo: true,
+	Schema:           rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
