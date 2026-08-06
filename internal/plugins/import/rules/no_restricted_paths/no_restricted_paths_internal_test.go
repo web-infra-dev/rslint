@@ -1,5 +1,6 @@
-// These tests cover the path helpers directly, including the shapes no rule
-// test can reach: the win32 flavor of the path comparison only runs on Windows.
+// These tests cover the path and glob helpers directly, including the shapes no
+// rule test can reach: the win32 flavor of the path comparison only runs on
+// Windows.
 package no_restricted_paths
 
 import "testing"
@@ -60,10 +61,10 @@ func TestContainsPath(t *testing.T) {
 			want:     true,
 		},
 		{
-			// `path.win32.relative('C:\\project\\server', 'D:\\other\\a.ts')` is
-			// `'D:\\other\\a.ts'`, which upstream reads as inside the target.
+			// `path.win32.relative('C:\\project\\server', 'D:\\vendor\\a.ts')` is
+			// `'D:\\vendor\\a.ts'`, which upstream reads as inside the target.
 			name:     "a file on another drive",
-			filePath: "D:/other/a.ts",
+			filePath: "D:/vendor/a.ts",
 			target:   "C:/project/server",
 			windows:  true,
 			want:     true,
@@ -155,11 +156,11 @@ func TestIsPathWithin(t *testing.T) {
 			want:     true,
 		},
 		{
-			// importType classifies the `'D:\\other\\allowed'` that
+			// importType classifies the `'D:\\vendor\\allowed'` that
 			// `path.win32.relative` hands back as "external", so the exception
 			// stays valid rather than being reported as escaping `from`.
 			name:     "an exception on another drive",
-			filePath: "D:/other/allowed",
+			filePath: "D:/vendor/allowed",
 			target:   "C:/project/server",
 			windows:  true,
 			want:     true,
@@ -178,6 +179,66 @@ func TestIsPathWithin(t *testing.T) {
 			got := isPathWithin(test.filePath, test.target, test.windows)
 			if got != test.want {
 				t.Errorf("isPathWithin(%q, %q, %v) = %v, want %v", test.filePath, test.target, test.windows, got, test.want)
+			}
+		})
+	}
+}
+
+// TestEscapeExtglob pins the rewrite that keeps the extended glob syntax
+// doublestar does not implement out of the base wildcard syntax.
+func TestEscapeExtglob(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		want    string
+	}{
+		{
+			name:    "a pattern without extended glob syntax",
+			pattern: "/src/**/*.ts",
+			want:    "/src/**/*.ts",
+		},
+		{
+			name:    "a zero-or-one list, whose `?` would match any character",
+			pattern: "/src/?(server)/*",
+			want:    `/src/\?(server)/*`,
+		},
+		{
+			name:    "a zero-or-more list, whose `*` would match any segment",
+			pattern: "/src/*(server)/*",
+			want:    `/src/\*(server)/*`,
+		},
+		{
+			name:    "an alternation list, which carries no base wildcard",
+			pattern: "/src/@(server|shared)/**/*",
+			want:    "/src/@(server|shared)/**/*",
+		},
+		{
+			name:    "wildcards nested inside a list body",
+			pattern: "/src/+(a*|b?)/x",
+			want:    `/src/+(a\*|b\?)/x`,
+		},
+		{
+			name:    "a nested list",
+			pattern: "/src/!(a|?(b))/x",
+			want:    `/src/!(a|\?(b))/x`,
+		},
+		{
+			name:    "an escaped character before a list",
+			pattern: `/src/\@x/?(a)`,
+			want:    `/src/\@x/\?(a)`,
+		},
+		{
+			name:    "an unterminated list, which is not extended glob syntax",
+			pattern: "/src/?(server/*",
+			want:    "/src/?(server/*",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := escapeExtglob(test.pattern)
+			if got != test.want {
+				t.Errorf("escapeExtglob(%q) = %q, want %q", test.pattern, got, test.want)
 			}
 		})
 	}

@@ -12,7 +12,6 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/minimatch"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -182,7 +181,7 @@ func isMatchingZone(z zone, basePath string, currentFilename string, windows boo
 
 func isMatchingTargetPath(fileName string, targetPath string, windows bool) bool {
 	if isGlob(targetPath) {
-		return minimatch.Match(fileName, targetPath, minimatch.Options{})
+		return utils.MatchGlob(escapeExtglob(targetPath), fileName)
 	}
 	return containsPath(fileName, targetPath, windows)
 }
@@ -213,7 +212,7 @@ func makePathValidators(fromPaths []string, except []string, basePath string, wi
 	for _, from := range fromPaths {
 		absoluteFrom := tspath.ResolvePath(basePath, from)
 		if anyGlob {
-			validators = append(validators, computeGlobPatternPathValidator(absoluteFrom, except))
+			validators = append(validators, computeGlobPatternPathValidator(absoluteFrom, except, windows))
 		} else {
 			validators = append(validators, computeAbsolutePathValidator(absoluteFrom, except, windows))
 		}
@@ -225,11 +224,11 @@ func makePathValidators(fromPaths []string, except []string, basePath string, wi
 // patterns. Note that upstream matches `except` patterns verbatim rather than
 // resolving them against `basePath` first, so only absolute exception patterns
 // can ever match a resolved import path.
-func computeGlobPatternPathValidator(absoluteFrom string, except []string) pathValidator {
-	fromMatcher := minimatch.New(absoluteFrom, minimatch.Options{})
+func computeGlobPatternPathValidator(absoluteFrom string, except []string, windows bool) pathValidator {
+	fromPattern := escapeExtglob(absoluteFrom)
 	validator := pathValidator{
 		isPathRestricted: func(absoluteImportPath string) bool {
-			return fromMatcher.Match(absoluteImportPath)
+			return utils.MatchGlob(fromPattern, absoluteImportPath)
 		},
 		hasValidExceptions: true,
 		invalidException: rule.RuleMessage{
@@ -245,17 +244,22 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string) pathV
 		}
 	}
 
-	// The exception patterns stay unresolved, and a Windows-native one such as
-	// `C:\repo\server\allowed\**\*` keeps its backslashes. minimatch.New
-	// rewrites those to `/` on Windows, the same way upstream's Minimatch
-	// constructor does, so the pattern can still match a normalized import path.
-	exceptionMatchers := make([]*minimatch.Matcher, 0, len(except))
+	// The exception patterns stay unresolved, so a Windows-native one such as
+	// `C:\repo\server\allowed\**\*` still carries its backslashes. Upstream's
+	// Minimatch constructor rewrites the platform separator to `/` before it
+	// compiles a pattern; without the same rewrite the backslashes would reach
+	// doublestar as escapes and could never match an import path normalized
+	// to `/`.
+	exceptions := make([]string, 0, len(except))
 	for _, exception := range except {
-		exceptionMatchers = append(exceptionMatchers, minimatch.New(exception, minimatch.Options{}))
+		if windows {
+			exception = strings.ReplaceAll(exception, `\`, "/")
+		}
+		exceptions = append(exceptions, escapeExtglob(exception))
 	}
 	validator.isPathException = func(absoluteImportPath string) bool {
-		for _, matcher := range exceptionMatchers {
-			if matcher.Match(absoluteImportPath) {
+		for _, exception := range exceptions {
+			if utils.MatchGlob(exception, absoluteImportPath) {
 				return true
 			}
 		}
@@ -303,7 +307,7 @@ func computeAbsolutePathValidator(absoluteFrom string, except []string, windows 
 }
 
 // containsPath reports whether filePath is target itself or one of its
-// descendants, mirroring upstream's `relative === '' || !relative.startsWith('..')`
+// descendants, mirroring upstream's `relative === ” || !relative.startsWith('..')`
 // check on `path.relative(target, filePath)`.
 func containsPath(filePath string, target string, windows bool) bool {
 	if !isPathWithin(filePath, target, windows) {
@@ -390,6 +394,68 @@ func unexpectedPathMessage(importPath string, customMessage string) rule.RuleMes
 		Id:          "unexpectedPath",
 		Description: description,
 	}
+}
+
+// globMetaEscaper escapes the characters doublestar reads as base wildcard
+// syntax, so the run of text it is applied to matches only itself.
+var globMetaEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	`*`, `\*`,
+	`?`, `\?`,
+	`[`, `\[`,
+	`]`, `\]`,
+	`{`, `\{`,
+	`}`, `\}`,
+)
+
+// escapeExtglob rewrites every extended glob construct — `!(a)`, `@(a|b)`,
+// `+(a)`, `?(a)`, `*(a)` — into the literal text it is written as. doublestar
+// implements no extended glob syntax, so without this the leading `?` and `*`
+// of a list would go on acting as base wildcards and match paths that merely
+// happen to carry a parenthesized segment.
+func escapeExtglob(pattern string) string {
+	var escaped strings.Builder
+	for index := 0; index < len(pattern); {
+		if pattern[index] == '\\' {
+			end := min(index+2, len(pattern))
+			escaped.WriteString(pattern[index:end])
+			index = end
+			continue
+		}
+		end, ok := extglobEnd(pattern, index)
+		if !ok {
+			escaped.WriteByte(pattern[index])
+			index++
+			continue
+		}
+		escaped.WriteString(globMetaEscaper.Replace(pattern[index:end]))
+		index = end
+	}
+	return escaped.String()
+}
+
+// extglobEnd returns the offset just past the extended glob construct starting
+// at index, if one starts there: one of `@?!+*` followed by a parenthesized
+// body.
+func extglobEnd(pattern string, index int) (int, bool) {
+	if strings.IndexByte("@?!+*", pattern[index]) < 0 || charAt(pattern, index+1) != '(' {
+		return 0, false
+	}
+	depth := 0
+	for i := index + 1; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '\\':
+			i++
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i + 1, true
+			}
+		}
+	}
+	return 0, false
 }
 
 var extglobPattern = regexp.MustCompile(`(\\).|([@?!+*]\(.*\))`)
