@@ -1,5 +1,7 @@
 #!/usr/bin/env zx
 import fs from 'fs';
+import { $, argv } from 'zx';
+
 $.verbose = true;
 
 // build binary for following platforms

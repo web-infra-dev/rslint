@@ -3,7 +3,6 @@ import type { RslintConfigEntry } from '../define-config.js';
 // Aligned with official eslint:recommended (@eslint/js@10.x).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
-  files: ['**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs'],
   rules: {
     'constructor-super': 'error',
     'no-control-regex': 'error',
@@ -40,7 +39,7 @@ const recommended: RslintConfigEntry = {
     'no-unsafe-optional-chaining': 'error',
     'no-unused-labels': 'error',
     'no-unused-private-class-members': 'error',
-    // 'no-unused-vars': 'error', // not implemented
+    'no-unused-vars': 'error',
     'no-unassigned-vars': 'error',
     'no-useless-assignment': 'error',
     'no-useless-backreference': 'error',
