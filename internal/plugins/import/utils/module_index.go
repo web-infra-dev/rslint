@@ -63,8 +63,8 @@ func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := compileModuleSettings(ctx.Settings)
 	index, _ := ctx.ProgramCache.Load(indexKey{settings: settings.key}, func() any {
 		return &ModuleIndex{
-			ctx:      ctx,
-			settings: settings,
+			ctx:        ctx,
+			settings:   settings,
 			refs:       make(map[refKey][]ModuleReference),
 			exports:    make(map[*ast.SourceFile]*localExports),
 			exportMaps: make(map[*ast.SourceFile]*ExportMap),
@@ -122,9 +122,9 @@ func (index *ModuleIndex) Refs(file *ast.SourceFile, options ModuleReferenceOpti
 	return refs
 }
 
-// Exports returns what file says about its own exports, with every module
-// specifier resolved and none of them followed. The result is shared with
-// every other caller and must not be modified.
+// localExportsOf returns what file says about its own exports, with every
+// module specifier resolved and none of them followed. The result is shared
+// with every other caller and must not be modified.
 func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil

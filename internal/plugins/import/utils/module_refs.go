@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type ModuleReferenceOptions struct {
@@ -101,21 +102,19 @@ func needsFullModuleScan(sourceFile *ast.SourceFile) bool {
 
 func collectModuleReferencesByWalk(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions, settings *ModuleSettings) []ModuleReference {
 	var refs []ModuleReference
-	visitDescendants(sourceFile.AsNode(), func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
+	// A module specifier can appear anywhere a call can, so every subtree is
+	// walked; no node accounts for its own children here.
+	rslint_utils.VisitDescendants(sourceFile.AsNode(), func(node *ast.Node) bool {
 		switch node.Kind {
 		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
 			if !options.ESModule {
-				return
+				return true
 			}
 			importDecl := node.AsImportDeclaration()
 			addModuleReference(ctx, sourceFile, &refs, settings, importDecl.ModuleSpecifier, node, false, importDeclarationOnlyImportsTypes(importDecl))
 		case ast.KindExportDeclaration:
 			if !options.ESModule {
-				return
+				return true
 			}
 			exportDecl := node.AsExportDeclaration()
 			// tsgo matches eslint-plugin-import here: only `export type * from`
@@ -124,6 +123,7 @@ func collectModuleReferencesByWalk(ctx rule.RuleContext, sourceFile *ast.SourceF
 		case ast.KindCallExpression:
 			collectCallModuleReferences(ctx, sourceFile, &refs, settings, node.AsCallExpression(), options)
 		}
+		return true
 	})
 
 	return refs
@@ -233,15 +233,4 @@ func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
 		}
 	}
 	return true
-}
-
-func visitDescendants(node *ast.Node, visit func(*ast.Node)) {
-	if node == nil {
-		return
-	}
-	visit(node)
-	node.ForEachChild(func(child *ast.Node) bool {
-		visitDescendants(child, visit)
-		return false
-	})
 }

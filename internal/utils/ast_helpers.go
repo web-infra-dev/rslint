@@ -313,3 +313,17 @@ func IsClassExtendsHeritageClause(node *ast.Node) bool {
 	return grandparent != nil &&
 		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
 }
+
+// VisitDescendants walks node and everything beneath it, depth-first in source
+// order. Returning false from visit leaves that node's own children unvisited
+// and the walk carries on with its siblings, which is how a caller stops
+// descending into a subtree it has already accounted for.
+func VisitDescendants(node *ast.Node, visit func(*ast.Node) bool) {
+	if node == nil || !visit(node) {
+		return
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		VisitDescendants(child, visit)
+		return false
+	})
+}
