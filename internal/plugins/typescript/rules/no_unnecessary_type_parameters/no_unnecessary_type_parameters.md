@@ -43,6 +43,12 @@ function getProperty<T, K extends keyof T>(obj: T, key: K) {
 }
 ```
 
+## Differences from ESLint
+
+rslint resolves a few signature positions that the TypeScript public API keeps out of reach of upstream `@typescript-eslint/no-unnecessary-type-parameters`, and counts a type parameter appearing there as used. That makes for slightly fewer reports, all of them ones upstream raises in error.
+
+The `replaceUsagesWithConstraint` suggestion parenthesizes the constraint wherever the type grammar calls for it, so applying it always leaves you with the same type the code had before.
+
 ## Original Documentation
 
 [typescript-eslint: no-unnecessary-type-parameters](https://typescript-eslint.io/rules/no-unnecessary-type-parameters)

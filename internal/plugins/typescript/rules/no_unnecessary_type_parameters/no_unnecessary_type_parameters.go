@@ -171,11 +171,18 @@ func isDirectGenericTypeArgumentUsage(identNode *ast.Node) bool {
 	if immediateParent == nil || immediateParent.Kind != ast.KindTypeReference {
 		return false
 	}
-	grandparent := skipUnionIntersectionUpward(immediateParent.Parent)
+	// ESLint's AST has no parenthesized-type node, so in `Foo<(T)>` the bare
+	// reference is what its type-argument list holds. Peel tsgo's wrappers to
+	// reach the node that actually sits in the list.
+	argument := immediateParent
+	for argument.Parent != nil && argument.Parent.Kind == ast.KindParenthesizedType {
+		argument = argument.Parent
+	}
+	grandparent := skipUnionIntersectionUpward(argument.Parent)
 	if grandparent == nil || !canHaveTypeArgumentsList(grandparent.Kind) {
 		return false
 	}
-	if !slices.Contains(grandparent.TypeArguments(), immediateParent) {
+	if !slices.Contains(grandparent.TypeArguments(), argument) {
 		return false
 	}
 	// The Array<T>/ReadonlyArray<T> exclusion only makes sense for an actual
@@ -409,9 +416,19 @@ func collectTypeParameterUsageCounts(tc *checker.Checker, node *ast.Node, foundI
 					}
 					visitType(template, false, false)
 				}
+				// A key remapped through `as` is a signature position like any
+				// other. A mapped type's name type is internal to the checker,
+				// so upstream — which only has the public ts.Type surface —
+				// never descends here and reads a type parameter spelled only
+				// in an `as` clause as unused.
 				visitType(checker.Checker_getNameTypeFromMappedType(tc, t), false, false)
 			}
 
+			// Every index signature instantiates its value type once per key,
+			// so all of them count as multiple uses. The public ts.Type
+			// surface only offers getStringIndexType/getNumberIndexType, so
+			// upstream sees no use at all in a symbol-keyed or pattern-keyed
+			// signature.
 			for _, info := range checker.Checker_getIndexInfosOfType(tc, t) {
 				visitType(info.ValueType(), true, false)
 			}
@@ -461,19 +478,10 @@ func buildReplaceWithConstraintFixes(ctx rule.RuleContext, container *ast.Node, 
 			constraintText = utils.TrimmedNodeText(sourceFile, unwrappedConstraint)
 		}
 	}
-	isComplexConstraint := unwrappedConstraint != nil &&
-		(unwrappedConstraint.Kind == ast.KindUnionType ||
-			unwrappedConstraint.Kind == ast.KindIntersectionType ||
-			unwrappedConstraint.Kind == ast.KindConditionalType)
-
 	fixes := make([]rule.RuleFix, 0, len(ctx.Refs.References(sym))+1)
 	for _, refNode := range ctx.Refs.References(sym) {
 		text := constraintText
-		// Substituting a union/intersection/conditional constraint into an
-		// array/indexed-access/intersection/union position needs parens to
-		// avoid changing what the surrounding type means, e.g. replacing T in
-		// `T[]` with `string | number` must produce `(string | number)[]`.
-		if isComplexConstraint && isWrapBoundaryKind(effectiveGrandparentKind(refNode)) {
+		if constraintNeedsParentheses(refNode, unwrappedConstraint) {
 			text = "(" + constraintText + ")"
 		}
 		fixes = append(fixes, rule.RuleFixReplace(sourceFile, refNode, text))
@@ -483,31 +491,89 @@ func buildReplaceWithConstraintFixes(ctx rule.RuleContext, container *ast.Node, 
 	return fixes
 }
 
-func isWrapBoundaryKind(kind ast.Kind) bool {
-	switch kind {
-	case ast.KindArrayType, ast.KindIndexedAccessType, ast.KindIntersectionType, ast.KindUnionType:
+// Binding levels of the TypeScript type grammar, loosest first. A constraint
+// written at a level looser than its substitution site accepts has to be
+// parenthesized or the surrounding operators re-associate: replacing T in
+// `T[]` with `readonly string[]` must yield `(readonly string[])[]`, since
+// `readonly string[][]` is an array of `string[]` instead.
+const (
+	precLoose        = iota // conditional, function and constructor types
+	precUnion               // `A | B`
+	precIntersection        // `A & B`
+	precTypeOperator        // `keyof A`, `readonly A`, `unique symbol`
+	precPostfix             // `A[]`, `A[B]`, and every primary type
+)
+
+func typePrecedence(node *ast.Node) int {
+	switch node.Kind {
+	case ast.KindConditionalType, ast.KindFunctionType, ast.KindConstructorType:
+		return precLoose
+	case ast.KindUnionType:
+		return precUnion
+	case ast.KindIntersectionType:
+		return precIntersection
+	case ast.KindTypeOperator:
+		return precTypeOperator
+	}
+	return precPostfix
+}
+
+// constraintNeedsParentheses reports whether constraint, written in place of
+// a reference to the type parameter, has to be wrapped to keep its meaning.
+func constraintNeedsParentheses(refNode *ast.Node, constraint *ast.Node) bool {
+	if constraint == nil {
+		return false
+	}
+	reference := refNode.Parent
+	if reference == nil {
+		return false
+	}
+	site := reference.Parent
+	if site == nil || site.Kind == ast.KindParenthesizedType {
+		// The position already carries parentheses of its own.
+		return false
+	}
+	if typePrecedence(constraint) < requiredPrecedence(site, reference) {
 		return true
+	}
+	// Upstream wraps a union, intersection or conditional constraint in these
+	// positions whether or not the grammar asks for it. Keep those parentheses
+	// so the suggestion reads the same as ESLint's.
+	switch constraint.Kind {
+	case ast.KindUnionType, ast.KindIntersectionType, ast.KindConditionalType:
+		switch site.Kind {
+		case ast.KindArrayType, ast.KindIndexedAccessType, ast.KindIntersectionType, ast.KindUnionType:
+			return true
+		}
 	}
 	return false
 }
 
-// effectiveGrandparentKind mirrors upstream's `referenceNode.parent.parent`
-// (referenceNode being the TSTypeReference wrapping the identifier): the
-// node two levels above the identifier, skipping any tsgo
-// ParenthesizedType wrappers ESLint's flattened AST doesn't have.
-func effectiveGrandparentKind(identNode *ast.Node) ast.Kind {
-	parent := identNode.Parent
-	if parent == nil {
-		return ast.KindUnknown
+// requiredPrecedence returns the tightest binding a type must have to sit at
+// child's position within site without parentheses.
+func requiredPrecedence(site *ast.Node, child *ast.Node) int {
+	switch site.Kind {
+	case ast.KindArrayType:
+		return precPostfix
+	case ast.KindIndexedAccessType:
+		// Only the object half is a postfix operand; the index sits inside
+		// brackets, which accept any type.
+		if site.AsIndexedAccessTypeNode().ObjectType == child {
+			return precPostfix
+		}
+	case ast.KindTypeOperator, ast.KindIntersectionType:
+		return precTypeOperator
+	case ast.KindUnionType:
+		return precIntersection
+	case ast.KindConditionalType:
+		// The check and extends halves are parsed without conditional and
+		// function types; the branches take a full type.
+		conditional := site.AsConditionalTypeNode()
+		if conditional.CheckType == child || conditional.ExtendsType == child {
+			return precUnion
+		}
 	}
-	grandparent := parent.Parent
-	for grandparent != nil && grandparent.Kind == ast.KindParenthesizedType {
-		grandparent = grandparent.Parent
-	}
-	if grandparent == nil {
-		return ast.KindUnknown
-	}
-	return grandparent.Kind
+	return precLoose
 }
 
 // removeTypeParameterFix removes typeParamNode from container's `<...>`

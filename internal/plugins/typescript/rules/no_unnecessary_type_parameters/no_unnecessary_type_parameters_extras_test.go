@@ -159,7 +159,85 @@ declare function f<T>(b: Box<T>): void;
 declare function g<U>(u: U): U;
 declare function f<T>(x: typeof g<T>): void;
 `},
+
+		// ---- Branch lock-in: isDirectGenericTypeArgumentUsage() paren peeling ----
+		// tsgo wraps `(T)` in a ParenthesizedType that ESLint's AST doesn't
+		// have, so the node sitting in the outer type-argument list is that
+		// wrapper rather than the reference itself. Both nesting depths must
+		// still register as a direct generic-argument use.
+		{Code: `class Boxes<T> extends Array<(T)> {}`},
+		{Code: `
+interface Holder<A> {
+  value: A;
+}
+declare function hold<T>(x: Holder<((T))>): void;
+`},
+
+		// ---- Deliberate divergence: mapped-type `as` clause counts as a use ----
+		// A key remapped through `as` is a real signature position, so T relating
+		// the parameter to the remapped key is not a lone use. ESLint misses this
+		// because its type walk never descends into a mapped type's name type,
+		// and reports T here.
+		{Code: `<T extends string>(t: T) => t as { [K in 'a' as T]: 0 };`},
+
+		// ---- Deliberate divergence: every index signature counts, not just
+		// string/number ----
+		// An index signature instantiates its value type once per key, so T is
+		// used many times over. ESLint can only read the string and number index
+		// types, so it counts symbol-keyed and pattern-keyed signatures as no use
+		// at all and reports T here, suggesting a fix that erases the type.
+		{Code: `declare function symbolKeyed<T>(x: number): { [k: symbol]: T };`},
+		{Code: "declare function patternKeyed<T>(x: number): { [k: `a${string}`]: T };"},
+		{Code: `declare function symbolKeyedParam<T>(x: { [k: symbol]: T }): void;`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- Branch lock-in: isDirectGenericTypeArgumentUsage() paren peeling ----
+		// Peeling the ParenthesizedType must not lose the Array/ReadonlyArray
+		// exclusion: `Array<(T)>` still defers to the type-checker phase, which
+		// counts a mutable array parameter as a single use.
+		{
+			Code: `declare function collect<T>(x: Array<(T)>): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Message:   "Type parameter T is used only once in the function signature.",
+				Line:      1,
+				Column:    26,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function collect(x: Array<(unknown)>): void;`,
+				}},
+			}},
+		},
+
+		// ---- Deliberate divergence: mapped-type `as` clause counts as a use ----
+		// The counterpart to the valid case above: with the parameter list no
+		// longer mentioning U, the `as` clause is U's only position, so it is
+		// reported as used only once. ESLint reports it as never used.
+		{
+			Code: `declare function remap<T extends string, U extends string>(x: number): { [K in T as U]: 0 };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "sole",
+					Message:   "Type parameter T is used only once in the function signature.",
+					Line:      1,
+					Column:    24,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "replaceUsagesWithConstraint",
+						Output:    `declare function remap<U extends string>(x: number): { [K in string as U]: 0 };`,
+					}},
+				},
+				{
+					MessageId: "sole",
+					Message:   "Type parameter U is used only once in the function signature.",
+					Line:      1,
+					Column:    42,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "replaceUsagesWithConstraint",
+						Output:    `declare function remap<T extends string>(x: number): { [K in T as string]: 0 };`,
+					}},
+				},
+			},
+		},
+
 		// ---- Dimension 4: polymorphic `this` type in a class member ----
 		// Regression lock-in: `this` types reach the type-parameter branch of the
 		// type walk with a class symbol, whose first declaration is a
@@ -447,6 +525,92 @@ function f<T extends 'a' | 'b'>(x: Lookup[T]): void {}
 type Lookup = { a: 1; b: 2 };
 function f(x: Lookup[('a' | 'b')]): void {}
 `,
+				}},
+			}},
+		},
+
+		// ---- Deliberate divergence: the constraint is parenthesized whenever
+		// the type grammar demands it, not only for unions, intersections and
+		// conditionals ----
+		// A function, constructor or type-operator constraint binds looser than
+		// the array, indexed-access and `keyof` positions it can land in, so it
+		// needs the same treatment. ESLint checks only the three complex kinds
+		// and emits `() => void[]`, `readonly string[][]` and
+		// `keyof string | number`, each of which denotes a different type than
+		// the code being replaced.
+		{
+			Code: `declare function callbacks<T extends () => void>(x: T[]): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    28,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function callbacks(x: (() => void)[]): void;`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function ctors<T extends new () => void>(x: T[]): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    24,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function ctors(x: (new () => void)[]): void;`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function frozen<T extends readonly string[]>(x: T[]): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    25,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function frozen(x: (readonly string[])[]): void;`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function keys<T extends string | number>(x: keyof T): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    23,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function keys(x: keyof (string | number)): void;`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function check<T extends () => void>(x: T extends object ? 1 : 2): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    24,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `declare function check(x: (() => void) extends object ? 1 : 2): void;`,
+				}},
+			}},
+		},
+		{
+			// A type query is already a primary type, so the array position
+			// takes it as written.
+			Code: `declare const seed: string;
+declare function seeded<T extends typeof seed>(x: T[]): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    25,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare const seed: string;
+declare function seeded(x: typeof seed[]): void;`,
 				}},
 			}},
 		},

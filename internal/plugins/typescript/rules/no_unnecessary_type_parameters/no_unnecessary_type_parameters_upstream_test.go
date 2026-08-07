@@ -482,7 +482,6 @@ const f = <T,>(
   getValue: (v: NoInfer<T>) => NoInfer<T>,
 ) => {};
 `},
-		{Code: "<T extends string>(t: T) => t as { [K in 'a' as T]: 0 };"},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `const func = <T,>(param: T) => null;`,
