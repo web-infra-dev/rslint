@@ -38,33 +38,59 @@ type RestrictPlusOperandsOptions struct {
 	SkipCompoundAssignments *bool
 }
 
+func parseOptions(options []any) RestrictPlusOperandsOptions {
+	opts, ok := rule.LegacyUnwrapOptions(options).(RestrictPlusOperandsOptions)
+	if !ok {
+		opts = RestrictPlusOperandsOptions{}
+		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+			if value, ok := optsMap["allowAny"].(bool); ok {
+				opts.AllowAny = utils.Ref(value)
+			}
+			if value, ok := optsMap["allowBoolean"].(bool); ok {
+				opts.AllowBoolean = utils.Ref(value)
+			}
+			if value, ok := optsMap["allowNullish"].(bool); ok {
+				opts.AllowNullish = utils.Ref(value)
+			}
+			if value, ok := optsMap["allowNumberAndString"].(bool); ok {
+				opts.AllowNumberAndString = utils.Ref(value)
+			}
+			if value, ok := optsMap["allowRegExp"].(bool); ok {
+				opts.AllowRegExp = utils.Ref(value)
+			}
+			if value, ok := optsMap["skipCompoundAssignments"].(bool); ok {
+				opts.SkipCompoundAssignments = utils.Ref(value)
+			}
+		}
+	}
+
+	if opts.AllowAny == nil {
+		opts.AllowAny = utils.Ref(true)
+	}
+	if opts.AllowBoolean == nil {
+		opts.AllowBoolean = utils.Ref(true)
+	}
+	if opts.AllowNullish == nil {
+		opts.AllowNullish = utils.Ref(true)
+	}
+	if opts.AllowNumberAndString == nil {
+		opts.AllowNumberAndString = utils.Ref(true)
+	}
+	if opts.AllowRegExp == nil {
+		opts.AllowRegExp = utils.Ref(true)
+	}
+	if opts.SkipCompoundAssignments == nil {
+		opts.SkipCompoundAssignments = utils.Ref(false)
+	}
+
+	return opts
+}
+
 var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(RestrictPlusOperandsOptions)
-		if !ok {
-			opts = RestrictPlusOperandsOptions{}
-		}
-		if opts.AllowAny == nil {
-			opts.AllowAny = utils.Ref(true)
-		}
-		if opts.AllowBoolean == nil {
-			opts.AllowBoolean = utils.Ref(true)
-		}
-		if opts.AllowNullish == nil {
-			opts.AllowNullish = utils.Ref(true)
-		}
-		if opts.AllowNumberAndString == nil {
-			opts.AllowNumberAndString = utils.Ref(true)
-		}
-		if opts.AllowRegExp == nil {
-			opts.AllowRegExp = utils.Ref(true)
-		}
-		if opts.SkipCompoundAssignments == nil {
-			opts.SkipCompoundAssignments = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		stringLikes := make([]string, 0, 5)
 		if *opts.AllowAny {
