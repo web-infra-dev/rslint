@@ -27,6 +27,10 @@ type ModuleIndex struct {
 	mu      sync.Mutex
 	refs    map[refKey][]ModuleReference
 	exports map[*ast.SourceFile]*LocalExports
+	// exportMaps holds the fully merged export maps that turned out not to
+	// depend on where the query that built them started. The builder decides
+	// which those are; see exportMapOf.
+	exportMaps map[*ast.SourceFile]*ExportMap
 }
 
 // refKey pairs a file with the module syntax the caller wants recognized.
@@ -61,8 +65,9 @@ func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 		return &ModuleIndex{
 			ctx:      ctx,
 			settings: settings,
-			refs:     make(map[refKey][]ModuleReference),
-			exports:  make(map[*ast.SourceFile]*LocalExports),
+			refs:       make(map[refKey][]ModuleReference),
+			exports:    make(map[*ast.SourceFile]*LocalExports),
+			exportMaps: make(map[*ast.SourceFile]*ExportMap),
 		}
 	}).(*ModuleIndex)
 	return index
@@ -142,6 +147,29 @@ func (index *ModuleIndex) Exports(file *ast.SourceFile) *LocalExports {
 	}
 	index.mu.Unlock()
 	return exports
+}
+
+// cachedExportMap returns the merged export map of a file whose closure was
+// found to be free of re-export cycles, or nil when there is none to reuse.
+// The result is read-only: every caller shares it.
+func (index *ModuleIndex) cachedExportMap(file *ast.SourceFile) *ExportMap {
+	if index == nil {
+		return nil
+	}
+	index.mu.Lock()
+	defer index.mu.Unlock()
+	return index.exportMaps[file]
+}
+
+func (index *ModuleIndex) storeExportMap(file *ast.SourceFile, exports *ExportMap) {
+	if index == nil {
+		return
+	}
+	index.mu.Lock()
+	defer index.mu.Unlock()
+	if _, ok := index.exportMaps[file]; !ok {
+		index.exportMaps[file] = exports
+	}
 }
 
 // CompileModuleSettings compiles the `import/` settings that decide which

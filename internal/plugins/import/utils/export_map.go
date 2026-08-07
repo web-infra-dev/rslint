@@ -118,10 +118,25 @@ func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName strin
 // structures the index holds. building maps a file to the map being filled
 // for it, so a module that re-exports its way back to itself sees the partial
 // map rather than recursing forever; seen does the same for the name lookup.
+//
+// It also decides which of the maps it builds outlive the query. A map is
+// only a property of its file when nothing in the file's re-export closure
+// forms a cycle: inside a cycle, what a module ends up exporting depends on
+// which module the query entered from, so those maps stay private to the
+// query that built them.
 type exportBuilder struct {
 	index    *ModuleIndex
 	building map[*ast.SourceFile]*ExportMap
 	seen     map[exportKey]bool
+	// onStack holds the files whose maps are still being filled, so that
+	// reaching one again is recognized as a cycle rather than as reuse.
+	onStack map[*ast.SourceFile]bool
+	// unstable holds the files this query finished but found to be in or
+	// below a cycle, so that reusing one keeps its dependents unstable too.
+	unstable map[*ast.SourceFile]bool
+	// sawCycle reports whether the file currently being built has reached a
+	// cycle so far. It is saved and restored around each nested build.
+	sawCycle bool
 }
 
 func newExportBuilder(ctx rule.RuleContext) *exportBuilder {
@@ -129,6 +144,8 @@ func newExportBuilder(ctx rule.RuleContext) *exportBuilder {
 		index:    IndexFor(ctx),
 		building: make(map[*ast.SourceFile]*ExportMap),
 		seen:     make(map[exportKey]bool),
+		onStack:  make(map[*ast.SourceFile]bool),
+		unstable: make(map[*ast.SourceFile]bool),
 	}
 }
 
@@ -172,21 +189,43 @@ func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier 
 // registered before the steps run, so a dependency that re-exports its way
 // back here merges whatever is complete at that point — which is what
 // re-walking the statements would also produce.
+//
+// A file whose closure turned out to be free of cycles is handed to the index
+// afterwards, because its map cannot depend on where the query started: a
+// dependency can only be half-built when it is also waiting on this file,
+// which is exactly the case a cycle-free closure rules out.
 func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap {
 	if sourceFile == nil {
 		return NewExportMap()
 	}
 	if existing := builder.building[sourceFile]; existing != nil {
+		if builder.onStack[sourceFile] || builder.unstable[sourceFile] {
+			builder.sawCycle = true
+		}
 		return existing
+	}
+	if cached := builder.index.cachedExportMap(sourceFile); cached != nil {
+		return cached
 	}
 
 	exports := NewExportMap()
 	builder.building[sourceFile] = exports
+	builder.onStack[sourceFile] = true
+	enclosing := builder.sawCycle
+	builder.sawCycle = false
 
 	local := builder.index.Exports(sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
+
+	delete(builder.onStack, sourceFile)
+	if builder.sawCycle {
+		builder.unstable[sourceFile] = true
+	} else {
+		builder.index.storeExportMap(sourceFile, exports)
+	}
+	builder.sawCycle = enclosing || builder.sawCycle
 	return exports
 }
 
