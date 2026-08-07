@@ -57,9 +57,10 @@ const (
 	rstestProfilePlaywright
 )
 
-// ParseRstestFnCall parses a final Rstest test/describe registration call.
-// Factory calls such as test.each(cases), test.runIf(condition), and
-// test.extend(fixtures) are intentionally not returned.
+// ParseRstestFnCall parses a final Rstest test/describe/hook registration
+// call; callers distinguish the three through Kind. Factory calls such as
+// test.each(cases), test.runIf(condition), and test.extend(fixtures) are
+// intentionally not returned.
 func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall {
 	return parseRstestFnCall(node, ctx, false, false)
 }
