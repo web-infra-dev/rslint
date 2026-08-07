@@ -1,7 +1,10 @@
 package minimatch_test
 
 import (
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch"
 )
@@ -113,6 +116,17 @@ func TestMatch(t *testing.T) {
 		{"/src/[z-a]/x", "/src/a/x", false},
 		{"/src/[abc/x", "/src/[abc/x", true},
 		{"/src/[abc/x", "/src/a/x", false},
+
+		// A class naming nothing matches any one character.
+		{"/src/[!]", "/src/a", true},
+		{"/src/[!]", "/src/]", true},
+		{"/src/[!]", "/src/.", false},
+		{"/src/[!]", "/src/ab", false},
+		{"/src/[^]", "/src/a", true},
+		{"/src/[^]", "/src/.", false},
+		{"/src/x[!]y", "/src/x.y", true},
+		{"/src/[!]]", "/src/a]", true},
+		{"/src/[!]]", "/src/]", false},
 
 		// A class naming a character a regexp reads as syntax of its own is
 		// still a class, and names that character.
@@ -250,6 +264,43 @@ func TestMatchOptions(t *testing.T) {
 			got := minimatch.Match(test.pattern, test.path, test.options)
 			if got != test.want {
 				t.Errorf("Match(%q, %q, %+v) = %v, want %v", test.pattern, test.path, test.options, got, test.want)
+			}
+		})
+	}
+}
+
+// TestMatchManyGlobstars covers a pattern carrying more `**` than any rule
+// would write. Dividing the path between them is a search, and one that misses
+// explores every division, so the answer has to come from a walk that
+// remembers where it has already failed rather than from raw backtracking.
+func TestMatchManyGlobstars(t *testing.T) {
+	parts := make([]string, 0, 32)
+	for i := range 32 {
+		parts = append(parts, string(rune('a'+i%26))+strconv.Itoa(i))
+	}
+	path := strings.Join(parts, "/")
+
+	globstars := strings.TrimSuffix(strings.Repeat("**/", 16), "/")
+
+	tests := []struct {
+		name    string
+		pattern string
+		want    bool
+	}{
+		{name: "a miss on the last part", pattern: globstars + "/zz", want: false},
+		{name: "a hit on the last part", pattern: globstars + "/" + parts[len(parts)-1], want: true},
+		{name: "a miss in the middle", pattern: globstars + "/zz/**", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			start := time.Now()
+			got := minimatch.Match(test.pattern, path, minimatch.Options{})
+			if got != test.want {
+				t.Errorf("Match(%q, %q) = %v, want %v", test.pattern, path, got, test.want)
+			}
+			if elapsed := time.Since(start); elapsed > 5*time.Second {
+				t.Errorf("Match(%q, %q) took %s, want a walk that does not backtrack exponentially", test.pattern, path, elapsed)
 			}
 		})
 	}

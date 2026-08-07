@@ -15,18 +15,14 @@
 // character classes and negated patterns. Partial matching and the filesystem
 // traversal helpers are left out.
 //
-// A `**` walks the path by recursion, the way minimatch did before it traded
-// that for a head/body/tail decomposition and a depth cap. Both answer the
-// same, and a pattern of the shape rules write costs microseconds either way,
-// but the recursion is exponential in how many `**` one pattern carries: past
-// roughly eight of them it stops being cheap.
+// A `**` walks the path by recursion, remembering the pairs of path part and
+// pattern part it has already failed at so that a pattern carrying several of
+// them stays cheap. minimatch instead caps how deep it recurses, and answers
+// that a path does not match once it hits the cap.
 //
 // A `?` and a character class each match one whole character, where minimatch
 // counts the UTF-16 units JavaScript strings are made of and so needs `??` for
 // a character outside the basic multilingual plane.
-//
-// A class that names nothing, `[!]` or `[^]`, matches nothing. JavaScript
-// alone reads it as any character, and later minimatch dropped that too.
 //
 // A `/` separates the parts of a path and a `\` escapes the character after
 // it, on every platform. minimatch 3 rewrote a `\` to a `/` when it ran on
@@ -84,6 +80,8 @@ const (
 	qmark = "[^/]"
 	// star matches any number of characters within one path part.
 	star = qmark + "*?"
+	// anyChar matches any single character, the way JavaScript's `[^]` does.
+	anyChar = `[\s\S]`
 	// reSpecials are the characters that need escaping in a regexp.
 	reSpecials = `().*{}+?[]^$\!`
 	// maxPatternLength bounds a pattern the way minimatch does.
@@ -397,6 +395,16 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 				escaping = false
 				continue
 			}
+			// A class naming nothing, `[!]` or `[^]`, is syntax JavaScript
+			// alone reads, and it matches any one character. Spell that out:
+			// a regexp character class cannot be empty, so the fallback below
+			// would otherwise read the whole thing as a literal.
+			if re[reClassStart:] == "[^" {
+				re = re[:reClassStart] + anyChar
+				hasMagic = true
+				inClass = false
+				continue
+			}
 			// Handle the case where we left a class open: `[z-a]` is valid and
 			// equivalent to `\[z-a\]`. Split where the last `[` was and re-walk
 			// the contents so any character that was passed through as-is gets
@@ -561,7 +569,18 @@ func (m *Matcher) Match(path string) bool {
 }
 
 func (m *Matcher) matchOne(file []string, row []patternPart) bool {
-	fi, pi := 0, 0
+	return m.matchOneFrom(file, row, 0, 0, nil)
+}
+
+// matchOneFrom matches the parts of a path from fi on against the parts of one
+// pattern row from pi on.
+//
+// Every recursion resumes at some pair of those two offsets and reads nothing
+// else, so a pair that has already failed cannot succeed a second time: failed
+// records the pairs that did, which is what keeps a pattern carrying several
+// `**` from exploring exponentially many ways to divide the path between them.
+// It is allocated only once a `**` actually has something to backtrack over.
+func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int, failed []bool) bool {
 	fl, pl := len(file), len(row)
 
 	for ; fi < fl && pi < pl; fi, pi = fi+1, pi+1 {
@@ -582,9 +601,15 @@ func (m *Matcher) matchOne(file []string, row []patternPart) bool {
 				}
 				return true
 			}
+			if failed == nil {
+				failed = make([]bool, fl*(pl+1))
+			}
 			for fr := fi; fr < fl; fr++ {
-				if m.matchOne(file[fr:], row[pi+1:]) {
-					return true
+				if state := fr*(pl+1) + pi + 1; !failed[state] {
+					if m.matchOneFrom(file, row, fr, pi+1, failed) {
+						return true
+					}
+					failed[state] = true
 				}
 				// `.` and `..` are never swallowed, and a dot-name only when
 				// explicitly asked for.
