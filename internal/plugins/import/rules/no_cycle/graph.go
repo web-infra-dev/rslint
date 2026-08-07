@@ -125,8 +125,8 @@ func withheldDynamicEdges(node *moduleNode) []int32 {
 }
 
 // computeGroups assigns every file its strongly connected component over
-// edge, with Tarjan's algorithm run from an explicit stack so that a deep
-// import chain cannot exhaust the goroutine stack.
+// edge, running Tarjan from an explicit stack so that a deep import chain
+// cannot exhaust the goroutine stack.
 func (graph *moduleGraph) computeGroups() {
 	count := len(graph.nodes)
 	graph.group = make([]int32, count)

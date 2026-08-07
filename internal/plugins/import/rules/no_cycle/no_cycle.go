@@ -191,7 +191,7 @@ func (graph *moduleGraph) isSearchable(opts ruleOptions, self int32, r int) bool
 	if target < 0 || target == self {
 		return false
 	}
-	return !(opts.allowUnsafeDynamicCyclicDependency && node.refs[r].Dynamic)
+	return !opts.allowUnsafeDynamicCyclicDependency || !node.refs[r].Dynamic
 }
 
 // hasCyclicCandidate reports whether any reference of self could be reported.
