@@ -1361,3 +1361,75 @@ const f = (a: any, b: unknown) => a + b;
 		},
 	})
 }
+
+// TestRestrictPlusOperandsSerializedOptions exercises the map-shaped options
+// produced by JS/JSON configs. The main suite uses typed Go options, which does
+// not cover the runtime config path used by presets.
+func TestRestrictPlusOperandsSerializedOptions(t *testing.T) {
+	strictOptions := map[string]interface{}{
+		"allowAny":             false,
+		"allowBoolean":         false,
+		"allowNullish":         false,
+		"allowNumberAndString": false,
+		"allowRegExp":          false,
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RestrictPlusOperandsRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: "let value = ''; value += 1;",
+				Options: map[string]interface{}{
+					"allowNumberAndString":    false,
+					"skipCompoundAssignments": true,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "let value = 'x' + 1;",
+				Options: strictOptions,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "mismatched",
+					Line:      1,
+					Column:    13,
+				}},
+			},
+			{
+				Code:    "declare const value: boolean;\nvalue + '';",
+				Options: strictOptions,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalid",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code:    "declare const value: null | undefined;\nvalue + '';",
+				Options: strictOptions,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalid",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code:    "declare const value: any;\nvalue + '';",
+				Options: strictOptions,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalid",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code:    "declare const value: RegExp;\nvalue + '';",
+				Options: strictOptions,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalid",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+		},
+	)
+}
