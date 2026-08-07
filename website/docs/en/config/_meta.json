@@ -1,5 +1,9 @@
 [
   {
+    "type": "section-header",
+    "label": "Basics"
+  },
+  {
     "type": "file",
     "name": "index",
     "label": "Overview"

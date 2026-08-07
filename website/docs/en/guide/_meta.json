@@ -1,5 +1,9 @@
 [
   {
+    "type": "section-header",
+    "label": "Start"
+  },
+  {
     "type": "file",
     "name": "index",
     "label": "Getting Started"
@@ -8,6 +12,10 @@
     "type": "file",
     "name": "vscode-extension",
     "label": "VSCode Extension"
+  },
+  {
+    "type": "section-header",
+    "label": "Features"
   },
   {
     "type": "file",
@@ -23,6 +31,10 @@
     "type": "file",
     "name": "inline-directives",
     "label": "Inline Directives"
+  },
+  {
+    "type": "section-header",
+    "label": "Reference"
   },
   {
     "type": "file",
