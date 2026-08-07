@@ -30,13 +30,16 @@ type routeStep struct {
 	line  int
 }
 
+// queuedModule is one breadth-first search entry. It keeps a parent link into
+// the queue instead of a copy of the route so far, and names the reference it
+// arrived through, so a route is materialized only for a path that closes a
+// cycle.
 type queuedModule struct {
-	sourceFile    *ast.SourceFile
-	parent        int
-	viaSourceFile *ast.SourceFile
-	viaSource     *ast.Node
-	viaSpecifier  string
-	depth         int
+	node    int32
+	parent  int32
+	viaNode int32
+	viaRef  int32
+	depth   int32
 }
 
 // NoCycleRule forbids dependency paths that resolve back to the linted module.
@@ -134,118 +137,142 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 		return
 	}
 
-	traversed := make(map[string]bool)
-	for _, ref := range collectModuleReferences(ctx, ctx.SourceFile, opts.moduleReferences) {
-		checkReference(ctx, opts, myPath, traversed, ref)
-	}
-}
-
-func checkReference(ctx rule.RuleContext, opts ruleOptions, myPath string, traversed map[string]bool, ref import_utils.ModuleReference) {
-	if ref.OnlyTypes || ref.Target == nil || shouldIgnoreExternal(ctx, opts, ref) {
+	graph := moduleGraphFor(ctx, opts)
+	if graph == nil {
 		return
 	}
-
-	if opts.allowUnsafeDynamicCyclicDependency && ref.Dynamic {
-		return
-	}
-
-	if moduleReferencePath(ref) == myPath {
-		return
-	}
-
-	route, ok := detectCycle(ctx, opts, myPath, traversed, ref.Target)
+	self, ok := graph.index[ctx.SourceFile]
 	if !ok {
 		return
 	}
 
-	reportNode := ref.Importer
-	if reportNode == nil {
-		reportNode = ref.Source
+	// A reference is only reportable when its target reaches this file again,
+	// which puts the two in one strongly connected group. Files holding no
+	// such reference — nearly all of them in a healthy project — are answered
+	// from the group numbers alone, without walking the graph.
+	if !graph.hasCyclicCandidate(opts, self) {
+		return
 	}
-	ctx.ReportNode(reportNode, messageCycle(route))
+
+	node := &graph.nodes[self]
+	stayInGroup := !opts.allowUnsafeDynamicCyclicDependency
+	traversed := make(map[int32]bool)
+	for r := range node.refs {
+		if !graph.isSearchable(opts, self, r) {
+			continue
+		}
+		// A search confined to the group only ever rules out references whose
+		// target is in it, so the ones outside can be skipped outright. The
+		// unconfined search shares its traversal set with every reference, and
+		// skipping any of them would change what the later ones see.
+		if stayInGroup && graph.group[node.edge[r]] != graph.group[self] {
+			continue
+		}
+		route, found := graph.detectCycle(opts, self, traversed, node.edge[r])
+		if !found {
+			continue
+		}
+
+		reportNode := node.refs[r].Importer
+		if reportNode == nil {
+			reportNode = node.refs[r].Source
+		}
+		ctx.ReportNode(reportNode, messageCycle(route))
+	}
 }
 
-func detectCycle(ctx rule.RuleContext, opts ruleOptions, myPath string, traversed map[string]bool, start *ast.SourceFile) ([]routeStep, bool) {
-	queue := []queuedModule{{sourceFile: start, parent: -1}}
-	if traversed == nil {
-		traversed = make(map[string]bool)
+// isSearchable reports whether reference r of file self is one the rule
+// searches from: an edge this configuration keeps, pointing at another file.
+// Direct self imports belong to import/no-self-import, and a dynamic import
+// is not a cycle when the configuration says so.
+func (graph *moduleGraph) isSearchable(opts ruleOptions, self int32, r int) bool {
+	node := &graph.nodes[self]
+	target := node.edge[r]
+	if target < 0 || target == self {
+		return false
 	}
+	return !(opts.allowUnsafeDynamicCyclicDependency && node.refs[r].Dynamic)
+}
 
+// hasCyclicCandidate reports whether any reference of self could be reported.
+// A reported reference has a route from its target back to self, and self
+// imports the target, so the two are mutually reachable and share a group.
+func (graph *moduleGraph) hasCyclicCandidate(opts ruleOptions, self int32) bool {
+	node := &graph.nodes[self]
+	for r := range node.refs {
+		if graph.isSearchable(opts, self, r) && graph.group[node.edge[r]] == graph.group[self] {
+			return true
+		}
+	}
+	return false
+}
+
+// detectCycle walks breadth-first from start looking for a way back to self
+// and returns the route it arrived by. traversed is shared across one file's
+// references, so a target an earlier reference already ruled out is not
+// searched again.
+//
+// The walk stays inside self's strongly connected group: every file on a route
+// back to self both reaches self and is reached from it, which is what that
+// group means, so a file outside it can neither lie on a route nor lead to
+// one. Withholding dynamic edges breaks that correspondence, because the
+// group numbers still describe the edges the search no longer follows, so
+// such a configuration searches the whole graph instead.
+func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed map[int32]bool, start int32) ([]routeStep, bool) {
+	group := graph.group[self]
+	stayInGroup := !opts.allowUnsafeDynamicCyclicDependency
+
+	queue := []queuedModule{{node: start, parent: -1, viaNode: -1, viaRef: -1}}
 	for head := 0; head < len(queue); head++ {
 		next := queue[head]
-		if next.sourceFile == nil {
+		if traversed[next.node] {
 			continue
 		}
+		traversed[next.node] = true
 
-		sourcePath := next.sourceFile.FileName()
-		if traversed[sourcePath] {
-			continue
-		}
-		traversed[sourcePath] = true
-
-		refs := collectModuleReferences(ctx, next.sourceFile, opts.moduleReferences)
-		dynamicPaths := unsafeDynamicPaths(ctx, opts, refs)
-		for _, ref := range refs {
-			if !referenceIsTraversable(ctx, opts, ref) {
+		for r, target := range graph.nodes[next.node].expand {
+			if target < 0 || traversed[target] {
 				continue
 			}
-			targetPath := moduleReferencePath(ref)
-			if targetPath == "" || traversed[targetPath] || dynamicPaths[targetPath] {
+			if target == self {
+				return graph.routeTo(queue, head), true
+			}
+			if int(next.depth)+1 >= opts.maxDepth {
 				continue
 			}
-			if targetPath == myPath {
-				return routeTo(queue, head), true
+			if stayInGroup && graph.group[target] != group {
+				continue
 			}
-			if next.depth+1 < opts.maxDepth {
-				queue = append(queue, queuedModule{
-					sourceFile:    ref.Target,
-					parent:        head,
-					viaSourceFile: ref.SourceFile,
-					viaSource:     ref.Source,
-					viaSpecifier:  ref.Specifier,
-					depth:         next.depth + 1,
-				})
-			}
+			queue = append(queue, queuedModule{
+				node:    target,
+				parent:  int32(head),
+				viaNode: next.node,
+				viaRef:  int32(r),
+				depth:   next.depth + 1,
+			})
 		}
 	}
 
 	return nil, false
 }
 
-func unsafeDynamicPaths(ctx rule.RuleContext, opts ruleOptions, refs []import_utils.ModuleReference) map[string]bool {
-	if !opts.allowUnsafeDynamicCyclicDependency {
-		return nil
-	}
-
-	var dynamicPaths map[string]bool
-	for _, ref := range refs {
-		if !ref.Dynamic || !referenceIsTraversable(ctx, opts, ref) {
-			continue
-		}
-		if dynamicPaths == nil {
-			dynamicPaths = make(map[string]bool)
-		}
-		dynamicPaths[moduleReferencePath(ref)] = true
-	}
-	return dynamicPaths
-}
-
 func referenceIsTraversable(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
 	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(ctx, opts, ref)
 }
 
-func routeTo(queue []queuedModule, index int) []routeStep {
-	// Queue entries retain parent links instead of copying the complete route
-	// at every edge. Materialize source lines only for a path that closes a cycle.
-	depth := queue[index].depth
+// routeTo follows the parent links back from a queue entry, materializing the
+// specifier and source line of every reference the search passed through.
+func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
+	depth := int(queue[index].depth)
 	route := make([]routeStep, depth)
 	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
 		next := queue[index]
+		ref := &graph.nodes[next.viaNode].refs[next.viaRef]
 		route[routeIndex] = routeStep{
-			value: next.viaSpecifier,
-			line:  sourceLine(next.viaSourceFile, next.viaSource),
+			value: ref.Specifier,
+			line:  sourceLine(ref.SourceFile, ref.Source),
 		}
-		index = next.parent
+		index = int(next.parent)
 	}
 	return route
 }

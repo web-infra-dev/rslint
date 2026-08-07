@@ -166,6 +166,11 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		return result
 	}
 
+	// One lazy memo shared by every rule on every file of this Program. Rules
+	// that derive whole-Program state — a module graph, a cross-file index —
+	// build it on the first file that asks and the rest of the run reuses it.
+	programCache := rule.NewProgramStore()
+
 	// lintFile lints one file with its already-resolved rules and checker. Its
 	// comments, DisableManager, and rule contexts are per-file. The listener
 	// registry belongs to the calling checker-shard task and is empty on entry;
@@ -230,6 +235,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Comments:       comments,
 				Refs:           refs,
 				BOM:            sourceBOM,
+				ProgramCache:   programCache,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 			}.WithDiagnosticConsumer(

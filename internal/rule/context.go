@@ -76,7 +76,12 @@ type RuleContext struct {
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
 	// false, which is what a context with no program can say.
-	BOM            *SourceBOM
+	BOM *SourceBOM
+	// ProgramCache memoizes whole-Program state for the duration of one lint
+	// run, so a rule that needs a cross-file structure builds it once instead
+	// of once per linted file. Nil only disables memoization; rules that use
+	// it must still answer correctly without it.
+	ProgramCache   *ProgramStore
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager
