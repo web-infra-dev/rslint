@@ -361,7 +361,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-unnecessary-type-assertion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-constraint.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-conversion.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-type-parameters.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-type-parameters.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-argument.test.ts',
     // './tests/typescript-eslint/rules/no-unsafe-assignment.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-call.test.ts',

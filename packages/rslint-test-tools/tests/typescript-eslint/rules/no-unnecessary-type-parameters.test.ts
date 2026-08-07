@@ -308,14 +308,30 @@ ruleTester.run('no-unnecessary-type-parameters', {
       ): T | undefined;
     `,
     `
-      import type { AST_NODE_TYPES, TSESTree } from '@typescript-eslint/types';
+      declare enum AST_NODE_TYPES {
+        A = 'A',
+        B = 'B',
+      }
+      declare namespace TSESTree {
+        interface Node {
+          type: AST_NODE_TYPES;
+        }
+      }
 
       declare const isNodeOfType: <NodeType extends AST_NODE_TYPES>(
         nodeType: NodeType,
       ) => node is Extract<TSESTree.Node, { type: NodeType }>;
     `,
     `
-      import type { AST_NODE_TYPES, TSESTree } from '@typescript-eslint/types';
+      declare enum AST_NODE_TYPES {
+        A = 'A',
+        B = 'B',
+      }
+      declare namespace TSESTree {
+        interface Node {
+          type: AST_NODE_TYPES;
+        }
+      }
 
       const isNodeOfType =
         <NodeType extends AST_NODE_TYPES>(nodeType: NodeType) =>
@@ -325,7 +341,15 @@ ruleTester.run('no-unnecessary-type-parameters', {
           node?.type === nodeType;
     `,
     `
-      import type { AST_TOKEN_TYPES, TSESTree } from '@typescript-eslint/types';
+      declare enum AST_TOKEN_TYPES {
+        A = 'A',
+        B = 'B',
+      }
+      declare namespace TSESTree {
+        interface Token {
+          type: AST_TOKEN_TYPES;
+        }
+      }
 
       export const isNotTokenOfTypeWithConditions =
         <
