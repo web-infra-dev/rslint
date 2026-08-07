@@ -569,6 +569,7 @@ typescriptutil
 unaliased
 unbnound
 uncast
+Uncapitalize
 unconfig
 unconfigured
 undefinded
