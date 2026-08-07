@@ -31,7 +31,7 @@ catalog:
   '@typescript-eslint/scope-manager': ^8.65.0
   '@typescript-eslint/visitor-keys': ^8.65.0
   eslint: ^10.8.0
-  eslint-plugin-cypress: ^6.4.3
+  eslint-plugin-cypress: ^6.4.4
   eslint-plugin-es-x: ^9.7.0
   eslint-plugin-playwright: ^2.11.0
   eslint-plugin-promise: 7.3.0
@@ -45,18 +45,18 @@ catalog:
   esquery: ^1.7.0
   globals: ^17.7.0
   '@codspeed/tinybench-plugin': ^5.7.1
-  '@rstest/core': ^0.11.3
-  tinybench: ^6.1.1
+  '@rstest/core': ^0.11.6
+  tinybench: ^6.1.2
   ajv: ^6.15.0
   husky: ^9.1.7
   lint-staged: ^16.4.0
   prettier: ^3.9.6
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
-  '@types/node': ^26.1.1
-  '@types/react': ^19.2.17
+  '@types/node': ^26.1.2
+  '@types/react': ^19.2.18
   '@types/vscode': ^1.125.0
-  '@typescript/native-preview': 7.0.0-dev.20250904.1
+  '@typescript/native-preview': 7.0.0-dev.20260707.2
   typescript: 5.9.3
   '@vscode/test-cli': ^0.0.15
   '@vscode/test-electron': ^2.5.2
@@ -72,19 +72,19 @@ catalog:
   esbuild-plugin-polyfill-node: ^0.3.0
   memfs: ^4.64.0
   prebundle: ^1.6.5
-  '@radix-ui/react-label': ^2.1.13
-  '@radix-ui/react-select': ^2.3.5
-  '@radix-ui/react-slot': ^1.3.1
-  '@radix-ui/react-toggle': ^1.1.16
-  '@radix-ui/react-toggle-group': ^1.1.17
+  '@radix-ui/react-label': ^2.1.15
+  '@radix-ui/react-select': ^2.3.7
+  '@radix-ui/react-slot': ^1.3.3
+  '@radix-ui/react-toggle': ^1.1.18
+  '@radix-ui/react-toggle-group': ^1.1.19
   '@rsbuild/plugin-node-polyfill': ^1.4.6
   '@rsbuild/plugin-sass': ^1.5.3
-  '@rspress/core': ^2.0.18
-  '@rspress/plugin-sitemap': ^2.0.18
+  '@rspress/core': ^2.0.19
+  '@rspress/plugin-sitemap': ^2.0.19
   '@rstack-dev/doc-ui': ^1.14.7
   '@tailwindcss/postcss': ^4.3.3
   '@types/dagre': ^0.7.54
-  '@types/react-dom': ^19.2.3
+  '@types/react-dom': ^19.2.4
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   dagre: ^0.8.5
