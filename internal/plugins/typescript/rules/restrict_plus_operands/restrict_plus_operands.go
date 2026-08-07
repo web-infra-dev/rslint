@@ -2,7 +2,6 @@ package restrict_plus_operands
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -41,26 +40,6 @@ type RestrictPlusOperandsOptions struct {
 	AllowNumberAndString    *bool `json:"allowNumberAndString"`
 	AllowRegExp             *bool `json:"allowRegExp"`
 	SkipCompoundAssignments *bool `json:"skipCompoundAssignments"`
-}
-
-func parseOptions(options []any) RestrictPlusOperandsOptions {
-	opts := RestrictPlusOperandsOptions{
-		AllowAny:                utils.Ref(true),
-		AllowBoolean:            utils.Ref(true),
-		AllowNullish:            utils.Ref(true),
-		AllowNumberAndString:    utils.Ref(true),
-		AllowRegExp:             utils.Ref(true),
-		SkipCompoundAssignments: utils.Ref(false),
-	}
-	if len(options) == 0 {
-		return opts
-	}
-	if optsMap, ok := options[0].(map[string]interface{}); ok {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
-	}
-	return opts
 }
 
 func parseOptions(options []any) RestrictPlusOperandsOptions {

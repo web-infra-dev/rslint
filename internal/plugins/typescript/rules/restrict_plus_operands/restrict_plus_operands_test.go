@@ -7,6 +7,88 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestParseOptions(t *testing.T) {
+	type optionValues struct {
+		allowAny                bool
+		allowBoolean            bool
+		allowNullish            bool
+		allowNumberAndString    bool
+		allowRegExp             bool
+		skipCompoundAssignments bool
+	}
+	resolve := func(t *testing.T, options []any) optionValues {
+		t.Helper()
+		got := parseOptions(options)
+		value := func(name string, pointer *bool) bool {
+			t.Helper()
+			if pointer == nil {
+				t.Fatalf("resolved option %s is nil", name)
+				return false
+			}
+			return *pointer
+		}
+		return optionValues{
+			allowAny:                value("allowAny", got.AllowAny),
+			allowBoolean:            value("allowBoolean", got.AllowBoolean),
+			allowNullish:            value("allowNullish", got.AllowNullish),
+			allowNumberAndString:    value("allowNumberAndString", got.AllowNumberAndString),
+			allowRegExp:             value("allowRegExp", got.AllowRegExp),
+			skipCompoundAssignments: value("skipCompoundAssignments", got.SkipCompoundAssignments),
+		}
+	}
+	boolRef := func(value bool) *bool { return &value }
+	tests := []struct {
+		name    string
+		options []any
+		want    optionValues
+	}{
+		{
+			name: "defaults",
+			want: optionValues{
+				allowAny:             true,
+				allowBoolean:         true,
+				allowNullish:         true,
+				allowNumberAndString: true,
+				allowRegExp:          true,
+			},
+		},
+		{
+			name: "serialized partial overrides",
+			options: []any{map[string]interface{}{
+				"allowAny":                false,
+				"allowNullish":            false,
+				"skipCompoundAssignments": true,
+			}},
+			want: optionValues{
+				allowBoolean:            true,
+				allowNumberAndString:    true,
+				allowRegExp:             true,
+				skipCompoundAssignments: true,
+			},
+		},
+		{
+			name: "typed partial overrides",
+			options: []any{RestrictPlusOperandsOptions{
+				AllowBoolean:         boolRef(false),
+				AllowNumberAndString: boolRef(false),
+			}},
+			want: optionValues{
+				allowAny:     true,
+				allowNullish: true,
+				allowRegExp:  true,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := resolve(t, test.options); got != test.want {
+				t.Fatalf("resolved options = %+v, want %+v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestRestrictPlusOperandsRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RestrictPlusOperandsRule, []rule_tester.ValidTestCase{
 		{Code: "let x = 5;"},
@@ -1362,9 +1444,8 @@ const f = (a: any, b: unknown) => a + b;
 	})
 }
 
-// TestRestrictPlusOperandsSerializedOptions exercises the map-shaped options
-// produced by JS/JSON configs. The main suite uses typed Go options, which does
-// not cover the runtime config path used by presets.
+// TestRestrictPlusOperandsSerializedOptions exercises the strict preset's
+// map-shaped options together, including the compound-assignment escape hatch.
 func TestRestrictPlusOperandsSerializedOptions(t *testing.T) {
 	strictOptions := map[string]interface{}{
 		"allowAny":             false,
