@@ -115,10 +115,6 @@ jobs:
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
-    # napi-build supplies the per-platform parser `.node` (downloaded into
-    # `binaries/native-<tuple>/`) that publish-marketplace.mjs stages into the
-    # eslint-plugin worker payload; without it the packaged plugin host can't load.
-    needs: [build, napi-build]
     runs-on: rspack-ubuntu-22.04-large
     environment: release
     steps:
@@ -131,11 +127,6 @@ jobs:
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
-
-      - name: Download Artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: binaries
 
       - name: Build and publish to Microsoft VS Code Marketplace
         env:
@@ -163,8 +154,6 @@ jobs:
   publish-extension-open-vsx:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    # Same as publish-extension-vscode: needs the per-platform parser `.node`.
-    needs: [build, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     steps:
@@ -177,11 +166,6 @@ jobs:
 
       - name: Setup Node
         uses: ./.github/actions/setup-node
-
-      - name: Download Artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: binaries
 
       - name: Build and publish to Open VSX Registry
         env:

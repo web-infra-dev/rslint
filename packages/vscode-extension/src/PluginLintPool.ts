@@ -10,17 +10,9 @@
  * (`buildPluginLintTasks` / `buildPluginLintResult`), shared with the CLI
  * engine so the two paths never drift.
  *
- * The host is loaded via a dynamic `import()` of the RELATIVE specifier
- * `./eslint-plugin/index.js` (not the bare `@rslint/core/eslint-plugin`):
- * relative to the built `dist/main.js` it resolves to the extension's OWN
- * `dist/eslint-plugin/index.js`, which `scripts/build.js` stages into the
- * package (worker bundle + nested `@rslint/native-<tuple>` platform pkg). The bare
- * specifier only resolves in dev (workspace `node_modules`); the packaged
- * vsix ships no `@rslint/core`, so it must be the relative sibling. The host
- * is ESM (uses `import.meta.url` to spawn its sibling `lint-worker.js`) while
- * this extension is bundled to CJS — a static `require` of an ESM module
- * would fail, a dynamic `import()` loads it correctly. esbuild keeps the
- * specifier external (see scripts/build.js) so it is emitted verbatim.
+ * The owning runtime injects the factory from the exact project-local
+ * `@rslint/core` installation that also supplied the Go binary. This wrapper
+ * therefore contains no bundled worker or package-resolution policy.
  */
 
 import { window } from 'vscode';
@@ -33,14 +25,6 @@ import type {
   EslintPluginLintResult,
 } from '@rslint/core/eslint-plugin';
 
-/** Subset of the `@rslint/core/eslint-plugin` module surface we depend on. */
-interface EslintPluginModule {
-  createPluginLintHost(
-    configs: ConfigDescriptor[],
-    onLog?: (rec: { level: string; source: string; text: string }) => void,
-  ): Promise<PluginLintHost>;
-}
-
 type PluginHostFactory = (
   configs: ConfigDescriptor[],
   onLog: (rec: { level: string; source: string; text: string }) => void,
@@ -52,40 +36,6 @@ type PluginHostFactory = (
 // bound remains two old pools plus the active pool. Hosts with an acquired
 // lint lease may temporarily exceed this bound until requests drain.
 const MAX_GRACE_GENERATIONS = 1;
-
-let modPromise: Promise<EslintPluginModule> | undefined;
-
-/**
- * Load the ESM host entry once. The specifier is RELATIVE
- * (`./eslint-plugin/index.js`): esbuild keeps it external so it survives
- * verbatim into `dist/main.js`, where it resolves to the sibling
- * `dist/eslint-plugin/index.js` staged by `scripts/build.js` — the same path
- * in dev and in the packaged vsix, so the dev test exercises the packaged
- * mechanism rather than a dev-only one.
- */
-async function loadModule(): Promise<EslintPluginModule> {
-  // The host entry exists only in the built `dist/` (staged by build.js), never
-  // under `src/`, so it is intentionally unresolvable at compile time; its
-  // module shape is supplied by `modPromise`'s declared type (no cast needed —
-  // the suppressed import is `any`, assignable straight into the typed slot).
-  // @ts-expect-error -- runtime-only path, resolved relative to dist/main.js
-  modPromise ??= import('./eslint-plugin/index.js').catch((err: unknown) => {
-    // Don't cache a rejected load: a transient failure (e.g. a mid-rebuild
-    // dist in the dev watch window) must stay retryable on the next ensure(),
-    // which is the recovery ensure()'s catch documents.
-    modPromise = undefined;
-    throw err;
-  });
-  return modPromise;
-}
-
-/**
- * Latches the one-shot "host failed to load" warning at MODULE scope (not
- * per-instance) so a persistent failure (e.g. a broken vsix that didn't ship
- * the worker payload) surfaces once per session — not once per workspace folder
- * in a multi-root window, where each folder owns its own PluginLintPool.
- */
-let warnedOnce = false;
 
 export class PluginLintPool {
   private readonly logger: Logger;
@@ -117,13 +67,11 @@ export class PluginLintPool {
   private disposed = false;
   private readonly createHost: PluginHostFactory;
   private readonly retirementDelayMs: number;
+  private warnedHostFailure = false;
 
   constructor(
     logger: Logger,
-    createHost: PluginHostFactory = async (configs, onLog) => {
-      const mod = await loadModule();
-      return mod.createPluginLintHost(configs, onLog);
-    },
+    createHost: PluginHostFactory,
     retirementDelayMs = 30_000,
   ) {
     this.logger = logger;
@@ -218,12 +166,10 @@ export class PluginLintPool {
         this.generations.set(generation, state);
         ready = true;
       } catch (err: unknown) {
-        // Init failed: either the host module couldn't be loaded (a packaging
-        // regression — the vsix didn't ship `dist/eslint-plugin/` or its native
-        // `.node`), or a referenced plugin failed to import. Keep the previous
-        // active host intact. Record an unavailable staged generation so the
-        // first valid config can still be committed and serve native rules;
-        // later prepares retry instead of caching this failure as ready.
+        // Init failed because the selected local core's host or a referenced
+        // plugin could not load. Keep the previous active host intact. Record
+        // an unavailable staged generation so the first valid config can still
+        // be committed and serve native rules; later prepares remain retryable.
         const state: HostGeneration = {
           fingerprint,
           ready: false,
@@ -236,9 +182,11 @@ export class PluginLintPool {
         // Make the failure visible — but ONLY when a config actually mounted
         // plugins (an empty-descriptor host builds no worker and failing is
         // not a user-facing problem), and only once per session so a
-        // persistent failure doesn't re-warn on every reload.
-        if (descriptors.length > 0 && !warnedOnce) {
-          warnedOnce = true;
+        // persistent failure doesn't re-warn on every reload. Keep this latch
+        // per runtime so one broken local core cannot hide another core's
+        // independently actionable failure.
+        if (descriptors.length > 0 && !this.warnedHostFailure) {
+          this.warnedHostFailure = true;
           void window.showWarningMessage(
             'Rslint: failed to load the ESLint-plugin host; rules mounted via a config’s `plugins` will report no diagnostics. See the Rslint output channel for details.',
           );

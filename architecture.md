@@ -128,7 +128,7 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                                                 | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests to `internal/api`, `internal/linter`, and `internal/inspector`                                                                                                                              |
 | `packages/rule-tester/`        | Forked `@typescript-eslint/rule-tester` package used in tests                                                                               | JS-side rule testing support that complements Go-side helpers                                                                                                                                                                                                                          |
 | `packages/utils/`              | Shared JavaScript utilities                                                                                                                 | Shared support package for the JS/website tooling layer                                                                                                                                                                                                                                |
-| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                                       | Launches `cmd/rslint --lsp`, starts `rslint/configRefresh`, serves reverse load/activate/commit/abort and plugin-lint requests, and consumes diagnostics/code actions from `internal/lsp`                                                                                              |
+| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                                       | Resolves the nearest project-local `@rslint/core` per open document, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime                                                    |
 | `packages/tsgo/`               | JS wrapper package for the `tsgo` tool                                                                                                      | JavaScript-facing wrapper around `cmd/tsgo` output                                                                                                                                                                                                                                     |
 | `typescript-go/`               | Git submodule containing TypeScript compiler Go port                                                                                        | Provides parser, AST, checker, `Program`, `project.Session`, diagnostics, scanner, and VFS primitives used throughout the backend                                                                                                                                                      |
 | `shim/`                        | Generated bridge packages exposing ts-go internals                                                                                          | Bridge layer between repository Go code and `typescript-go` internals; generated and updated by `tools/`                                                                                                                                                                               |
@@ -685,41 +685,45 @@ The transport and target phase differ by surface:
   loader boundary as the final suffix of every successful config. Their global
   ignores and negations therefore participate in staged reachability and are
   published exactly once; an empty catalog uses the same override directly.
-- The extension owns shared UI, commands, and output channels once. Its
-  `WorkspaceRslintCoordinator` keys desired and active roots by workspace-folder
-  URI (not display name), subscribes to folder changes before awaiting any root,
-  and independently starts or closes one `Rslint` runtime per URI generation.
-  One slow or failed root therefore cannot serialize healthy roots; terminal
-  shutdown still attempts every per-root close before releasing shared
-  resources. If an old generation does not confirm that it closed, its URI slot
-  remains quarantined: no replacement starts, and the retained error is
-  included in terminal shutdown. Each runtime owns its native server children,
-  config watcher, transaction adapter, plugin pool, request handlers, and
-  workspace logger. A process owner covers automatic LanguageClient restarts,
-  terminates any still-live prior child before a restart spawn, blocks new
-  spawns once closing begins, and awaits stdio close after bounded forced
-  termination of any child that survives protocol shutdown. A closing-aware
-  client error handler forbids restart, and per-root close waits for the pending
-  initialize/state tail before extension-wide channels are released.
-- Every runtime keeps a workspace-relative document selector, while
-  `WorkspaceDocumentRouter` is the single authority for overlapping selectors.
-  Among ready roots it assigns an open supported document to the longest
-  matching URI root. A root activation or removal performs an ordered
+- The extension owns shared UI, commands, and output channels once. For each
+  open supported file, `CoreResolver` follows normal `node_modules` ancestry or
+  the resource-scoped `rslint.corePath` override to an exact
+  `@rslint/core` package. There is no bundled fallback and no alternate PnP
+  execution path. That package supplies the Go binary, config-module host,
+  protocol version, and lazily loaded ESLint-plugin worker host as one coherent
+  runtime boundary.
+- `RuntimeManager` keys a runtime by VS Code workspace-folder URI plus the
+  package directory's normalized physical realpath. Documents resolving through
+  symlinks to the same installation share its process and worker state; distinct
+  physical copies remain isolated even when their version strings match. Only
+  installations selected by currently open documents start. Reference release
+  closes an unused runtime, while a document switch starts and validates the
+  replacement before withdrawing its last-good owner. An unconfirmed close
+  quarantines that exact runtime key so a replacement cannot overlap a possibly
+  live process. Terminal shutdown still attempts every runtime close before
+  releasing shared resources.
+- Each runtime owns its native server children, config watcher, transaction
+  adapter, plugin pool, request handlers, and workspace logger. A process owner
+  covers automatic LanguageClient restarts, terminates any still-live prior
+  child before a restart spawn, blocks new spawns once closing begins, and
+  awaits stdio close after bounded forced termination of any child that survives
+  protocol shutdown. A closing-aware client error handler forbids restart.
+- Every runtime retains a workspace-relative document selector, while
+  `WorkspaceDocumentRouter` is the single authority for the selectors' overlap.
+  The manager assigns each document explicitly to the runtime selected by local
+  package resolution. An assignment change performs an ordered
   `didClose`/diagnostic-clear/`didOpen` handoff using the document's current
   in-memory text, without requiring the editor to close. Middleware admits
   changes, saves, diagnostics, and code actions only for the exact active
   runtime that currently owns the server-open document. Exact runtime identity
-  rejects diagnostics from a replaced same-URI client, while a document epoch
+  rejects diagnostics from a replaced same-key client, while a document epoch
   rejects code actions that finish after an ownership change. When the
   LanguageClient automatically restarts a native server, the router invalidates
-  every recorded server-open session for that runtime—including documents that
-  closed during the feature-listener gap—before LanguageClient replays
-  `didOpen`, so the replacement process receives every still-open document
-  exactly once and a later same-URI reopen cannot inherit stale ownership. The
-  reset is queued as soon as a running transport exits and repeated at the next
-  `Running` transition; root removal also drains any exact-runtime session that
-  disappeared from VS Code's open-document list during that gap.
-- Each root starts `rslint/configRefresh`, and Go scans that process cwd with a
+  every recorded server-open session for that runtime before LanguageClient
+  replays `didOpen`, so the replacement process receives each still-open owned
+  document exactly once.
+- Each selected runtime starts `rslint/configRefresh`, and Go scans that
+  process's workspace-folder cwd with a
   transaction-scoped cached VFS. Go sends
   `rslint/loadConfigs` and
   `rslint/activateConfigs`, then commits or aborts the matching plugin-host state
@@ -1292,13 +1296,14 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  VS Code Extension (shared UI / channels)                                   │
-│     ├── WorkspaceRslintCoordinator (URI identity + generations)             │
-│     ├── WorkspaceDocumentRouter (longest-ready-root ownership)               │
-│     └── Rslint runtime per active root                                       │
+│     ├── CoreResolver (nearest local core per open document)                  │
+│     ├── RuntimeManager (workspace URI + physical core identity)              │
+│     ├── WorkspaceDocumentRouter (explicit document ownership)                │
+│     └── Rslint runtime per selected installation                             │
 │             └──────── rslint/configRefresh ────────────────┐                 │
 │             ◄──────── load / activate / commit / abort     │                 │
 │                                                            ▼                 │
-│                                             cmd/rslint --lsp per root         │
+│                                  local core's cmd/rslint --lsp per runtime   │
 │     │                                                                        │
 │     ▼                                                                        │
 │  internal/lsp + ts-go project.Session                                        │

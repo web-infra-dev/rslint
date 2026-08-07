@@ -23,12 +23,9 @@ import {
   Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
-import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
-  ConfigModuleHost,
   type ActivateConfigsRequest,
   type ConfigModuleActivationPlan,
   type LoadConfigsRequest,
@@ -44,6 +41,7 @@ import {
   type WorkspaceDocumentRouter,
 } from './WorkspaceDocumentRouter';
 import { LanguageServerProcessOwner } from './LanguageServerProcessOwner';
+import type { CoreInstallation } from './CoreResolver';
 
 /**
  * Workspace-relative lockfiles whose individual metadata feeds the
@@ -62,7 +60,7 @@ export type ConfigRefreshReason =
   'initial' | 'config-change' | 'dependency-change';
 
 interface ConfigRefreshRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
+  protocolVersion: number;
   reason: ConfigRefreshReason;
 }
 
@@ -307,8 +305,8 @@ function observeClientStopped(
 
 export interface RslintOptions {
   readonly rootKey: string;
-  readonly extensionUri: Uri;
   readonly workspaceFolder: WorkspaceFolder;
+  readonly installation: CoreInstallation;
   readonly outputChannel: OutputChannel;
   readonly lspOutputChannel: OutputChannel;
   readonly router: WorkspaceDocumentRouter;
@@ -319,7 +317,7 @@ export class Rslint implements Disposable {
   private readonly logger: Logger;
   public readonly rootKey: string;
   public readonly workspaceFolder: WorkspaceFolder;
-  private readonly extensionUri: Uri;
+  private readonly installation: CoreInstallation;
   private readonly router: WorkspaceDocumentRouter;
   private readonly lspOutputChannel: OutputChannel | undefined;
   private readonly outputChannel: OutputChannel | undefined;
@@ -349,17 +347,20 @@ export class Rslint implements Disposable {
 
   constructor(options: RslintOptions) {
     this.rootKey = options.rootKey;
-    this.extensionUri = options.extensionUri;
     this.workspaceFolder = options.workspaceFolder;
+    this.installation = options.installation;
     this.router = options.router;
     const logger = new Logger(
-      `Rslint (${options.workspaceFolder.name}: ${options.workspaceFolder.uri.fsPath})`,
+      `Rslint ${options.installation.version} (${options.workspaceFolder.name})`,
     ).useDefaultLogLevel();
     this.logger = logger;
     this.lspOutputChannel = options.lspOutputChannel;
     this.outputChannel = options.outputChannel;
     try {
-      this.pluginLintPool = new PluginLintPool(logger);
+      this.pluginLintPool = new PluginLintPool(
+        logger,
+        options.installation.createPluginLintHost,
+      );
     } catch (error) {
       logger.dispose();
       throw error;
@@ -375,7 +376,7 @@ export class Rslint implements Disposable {
       throw abortError(signal);
     }
     this.startOperation = this.startImpl(signal);
-    // The abort facade releases the per-URI coordinator even when JavaScript
+    // The abort facade releases the runtime-manager slot even when JavaScript
     // module evaluation itself cannot be interrupted. startImpl retains its
     // own rejection handler and epoch checks so a late completion is harmless.
     this.startPromise = raceWithAbort(this.startOperation, signal);
@@ -390,7 +391,7 @@ export class Rslint implements Disposable {
     const pluginLintPool = this.pluginLintPool;
     this.pluginDependencyRevision = 0;
 
-    const binPath = await this.getBinaryPath();
+    const binPath = this.installation.binaryPath;
     this.assertStartCurrent(epoch, signal);
     this.logger.info('Rslint binary path:', binPath);
 
@@ -469,9 +470,10 @@ export class Rslint implements Disposable {
       this.assertStartCurrent(epoch, signal, client);
 
       const adapter = new LspConfigTransactionAdapter(
-        new ConfigModuleHost(),
+        this.installation.createConfigModuleHost(),
         pluginLintPool,
         (activation) => this.computeActivationFingerprint(activation),
+        this.installation.protocolVersion,
       );
       this.configTransactionAdapter = adapter;
 
@@ -668,7 +670,7 @@ export class Rslint implements Disposable {
         return;
       }
       const request: ConfigRefreshRequest = {
-        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+        protocolVersion: this.installation.protocolVersion,
         reason,
       };
       await client.sendRequest('rslint/configRefresh', request);
@@ -911,182 +913,5 @@ export class Rslint implements Disposable {
 
   public dispose(): void {
     void this.close().catch(() => undefined);
-  }
-
-  private async findBinaryFromUserSettings(): Promise<string | null> {
-    const customBinPathConfig = workspace
-      .getConfiguration('rslint', this.workspaceFolder.uri)
-      .get<string>('customBinPath')
-      ?.trim();
-
-    if (!customBinPathConfig) {
-      this.logger.warn(
-        'rslint.binPath is set to "custom" but rslint.customBinPath is not configured',
-      );
-      return null;
-    }
-
-    this.logger.debug(
-      `Try using Rslint binary path from user settings: ${customBinPathConfig}`,
-    );
-
-    const exist = await fileExists(Uri.file(customBinPathConfig));
-
-    if (exist) {
-      this.logger.debug(
-        `Using Rslint binary from user settings: ${customBinPathConfig}`,
-      );
-      return customBinPathConfig;
-    } else {
-      this.logger.error(
-        `Rslint binary path from user settings does not exist: ${customBinPathConfig}`,
-      );
-      return null;
-    }
-  }
-
-  private findBinaryFromNodeModules(): string | null {
-    const searchRoot = this.workspaceFolder.uri.fsPath;
-
-    try {
-      this.logger.debug('Looking for Rslint binary in node_modules');
-      const pathToRslintCorePackage = path.dirname(
-        require.resolve('@rslint/core/package.json', {
-          paths: [searchRoot],
-        }),
-      );
-      // Try each platform-package candidate in order, using the first that
-      // resolves (linux ships gnu/musl variants — only one is installed).
-      for (const request of getPlatformBinRequests()) {
-        try {
-          const platformPackageBinPath = require.resolve(request, {
-            paths: [pathToRslintCorePackage],
-          });
-
-          this.logger.debug(
-            `Using Rslint binary from node_modules: ${platformPackageBinPath}`,
-          );
-          return platformPackageBinPath;
-        } catch {
-          // Candidate not installed; try the next one.
-        }
-      }
-    } catch {
-      this.logger.debug('No binary found in node_modules');
-    }
-
-    return null;
-  }
-
-  private async findBinaryFromPnp(): Promise<string | null> {
-    const folder = this.workspaceFolder;
-
-    for (const extension of ['cjs', 'js']) {
-      const yarnPnpFile = Uri.joinPath(folder.uri, `.pnp.${extension}`);
-
-      if (!(await fileExists(yarnPnpFile))) {
-        continue;
-      }
-
-      try {
-        this.logger.debug('Looking for Rslint binary in PnP mode');
-        const yarnPnpApi: {
-          resolveRequest: (request: string, issuer: string) => string | null;
-        } = require(yarnPnpFile.fsPath); // rslint-disable-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-
-        const rslintCorePackage = yarnPnpApi.resolveRequest(
-          '@rslint/core/package.json',
-          folder.uri.fsPath,
-        );
-
-        if (!rslintCorePackage) {
-          continue;
-        }
-
-        // Try each platform-package candidate in order, using the first that
-        // resolves (linux ships gnu/musl variants — only one is installed).
-        // PnP's resolveRequest throws (rather than returning null) for a
-        // candidate absent from the dependency map, so each lookup needs its
-        // own try/catch to fall through to the next tuple.
-        for (const request of getPlatformBinRequests()) {
-          try {
-            const rslintPlatformPkgPath = yarnPnpApi.resolveRequest(
-              request,
-              rslintCorePackage,
-            );
-
-            if (!rslintPlatformPkgPath) {
-              continue;
-            }
-
-            const rslintPlatformPkg = Uri.file(rslintPlatformPkgPath);
-
-            if (await fileExists(rslintPlatformPkg)) {
-              this.logger.debug(
-                `Using Rslint binary from PnP: ${rslintPlatformPkg.fsPath}`,
-              );
-              return rslintPlatformPkg.fsPath;
-            }
-          } catch {
-            // Candidate not registered in this PnP map; try the next one.
-          }
-        }
-      } catch {
-        this.logger.debug('No binary found in PnP mode');
-      }
-    }
-
-    this.logger.debug('Not using PnP mode, skip resolving');
-    return null;
-  }
-
-  private findBinaryFromBuiltIn(): string {
-    const builtInBinPath = Uri.joinPath(
-      this.extensionUri,
-      'dist',
-      'rslint',
-    ).fsPath;
-    this.logger.debug(
-      'Using built-in Rslint binary as fallback:',
-      builtInBinPath,
-    );
-    return builtInBinPath;
-  }
-
-  private async getBinaryPath(): Promise<string> {
-    const binPathConfig = workspace
-      .getConfiguration('rslint', this.workspaceFolder.uri)
-      .get<RslintBinPath>('binPath');
-
-    let finalBinPath: string | null = null;
-    if (binPathConfig === 'local') {
-      // 1. Check if the binary exists in node_modules or PnP
-      // 2. Fallback to built-in binary if not found
-      const localBinPath =
-        this.findBinaryFromNodeModules() ?? (await this.findBinaryFromPnp());
-
-      if (localBinPath === null) {
-        this.logger.info(
-          'No local Rslint binary found, falling back to built-in binary',
-        );
-      }
-
-      finalBinPath = localBinPath ?? this.findBinaryFromBuiltIn();
-    } else if (binPathConfig === 'built-in') {
-      finalBinPath = this.findBinaryFromBuiltIn();
-    } else if (binPathConfig === 'custom') {
-      finalBinPath = await this.findBinaryFromUserSettings();
-      if (finalBinPath === null) {
-        throw new Error(
-          'Customized Rslint binary path is not set or does not exist',
-        );
-      }
-    }
-
-    if (!finalBinPath) {
-      throw new Error(`Unsupported rslint.binPath setting: ${binPathConfig}`);
-    }
-    this.logger.debug('Final Rslint binary path:', finalBinPath);
-    return finalBinPath;
   }
 }
