@@ -39,13 +39,10 @@ func ExternalModuleFolders(settings map[string]interface{}) []string {
 
 // IsExternalModulePath reports whether a resolved path or unresolved bare
 // specifier should be treated as external by eslint-plugin-import rules.
+// Callers that ask more than once for the same settings should compile them
+// with [CompileModuleSettings] and ask that instead.
 func IsExternalModulePath(settings map[string]interface{}, specifier string, resolvedPath string) bool {
-	for _, folder := range ExternalModuleFolders(settings) {
-		if pathContainsSegment(resolvedPath, folder) {
-			return true
-		}
-	}
-	return specifier != "" && !tspath.IsExternalModuleNameRelative(specifier) && resolvedPath == ""
+	return CompileModuleSettings(settings).IsExternalPath(specifier, resolvedPath)
 }
 
 func pathContainsSegment(fileName string, segment string) bool {

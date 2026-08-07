@@ -22,11 +22,84 @@ type ModuleReference struct {
 	OnlyTypes    bool
 }
 
+// CollectModuleReferences returns sourceFile's module references in source
+// order, each with its target resolved. Rules that need this for more than
+// the file they are linting should go through [ModuleIndex] instead, which
+// answers the same question once per Program.
 func CollectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions) []ModuleReference {
-	if ctx.Program == nil || sourceFile == nil {
+	return collectModuleReferences(ctx, sourceFile, options, CompileModuleSettings(ctx.Settings))
+}
+
+func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions, settings *ModuleSettings) []ModuleReference {
+	if ctx.Program == nil || sourceFile == nil || (!options.ESModule && !options.CommonJS && !options.AMD) {
 		return nil
 	}
 
+	// SourceFile.Imports is populated by the parser and avoids walking every
+	// AST node in the usual static-ESM case. The generic collector remains
+	// necessary for call-based edges, parser recovery, and imports inside
+	// module bodies.
+	if options.CommonJS || options.AMD || needsFullModuleScan(sourceFile) {
+		return collectModuleReferencesByWalk(ctx, sourceFile, options, settings)
+	}
+	return collectStaticImports(ctx, sourceFile, settings)
+}
+
+// collectStaticImports reads the module specifiers the parser already
+// recorded. It handles the shapes those specifiers can take in a file with no
+// dynamic import, no module declaration and no parse error, which is what
+// needsFullModuleScan checks for.
+func collectStaticImports(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings) []ModuleReference {
+	imports := sourceFile.Imports()
+	refs := make([]ModuleReference, 0, len(imports))
+	for _, source := range imports {
+		importer := ast.TryGetImportFromModuleSpecifier(source)
+		if importer == nil {
+			continue
+		}
+
+		onlyTypes := false
+		switch importer.Kind {
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+			onlyTypes = importDeclarationOnlyImportsTypes(importer.AsImportDeclaration())
+		case ast.KindExportDeclaration:
+			onlyTypes = ast.IsTypeOnlyImportOrExportDeclaration(importer)
+		default:
+			continue
+		}
+
+		ref := ModuleReference{
+			Source:     source,
+			Importer:   importer,
+			SourceFile: sourceFile,
+			Specifier:  source.Text(),
+			OnlyTypes:  onlyTypes,
+		}
+		ref.ResolvedPath, ref.Target, _ = ResolveSourceFileFromSourceFile(ctx, sourceFile, source)
+		if ref.Target != nil && settings.IsIgnoredPath(ref.Target.FileName()) {
+			continue
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
+// needsFullModuleScan reports whether sourceFile can hold module specifiers
+// that are not reachable from the parser's own list in the shapes
+// collectStaticImports understands.
+func needsFullModuleScan(sourceFile *ast.SourceFile) bool {
+	if sourceFile.Flags&ast.NodeFlagsPossiblyContainsDynamicImport != 0 || len(sourceFile.Diagnostics()) != 0 {
+		return true
+	}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement != nil && statement.Kind == ast.KindModuleDeclaration {
+			return true
+		}
+	}
+	return false
+}
+
+func collectModuleReferencesByWalk(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions, settings *ModuleSettings) []ModuleReference {
 	var refs []ModuleReference
 	visitDescendants(sourceFile.AsNode(), func(node *ast.Node) {
 		if node == nil {
@@ -39,7 +112,7 @@ func CollectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, o
 				return
 			}
 			importDecl := node.AsImportDeclaration()
-			addModuleReference(ctx, sourceFile, &refs, importDecl.ModuleSpecifier, node, false, importDeclarationOnlyImportsTypes(importDecl))
+			addModuleReference(ctx, sourceFile, &refs, settings, importDecl.ModuleSpecifier, node, false, importDeclarationOnlyImportsTypes(importDecl))
 		case ast.KindExportDeclaration:
 			if !options.ESModule {
 				return
@@ -47,16 +120,16 @@ func CollectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, o
 			exportDecl := node.AsExportDeclaration()
 			// tsgo matches eslint-plugin-import here: only `export type * from`
 			// is exclusively type-only; named type re-exports still stay graph edges.
-			addModuleReference(ctx, sourceFile, &refs, exportDecl.ModuleSpecifier, node, false, ast.IsTypeOnlyImportOrExportDeclaration(node))
+			addModuleReference(ctx, sourceFile, &refs, settings, exportDecl.ModuleSpecifier, node, false, ast.IsTypeOnlyImportOrExportDeclaration(node))
 		case ast.KindCallExpression:
-			collectCallModuleReferences(ctx, sourceFile, &refs, node.AsCallExpression(), options)
+			collectCallModuleReferences(ctx, sourceFile, &refs, settings, node.AsCallExpression(), options)
 		}
 	})
 
 	return refs
 }
 
-func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *[]ModuleReference, call *ast.CallExpression, options ModuleReferenceOptions) {
+func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *[]ModuleReference, settings *ModuleSettings, call *ast.CallExpression, options ModuleReferenceOptions) {
 	if call == nil {
 		return
 	}
@@ -70,7 +143,7 @@ func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFil
 		if len(call.Arguments.Nodes) == 0 {
 			return
 		}
-		addModuleReference(ctx, sourceFile, refs, ast.SkipParentheses(call.Arguments.Nodes[0]), call.AsNode(), true, false)
+		addModuleReference(ctx, sourceFile, refs, settings, ast.SkipParentheses(call.Arguments.Nodes[0]), call.AsNode(), true, false)
 		return
 	}
 
@@ -82,7 +155,7 @@ func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFil
 	if options.CommonJS && ast.IsRequireCall(call.AsNode(), false) {
 		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
 		if arg != nil && ast.IsStringLiteralLike(arg) {
-			addModuleReference(ctx, sourceFile, refs, arg, call.AsNode(), false, false)
+			addModuleReference(ctx, sourceFile, refs, settings, arg, call.AsNode(), false, false)
 		}
 		return
 	}
@@ -100,12 +173,12 @@ func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFil
 			if element == nil || !ast.IsStringLiteralLike(element) {
 				continue
 			}
-			addModuleReference(ctx, sourceFile, refs, element, call.AsNode(), false, false)
+			addModuleReference(ctx, sourceFile, refs, settings, element, call.AsNode(), false, false)
 		}
 	}
 }
 
-func addModuleReference(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *[]ModuleReference, source *ast.Node, importer *ast.Node, dynamic bool, onlyTypes bool) {
+func addModuleReference(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *[]ModuleReference, settings *ModuleSettings, source *ast.Node, importer *ast.Node, dynamic bool, onlyTypes bool) {
 	if source == nil {
 		return
 	}
@@ -124,7 +197,7 @@ func addModuleReference(ctx rule.RuleContext, sourceFile *ast.SourceFile, refs *
 	}
 
 	ref.ResolvedPath, ref.Target, _ = ResolveSourceFileFromSourceFile(ctx, sourceFile, source)
-	if ref.Target != nil && IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
+	if ref.Target != nil && settings.IsIgnoredPath(ref.Target.FileName()) {
 		return
 	}
 

@@ -256,8 +256,8 @@ func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed ma
 	return nil, false
 }
 
-func referenceIsTraversable(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
-	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(ctx, opts, ref)
+func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, ref import_utils.ModuleReference) bool {
+	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(settings, opts, ref)
 }
 
 // routeTo follows the parent links back from a queue entry, materializing the
@@ -275,90 +275,6 @@ func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
 		index = int(next.parent)
 	}
 	return route
-}
-
-func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options import_utils.ModuleReferenceOptions) []import_utils.ModuleReference {
-	if sourceFile == nil || (!options.ESModule && !options.CommonJS && !options.AMD) {
-		return nil
-	}
-	// SourceFile.Imports is populated by the parser and avoids walking every AST
-	// node in the usual static-ESM case. The generic collector remains necessary
-	// for call-based edges, parser recovery, and imports inside module bodies.
-	if options.CommonJS || options.AMD || sourceFileNeedsFullModuleScan(sourceFile) {
-		return import_utils.CollectModuleReferences(ctx, sourceFile, options)
-	}
-
-	imports := sourceFile.Imports()
-	refs := make([]import_utils.ModuleReference, 0, len(imports))
-	for _, source := range imports {
-		importer := ast.TryGetImportFromModuleSpecifier(source)
-		if importer == nil {
-			continue
-		}
-
-		onlyTypes := false
-		switch importer.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			onlyTypes = importDeclarationOnlyImportsTypes(importer.AsImportDeclaration())
-		case ast.KindExportDeclaration:
-			onlyTypes = ast.IsTypeOnlyImportOrExportDeclaration(importer)
-		default:
-			continue
-		}
-
-		ref := import_utils.ModuleReference{
-			Source:     source,
-			Importer:   importer,
-			SourceFile: sourceFile,
-			Specifier:  source.Text(),
-			OnlyTypes:  onlyTypes,
-		}
-		ref.ResolvedPath, ref.Target, _ = import_utils.ResolveSourceFileFromSourceFile(ctx, sourceFile, source)
-		if ref.Target != nil && import_utils.IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
-			continue
-		}
-		refs = append(refs, ref)
-	}
-	return refs
-}
-
-func sourceFileNeedsFullModuleScan(sourceFile *ast.SourceFile) bool {
-	if sourceFile.Flags&ast.NodeFlagsPossiblyContainsDynamicImport != 0 || len(sourceFile.Diagnostics()) != 0 {
-		return true
-	}
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement != nil && statement.Kind == ast.KindModuleDeclaration {
-			return true
-		}
-	}
-	return false
-}
-
-func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
-	if importDecl == nil || importDecl.ImportClause == nil {
-		return false
-	}
-
-	importClause := importDecl.ImportClause
-	if importClause.IsTypeOnly() {
-		return true
-	}
-
-	clause := importClause.AsImportClause()
-	if clause == nil || clause.Name() != nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
-		return false
-	}
-	namedImports := clause.NamedBindings.AsNamedImports()
-	if namedImports == nil || namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0 {
-		return false
-	}
-
-	for _, specifier := range namedImports.Elements.Nodes {
-		if specifier == nil || specifier.Kind != ast.KindImportSpecifier || !ast.IsTypeOnlyImportDeclaration(specifier) {
-			return false
-		}
-	}
-	return true
 }
 
 func sourceLine(sourceFile *ast.SourceFile, source *ast.Node) int {
@@ -391,9 +307,9 @@ func moduleReferencePath(ref import_utils.ModuleReference) string {
 	return ref.ResolvedPath
 }
 
-func shouldIgnoreExternal(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
+func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, ref import_utils.ModuleReference) bool {
 	if !opts.ignoreExternal {
 		return false
 	}
-	return import_utils.IsExternalModulePath(ctx.Settings, ref.Specifier, moduleReferencePath(ref))
+	return settings.IsExternalPath(ref.Specifier, moduleReferencePath(ref))
 }

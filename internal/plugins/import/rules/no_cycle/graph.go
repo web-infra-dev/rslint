@@ -1,22 +1,20 @@
 package no_cycle
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// graphKey identifies one shape of the dependency graph. Everything that
-// decides which references a file has and which of them are graph edges
-// belongs here. maxDepth does not: it bounds the search, not the graph, so
-// configurations that differ only in maxDepth share one graph.
+// graphKey identifies one shape of the dependency graph. The references
+// themselves come from the shared module index, so only what turns a
+// reference into a graph edge belongs here. maxDepth does not: it bounds the
+// search, not the graph, so configurations that differ only in maxDepth share
+// one graph.
 type graphKey struct {
-	moduleReferences   import_utils.ModuleReferenceOptions
+	index              import_utils.IndexKey
 	ignoreExternal     bool
 	allowUnsafeDynamic bool
-	settings           string
 }
 
 // moduleNode holds one file's references together with the edges they resolve
@@ -46,30 +44,20 @@ type moduleGraph struct {
 // moduleGraphFor returns the Program's dependency graph for these options,
 // building it on the first file of the run that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
+	moduleIndex := import_utils.IndexFor(ctx, opts.moduleReferences)
 	key := graphKey{
-		moduleReferences:   opts.moduleReferences,
+		index:              import_utils.IndexKey{Options: opts.moduleReferences, Settings: moduleIndex.Settings().Key()},
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
-		settings:           graphSettingsKey(ctx.Settings),
 	}
 	graph, _ := ctx.ProgramCache.Load(key, func() any {
-		return buildModuleGraph(ctx, opts)
+		return buildModuleGraph(moduleIndex, opts)
 	}).(*moduleGraph)
 	return graph
 }
 
-// graphSettingsKey captures the settings that change the graph: import/ignore
-// drops references while they are collected, and external-module-folders
-// decides what ignoreExternal treats as external.
-func graphSettingsKey(settings map[string]interface{}) string {
-	if settings == nil {
-		return ""
-	}
-	return fmt.Sprint(settings["import/ignore"], "\x00", settings["import/external-module-folders"])
-}
-
-func buildModuleGraph(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
-	files := ctx.Program.SourceFiles()
+func buildModuleGraph(moduleIndex *import_utils.ModuleIndex, opts ruleOptions) *moduleGraph {
+	files := moduleIndex.Files()
 	graph := &moduleGraph{
 		nodes: make([]moduleNode, len(files)),
 		index: make(map[*ast.SourceFile]int32, len(files)),
@@ -78,8 +66,9 @@ func buildModuleGraph(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		graph.index[file] = int32(i)
 	}
 
+	settings := moduleIndex.Settings()
 	for i, file := range files {
-		refs := collectModuleReferences(ctx, file, opts.moduleReferences)
+		refs := moduleIndex.Refs(file)
 		if len(refs) == 0 {
 			continue
 		}
@@ -88,7 +77,7 @@ func buildModuleGraph(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		node.edge = make([]int32, len(refs))
 		for r := range refs {
 			node.edge[r] = -1
-			if !referenceIsTraversable(ctx, opts, refs[r]) {
+			if !referenceIsTraversable(settings, opts, refs[r]) {
 				continue
 			}
 			if target, ok := graph.index[refs[r].Target]; ok {

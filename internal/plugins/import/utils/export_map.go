@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"regexp"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -389,36 +387,11 @@ func localNamespaceImportMeta(ctx rule.RuleContext, sourceFile *ast.SourceFile, 
 }
 
 // IsImportPathIgnored matches eslint-plugin-import's shared `import/ignore`
-// setting for resolved import target paths.
+// setting for resolved import target paths. Callers that ask more than once
+// for the same settings should compile them with [CompileModuleSettings] and
+// ask that instead.
 func IsImportPathIgnored(settings map[string]interface{}, fileName string) bool {
-	if settings == nil {
-		return false
-	}
-
-	rawPatterns, ok := settings["import/ignore"]
-	if !ok {
-		return false
-	}
-
-	var patterns []string
-	switch typed := rawPatterns.(type) {
-	case []string:
-		patterns = typed
-	case []interface{}:
-		for _, item := range typed {
-			if pattern, ok := item.(string); ok {
-				patterns = append(patterns, pattern)
-			}
-		}
-	}
-
-	for _, pattern := range patterns {
-		re, err := regexp.Compile(pattern)
-		if err == nil && re.MatchString(fileName) {
-			return true
-		}
-	}
-	return false
+	return CompileModuleSettings(settings).IsIgnoredPath(fileName)
 }
 
 func sourceFileHasExport(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportName string, seen map[exportKey]bool) (bool, bool) {
