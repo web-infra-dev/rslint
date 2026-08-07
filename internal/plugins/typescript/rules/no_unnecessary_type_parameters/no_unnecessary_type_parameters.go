@@ -200,6 +200,7 @@ func isDirectGenericTypeArgumentUsage(identNode *ast.Node) bool {
 func canHaveTypeArgumentsList(kind ast.Kind) bool {
 	switch kind {
 	case ast.KindTypeReference, ast.KindExpressionWithTypeArguments,
+		ast.KindImportType, ast.KindTypeQuery,
 		ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
 		ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
 		return true
@@ -325,10 +326,15 @@ func collectTypeParameterUsageCounts(tc *checker.Checker, node *ast.Node, foundI
 			if sym == nil || len(sym.Declarations) == 0 {
 				return
 			}
-			declTypeParam := sym.Declarations[0].AsTypeParameterDeclaration()
-			if declTypeParam == nil {
+			// A polymorphic `this` type also carries TypeFlagsTypeParameter, but
+			// its symbol is the declaring class/interface, so its first
+			// declaration is not a type parameter. Such a type contributes no
+			// count and has no constraint or default to recurse into.
+			decl := sym.Declarations[0]
+			if !ast.IsTypeParameterDeclaration(decl) {
 				return
 			}
+			declTypeParam := decl.AsTypeParameterDeclaration()
 			nameNode := declTypeParam.Name()
 			if nameNode != nil {
 				incrementIdentifierCount(nameNode, assumeMultipleUses)

@@ -136,7 +136,90 @@ class Container<T> {
   }
 }
 `},
+
+		// ---- Dimension 4: polymorphic `this` type in a member signature ----
+		// A `this` type carries the same type-parameter type flag as a real type
+		// parameter, but its symbol is the declaring interface, so its first
+		// declaration is not a type parameter declaration. It must be skipped
+		// rather than blindly treated as one. Here T is used twice, so nothing
+		// is reported; see the invalid cases for the single-use counterpart.
+		{Code: `
+interface Box<T> {
+  value: T;
+  take(value: T): void;
+  self(): this;
+}
+declare function f<T>(b: Box<T>): void;
+`},
+
+		// ---- Branch lock-in: canHaveTypeArgumentsList() TypeQuery arm ----
+		// `typeof g<T>` attaches its type arguments to a TypeQuery rather than a
+		// TypeReference; T must still register as a direct generic-argument use.
+		{Code: `
+declare function g<U>(u: U): U;
+declare function f<T>(x: typeof g<T>): void;
+`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- Dimension 4: polymorphic `this` type in a class member ----
+		// Regression lock-in: `this` types reach the type-parameter branch of the
+		// type walk with a class symbol, whose first declaration is a
+		// ClassDeclaration. Reporting T here (used only once, in `value: T`)
+		// matches ESLint; the `this` return contributes nothing.
+		{
+			Code: `
+class Box<T> {
+  value: T;
+  self(): this {
+    return this;
+  }
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Message:   "Type parameter T is used only once in the class signature.",
+				Line:      2,
+				Column:    11,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class Box {
+  value: unknown;
+  self(): this {
+    return this;
+  }
+}
+`,
+				}},
+			}},
+		},
+		// The same shape with an inferred (rather than annotated) `this` return.
+		{
+			Code: `
+class Box<T> {
+  value: T;
+  self() {
+    return this;
+  }
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    11,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class Box {
+  value: unknown;
+  self() {
+    return this;
+  }
+}
+`,
+				}},
+			}},
+		},
+
 		// ---- Real-user: typescript-eslint/typescript-eslint#11528 (not planned) ----
 		// The maintainers confirmed this sibling shape from the same thread
 		// SHOULD be reported: TData appears only in the return type itself

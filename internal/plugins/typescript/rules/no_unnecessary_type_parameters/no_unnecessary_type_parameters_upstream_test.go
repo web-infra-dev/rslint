@@ -325,9 +325,15 @@ declare enum AST_NODE_TYPES {
   B = 'B',
 }
 declare namespace TSESTree {
-  interface Node {
-    type: AST_NODE_TYPES;
+  interface NodeA {
+    type: AST_NODE_TYPES.A;
+    a: string;
   }
+  interface NodeB {
+    type: AST_NODE_TYPES.B;
+    b: number;
+  }
+  type Node = NodeA | NodeB;
 }
 
 declare const isNodeOfType: <NodeType extends AST_NODE_TYPES>(
@@ -340,9 +346,15 @@ declare enum AST_NODE_TYPES {
   B = 'B',
 }
 declare namespace TSESTree {
-  interface Node {
-    type: AST_NODE_TYPES;
+  interface NodeA {
+    type: AST_NODE_TYPES.A;
+    a: string;
   }
+  interface NodeB {
+    type: AST_NODE_TYPES.B;
+    b: number;
+  }
+  type Node = NodeA | NodeB;
 }
 
 const isNodeOfType =
@@ -358,9 +370,15 @@ declare enum AST_TOKEN_TYPES {
   B = 'B',
 }
 declare namespace TSESTree {
-  interface Token {
-    type: AST_TOKEN_TYPES;
+  interface TokenA {
+    type: AST_TOKEN_TYPES.A;
+    a: string;
   }
+  interface TokenB {
+    type: AST_TOKEN_TYPES.B;
+    b: number;
+  }
+  type Token = TokenA | TokenB;
 }
 
 export const isNotTokenOfTypeWithConditions =
