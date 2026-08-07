@@ -204,7 +204,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { #foo() { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of private method '#foo'.",
+					Message:   "Expected to return a value at the end of private method #foo.",
 					Line:      1,
 					Column:    11,
 					EndLine:   1,
@@ -362,7 +362,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { get #foo() { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of private getter '#foo'.",
+					Message:   "Expected to return a value at the end of private getter #foo.",
 					Line:      1,
 					Column:    15,
 					EndLine:   1,
@@ -441,7 +441,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { static #foo() { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of static private method '#foo'.",
+					Message:   "Expected to return a value at the end of static private method #foo.",
 					Line:      1,
 					Column:    18,
 					EndLine:   1,
@@ -452,7 +452,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { static get #foo() { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of static private getter '#foo'.",
+					Message:   "Expected to return a value at the end of static private getter #foo.",
 					Line:      1,
 					Column:    22,
 					EndLine:   1,
@@ -463,7 +463,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { static async #foo() { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of static private async method '#foo'.",
+					Message:   "Expected to return a value at the end of static private async method #foo.",
 					Line:      1,
 					Column:    24,
 					EndLine:   1,
@@ -531,7 +531,7 @@ func TestConsistentReturnExtras(t *testing.T) {
 				Code: `class C { static #f = () => { if (a) return 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingReturn",
-					Message:   "Expected to return a value at the end of static private method '#f'.",
+					Message:   "Expected to return a value at the end of static private method #f.",
 					Line:      1,
 					Column:    26,
 					EndLine:   1,

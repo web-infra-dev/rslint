@@ -527,7 +527,9 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	parent := node.Parent
+	// ESTree does not expose parentheses as nodes, so a function value wrapped
+	// only in parentheses still has the surrounding property as its parent.
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 	if parent == nil {
 		return "function"
 	}
@@ -535,7 +537,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 	tokens := []string{}
 
 	isClassMember := isCoreDirectClassMember(node)
-	isClassFieldValue := isCoreClassFieldInitializer(node)
+	isClassFieldValue := isCoreClassFieldInitializer(node, parent)
 	if isClassMember || isClassFieldValue {
 		owner := node
 		if isClassFieldValue {
@@ -595,7 +597,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 func appendCoreFunctionNameFromOwner(tokens *[]string, owner *ast.Node, node *ast.Node) {
 	if name := owner.Name(); name != nil {
 		if name.Kind == ast.KindPrivateIdentifier {
-			*tokens = append(*tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
+			*tokens = append(*tokens, name.AsPrivateIdentifier().Text)
 			return
 		}
 		if s, ok := GetStaticPropertyName(name); ok {
@@ -634,14 +636,16 @@ func isCoreDirectClassMember(node *ast.Node) bool {
 	return false
 }
 
-func isCoreClassFieldInitializer(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
+	if parent == nil ||
+		parent.Kind != ast.KindPropertyDeclaration ||
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		return parent.AsPropertyDeclaration().Initializer == node
+		initializer := parent.AsPropertyDeclaration().Initializer
+		return initializer != nil && ast.SkipParentheses(initializer) == node
 	}
 	return false
 }
