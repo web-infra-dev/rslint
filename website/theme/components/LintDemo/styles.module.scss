@@ -1,0 +1,644 @@
+/* Live-lint demo pane + parallax starfield background.
+   Ported from the d-glitch-decode prototype. All demo-internal element
+   classes are kept as :global kebab-case names (the imperative useEffect
+   logic builds DOM with innerHTML / classList using these literal strings),
+   scoped under the module-hashed `.lintDemo` / `.starfield` roots so they
+   don't leak globally.
+
+   Theme: rspress puts `.dark` on <html> in dark mode and removes it in
+   light mode (verified theme/index.scss:11). The prototype's light palette
+   (originally `:root.theme-light`) is therefore bound to html:not(.dark),
+   and the dark palette to html.dark. Brand orange is shared across both. */
+
+.starfield {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Below all rspress content (nav, hero, tool-stack) and the page
+     background image, above the solid page fill. rspress home content is
+     statically positioned, so a low positive z-index here would paint the
+     canvas ABOVE block-level siblings; -1 puts it in the negative-z
+     stacking step so every positioned/static module reliably covers it. */
+  z-index: 0;
+  display: block;
+
+  /* Light mode (html without .dark) — dots are darker on cream, so dial
+     opacity down a touch to avoid a stippled look. */
+  :global(html:not(.dark)) & {
+    opacity: 0.85;
+  }
+}
+
+.lintDemo {
+  /* ---- Theme tokens (dark default) ---- */
+  --ld-orange: #ff5e00;
+  --ld-orange-soft: #ff7524;
+  --ld-text: #e8eaf0;
+  --ld-muted: #7c8294;
+
+  /* Decode pane shell */
+  --ld-pane-bg: linear-gradient(180deg, #0b0e16, #090c14);
+  --ld-pane-shadow: 0 30px 80px -30px rgba(255, 94, 0, 0.5);
+  --ld-pane-head-bg: rgba(255, 255, 255, 0.02);
+  --ld-pane-head-border: rgba(255, 255, 255, 0.05);
+  --ld-pane-head-right: rgba(255, 255, 255, 0.4);
+  --ld-replay-bg: rgba(255, 255, 255, 0.04);
+  --ld-replay-bg-hov: rgba(255, 94, 0, 0.08);
+  --ld-replay-border: rgba(255, 255, 255, 0.1);
+  --ld-replay-border-hov: rgba(255, 94, 0, 0.5);
+  --ld-replay-color: rgba(255, 255, 255, 0.62);
+  --ld-replay-color-hov: var(--ld-orange-soft);
+  --ld-shine-bright: rgba(255, 200, 150, 1);
+  --ld-shine-mid: rgba(255, 94, 0, 0.85);
+  --ld-border-on: rgba(255, 94, 0, 0.6);
+  --ld-border-off: rgba(255, 94, 0, 0.1);
+
+  /* Source code syntax tokens (Material Palenight) */
+  --ld-code-text: #d4d4d4;
+  --ld-code-lockin-flash: #ffffff;
+  --ld-code-lockin-glow: rgba(255, 255, 255, 0.8);
+  --ld-code-gutter: rgba(255, 255, 255, 0.15);
+  --ld-code-enc: rgba(220, 224, 235, 0.18);
+  --ld-code-scr: rgba(255, 200, 150, 0.82);
+  --ld-code-scr-glow: rgba(255, 94, 0, 0.55);
+  --ld-code-kw: #c792ea;
+  --ld-code-str: #c3e88d;
+  --ld-code-num: #ffcb6b;
+  --ld-code-com: #5a5f73;
+  --ld-code-fn: #82aaff;
+
+  /* Scanner band */
+  --ld-scanner-orange: #ff5e00;
+  --ld-scanner-fade-faint: rgba(255, 94, 0, 0.04);
+  --ld-scanner-fade-mid: rgba(255, 94, 0, 0.18);
+  --ld-scanner-flare-white: white;
+  --ld-scanner-trail: rgba(255, 94, 0, 0.3);
+
+  /* VS Code squiggle (error red) */
+  --ld-squiggle-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4' width='6' height='4' preserveAspectRatio='none'><path d='M0 3 Q1.5 0.6 3 3 T6 3' fill='none' stroke='%23f48771' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  --ld-token-violation-tint: #f48771;
+
+  /* VS Code MarkerHover tooltip (Default Dark+) */
+  --ld-vsc-bg: #252526;
+  --ld-vsc-border: #454545;
+  --ld-vsc-keyline: #3e3e42;
+  --ld-vsc-text: #cccccc;
+  --ld-vsc-link: #3794ff;
+  --ld-vsc-err-red: #f48771;
+  --ld-vsc-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Console (rslint default printer ANSI palette) */
+  --ld-console-bg: rgba(0, 0, 0, 0.32);
+  --ld-console-border: rgba(255, 255, 255, 0.05);
+  --ld-console-rname: #5fff5f;
+  --ld-console-file: #5fd7d7;
+  --ld-console-err: #ff5f5f;
+  --ld-console-warn: #ffd75f;
+  --ld-console-faint: rgba(255, 255, 255, 0.42);
+  --ld-console-cmd: rgba(255, 255, 255, 0.7);
+  --ld-console-bold: #ffffff;
+  --ld-console-caret: rgba(255, 255, 255, 0.85);
+
+  /* Monospace stack: JetBrains Mono is not loaded by the site
+     (rspress controls <head>), so fall through to platform mono fonts. */
+  --ld-mono:
+    'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Consolas', monospace;
+
+  /* Placement (width, centering, gutters) is owned by the page's
+     `.heroRow` grid — see theme/pages/index.module.scss. Here the root only
+     carries the theme tokens + a stacking context for the pane. */
+  position: relative;
+  z-index: 4;
+
+  /* ---- Light palette: rspress light mode = html WITHOUT .dark ----
+     Nested as `:global(html:not(.dark)) &` so `.lintDemo` stays the local
+     (module-hashed) anchor and only the `html:not(.dark)` ancestor is
+     global. Compiles to `:global(html:not(.dark)) .lintDemo { ... }`. */
+  :global(html:not(.dark)) & {
+    --ld-text: #1d1f24;
+    --ld-muted: #5b6172;
+
+    --ld-pane-bg: linear-gradient(180deg, #ffffff, #fafbfd);
+    --ld-pane-shadow:
+      0 22px 56px -28px rgba(20, 22, 28, 0.22), 0 1px 0 rgba(20, 22, 28, 0.04);
+    --ld-pane-head-bg: rgba(20, 22, 28, 0.03);
+    --ld-pane-head-border: rgba(20, 22, 28, 0.08);
+    --ld-pane-head-right: rgba(20, 22, 28, 0.5);
+    --ld-replay-bg: rgba(20, 22, 28, 0.04);
+    --ld-replay-bg-hov: rgba(255, 94, 0, 0.1);
+    --ld-replay-border: rgba(20, 22, 28, 0.1);
+    --ld-replay-border-hov: rgba(255, 94, 0, 0.55);
+    --ld-replay-color: rgba(20, 22, 28, 0.62);
+    --ld-shine-bright: rgba(255, 174, 110, 1);
+    --ld-shine-mid: rgba(255, 94, 0, 0.95);
+    --ld-border-on: rgba(255, 94, 0, 0.7);
+    --ld-border-off: rgba(255, 94, 0, 0.12);
+
+    --ld-code-text: #1f1f1f;
+    --ld-code-lockin-flash: #000000;
+    --ld-code-lockin-glow: rgba(0, 0, 0, 0.55);
+    --ld-code-gutter: rgba(20, 22, 28, 0.3);
+    --ld-code-enc: rgba(20, 22, 28, 0.28);
+    --ld-code-scr: rgba(160, 60, 0, 0.85);
+    --ld-code-scr-glow: rgba(255, 94, 0, 0.42);
+    --ld-code-kw: #0000ff;
+    --ld-code-str: #a31515;
+    --ld-code-num: #098658;
+    --ld-code-com: #008000;
+    --ld-code-fn: #795e26;
+
+    --ld-scanner-fade-faint: rgba(255, 94, 0, 0.06);
+    --ld-scanner-fade-mid: rgba(255, 94, 0, 0.22);
+    --ld-scanner-flare-white: #ffcf99;
+    --ld-scanner-trail: rgba(255, 94, 0, 0.32);
+
+    --ld-squiggle-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4' width='6' height='4' preserveAspectRatio='none'><path d='M0 3 Q1.5 0.6 3 3 T6 3' fill='none' stroke='%23cd3131' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    --ld-token-violation-tint: #cd3131;
+
+    --ld-vsc-bg: #f3f3f3;
+    --ld-vsc-border: #c8c8c8;
+    --ld-vsc-keyline: #d4d4d4;
+    --ld-vsc-text: #1f1f1f;
+    --ld-vsc-link: #006ab1;
+    --ld-vsc-err-red: #cd3131;
+    --ld-vsc-shadow: rgba(20, 22, 28, 0.18);
+
+    --ld-console-bg: rgba(245, 245, 247, 0.85);
+    --ld-console-border: rgba(20, 22, 28, 0.08);
+    --ld-console-rname: #267f00;
+    --ld-console-file: #007acc;
+    --ld-console-err: #cd3131;
+    --ld-console-warn: #949800;
+    --ld-console-faint: rgba(20, 22, 28, 0.55);
+    --ld-console-cmd: rgba(20, 22, 28, 0.78);
+    --ld-console-bold: #000000;
+    --ld-console-caret: rgba(20, 22, 28, 0.85);
+  }
+}
+
+/* ===========================================================
+   Demo-internal element styles. Kept as :global kebab classes
+   (the imperative JS references them as literal strings), but
+   nested under the hashed `.lintDemo` root so they stay scoped.
+   =========================================================== */
+.lintDemo :global {
+  .stage-col {
+    display: flex;
+    flex-direction: column;
+    width: 590px;
+    max-width: 100%;
+  }
+
+  .decode-pane {
+    position: relative;
+    width: 590px;
+    max-width: 100%;
+    background: var(--ld-pane-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--ld-pane-shadow);
+    isolation: isolate;
+  }
+
+  /* Animated frame border, drawn ON TOP of the content as a 1.5px ring (so
+     no inner background can ever cover it — that's also why the content
+     needs no inset). Two stacked rings via the mask-composite border trick:
+       ::before — progress fill that draws around the perimeter in sync with
+         the lint run (--ld-border-fill, 0→1, set by the engine each frame);
+       ::after  — the bright shine arc that keeps travelling on top. */
+  .ld-frame,
+  .ld-frame::before,
+  .ld-frame::after {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  .ld-frame {
+    z-index: 6;
+  }
+  .ld-frame::before,
+  .ld-frame::after {
+    content: '';
+    padding: 1.5px;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+  .ld-frame::before {
+    /* Starts at -52deg — the actual top-left corner direction for this pane's
+       aspect (a generic -45deg lands part-way along the top edge, leaving the
+       corner unfilled). Draws clockwise from there. Must match the shine start
+       angle in index.tsx. */
+    background: conic-gradient(
+      from -52deg,
+      var(--ld-border-on) 0deg,
+      var(--ld-border-on) calc(var(--ld-border-fill, 0) * 360deg),
+      var(--ld-border-off) calc(var(--ld-border-fill, 0) * 360deg)
+    );
+  }
+  .ld-frame::after {
+    /* Shine dot rides at the fill's leading edge (its angle --ld-shine-angle
+       is driven by the engine each frame, see index.tsx), so it "draws" the
+       ring as it grows, then keeps looping once the ring is full. The bright
+       highlight starts at the conic's start angle (the fill front) and only
+       glows forward (clockwise, into the about-to-be-filled side). It must NOT
+       glow backward: at the very start that backward side is the ring's
+       "tail" (filled last, a whole lap later), so lighting it would make a
+       streak flash on then vanish as the dot moves off. */
+    background: conic-gradient(
+      from var(--ld-shine-angle, -52deg),
+      var(--ld-shine-bright) 0deg,
+      var(--ld-shine-mid) 13deg,
+      transparent 34deg 360deg
+    );
+  }
+
+  .pane-head {
+    position: relative;
+    z-index: 1;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ld-pane-head-border);
+    font-family: var(--ld-mono);
+    font-size: 11px;
+    color: var(--ld-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ld-pane-head-bg);
+  }
+  .pane-head .live {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ld-orange);
+    box-shadow: 0 0 6px var(--ld-orange);
+    animation: ld-blink 1.4s infinite;
+  }
+  .pane-head .right {
+    margin-left: auto;
+    color: var(--ld-pane-head-right);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* Always laid out (display:inline-flex from the start) so it never pops in
+     with a reflow that shoves paneFile sideways (which read as the module
+     "jumping"). Shown dimmed + non-interactive while the run is in progress —
+     so paneFile's right edge isn't an odd blank gap — then brightens to fully
+     enabled when ready. */
+  .pane-head .replay {
+    display: inline-flex;
+    opacity: 0.4;
+    pointer-events: none;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid var(--ld-replay-border);
+    background: var(--ld-replay-bg);
+    color: var(--ld-replay-color);
+    font-family: var(--ld-mono);
+    font-size: 10.5px;
+    cursor: pointer;
+    transition:
+      color 0.15s,
+      border-color 0.15s,
+      background 0.15s,
+      opacity 0.35s ease;
+  }
+  .pane-head .replay.ready {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .pane-head .replay:hover {
+    color: var(--ld-replay-color-hov);
+    border-color: var(--ld-replay-border-hov);
+    background: var(--ld-replay-bg-hov);
+  }
+  .pane-head .replay .icon {
+    display: inline-block;
+    font-size: 12px;
+    line-height: 1;
+    transform: translateY(0.5px);
+  }
+  .pane-head .replay:hover .icon {
+    animation: ld-replay-spin 0.5s ease;
+  }
+
+  .decode-body {
+    position: relative;
+    z-index: 1;
+    padding: 10px 14px 6px;
+    height: 165px;
+    overflow: hidden;
+  }
+  .scanner {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      var(--ld-scanner-fade-faint) 25%,
+      var(--ld-scanner-fade-mid) 48%,
+      var(--ld-scanner-fade-faint) 75%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 5;
+    transform: translateY(-70px);
+  }
+  .scanner::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--ld-scanner-orange) 15%,
+      var(--ld-scanner-flare-white) 50%,
+      var(--ld-scanner-orange) 85%,
+      transparent
+    );
+    box-shadow:
+      0 0 12px var(--ld-scanner-orange),
+      0 0 24px var(--ld-scanner-orange),
+      0 0 48px var(--ld-scanner-orange);
+  }
+  .scanner::after {
+    content: '';
+    position: absolute;
+    top: calc(50% + 2px);
+    left: 0;
+    right: 0;
+    height: 18px;
+    background: linear-gradient(180deg, var(--ld-scanner-trail), transparent);
+  }
+
+  .code-text {
+    font-family: var(--ld-mono);
+    font-size: 12px;
+    line-height: 22px;
+    color: var(--ld-text);
+    white-space: pre;
+    counter-reset: line;
+    position: relative;
+  }
+  .cl {
+    display: block;
+    position: relative;
+    padding-left: 28px;
+    min-height: 18px;
+  }
+  .cl::before {
+    counter-increment: line;
+    content: counter(line);
+    position: absolute;
+    left: 0;
+    width: 20px;
+    text-align: right;
+    color: var(--ld-code-gutter);
+    font-variant-numeric: tabular-nums;
+  }
+  .ch {
+    display: inline-block;
+    transform-origin: center;
+    transition:
+      color 0.28s ease,
+      text-shadow 0.28s ease;
+  }
+  .ch.enc {
+    color: var(--ld-code-enc);
+  }
+  .ch.scr {
+    color: var(--ld-code-scr);
+    text-shadow: 0 0 6px var(--ld-code-scr-glow);
+  }
+  .ch.dec {
+    color: var(--ld-code-text);
+    animation: ld-lockin 0.32s ease-out;
+  }
+  .ch.dec.t-k {
+    color: var(--ld-code-kw);
+  }
+  .ch.dec.t-s {
+    color: var(--ld-code-str);
+  }
+  .ch.dec.t-n {
+    color: var(--ld-code-num);
+  }
+  .ch.dec.t-c {
+    color: var(--ld-code-com);
+    font-style: italic;
+  }
+  .ch.dec.t-p {
+    color: var(--ld-code-fn);
+  }
+
+  .ch.violation {
+    position: relative;
+    cursor: help;
+  }
+  .ch.violation::after {
+    content: '';
+    position: absolute;
+    left: -0.5px;
+    right: -0.5px;
+    bottom: -1px;
+    height: 4px;
+    background-image: var(--ld-squiggle-url);
+    background-repeat: repeat-x;
+    background-size: 6px 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .ch.violation.visible::after {
+    opacity: 0.92;
+  }
+  .ch.violation.visible {
+    animation: ld-token-tint 1.8s ease-in-out infinite;
+  }
+  .ch.violation.visible.hovered {
+    animation: none;
+    color: var(--ld-token-violation-tint);
+  }
+  .ch.violation.visible.hovered::after {
+    opacity: 1;
+  }
+
+  /* VS Code MarkerHover popover */
+  .vsc-tip {
+    position: absolute;
+    z-index: 8;
+    width: 340px;
+    background: var(--ld-vsc-bg);
+    color: var(--ld-vsc-text);
+    border: 1px solid var(--ld-vsc-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px var(--ld-vsc-shadow);
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI',
+      'Helvetica Neue', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    pointer-events: none;
+  }
+  .vsc-tip.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .vsc-tip .vsc-body {
+    padding: 8px 12px 8px 12px;
+  }
+  .vsc-tip .msg {
+    display: block;
+    white-space: pre-wrap;
+    color: var(--ld-vsc-text);
+    word-wrap: break-word;
+  }
+  .vsc-tip .details {
+    display: block;
+    margin-top: 4px;
+    opacity: 0.6;
+    color: var(--ld-vsc-text);
+  }
+  .vsc-tip .status-bar {
+    border-top: 1px solid var(--ld-vsc-keyline);
+    padding: 5px 12px 7px 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 12px;
+  }
+  .vsc-tip .status-bar .action {
+    color: var(--ld-vsc-link);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .vsc-tip .status-bar .action:hover {
+    text-decoration: underline;
+  }
+
+  .console {
+    position: relative;
+    z-index: 1;
+    padding: 6px 14px 10px;
+    height: 250px;
+    overflow: hidden;
+    border-top: 1px solid var(--ld-console-border);
+    background: var(--ld-console-bg);
+    font-family: var(--ld-mono);
+    font-size: 10.5px;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .console .log {
+    display: block;
+    color: var(--ld-text);
+    white-space: pre;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    min-width: 0;
+    scrollbar-width: none;
+    animation: ld-log-in 0.32s ease-out;
+  }
+  .console .log::-webkit-scrollbar {
+    display: none;
+  }
+  .console .log.fade {
+    animation: ld-log-out 0.2s ease forwards;
+  }
+  .console .log .rname {
+    color: var(--ld-console-rname);
+  }
+  .console .log .file {
+    color: var(--ld-console-file);
+    font-style: italic;
+  }
+  .console .log .sev-err {
+    color: var(--ld-console-err);
+    font-weight: 700;
+  }
+  .console .log .sev-warn {
+    color: var(--ld-console-warn);
+  }
+  .console .log .border {
+    color: var(--ld-console-faint);
+  }
+  .console .log .gutter {
+    color: var(--ld-console-faint);
+  }
+  .console .log .under {
+    color: var(--ld-console-err);
+    font-weight: 700;
+  }
+  .console .log .cmd {
+    color: var(--ld-console-cmd);
+  }
+  .console .log .ok {
+    color: var(--ld-console-rname);
+    font-weight: 700;
+  }
+  .console .log .bad {
+    color: var(--ld-console-err);
+    font-weight: 700;
+  }
+  .console .log .bold {
+    color: var(--ld-console-bold);
+    font-weight: 700;
+  }
+  .console .log .meta {
+    color: var(--ld-console-faint);
+  }
+  .console .log.cmdline {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+  }
+  .console .log.cmdline .cmd-group {
+    white-space: nowrap;
+  }
+  .console .log.cmdline .type-caret {
+    display: inline-block;
+    margin-left: 0;
+    color: var(--ld-console-caret);
+    animation: ld-caret-blink 1s linear infinite;
+  }
+  .console .log.cmdline .prog-right {
+    white-space: nowrap;
+    transition: opacity 0.32s ease-out;
+  }
+  .console .log.cmdline .prog-right.fading {
+    opacity: 0;
+  }
+  .console .log.diag-in {
+    animation: ld-diag-rise 0.32s ease-out;
+  }
+}
