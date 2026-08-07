@@ -7,42 +7,18 @@ import (
 )
 
 // ExternalModuleFolders returns eslint-plugin-import's configured external
-// module folders, defaulting to node_modules.
+// module folders, defaulting to node_modules when the setting names none.
 func ExternalModuleFolders(settings map[string]interface{}) []string {
-	folders := []string{"node_modules"}
-	if settings == nil {
-		return folders
-	}
-
-	raw, ok := settings["import/external-module-folders"]
-	if !ok {
-		return folders
-	}
-
-	switch typed := raw.(type) {
-	case []string:
-		return append([]string{}, typed...)
-	case []interface{}:
-		result := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if folder, ok := item.(string); ok && folder != "" {
-				result = append(result, folder)
-			}
-		}
-		if len(result) > 0 {
-			return result
+	var folders []string
+	for _, folder := range settingsStringList(settings, "import/external-module-folders") {
+		if folder != "" {
+			folders = append(folders, folder)
 		}
 	}
-
+	if len(folders) == 0 {
+		return []string{"node_modules"}
+	}
 	return folders
-}
-
-// IsExternalModulePath reports whether a resolved path or unresolved bare
-// specifier should be treated as external by eslint-plugin-import rules.
-// Callers that ask more than once for the same settings should compile them
-// with [compileModuleSettings] and ask that instead.
-func IsExternalModulePath(settings map[string]interface{}, specifier string, resolvedPath string) bool {
-	return compileModuleSettings(settings).IsExternalPath(specifier, resolvedPath)
 }
 
 func pathContainsSegment(fileName string, segment string) bool {

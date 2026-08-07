@@ -6,7 +6,7 @@ import (
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 )
 
-func TestIsExternalModulePath(t *testing.T) {
+func TestModuleSettingsIsExternalPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -56,9 +56,9 @@ func TestIsExternalModulePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := import_utils.IsExternalModulePath(tt.settings, tt.specifier, tt.resolvedPath)
+			got := import_utils.CompileModuleSettings(tt.settings).IsExternalPath(tt.specifier, tt.resolvedPath)
 			if got != tt.want {
-				t.Fatalf("IsExternalModulePath() = %v, want %v", got, tt.want)
+				t.Fatalf("IsExternalPath() = %v, want %v", got, tt.want)
 			}
 		})
 	}

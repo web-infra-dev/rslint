@@ -324,6 +324,24 @@ func TestGetExportMap(t *testing.T) {
 		}
 	})
 
+	t.Run("default export of named class expression does not carry namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-named-class-expression")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil {
+			t.Fatal("expected default export to be visible")
+			return
+		}
+		if def.Namespace != nil {
+			t.Fatal("expected named class expression default not to carry namespace metadata")
+		}
+	})
+
 	t.Run("local export of namespace import carries namespace metadata", func(t *testing.T) {
 		t.Parallel()
 
@@ -441,7 +459,7 @@ func TestHasExportRespectsImportIgnore(t *testing.T) {
 	}
 }
 
-func TestIsImportPathIgnored(t *testing.T) {
+func TestModuleSettingsIsIgnoredPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -480,9 +498,9 @@ func TestIsImportPathIgnored(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := import_utils.IsImportPathIgnored(tc.settings, tc.fileName)
+			got := import_utils.CompileModuleSettings(tc.settings).IsIgnoredPath(tc.fileName)
 			if got != tc.want {
-				t.Fatalf("IsImportPathIgnored() = %v, want %v", got, tc.want)
+				t.Fatalf("IsIgnoredPath() = %v, want %v", got, tc.want)
 			}
 		})
 	}

@@ -110,8 +110,7 @@ func (local *localExports) appendStatement(ctx rule.RuleContext, sourceFile *ast
 		if exportAssignment.IsExportEquals {
 			return
 		}
-		name, _ := exportAssignmentReferencedIdentifier(exportAssignment.Expression)
-		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: name})
+		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: referencedIdentifierText(exportAssignment.Expression)})
 	case ast.KindNamespaceExportDeclaration:
 		if name := stmt.Name(); name != nil {
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
@@ -161,12 +160,11 @@ func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 				sourceName = specifier.Name()
 			}
 			localName, localOK := moduleExportName(sourceName)
-			identifier, _ := exportAssignmentReferencedIdentifier(sourceName)
 			step.Specs = append(step.Specs, exportSpec{
 				Exported:   exportedName,
 				Local:      localName,
 				LocalOK:    localOK,
-				LocalIdent: identifier,
+				LocalIdent: referencedIdentifierText(sourceName),
 			})
 		}
 		local.Steps = append(local.Steps, step)
@@ -237,6 +235,18 @@ func exportedDeclarationNames(stmt *ast.Node) []string {
 		}
 	}
 	return nil
+}
+
+// referencedIdentifierText returns the identifier an expression is, after
+// parentheses, and "" for every other expression. A named function or class
+// expression does not count: its name binds inside its own body, not to a
+// binding of the file, so it can never reference a namespace import.
+func referencedIdentifierText(expr *ast.Node) string {
+	expr = ast.SkipParentheses(expr)
+	if expr == nil || expr.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return expr.AsIdentifier().Text
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression

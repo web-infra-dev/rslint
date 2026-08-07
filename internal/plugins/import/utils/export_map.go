@@ -283,9 +283,9 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 
 // namespaceImportMeta finds the `import * as localName` the file re-exports
 // under some other name. Every import declaration before the matching one has
-// its export map built along the way, because that is what the search used to
-// do while walking the statements, and the maps it leaves behind are visible
-// to the rest of this query.
+// its export map built along the way, so by the time a match is returned the
+// maps of all earlier imports exist and stay visible to the rest of this
+// query.
 func (builder *exportBuilder) namespaceImportMeta(local *localExports, localName string) (*ExportMeta, bool) {
 	if localName == "" {
 		return nil, false
@@ -300,14 +300,6 @@ func (builder *exportBuilder) namespaceImportMeta(local *localExports, localName
 		}
 	}
 	return nil, false
-}
-
-// IsImportPathIgnored matches eslint-plugin-import's shared `import/ignore`
-// setting for resolved import target paths. Callers that ask more than once
-// for the same settings should compile them with [compileModuleSettings] and
-// ask that instead.
-func IsImportPathIgnored(settings map[string]interface{}, fileName string) bool {
-	return compileModuleSettings(settings).IsIgnoredPath(fileName)
 }
 
 func sourceFileHasExport(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {

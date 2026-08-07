@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -46,11 +47,13 @@ type indexKey struct {
 }
 
 // IndexFor returns the Program's import index for these settings, building it
-// on the first rule of the run that asks for it.
+// on the first rule of the run that asks for it. Only the cache key is derived
+// per call; compiling the settings — notably their regexps — happens inside
+// the build, once per Program and key.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
-	settings := compileModuleSettings(ctx.Settings)
-	return CachedByProgram(ctx.Program, indexKey{settings: settings.key}, func() *ModuleIndex {
-		return newModuleIndex(settings)
+	key := moduleSettingsKey(ctx.Settings)
+	return CachedByProgram(ctx.Program, indexKey{settings: key}, func() *ModuleIndex {
+		return newModuleIndex(compileModuleSettings(ctx.Settings))
 	})
 }
 
@@ -135,11 +138,20 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 	return compiled
 }
 
+// moduleSettingsKey encodes the settings compileModuleSettings reads into one
+// string: two settings maps share a key exactly when they compile alike. Every
+// element is quoted so that list boundaries survive the encoding, and the
+// lists are read through the same coercions the compilation applies.
 func moduleSettingsKey(settings map[string]interface{}) string {
-	if settings == nil {
-		return ""
+	var key strings.Builder
+	for _, pattern := range settingsStringList(settings, "import/ignore") {
+		key.WriteString(strconv.Quote(pattern))
 	}
-	return fmt.Sprint(settings["import/ignore"], "\x00", settings["import/external-module-folders"])
+	key.WriteByte('\x00')
+	for _, folder := range ExternalModuleFolders(settings) {
+		key.WriteString(strconv.Quote(folder))
+	}
+	return key.String()
 }
 
 // Key identifies the settings these were compiled from, for callers that key

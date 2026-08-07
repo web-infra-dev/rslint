@@ -68,6 +68,14 @@ func buildModuleGraph(ctx rule.RuleContext, settings *import_utils.ModuleSetting
 	}
 
 	for i, file := range files {
+		// An edge into an excluded file is never traversable, so no search can
+		// enter it and no reference of its own can close a cycle back to it.
+		// Its outgoing references are therefore never needed, which keeps
+		// ignored — and, under ignoreExternal, node_modules — files out of the
+		// collection work entirely.
+		if fileIsExcluded(settings, opts, file) {
+			continue
+		}
 		refs := ctx.Modules.Edges(file, opts.syntax)
 		if len(refs) == 0 {
 			continue
@@ -92,6 +100,19 @@ func buildModuleGraph(ctx rule.RuleContext, settings *import_utils.ModuleSetting
 
 	graph.computeGroups()
 	return graph
+}
+
+// fileIsExcluded reports whether referenceIsTraversable drops every edge into
+// file: its path is covered by `import/ignore`, or ignoreExternal is set and
+// the path is external. IsExternalPath only consults its specifier when the
+// resolved path is empty, so passing none matches what it answers for any
+// edge resolving to this file.
+func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, file *ast.SourceFile) bool {
+	fileName := file.FileName()
+	if settings.IsIgnoredPath(fileName) {
+		return true
+	}
+	return opts.ignoreExternal && settings.IsExternalPath("", fileName)
 }
 
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's

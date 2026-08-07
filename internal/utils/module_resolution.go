@@ -7,15 +7,15 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
-// ResolveFromSourceFile resolves a module specifier to the file it names, from
-// the perspective of the provided origin file.
+// ResolveModulePath resolves a module specifier to the path of the file it
+// names, from the perspective of the provided origin file.
 func ResolveModulePath(program *compiler.Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, bool) {
 	resolvedPath, _, ok := resolveModule(program, sourceFile, moduleSpecifier)
 	return resolvedPath, ok
 }
 
-// ResolveSourceFileFromSourceFile resolves a module specifier and returns the
-// Program's source file for the resolved path.
+// ResolveModuleFile resolves a module specifier and returns the Program's
+// source file for the resolved path.
 func ResolveModuleFile(program *compiler.Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	resolvedPath, target, ok := resolveModule(program, sourceFile, moduleSpecifier)
 	if !ok || target == nil {
