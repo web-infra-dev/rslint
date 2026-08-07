@@ -32,14 +32,18 @@ type cachedValue struct {
 
 func cacheFor(program *compiler.Program) *programCache {
 	key := weak.Make(program)
-	if entry, ok := programCaches.Load(key); ok {
-		return entry.(*programCache)
+	if stored, ok := programCaches.Load(key); ok {
+		if entry, ok := stored.(*programCache); ok {
+			return entry
+		}
 	}
 
 	entry := &programCache{values: make(map[any]*cachedValue)}
-	actual, loaded := programCaches.LoadOrStore(key, entry)
-	if loaded {
-		return actual.(*programCache)
+	if stored, loaded := programCaches.LoadOrStore(key, entry); loaded {
+		if existing, ok := stored.(*programCache); ok {
+			return existing
+		}
+		return entry
 	}
 
 	// The cleanup takes the weak key rather than the Program, so registering
