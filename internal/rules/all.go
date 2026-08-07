@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
+	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
@@ -162,6 +163,7 @@ func GetAllRules() []rule.Rule {
 		array_callback_return.ArrayCallbackReturnRule,
 		arrow_body_style.ArrowBodyStyleRule,
 		complexity.ComplexityRule,
+		consistent_return.ConsistentReturnRule,
 		constructor_super.ConstructorSuperRule,
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,

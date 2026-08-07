@@ -102,7 +102,7 @@ func TestMaxParamsExtras(t *testing.T) {
 			},
 			{
 				Code:   "class C { static #method(a, b, c, d) {} }",
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Static private method '#method'", 4, 3), Line: 1, Column: 11}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Static private method #method", 4, 3), Line: 1, Column: 11}},
 			},
 			{
 				Code:   "class C { field = (a, b, c, d) => {}; }",
@@ -110,7 +110,7 @@ func TestMaxParamsExtras(t *testing.T) {
 			},
 			{
 				Code:   "class C { static #field = (a, b, c, d) => {}; }",
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Static private method '#field'", 4, 3)}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Static private method #field", 4, 3)}},
 			},
 			{
 				Code:   "const obj = { field: function(a, b, c, d) {} };",

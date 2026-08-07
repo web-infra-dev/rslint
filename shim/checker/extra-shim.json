@@ -27,7 +27,11 @@
       "getWidenedType",
       "isTypeAssignableTo",
       "isTypeStrictSubtypeOf",
-      "getIndexInfosOfType"
+      "getIndexInfosOfType",
+      "getTypeParameterFromMappedType",
+      "getConstraintTypeFromMappedType",
+      "getNameTypeFromMappedType",
+      "getTemplateTypeFromMappedType"
     ]
   },
   "ExtraFields": {

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -41,8 +42,8 @@ func (f *symlinkVFS) Realpath(path string) string {
 	return f.FS.Realpath(path)
 }
 
-// typeOfTestAlias returns the type `type Test = ...` resolves to in fileName.
-func typeOfTestAlias(t *testing.T, program *compiler.Program, c *checker.Checker, fileName string) *checker.Type {
+// typeOfLastAlias returns the type of the last type alias declared in fileName.
+func typeOfLastAlias(t *testing.T, program *compiler.Program, c *checker.Checker, fileName string) *checker.Type {
 	t.Helper()
 	sourceFile := program.GetSourceFile(fileName)
 	assert.Assert(t, sourceFile != nil, "expected %s in the program", fileName)
@@ -55,9 +56,32 @@ func typeOfTestAlias(t *testing.T, program *compiler.Program, c *checker.Checker
 	}
 	assert.Assert(t, alias != nil, "expected a type alias declaration")
 
-	declared := c.GetTypeAtLocation(alias.AsTypeAliasDeclaration().Name())
+	return c.GetTypeAtLocation(alias.AsTypeAliasDeclaration().Name())
+}
+
+// typeOfTestAlias returns the type `type Test = ...` resolves to in fileName.
+func typeOfTestAlias(t *testing.T, program *compiler.Program, c *checker.Checker, fileName string) *checker.Type {
+	t.Helper()
+	declared := typeOfLastAlias(t, program, c, fileName)
 	assert.Assert(t, checker.Type_symbol(declared) != nil, "expected the alias to resolve to a symbol")
 	return declared
+}
+
+func firstVariableInitializer(t *testing.T, program *compiler.Program, fileName string) *ast.Node {
+	t.Helper()
+	sourceFile := program.GetSourceFile(fileName)
+	assert.Assert(t, sourceFile != nil, "expected %s in the program", fileName)
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindVariableStatement {
+			continue
+		}
+		declarations := statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes
+		if len(declarations) > 0 {
+			return declarations[0].AsVariableDeclaration().Initializer
+		}
+	}
+	t.Fatal("expected a variable initializer")
+	return nil
 }
 
 func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
@@ -231,4 +255,146 @@ func TestTypeMatchesSomeSpecifierFromPackageIgnoresLocalTypes(t *testing.T) {
 		Name:    NameList{"Demo"},
 		Package: "demo-pkg",
 	}}, nil, program), false)
+}
+
+func TestTypeMatchesSomeSpecifierExpandsIntersections(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath: "interface Extra { extra: true }\ntype Test = Error & Extra;\n",
+	})
+
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err, "couldn't create program")
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+
+	intersection := typeOfLastAlias(t, program, c, filePath)
+	assert.Equal(t, TypeMatchesSomeSpecifier(intersection, []TypeOrValueSpecifier{{
+		From: TypeOrValueSpecifierFromLib,
+		Name: NameList{"Error"},
+	}}, nil, program), true)
+}
+
+func TestTypeMatchesSomeSpecifierUsesResolutionPackageID(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+
+	tests := []struct {
+		name            string
+		rootPackageJSON string
+		nestedPackage   string
+		wantMatch       bool
+	}{
+		{
+			name:            "named nested package does not replace entry package",
+			rootPackageJSON: `{"name":"demo-pkg","version":"1.0.0","types":"dist/index.d.ts"}`,
+			nestedPackage:   `{"name":"nested-pkg","version":"2.0.0"}`,
+			wantMatch:       true,
+		},
+		{
+			name:            "package without version has no package ID",
+			rootPackageJSON: `{"name":"demo-pkg","types":"dist/index.d.ts"}`,
+			nestedPackage:   `{"sideEffects":false}`,
+			wantMatch:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filePath := resolve("file.ts")
+			fs := NewOverlayVFS(baseFS, map[string]string{
+				filePath: "import { Demo, demoValue } from 'demo-pkg';\nconst value = demoValue;\ntype Test = Demo;\n",
+				resolve("node_modules/demo-pkg/package.json"):      test.rootPackageJSON,
+				resolve("node_modules/demo-pkg/dist/package.json"): test.nestedPackage,
+				resolve("node_modules/demo-pkg/dist/index.d.ts"):   "export declare class Demo {}\nexport declare function demoValue(): void;\n",
+			})
+
+			program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+			assert.NilError(t, err, "couldn't create program")
+			c, done := program.GetTypeChecker(t.Context())
+			defer done()
+
+			demo := typeOfTestAlias(t, program, c, filePath)
+			assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{{
+				From:    TypeOrValueSpecifierFromPackage,
+				Name:    NameList{"Demo"},
+				Package: "demo-pkg",
+			}}, nil, program), test.wantMatch)
+
+			valueNode := firstVariableInitializer(t, program, filePath)
+			assert.Equal(t, ValueMatchesSomeSpecifier(valueNode, []TypeOrValueSpecifier{{
+				From:    TypeOrValueSpecifierFromPackage,
+				Name:    NameList{"demoValue"},
+				Package: "demo-pkg",
+			}}, program, c.GetTypeAtLocation(valueNode)), test.wantMatch)
+		})
+	}
+}
+
+func TestTypeMatchesSomeSpecifierChecksWholeIntersectionBeforeConstituents(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+
+	tests := []struct {
+		name string
+		code string
+		want bool
+	}{
+		{
+			name: "whole alias matches",
+			code: "type SafePromise = Promise<number> & { __safeBrand: string };\ntype Test = SafePromise;\n",
+			want: true,
+		},
+		{
+			name: "inlined alias is not a constituent",
+			code: "type SafePromise = Promise<number> & { __safeBrand: string };\ntype Test = SafePromise & {};\n",
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filePath := resolve("file.ts")
+			fs := NewOverlayVFS(baseFS, map[string]string{filePath: test.code})
+			program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+			assert.NilError(t, err, "couldn't create program")
+			c, done := program.GetTypeChecker(t.Context())
+			defer done()
+
+			intersection := typeOfLastAlias(t, program, c, filePath)
+			assert.Equal(t, TypeMatchesSomeSpecifier(intersection, []TypeOrValueSpecifier{{
+				From: TypeOrValueSpecifierFromFile,
+				Name: NameList{"SafePromise"},
+			}}, nil, program), test.want)
+		})
+	}
+}
+
+func TestTypeMatchesSomeSpecifierDistinguishesOmittedAndEmptyFilePath(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath: "interface Demo { value: string }\ntype Test = Demo;\n",
+	})
+
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err, "couldn't create program")
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+
+	demo := typeOfTestAlias(t, program, c, filePath)
+	decode := func(raw string) TypeOrValueSpecifier {
+		t.Helper()
+		var specifier TypeOrValueSpecifier
+		assert.NilError(t, json.Unmarshal([]byte(raw), &specifier))
+		return specifier
+	}
+
+	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
+		decode(`{"from":"file","name":"Demo"}`),
+	}, nil, program), true)
+	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
+		decode(`{"from":"file","name":"Demo","path":""}`),
+	}, nil, program), false)
 }

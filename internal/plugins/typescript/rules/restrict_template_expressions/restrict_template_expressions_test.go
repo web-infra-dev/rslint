@@ -66,6 +66,9 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 				Code: "class CustomError extends Error {}\nclass Deeper extends CustomError {}\ndeclare const arg: Deeper;\nconst msg = `arg = ${arg}`;\n",
 			},
 			{
+				Code: "interface Extra { extra: true }\ndeclare const Mixed: new () => Error & Extra;\nclass Derived extends Mixed {}\ndeclare const arg: Derived;\nconst msg = `arg = ${arg}`;\n",
+			},
+			{
 				Code: "declare const arg: object;\ndeclare function tag(strings: TemplateStringsArray, ...values: unknown[]): string;\nconst msg = tag`arg = ${arg}`;\n",
 			},
 			{
@@ -331,6 +334,20 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 						Line:      2,
 						Column:    22,
 						EndLine:   2,
+						EndColumn: 25,
+					},
+				},
+			},
+			{
+				Code:    "interface Demo { value: string }\ndeclare const arg: Demo;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{map[string]any{"from": "file", "name": "Demo", "path": ""}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "invalidType",
+						Message:   "Invalid type \"Demo\" of template literal expression.",
+						Line:      3,
+						Column:    22,
+						EndLine:   3,
 						EndColumn: 25,
 					},
 				},
