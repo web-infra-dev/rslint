@@ -62,8 +62,8 @@ func JoinRstestFnMemberEntries(entries []ParsedRstestFnMemberEntry) string {
 	return testFramework.JoinMemberEntries(entries)
 }
 
-func RstestFnMemberEntriesRange(entries []ParsedRstestFnMemberEntry) (core.TextRange, bool) {
-	return testFramework.MemberEntriesRange(entries)
+func RstestFnMemberEntriesRange(sourceFile *ast.SourceFile, entries []ParsedRstestFnMemberEntry) (core.TextRange, bool) {
+	return testFramework.MemberEntriesRange(sourceFile, entries)
 }
 
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {

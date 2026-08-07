@@ -142,8 +142,8 @@ func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
 
 // JestFnMemberEntriesRange returns the source range spanning the first through
 // last member entry nodes in a parsed jest/expect call chain.
-func JestFnMemberEntriesRange(entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
-	return testFramework.MemberEntriesRange(entries)
+func JestFnMemberEntriesRange(sourceFile *ast.SourceFile, entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
+	return testFramework.MemberEntriesRange(sourceFile, entries)
 }
 
 func GetJestKind(name string) JestFnType {

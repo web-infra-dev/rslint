@@ -97,5 +97,23 @@ ruleTester.run('no-restricted-jest-methods', {} as never, {
         },
       ],
     },
+    {
+      // The reported range starts at the method name, whose leading trivia
+      // must not be included.
+      code: 'jest. /* c */ advanceTimersByTime();',
+      options: [{ advanceTimersByTime: null }],
+      errors: [
+        {
+          messageId: 'restrictedJestMethod',
+          data: {
+            message: null,
+            restriction: 'advanceTimersByTime',
+          },
+          column: 15,
+          endColumn: 34,
+          line: 1,
+        },
+      ],
+    },
   ],
 });
