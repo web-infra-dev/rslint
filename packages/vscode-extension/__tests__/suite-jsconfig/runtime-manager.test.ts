@@ -60,6 +60,7 @@ class FakeResolver implements RuntimeCoreResolver {
 class FakeRuntime implements ManagedRslintRuntime {
   readonly opened: string[] = [];
   readonly closedDocuments: string[] = [];
+  startCalls = 0;
   closeCalls = 0;
 
   constructor(
@@ -70,6 +71,7 @@ class FakeRuntime implements ManagedRslintRuntime {
   ) {}
 
   async start(signal: AbortSignal): Promise<void> {
+    this.startCalls++;
     if (this.behavior.failStart) {
       throw new Error(`start failed for ${this.rootKey}`);
     }
@@ -270,6 +272,31 @@ suite('local-core runtime manager', () => {
     await manager.close();
   });
 
+  test('isolates an initial start failure from a document using another core', async () => {
+    const { manager, resolver, router, runtimes } = harness((identity) => ({
+      failStart: identity === 'broken-core',
+    }));
+    resolver.keys.set(first.uri.toString(), 'broken-core');
+    resolver.keys.set(second.uri.toString(), 'healthy-core');
+
+    await reconcileAll(manager, [first, second]);
+
+    const broken = runtimes.find(
+      (runtime) => runtime.identity === 'broken-core',
+    );
+    const healthy = runtimes.find(
+      (runtime) => runtime.identity === 'healthy-core',
+    );
+    assert.ok(broken);
+    assert.ok(healthy);
+    assert.strictEqual(router.getServerOpenOwner(first), undefined);
+    assert.strictEqual(router.getServerOpenOwner(second), healthy.rootKey);
+    assert.strictEqual(broken.closeCalls, 1);
+    assert.strictEqual(healthy.closeCalls, 0);
+    await manager.close();
+    assert.strictEqual(healthy.closeCalls, 1);
+  });
+
   test('keeps the last-good owner when replacement resolution fails', async () => {
     const { manager, resolver, router, runtimes } = harness();
     resolver.keys.set(first.uri.toString(), 'working-core');
@@ -389,6 +416,35 @@ suite('local-core runtime manager', () => {
     assert.strictEqual(runtimes[1].closeCalls, 1);
   });
 
+  test('does not start a same-key replacement after shutdown fails', async () => {
+    const { manager, resolver, router, runtimes } = harness((identity) => ({
+      failClose: identity === 'quarantined-core',
+    }));
+    resolver.keys.set(first.uri.toString(), 'quarantined-core');
+    await manager.reconcile(first);
+
+    resolver.keys.set(first.uri.toString(), 'healthy-core');
+    await manager.reconcile(first);
+    await eventually(
+      () => runtimes[0].closeCalls === 1,
+      'the superseded runtime should attempt shutdown',
+    );
+
+    resolver.keys.set(first.uri.toString(), 'quarantined-core');
+    await manager.reconcile(first);
+
+    assert.strictEqual(runtimes.length, 3);
+    assert.strictEqual(runtimes[2].identity, 'quarantined-core');
+    assert.strictEqual(
+      runtimes[2].startCalls,
+      0,
+      'a failed shutdown must remain a barrier for the same runtime key',
+    );
+    assert.strictEqual(router.getServerOpenOwner(first), runtimes[1].rootKey);
+    await assert.rejects(manager.close(), /failed to close runtime manager/);
+    assert.strictEqual(runtimes[1].closeCalls, 1);
+  });
+
   test('isolates a factory failure from a document using another core', async () => {
     const { manager, resolver, router, runtimes } = harness((identity) => ({
       failFactory: identity === 'broken-core',
@@ -404,6 +460,25 @@ suite('local-core runtime manager', () => {
     );
     assert.strictEqual(router.getServerOpenOwner(first), undefined);
     assert.strictEqual(router.getServerOpenOwner(second), runtimes[0].rootKey);
+    await manager.close();
+  });
+
+  test('recovers after an initially missing core becomes available', async () => {
+    const { manager, resolver, router, runtimes } = harness();
+    resolver.keys.set(first.uri.toString(), 'installed-later');
+    resolver.failures.add('installed-later');
+
+    await manager.reconcile(first);
+    assert.strictEqual(router.getServerOpenOwner(first), undefined);
+    assert.strictEqual(runtimes.length, 0);
+
+    resolver.failures.delete('installed-later');
+    manager.clearResolutionCache();
+    await manager.reconcile(first);
+
+    assert.strictEqual(resolver.clearCalls, 1);
+    assert.strictEqual(runtimes.length, 1);
+    assert.strictEqual(router.getServerOpenOwner(first), runtimes[0].rootKey);
     await manager.close();
   });
 
@@ -475,5 +550,27 @@ suite('local-core runtime manager', () => {
     assert.strictEqual(resolver.clearCalls, 1);
     assert.strictEqual(runtimes.length, 1);
     await manager.close();
+  });
+
+  test('closes every active runtime when one terminal close fails', async () => {
+    const { manager, resolver, runtimes } = harness((identity) => ({
+      failClose: identity === 'broken-core',
+    }));
+    resolver.keys.set(first.uri.toString(), 'broken-core');
+    resolver.keys.set(second.uri.toString(), 'healthy-core');
+    await reconcileAll(manager, [first, second]);
+
+    await assert.rejects(manager.close(), /failed to close runtime manager/);
+
+    assert.strictEqual(runtimes.length, 2);
+    assert.deepStrictEqual(
+      new Map(
+        runtimes.map((runtime) => [runtime.identity, runtime.closeCalls]),
+      ),
+      new Map([
+        ['broken-core', 1],
+        ['healthy-core', 1],
+      ]),
+    );
   });
 });
