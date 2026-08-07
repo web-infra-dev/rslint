@@ -27,7 +27,7 @@ type ModuleReference struct {
 // the file they are linting should go through [ModuleIndex] instead, which
 // answers the same question once per Program.
 func CollectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions) []ModuleReference {
-	return collectModuleReferences(ctx, sourceFile, options, CompileModuleSettings(ctx.Settings))
+	return collectModuleReferences(ctx, sourceFile, options, compileModuleSettings(ctx.Settings))
 }
 
 func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options ModuleReferenceOptions, settings *ModuleSettings) []ModuleReference {

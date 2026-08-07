@@ -26,7 +26,7 @@ type ModuleIndex struct {
 
 	mu      sync.Mutex
 	refs    map[refKey][]ModuleReference
-	exports map[*ast.SourceFile]*LocalExports
+	exports map[*ast.SourceFile]*localExports
 	// exportMaps holds the fully merged export maps that turned out not to
 	// depend on where the query that built them started. The builder decides
 	// which those are; see exportMapOf.
@@ -60,13 +60,13 @@ type indexKey struct {
 // IndexFor returns the Program's module index, building it on the first rule
 // of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
-	settings := CompileModuleSettings(ctx.Settings)
+	settings := compileModuleSettings(ctx.Settings)
 	index, _ := ctx.ProgramCache.Load(indexKey{settings: settings.key}, func() any {
 		return &ModuleIndex{
 			ctx:      ctx,
 			settings: settings,
 			refs:       make(map[refKey][]ModuleReference),
-			exports:    make(map[*ast.SourceFile]*LocalExports),
+			exports:    make(map[*ast.SourceFile]*localExports),
 			exportMaps: make(map[*ast.SourceFile]*ExportMap),
 		}
 	}).(*ModuleIndex)
@@ -125,7 +125,7 @@ func (index *ModuleIndex) Refs(file *ast.SourceFile, options ModuleReferenceOpti
 // Exports returns what file says about its own exports, with every module
 // specifier resolved and none of them followed. The result is shared with
 // every other caller and must not be modified.
-func (index *ModuleIndex) Exports(file *ast.SourceFile) *LocalExports {
+func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil
 	}
@@ -172,9 +172,9 @@ func (index *ModuleIndex) storeExportMap(file *ast.SourceFile, exports *ExportMa
 	}
 }
 
-// CompileModuleSettings compiles the `import/` settings that decide which
+// compileModuleSettings compiles the `import/` settings that decide which
 // references survive collection and which resolved paths count as external.
-func CompileModuleSettings(settings map[string]interface{}) *ModuleSettings {
+func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 	compiled := &ModuleSettings{
 		externalFolders: ExternalModuleFolders(settings),
 		key:             moduleSettingsKey(settings),

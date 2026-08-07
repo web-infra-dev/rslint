@@ -6,21 +6,21 @@ import (
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// LocalExports is everything one file says about its own exports, with every
+// localExports is everything one file says about its own exports, with every
 // module specifier resolved and none of them followed. It is a function of
 // that file's syntax alone, which is what makes it safe to compute once per
 // Program: what a dependency exports can change with the order modules are
 // visited in, but what a file itself declares cannot.
-type LocalExports struct {
+type localExports struct {
 	// Steps replay the file's export statements in source order. Applying
 	// them in order reproduces what re-walking the statements would produce,
 	// including a later statement overwriting an earlier one.
-	Steps []ExportStep
+	Steps []exportStep
 	// Imports lists the file's import declarations that have an import
 	// clause, in source order, each with its resolved target. Resolving a
 	// locally re-exported namespace walks all of them, and the order matters
 	// because that walk builds their export maps along the way.
-	Imports []ImportBinding
+	Imports []importedModule
 }
 
 type exportStepKind uint8
@@ -38,27 +38,27 @@ const (
 	exportStepNamed
 )
 
-type ExportStep struct {
+type exportStep struct {
 	Kind  exportStepKind
 	Names []string
 	// Local is the identifier `export default` names, empty when the
 	// expression is not a plain identifier.
 	Local string
-	Link  ExportLink
-	Specs []ExportSpec
+	Link  exportLink
+	Specs []exportSpec
 	// FromModule distinguishes `export { a } from "m"` from `export { a }`.
 	FromModule bool
 }
 
-// ExportLink is a resolved `… from "specifier"`. Resolved is false when the
+// exportLink is a resolved `… from "specifier"`. Resolved is false when the
 // specifier does not resolve, is covered by `import/ignore`, or names a file
 // that is not an ES module — the three cases the export map treats alike.
-type ExportLink struct {
+type exportLink struct {
 	Target   *ast.SourceFile
 	Resolved bool
 }
 
-type ExportSpec struct {
+type exportSpec struct {
 	Exported string
 	// Local is the name looked up in the dependency. LocalOK is false when
 	// the specifier's source name is not a static name.
@@ -69,16 +69,16 @@ type ExportSpec struct {
 	LocalIdent string
 }
 
-// ImportBinding is one `import … from "specifier"` with an import clause.
-type ImportBinding struct {
-	Link ExportLink
+// importedModule is one `import … from "specifier"` with an import clause.
+type importedModule struct {
+	Link exportLink
 	// NamespaceName is the local name of an `import * as ns` clause, empty
 	// for every other clause shape.
 	NamespaceName string
 }
 
-func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings) *LocalExports {
-	local := &LocalExports{}
+func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
+	local := &localExports{}
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return local
 	}
@@ -96,10 +96,10 @@ func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, setti
 	return local
 }
 
-func (local *LocalExports) appendStatement(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
+func (local *localExports) appendStatement(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
 	if exportedDeclarationHasNameForMap(stmt, false) {
 		if names := exportedDeclarationNames(stmt); len(names) > 0 {
-			local.Steps = append(local.Steps, ExportStep{Kind: exportStepNames, Names: names})
+			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
 		}
 		return
 	}
@@ -111,17 +111,17 @@ func (local *LocalExports) appendStatement(ctx rule.RuleContext, sourceFile *ast
 			return
 		}
 		name, _ := exportAssignmentReferencedIdentifier(exportAssignment.Expression)
-		local.Steps = append(local.Steps, ExportStep{Kind: exportStepLocalDefault, Local: name})
+		local.Steps = append(local.Steps, exportStep{Kind: exportStepLocalDefault, Local: name})
 	case ast.KindNamespaceExportDeclaration:
 		if name := stmt.Name(); name != nil {
-			local.Steps = append(local.Steps, ExportStep{Kind: exportStepNames, Names: []string{name.Text()}})
+			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
 		}
 	case ast.KindExportDeclaration:
 		local.appendExportDeclaration(ctx, sourceFile, settings, stmt.AsExportDeclaration())
 	}
 }
 
-func (local *LocalExports) appendExportDeclaration(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
+func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
 	if exportDecl == nil {
 		return
 	}
@@ -130,7 +130,7 @@ func (local *LocalExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 		if exportDecl.ModuleSpecifier == nil {
 			return
 		}
-		local.Steps = append(local.Steps, ExportStep{
+		local.Steps = append(local.Steps, exportStep{
 			Kind: exportStepStar,
 			Link: resolveExportLink(ctx, sourceFile, settings, exportDecl.ModuleSpecifier),
 		})
@@ -143,7 +143,7 @@ func (local *LocalExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 		if namedExports == nil || namedExports.Elements == nil {
 			return
 		}
-		step := ExportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
+		step := exportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
 		if step.FromModule {
 			step.Link = resolveExportLink(ctx, sourceFile, settings, exportDecl.ModuleSpecifier)
 		}
@@ -151,18 +151,18 @@ func (local *LocalExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 			if spec == nil || spec.Kind != ast.KindExportSpecifier {
 				continue
 			}
-			exportSpec := spec.AsExportSpecifier()
-			exportedName, ok := moduleExportName(exportSpec.Name())
+			specifier := spec.AsExportSpecifier()
+			exportedName, ok := moduleExportName(specifier.Name())
 			if !ok {
 				continue
 			}
-			sourceName := exportSpec.PropertyName
+			sourceName := specifier.PropertyName
 			if sourceName == nil {
-				sourceName = exportSpec.Name()
+				sourceName = specifier.Name()
 			}
 			localName, localOK := moduleExportName(sourceName)
 			identifier, _ := exportAssignmentReferencedIdentifier(sourceName)
-			step.Specs = append(step.Specs, ExportSpec{
+			step.Specs = append(step.Specs, exportSpec{
 				Exported:   exportedName,
 				Local:      localName,
 				LocalOK:    localOK,
@@ -179,12 +179,12 @@ func (local *LocalExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 		if !ok {
 			return
 		}
-		local.Steps = append(local.Steps, ExportStep{Kind: exportStepNames, Names: []string{name}})
+		local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name}})
 	}
 }
 
-func importBinding(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) ImportBinding {
-	binding := ImportBinding{}
+func importBinding(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
+	binding := importedModule{}
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return binding
 	}
@@ -203,15 +203,15 @@ func importBinding(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *M
 
 // resolveExportLink answers what getExportMap would answer for one specifier,
 // without building the target's map.
-func resolveExportLink(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) ExportLink {
+func resolveExportLink(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
 	if ctx.Program == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
-		return ExportLink{}
+		return exportLink{}
 	}
 	_, target, ok := ResolveSourceFileFromSourceFile(ctx, sourceFile, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
-		return ExportLink{}
+		return exportLink{}
 	}
-	return ExportLink{Target: target, Resolved: true}
+	return exportLink{Target: target, Resolved: true}
 }
 
 func exportedDeclarationNames(stmt *ast.Node) []string {

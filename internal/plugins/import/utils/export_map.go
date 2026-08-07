@@ -165,12 +165,12 @@ func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *as
 // resolveExportLinkForLookup is the name-lookup counterpart of
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
-func resolveExportLinkForLookup(ctx rule.RuleContext, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) ExportLink {
+func resolveExportLinkForLookup(ctx rule.RuleContext, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
 	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
-		return ExportLink{}
+		return exportLink{}
 	}
-	return ExportLink{Target: sourceFile, Resolved: true}
+	return exportLink{Target: sourceFile, Resolved: true}
 }
 
 func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
@@ -214,7 +214,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.Exports(sourceFile)
+	local := builder.index.localExportsOf(sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
@@ -229,7 +229,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	return exports
 }
 
-func (builder *exportBuilder) applyStep(exports *ExportMap, local *LocalExports, step ExportStep) {
+func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports, step exportStep) {
 	switch step.Kind {
 	case exportStepNames:
 		for _, name := range step.Names {
@@ -284,7 +284,7 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *LocalExports,
 // its export map built along the way, because that is what the search used to
 // do while walking the statements, and the maps it leaves behind are visible
 // to the rest of this query.
-func (builder *exportBuilder) namespaceImportMeta(local *LocalExports, localName string) (*ExportMeta, bool) {
+func (builder *exportBuilder) namespaceImportMeta(local *localExports, localName string) (*ExportMeta, bool) {
 	if localName == "" {
 		return nil, false
 	}
@@ -302,10 +302,10 @@ func (builder *exportBuilder) namespaceImportMeta(local *LocalExports, localName
 
 // IsImportPathIgnored matches eslint-plugin-import's shared `import/ignore`
 // setting for resolved import target paths. Callers that ask more than once
-// for the same settings should compile them with [CompileModuleSettings] and
+// for the same settings should compile them with [compileModuleSettings] and
 // ask that instead.
 func IsImportPathIgnored(settings map[string]interface{}, fileName string) bool {
-	return CompileModuleSettings(settings).IsIgnoredPath(fileName)
+	return compileModuleSettings(settings).IsIgnoredPath(fileName)
 }
 
 func sourceFileHasExport(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
