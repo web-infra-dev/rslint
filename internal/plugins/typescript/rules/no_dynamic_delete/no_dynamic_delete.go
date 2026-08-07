@@ -25,7 +25,8 @@ func isAllowedDeleteArgument(argument *ast.Node) bool {
 }
 
 var NoDynamicDeleteRule = rule.CreateRule(rule.Rule{
-	Name: "no-dynamic-delete",
+	Name:   "no-dynamic-delete",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {

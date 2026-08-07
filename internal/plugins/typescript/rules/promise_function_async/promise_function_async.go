@@ -1,11 +1,17 @@
 package promise_function_async
 
 import (
+	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed promise_function_async.schema.json
+var schemaJSON []byte
 
 func buildMissingAsyncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,42 +21,52 @@ func buildMissingAsyncMessage() rule.RuleMessage {
 }
 
 type PromiseFunctionAsyncOptions struct {
-	AllowAny *bool
+	AllowAny *bool `json:"allowAny,omitempty"`
 	// TODO(port): TypeOrValueSpecifier
-	AllowedPromiseNames       []string
-	CheckArrowFunctions       *bool
-	CheckFunctionDeclarations *bool
-	CheckFunctionExpressions  *bool
-	CheckMethodDeclarations   *bool
+	AllowedPromiseNames       []string `json:"allowedPromiseNames,omitempty"`
+	CheckArrowFunctions       *bool    `json:"checkArrowFunctions,omitempty"`
+	CheckFunctionDeclarations *bool    `json:"checkFunctionDeclarations,omitempty"`
+	CheckFunctionExpressions  *bool    `json:"checkFunctionExpressions,omitempty"`
+	CheckMethodDeclarations   *bool    `json:"checkMethodDeclarations,omitempty"`
+}
+
+func parseOptions(options []any) PromiseFunctionAsyncOptions {
+	opts := PromiseFunctionAsyncOptions{}
+	if len(options) > 0 {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			// Convert the configured option object to JSON and back into the struct.
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
+		}
+	}
+	if opts.AllowAny == nil {
+		opts.AllowAny = utils.Ref(true)
+	}
+	if opts.AllowedPromiseNames == nil {
+		opts.AllowedPromiseNames = []string{}
+	}
+	if opts.CheckArrowFunctions == nil {
+		opts.CheckArrowFunctions = utils.Ref(true)
+	}
+	if opts.CheckFunctionDeclarations == nil {
+		opts.CheckFunctionDeclarations = utils.Ref(true)
+	}
+	if opts.CheckFunctionExpressions == nil {
+		opts.CheckFunctionExpressions = utils.Ref(true)
+	}
+	if opts.CheckMethodDeclarations == nil {
+		opts.CheckMethodDeclarations = utils.Ref(true)
+	}
+	return opts
 }
 
 var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 	Name:             "promise-function-async",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PromiseFunctionAsyncOptions)
-		if !ok {
-			opts = PromiseFunctionAsyncOptions{}
-		}
-		if opts.AllowAny == nil {
-			opts.AllowAny = utils.Ref(true)
-		}
-		if opts.AllowedPromiseNames == nil {
-			opts.AllowedPromiseNames = []string{}
-		}
-		if opts.CheckArrowFunctions == nil {
-			opts.CheckArrowFunctions = utils.Ref(true)
-		}
-		if opts.CheckFunctionDeclarations == nil {
-			opts.CheckFunctionDeclarations = utils.Ref(true)
-		}
-		if opts.CheckFunctionExpressions == nil {
-			opts.CheckFunctionExpressions = utils.Ref(true)
-		}
-		if opts.CheckMethodDeclarations == nil {
-			opts.CheckMethodDeclarations = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		allAllowedPromiseNames := utils.NewSetWithSizeHint[string](len(opts.AllowedPromiseNames))
 		allAllowedPromiseNames.Add("Promise")

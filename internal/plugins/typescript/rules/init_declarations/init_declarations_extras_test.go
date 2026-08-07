@@ -450,18 +450,6 @@ namespace Outer {
 				},
 			},
 
-			// Locks in option-shape coverage: bare-object option form (no mode
-			// string), exercising the `map[string]interface{}` arm of
-			// parseOptions. Defaults to mode="always" so an uninitialized binding
-			// reports.
-			{
-				Code:    `var foo;`,
-				Options: map[string]interface{}{"ignoreForLoopInit": true},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "initialized", Line: 1, Column: 5, EndLine: 1, EndColumn: 8},
-				},
-			},
-
 			// ---- Real-user: multi-declarator with mixed init under "never" ----
 			// Verifies per-declarator evaluation: only the initialized ones report.
 			{

@@ -1,6 +1,8 @@
 package prefer_destructuring
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -8,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_destructuring.schema.json
+var schemaJSON []byte
 
 // destructuringConfig holds the array/object enforcement flags for a given context.
 type destructuringConfig struct {
@@ -26,34 +31,26 @@ type options struct {
 	EnforceForDeclarationWithTypeAnnotation bool
 }
 
-func parseOptions(raw any) options {
+// parseOptions reads the two-element option tuple
+// [enabledTypes, enforcementOptions].
+func parseOptions(raw []any) options {
 	opts := options{
 		VariableDeclarator:   destructuringConfig{Array: true, Object: true},
 		AssignmentExpression: destructuringConfig{Array: true, Object: true},
 	}
 
-	if raw == nil {
+	if len(raw) == 0 {
 		return opts
 	}
 
-	// Options come as an array [enabledTypes, enforcementOptions]
-	optArray, isArray := raw.([]interface{})
-	if !isArray || len(optArray) == 0 {
-		// Try bare object format (from CLI single-option unwrap)
-		if m, ok := raw.(map[string]interface{}); ok {
-			parseFirstOption(m, &opts)
-		}
-		return opts
-	}
-
-	// Parse first element: enabled types
-	if first, ok := optArray[0].(map[string]interface{}); ok {
+	// First element: enabled types
+	if first, ok := raw[0].(map[string]interface{}); ok {
 		parseFirstOption(first, &opts)
 	}
 
-	// Parse second element: enforcement options
-	if len(optArray) > 1 {
-		if second, ok := optArray[1].(map[string]interface{}); ok {
+	// Second element: enforcement options
+	if len(raw) > 1 {
+		if second, ok := raw[1].(map[string]interface{}); ok {
 			if v, ok := second["enforceForRenamedProperties"].(bool); ok {
 				opts.EnforceForRenamedProperties = v
 			}
@@ -123,9 +120,9 @@ const precedenceOfAssignmentExpr = 1
 // PreferDestructuringRule implements @typescript-eslint/prefer-destructuring.
 var PreferDestructuringRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-destructuring",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

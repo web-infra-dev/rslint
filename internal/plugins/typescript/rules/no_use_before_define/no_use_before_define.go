@@ -1,10 +1,15 @@
 package no_use_before_define
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_use_before_define.schema.json
+var schemaJSON []byte
 
 // options mirrors the typescript-eslint rule schema.
 // See https://typescript-eslint.io/rules/no-use-before-define/#options
@@ -18,7 +23,7 @@ type options struct {
 	allowNamedExports    bool
 }
 
-func parseOptions(rawOptions any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{
 		functions:            true,
 		classes:              true,
@@ -28,29 +33,19 @@ func parseOptions(rawOptions any) options {
 		ignoreTypeReferences: true,
 		allowNamedExports:    false,
 	}
+	if len(rawOptions) == 0 {
+		return opts
+	}
 
 	// Handle "nofunc" string option.
-	if str, ok := rawOptions.(string); ok {
+	if str, ok := rawOptions[0].(string); ok {
 		if str == "nofunc" {
 			opts.functions = false
 		}
 		return opts
 	}
 
-	// Handle array format from JS tests: ["nofunc"] or [{...}]
-	if arr, ok := rawOptions.([]interface{}); ok && len(arr) > 0 {
-		if str, ok := arr[0].(string); ok {
-			if str == "nofunc" {
-				opts.functions = false
-			}
-			return opts
-		}
-	}
-
-	optsMap := utils.GetOptionsMap(rawOptions)
-	if optsMap == nil {
-		return opts
-	}
+	optsMap, _ := rawOptions[0].(map[string]interface{})
 
 	if v, ok := optsMap["functions"].(bool); ok {
 		opts.functions = v
@@ -383,13 +378,13 @@ type definitionInfo struct {
 
 var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 	Name:             "no-use-before-define",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil || ctx.Refs == nil {
 			return rule.RuleListeners{}
 		}
 
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		var executionScopes []*ast.Node
 		currentExecutionScope := func() *ast.Node {

@@ -1,11 +1,17 @@
 package prefer_promise_reject_errors
 
 import (
+	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_promise_reject_errors.schema.json
+var schemaJSON []byte
 
 func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,29 +21,43 @@ func buildRejectAnErrorMessage() rule.RuleMessage {
 }
 
 type PreferPromiseRejectErrorsOptions struct {
-	AllowEmptyReject     *bool
-	AllowThrowingAny     *bool
-	AllowThrowingUnknown *bool
+	AllowEmptyReject     *bool `json:"allowEmptyReject"`
+	AllowThrowingAny     *bool `json:"allowThrowingAny"`
+	AllowThrowingUnknown *bool `json:"allowThrowingUnknown"`
+}
+
+func parseOptions(options []any) PreferPromiseRejectErrorsOptions {
+	opts := PreferPromiseRejectErrorsOptions{
+		AllowEmptyReject:     utils.Ref(false),
+		AllowThrowingAny:     utils.Ref(false),
+		AllowThrowingUnknown: utils.Ref(false),
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	if opts.AllowEmptyReject == nil {
+		opts.AllowEmptyReject = utils.Ref(false)
+	}
+	if opts.AllowThrowingAny == nil {
+		opts.AllowThrowingAny = utils.Ref(false)
+	}
+	if opts.AllowThrowingUnknown == nil {
+		opts.AllowThrowingUnknown = utils.Ref(false)
+	}
+	return opts
 }
 
 var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-promise-reject-errors",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PreferPromiseRejectErrorsOptions)
-		if !ok {
-			opts = PreferPromiseRejectErrorsOptions{}
-		}
-		if opts.AllowEmptyReject == nil {
-			opts.AllowEmptyReject = utils.Ref(false)
-		}
-		if opts.AllowThrowingAny == nil {
-			opts.AllowThrowingAny = utils.Ref(false)
-		}
-		if opts.AllowThrowingUnknown == nil {
-			opts.AllowThrowingUnknown = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		checkRejectCall := func(callExpression *ast.CallExpression) {
 			if len(callExpression.Arguments.Nodes) != 0 {

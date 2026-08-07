@@ -1,12 +1,16 @@
 package prefer_optional_chain
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_optional_chain.schema.json
+var schemaJSON []byte
 
 type PreferOptionalChainOptions struct {
 	AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing *bool `json:"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing"`
@@ -34,20 +38,14 @@ func buildOptionalChainSuggestMessage() rule.RuleMessage {
 }
 
 var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-optional-chain",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PreferOptionalChainOptions)
-		if !ok {
-			opts = PreferOptionalChainOptions{}
-			if options != nil {
-				// For IPC mode, options come as []interface{} or map[string]interface{}
-				raw := options
-				if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-					raw = optArray[0]
-				}
-				if jsonBytes, err := json.Marshal(raw); err == nil {
-					_ = json.Unmarshal(jsonBytes, &opts)
+	Name:   "prefer-optional-chain",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := PreferOptionalChainOptions{}
+		if len(options) > 0 {
+			if optsMap, ok := options[0].(map[string]interface{}); ok {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
+					_ = json.Unmarshal(optsJSON, &opts)
 				}
 			}
 		}

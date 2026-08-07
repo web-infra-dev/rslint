@@ -34,7 +34,8 @@ func buildRemoveUnnecessaryConstraintMessage(constraint string) rule.RuleMessage
 var disambiguationExtensions = []string{tspath.ExtensionCts, tspath.ExtensionMts, tspath.ExtensionTsx}
 
 var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
-	Name: "no-unnecessary-type-constraint",
+	Name:   "no-unnecessary-type-constraint",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		needsDisambiguationResolved := false
 		needsDisambiguation := false

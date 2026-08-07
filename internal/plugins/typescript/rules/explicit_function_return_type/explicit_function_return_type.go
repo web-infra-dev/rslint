@@ -1,11 +1,16 @@
 package explicit_function_return_type
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed explicit_function_return_type.schema.json
+var schemaJSON []byte
 
 type options struct {
 	allowConciseArrowFunctionExpressionsStartingWithVoid bool
@@ -18,7 +23,7 @@ type options struct {
 	allowTypedFunctionExpressions                        bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		allowConciseArrowFunctionExpressionsStartingWithVoid: false,
 		allowDirectConstAssertionInArrowFunctions:            true,
@@ -30,10 +35,11 @@ func parseOptions(rawOpts any) options {
 		allowTypedFunctionExpressions:       true,
 	}
 
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
+
 	if v, ok := optsMap["allowConciseArrowFunctionExpressionsStartingWithVoid"].(bool); ok {
 		opts.allowConciseArrowFunctionExpressionsStartingWithVoid = v
 	}
@@ -71,12 +77,12 @@ type functionInfo struct {
 }
 
 var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-function-return-type",
-	Run:  run,
+	Name:   "explicit-function-return-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	opts := parseOptions(rawOptions)
 	functionStack := make([]*functionInfo, 0)
 

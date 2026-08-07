@@ -7,7 +7,8 @@ import (
 )
 
 var PreferForOfRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-for-of",
+	Name:   "prefer-for-of",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindForStatement: func(node *ast.Node) {

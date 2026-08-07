@@ -220,6 +220,7 @@ func isConstVariableDeclaration(node *ast.Node) bool {
 // PreferIncludesRule checks for indexOf comparisons that can use includes instead.
 var PreferIncludesRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-includes",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getNodeText := func(n *ast.Node) string {

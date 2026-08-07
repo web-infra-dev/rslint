@@ -1,6 +1,7 @@
 package array_type
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,9 +9,27 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed array_type.schema.json
+var schemaJSON []byte
+
 type ArrayTypeOptions struct {
 	Default  string `json:"default"`
 	Readonly string `json:"readonly,omitempty"`
+}
+
+func parseOptions(options []any) ArrayTypeOptions {
+	opts := ArrayTypeOptions{Default: "array"}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if defaultVal, ok := optsMap["default"].(string); ok {
+		opts.Default = defaultVal
+	}
+	if readonlyVal, ok := optsMap["readonly"].(string); ok {
+		opts.Readonly = readonlyVal
+	}
+	return opts
 }
 
 // Check whatever node can be considered as simple
@@ -257,34 +276,10 @@ func buildArrayFixes(
 }
 
 var ArrayTypeRule = rule.CreateRule(rule.Rule{
-	Name: "array-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := ArrayTypeOptions{
-			Default: "array",
-		}
-		// Parse options with dual-format support (handles both array and object formats)
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			// Handle array format: [{ option: value }]
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				// Handle direct object format: { option: value }
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if defaultVal, ok := optsMap["default"].(string); ok {
-					opts.Default = defaultVal
-				}
-				if readonlyVal, ok := optsMap["readonly"].(string); ok {
-					opts.Readonly = readonlyVal
-				}
-			}
-		}
+	Name:   "array-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		defaultOption := opts.Default
 		readonlyOption := opts.Readonly

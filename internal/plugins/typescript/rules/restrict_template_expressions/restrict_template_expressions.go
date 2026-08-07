@@ -52,8 +52,11 @@ func parseOptions(options []any) RestrictTemplateExpressionsOptions {
 		AllowNumber:  true,
 		AllowRegExp:  true,
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
 		return opts
 	}
 	if raw, ok := optsMap["allow"]; ok {

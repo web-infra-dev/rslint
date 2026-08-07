@@ -8,7 +8,8 @@ import (
 )
 
 var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
-	Name: "no-extra-non-null-assertion",
+	Name:   "no-extra-non-null-assertion",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noExtraNonNullAssertion",

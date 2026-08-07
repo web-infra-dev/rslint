@@ -5,7 +5,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoMisusedSpreadRule(t *testing.T) {
@@ -146,7 +145,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
         const promise = new Promise(() => {});
         const o = { ...promise };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"Promise"}},
+			Options: map[string]interface{}{"allow": []interface{}{"Promise"}},
 		},
 		{Code: `
       interface A {}
@@ -163,7 +162,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
         const str: string = 'test';
         const a = [...str];
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"string"}},
+			Options: map[string]interface{}{"allow": []interface{}{"string"}},
 		},
 		{
 			Code: `
@@ -171,7 +170,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...f };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"f"}},
+			Options: map[string]interface{}{"allow": []interface{}{"f"}},
 		},
 		{
 			Code: `
@@ -179,7 +178,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...iterator };
       `,
-			Options: NoMisusedSpreadOptions{Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}}}},
+			Options: map[string]interface{}{"allow": []interface{}{map[string]interface{}{"from": "lib", "name": "Iterable"}}},
 		},
 		{
 			Code: `
@@ -189,7 +188,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const spreadBrandedString = [...brandedString];
       `,
-			Options: NoMisusedSpreadOptions{Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}}}},
+			Options: map[string]interface{}{"allow": []interface{}{map[string]interface{}{"from": "file", "name": "BrandedString"}}},
 		},
 		{
 			Code: `
@@ -201,7 +200,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...iterator };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}},
+			Options: map[string]interface{}{"allow": []interface{}{"CustomIterable"}},
 		},
 		{
 			Code: `
@@ -213,7 +212,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...iterator };
       `,
-			Options: NoMisusedSpreadOptions{Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}}}},
+			Options: map[string]interface{}{"allow": []interface{}{map[string]interface{}{"from": "file", "name": "CustomIterable"}}},
 		},
 		{
 			Code: `
@@ -229,8 +228,8 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...iterator };
       `,
-			Options: NoMisusedSpreadOptions{
-				Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromPackage, Name: []string{"CustomIterable"}, Package: "module"}},
+			Options: map[string]interface{}{
+				"allow": []interface{}{map[string]interface{}{"from": "package", "name": "CustomIterable", "package": "module"}},
 			},
 		},
 		{
@@ -243,7 +242,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const o = { ...a };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+			Options: map[string]interface{}{"allow": []interface{}{"A"}},
 		},
 		{
 			Code: `
@@ -253,7 +252,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
           },
         };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+			Options: map[string]interface{}{"allow": []interface{}{"A"}},
 		},
 	}, []rule_tester.InvalidTestCase{
 		{
@@ -1337,7 +1336,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 
         const a = { ...iterator };
       `,
-			Options: NoMisusedSpreadOptions{AllowInline: []string{"AnotherIterable"}},
+			Options: map[string]interface{}{"allow": []interface{}{"AnotherIterable"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noIterableSpreadInObject",
@@ -1363,7 +1362,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
       `,
 			// TODO(port): for some reason tsgo returns `error` type for iterator
 			Skip:    true,
-			Options: NoMisusedSpreadOptions{Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromPackage, Name: []string{"Nothing"}, Package: "module"}}},
+			Options: map[string]interface{}{"allow": []interface{}{map[string]interface{}{"from": "package", "name": "Nothing", "package": "module"}}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noIterableSpreadInObject",

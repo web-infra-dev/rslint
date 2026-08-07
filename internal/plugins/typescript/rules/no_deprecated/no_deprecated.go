@@ -432,10 +432,10 @@ func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
 // TypeOrValueSpecifier's own UnmarshalJSON rather than re-deriving both shapes
 // by hand.
 func parseAllowSpecifiers(options []any) []utils.TypeOrValueSpecifier {
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return nil
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	raw, ok := optsMap["allow"]
 	if !ok {
 		return nil

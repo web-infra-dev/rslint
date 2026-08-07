@@ -1,6 +1,7 @@
 package no_misused_promises
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_misused_promises.schema.json
+var schemaJSON []byte
 
 func buildConditionalMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -119,55 +123,57 @@ func (o *NoMisusedPromisesOptions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
-	Name:             "no-misused-promises",
-	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoMisusedPromisesOptions)
-		if !ok {
-			opts = NoMisusedPromisesOptions{}
-			// Options coming from JS configs / the test runner arrive as
-			// `[]interface{}` whose first element is the actual option object.
-			// Round-trip through JSON to populate the typed struct (matches the
-			// pattern used by other ported rules; malformed input falls back to
-			// defaults — global config-shape validation is a project-level concern).
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
+func parseOptions(options []any) NoMisusedPromisesOptions {
+	opts := NoMisusedPromisesOptions{}
+	if len(options) > 0 {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			// Round-trip through JSON to populate the typed struct (malformed
+			// input falls back to defaults — config-shape validation is a
+			// project-level concern).
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
 			}
 		}
-		if opts.ChecksConditionals == nil {
-			opts.ChecksConditionals = utils.Ref(true)
-		}
-		if opts.ChecksSpreads == nil {
-			opts.ChecksSpreads = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturn == nil {
-			opts.ChecksVoidReturn = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts == nil {
-			opts.ChecksVoidReturnOpts = utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
-		}
-		if opts.ChecksVoidReturnOpts.Arguments == nil {
-			opts.ChecksVoidReturnOpts.Arguments = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Attributes == nil {
-			opts.ChecksVoidReturnOpts.Attributes = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.InheritedMethods == nil {
-			opts.ChecksVoidReturnOpts.InheritedMethods = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Properties == nil {
-			opts.ChecksVoidReturnOpts.Properties = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Returns == nil {
-			opts.ChecksVoidReturnOpts.Returns = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Variables == nil {
-			opts.ChecksVoidReturnOpts.Variables = utils.Ref(true)
-		}
+	}
+	if opts.ChecksConditionals == nil {
+		opts.ChecksConditionals = utils.Ref(true)
+	}
+	if opts.ChecksSpreads == nil {
+		opts.ChecksSpreads = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturn == nil {
+		opts.ChecksVoidReturn = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts == nil {
+		opts.ChecksVoidReturnOpts = utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
+	}
+	if opts.ChecksVoidReturnOpts.Arguments == nil {
+		opts.ChecksVoidReturnOpts.Arguments = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts.Attributes == nil {
+		opts.ChecksVoidReturnOpts.Attributes = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts.InheritedMethods == nil {
+		opts.ChecksVoidReturnOpts.InheritedMethods = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts.Properties == nil {
+		opts.ChecksVoidReturnOpts.Properties = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts.Returns == nil {
+		opts.ChecksVoidReturnOpts.Returns = utils.Ref(true)
+	}
+	if opts.ChecksVoidReturnOpts.Variables == nil {
+		opts.ChecksVoidReturnOpts.Variables = utils.Ref(true)
+	}
+	return opts
+}
+
+var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
+	Name:             "no-misused-promises",
+	Schema:           rule.NewSchema(schemaJSON),
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		anySignatureIsThenableType := func(
 			node *ast.Node,

@@ -1,13 +1,14 @@
 package naming_convention
 
 import (
+	_ "embed"
 	"fmt"
 	"math/bits"
-	"regexp"
 	"sort"
 	"strings"
 	"unicode"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -15,10 +16,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed naming_convention.schema.json
+var schemaJSON []byte
+
 // NamingConventionRule is the exported rule for registration.
 var NamingConventionRule = rule.CreateRule(rule.Rule{
-	Name: "naming-convention",
-	Run:  run,
+	Name:   "naming-convention",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 // ---- Enums ----
@@ -275,7 +280,7 @@ func parseTypeModifier(s string) (typeModifierKind, bool) {
 // ---- Normalized config types ----
 
 type matchRegex struct {
-	regex *regexp.Regexp
+	regex *regexp2.Regexp
 	match bool
 }
 
@@ -443,29 +448,13 @@ func checkFormat(name string, format predefinedFormat) bool {
 
 // ---- Options parsing ----
 
-func parseOptions(rawOpts any) []normalizedSelector {
-	if rawOpts == nil {
-		return getDefaultConfig()
-	}
-
-	var optsList []interface{}
-	switch v := rawOpts.(type) {
-	case []interface{}:
-		optsList = v
-	case map[string]interface{}:
-		// Single selector object (e.g., when the config has one option element,
-		// LegacyUnwrapOptions collapses the single-element options array).
-		optsList = []interface{}{v}
-	default:
-		return getDefaultConfig()
-	}
-
-	if len(optsList) == 0 {
+func parseOptions(options []any) []normalizedSelector {
+	if len(options) == 0 {
 		return getDefaultConfig()
 	}
 
 	var selectors []normalizedSelector
-	for _, opt := range optsList {
+	for _, opt := range options {
 		optMap, ok := opt.(map[string]interface{})
 		if !ok {
 			continue
@@ -509,7 +498,7 @@ func parseOptions(rawOpts any) []normalizedSelector {
 }
 
 func getDefaultConfig() []normalizedSelector {
-	return parseOptions([]interface{}{
+	return parseOptions([]any{
 		map[string]interface{}{
 			"selector":           "default",
 			"format":             []interface{}{"camelCase"},
@@ -677,7 +666,7 @@ func parseMatchRegex(val interface{}) *matchRegex {
 	}
 	switch v := val.(type) {
 	case string:
-		re, err := regexp.Compile(v)
+		re, err := utils.CompileRegexp2(v, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return nil
 		}
@@ -688,7 +677,7 @@ func parseMatchRegex(val interface{}) *matchRegex {
 		if m, ok := v["match"].(bool); ok {
 			matchVal = m
 		}
-		re, err := regexp.Compile(regexStr)
+		re, err := utils.CompileRegexp2(regexStr, utils.JSUnicodeRegexOptions)
 		if err != nil {
 			return nil
 		}
@@ -890,7 +879,7 @@ func validate(name string, sel normalizedSelector, idMods modifierKind, idSelect
 
 	// 7. Validate custom regex (against processed name, after stripping underscores and affixes)
 	if sel.custom != nil {
-		matches := sel.custom.regex.MatchString(processedName)
+		matches := utils.Regexp2MatchString(sel.custom.regex, processedName)
 		if sel.custom.match != matches {
 			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.String())
 			return validationResult{valid: false, message: &msg}
@@ -2146,8 +2135,7 @@ func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
 
 // ---- Main run function ----
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	selectors := parseOptions(options)
 
 	if len(selectors) == 0 {
@@ -2218,7 +2206,7 @@ func validateIdentifier(ctx rule.RuleContext, id identifierInfo, selectors []nor
 		// Check filter match — if filter doesn't match the name, skip this
 		// selector entirely so the next one in specificity order can match.
 		if sel.filter != nil {
-			matches := sel.filter.regex.MatchString(id.name)
+			matches := utils.Regexp2MatchString(sel.filter.regex, id.name)
 			if sel.filter.match != matches {
 				continue
 			}

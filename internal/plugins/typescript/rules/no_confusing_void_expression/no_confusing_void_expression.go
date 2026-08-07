@@ -1,6 +1,7 @@
 package no_confusing_void_expression
 
 import (
+	_ "embed"
 	"encoding/json"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_confusing_void_expression.schema.json
+var schemaJSON []byte
 
 func buildInvalidVoidExprMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -64,28 +68,24 @@ type NoConfusingVoidExpressionOptions struct {
 	IgnoreVoidReturningFunctions bool `json:"ignoreVoidReturningFunctions,omitempty"`
 }
 
+func parseOptions(options []any) NoConfusingVoidExpressionOptions {
+	opts := NoConfusingVoidExpressionOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	// Convert the configured option object to JSON and back into the struct.
+	if optsJSON, err := json.Marshal(options[0]); err == nil {
+		_ = json.Unmarshal(optsJSON, &opts)
+	}
+	return opts
+}
+
 var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-confusing-void-expression",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoConfusingVoidExpressionOptions)
-
-		if !ok {
-			// try convert options to JSON and back to struct
-			opts = NoConfusingVoidExpressionOptions{}
-			// get first element of options (re-wrapping config.rules' unwrapped
-			// single option into eslint-format []any)
-			options_array := rule.NormalizeOptions(options)
-			// if options_array has at least one element, try to unmarshal it
-			if len(options_array) > 0 {
-				optsJSON, err := json.Marshal(options_array[0])
-				if err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		canFix := func(node *ast.Node) bool {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)

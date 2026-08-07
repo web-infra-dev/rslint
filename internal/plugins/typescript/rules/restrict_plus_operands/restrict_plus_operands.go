@@ -1,6 +1,8 @@
 package restrict_plus_operands
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed restrict_plus_operands.schema.json
+var schemaJSON []byte
 
 func buildBigintAndNumberMessage(left, right string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -30,41 +35,40 @@ func buildMismatchedMessage(stringLike, left, right string) rule.RuleMessage {
 }
 
 type RestrictPlusOperandsOptions struct {
-	AllowAny                *bool
-	AllowBoolean            *bool
-	AllowNullish            *bool
-	AllowNumberAndString    *bool
-	AllowRegExp             *bool
-	SkipCompoundAssignments *bool
+	AllowAny                *bool `json:"allowAny"`
+	AllowBoolean            *bool `json:"allowBoolean"`
+	AllowNullish            *bool `json:"allowNullish"`
+	AllowNumberAndString    *bool `json:"allowNumberAndString"`
+	AllowRegExp             *bool `json:"allowRegExp"`
+	SkipCompoundAssignments *bool `json:"skipCompoundAssignments"`
+}
+
+func parseOptions(options []any) RestrictPlusOperandsOptions {
+	opts := RestrictPlusOperandsOptions{
+		AllowAny:                utils.Ref(true),
+		AllowBoolean:            utils.Ref(true),
+		AllowNullish:            utils.Ref(true),
+		AllowNumberAndString:    utils.Ref(true),
+		AllowRegExp:             utils.Ref(true),
+		SkipCompoundAssignments: utils.Ref(false),
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	return opts
 }
 
 var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(RestrictPlusOperandsOptions)
-		if !ok {
-			opts = RestrictPlusOperandsOptions{}
-		}
-		if opts.AllowAny == nil {
-			opts.AllowAny = utils.Ref(true)
-		}
-		if opts.AllowBoolean == nil {
-			opts.AllowBoolean = utils.Ref(true)
-		}
-		if opts.AllowNullish == nil {
-			opts.AllowNullish = utils.Ref(true)
-		}
-		if opts.AllowNumberAndString == nil {
-			opts.AllowNumberAndString = utils.Ref(true)
-		}
-		if opts.AllowRegExp == nil {
-			opts.AllowRegExp = utils.Ref(true)
-		}
-		if opts.SkipCompoundAssignments == nil {
-			opts.SkipCompoundAssignments = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		stringLikes := make([]string, 0, 5)
 		if *opts.AllowAny {

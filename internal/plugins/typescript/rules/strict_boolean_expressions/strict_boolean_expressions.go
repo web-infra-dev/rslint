@@ -10,6 +10,7 @@
 package strict_boolean_expressions
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -21,6 +22,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed strict_boolean_expressions.schema.json
+var schemaJSON []byte
 
 // Options mirrors typescript-eslint's option shape. Pointer-typed booleans
 // distinguish "user explicitly set false" from "user did not set, fall back to
@@ -51,7 +55,7 @@ type resolvedOptions struct {
 	allowString                                            bool
 }
 
-func parseOptions(options any) resolvedOptions {
+func parseOptions(options []any) resolvedOptions {
 	// Defaults match upstream:
 	//   allowString=true, allowNumber=true, allowNullableObject=true,
 	//   all other booleans default to false.
@@ -61,14 +65,16 @@ func parseOptions(options any) resolvedOptions {
 		allowNullableObject: true,
 	}
 
-	optsMap := utils.GetOptionsMap(options)
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if optsMap == nil {
 		return opts
 	}
 
-	// Round-trip via JSON so the call accepts both the CLI shape (bare object)
-	// and the rule_tester shape (array-wrapped), matching every other
-	// typescript-eslint rule in this repo.
+	// Round-trip via JSON to fill the pointer-typed Options struct, which keeps
+	// "explicitly set to false" distinguishable from "not set at all".
 	jsonBytes, err := json.Marshal(optsMap)
 	if err != nil {
 		return opts
@@ -278,10 +284,10 @@ func sugDefaultZero() rule.RuleMessage {
 
 var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-boolean-expressions",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _optionsRaw []any) rule.RuleListeners {
-		optionsRaw := rule.LegacyUnwrapOptions(_optionsRaw)
-		opts := parseOptions(optionsRaw)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile
 

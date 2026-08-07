@@ -17,9 +17,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// arrayOption builds the array-wrapped option shape that exercises
-// utils.GetOptionsMap's JSON path — passing a Go struct directly would
-// short-circuit it and leave the CLI-facing wiring untested.
+// arrayOption builds the array-wrapped option shape that exercises the rule's
+// own options-array parsing — passing a Go struct directly would short-circuit
+// it and leave the CLI-facing wiring untested.
 func arrayOption(values ...interface{}) []interface{} {
 	return values
 }

@@ -459,11 +459,6 @@ class C implements I {
 			// Counterpart already in upstream; locks in our parseOptions behavior for {}.
 			{Code: `class C { foo() { return this.x; } x = 0; }`, Options: objectOption(map[string]interface{}{})},
 
-			// ---- Locks in: passing a non-object options shape gracefully degrades ----
-			// rule_tester passes the value through GetOptionsMap which returns nil
-			// for non-object shapes; rule falls back to defaults.
-			{Code: `class C { foo() { return this.x; } x = 0; }`, Options: []interface{}{"not-an-object"}},
-
 			// ---- Locks in: exceptMethods with empty array is equivalent to no exceptions ----
 			// (arm 5 of isIncludedInstanceMethod: `exceptMethods.size === 0 → true`)
 			// Method without this STILL reports under [] — locked in on the invalid side.

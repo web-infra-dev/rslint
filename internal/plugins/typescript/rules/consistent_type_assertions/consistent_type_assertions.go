@@ -1,12 +1,16 @@
 package consistent_type_assertions
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed consistent_type_assertions.schema.json
+var schemaJSON []byte
 
 type AssertionStyle string
 
@@ -223,26 +227,13 @@ func (e consistentTypeAssertionsEdits) angleToAsFix(
 // `({ ... }) as T` — the parenthesized object literal — get detected, matching
 // upstream.
 var ConsistentTypeAssertionsRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-type-assertions",
-	Run:  run,
+	Name:   "consistent-type-assertions",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opts := ConsistentTypeAssertionsOptions{
-		AssertionStyle:              AssertionStyleAs,
-		ObjectLiteralTypeAssertions: LiteralAssertionAllow,
-		ArrayLiteralTypeAssertions:  LiteralAssertionAllow,
-	}
-	if options != nil {
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if optsMap, ok := optArray[0].(map[string]interface{}); ok {
-				parseOptionsMap(optsMap, &opts)
-			}
-		} else if optsMap, ok := options.(map[string]interface{}); ok {
-			parseOptionsMap(optsMap, &opts)
-		}
-	}
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	edits := consistentTypeAssertionsEdits{sourceFile: ctx.SourceFile}
 
@@ -405,7 +396,17 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 	}
 }
 
-func parseOptionsMap(optsMap map[string]interface{}, opts *ConsistentTypeAssertionsOptions) {
+func parseOptions(options []any) ConsistentTypeAssertionsOptions {
+	opts := ConsistentTypeAssertionsOptions{
+		AssertionStyle:              AssertionStyleAs,
+		ObjectLiteralTypeAssertions: LiteralAssertionAllow,
+		ArrayLiteralTypeAssertions:  LiteralAssertionAllow,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+
 	if v, exists := optsMap["assertionStyle"]; exists {
 		if str, ok := v.(string); ok {
 			opts.AssertionStyle = AssertionStyle(str)
@@ -423,4 +424,6 @@ func parseOptionsMap(optsMap map[string]interface{}, opts *ConsistentTypeAsserti
 			opts.ArrayLiteralTypeAssertions = LiteralAssertion(str)
 		}
 	}
+
+	return opts
 }

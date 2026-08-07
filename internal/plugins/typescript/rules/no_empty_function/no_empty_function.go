@@ -1,6 +1,7 @@
 package no_empty_function
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,37 +9,38 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_empty_function.schema.json
+var schemaJSON []byte
+
 type NoEmptyFunctionOptions struct {
 	Allow []string `json:"allow"`
 }
 
-var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
-	Name: "no-empty-function",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoEmptyFunctionOptions{
-			Allow: []string{},
-		}
-		if options != nil {
-			var optsMap map[string]interface{}
-			if optsArray, ok := options.([]interface{}); ok && len(optsArray) > 0 {
-				if opts, ok := optsArray[0].(map[string]interface{}); ok {
-					optsMap = opts
-				}
-			} else if opts, ok := options.(map[string]interface{}); ok {
-				optsMap = opts
-			}
+func parseOptions(options []any) NoEmptyFunctionOptions {
+	opts := NoEmptyFunctionOptions{
+		Allow: []string{},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
 
-			if optsMap != nil {
-				if allow, ok := optsMap["allow"].([]interface{}); ok {
-					for _, a := range allow {
-						if str, ok := a.(string); ok {
-							opts.Allow = append(opts.Allow, str)
-						}
-					}
-				}
+	if allow, ok := optsMap["allow"].([]interface{}); ok {
+		for _, a := range allow {
+			if str, ok := a.(string); ok {
+				opts.Allow = append(opts.Allow, str)
 			}
 		}
+	}
+
+	return opts
+}
+
+var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
+	Name:   "no-empty-function",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		// Helper to check if a type is allowed
 		isAllowed := func(allowType string) bool {

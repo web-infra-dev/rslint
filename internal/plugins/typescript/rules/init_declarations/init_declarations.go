@@ -1,12 +1,16 @@
 package init_declarations
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed init_declarations.schema.json
+var schemaJSON []byte
 
 // InitDeclarationsRule mirrors @typescript-eslint/init-declarations, which wraps
 // the ESLint core init-declarations rule and additionally:
@@ -22,9 +26,9 @@ import (
 // Upstream wrapper: packages/eslint-plugin/src/rules/init-declarations.ts
 // Upstream base rule: eslint/lib/rules/init-declarations.js
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
-	Name: "init-declarations",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "init-declarations",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -44,43 +48,21 @@ type initDeclarationsOptions struct {
 	ignoreForLoopInit bool
 }
 
-// parseOptions accepts every shape config.go can hand a rule that uses ESLint's
-// `["mode", { ...sub-options }]` schema:
-//   - nil → defaults
-//   - "always" / "never" (string, from `['<level>', '<mode>']` — single-element
-//     option arrays are unwrapped by config.go)
-//   - []interface{}{"<mode>", map[string]interface{}{...}} (multi-element form,
-//     not unwrapped)
-//   - map[string]interface{}{...} (defensive — the CLI single-option fallback
-//     when only the sub-option object is supplied)
-func parseOptions(raw any) initDeclarationsOptions {
+// parseOptions reads ESLint's `["<mode>", { ...sub-options }]` options array:
+// the mode string in slot 0 (defaulting to "always"), and the sub-option
+// object — only meaningful for "never" — in slot 1.
+func parseOptions(options []any) initDeclarationsOptions {
 	opts := initDeclarationsOptions{mode: "always"}
 
-	if raw == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	var modeStr string
-	var subOpts map[string]interface{}
-
-	switch v := raw.(type) {
-	case string:
-		modeStr = v
-	case []interface{}:
-		if len(v) > 0 {
-			modeStr, _ = v[0].(string)
-		}
-		if len(v) > 1 {
-			subOpts, _ = v[1].(map[string]interface{})
-		}
-	case map[string]interface{}:
-		subOpts = v
-	}
-
-	if modeStr == "always" || modeStr == "never" {
+	if modeStr, _ := options[0].(string); modeStr == "always" || modeStr == "never" {
 		opts.mode = modeStr
 	}
-	if subOpts != nil {
+	if len(options) > 1 {
+		subOpts, _ := options[1].(map[string]interface{})
 		if b, ok := subOpts["ignoreForLoopInit"].(bool); ok {
 			opts.ignoreForLoopInit = b
 		}

@@ -1,6 +1,7 @@
 package no_unsafe_member_access
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unsafe_member_access.schema.json
+var schemaJSON []byte
 
 func buildUnsafeComputedMemberAccessMessage(property, t string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -45,6 +49,7 @@ func createDataType(t *checker.Type) string {
 
 var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-member-access",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()

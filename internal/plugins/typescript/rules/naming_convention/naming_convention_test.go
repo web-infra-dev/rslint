@@ -584,3 +584,75 @@ func TestNamingConventionRule(t *testing.T) {
 		},
 	})
 }
+
+// TestNamingConventionRegexSchema locks in that both regex-valued options are
+// validated as regexes: `filter`'s bare-string form and the `regex` key of
+// its object form (shared by `custom`). The rule compiles each one, so an
+// unparsable pattern would otherwise be dropped and the selector would apply
+// to everything. Upstream's schema declares bare strings.
+func TestNamingConventionRegexSchema(t *testing.T) {
+	selector := func(filter any) []any {
+		return []any{map[string]any{
+			"selector": "variable",
+			"format":   []any{"camelCase"},
+			"filter":   filter,
+		}}
+	}
+	for name, filter := range map[string]any{
+		"bare string":  "(",
+		"regex object": map[string]any{"match": true, "regex": "("},
+	} {
+		if err := NamingConventionRule.Schema.Validate(selector(filter)); err == nil {
+			t.Errorf("expected an invalid filter %s to fail schema validation", name)
+		}
+	}
+	for name, filter := range map[string]any{
+		"bare string":  "^ignored",
+		"regex object": map[string]any{"match": true, "regex": "^ignored"},
+	} {
+		if err := NamingConventionRule.Schema.Validate(selector(filter)); err != nil {
+			t.Errorf("expected a valid filter %s to pass schema validation, got: %v", name, err)
+		}
+	}
+}
+
+// TestNamingConventionCustomLookahead locks in that `custom.regex` (and by
+// extension `filter`, which shares the same compile path) is matched with
+// the same ECMAScript regex engine the schema validates it against
+// (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a JS-only
+// pattern that passes schema validation would otherwise silently fail to
+// compile and never flag a mismatched name.
+func TestNamingConventionCustomLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule, []rule_tester.ValidTestCase{
+		{
+			Code: `const myVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `const deprecatedVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "satisfyCustom", Line: 1, Column: 7},
+			},
+		},
+	})
+}

@@ -1,6 +1,7 @@
 package no_magic_numbers
 
 import (
+	_ "embed"
 	"math"
 	"math/big"
 	"strconv"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_magic_numbers.schema.json
+var schemaJSON []byte
 
 // Maximum array length by the ECMAScript Specification.
 const maxArrayLength = 1<<32 - 1
@@ -27,14 +31,14 @@ type options struct {
 	ignoreTypeIndexes             bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		ignore: make(map[string]bool),
 	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if v, ok := optsMap["detectObjects"].(bool); ok {
 		opts.detectObjects = v
 	}
@@ -192,9 +196,9 @@ var useConstMessage = rule.RuleMessage{
 
 // NoMagicNumbersRule implements the @typescript-eslint/no-magic-numbers rule.
 var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
-	Name: "no-magic-numbers",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-magic-numbers",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		handleNumericNode := func(node *ast.Node, isBigInt bool) {

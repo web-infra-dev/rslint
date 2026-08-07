@@ -1,6 +1,7 @@
 package parameter_properties
 
 import (
+	_ "embed"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,8 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed parameter_properties.schema.json
+var schemaJSON []byte
 
 // Modifier values that match the ESLint option schema:
 // "readonly", "private", "protected", "public",
@@ -20,15 +23,15 @@ type options struct {
 	prefer string
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	o := options{
 		allow:  make(map[string]bool),
 		prefer: "class-property",
 	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return o
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if allow, ok := optsMap["allow"].([]interface{}); ok {
 		for _, a := range allow {
 			if s, ok := a.(string); ok {
@@ -86,9 +89,9 @@ type propertyNodes struct {
 }
 
 var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
-	Name: "parameter-properties",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "parameter-properties",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		if opts.prefer == "class-property" {

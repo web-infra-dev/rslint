@@ -7,7 +7,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreferOptionalChainRule(t *testing.T) {
@@ -339,50 +338,50 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// --- Options: checkAny=false ---
 		{
 			Code:    "declare const x: any;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckAny: utils.Ref(false)},
+			Options: map[string]interface{}{"checkAny": false},
 		},
 		// --- Options: checkString=false ---
 		{
 			Code:    "declare const x: string;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckString: utils.Ref(false)},
+			Options: map[string]interface{}{"checkString": false},
 		},
 		// --- Options: checkNumber=false ---
 		{
 			Code:    "declare const x: number;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckNumber: utils.Ref(false)},
+			Options: map[string]interface{}{"checkNumber": false},
 		},
 		// --- Options: checkBoolean=false ---
 		{
 			Code:    "declare const x: boolean;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckBoolean: utils.Ref(false)},
+			Options: map[string]interface{}{"checkBoolean": false},
 		},
 		// --- Options: checkBigInt=false ---
 		{
 			Code:    "declare const x: bigint;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckBigInt: utils.Ref(false)},
+			Options: map[string]interface{}{"checkBigInt": false},
 		},
 		// --- Options: checkUnknown=false ---
 		{
 			Code:    "declare const x: unknown;\nx && x.length;",
-			Options: PreferOptionalChainOptions{CheckUnknown: utils.Ref(false)},
+			Options: map[string]interface{}{"checkUnknown": false},
 		},
 
 		// --- requireNullish valid cases ---
 		{
 			Code:    "declare const x: string;\nx && x.length;",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: string;\nfoo && foo.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: { bar: string };\nfoo && foo.bar && foo.bar.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: string;\n(foo || {}).toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		// --- Additional valid patterns (false positive prevention) ---
 		{Code: `foo || ({} as any);`},
@@ -440,23 +439,23 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// requireNullish additional valid
 		{
 			Code:    "declare const x: string | number | boolean | object;\nx && x.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: string;\nfoo && foo.toString() && foo.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: { bar: string };\nfoo && foo.bar && foo.bar.toString() && foo.bar.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo1: { bar: string | null };\nfoo1 && foo1.bar;",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 		{
 			Code:    "declare const foo: string | null;\n(foo || 'a' || {}).toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 		},
 
 		// --- Diverging property access paths (same terminal name, different chains) ---
@@ -1146,7 +1145,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		{
 			Code:    "declare const thing1: string | null;\nthing1 && thing1.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "preferOptionalChain",
@@ -1158,7 +1157,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		},
 		{
 			Code:    "declare const foo: { bar: string | null | undefined } | null | undefined;\nfoo && foo.bar && foo.bar.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Output:  []string{"declare const foo: { bar: string | null | undefined } | null | undefined;\nfoo?.bar?.toString();"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
@@ -1166,7 +1165,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		},
 		{
 			Code:    "declare const foo: string | null;\n(foo || {}).toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "preferOptionalChain",
@@ -1182,7 +1181,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		{
 			Code:    "declare const foo: { bar: number } | null | undefined;\nfoo != undefined && foo.bar;",
-			Options: PreferOptionalChainOptions{AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing: utils.Ref(true)},
+			Options: map[string]interface{}{"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing": true},
 			Output:  []string{"declare const foo: { bar: number } | null | undefined;\nfoo?.bar;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
@@ -1190,7 +1189,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		},
 		{
 			Code:    "declare const foo: { bar: number } | null | undefined;\nfoo != undefined && foo.bar;",
-			Options: PreferOptionalChainOptions{AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing: utils.Ref(false)},
+			Options: map[string]interface{}{"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "preferOptionalChain",
@@ -1678,7 +1677,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		{
 			Code:    "declare const foo: { bar: boolean } | null | undefined;\ndeclare function acceptsBoolean(arg: boolean): void;\nacceptsBoolean(foo != null && foo.bar);",
-			Options: PreferOptionalChainOptions{AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing: utils.Ref(true)},
+			Options: map[string]interface{}{"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing": true},
 			Output:  []string{"declare const foo: { bar: boolean } | null | undefined;\ndeclare function acceptsBoolean(arg: boolean): void;\nacceptsBoolean(foo?.bar);"},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
@@ -1688,7 +1687,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		{
 			Code:    "declare const thing1: string | null;\nthing1 && thing1.toString() && true;",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 				{MessageId: "optionalChainSuggest", Output: "declare const thing1: string | null;\nthing1?.toString() && true;"},
 			}}},
@@ -1696,14 +1695,14 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Chains with duplicate last operands stop before the duplicate
 		{
 			Code:    "declare const foo: string | null;\nfoo && foo.toString() && foo.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 				{MessageId: "optionalChainSuggest", Output: "declare const foo: string | null;\nfoo?.toString() && foo.toString();"},
 			}}},
 		},
 		{
 			Code:    "declare const foo: { bar: string | null | undefined } | null | undefined;\nfoo && foo.bar && foo.bar.toString() && foo.bar.toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Output:  []string{"declare const foo: { bar: string | null | undefined } | null | undefined;\nfoo?.bar?.toString() && foo.bar.toString();"},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
@@ -1831,14 +1830,14 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		{
 			Code:    "declare const foo: string;\n(foo || undefined || {}).toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 				{MessageId: "optionalChainSuggest", Output: "declare const foo: string;\n(foo || undefined)?.toString();"},
 			}}},
 		},
 		{
 			Code:    "declare const foo: string | null;\n(foo || undefined || {}).toString();",
-			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
+			Options: map[string]interface{}{"requireNullish": true},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 				{MessageId: "optionalChainSuggest", Output: "declare const foo: string | null;\n(foo || undefined)?.toString();"},
 			}}},

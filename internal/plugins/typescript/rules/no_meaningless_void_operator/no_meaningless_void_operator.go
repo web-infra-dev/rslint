@@ -1,6 +1,8 @@
 package no_meaningless_void_operator
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_meaningless_void_operator.schema.json
+var schemaJSON []byte
 
 func buildMeaninglessVoidOperatorMessage(t string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -23,21 +28,30 @@ func buildRemoveVoidMessage() rule.RuleMessage {
 }
 
 type NoMeaninglessVoidOperatorOptions struct {
-	CheckNever *bool
+	CheckNever *bool `json:"checkNever"`
+}
+
+func parseOptions(options []any) NoMeaninglessVoidOperatorOptions {
+	opts := NoMeaninglessVoidOperatorOptions{}
+	if len(options) > 0 {
+		if optsMap, ok := options[0].(map[string]interface{}); ok {
+			if optsJSON, err := json.Marshal(optsMap); err == nil {
+				_ = json.Unmarshal(optsJSON, &opts)
+			}
+		}
+	}
+	if opts.CheckNever == nil {
+		opts.CheckNever = utils.Ref(false)
+	}
+	return opts
 }
 
 var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 	Name:             "no-meaningless-void-operator",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoMeaninglessVoidOperatorOptions)
-		if !ok {
-			opts = NoMeaninglessVoidOperatorOptions{}
-		}
-		if opts.CheckNever == nil {
-			opts.CheckNever = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindVoidExpression: func(node *ast.Node) {
