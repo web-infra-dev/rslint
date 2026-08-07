@@ -12,7 +12,8 @@ import (
 // search, not the graph, so configurations that differ only in maxDepth share
 // one graph.
 type graphKey struct {
-	index              import_utils.IndexKey
+	settings           string
+	moduleReferences   import_utils.ModuleReferenceOptions
 	ignoreExternal     bool
 	allowUnsafeDynamic bool
 }
@@ -44,9 +45,10 @@ type moduleGraph struct {
 // moduleGraphFor returns the Program's dependency graph for these options,
 // building it on the first file of the run that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
-	moduleIndex := import_utils.IndexFor(ctx, opts.moduleReferences)
+	moduleIndex := import_utils.IndexFor(ctx)
 	key := graphKey{
-		index:              import_utils.IndexKey{Options: opts.moduleReferences, Settings: moduleIndex.Settings().Key()},
+		settings:           moduleIndex.Settings().Key(),
+		moduleReferences:   opts.moduleReferences,
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
@@ -68,7 +70,7 @@ func buildModuleGraph(moduleIndex *import_utils.ModuleIndex, opts ruleOptions) *
 
 	settings := moduleIndex.Settings()
 	for i, file := range files {
-		refs := moduleIndex.Refs(file)
+		refs := moduleIndex.Refs(file, opts.moduleReferences)
 		if len(refs) == 0 {
 			continue
 		}

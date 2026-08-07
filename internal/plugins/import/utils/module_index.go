@@ -11,10 +11,10 @@ import (
 )
 
 // ModuleIndex answers, for any file in one Program, the questions every
-// import rule asks about a file in isolation: which modules it references and
-// which files those resolve to. Each answer is a function of that file's own
-// syntax, so it is computed once for the whole lint run however many files ask
-// for it, and however many times.
+// import rule asks about a file in isolation: which modules it references,
+// what they resolve to, and what the file says about its own exports. Each
+// answer is a function of that file's own syntax, so it is computed once for
+// the whole lint run however many files ask for it, and however many times.
 //
 // It holds only file-local facts. What a rule then does with them — which
 // references it treats as graph edges, how it walks between files — stays in
@@ -22,11 +22,19 @@ import (
 // the Program.
 type ModuleIndex struct {
 	ctx      rule.RuleContext
-	options  ModuleReferenceOptions
 	settings *ModuleSettings
 
-	mu   sync.Mutex
-	refs map[*ast.SourceFile][]ModuleReference
+	mu      sync.Mutex
+	refs    map[refKey][]ModuleReference
+	exports map[*ast.SourceFile]*LocalExports
+}
+
+// refKey pairs a file with the module syntax the caller wants recognized.
+// Rules disagree about whether require() and define() count, and the answer
+// differs accordingly.
+type refKey struct {
+	file    *ast.SourceFile
+	options ModuleReferenceOptions
 }
 
 // ModuleSettings is the `import/` settings block compiled once. The raw
@@ -39,26 +47,22 @@ type ModuleSettings struct {
 	key             string
 }
 
-// IndexKey identifies one ModuleIndex. Only what changes the references
-// themselves belongs here: the syntax the collector recognizes, and the
-// settings that drop references as they are collected.
-type IndexKey struct {
-	Options  ModuleReferenceOptions
-	Settings string
+// indexKey identifies one ModuleIndex. Only the settings appear: they are the
+// one input that changes every answer the index gives.
+type indexKey struct {
+	settings string
 }
 
-// IndexFor returns the Program's module index for these collection options,
-// building it on the first rule of the run that asks for it. Rules that
-// disagree about which module syntax counts get their own index.
-func IndexFor(ctx rule.RuleContext, options ModuleReferenceOptions) *ModuleIndex {
+// IndexFor returns the Program's module index, building it on the first rule
+// of the run that asks for it.
+func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := CompileModuleSettings(ctx.Settings)
-	key := IndexKey{Options: options, Settings: settings.key}
-	index, _ := ctx.ProgramCache.Load(key, func() any {
+	index, _ := ctx.ProgramCache.Load(indexKey{settings: settings.key}, func() any {
 		return &ModuleIndex{
 			ctx:      ctx,
-			options:  options,
 			settings: settings,
-			refs:     make(map[*ast.SourceFile][]ModuleReference),
+			refs:     make(map[refKey][]ModuleReference),
+			exports:  make(map[*ast.SourceFile]*LocalExports),
 		}
 	}).(*ModuleIndex)
 	return index
@@ -72,8 +76,8 @@ func (index *ModuleIndex) Settings() *ModuleSettings {
 	return index.settings
 }
 
-// Files returns every file of the Program, in the Program's own order. The
-// index of a file in this slice is stable for the lifetime of the index, so
+// Files returns every file of the Program, in the Program's own order. A
+// file's position in this slice is stable for the lifetime of the index, so
 // callers that need a dense numbering of the Program can adopt it.
 func (index *ModuleIndex) Files() []*ast.SourceFile {
 	if index == nil || index.ctx.Program == nil {
@@ -82,34 +86,62 @@ func (index *ModuleIndex) Files() []*ast.SourceFile {
 	return index.ctx.Program.SourceFiles()
 }
 
-// Refs returns file's module references in source order, with each reference's
-// target already resolved. The result is shared with every other caller and
-// must not be modified.
-func (index *ModuleIndex) Refs(file *ast.SourceFile) []ModuleReference {
+// Refs returns file's module references in source order, with each
+// reference's target already resolved. The result is shared with every other
+// caller and must not be modified.
+func (index *ModuleIndex) Refs(file *ast.SourceFile, options ModuleReferenceOptions) []ModuleReference {
 	if index == nil || file == nil {
 		return nil
 	}
 
+	key := refKey{file: file, options: options}
 	index.mu.Lock()
-	refs, ok := index.refs[file]
+	refs, ok := index.refs[key]
 	index.mu.Unlock()
 	if ok {
 		return refs
 	}
 
-	// Collected outside the lock: collection is pure, so two files racing on
+	// Computed outside the lock: collection is pure, so two files racing on
 	// their first request cost one redundant collection at worst, which is
 	// cheaper than serializing every file in the run behind one mutex.
-	refs = collectModuleReferences(index.ctx, file, index.options, index.settings)
+	refs = collectModuleReferences(index.ctx, file, options, index.settings)
 
 	index.mu.Lock()
-	if existing, ok := index.refs[file]; ok {
+	if existing, ok := index.refs[key]; ok {
 		refs = existing
 	} else {
-		index.refs[file] = refs
+		index.refs[key] = refs
 	}
 	index.mu.Unlock()
 	return refs
+}
+
+// Exports returns what file says about its own exports, with every module
+// specifier resolved and none of them followed. The result is shared with
+// every other caller and must not be modified.
+func (index *ModuleIndex) Exports(file *ast.SourceFile) *LocalExports {
+	if index == nil || file == nil {
+		return nil
+	}
+
+	index.mu.Lock()
+	exports, ok := index.exports[file]
+	index.mu.Unlock()
+	if ok {
+		return exports
+	}
+
+	exports = collectLocalExports(index.ctx, file, index.settings)
+
+	index.mu.Lock()
+	if existing, ok := index.exports[file]; ok {
+		exports = existing
+	} else {
+		index.exports[file] = exports
+	}
+	index.mu.Unlock()
+	return exports
 }
 
 // CompileModuleSettings compiles the `import/` settings that decide which
