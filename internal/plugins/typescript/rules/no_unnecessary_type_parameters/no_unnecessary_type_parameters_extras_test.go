@@ -190,6 +190,29 @@ declare function hold<T>(x: Holder<((T))>): void;
 		{Code: "declare function patternKeyed<T>(x: number): { [k: `a${string}`]: T };"},
 		{Code: `declare function symbolKeyedParam<T>(x: { [k: symbol]: T }): void;`},
 	}, []rule_tester.InvalidTestCase{
+		// A comment after the separator belongs to the following type parameter.
+		// Removing the first parameter must preserve it, matching upstream.
+		{
+			Code: `function f<T, /* keep */ U>(x: T, y: U): U { return y; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `function f</* keep */ U>(x: unknown, y: U): U { return y; }`,
+				}},
+			}},
+		},
+		{
+			Code: "function f<T, // keep\n U>(x: T, y: U): U { return y; }",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    "function f<// keep\n U>(x: unknown, y: U): U { return y; }",
+				}},
+			}},
+		},
+
 		// ---- Branch lock-in: isDirectGenericTypeArgumentUsage() paren peeling ----
 		// Peeling the ParenthesizedType must not lose the Array/ReadonlyArray
 		// exclusion: `Array<(T)>` still defers to the type-checker phase, which

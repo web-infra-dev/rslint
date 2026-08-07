@@ -595,7 +595,8 @@ func removeTypeParameterFix(sourceFile *ast.SourceFile, container *ast.Node, typ
 	index := slices.Index(typeParams, typeParamNode)
 	if index == 0 {
 		commaEnd := findTokenEnd(sourceFile, paramRange.End(), ast.KindCommaToken)
-		nextStart := scanner.SkipTrivia(sourceFile.Text(), commaEnd)
+		nextParamStart := utils.TrimNodeTextRange(sourceFile, typeParams[1]).Pos()
+		nextStart := utils.SkipLeadingWhitespace(sourceFile.Text(), commaEnd, nextParamStart)
 		return rule.RuleFixRemoveRange(core.NewTextRange(paramRange.Pos(), nextStart))
 	}
 
