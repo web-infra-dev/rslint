@@ -220,7 +220,7 @@ export class CoreResolver {
   }
 
   public async resolve(
-    document: TextDocument,
+    document: Pick<TextDocument, 'uri'>,
     workspaceFolder: WorkspaceFolder,
     configuredPath?: string,
   ): Promise<ResolvedCoreRuntime> {

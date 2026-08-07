@@ -3,9 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  commands,
   Uri,
-  window,
   workspace,
   type TextDocument,
   type WorkspaceFolder,
@@ -16,23 +14,42 @@ import {
   resolveCorePackageDirectory,
 } from '../../src/CoreResolver';
 
+// require.resolve can retain a Windows 8.3 alias (RUNNER~1) while fs.realpath
+// returns its long spelling. Compare the physical identity used by production.
+async function canonicalPath(filePath: string): Promise<string> {
+  const realPath = path.normalize(await fs.realpath(filePath));
+  return process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+}
+
+async function assertSamePhysicalPath(
+  actual: string,
+  expected: string,
+): Promise<void> {
+  assert.strictEqual(
+    await canonicalPath(actual),
+    await canonicalPath(expected),
+  );
+}
+
 suite('local core resolver', () => {
   let temporaryDirectory: string;
-  let openedDocuments: TextDocument[];
 
   setup(async () => {
     temporaryDirectory = await fs.mkdtemp(
       path.join(os.tmpdir(), 'rslint-core-resolver-'),
     );
-    openedDocuments = [];
   });
 
-  teardown(async () => {
-    for (const document of openedDocuments) {
-      await window.showTextDocument(document, { preview: false });
-      await commands.executeCommand('workbench.action.closeActiveEditor');
-    }
-    await fs.rm(temporaryDirectory, { recursive: true, force: true });
+  teardown(async function () {
+    this.timeout(10_000);
+    // Keep transient Windows EBUSY handling bounded and surface the final
+    // failure instead of turning cleanup into a best-effort operation.
+    await fs.rm(temporaryDirectory, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
   });
 
   async function createPackageDirectory(root: string): Promise<string> {
@@ -53,13 +70,15 @@ suite('local core resolver', () => {
     };
   }
 
-  async function openSource(relativePath: string): Promise<TextDocument> {
+  async function createSource(
+    relativePath: string,
+  ): Promise<Pick<TextDocument, 'uri'>> {
     const source = path.join(temporaryDirectory, relativePath);
     await fs.mkdir(path.dirname(source), { recursive: true });
     await fs.writeFile(source, 'const value = 1;\n');
-    const document = await workspace.openTextDocument(Uri.file(source));
-    openedDocuments.push(document);
-    return document;
+    // Core resolution consumes only uri. A real VS Code TextDocument adds an
+    // unrelated editor/file-watcher lifecycle and made Windows cleanup racy.
+    return { uri: Uri.file(source) };
   }
 
   async function createLoadableCore(
@@ -105,9 +124,9 @@ suite('local core resolver', () => {
     const sourceDirectory = path.join(nestedRoot, 'src');
     await fs.mkdir(sourceDirectory, { recursive: true });
 
-    assert.strictEqual(
+    await assertSamePhysicalPath(
       resolveCorePackageDirectory(sourceDirectory),
-      await fs.realpath(nestedCore),
+      nestedCore,
     );
     assert.notStrictEqual(nestedCore, rootCore);
   });
@@ -130,8 +149,8 @@ suite('local core resolver', () => {
       'core',
     );
     await createLoadableCore(packageDirectory, '1.2.3');
-    const first = await openSource('packages/first/src/index.ts');
-    const second = await openSource('packages/second/src/index.ts');
+    const first = await createSource('packages/first/src/index.ts');
+    const second = await createSource('packages/second/src/index.ts');
 
     const resolver = new CoreResolver();
     const [firstResolution, secondResolution] = await Promise.all([
@@ -144,9 +163,9 @@ suite('local core resolver', () => {
       secondResolution.installation,
     );
     assert.strictEqual(firstResolution.installation.version, '1.2.3');
-    assert.strictEqual(
+    await assertSamePhysicalPath(
       firstResolution.installation.packageDirectory,
-      await fs.realpath(packageDirectory),
+      packageDirectory,
     );
   });
 
@@ -171,8 +190,8 @@ suite('local core resolver', () => {
       createLoadableCore(firstCore, '1.0.0'),
       createLoadableCore(secondCore, '2.0.0'),
     ]);
-    const first = await openSource('packages/first/src/index.ts');
-    const second = await openSource('packages/second/src/index.ts');
+    const first = await createSource('packages/first/src/index.ts');
+    const second = await createSource('packages/second/src/index.ts');
 
     const resolver = new CoreResolver();
     const [firstResolution, secondResolution] = await Promise.all([
@@ -206,8 +225,8 @@ suite('local core resolver', () => {
       createLoadableCore(firstCore, '1.0.0'),
       createLoadableCore(secondCore, '1.0.0'),
     ]);
-    const first = await openSource('packages/first/src/index.ts');
-    const second = await openSource('packages/second/src/index.ts');
+    const first = await createSource('packages/first/src/index.ts');
+    const second = await createSource('packages/second/src/index.ts');
 
     const resolver = new CoreResolver();
     const [firstResolution, secondResolution] = await Promise.all([
@@ -229,7 +248,7 @@ suite('local core resolver', () => {
       'rslint-core',
     );
     await createLoadableCore(packageDirectory, '3.0.0');
-    const document = await openSource('src/index.ts');
+    const document = await createSource('src/index.ts');
 
     const resolved = await new CoreResolver().resolve(
       document,
@@ -237,7 +256,7 @@ suite('local core resolver', () => {
       'vendor/rslint-core',
     );
 
-    assert.strictEqual(
+    await assertSamePhysicalPath(
       resolved.installation.packageDirectory,
       packageDirectory,
     );
@@ -253,7 +272,7 @@ suite('local core resolver', () => {
     );
     await createLoadableCore(packageDirectory, '1.0.0');
     await fs.rm(path.join(packageDirectory, 'rslint'));
-    const document = await openSource('src/index.ts');
+    const document = await createSource('src/index.ts');
 
     await assert.rejects(
       new CoreResolver().resolve(document, temporaryWorkspaceFolder()),
@@ -279,7 +298,7 @@ suite('local core resolver', () => {
     const actualCore = path.dirname(
       require.resolve('@rslint/core/package.json'),
     );
-    const documents: TextDocument[] = [];
+    const documents: Array<Pick<TextDocument, 'uri'>> = [];
     for (const name of ['a', 'b']) {
       const project = path.join(temporaryDirectory, name);
       const packageScope = path.join(project, 'node_modules', '@rslint');
@@ -291,9 +310,8 @@ suite('local core resolver', () => {
       );
       const source = path.join(project, 'index.ts');
       await fs.writeFile(source, `const ${name} = 1;\n`);
-      documents.push(await workspace.openTextDocument(Uri.file(source)));
+      documents.push({ uri: Uri.file(source) });
     }
-    openedDocuments.push(...documents);
 
     const resolver = new CoreResolver();
     const first = await resolver.resolve(documents[0], folder);
