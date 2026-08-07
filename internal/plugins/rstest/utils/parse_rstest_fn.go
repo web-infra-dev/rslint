@@ -17,6 +17,7 @@ const (
 	rstestAPIDescribe
 	rstestAPIParameterizedTest
 	rstestAPIParameterizedDescribe
+	rstestAPIHook
 )
 
 type rstestInvocation uint8
@@ -56,9 +57,10 @@ const (
 	rstestProfilePlaywright
 )
 
-// ParseRstestFnCall parses a final Rstest test/describe registration call.
-// Factory calls such as test.each(cases), test.runIf(condition), and
-// test.extend(fixtures) are intentionally not returned.
+// ParseRstestFnCall parses a final Rstest test/describe/hook registration
+// call; callers distinguish the three through Kind. Factory calls such as
+// test.each(cases), test.runIf(condition), and test.extend(fixtures) are
+// intentionally not returned.
 func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall {
 	return parseRstestFnCall(node, ctx, false, false)
 }
@@ -68,6 +70,19 @@ func ParseRstestFnCallWithOfficialExtensions(
 	ctx rule.RuleContext,
 ) *ParsedRstestFnCall {
 	return parseRstestFnCall(node, ctx, true, true)
+}
+
+// IsTypeOfRstestFnCall reports whether node parses as a Rstest registration
+// call of one of the given kinds. What this plugin owns is the entry point:
+// parsing runs with official extensions enabled (import.meta + playwright),
+// the same choice RstestTestCallbacks.ParseFnCall makes. The kind matching
+// itself is shared with jest through testFramework.IsCallOfKind.
+func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
+	parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
+	if parsed == nil {
+		return false
+	}
+	return testFramework.IsCallOfKind(&parsed.ParsedCall, kinds...)
 }
 
 func parseRstestFnCall(
@@ -129,6 +144,8 @@ func parseRstestFnCall(
 		resolved.kind = RstestFnTypeTest
 	case rstestAPIDescribe, rstestAPIParameterizedDescribe:
 		resolved.kind = RstestFnTypeDescribe
+	case rstestAPIHook:
+		resolved.kind = RstestFnTypeHook
 	default:
 		return nil
 	}
@@ -504,6 +521,13 @@ func directRstestAPIState(profile rstestAPIProfile, name string) rstestAPIState 
 	case "describe":
 		return rstestAPIDescribe
 	default:
+		// Both profiles expose the same four hooks: @rstest/playwright
+		// re-exports them (packages/playwright/src/index.ts:2-9). Hooks accept
+		// no chained members, which holds by construction: applyRstestChainPart
+		// has no rstestAPIHook branch, so any member invalidates the chain.
+		if testFramework.IsHookName(name) {
+			return rstestAPIHook
+		}
 		return rstestAPIInvalid
 	}
 }
@@ -537,6 +561,22 @@ func applyRstestChainPart(profile rstestAPIProfile, state rstestAPIState, part r
 				return rstestAPIDescribe
 			}
 		}
+		// PlaywrightTest declares the four hooks as members of the test object,
+		// and extend() returns another PlaywrightTest, so `test.beforeEach()`
+		// and `test.extend(fixtures).beforeEach()` register a hook. This is a
+		// member lookup on the test object, not a modifier applied to an
+		// already resolved hook, which is why it is reached from the test state
+		// rather than from rstestAPIHook.
+		//
+		// Only rstestAPITestWithExtend qualifies: that state means the receiver
+		// is still a PlaywrightTest. Modifiers such as `.skip` or `.each(...)`
+		// leave rstestAPITest, and those results do not expose hooks.
+		if profile == rstestProfilePlaywright &&
+			state == rstestAPITestWithExtend &&
+			part.invocation == rstestNotInvoked &&
+			testFramework.IsHookName(part.name) {
+			return rstestAPIHook
+		}
 	case rstestAPIDescribe:
 		switch part.name {
 		case "only", "skip", "todo", "concurrent", "sequential":
@@ -561,6 +601,19 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	if state == rstestAPIInvalid {
 		resolved.state = rstestAPIInvalid
 		return false
+	}
+	// `test.beforeEach()` resolves to the hook the member selects, not to the
+	// test object it was read from, so the reported name and original node move
+	// to the member. Rules keyed on the hook name — prefer-hooks-in-order, for
+	// one — would otherwise see every Playwright hook as `test`.
+	//
+	// No guard against a hook→hook transition is needed: applyRstestChainPart
+	// has no rstestAPIHook branch, so a member applied to a hook always
+	// invalidates the chain and returns above. Reaching here with a hook state
+	// therefore means the member just introduced it.
+	if state == rstestAPIHook {
+		resolved.name = part.name
+		resolved.originalNode = part.node
 	}
 	resolved.state = state
 	// Only semantic conclusions are recorded here. This runs on the alias chain

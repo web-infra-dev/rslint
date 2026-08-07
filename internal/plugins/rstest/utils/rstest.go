@@ -46,6 +46,7 @@ type ParsedRstestFnMemberEntry = testFramework.MemberEntry
 
 const (
 	RstestFnTypeDescribe = testFramework.FnKindDescribe
+	RstestFnTypeHook     = testFramework.FnKindHook
 	RstestFnTypeTest     = testFramework.FnKindTest
 )
 
