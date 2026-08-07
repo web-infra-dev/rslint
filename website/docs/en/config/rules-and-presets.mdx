@@ -13,6 +13,29 @@ Import presets from `@rslint/core`:
 
 <PresetImportSnippet />
 
+### Choosing a TypeScript preset
+
+The `ts.configs.*` presets mirror typescript-eslint's own layering. Pick one baseline:
+
+| Baseline                 | What it covers                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `recommended`            | Rules that catch code likely to be buggy, using syntax alone                          |
+| `recommendedTypeChecked` | `recommended` plus the rules that read type information                               |
+| `strict`                 | `recommended` plus opinionated rules that catch more bugs at the cost of more reports |
+| `strictTypeChecked`      | `strict` plus the rules that read type information                                    |
+
+`stylistic` and `stylisticTypeChecked` hold the consistency rules. Layer one after the baseline:
+
+```ts
+export default defineConfig([
+  js.configs.recommended,
+  ts.configs.strictTypeChecked,
+  ts.configs.stylisticTypeChecked,
+]);
+```
+
+Every `ts.configs.*` preset declares the `@typescript-eslint` plugin and enables `parserOptions.projectService`, so the type-checked variants run as-is.
+
 ## rules
 
 - **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`

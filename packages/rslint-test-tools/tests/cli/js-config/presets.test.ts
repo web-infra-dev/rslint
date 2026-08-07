@@ -59,6 +59,66 @@ describe('defineConfig and config presets', () => {
     expect(plugins).toContain('@typescript-eslint');
   });
 
+  const tsPresetNames = [
+    'recommended',
+    'recommendedTypeChecked',
+    'strict',
+    'strictTypeChecked',
+    'stylistic',
+    'stylisticTypeChecked',
+  ] as const;
+
+  test.each(tsPresetNames)(
+    'ts.configs.%s layers the base entry and the eslint-recommended override',
+    (name) => {
+      const entries = ts.configs[name];
+      expect(Array.isArray(entries)).toBe(true);
+
+      const plugins = entries.flatMap((entry) =>
+        Array.isArray(entry.plugins) ? entry.plugins : [],
+      );
+      expect(plugins).toContain('@typescript-eslint');
+
+      // The eslint-recommended layer is what turns off the core rules
+      // TypeScript already reports on.
+      const overrides = entries.find((entry) =>
+        entry.files?.includes('**/*.mts'),
+      );
+      expect(overrides?.rules?.['no-undef']).toBe('off');
+
+      // The preset's own rules always land in the last entry.
+      const rules = entries[entries.length - 1].rules ?? {};
+      expect(Object.keys(rules).length).toBeGreaterThan(0);
+      for (const ruleName of Object.keys(rules)) {
+        // A preset only ever enables its own plugin's rules; core rules
+        // appear solely as 'off' to make room for their TS-aware counterpart.
+        if (!ruleName.startsWith('@typescript-eslint/')) {
+          expect(rules[ruleName]).toBe('off');
+        }
+      }
+    },
+  );
+
+  test.each([
+    ['recommended', 'recommendedTypeChecked'],
+    ['strict', 'strictTypeChecked'],
+    ['stylistic', 'stylisticTypeChecked'],
+    ['recommended', 'strict'],
+    ['recommendedTypeChecked', 'strictTypeChecked'],
+  ] as const)(
+    'ts.configs.%s is contained in ts.configs.%s',
+    (subset, superset) => {
+      const enabled = (name: (typeof tsPresetNames)[number]) => {
+        const entries = ts.configs[name];
+        const rules = entries[entries.length - 1].rules ?? {};
+        return Object.keys(rules).filter((key) => rules[key] !== 'off');
+      };
+      expect(enabled(superset)).toEqual(
+        expect.arrayContaining(enabled(subset)),
+      );
+    },
+  );
+
   test('react.configs.recommended should declare react plugin', () => {
     const rec = reactPlugin.configs.recommended;
     expect(rec.plugins).toBeDefined();

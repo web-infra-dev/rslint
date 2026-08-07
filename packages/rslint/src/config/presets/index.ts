@@ -1,4 +1,12 @@
-import { base as tsBase, recommended as tsRecommended } from './typescript.js';
+import {
+  base as tsBase,
+  recommended as tsRecommended,
+  recommendedTypeChecked as tsRecommendedTypeChecked,
+  strict as tsStrict,
+  strictTypeChecked as tsStrictTypeChecked,
+  stylistic as tsStylistic,
+  stylisticTypeChecked as tsStylisticTypeChecked,
+} from './typescript.js';
 import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as reactHooksRecommended } from './react-hooks.js';
@@ -10,7 +18,15 @@ import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 
 export const ts = {
-  configs: { base: tsBase, recommended: tsRecommended },
+  configs: {
+    base: tsBase,
+    recommended: tsRecommended,
+    recommendedTypeChecked: tsRecommendedTypeChecked,
+    strict: tsStrict,
+    strictTypeChecked: tsStrictTypeChecked,
+    stylistic: tsStylistic,
+    stylisticTypeChecked: tsStylisticTypeChecked,
+  },
 };
 
 export const js = {
