@@ -45,7 +45,7 @@ type moduleGraph struct {
 // moduleGraphFor returns the Program's dependency graph for these options,
 // building it on the first file of the run that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
-	settings := import_utils.IndexFor(ctx).Settings()
+	settings := import_utils.SettingsFor(ctx)
 	key := graphKey{
 		settings:           settings.Key(),
 		syntax:             opts.syntax,

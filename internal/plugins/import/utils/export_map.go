@@ -157,7 +157,7 @@ type exportKey struct {
 }
 
 func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
-	link := resolveExportLinkForLookup(ctx, origin, builder.index.Settings(), moduleSpecifier)
+	link := resolveExportLinkForLookup(ctx, origin, builder.index.settings, moduleSpecifier)
 	if link.Target == nil {
 		return false, false
 	}
@@ -180,7 +180,7 @@ func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier 
 		return nil, false
 	}
 
-	link := resolveExportLink(ctx, origin, builder.index.Settings(), moduleSpecifier)
+	link := resolveExportLink(ctx, origin, builder.index.settings, moduleSpecifier)
 	if !link.Resolved {
 		return nil, false
 	}

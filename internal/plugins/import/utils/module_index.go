@@ -1,13 +1,9 @@
 package utils
 
 import (
-	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -30,16 +26,6 @@ type ModuleIndex struct {
 	exportMaps map[*ast.SourceFile]*ExportMap
 }
 
-// ModuleSettings is the `import/` settings block compiled once. The raw
-// settings are re-read for every reference otherwise, which means recompiling
-// the import/ignore patterns and re-deriving the external module folders each
-// time.
-type ModuleSettings struct {
-	ignore          []*regexp.Regexp
-	externalFolders []string
-	key             string
-}
-
 // indexKey identifies one index. Only the settings appear: they are the one
 // input that changes every answer it gives.
 type indexKey struct {
@@ -47,13 +33,11 @@ type indexKey struct {
 }
 
 // IndexFor returns the Program's import index for these settings, building it
-// on the first rule of the run that asks for it. Only the cache key is derived
-// per call; compiling the settings — notably their regexps — happens inside
-// the build, once per Program and key.
+// on the first rule of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
-	key := moduleSettingsKey(ctx.Settings)
-	return CachedByProgram(ctx.Program, indexKey{settings: key}, func() *ModuleIndex {
-		return newModuleIndex(compileModuleSettings(ctx.Settings))
+	settings := SettingsFor(ctx)
+	return CachedByProgram(ctx.Program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
+		return newModuleIndex(settings)
 	})
 }
 
@@ -63,14 +47,6 @@ func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
 		exports:    make(map[*ast.SourceFile]*localExports),
 		exportMaps: make(map[*ast.SourceFile]*ExportMap),
 	}
-}
-
-// Settings returns the compiled `import/` settings this index was built with.
-func (index *ModuleIndex) Settings() *ModuleSettings {
-	if index == nil {
-		return nil
-	}
-	return index.settings
 }
 
 // localExportsOf returns what file says about its own exports, with every
@@ -121,91 +97,4 @@ func (index *ModuleIndex) storeExportMap(file *ast.SourceFile, exports *ExportMa
 	if _, ok := index.exportMaps[file]; !ok {
 		index.exportMaps[file] = exports
 	}
-}
-
-// compileModuleSettings compiles the `import/` settings that decide which
-// references count and which resolved paths are external.
-func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
-	compiled := &ModuleSettings{
-		externalFolders: ExternalModuleFolders(settings),
-		key:             moduleSettingsKey(settings),
-	}
-	for _, pattern := range settingsStringList(settings, "import/ignore") {
-		if expression, err := regexp.Compile(pattern); err == nil {
-			compiled.ignore = append(compiled.ignore, expression)
-		}
-	}
-	return compiled
-}
-
-// moduleSettingsKey encodes the settings compileModuleSettings reads into one
-// string: two settings maps share a key exactly when they compile alike. Every
-// element is quoted so that list boundaries survive the encoding, and the
-// lists are read through the same coercions the compilation applies.
-func moduleSettingsKey(settings map[string]interface{}) string {
-	var key strings.Builder
-	for _, pattern := range settingsStringList(settings, "import/ignore") {
-		key.WriteString(strconv.Quote(pattern))
-	}
-	key.WriteByte('\x00')
-	for _, folder := range ExternalModuleFolders(settings) {
-		key.WriteString(strconv.Quote(folder))
-	}
-	return key.String()
-}
-
-// Key identifies the settings these were compiled from, for callers that key
-// their own derived state by them.
-func (compiled *ModuleSettings) Key() string {
-	if compiled == nil {
-		return ""
-	}
-	return compiled.key
-}
-
-// IsIgnoredPath reports whether `import/ignore` covers a resolved import
-// target path.
-func (compiled *ModuleSettings) IsIgnoredPath(fileName string) bool {
-	if compiled == nil {
-		return false
-	}
-	for _, expression := range compiled.ignore {
-		if expression.MatchString(fileName) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsExternalPath reports whether a resolved path or unresolved bare specifier
-// should be treated as external.
-func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath string) bool {
-	if compiled == nil {
-		return false
-	}
-	for _, folder := range compiled.externalFolders {
-		if pathContainsSegment(resolvedPath, folder) {
-			return true
-		}
-	}
-	return specifier != "" && !tspath.IsExternalModuleNameRelative(specifier) && resolvedPath == ""
-}
-
-func settingsStringList(settings map[string]interface{}, name string) []string {
-	if settings == nil {
-		return nil
-	}
-	switch typed := settings[name].(type) {
-	case []string:
-		return typed
-	case []interface{}:
-		values := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if value, ok := item.(string); ok {
-				values = append(values, value)
-			}
-		}
-		return values
-	}
-	return nil
 }
