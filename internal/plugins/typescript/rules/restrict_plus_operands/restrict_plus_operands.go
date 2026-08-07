@@ -63,54 +63,6 @@ func parseOptions(options []any) RestrictPlusOperandsOptions {
 	return opts
 }
 
-func parseOptions(options []any) RestrictPlusOperandsOptions {
-	opts, ok := rule.LegacyUnwrapOptions(options).(RestrictPlusOperandsOptions)
-	if !ok {
-		opts = RestrictPlusOperandsOptions{}
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-			if value, ok := optsMap["allowAny"].(bool); ok {
-				opts.AllowAny = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowBoolean"].(bool); ok {
-				opts.AllowBoolean = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowNullish"].(bool); ok {
-				opts.AllowNullish = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowNumberAndString"].(bool); ok {
-				opts.AllowNumberAndString = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowRegExp"].(bool); ok {
-				opts.AllowRegExp = utils.Ref(value)
-			}
-			if value, ok := optsMap["skipCompoundAssignments"].(bool); ok {
-				opts.SkipCompoundAssignments = utils.Ref(value)
-			}
-		}
-	}
-
-	if opts.AllowAny == nil {
-		opts.AllowAny = utils.Ref(true)
-	}
-	if opts.AllowBoolean == nil {
-		opts.AllowBoolean = utils.Ref(true)
-	}
-	if opts.AllowNullish == nil {
-		opts.AllowNullish = utils.Ref(true)
-	}
-	if opts.AllowNumberAndString == nil {
-		opts.AllowNumberAndString = utils.Ref(true)
-	}
-	if opts.AllowRegExp == nil {
-		opts.AllowRegExp = utils.Ref(true)
-	}
-	if opts.SkipCompoundAssignments == nil {
-		opts.SkipCompoundAssignments = utils.Ref(false)
-	}
-
-	return opts
-}
-
 var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
 	Schema:           rule.NewSchema(schemaJSON),
