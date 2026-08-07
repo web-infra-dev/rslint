@@ -548,6 +548,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
