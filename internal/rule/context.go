@@ -77,11 +77,10 @@ type RuleContext struct {
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
 	// false, which is what a context with no program can say.
 	BOM *SourceBOM
-	// ProgramCache memoizes whole-Program state for the duration of one lint
-	// run, so a rule that needs a cross-file structure builds it once instead
-	// of once per linted file. Nil only disables memoization; rules that use
-	// it must still answer correctly without it.
-	ProgramCache   *ProgramStore
+	// Modules answers which modules each file of the Program references and
+	// what they resolve to, derived once per lint run rather than once per
+	// rule and file. Nil when no program is available.
+	Modules        *ModuleGraph
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager

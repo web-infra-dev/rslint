@@ -13,7 +13,7 @@ import (
 // one graph.
 type graphKey struct {
 	settings           string
-	moduleReferences   import_utils.ModuleReferenceOptions
+	syntax             rule.ModuleSyntax
 	ignoreExternal     bool
 	allowUnsafeDynamic bool
 }
@@ -22,7 +22,7 @@ type graphKey struct {
 // to. Both are derived from the file's syntax, so the whole node is a property
 // of the Program and is computed once per lint run.
 type moduleNode struct {
-	refs []import_utils.ModuleReference
+	refs []rule.ModuleEdge
 	// edge[i] is the node that reference i points at, or -1 when the
 	// reference is type-only, unresolved, or excluded by ignoreExternal.
 	edge []int32
@@ -45,21 +45,20 @@ type moduleGraph struct {
 // moduleGraphFor returns the Program's dependency graph for these options,
 // building it on the first file of the run that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
-	moduleIndex := import_utils.IndexFor(ctx)
+	settings := import_utils.IndexFor(ctx).Settings()
 	key := graphKey{
-		settings:           moduleIndex.Settings().Key(),
-		moduleReferences:   opts.moduleReferences,
+		settings:           settings.Key(),
+		syntax:             opts.syntax,
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
-	graph, _ := ctx.ProgramCache.Load(key, func() any {
-		return buildModuleGraph(moduleIndex, opts)
-	}).(*moduleGraph)
-	return graph
+	return import_utils.CachedByProgram(ctx.Program, key, func() *moduleGraph {
+		return buildModuleGraph(ctx, settings, opts)
+	})
 }
 
-func buildModuleGraph(moduleIndex *import_utils.ModuleIndex, opts ruleOptions) *moduleGraph {
-	files := moduleIndex.Files()
+func buildModuleGraph(ctx rule.RuleContext, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
+	files := ctx.Modules.Files()
 	graph := &moduleGraph{
 		nodes: make([]moduleNode, len(files)),
 		index: make(map[*ast.SourceFile]int32, len(files)),
@@ -68,9 +67,8 @@ func buildModuleGraph(moduleIndex *import_utils.ModuleIndex, opts ruleOptions) *
 		graph.index[file] = int32(i)
 	}
 
-	settings := moduleIndex.Settings()
 	for i, file := range files {
-		refs := moduleIndex.Refs(file, opts.moduleReferences)
+		refs := ctx.Modules.Edges(file, opts.syntax)
 		if len(refs) == 0 {
 			continue
 		}
@@ -102,7 +100,7 @@ func buildModuleGraph(moduleIndex *import_utils.ModuleIndex, opts ruleOptions) *
 func withheldDynamicEdges(node *moduleNode) []int32 {
 	var withheld map[int32]bool
 	for r, target := range node.edge {
-		if target < 0 || !node.refs[r].Dynamic {
+		if target < 0 || !node.refs[r].Dynamic() {
 			continue
 		}
 		if withheld == nil {

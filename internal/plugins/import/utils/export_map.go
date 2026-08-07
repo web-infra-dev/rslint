@@ -125,6 +125,7 @@ func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName strin
 // which module the query entered from, so those maps stay private to the
 // query that built them.
 type exportBuilder struct {
+	ctx      rule.RuleContext
 	index    *ModuleIndex
 	building map[*ast.SourceFile]*ExportMap
 	seen     map[exportKey]bool
@@ -141,6 +142,7 @@ type exportBuilder struct {
 
 func newExportBuilder(ctx rule.RuleContext) *exportBuilder {
 	return &exportBuilder{
+		ctx:      ctx,
 		index:    IndexFor(ctx),
 		building: make(map[*ast.SourceFile]*ExportMap),
 		seen:     make(map[exportKey]bool),
@@ -166,7 +168,7 @@ func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *as
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
 func resolveExportLinkForLookup(ctx rule.RuleContext, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
+	_, sourceFile, ok := rslint_utils.ResolveModuleFile(ctx.Program, origin, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
@@ -214,7 +216,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.localExportsOf(sourceFile)
+	local := builder.index.localExportsOf(builder.ctx, sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}

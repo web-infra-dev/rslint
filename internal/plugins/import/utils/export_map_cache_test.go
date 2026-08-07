@@ -22,8 +22,9 @@ func exportMapNames(exportMap *import_utils.ExportMap, candidates []string) map[
 }
 
 // contextsForFiles builds one Program over the given virtual files and
-// returns a context per entry file, all sharing one ProgramCache the way the
-// linter shares one across a run.
+// returns a context per entry file. Everything derived from a Program is
+// shared by every context over it, so these see each other's work the way two
+// files of one lint run do.
 func contextsForFiles(t *testing.T, files map[string]string, entries ...string) []rule.RuleContext {
 	t.Helper()
 
@@ -39,7 +40,6 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 		t.Fatalf("CreateProgram: %v", err)
 	}
 
-	programCache := rule.NewProgramStore()
 	contexts := make([]rule.RuleContext, 0, len(entries))
 	for _, entry := range entries {
 		sourceFile := program.GetSourceFile(entry)
@@ -47,9 +47,9 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 			t.Fatalf("entry %q was not parsed", entry)
 		}
 		contexts = append(contexts, rule.RuleContext{
-			Program:      program,
-			SourceFile:   sourceFile,
-			ProgramCache: programCache,
+			Program:    program,
+			SourceFile: sourceFile,
+			Modules:    rule.NewModuleGraph(program),
 		})
 	}
 	return contexts

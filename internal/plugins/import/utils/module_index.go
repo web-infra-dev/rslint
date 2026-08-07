@@ -10,35 +10,23 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// ModuleIndex answers, for any file in one Program, the questions every
-// import rule asks about a file in isolation: which modules it references,
-// what they resolve to, and what the file says about its own exports. Each
-// answer is a function of that file's own syntax, so it is computed once for
-// the whole lint run however many files ask for it, and however many times.
+// ModuleIndex answers what each file of one Program says about its own
+// exports. That answer depends only on the file's syntax, so it is derived
+// once for the whole lint run however many files ask for it.
 //
-// It holds only file-local facts. What a rule then does with them — which
-// references it treats as graph edges, how it walks between files — stays in
-// the rule, because those choices belong to the rule's options rather than to
-// the Program.
+// What a file *imports* is not here: the core module graph on RuleContext
+// answers that for every rule, not just these. This holds the part that is
+// specific to eslint-plugin-import — export maps, and the `import/` settings
+// that decide which references count.
 type ModuleIndex struct {
-	ctx      rule.RuleContext
 	settings *ModuleSettings
 
 	mu      sync.Mutex
-	refs    map[refKey][]ModuleReference
 	exports map[*ast.SourceFile]*localExports
 	// exportMaps holds the fully merged export maps that turned out not to
 	// depend on where the query that built them started. The builder decides
 	// which those are; see exportMapOf.
 	exportMaps map[*ast.SourceFile]*ExportMap
-}
-
-// refKey pairs a file with the module syntax the caller wants recognized.
-// Rules disagree about whether require() and define() count, and the answer
-// differs accordingly.
-type refKey struct {
-	file    *ast.SourceFile
-	options ModuleReferenceOptions
 }
 
 // ModuleSettings is the `import/` settings block compiled once. The raw
@@ -51,26 +39,27 @@ type ModuleSettings struct {
 	key             string
 }
 
-// indexKey identifies one ModuleIndex. Only the settings appear: they are the
-// one input that changes every answer the index gives.
+// indexKey identifies one index. Only the settings appear: they are the one
+// input that changes every answer it gives.
 type indexKey struct {
 	settings string
 }
 
-// IndexFor returns the Program's module index, building it on the first rule
-// of the run that asks for it.
+// IndexFor returns the Program's import index for these settings, building it
+// on the first rule of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := compileModuleSettings(ctx.Settings)
-	index, _ := ctx.ProgramCache.Load(indexKey{settings: settings.key}, func() any {
-		return &ModuleIndex{
-			ctx:        ctx,
-			settings:   settings,
-			refs:       make(map[refKey][]ModuleReference),
-			exports:    make(map[*ast.SourceFile]*localExports),
-			exportMaps: make(map[*ast.SourceFile]*ExportMap),
-		}
-	}).(*ModuleIndex)
-	return index
+	return CachedByProgram(ctx.Program, indexKey{settings: settings.key}, func() *ModuleIndex {
+		return newModuleIndex(settings)
+	})
+}
+
+func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
+	return &ModuleIndex{
+		settings:   settings,
+		exports:    make(map[*ast.SourceFile]*localExports),
+		exportMaps: make(map[*ast.SourceFile]*ExportMap),
+	}
 }
 
 // Settings returns the compiled `import/` settings this index was built with.
@@ -81,51 +70,10 @@ func (index *ModuleIndex) Settings() *ModuleSettings {
 	return index.settings
 }
 
-// Files returns every file of the Program, in the Program's own order. A
-// file's position in this slice is stable for the lifetime of the index, so
-// callers that need a dense numbering of the Program can adopt it.
-func (index *ModuleIndex) Files() []*ast.SourceFile {
-	if index == nil || index.ctx.Program == nil {
-		return nil
-	}
-	return index.ctx.Program.SourceFiles()
-}
-
-// Refs returns file's module references in source order, with each
-// reference's target already resolved. The result is shared with every other
-// caller and must not be modified.
-func (index *ModuleIndex) Refs(file *ast.SourceFile, options ModuleReferenceOptions) []ModuleReference {
-	if index == nil || file == nil {
-		return nil
-	}
-
-	key := refKey{file: file, options: options}
-	index.mu.Lock()
-	refs, ok := index.refs[key]
-	index.mu.Unlock()
-	if ok {
-		return refs
-	}
-
-	// Computed outside the lock: collection is pure, so two files racing on
-	// their first request cost one redundant collection at worst, which is
-	// cheaper than serializing every file in the run behind one mutex.
-	refs = collectModuleReferences(index.ctx, file, options, index.settings)
-
-	index.mu.Lock()
-	if existing, ok := index.refs[key]; ok {
-		refs = existing
-	} else {
-		index.refs[key] = refs
-	}
-	index.mu.Unlock()
-	return refs
-}
-
 // localExportsOf returns what file says about its own exports, with every
 // module specifier resolved and none of them followed. The result is shared
 // with every other caller and must not be modified.
-func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
+func (index *ModuleIndex) localExportsOf(ctx rule.RuleContext, file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil
 	}
@@ -137,7 +85,7 @@ func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
 		return exports
 	}
 
-	exports = collectLocalExports(index.ctx, file, index.settings)
+	exports = collectLocalExports(ctx, file, index.settings)
 
 	index.mu.Lock()
 	if existing, ok := index.exports[file]; ok {
@@ -173,7 +121,7 @@ func (index *ModuleIndex) storeExportMap(file *ast.SourceFile, exports *ExportMa
 }
 
 // compileModuleSettings compiles the `import/` settings that decide which
-// references survive collection and which resolved paths count as external.
+// references count and which resolved paths are external.
 func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 	compiled := &ModuleSettings{
 		externalFolders: ExternalModuleFolders(settings),

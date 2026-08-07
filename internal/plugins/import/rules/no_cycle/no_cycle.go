@@ -22,7 +22,7 @@ type ruleOptions struct {
 	maxDepth                           int
 	ignoreExternal                     bool
 	allowUnsafeDynamicCyclicDependency bool
-	moduleReferences                   import_utils.ModuleReferenceOptions
+	syntax                             rule.ModuleSyntax
 }
 
 type routeStep struct {
@@ -58,7 +58,7 @@ var NoCycleRule = rule.Rule{
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
 		maxDepth: unlimitedDepth,
-		moduleReferences: import_utils.ModuleReferenceOptions{
+		syntax: rule.ModuleSyntax{
 			ESModule: true,
 		},
 	}
@@ -72,10 +72,10 @@ func parseOptions(options []any) ruleOptions {
 	}
 	opts.ignoreExternal, _ = optsMap["ignoreExternal"].(bool)
 	opts.allowUnsafeDynamicCyclicDependency, _ = optsMap["allowUnsafeDynamicCyclicDependency"].(bool)
-	opts.moduleReferences.CommonJS, _ = optsMap["commonjs"].(bool)
-	opts.moduleReferences.AMD, _ = optsMap["amd"].(bool)
+	opts.syntax.CommonJS, _ = optsMap["commonjs"].(bool)
+	opts.syntax.AMD, _ = optsMap["amd"].(bool)
 	if esmodule, ok := optsMap["esmodule"].(bool); ok {
-		opts.moduleReferences.ESModule = esmodule
+		opts.syntax.ESModule = esmodule
 	}
 
 	return opts
@@ -173,9 +173,9 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 			continue
 		}
 
-		reportNode := node.refs[r].Importer
+		reportNode := node.refs[r].Declaration
 		if reportNode == nil {
-			reportNode = node.refs[r].Source
+			reportNode = node.refs[r].Specifier
 		}
 		ctx.ReportNode(reportNode, messageCycle(route))
 	}
@@ -191,7 +191,7 @@ func (graph *moduleGraph) isSearchable(opts ruleOptions, self int32, r int) bool
 	if target < 0 || target == self {
 		return false
 	}
-	return !opts.allowUnsafeDynamicCyclicDependency || !node.refs[r].Dynamic
+	return !opts.allowUnsafeDynamicCyclicDependency || !node.refs[r].Dynamic()
 }
 
 // hasCyclicCandidate reports whether any reference of self could be reported.
@@ -256,8 +256,17 @@ func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed ma
 	return nil, false
 }
 
-func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, ref import_utils.ModuleReference) bool {
-	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(settings, opts, ref)
+// referenceIsTraversable reports whether an edge is one the rule follows: it
+// has to survive into the emitted JavaScript, name a file the Program loaded,
+// and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
+func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
+	if edge.TypeOnly || edge.Target == nil {
+		return false
+	}
+	if settings.IsIgnoredPath(edge.Target.FileName()) {
+		return false
+	}
+	return !shouldIgnoreExternal(settings, opts, edge)
 }
 
 // routeTo follows the parent links back from a queue entry, materializing the
@@ -267,10 +276,10 @@ func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
 	route := make([]routeStep, depth)
 	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
 		next := queue[index]
-		ref := &graph.nodes[next.viaNode].refs[next.viaRef]
+		edge := &graph.nodes[next.viaNode].refs[next.viaRef]
 		route[routeIndex] = routeStep{
-			value: ref.Specifier,
-			line:  sourceLine(ref.SourceFile, ref.Source),
+			value: edge.Text(),
+			line:  sourceLine(edge.From, edge.Specifier),
 		}
 		index = int(next.parent)
 	}
@@ -300,16 +309,16 @@ func messageCycle(route []routeStep) rule.RuleMessage {
 	}
 }
 
-func moduleReferencePath(ref import_utils.ModuleReference) string {
-	if ref.Target != nil {
-		return ref.Target.FileName()
+func moduleReferencePath(edge rule.ModuleEdge) string {
+	if edge.Target != nil {
+		return edge.Target.FileName()
 	}
-	return ref.ResolvedPath
+	return edge.ResolvedPath
 }
 
-func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, ref import_utils.ModuleReference) bool {
+func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
 	if !opts.ignoreExternal {
 		return false
 	}
-	return settings.IsExternalPath(ref.Specifier, moduleReferencePath(ref))
+	return settings.IsExternalPath(edge.Text(), moduleReferencePath(edge))
 }

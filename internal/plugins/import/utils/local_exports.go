@@ -207,7 +207,7 @@ func resolveExportLink(ctx rule.RuleContext, sourceFile *ast.SourceFile, setting
 	if ctx.Program == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return exportLink{}
 	}
-	_, target, ok := ResolveSourceFileFromSourceFile(ctx, sourceFile, moduleSpecifier)
+	_, target, ok := rslint_utils.ResolveModuleFile(ctx.Program, sourceFile, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
 		return exportLink{}
 	}
