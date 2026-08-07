@@ -606,7 +606,12 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	// test object it was read from, so the reported name and original node move
 	// to the member. Rules keyed on the hook name — prefer-hooks-in-order, for
 	// one — would otherwise see every Playwright hook as `test`.
-	if state == rstestAPIHook && resolved.state != rstestAPIHook {
+	//
+	// No guard against a hook→hook transition is needed: applyRstestChainPart
+	// has no rstestAPIHook branch, so a member applied to a hook always
+	// invalidates the chain and returns above. Reaching here with a hook state
+	// therefore means the member just introduced it.
+	if state == rstestAPIHook {
 		resolved.name = part.name
 		resolved.originalNode = part.node
 	}
