@@ -304,7 +304,7 @@ func TestRequireAwaitExtras(t *testing.T) {
 			{
 				Code: `class A { static async #secret() { return value; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					missingAwaitError("Static private async method '#secret' has no 'await' expression.", 1, 11, `class A { static #secret() { return value; } }`),
+					missingAwaitError("Static private async method #secret has no 'await' expression.", 1, 11, `class A { static #secret() { return value; } }`),
 				},
 			},
 		},
