@@ -387,7 +387,8 @@ suite('rslint extension', function () {
     const editor = await vscode.window.showTextDocument(doc);
     await waitForDiagnostics(doc);
 
-    const cleanContent = "const marker = '😀'; export { marker };\n";
+    const eol = doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+    const cleanContent = `const marker = '😀'; export { marker };${eol}`;
     await editor.edit((builder) => {
       builder.replace(
         new vscode.Range(
@@ -399,7 +400,7 @@ suite('rslint extension', function () {
     });
     await waitForDiagnosticsCount(doc, 0);
 
-    const insertedContent = 'const unsafeValue: any = {};\nunsafeValue.foo;\n';
+    const insertedContent = `const unsafeValue: any = {};${eol}unsafeValue.foo;${eol}`;
     const insertionOffset = doc.getText().indexOf('export');
     assert.ok(insertionOffset > 0, 'Expected an export insertion anchor');
     await editor.edit((builder) => {
@@ -409,9 +410,38 @@ suite('rslint extension', function () {
     assert.strictEqual(
       doc.getText(),
       cleanContent.replace('export', `${insertedContent}export`),
-      'VS Code and the server should apply the same UTF-16 incremental range',
+      'VS Code should preserve the document EOL while applying the edit',
     );
-    await waitForDiagnosticsWithMessage(doc, 'no-unsafe-member-access');
+    const diagnostics = await waitForDiagnosticsWithMessage(
+      doc,
+      'no-unsafe-member-access',
+    );
+    const unsafeMember = diagnostics.find((diagnostic) =>
+      diagnostic.message.includes('no-unsafe-member-access'),
+    );
+    assert.ok(unsafeMember, 'Expected an unsafe member access diagnostic');
+    assert.deepStrictEqual(
+      {
+        start: {
+          line: unsafeMember.range.start.line,
+          character: unsafeMember.range.start.character,
+        },
+        end: {
+          line: unsafeMember.range.end.line,
+          character: unsafeMember.range.end.character,
+        },
+      },
+      {
+        start: { line: 1, character: 'unsafeValue.'.length },
+        end: { line: 1, character: 'unsafeValue.foo'.length },
+      },
+      'The server should return the UTF-16 range of the inserted property',
+    );
+    assert.strictEqual(
+      doc.getText(unsafeMember.range),
+      'foo',
+      'The server diagnostic should select the inserted property',
+    );
   });
 
   test('diagnostics clear completely when all errors removed', async () => {

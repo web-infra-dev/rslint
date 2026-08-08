@@ -91,6 +91,15 @@ func TestApplyDocumentChanges(t *testing.T) {
 			want:    "a😀c",
 		},
 		{
+			name:    "UTF-16 astral insertion with sequential CRLF edit",
+			content: "a😀b\r\nc",
+			changes: []lsproto.TextDocumentContentChangePartialOrWholeDocument{
+				partialDocumentChange(0, 3, 0, 3, "X\r\nY"),
+				partialDocumentChange(1, 1, 1, 2, "B"),
+			},
+			want: "a😀X\r\nYB\r\nc",
+		},
+		{
 			name:    "UTF-16 CJK character",
 			content: "甲乙c",
 			changes: []lsproto.TextDocumentContentChangePartialOrWholeDocument{partialDocumentChange(0, 2, 0, 3, "d")},
