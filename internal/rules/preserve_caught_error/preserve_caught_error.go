@@ -38,12 +38,12 @@ type Options struct {
 
 func parseOptions(options []any) Options {
 	opts := Options{ErrorClassNames: map[string]int{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	opts.RequireCatchParameter, _ = optsMap["requireCatchParameter"].(bool)
-	items, _ := optsMap["errorClassNames"].([]interface{})
+	m, _ := options[0].(map[string]any)
+	opts.RequireCatchParameter, _ = m["requireCatchParameter"].(bool)
+	items, _ := m["errorClassNames"].([]interface{})
 	for _, item := range items {
 		switch entry := item.(type) {
 		case string:
