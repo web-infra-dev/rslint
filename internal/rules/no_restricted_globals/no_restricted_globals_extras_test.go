@@ -20,6 +20,23 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 		t,
 		&NoRestrictedGlobalsRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Optimization lock-in: a same-named binding anywhere in the file
+			// keeps global-object shadow checks lexical rather than file-wide ----
+			{
+				Code: `const f = function window() { window.foo(); };`,
+				Options: []interface{}{map[string]interface{}{
+					"globals": []interface{}{"foo"}, "checkGlobalObject": true,
+				}},
+				Globals: map[string]any{"window": "readonly"},
+			},
+			{
+				Code: `const C = class window { method() { return window.foo; } };`,
+				Options: []interface{}{map[string]interface{}{
+					"globals": []interface{}{"foo"}, "checkGlobalObject": true,
+				}},
+				Globals: map[string]any{"window": "readonly"},
+			},
+
 			// ---- Dimension 4: parenthesized / assertion-wrapped receiver ----
 			// ESLint's own astUtils.isSpecificMemberAccess / getStaticPropertyName
 			// also don't see through TSNonNullExpression or TSAsExpression (they
@@ -126,6 +143,43 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Optimization lock-in: SourceFile.Identifiers stores normalized
+			// names, so the whole-file candidate gate must retain escaped uses ----
+			{
+				Code:    `\u0066oo;`,
+				Options: []interface{}{"foo"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "defaultMessage", Line: 1, Column: 1, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- Optimization lock-in: the no-binding cache and the exact
+			// shadowed-binding fallback may coexist in one source file ----
+			{
+				Code: `window.foo();
+function f(window: any) { window.foo(); }
+window.foo();`,
+				Options: []interface{}{map[string]interface{}{
+					"globals": []interface{}{"foo"}, "checkGlobalObject": true,
+				}},
+				Globals: map[string]any{"window": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "defaultMessage", Line: 3, Column: 8, EndLine: 3, EndColumn: 11},
+				},
+			},
+			{
+				Code: `interface window {}
+window.foo();`,
+				Options: []interface{}{map[string]interface{}{
+					"globals": []interface{}{"foo"}, "checkGlobalObject": true,
+				}},
+				Globals: map[string]any{"window": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "defaultMessage", Line: 2, Column: 8, EndLine: 2, EndColumn: 11},
+				},
+			},
+
 			// ---- Dimension 4: parenthesized global-object receiver ----
 			{
 				Code:    `(window).foo()`,
