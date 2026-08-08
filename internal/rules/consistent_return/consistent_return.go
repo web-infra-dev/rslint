@@ -44,13 +44,13 @@ type options struct {
 	treatUndefinedAsUnspecified bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{treatUndefinedAsUnspecified: false}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
-	if value, ok := optsMap["treatUndefinedAsUnspecified"].(bool); ok {
+	m, _ := rawOptions[0].(map[string]any)
+	if value, ok := m["treatUndefinedAsUnspecified"].(bool); ok {
 		opts.treatUndefinedAsUnspecified = value
 	}
 	return opts
@@ -60,8 +60,8 @@ func parseOptions(raw any) options {
 var ConsistentReturnRule = rule.Rule{
 	Name:   "consistent-return",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		opts := parseOptions(rule.LegacyUnwrapOptions(_options))
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		opts := parseOptions(rawOptions)
 
 		// Every diagnostic depends on the code path a `return` belongs to, so
 		// the returns are collected first and judged once the file is walked.
