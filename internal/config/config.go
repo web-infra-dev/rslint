@@ -366,6 +366,27 @@ func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON preserves the open languageOptions object captured in Raw while
+// folding any typed ParserOptions updates back into its parserOptions member.
+// Without this counterpart to UnmarshalJSON, a config JSON round trip would
+// silently discard ecmaVersion, globals, sourceType, and unknown parser keys.
+func (lo LanguageOptions) MarshalJSON() ([]byte, error) {
+	raw := deepMergeConfigObjects(nil, lo.Raw)
+	if lo.ParserOptions != nil {
+		encodedParserOptions, err := json.Marshal(lo.ParserOptions)
+		if err != nil {
+			return nil, err
+		}
+		var typedParserOptions map[string]any
+		if err := json.Unmarshal(encodedParserOptions, &typedParserOptions); err != nil {
+			return nil, err
+		}
+		baseParserOptions, _ := configObject(raw["parserOptions"])
+		raw["parserOptions"] = deepMergeConfigObjects(baseParserOptions, typedParserOptions)
+	}
+	return json.Marshal(raw)
+}
+
 // ProjectPaths represents project paths that can be either a single string or an array of strings
 type ProjectPaths []string
 

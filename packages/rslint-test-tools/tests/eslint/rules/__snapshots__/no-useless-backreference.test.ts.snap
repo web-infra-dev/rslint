@@ -876,3 +876,133 @@ exports[`no-useless-backreference > invalid 32`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-useless-backreference > invalid 33`] = `
+{
+  "code": "const R = globalThis.RegExp; R('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 34`] = `
+{
+  "code": "const root = globalThis; root.RegExp('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 35`] = `
+{
+  "code": "let R; R = globalThis.RegExp; R('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 36`] = `
+{
+  "code": "const { RegExp: R } = globalThis; R('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 37`] = `
+{
+  "code": "const R = window.RegExp; R('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

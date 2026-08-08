@@ -25,7 +25,13 @@ ruleTester.run('no-useless-backreference', {
       code: String.raw`new RegExp('(\\1)')`,
       languageOptions: { globals: { RegExp: 'off' } },
     },
+    {
+      code: String.raw`const R = RegExp; R('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+    },
     String.raw`window.RegExp('(\\1)')`,
+    String.raw`const R = window.RegExp; R('(\\1)')`,
+    String.raw`const root = window; root.RegExp('(\\1)')`,
     {
       code: String.raw`window.RegExp('(\\1)')`,
       languageOptions: { globals: { window: 'off' } },
@@ -33,6 +39,14 @@ ruleTester.run('no-useless-backreference', {
     {
       code: String.raw`globalThis.RegExp('(\\1)')`,
       languageOptions: { ecmaVersion: 2019 },
+    },
+    {
+      code: String.raw`const R = globalThis.RegExp; R('(\\1)')`,
+      languageOptions: { ecmaVersion: 2019 },
+    },
+    {
+      code: String.raw`const R = globalThis.RegExp; R('(\\1)')`,
+      languageOptions: { globals: { globalThis: 'off' } },
     },
     {
       code: String.raw`const window = { RegExp }; window.RegExp('(\\1)')`,
@@ -275,6 +289,33 @@ ruleTester.run('no-useless-backreference', {
     {
       code: String.raw`window['RegExp']('(\\1)')`,
       languageOptions: { globals: { window: 'readonly' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`const R = globalThis.RegExp; R('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`const root = globalThis; root.RegExp('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`let R; R = globalThis.RegExp; R('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`const { RegExp: R } = globalThis; R('(\\1)')`,
+      languageOptions: { globals: { RegExp: 'off' } },
+      errors: [{ messageId: 'nested' }],
+    },
+    {
+      code: String.raw`const R = window.RegExp; R('(\\1)')`,
+      languageOptions: {
+        globals: { RegExp: 'off', window: 'readonly' },
+      },
       errors: [{ messageId: 'nested' }],
     },
   ],

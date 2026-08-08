@@ -242,7 +242,34 @@ type regExpCalleeCache struct {
 	// Cache the pure builtin-type predicate, not identifier symbols: the
 	// checker may give one const/import/global symbol different flow-narrowed
 	// types at different call sites.
-	types map[*checker.Type]bool
+	types       map[*checker.Type]bool
+	aliases     map[regExpAliasKey]regExpAliasDependency
+	resolving   map[regExpAliasKey]bool
+	globalRoots map[string]bool
+}
+
+type regExpAliasKind uint8
+
+const (
+	regExpAliasConstructor regExpAliasKind = iota
+	regExpAliasGlobalObject
+)
+
+type regExpAliasKey struct {
+	symbol *ast.Symbol
+	kind   regExpAliasKind
+}
+
+// An alias may be reachable from one or more effective-global roots and also
+// have unrelated value sources. ReferenceTracker follows every read of an
+// alias reached from a root, even if another assignment writes an unknown
+// value to that alias. Keep those facts independently instead of requiring all
+// possible origins to be globals.
+type regExpAliasDependency struct {
+	hasRoot        bool
+	rootAvailable  bool
+	hasIndependent bool
+	incomplete     bool
 }
 
 func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *regExpCalleeCache) bool {
@@ -256,44 +283,55 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *
 			// effective global scope. Config/inline `off` removes that binding,
 			// while a declaration in this file shadows it even when TypeScript's
 			// checker merges the declaration with lib.d.ts.
-			if !ctx.Globals.Access("RegExp").IsDeclared() {
-				return false
-			}
 			if ctx.Refs != nil {
-				if ctx.Refs.ResolveInFile(callee) != nil {
-					return false
+				if ctx.Refs.ResolveInFile(callee) == nil {
+					return isRegExpGlobalReference(ctx, callee) &&
+						isAvailableRegExpGlobalRoot(ctx, callee, "RegExp", calleeCache)
 				}
+				// A same-named local can itself be an alias, for example
+				// `const { RegExp } = globalThis`. Let the type/provenance path
+				// below distinguish that from an ordinary shadowing declaration.
+			} else {
+				// NameResolver does not surface every TypeScript value declaration
+				// here (notably an identifier-named namespace), so retain the
+				// syntactic check as the binder-only fallback.
+				return isAvailableRegExpGlobalRoot(ctx, callee, "RegExp", calleeCache)
 			}
-			// NameResolver does not surface every TypeScript value declaration
-			// here (notably an identifier-named namespace), so retain the
-			// syntactic check as the binder-only fallback.
-			return !utils.IsShadowed(callee, "RegExp")
 		}
-		// Identifier alias such as `const r = RegExp; new r(...)` — only the
-		// type check can recognize this. No syntactic fallback to avoid
-		// over-matching arbitrary identifiers when type info is unavailable.
-		// Retain the bare binding's availability gate for type-only/flow aliases:
-		// the checker can prove constructor identity, but cannot create an ESLint
-		// global variable that config or an inline directive removed.
-		if !ctx.Globals.Access("RegExp").IsDeclared() {
+		// Effective-global provenance is authoritative for aliases rooted at
+		// RegExp or a global object. This path deliberately does not require
+		// TypeScript to know a configured host object such as `window`.
+		dependency := classifyRegExpAliasIdentifier(ctx, callee, regExpAliasConstructor, calleeCache)
+		if dependency.rootAvailable {
+			if !dependency.hasIndependent {
+				return true
+			}
+			// Preserve rslint's flow-sensitive TypeScript precision when the
+			// alias also receives unrelated values. If type information is
+			// missing or indeterminate, effective-global reachability remains
+			// authoritative, matching ReferenceTracker's behavior.
+			isConstructor, conclusive := classifyBuiltinRegExpConstructorType(ctx, callee, calleeCache)
+			if conclusive {
+				return isConstructor
+			}
+			return true
+		}
+		if dependency.hasRoot && !dependency.hasIndependent {
+			// Every recognized source is an effective-global root that is
+			// unavailable for this file. Do not let TypeScript's default libs
+			// reintroduce a binding removed by languageOptions.
 			return false
 		}
-		if ctx.TypeChecker != nil && ctx.Program != nil {
-			t := ctx.TypeChecker.GetTypeAtLocation(callee)
-			if t == nil {
-				return false
-			}
-			if cached, ok := calleeCache.types[t]; ok {
-				return cached
-			}
-			result := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor")
-			if calleeCache.types == nil {
-				calleeCache.types = make(map[*checker.Type]bool)
-			}
-			calleeCache.types[t] = result
-			return result
+		if name == "RegExp" {
+			// An unrooted same-named local is an ordinary shadow.
+			return false
 		}
-		return false
+
+		// A local/imported/ambient alias whose value is independent of the
+		// effective globals is an rslint TypeScript extension. Only the type
+		// check can recognize it; without type info, do not guess from its name.
+		isConstructor, _ := classifyBuiltinRegExpConstructorType(ctx, callee, calleeCache)
+		return isConstructor
 	}
 
 	// `globalThis.RegExp` and host equivalents start from the global-object
@@ -312,10 +350,384 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node, calleeCache *
 		name := object.AsIdentifier().Text
 		switch name {
 		case "globalThis", "window", "self", "global":
-			return ctx.Globals.Access(name).IsDeclared() && !utils.IsShadowed(object, name)
+			if isRegExpGlobalReference(ctx, object) &&
+				isAvailableRegExpGlobalRoot(ctx, object, name, calleeCache) {
+				return true
+			}
 		}
+		dependency := classifyRegExpAliasIdentifier(ctx, object, regExpAliasGlobalObject, calleeCache)
+		return dependency.rootAvailable
 	}
 	return false
+}
+
+func classifyBuiltinRegExpConstructorType(
+	ctx rule.RuleContext,
+	callee *ast.Node,
+	cache *regExpCalleeCache,
+) (isConstructor bool, conclusive bool) {
+	if ctx.TypeChecker == nil || ctx.Program == nil || callee == nil {
+		return false, false
+	}
+	t := ctx.TypeChecker.GetTypeAtLocation(callee)
+	if t == nil {
+		return false, false
+	}
+	for _, part := range utils.UnionTypeParts(t) {
+		if utils.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+			utils.IsIntrinsicErrorType(part) {
+			return false, false
+		}
+	}
+	if result, ok := cache.types[t]; ok {
+		return result, true
+	}
+	result := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor")
+	if cache.types == nil {
+		cache.types = make(map[*checker.Type]bool)
+	}
+	cache.types[t] = result
+	return result, true
+}
+
+func classifyRegExpAliasIdentifier(
+	ctx rule.RuleContext,
+	identifier *ast.Node,
+	kind regExpAliasKind,
+	cache *regExpCalleeCache,
+) regExpAliasDependency {
+	if ctx.Refs == nil || identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return regExpAliasDependency{}
+	}
+	symbol := ctx.Refs.ResolveInFile(identifier)
+	if symbol == nil {
+		return regExpAliasDependency{}
+	}
+	return classifyRegExpAliasSymbol(ctx, symbol, kind, cache)
+}
+
+func classifyRegExpAliasSymbol(
+	ctx rule.RuleContext,
+	symbol *ast.Symbol,
+	kind regExpAliasKind,
+	cache *regExpCalleeCache,
+) regExpAliasDependency {
+	if symbol == nil {
+		return regExpAliasDependency{}
+	}
+	key := regExpAliasKey{symbol: symbol, kind: kind}
+	if dependency, ok := cache.aliases[key]; ok {
+		return dependency
+	}
+	if cache.resolving[key] {
+		// A cycle contributes no value source of its own. Mark the result as
+		// incomplete so it is not memoized before another entry point has had a
+		// chance to reach a real source in the cycle.
+		return regExpAliasDependency{incomplete: true}
+	}
+	if cache.resolving == nil {
+		cache.resolving = make(map[regExpAliasKey]bool)
+	}
+	cache.resolving[key] = true
+	defer delete(cache.resolving, key)
+
+	dependencies := make([]regExpAliasDependency, 0, len(symbol.Declarations)+1)
+	for _, declaration := range symbol.Declarations {
+		dependencies = appendAliasDeclarationDependencies(dependencies, ctx, declaration, kind, cache)
+	}
+	if ctx.Refs != nil {
+		for _, reference := range ctx.Refs.References(symbol) {
+			dependency, ok := classifyRegExpWriteDependency(ctx, reference, kind, cache)
+			if ok {
+				dependencies = append(dependencies, dependency)
+			}
+		}
+	}
+
+	dependency := combineRegExpAliasDependencies(dependencies...)
+	if len(dependencies) == 0 {
+		// Imports, ambient declarations, and uninitialized locals have no
+		// syntactic source to trace. The TypeChecker may still recognize a
+		// RegExpConstructor type for non-shadowing aliases.
+		dependency.hasIndependent = true
+	}
+	if !dependency.incomplete {
+		if cache.aliases == nil {
+			cache.aliases = make(map[regExpAliasKey]regExpAliasDependency)
+		}
+		cache.aliases[key] = dependency
+	}
+	return dependency
+}
+
+func appendAliasDeclarationDependencies(
+	dependencies []regExpAliasDependency,
+	ctx rule.RuleContext,
+	declaration *ast.Node,
+	kind regExpAliasKind,
+	cache *regExpCalleeCache,
+) []regExpAliasDependency {
+	if declaration == nil {
+		return dependencies
+	}
+	switch declaration.Kind {
+	case ast.KindVariableDeclaration:
+		variable := declaration.AsVariableDeclaration()
+		if variable != nil && variable.Name() != nil && variable.Name().Kind == ast.KindIdentifier && variable.Initializer != nil {
+			return append(dependencies, classifyRegExpAliasExpression(ctx, variable.Initializer, kind, cache))
+		}
+	case ast.KindParameter:
+		parameter := declaration.AsParameterDeclaration()
+		if parameter != nil && parameter.Name() != nil && parameter.Name().Kind == ast.KindIdentifier && parameter.Initializer != nil {
+			return append(dependencies, classifyRegExpAliasExpression(ctx, parameter.Initializer, kind, cache))
+		}
+	case ast.KindBindingElement:
+		element := declaration.AsBindingElement()
+		if element == nil {
+			return dependencies
+		}
+		if kind == regExpAliasConstructor {
+			if source := directObjectBindingInitializer(declaration, "RegExp"); source != nil {
+				dependencies = append(dependencies, classifyRegExpAliasExpression(ctx, source, regExpAliasGlobalObject, cache))
+			}
+		}
+		if element.Initializer != nil {
+			dependencies = append(dependencies, classifyRegExpAliasExpression(ctx, element.Initializer, kind, cache))
+		}
+	}
+	return dependencies
+}
+
+func directObjectBindingInitializer(bindingElement *ast.Node, propertyName string) *ast.Node {
+	if bindingElement == nil || bindingElement.Parent == nil ||
+		bindingElement.Parent.Kind != ast.KindObjectBindingPattern {
+		return nil
+	}
+	element := bindingElement.AsBindingElement()
+	if element == nil || element.DotDotDotToken != nil {
+		return nil
+	}
+	property := element.PropertyName
+	if property == nil {
+		property = element.Name()
+	}
+	name, ok := utils.GetStaticPropertyName(property)
+	if !ok || name != propertyName {
+		return nil
+	}
+	pattern := bindingElement.Parent
+	container := pattern.Parent
+	if container == nil || container.Name() != pattern {
+		return nil
+	}
+	switch container.Kind {
+	case ast.KindVariableDeclaration:
+		return container.AsVariableDeclaration().Initializer
+	case ast.KindParameter:
+		return container.AsParameterDeclaration().Initializer
+	}
+	return nil
+}
+
+func classifyRegExpWriteDependency(
+	ctx rule.RuleContext,
+	reference *ast.Node,
+	kind regExpAliasKind,
+	cache *regExpCalleeCache,
+) (regExpAliasDependency, bool) {
+	if !utils.IsWriteReference(reference) {
+		return regExpAliasDependency{}, false
+	}
+	current := reference
+	for current.Parent != nil {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindNonNullExpression:
+			current = parent
+			continue
+		}
+		break
+	}
+	if current.Parent != nil && current.Parent.Kind == ast.KindBinaryExpression {
+		binary := current.Parent.AsBinaryExpression()
+		if binary != nil && binary.Left == current && binary.OperatorToken != nil &&
+			ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			return classifyRegExpAliasExpression(ctx, binary.Right, kind, cache), true
+		}
+	}
+
+	if kind != regExpAliasConstructor || reference.Parent == nil {
+		return regExpAliasDependency{}, false
+	}
+	property := reference.Parent
+	var propertyNode *ast.Node
+	switch property.Kind {
+	case ast.KindPropertyAssignment:
+		if property.AsPropertyAssignment().Initializer == reference {
+			propertyNode = property.AsPropertyAssignment().Name()
+		}
+	case ast.KindShorthandPropertyAssignment:
+		if property.AsShorthandPropertyAssignment().Name() == reference {
+			propertyNode = reference
+		}
+	}
+	if propertyNode == nil || property.Parent == nil || property.Parent.Kind != ast.KindObjectLiteralExpression {
+		return regExpAliasDependency{}, false
+	}
+	name, ok := utils.GetStaticPropertyName(propertyNode)
+	if !ok || name != "RegExp" {
+		return regExpAliasDependency{}, false
+	}
+	left := property.Parent
+	for left.Parent != nil && left.Parent.Kind == ast.KindParenthesizedExpression {
+		left = left.Parent
+	}
+	if left.Parent == nil || left.Parent.Kind != ast.KindBinaryExpression {
+		return regExpAliasDependency{}, false
+	}
+	binary := left.Parent.AsBinaryExpression()
+	if binary == nil || binary.Left != left || binary.OperatorToken == nil ||
+		binary.OperatorToken.Kind != ast.KindEqualsToken {
+		return regExpAliasDependency{}, false
+	}
+	return classifyRegExpAliasExpression(ctx, binary.Right, regExpAliasGlobalObject, cache), true
+}
+
+func classifyRegExpAliasExpression(
+	ctx rule.RuleContext,
+	expression *ast.Node,
+	kind regExpAliasKind,
+	cache *regExpCalleeCache,
+) regExpAliasDependency {
+	expression = utils.SkipAssertionsAndParens(expression)
+	if expression == nil {
+		return regExpAliasDependency{}
+	}
+	if expression.Kind == ast.KindIdentifier {
+		name := expression.AsIdentifier().Text
+		if symbol := ctx.Refs.ResolveInFile(expression); symbol != nil {
+			return classifyRegExpAliasSymbol(ctx, symbol, kind, cache)
+		}
+		if !isRegExpGlobalReference(ctx, expression) {
+			return regExpAliasDependency{hasIndependent: true}
+		}
+		switch kind {
+		case regExpAliasConstructor:
+			if name == "RegExp" {
+				return regExpAliasDependency{hasRoot: true, rootAvailable: isAvailableRegExpGlobalRoot(ctx, expression, name, cache)}
+			}
+		case regExpAliasGlobalObject:
+			switch name {
+			case "globalThis", "window", "self", "global":
+				return regExpAliasDependency{hasRoot: true, rootAvailable: isAvailableRegExpGlobalRoot(ctx, expression, name, cache)}
+			}
+		}
+		return regExpAliasDependency{hasIndependent: true}
+	}
+
+	if kind == regExpAliasConstructor && ast.IsAccessExpression(expression) {
+		property, ok := utils.AccessExpressionStaticName(expression)
+		if ok && property == "RegExp" {
+			return classifyRegExpAliasExpression(ctx, utils.AccessExpressionObject(expression), regExpAliasGlobalObject, cache)
+		}
+		return regExpAliasDependency{hasIndependent: true}
+	}
+
+	switch expression.Kind {
+	case ast.KindConditionalExpression:
+		conditional := expression.AsConditionalExpression()
+		return combineRegExpAliasDependencies(
+			classifyRegExpAliasExpression(ctx, conditional.WhenTrue, kind, cache),
+			classifyRegExpAliasExpression(ctx, conditional.WhenFalse, kind, cache),
+		)
+	case ast.KindBinaryExpression:
+		binary := expression.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil {
+			return regExpAliasDependency{hasIndependent: true}
+		}
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+			return combineRegExpAliasDependencies(
+				classifyRegExpAliasExpression(ctx, binary.Left, kind, cache),
+				classifyRegExpAliasExpression(ctx, binary.Right, kind, cache),
+			)
+		case ast.KindCommaToken, ast.KindEqualsToken:
+			return classifyRegExpAliasExpression(ctx, binary.Right, kind, cache)
+		}
+	}
+	return regExpAliasDependency{hasIndependent: true}
+}
+
+func combineRegExpAliasDependencies(dependencies ...regExpAliasDependency) regExpAliasDependency {
+	var combined regExpAliasDependency
+	for _, dependency := range dependencies {
+		combined.hasRoot = combined.hasRoot || dependency.hasRoot
+		combined.rootAvailable = combined.rootAvailable || dependency.rootAvailable
+		combined.hasIndependent = combined.hasIndependent || dependency.hasIndependent
+		combined.incomplete = combined.incomplete || dependency.incomplete
+	}
+	return combined
+}
+
+func isAvailableRegExpGlobalRoot(
+	ctx rule.RuleContext,
+	identifier *ast.Node,
+	name string,
+	cache *regExpCalleeCache,
+) bool {
+	if !ctx.Globals.Access(name).IsDeclared() || identifier == nil ||
+		identifier.Kind != ast.KindIdentifier {
+		return false
+	}
+	if ctx.Refs != nil && ctx.Refs.ResolveInFile(identifier) != nil {
+		return false
+	}
+	if !isRegExpGlobalReference(ctx, identifier) {
+		return false
+	}
+	if available, ok := cache.globalRoots[name]; ok {
+		return available
+	}
+
+	// ReferenceTracker drops an entire root when that global binding is
+	// written anywhere in the file, including aliases captured before the
+	// write. Scan once per root name and cache both the true and false result.
+	available := true
+	if ctx.SourceFile != nil {
+		var visit func(*ast.Node) bool
+		visit = func(node *ast.Node) bool {
+			if !available {
+				return true
+			}
+			if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == name &&
+				!utils.IsNonReferenceIdentifier(node) && utils.IsWriteReference(node) {
+				if isRegExpGlobalReference(ctx, node) {
+					available = false
+					return true
+				}
+			}
+			node.ForEachChild(visit)
+			return false
+		}
+		ctx.SourceFile.AsNode().ForEachChild(visit)
+	}
+	if cache.globalRoots == nil {
+		cache.globalRoots = make(map[string]bool)
+	}
+	cache.globalRoots[name] = available
+	return available
+}
+
+func isRegExpGlobalReference(ctx rule.RuleContext, identifier *ast.Node) bool {
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(identifier); symbol != nil {
+			return !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+		}
+	}
+	return !utils.IsShadowed(identifier, identifier.AsIdentifier().Text)
 }
 
 // checkRegex parses the pattern and reports useless backreferences. `node` is
