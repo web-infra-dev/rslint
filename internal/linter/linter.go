@@ -166,6 +166,11 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		return result
 	}
 
+	// One module graph shared by every rule on every file of this Program.
+	// What a file imports is a property of the Program, so it is derived on
+	// the first file that asks and the rest of the run reuses it.
+	moduleGraph := rule.NewModuleGraph(opts.Program)
+
 	// lintFile lints one file with its already-resolved rules and checker. Its
 	// comments, DisableManager, and rule contexts are per-file. The listener
 	// registry belongs to the calling checker-shard task and is empty on entry;
@@ -228,6 +233,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Comments:       comments,
 				Refs:           refs,
 				BOM:            sourceBOM,
+				Modules:        moduleGraph,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 			}.WithDiagnosticConsumer(

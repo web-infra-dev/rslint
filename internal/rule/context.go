@@ -65,7 +65,11 @@ type RuleContext struct {
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
 	// false, which is what a context with no program can say.
-	BOM            *SourceBOM
+	BOM *SourceBOM
+	// Modules answers which modules each file of the Program references and
+	// what they resolve to, derived once per lint run rather than once per
+	// rule and file. Nil when no program is available.
+	Modules        *ModuleGraph
 	Program        *compiler.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager
