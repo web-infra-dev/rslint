@@ -53,6 +53,20 @@ expect(errorThrowingFunction).toThrowErrorMatchingInlineSnapshot();
 expect(errorThrowingFunction).toThrowErrorMatchingInlineSnapshot(
   `Error Message`,
 );
+
+// Custom messages are not snapshot content, so interpolation is allowed.
+expect(errorThrowingFunction).toThrowErrorMatchingInlineSnapshot(
+  `Error Message`,
+  `case ${caseId}`,
+);
+
+expect(something).toMatchInlineSnapshot(
+  { property: expect.any(Date) },
+  `Object {
+    property: Any<Date>
+  }`,
+  `case ${caseId}`,
+);
 ```
 
 ## Only inline snapshots are checked

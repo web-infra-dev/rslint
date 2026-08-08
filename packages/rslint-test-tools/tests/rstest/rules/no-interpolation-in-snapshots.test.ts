@@ -8,6 +8,12 @@ ruleTester.run('no-interpolation-in-snapshots', {} as never, {
       code: 'expect(something).toMatchInlineSnapshot(`No interpolation`);',
     },
     {
+      code: 'expect(fn).toThrowErrorMatchingInlineSnapshot("snap", `case ${id}`);',
+    },
+    {
+      code: 'expect(value).toMatchInlineSnapshot({}, "snap", `case ${id}`);',
+    },
+    {
       // toMatchFileSnapshot takes a path, so interpolation is intended
       code: 'test("case", async () => { await expect(data).toMatchFileSnapshot(`./__snapshots__/${name}.json`); });',
     },
@@ -23,6 +29,10 @@ ruleTester.run('no-interpolation-in-snapshots', {} as never, {
     {
       code: 'expect(something).toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
       errors: [{ messageId: 'noInterpolation', line: 1, column: 54 }],
+    },
+    {
+      code: 'expect(something).toMatchInlineSnapshot({}, `${interpolated}`, `case ${id}`);',
+      errors: [{ messageId: 'noInterpolation', line: 1, column: 45 }],
     },
     {
       code: 'test("case", ({ expect }) => expect(value).toMatchInlineSnapshot(`${interpolated}`));',

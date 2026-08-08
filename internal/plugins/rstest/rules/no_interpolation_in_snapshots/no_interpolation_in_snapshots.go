@@ -2,14 +2,62 @@ package no_interpolation_in_snapshots
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildNoInterpolationMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noInterpolation",
 		Description: "Do not use string interpolation inside of snapshots",
+	}
+}
+
+func isStringSnapshotArgument(ctx rule.RuleContext, node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	if internalUtils.IsStringLiteralOrTemplate(node) {
+		return true
+	}
+	if ctx.TypeChecker == nil {
+		return false
+	}
+
+	t := internalUtils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
+	return internalUtils.Every(internalUtils.UnionTypeParts(t), func(part *checker.Type) bool {
+		return internalUtils.IsTypeFlagSet(part, checker.TypeFlagsStringLike)
+	})
+}
+
+func getInlineSnapshotArgument(ctx rule.RuleContext, matcherName string, call *ast.Node) *ast.Node {
+	if call == nil {
+		return nil
+	}
+	arguments := call.Arguments()
+	if len(arguments) == 0 {
+		return nil
+	}
+
+	switch matcherName {
+	case "toThrowErrorMatchingInlineSnapshot":
+		return arguments[0]
+	case "toMatchInlineSnapshot":
+		// Rstest decides between (snapshot, message) and
+		// (properties, snapshot, message) from the first argument's runtime
+		// type.
+		if len(arguments) == 1 || isStringSnapshotArgument(ctx, arguments[0]) {
+			return arguments[0]
+		}
+		return arguments[1]
+	default:
+		return nil
 	}
 }
 
@@ -45,12 +93,16 @@ var NoInterpolationInSnapshotsRule = rule.Rule{
 					if call == nil {
 						continue
 					}
-					// Both overloads of the inline snapshot matchers may hold the
-					// snapshot in arguments[0] or arguments[1], so all are checked.
-					for _, arg := range call.Arguments() {
-						if arg := ast.SkipParentheses(arg); arg != nil && arg.Kind == ast.KindTemplateExpression {
-							ctx.ReportNode(arg, buildNoInterpolationMessage())
-						}
+					// Custom messages follow the snapshot argument and are never
+					// rewritten into the source file, so only inspect the argument
+					// selected by the matcher's overload.
+					arg := getInlineSnapshotArgument(ctx, matcher.Name, call)
+					if arg == nil {
+						continue
+					}
+					arg = ast.SkipParentheses(arg)
+					if arg.Kind == ast.KindTemplateExpression {
+						ctx.ReportNode(arg, buildNoInterpolationMessage())
 					}
 				}
 			},
