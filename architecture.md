@@ -916,8 +916,8 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
 5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order. Planning fixes those identities and stable slots serially, then independent Programs fill the slots through a bounded worker pool.
 6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
-7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
-8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
+7. **Rule Plan Preparation**: `PrepareLintPlan()` retains every selected file by Program and resolves each eligible file's complete rule set once from the stable lint-target path, never the Program source alias. The immutable result preserves syntax-error and zero-rule files for native accounting while exposing the non-empty file/rule projection needed by third-party plugin dispatch. CLI and native API reuse the same plan for plugin and native execution; LSP keeps its single-document `LintSingleFile` path.
+8. **Rule Execution**: `RunLinter()` schedules per-Program work over the prepared plan; the unexported `runLintRulesInProgram()` retains the existing TypeChecker-exclusive grouping and filters the native subset without resolving rules again. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
 11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
@@ -931,16 +931,21 @@ The main Go workload work groups and pools below honor `--singleThreaded`.
 The flag serializes these workload stages, but IPC transport, diagnostic
 collection, and plugin dispatch may still use infrastructure goroutines.
 
-1. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
+1. **Lint-plan work group** (`PrepareLintPlan()` via `core.NewWorkGroup`)
+   - Resolves per-file rules into stable per-Program slots with at most
+     `min(GOMAXPROCS, selected file count)` workers.
+   - `--singleThreaded` resolves the same slots serially in Program/file order.
+
+2. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
    - Schedules per-Program lint work; runs rules in parallel within a Program.
    - `--singleThreaded` collapses the work group to serial execution.
 
-2. **Type-check work group** (`runTypeCheckAcrossPrograms`)
+3. **Type-check work group** (`runTypeCheckAcrossPrograms`)
    - Schedules diagnostics for real tsconfig Programs and merges results in
      stable Program order.
    - `--singleThreaded` computes Program diagnostics serially.
 
-3. **Staged catalog discovery and Program creation**
+4. **Staged catalog discovery and Program creation**
    - A bounded Go worker pool scans one reachable sibling frontier at a time.
      Config-boundary nodes are suspended, batched after that frontier is
      processed, and resumed only after the Node result is merged.
@@ -966,7 +971,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      worker and serializes module evaluation within each Node frontier batch.
      Coordinator batches and results remain ordered in either mode.
 
-4. **Lint-target directory walker** (`internal/config/file_discovery.go`)
+5. **Lint-target directory walker** (`internal/config/file_discovery.go`)
    - `DiscoverLintTargets` uses a fixed-size worker pool (`walkPool`) that
      walks the directory tree. `DiscoverLintFiles` is the path-only
      compatibility wrapper. Live goroutine count is capped at `workers`, not
@@ -985,7 +990,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      scheduling-dependent non-determinism that a parallel walker would
      otherwise introduce.
 
-5. **Program source identity index** (`bindLintTargetPlan`)
+6. **Program source identity index** (`bindLintTargetPlan`)
    - Direct lexical Program lookups remain synchronous. The target identity
      maps are not allocated until one misses. The binder then builds the
      governing config's Program indexes in one canonicalization batch, reusing
@@ -1061,6 +1066,10 @@ goroutines remain outside that guarantee.
 - **Program-Level Parallelism**: configured Program construction uses a bounded, stable-slot worker pool, and `RunLinter` queues subsequent lint work per Program through `core.NewWorkGroup`; `--singleThreaded` forces both flows to run serially
 - **Single-Walk Rule Dispatch**: each file is traversed once, with rules registering listeners up front and sharing the same AST walk
 - **Early Filtering**: exact lint target plans, skip paths, global-ignore filters, and gap-file type filtering reduce work before listeners run
+- **Shared Prepared Lint Plan**: CLI and native API resolve each selected
+  file's complete rule set once into immutable per-Program slots. Native
+  execution and optional third-party plugin dispatch consume projections of the
+  same plan instead of repeating target collection or rule resolution
 
 ### Performance Optimizations
 
@@ -1084,9 +1093,9 @@ goroutines remain outside that guarantee.
 - **Exact Config-Shape Interning**: a `FileConfigResolver` parses global and
   entry-local ignores once, maps each exact file path to its complete matched
   flat-config entry bitset, and merges/prepares enabled rules once per unique
-  bitset. CLI/API native and third-party plugin collection can share the fully
-  published immutable plan. LSP keeps its existing per-document resolver
-  lifetime; per-file rule runtime state stays outside every plan.
+  bitset. The prepared lint plan references these published immutable rule
+  slices without moving per-file runtime state into the config cache. LSP keeps
+  its existing per-document resolver lifetime.
 
 ### Caching Strategy
 
