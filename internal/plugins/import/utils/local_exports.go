@@ -97,7 +97,7 @@ func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, setti
 }
 
 func (local *localExports) appendStatement(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
-	if exportedDeclarationHasNameForMap(stmt, false) {
+	if isExportedDeclaration(stmt) {
 		if names := exportedDeclarationNames(stmt); len(names) > 0 {
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
 		}
@@ -249,25 +249,6 @@ func referencedIdentifierText(expr *ast.Node) string {
 	return expr.AsIdentifier().Text
 }
 
-// exportAssignmentReferencedIdentifier returns the identifier an expression
-// names, after parentheses. A named function or class expression names
-// itself.
-func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
-	expr = ast.SkipParentheses(expr)
-	if expr == nil {
-		return "", false
-	}
-	switch expr.Kind {
-	case ast.KindIdentifier:
-		return expr.AsIdentifier().Text, true
-	case ast.KindFunctionExpression, ast.KindClassExpression:
-		if name := expr.Name(); name != nil {
-			return name.Text(), true
-		}
-	}
-	return "", false
-}
-
 func collectVariableStatementNames(stmt *ast.Node, visit func(name string)) {
 	if stmt == nil || visit == nil {
 		return
@@ -286,7 +267,9 @@ func collectVariableStatementNames(stmt *ast.Node, visit func(name string)) {
 	}
 }
 
-func exportedDeclarationHasNameForMap(stmt *ast.Node, ambientNamespace bool) bool {
+// isExportedDeclaration reports whether stmt is a declaration exported by its
+// own modifier, the statements exportedDeclarationNames reads names from.
+func isExportedDeclaration(stmt *ast.Node) bool {
 	if stmt == nil {
 		return false
 	}
@@ -298,7 +281,7 @@ func exportedDeclarationHasNameForMap(stmt *ast.Node, ambientNamespace bool) boo
 		ast.KindTypeAliasDeclaration,
 		ast.KindEnumDeclaration,
 		ast.KindModuleDeclaration:
-		return ambientNamespace || ast.HasSyntacticModifier(stmt, ast.ModifierFlagsExport)
+		return ast.HasSyntacticModifier(stmt, ast.ModifierFlagsExport)
 	}
 	return false
 }

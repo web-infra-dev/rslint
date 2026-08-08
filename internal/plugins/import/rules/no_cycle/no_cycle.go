@@ -9,7 +9,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -256,19 +255,6 @@ func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed ma
 	return nil, false
 }
 
-// referenceIsTraversable reports whether an edge is one the rule follows: it
-// has to survive into the emitted JavaScript, name a file the Program loaded,
-// and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
-func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
-	if edge.TypeOnly || edge.Target == nil {
-		return false
-	}
-	if settings.IsIgnoredPath(edge.Target.FileName()) {
-		return false
-	}
-	return !shouldIgnoreExternal(settings, opts, edge)
-}
-
 // routeTo follows the parent links back from a queue entry, materializing the
 // specifier and source line of every reference the search passed through.
 func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
@@ -307,18 +293,4 @@ func messageCycle(route []routeStep) rule.RuleMessage {
 		Id:          "cycle",
 		Description: description,
 	}
-}
-
-func moduleReferencePath(edge rule.ModuleEdge) string {
-	if edge.Target != nil {
-		return edge.Target.FileName()
-	}
-	return edge.ResolvedPath
-}
-
-func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
-	if !opts.ignoreExternal {
-		return false
-	}
-	return settings.IsExternalPath(edge.Text(), moduleReferencePath(edge))
 }

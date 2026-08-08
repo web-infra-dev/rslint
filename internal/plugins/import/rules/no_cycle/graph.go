@@ -115,6 +115,33 @@ func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, fil
 	return opts.ignoreExternal && settings.IsExternalPath("", fileName)
 }
 
+// referenceIsTraversable reports whether an edge is one the rule follows: it
+// has to survive into the emitted JavaScript, name a file the Program loaded,
+// and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
+func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
+	if edge.TypeOnly || edge.Target == nil {
+		return false
+	}
+	if settings.IsIgnoredPath(edge.Target.FileName()) {
+		return false
+	}
+	return !shouldIgnoreExternal(settings, opts, edge)
+}
+
+func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
+	if !opts.ignoreExternal {
+		return false
+	}
+	return settings.IsExternalPath(edge.Text(), moduleReferencePath(edge))
+}
+
+func moduleReferencePath(edge rule.ModuleEdge) string {
+	if edge.Target != nil {
+		return edge.Target.FileName()
+	}
+	return edge.ResolvedPath
+}
+
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's
 // dynamically imported targets are not followed out of that file, whichever
 // reference reaches them.
