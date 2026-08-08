@@ -184,12 +184,12 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 
 	modifiers := make([]ParsedJestFnMemberEntry, 0, len(entries))
 	for _, member := range entries {
-		parent := member.Node.Parent
-		if parent == nil {
+		_, accessor := GetAccessorReceiverAndParent(&member)
+		if accessor == nil {
 			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
-		grandparent := ast.WalkUpParenthesizedExpressions(parent.Parent)
+		grandparent := ast.WalkUpParenthesizedExpressions(accessor.Parent)
 		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
 			return modifiers, &member, ExpectParseReasonNone
 		}
@@ -336,11 +336,18 @@ func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
 }
 
 func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
-	if entry == nil || entry.Node == nil || entry.Node.Parent == nil {
+	if entry == nil || entry.Node == nil {
 		return nil, nil
 	}
 
 	parent := entry.Node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	if parent == nil {
+		return nil, nil
+	}
+
 	switch parent.Kind {
 	case ast.KindPropertyAccessExpression:
 		return parent.AsPropertyAccessExpression().Expression, parent
