@@ -19,9 +19,15 @@
 package curly
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -85,6 +91,8 @@ func TestCurlyExtras(t *testing.T) {
 			// (no native rule does), so invalid combos degrade instead of erroring.
 			// `["consistent"]` alone has no multi* mode → behaves like "all". ----
 			{Code: "if (a) { b() }", Options: []interface{}{"consistent"}},
+			// Explicit "all" + "consistent" is also just "all".
+			{Code: "if (a) { b() } else { c() }", Options: []interface{}{"all", "consistent"}},
 			// Unknown 2nd option is ignored → behaves like plain "multi".
 			{Code: "if (a) b()", Options: []interface{}{"multi", "foo"}},
 
@@ -126,6 +134,15 @@ func TestCurlyExtras(t *testing.T) {
 			{Code: "do { f(); g(); } while (x)", Options: "multi"},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "if (a) b(); else c();",
+				Output:  []string{"if (a) {b();} else {c();}"},
+				Options: []interface{}{"all", "consistent"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingCurlyAfterCondition", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
+					{MessageId: "missingCurlyAfter", Line: 1, Column: 18, EndLine: 1, EndColumn: 22},
+				},
+			},
 			// ---- Real-user/tsgo: as-cast body, braces unnecessary under multi ----
 			{
 				Code:    "if (foo) { x = y as Foo; }",
@@ -661,4 +678,80 @@ func TestCurlyExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedCurlyAfterCondition", Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
 		},
 	)
+}
+
+func TestCurlyEditDemandPreservesDiagnostics(t *testing.T) {
+	testCases := []struct {
+		name        string
+		code        string
+		options     []any
+		wantAutofix bool
+		wantFixText string
+	}{
+		{
+			name:        "missing braces",
+			code:        "if (condition) action();",
+			wantAutofix: true,
+			wantFixText: "{action();}",
+		},
+		{
+			name:        "removable braces",
+			code:        "if (condition) { action(); }",
+			options:     []any{"multi"},
+			wantAutofix: true,
+			wantFixText: " action(); ",
+		},
+		{
+			name:    "unsafe brace removal",
+			code:    "if (condition) { action() } next()",
+			options: []any{"multi"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/curly-edit-demand.ts",
+				Path:     tspath.Path("/curly-edit-demand.ts"),
+			}, testCase.code, core.ScriptKindTS)
+
+			run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+				comments := rule.NewCommentStore(sourceFile)
+				var diagnostics []rule.RuleDiagnostic
+				ctx := rule.RuleContext{
+					SourceFile:     sourceFile,
+					Comments:       comments,
+					DisableManager: rule.NewDisableManager(sourceFile, comments),
+				}.WithDiagnosticConsumer(CurlyRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+					Demand: demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				})
+
+				statement := sourceFile.Statements.Nodes[0]
+				CurlyRule.Run(ctx, testCase.options)[statement.Kind](statement)
+				if len(diagnostics) != 1 {
+					t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+				}
+				return diagnostics[0]
+			}
+
+			diagnosticOnly := run(rule.EditDemandNone)
+			withAutofix := run(rule.EditDemandAutofix)
+			if diagnosticOnly.Range != withAutofix.Range ||
+				!reflect.DeepEqual(diagnosticOnly.Message, withAutofix.Message) {
+				t.Fatalf("diagnostic changed with edit demand: without=%#v with=%#v", diagnosticOnly, withAutofix)
+			}
+			if diagnosticOnly.FixesPtr != nil {
+				t.Fatalf("diagnostics-only consumer received fixes: %#v", diagnosticOnly.Fixes())
+			}
+			if got := len(withAutofix.Fixes()); (got != 0) != testCase.wantAutofix {
+				t.Fatalf("autofix count = %d, want autofix %v", got, testCase.wantAutofix)
+			}
+			if testCase.wantAutofix && withAutofix.Fixes()[0].Text != testCase.wantFixText {
+				t.Fatalf("fix text = %q, want %q", withAutofix.Fixes()[0].Text, testCase.wantFixText)
+			}
+		})
+	}
 }
