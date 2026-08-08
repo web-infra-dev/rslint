@@ -88,6 +88,10 @@ type LintResult struct {
 //     (for example config global ignores). Entries within the slice
 //     may be nil individually.
 //   - GetRulesForFile=nil                 → no lint rules executed
+//   - PreparedPlan=nil                    → RunLinter collects targets and
+//     resolves rules through GetRulesForFile during the lint phase. Callers
+//     that need the same resolved targets before native execution may build a
+//     plan with PrepareLintPlan and pass it here.
 //   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
 //     for syntax errors before resolving or running rules. A non-nil set means
 //     the caller already performed that check and names the invalid files.
@@ -129,7 +133,13 @@ type RunLinterOptions struct {
 	// Program membership. nil preserves the legacy Program scan.
 	TargetFiles [][]string
 
-	GetRulesForFile  RuleHandler
+	GetRulesForFile RuleHandler
+	// PreparedPlan, when non-nil, must have been built from these same Phase 1
+	// options with PrepareLintPlan. RunLinter consumes its per-Program files and
+	// resolved rules without collecting targets or calling GetRulesForFile again.
+	// The callback remains required to distinguish a lint pass from
+	// --type-check-only and to preserve the existing zero-value contract.
+	PreparedPlan     *LintPlan
 	TypeInfoFiles    map[string]struct{}
 	SyntaxErrorFiles map[string]struct{}
 	// Consumer owns diagnostic delivery and the optional edit artifacts needed
