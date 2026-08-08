@@ -59,6 +59,37 @@ func TestExtractGlobals_NoLanguageOptions(t *testing.T) {
 	}
 }
 
+func TestExtractSourceType(t *testing.T) {
+	if got := ExtractSourceType(nil); got != "" {
+		t.Errorf("ExtractSourceType(nil) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{}); got != "" {
+		t.Errorf("ExtractSourceType(empty) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": "module"}}); got != "module" {
+		t.Errorf("ExtractSourceType(sourceType) = %q, want \"module\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": "script"}}); got != "script" {
+		t.Errorf("ExtractSourceType(script) = %q, want \"script\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": "commonjs"}}); got != "commonjs" {
+		t.Errorf("ExtractSourceType(commonjs) = %q, want \"commonjs\"", got)
+	}
+	// Legacy parserOptions.sourceType is ignored — same contract as the JS
+	// language plugin.
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{
+		"parserOptions": map[string]any{"sourceType": "script"},
+	}}); got != "" {
+		t.Errorf("ExtractSourceType(parserOptions.sourceType) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": "esm"}}); got != "" {
+		t.Errorf("ExtractSourceType(invalid) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": 1}}); got != "" {
+		t.Errorf("ExtractSourceType(non-string) = %q, want \"\"", got)
+	}
+}
+
 func TestMergeLanguageOptions_MergesGlobalsByName(t *testing.T) {
 	base := &LanguageOptions{Raw: map[string]any{
 		"globals": map[string]any{

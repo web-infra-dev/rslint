@@ -255,6 +255,9 @@ func ValidateConfig(config RslintConfig) error {
 		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
+		if err := validateConfigSourceType(entry.LanguageOptions); err != nil {
+			return fmt.Errorf("config entry at index %d: %w", index, err)
+		}
 		if err := validateConfigRules(entry.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
@@ -287,6 +290,33 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 		}
 	}
 	return nil
+}
+
+// validateConfigSourceType rejects authored `languageOptions.sourceType`
+// values that are not ESLint's "module" / "script" / "commonjs". Absent is
+// fine — callers treat unset as structural ESM detection. Matches the JS
+// language plugin, which only reads the top-level field (no legacy
+// `parserOptions.sourceType`).
+func validateConfigSourceType(languageOptions *LanguageOptions) error {
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+	value, present := languageOptions.Raw["sourceType"]
+	if !present {
+		return nil
+	}
+	s, ok := value.(string)
+	if !ok || !isValidSourceType(s) {
+		return fmt.Errorf(
+			"key \"languageOptions.sourceType\": invalid value %v; expected \"module\", \"script\", or \"commonjs\"",
+			value,
+		)
+	}
+	return nil
+}
+
+func isValidSourceType(s string) bool {
+	return s == "module" || s == "script" || s == "commonjs"
 }
 
 func validateConfigRules(rules Rules) error {
@@ -964,6 +994,25 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 		}
 	}
 	return globals
+}
+
+// ExtractSourceType reads the effective module kind from a merged
+// `languageOptions.sourceType`. Only the top-level field is accepted — the
+// same contract as the JS language plugin (no legacy
+// `parserOptions.sourceType`). Returns "" when unset, not a string, or not
+// one of "module" / "script" / "commonjs" — callers should fall back to
+// structural ESM detection. Values ValidateConfig rejects are dropped here
+// rather than guessed at, so a config that skipped validation behaves as if
+// it never mentioned sourceType.
+func ExtractSourceType(langOpts *LanguageOptions) string {
+	if langOpts == nil || langOpts.Raw == nil {
+		return ""
+	}
+	s, ok := langOpts.Raw["sourceType"].(string)
+	if !ok || !isValidSourceType(s) {
+		return ""
+	}
+	return s
 }
 
 // RulePluginPrefix extracts the plugin prefix from a rule name.
