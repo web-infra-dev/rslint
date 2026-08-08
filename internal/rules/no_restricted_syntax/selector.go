@@ -1,5 +1,10 @@
 package no_restricted_syntax
 
+import (
+	"github.com/dlclark/regexp2"
+	"github.com/microsoft/typescript-go/shim/ast"
+)
+
 // selector models the subset of the ESLint / esquery selector grammar that the
 // rule needs in order to evaluate user-supplied patterns. Each variant is a
 // node in the parsed selector tree. The matcher in selector_matcher.go walks
@@ -12,7 +17,8 @@ type selector interface {
 // is the wildcard. ESTree type names map to one or more tsgo ast.Kind values
 // via estreeKindMap in selector_mapping.go.
 type identifierSelector struct {
-	Name string
+	Name  string
+	Kinds []ast.Kind
 }
 
 func (identifierSelector) isSelector() {}
@@ -54,13 +60,15 @@ const (
 )
 
 type attrValue struct {
-	Kind  attrValueKind
-	Str   string
-	Num   float64
-	Bool  bool
-	Regex string
-	Flags string
-	Ident string
+	Kind          attrValueKind
+	Str           string
+	Num           float64
+	Bool          bool
+	Regex         string
+	Flags         string
+	Ident         string
+	compiledRegex *regexp2.Regexp
+	regexPrefix   string
 }
 
 // attrSelector matches a node whose attribute (a dotted path inside the

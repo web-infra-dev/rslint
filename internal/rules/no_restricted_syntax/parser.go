@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/dlclark/regexp2"
 )
 
 // parseSelector parses an ESLint selector string into a selector tree.
@@ -142,17 +144,17 @@ func (p *parser) parseSequence() (selector, error) {
 		return nil, errors.New("unexpected end of selector")
 	case c == '*':
 		p.pos++
-		head = identifierSelector{Name: "*"}
+		head = newIdentifierSelector("*")
 	case c == '.' || c == '[' || c == ':':
 		// Filters without an explicit head — equivalent to `*` followed by
 		// the filter.
-		head = identifierSelector{Name: "*"}
+		head = newIdentifierSelector("*")
 	case isIdentStart(c):
 		name, err := p.parseIdent()
 		if err != nil {
 			return nil, err
 		}
-		head = identifierSelector{Name: name}
+		head = newIdentifierSelector(name)
 	default:
 		return nil, fmt.Errorf("unexpected character %q at position %d", c, p.pos)
 	}
@@ -184,6 +186,10 @@ func (p *parser) parseSequence() (selector, error) {
 		}
 	}
 	return head, nil
+}
+
+func newIdentifierSelector(name string) identifierSelector {
+	return identifierSelector{Name: name, Kinds: kindsForEstreeName(name)}
 }
 
 func (p *parser) parseIdent() (string, error) {
@@ -316,7 +322,14 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		return attrValue{Kind: attrValueRegex, Regex: pat, Flags: flags}, nil
+		compiled, _ := regexp2.Compile(pat, regexpFlags(flags))
+		return attrValue{
+			Kind:          attrValueRegex,
+			Regex:         pat,
+			Flags:         flags,
+			compiledRegex: compiled,
+			regexPrefix:   anchoredLiteralPrefix(pat, flags),
+		}, nil
 	case c == '-' || (c >= '0' && c <= '9'):
 		num, err := p.parseNumber()
 		if err != nil {
@@ -339,6 +352,26 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		return attrValue{Kind: attrValueIdent, Ident: ident}, nil
 	}
 	return attrValue{}, fmt.Errorf("unexpected attribute value at position %d", p.pos)
+}
+
+// anchoredLiteralPrefix extracts only the plainly literal ASCII prefix from a
+// start-anchored, case-sensitive, single-line pattern. It is a conservative
+// rejection hint: an empty result keeps the full regexp path, while a non-empty
+// result must prefix every possible match.
+func anchoredLiteralPrefix(pattern, flags string) string {
+	if !strings.HasPrefix(pattern, "^") || strings.ContainsAny(flags, "im") {
+		return ""
+	}
+	end := 1
+	for end < len(pattern) {
+		c := pattern[end]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == ' ' || c == '-' {
+			end++
+			continue
+		}
+		break
+	}
+	return pattern[1:end]
 }
 
 func (p *parser) parseString(quote byte) (string, error) {
