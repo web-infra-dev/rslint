@@ -62,6 +62,8 @@ export type ConfigRefreshReason =
 interface ConfigRefreshRequest {
   protocolVersion: number;
   reason: ConfigRefreshReason;
+  /** Absolute JS/TS config module path; this client omits it for automatic discovery. */
+  configPath?: string;
 }
 
 export type ConfigRefreshRequester = (

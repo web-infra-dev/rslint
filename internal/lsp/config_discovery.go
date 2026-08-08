@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -30,8 +32,29 @@ const (
 )
 
 type configRefreshRequest struct {
-	ProtocolVersion int    `json:"protocolVersion"`
-	Reason          string `json:"reason"`
+	ProtocolVersion int                       `json:"protocolVersion"`
+	Reason          string                    `json:"reason"`
+	ConfigPath      optionalConfigRefreshPath `json:"configPath"`
+}
+
+// optionalConfigRefreshPath preserves the distinction between an absent
+// configPath (automatic discovery) and an invalid explicit null value.
+type optionalConfigRefreshPath struct {
+	Value   string
+	Present bool
+}
+
+func (path *optionalConfigRefreshPath) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return errors.New("configPath must be a string when present")
+	}
+	var value string
+	if err := stdjson.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("configPath must be a string: %w", err)
+	}
+	path.Value = value
+	path.Present = true
+	return nil
 }
 
 type configRefreshResponse struct {
@@ -285,33 +308,100 @@ type lspDiscoveredConfigSnapshot struct {
 	usableLastGood      bool
 }
 
-func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRefreshResponse, error) {
-	var request configRefreshRequest
-	data, err := stdjson.Marshal(params)
-	if err != nil {
-		return configRefreshResponse{}, fmt.Errorf("marshal config refresh params: %w", err)
-	}
-	if err := stdjson.Unmarshal(data, &request); err != nil {
-		return configRefreshResponse{}, fmt.Errorf("parse config refresh params: %w", err)
-	}
+func (s *Server) handleConfigRefresh(ctx context.Context, request configRefreshRequest) (configRefreshResponse, error) {
 	if request.ProtocolVersion != discovery.ConfigDiscoveryProtocolVersion {
 		return configRefreshResponse{}, fmt.Errorf(
-			"unsupported config refresh protocol %d",
+			"%w: unsupported config refresh protocol %d; expected %d",
+			lsproto.ErrorCodeInvalidParams,
 			request.ProtocolVersion,
+			discovery.ConfigDiscoveryProtocolVersion,
 		)
 	}
 	switch request.Reason {
 	case "initial", "config-change", "gitignore-change", "dependency-change":
 	default:
-		return configRefreshResponse{}, fmt.Errorf("unsupported config refresh reason %q", request.Reason)
+		return configRefreshResponse{}, fmt.Errorf(
+			"%w: unsupported config refresh reason %q",
+			lsproto.ErrorCodeInvalidParams,
+			request.Reason,
+		)
 	}
 	if s.fs == nil {
 		return configRefreshResponse{}, errors.New("config refresh requires a filesystem")
+	}
+	if err := ctx.Err(); err != nil {
+		return configRefreshResponse{}, err
+	}
+
+	configPath := ""
+	if request.ConfigPath.Present {
+		var err error
+		configPath, err = normalizeLSPExplicitConfigPath(request.ConfigPath.Value)
+		if err != nil {
+			return configRefreshResponse{}, fmt.Errorf("%w: %w", lsproto.ErrorCodeInvalidParams, err)
+		}
+	}
+	if !s.configRefreshInitialized {
+		if request.Reason != "initial" {
+			return configRefreshResponse{}, fmt.Errorf(
+				"%w: the first config refresh must use reason %q",
+				lsproto.ErrorCodeInvalidParams,
+				"initial",
+			)
+		}
+		s.configRefreshInitialized = true
+		s.configRefreshConfigPath = configPath
+	} else {
+		lockedExplicit := s.configRefreshConfigPath != ""
+		if request.ConfigPath.Present != lockedExplicit ||
+			(lockedExplicit && !lspConfigPathsEqual(configPath, s.configRefreshConfigPath, s.fs)) {
+			return configRefreshResponse{}, fmt.Errorf(
+				"%w: config path selection is fixed for this server process; restart the server to change it",
+				lsproto.ErrorCodeInvalidParams,
+			)
+		}
 	}
 	// Set this before doing fallible discovery: a failed initial transaction is
 	// still proof that the client installed the reverse handlers, and a later
 	// config or config-scoped .gitignore event must retry while keeping last-good.
 	s.configDiscoveryActive = true
+	return s.refreshConfig(ctx)
+}
+
+func normalizeLSPExplicitConfigPath(configPath string) (string, error) {
+	if configPath == "" {
+		return "", errors.New("configPath must not be empty")
+	}
+	if strings.IndexByte(configPath, 0) >= 0 {
+		return "", errors.New("configPath must not contain NUL")
+	}
+	if strings.HasPrefix(strings.ToLower(configPath), "file:") {
+		return "", errors.New("configPath must be a native filesystem path, not a URI")
+	}
+	if !tspath.PathIsAbsolute(configPath) {
+		return "", fmt.Errorf("configPath must be absolute: %q", configPath)
+	}
+	normalized := tspath.NormalizePath(configPath)
+	switch path.Ext(normalized) {
+	case ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("configPath must name a JS/TS config module: %q", configPath)
+	}
+}
+
+func lspConfigPathsEqual(left string, right string, fsys vfs.FS) bool {
+	caseSensitive := fsys == nil || fsys.UseCaseSensitiveFileNames()
+	return lspLexicalPathID(left, caseSensitive) == lspLexicalPathID(right, caseSensitive)
+}
+
+// refreshConfig rebuilds the config transaction selected by the client's
+// initial refresh. Internal file watchers call this directly so they cannot
+// reinterpret an omitted wire configPath as automatic discovery.
+func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, error) {
+	if !s.configRefreshInitialized {
+		return configRefreshResponse{}, errors.New("config refresh source is not initialized")
+	}
 
 	// cachedvfs is intentionally scoped to one generation. A long-lived cache
 	// would make file creation/deletion and .gitignore edits invisible to later
@@ -319,11 +409,22 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 	// generation's path identity snapshot.
 	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
-	catalog, err := discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
-		CWD:         tspath.NormalizePath(s.cwd),
-		ImplicitCWD: true,
-		Fresh:       true,
-	})
+	cwd := tspath.NormalizePath(s.cwd)
+	var catalog *discovery.ConfigCatalog
+	var err error
+	if s.configRefreshConfigPath == "" {
+		catalog, err = discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
+			CWD:         cwd,
+			ImplicitCWD: true,
+			Fresh:       true,
+		})
+	} else {
+		catalog, err = discovery.LoadExplicitConfig(ctx, snapshotFS, loader, discovery.ExplicitConfigRequest{
+			CWD:        cwd,
+			ConfigPath: s.configRefreshConfigPath,
+			Fresh:      true,
+		})
+	}
 	recoveredUnavailable := false
 	var unavailableCause error
 	if err != nil {
@@ -351,6 +452,7 @@ func (s *Server) handleConfigRefresh(ctx context.Context, params any) (configRef
 			Configs:            make(map[string]config.RslintConfig),
 			EffectiveConfigIDs: []string{},
 			Failures:           append([]discovery.ConfigFailure(nil), allFailed.Failures...),
+			Explicit:           s.configRefreshConfigPath != "",
 		}
 		recoveredUnavailable = true
 	} else if s.configDiscoveryHasLastGood {
@@ -533,6 +635,12 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// by their discovery generation; unavailable boundaries intentionally remain
 	// empty and only stop JSON fallback ownership.
 	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
+	if catalog.Explicit {
+		// An explicit JS/TS config is invocation-wide and owns the cwd. JSON is
+		// not part of this mode, so an unrelated JSON file must not make the
+		// selected module's transaction fail.
+		return snapshot, nil
+	}
 
 	jsonConfig, jsonPath, jsonTsConfigs, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)
 	if err != nil {

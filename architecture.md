@@ -560,6 +560,12 @@ config/ownership catalog and observes `.gitignore` sources during the same
 directory walk. Explicit loading first selects the exact module unconditionally,
 then freezes that invocation-wide owner's Git projection with the same frontier
 without probing nested config candidates. Neither path collects lint targets.
+For LSP, the client's first `rslint/configRefresh` may include one absolute
+`configPath`. The server fixes that optional path for its lifetime: later client
+refreshes must repeat the same choice, while Go-owned `.gitignore` refreshes
+reuse it internally. Changing between automatic discovery and an explicit path,
+or changing the path itself, requires a new server process. Explicit LSP mode
+uses only the selected JS/TS module and does not load JSON fallback config.
 Go owns candidate discovery, default exclusions, config hierarchy, authored and
 Git directory reachability, the frozen Git projection for each owner, and final
 effective IDs. Node only
@@ -722,9 +728,13 @@ The transport and target phase differ by surface:
   every recorded server-open session for that runtime before LanguageClient
   replays `didOpen`, so the replacement process receives each still-open owned
   document exactly once.
-- Each selected runtime starts `rslint/configRefresh`, and Go scans that
-  process's workspace-folder cwd with a
-  transaction-scoped cached VFS. Go sends
+- Each selected runtime starts `rslint/configRefresh`. With no `configPath`, Go
+  scans that process's workspace-folder cwd with a transaction-scoped cached
+  VFS. A client may instead repeat one fixed absolute JS/TS `configPath` on
+  every refresh; Go loads exactly that module while retaining the process cwd
+  as its invocation-wide matching root. The client owns change notifications
+  for the explicit path, while Go's existing `.gitignore` watcher refreshes
+  the already-fixed source. Go sends
   `rslint/loadConfigs` and
   `rslint/activateConfigs`, then commits or aborts the matching plugin-host state
   through `rslint/commitConfigs` / `rslint/abortConfigs`. `fresh` loads cache-bust the config entry
