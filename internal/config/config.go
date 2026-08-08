@@ -974,11 +974,6 @@ func (path *fileMatchPath) matchesAny(patterns []string) bool {
 	return false
 }
 
-func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	matchPath := newFileMatchPath(filePath, cwd)
-	return matchPath.matchesSingle(pattern)
-}
-
 func (path *fileMatchPath) matchesSingle(pattern string) bool {
 	negated := false
 	for strings.HasPrefix(pattern, "!") {
@@ -990,11 +985,6 @@ func (path *fileMatchPath) matchesSingle(pattern string) bool {
 		return !matched
 	}
 	return matched
-}
-
-func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	matchPath := newFileMatchPath(filePath, cwd)
-	return matchPath.matchesPositive(pattern)
 }
 
 func (path *fileMatchPath) matchesPositive(pattern string) bool {
