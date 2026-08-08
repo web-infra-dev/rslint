@@ -1,8 +1,6 @@
 import * as assert from 'node:assert';
 import {
-  commands,
   Uri,
-  window,
   workspace,
   type TextDocument,
   type WorkspaceFolder,
@@ -155,32 +153,31 @@ async function reconcileAll(
   await Promise.all(documents.map((document) => manager.reconcile(document)));
 }
 
+// runSuite activates the real extension before Mocha. Detached documents keep
+// this fake manager's lifecycle from starting and stopping actual LSP clients.
+function detachedDocument(uri: Uri, languageId = 'typescript'): TextDocument {
+  return { uri, languageId } as TextDocument;
+}
+
 suite('local-core runtime manager', () => {
-  let testDirectory: Uri;
+  let documentRoot: Uri;
   let first: TextDocument;
   let second: TextDocument;
   let workspaceFolder: WorkspaceFolder;
+  let openDocuments: Set<TextDocument>;
+  let generation = 0;
 
-  setup(async () => {
+  setup(() => {
     const folder = workspace.workspaceFolders?.[0];
     assert.ok(folder, 'test requires a workspace folder');
     workspaceFolder = folder;
-    testDirectory = Uri.joinPath(folder.uri, `.runtime-manager-${Date.now()}`);
-    await workspace.fs.createDirectory(testDirectory);
-    const firstUri = Uri.joinPath(testDirectory, 'first.ts');
-    const secondUri = Uri.joinPath(testDirectory, 'second.ts');
-    await workspace.fs.writeFile(firstUri, Buffer.from('const first = 1;\n'));
-    await workspace.fs.writeFile(secondUri, Buffer.from('const second = 2;\n'));
-    first = await workspace.openTextDocument(firstUri);
-    second = await workspace.openTextDocument(secondUri);
-  });
-
-  teardown(async () => {
-    for (const document of [first, second]) {
-      await window.showTextDocument(document, { preview: false });
-      await commands.executeCommand('workbench.action.closeActiveEditor');
-    }
-    await workspace.fs.delete(testDirectory, { recursive: true });
+    documentRoot = Uri.joinPath(
+      folder.uri,
+      `.runtime-manager-${String(generation++)}`,
+    );
+    first = detachedDocument(Uri.joinPath(documentRoot, 'first.ts'));
+    second = detachedDocument(Uri.joinPath(documentRoot, 'second.ts'));
+    openDocuments = new Set([first, second]);
   });
 
   function harness(
@@ -208,8 +205,17 @@ suite('local-core runtime manager', () => {
         return runtime;
       },
       silentLogger,
+      (document) => openDocuments.has(document),
     );
     return { manager, resolver, router, runtimes };
+  }
+
+  function closeDocument(
+    manager: RuntimeManager,
+    document: TextDocument,
+  ): void {
+    openDocuments.delete(document);
+    manager.documentClosed(document);
   }
 
   test('reuses one physical core installation for multiple documents', async () => {
@@ -228,9 +234,9 @@ suite('local-core runtime manager', () => {
   });
 
   test('does not resolve or retain runtimes for unsupported documents', async () => {
-    const notesUri = Uri.joinPath(testDirectory, 'notes.md');
-    await workspace.fs.writeFile(notesUri, Buffer.from('# Notes\n'));
-    const notes = await workspace.openTextDocument(notesUri);
+    const notesUri = Uri.joinPath(documentRoot, 'notes.md');
+    const notes = detachedDocument(notesUri, 'markdown');
+    openDocuments.add(notes);
     const { manager, resolver, runtimes } = harness();
 
     await manager.reconcile(notes);
@@ -357,14 +363,14 @@ suite('local-core runtime manager', () => {
     const { manager, router, runtimes } = harness();
     await reconcileAll(manager, [first, second]);
 
-    manager.documentClosed(first);
+    closeDocument(manager, first);
     await eventually(
       () => router.getServerOpenOwner(first) === undefined,
       'the first document should detach',
     );
     assert.strictEqual(runtimes[0].closeCalls, 0);
 
-    manager.documentClosed(second);
+    closeDocument(manager, second);
     await eventually(
       () => runtimes[0].closeCalls === 1,
       'the last document should release the runtime',
@@ -393,6 +399,25 @@ suite('local-core runtime manager', () => {
       ['current-core'],
     );
     assert.strictEqual(router.getServerOpenOwner(first), runtimes[0].rootKey);
+    await manager.close();
+  });
+
+  test('discards a resolution after the document leaves the workspace snapshot', async () => {
+    const { manager, resolver, router, runtimes } = harness();
+    const gate = deferred<void>();
+    resolver.gates.set('shared-core', gate);
+
+    const reconciling = manager.reconcile(first);
+    await eventually(
+      () => resolver.started.includes('shared-core'),
+      'core resolution should begin',
+    );
+    openDocuments.delete(first);
+    gate.resolve();
+    await reconciling;
+
+    assert.deepStrictEqual(runtimes, []);
+    assert.strictEqual(router.getServerOpenOwner(first), undefined);
     await manager.close();
   });
 
@@ -531,7 +556,7 @@ suite('local-core runtime manager', () => {
       () => runtimes.length === 1,
       'the pending runtime should be created',
     );
-    manager.documentClosed(first);
+    closeDocument(manager, first);
     await reconciling;
     await eventually(
       () => runtimes[0].closeCalls === 1,

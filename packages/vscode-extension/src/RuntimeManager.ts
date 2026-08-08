@@ -72,6 +72,9 @@ export class RuntimeManager {
     private readonly resolver: RuntimeCoreResolver,
     private readonly runtimeFactory: ManagedRslintRuntimeFactory,
     private readonly logger: RuntimeManagerLogger,
+    private readonly documentIsOpen: (document: TextDocument) => boolean = (
+      document,
+    ) => workspace.textDocuments.includes(document),
   ) {}
 
   public initialize(documents: readonly TextDocument[]): void {
@@ -351,7 +354,7 @@ export class RuntimeManager {
     return (
       !this.closing &&
       this.documentEpochs.get(documentKey(document)) === epoch &&
-      workspace.textDocuments.includes(document)
+      this.documentIsOpen(document)
     );
   }
 

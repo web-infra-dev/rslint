@@ -213,6 +213,19 @@ export interface LanguageClientCloseTarget {
  * preserve actionable failures from a Running shutdown.
  */
 export class ManagedLanguageClient extends LanguageClient {
+  public override async start(): Promise<void> {
+    const outerStart = super.start();
+    if (this.state !== State.Starting) return outerStart;
+
+    // languageclient v9 keeps a shared start promise behind its public async
+    // start() call. A transport close during initialize clears the private
+    // reference before the outer call adopts it, leaving its rejection
+    // unobserved. A second, idempotent call adopts that shared promise now.
+    const sharedStart = super.start();
+    void outerStart.catch(() => undefined);
+    return sharedStart;
+  }
+
   public override async stop(timeout?: number): Promise<void> {
     const stateBeforeStop = this.state;
     try {
