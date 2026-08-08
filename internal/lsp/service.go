@@ -311,7 +311,8 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			needsAncestorJSConfigRefresh = true
 		}
 	}
-	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryActive {
+	needsAutomaticAncestorRefresh := needsAncestorJSConfigRefresh && s.configRefreshConfigPath == ""
+	if (needsIgnoreRefresh || needsAutomaticAncestorRefresh) && s.configDiscoveryActive {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
 		// cannot race an extension-initiated transaction. JSON fallback is part
@@ -319,13 +320,10 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		// active, otherwise a later JS activation failure could leave half of a
 		// rejected generation live.
 		reason := "gitignore-change"
-		if needsAncestorJSConfigRefresh {
+		if needsAutomaticAncestorRefresh {
 			reason = "config-change"
 		}
-		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
-			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
-			Reason:          reason,
-		})
+		_, err := s.refreshConfig(ctx)
 		if err == nil {
 			return nil
 		}
