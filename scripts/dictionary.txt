@@ -2,6 +2,8 @@
 aavascript
 accesskey
 accum
+acdfg
+acefg
 acked
 acking
 acks
@@ -219,6 +221,7 @@ gosec
 gotest
 graphlib
 Grek
+gruber
 Gujr
 guoyu
 handl
@@ -262,6 +265,7 @@ keyshortcuts
 keytar
 Khmr
 Knda
+koblas
 Kore
 labelledby
 Laoo
@@ -414,6 +418,7 @@ psdifjo
 Ptrs
 pullquote
 punct
+qmark
 quasis
 quxx
 qwer
@@ -485,6 +490,7 @@ résumé
 saddr
 samp
 santhosh
+schlueter
 scopemanager
 sectionhead
 Seeked
@@ -498,6 +504,7 @@ shadcn
 shadowable
 shouldnt
 SIGSEGV
+slashless
 smajobber
 somethingelse
 sonarjs
@@ -583,6 +590,7 @@ unional
 uniseg
 unmarshals
 unmodeled
+unnegated
 unpadded
 unpark
 Unparseable
