@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -18,5 +19,6 @@ func GetAllRules() []rule.Rule {
 		no_identical_title.NoIdenticalTitleRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
+		valid_title.ValidTitleRule,
 	}
 }

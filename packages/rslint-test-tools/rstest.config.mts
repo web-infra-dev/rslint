@@ -556,6 +556,7 @@ export default defineConfig({
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
+    './tests/rstest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
