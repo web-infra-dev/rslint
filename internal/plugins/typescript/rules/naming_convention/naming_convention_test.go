@@ -337,6 +337,59 @@ func TestNamingConventionRule(t *testing.T) {
 			},
 		},
 	}, []rule_tester.InvalidTestCase{
+		// Modifier-specific selectors must still distinguish explicit private
+		// and protected members from the implicit public default when modifier
+		// computation is limited to the bits needed by this config.
+		{
+			Code: "class MyClass {\n  private privateValue = 1;\n  protected ProtectedValue = 2;\n  PublicMethod() {}\n}",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":            []interface{}{"camelCase"},
+					"leadingUnderscore": "require",
+					"modifiers":         []interface{}{"private"},
+					"selector":          "memberLike",
+				},
+				map[string]interface{}{
+					"format":            []interface{}{"camelCase"},
+					"leadingUnderscore": "require",
+					"modifiers":         []interface{}{"protected"},
+					"selector":          "memberLike",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"camelCase", "UPPER_CASE"},
+					"modifiers": []interface{}{"public"},
+					"selector":  "method",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingUnderscore", Line: 2, Column: 11},
+				{MessageId: "missingUnderscore", Line: 3, Column: 13},
+				{MessageId: "doesNotMatchFormat", Line: 4, Column: 3},
+			},
+		},
+
+		// Reference tracking must distinguish same-named bindings in nested
+		// scopes. The shorthand reads only the inner binding: it uses the base
+		// snake_case config and fails, while the outer binding is unused and
+		// correctly matches the PascalCase override.
+		{
+			Code: "function use_value() {\n  const SameName = 1;\n  return { SameName };\n}\nuse_value();\nconst SameName = 2;",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":   []interface{}{"snake_case"},
+					"selector": "variable",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"PascalCase"},
+					"modifiers": []interface{}{"unused"},
+					"selector":  "variable",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "doesNotMatchFormat", Line: 2, Column: 9},
+			},
+		},
+
 		// Members never get the `unused` modifier: an unreferenced type
 		// property is still checked against the base format, not the
 		// unused override.
