@@ -349,9 +349,8 @@ func isArrayParameterizedRegistration(parsed *rstestUtils.ParsedRstestFnCall, ca
 }
 
 var (
-	reDupPrefix = regexp.MustCompile(`^([\x60'"]).+? `)
-	reAccOpen   = regexp.MustCompile(`^([\x60'"]) +`)
-	reAccClose  = regexp.MustCompile(` +([\x60'"])$`)
+	reAccOpen  = regexp.MustCompile(`^([\x60'"]) +`)
+	reAccClose = regexp.MustCompile(` +([\x60'"])$`)
 	// D1: the accepted specifiers are Rstest's, not jest's. formatRegExp is
 	// /%[sdjifoOc%]/ (packages/core/src/runtime/util.ts:159 at rstest c4b67c72)
 	// and %# / %$ are substituted ahead of it by formatName, so `%p` — valid to
@@ -367,8 +366,23 @@ func accidentalSpaceReplacement(rawSrc string) string {
 	return s
 }
 
-func duplicatePrefixReplacement(rawSrc string) string {
-	return reDupPrefix.ReplaceAllString(rawSrc, "$1")
+func duplicatePrefixReplacement(rawSrc string, fnName string) (string, bool) {
+	if fnName == "" || len(rawSrc) < len(fnName)+3 {
+		return "", false
+	}
+	prefixEnd := 1 + len(fnName)
+	if rawSrc[len(rawSrc)-1] != rawSrc[0] {
+		return "", false
+	}
+	switch rawSrc[0] {
+	case '`', '\'', '"':
+	default:
+		return "", false
+	}
+	if rawSrc[prefixEnd] != ' ' || !strings.EqualFold(rawSrc[1:prefixEnd], fnName) {
+		return "", false
+	}
+	return rawSrc[:1] + rawSrc[prefixEnd+1:], true
 }
 
 func regexpToMessagePattern(re *regexp2.Regexp) string {
@@ -512,24 +526,30 @@ var ValidTitleRule = rule.Rule{
 					}
 				}
 
-				// D4: no f/x prefix to trim. Rstest has neither fit/xit nor
-				// fdescribe/xdescribe, so Name is already the bare API name.
-				// D5: Name is the semantic name, which survives both import
-				// aliases and same-file const aliases, so `const t = test.skip;
-				// t('test foo')` reports where jest — whose parser does not
-				// follow that alias — reports nothing.
+				// Playwright exposes describe registrations through test.describe.
+				// The parser keeps Name as the root API ("test") while Kind records
+				// the registration kind, so describe titles must use the describe
+				// matcher group and prefix. Test registrations still use Name to
+				// distinguish test from it after import or same-file alias resolution.
 				fnName := parsed.Name
+				if parsed.Kind == rstestUtils.RstestFnTypeDescribe {
+					fnName = "describe"
+				}
 				firstTok := title
 				if i := strings.IndexByte(title, ' '); i >= 0 {
 					firstTok = title[:i]
 				}
 				if strings.EqualFold(firstTok, fnName) {
 					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
-					fix := duplicatePrefixReplacement(raw)
-					ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
+					msg := rule.RuleMessage{
 						Id:          "duplicatePrefix",
 						Description: "should not have duplicate prefix",
-					}, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
+					}
+					if fix, ok := duplicatePrefixReplacement(raw, fnName); ok {
+						ctx.ReportNodeWithFixes(arg, msg, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
+					} else {
+						ctx.ReportNode(arg, msg)
+					}
 				}
 
 				if me := matcherFor(fnName, co.mustNotMatch); utils.Regexp2MatchString(me.re, title) {

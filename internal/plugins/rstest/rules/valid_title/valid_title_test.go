@@ -51,6 +51,19 @@ rstest.test("case", () => {});`},
 api.test("case", () => {});`},
 		{Code: `import { test } from "@rstest/playwright";
 test("case", () => {});`},
+		{Code: `import { test } from "@rstest/playwright";
+test.describe("test authentication", () => {});`},
+		{
+			Code: `import { test } from "@rstest/playwright";
+test.describe("suite", () => {});`,
+			Options: []interface{}{map[string]interface{}{
+				"mustNotMatch": map[string]interface{}{"test": "^suite$"},
+				"mustMatch": map[string]interface{}{
+					"describe": "^suite$",
+					"test":     "^case$",
+				},
+			}},
+		},
 
 		// A factory call is not a registration, so its first argument — here a
 		// fixtures object — must not be taken for a title.
@@ -366,6 +379,46 @@ testThat("foo works", () => {});`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
 		},
 		{
+			Code: `import { test } from "@rstest/playwright";
+test.describe("describe authentication", () => {});`,
+			Output: []string{`import { test } from "@rstest/playwright";
+test.describe("authentication", () => {});`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
+			Code: `import { test } from "@rstest/playwright";
+const suite = test.describe.only;
+suite("describe authentication", () => {});`,
+			Output: []string{`import { test } from "@rstest/playwright";
+const suite = test.describe.only;
+suite("authentication", () => {});`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		// Detection uses the decoded title, but a fix is only safe when the raw
+		// source spells both the prefix and its separating space literally.
+		{
+			Code:   `test("test\u0020auth flow", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
+			Code:   `test("test\u0020auth", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
+			Code:   `test("te\u0073t auth flow", () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
+			Code:   `test("test auth\u0020flow", () => {});`,
+			Output: []string{`test("auth\u0020flow", () => {});`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
+			Code:   "test(`TEST authentication`, () => {});",
+			Output: []string{"test(`authentication`, () => {});"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
+		},
+		{
 			Code:   `it("it foo", () => {});`,
 			Output: []string{`it("foo", () => {});`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicatePrefix"}},
@@ -542,6 +595,28 @@ test.each(entries)(".add(%i, %z)", (a, b, expected) => {});`,
 			Code:    `describe.skip("the test", () => {});`,
 			Options: []interface{}{map[string]interface{}{"mustMatch": map[string]interface{}{"describe": patHashTag}}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "mustMatch"}},
+		},
+		{
+			Code: `import { test } from "@rstest/playwright";
+test.describe("suite", () => {});`,
+			Options: []interface{}{map[string]interface{}{
+				"mustNotMatch": map[string]interface{}{"describe": "^suite$"},
+			}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mustNotMatch",
+				Message:   "describe should not match /^suite$/u",
+			}},
+		},
+		{
+			Code: `import { test } from "@rstest/playwright";
+test.describe("suite", () => {});`,
+			Options: []interface{}{map[string]interface{}{
+				"mustMatch": map[string]interface{}{"describe": "^ok$"},
+			}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mustMatch",
+				Message:   "describe should match /^ok$/u",
+			}},
 		},
 		// D5: the groups are keyed by the API being registered, so a renamed
 		// import is still matched against the `test` group.
