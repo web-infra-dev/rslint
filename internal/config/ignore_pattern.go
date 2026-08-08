@@ -523,12 +523,19 @@ func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
 		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
 			return true
 		}
-		segments := strings.Split(dirPath, "/")
-		for j := 1; j < len(segments); j++ {
-			partial := strings.Join(segments[:j], "/")
+		// Split+Join enumerated the prefixes ending immediately before every
+		// slash. Scan those same boundaries so each prefix is a zero-copy view
+		// into dirPath instead of allocating a segment slice and joined string.
+		for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
+			partial := dirPath[:slash]
 			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
 				return true
 			}
+			next := strings.IndexByte(dirPath[slash+1:], '/')
+			if next < 0 {
+				break
+			}
+			slash += next + 1
 		}
 	}
 	return false

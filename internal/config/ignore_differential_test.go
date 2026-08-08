@@ -281,3 +281,79 @@ func TestDifferential_DirBlockComponentMatches(t *testing.T) {
 		}
 	}
 }
+
+// structuredDirBlockReference freezes the pre-optimization structured
+// matcher. Unlike mainX_isDirPathBlocked, it consumes IgnorePattern directly,
+// so this isolates ancestor enumeration from raw-pattern classification.
+func structuredDirBlockReference(dirPath string, patterns []IgnorePattern) bool {
+	for i := range patterns {
+		p := patterns[i]
+		if p.Negated || p.Kind != dirAbsoluteBlock {
+			continue
+		}
+		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
+			return true
+		}
+		segments := strings.Split(dirPath, "/")
+		for j := 1; j < len(segments); j++ {
+			partial := strings.Join(segments[:j], "/")
+			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestIsDirAbsolutelyBlocked_PathShapeDifferential(t *testing.T) {
+	patterns := ParseIgnorePatterns([]string{
+		"a/**",
+		"**/b",
+		"foo/..",
+		"!negated/**",
+		"cover/**/*",
+		"[xy]/**",
+	})
+	for _, dirPath := range []string{
+		"",
+		".",
+		"/",
+		"//",
+		"/repo",
+		"repo/",
+		"a//b",
+		"a///b/",
+		"a/b/c",
+		"x/y/z",
+		"α/β/γ",
+	} {
+		want := structuredDirBlockReference(dirPath, patterns)
+		if got := isDirAbsolutelyBlocked(dirPath, patterns); got != want {
+			t.Errorf("isDirAbsolutelyBlocked(%q) = %v, want frozen structured result %v", dirPath, got, want)
+		}
+	}
+}
+
+func FuzzIsDirAbsolutelyBlockedMatchesStructuredReference(f *testing.F) {
+	f.Add("src/vs/workbench/contrib/chat", "**/dist/**\x00src/**\x00!src/keep/**", false)
+	f.Add("/repo", "foo/..\x00**/node_modules/**", false)
+	f.Add("a///b/", "a/**\x00**/b\x00a/**/*", true)
+	f.Add("α/β/γ", "**/β\x00[αβ]/**", false)
+
+	f.Fuzz(func(t *testing.T, dirPath string, encodedPatterns string, caseInsensitive bool) {
+		if len(dirPath) > 256 || len(encodedPatterns) > 512 {
+			t.Skip()
+		}
+		patterns := ParseIgnorePatterns(strings.Split(encodedPatterns, "\x00"))
+		if caseInsensitive {
+			for i := range patterns {
+				patterns[i].CaseInsensitive = true
+			}
+		}
+		want := structuredDirBlockReference(dirPath, patterns)
+		if got := isDirAbsolutelyBlocked(dirPath, patterns); got != want {
+			t.Fatalf("dir=%q patterns=%q caseInsensitive=%v: got %v, want %v",
+				dirPath, encodedPatterns, caseInsensitive, got, want)
+		}
+	})
+}
