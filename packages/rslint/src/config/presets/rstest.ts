@@ -7,6 +7,7 @@ const recommended: RslintConfigEntry = {
     'rstest/no-conditional-expect': 'error',
     'rstest/no-disabled-tests': 'warn',
     'rstest/no-identical-title': 'error',
+    'rstest/no-interpolation-in-snapshots': 'error',
     'rstest/no-mocks-import': 'error',
   },
 };

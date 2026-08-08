@@ -554,6 +554,7 @@ export default defineConfig({
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
+    './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
 
     // eslint-plugin-promise
