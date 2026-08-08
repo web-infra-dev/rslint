@@ -62,12 +62,10 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 
 	s.initializeParams = params
 
+	// rslint diagnostics and edits use VS Code's native UTF-16 coordinates.
+	// UTF-16 is mandatory for LSP clients, so selecting it unconditionally keeps
+	// incoming incremental edits and outgoing ranges on one encoding contract.
 	s.positionEncoding = lsproto.PositionEncodingKindUTF16
-	if genCapabilities := s.initializeParams.Capabilities.General; genCapabilities != nil && genCapabilities.PositionEncodings != nil {
-		if slices.Contains(*genCapabilities.PositionEncodings, lsproto.PositionEncodingKindUTF8) {
-			s.positionEncoding = lsproto.PositionEncodingKindUTF8
-		}
-	}
 
 	response := &lsproto.InitializeResult{
 		ServerInfo: &lsproto.ServerInfo{
@@ -79,7 +77,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
 				Options: &lsproto.TextDocumentSyncOptions{
 					OpenClose: ptrTo(true),
-					Change:    ptrTo(lsproto.TextDocumentSyncKindFull),
+					Change:    ptrTo(lsproto.TextDocumentSyncKindIncremental),
 					Save: &lsproto.BooleanOrSaveOptions{
 						SaveOptions: &lsproto.SaveOptions{
 							IncludeText: ptrTo(true),
@@ -143,7 +141,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 			CurrentDirectory:   s.cwd,
 			DefaultLibraryPath: s.defaultLibraryPath,
 			TypingsLocation:    s.typingsLocation,
-			PositionEncoding:   lsproto.PositionEncodingKindUTF8,
+			PositionEncoding:   s.positionEncoding,
 			WatchEnabled:       s.watchEnabled,
 		},
 		FS:         s.fs,
@@ -552,10 +550,16 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 
 	uri := params.TextDocument.Uri
 
-	// For full document sync, we expect one change with the full text
-	if len(params.ContentChanges) > 0 {
-		s.documents[uri] = params.ContentChanges[0].WholeDocument.Text
+	content, err := applyDocumentChanges(s.documents[uri], params.ContentChanges)
+	if err != nil {
+		// didChange is a notification, so the server cannot return an error to
+		// request a retry. Keep both document mirrors on their previous content
+		// instead of partially applying malformed input or sending an invalid
+		// JSON-RPC response with a null request ID.
+		log.Printf("Ignoring invalid didChange for %s: %v", uri, err)
+		return nil
 	}
+	s.documents[uri] = content
 	if s.lintPrograms != nil {
 		s.lintPrograms.DidChange(uri, s.documents[uri])
 	}

@@ -382,6 +382,38 @@ suite('rslint extension', function () {
     );
   });
 
+  test('incremental edit after an emoji keeps UTF-16 positions aligned', async () => {
+    const doc = await openFixture('autofix.ts');
+    const editor = await vscode.window.showTextDocument(doc);
+    await waitForDiagnostics(doc);
+
+    const cleanContent = "const marker = '😀'; export { marker };\n";
+    await editor.edit((builder) => {
+      builder.replace(
+        new vscode.Range(
+          doc.positionAt(0),
+          doc.positionAt(doc.getText().length),
+        ),
+        cleanContent,
+      );
+    });
+    await waitForDiagnosticsCount(doc, 0);
+
+    const insertedContent = 'const unsafeValue: any = {};\nunsafeValue.foo;\n';
+    const insertionOffset = doc.getText().indexOf('export');
+    assert.ok(insertionOffset > 0, 'Expected an export insertion anchor');
+    await editor.edit((builder) => {
+      builder.insert(doc.positionAt(insertionOffset), insertedContent);
+    });
+
+    assert.strictEqual(
+      doc.getText(),
+      cleanContent.replace('export', `${insertedContent}export`),
+      'VS Code and the server should apply the same UTF-16 incremental range',
+    );
+    await waitForDiagnosticsWithMessage(doc, 'no-unsafe-member-access');
+  });
+
   test('diagnostics clear completely when all errors removed', async () => {
     const doc = await openFixture('index.ts');
     const editor = await vscode.window.showTextDocument(doc);
