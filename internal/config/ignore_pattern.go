@@ -198,18 +198,22 @@ func ParseIgnorePatterns(raw []string) []IgnorePattern {
 // re-includes), aligned with ESLint v10. Matches only the cwd-relative path —
 // never the absolute path — so `**/`-prefixed patterns can't hit system dirs.
 func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
-	if cwd == "" {
-		return isFileIgnoredSimple(filePath, patterns)
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.isIgnored(patterns)
+}
+
+func (path *fileMatchPath) isIgnored(patterns []IgnorePattern) bool {
+	if len(patterns) == 0 {
+		return false
 	}
-	normalizedPath := normalizePath(filePath, cwd)
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-	if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+	normalizedPath, unixPath := path.normalizedPaths()
+	if path.cwd != "" && pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
 		// On Windows and case-insensitive macOS volumes, callers may supply a
 		// canonical path whose drive/share or directory casing differs from
 		// cwd. A case-sensitive relative conversion then manufactures ../ even
 		// though both paths name the same tree. Re-resolve only on that uncommon
 		// fallback so the normal hot path pays no extra pattern scan.
-		normalizedPath = normalizePathWithCaseSensitivity(filePath, cwd, false)
+		normalizedPath = normalizePathWithCaseSensitivity(path.original, path.cwd, false)
 		unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
 	}
 	return isFileIgnoredNormalized(normalizedPath, unixPath, patterns)
