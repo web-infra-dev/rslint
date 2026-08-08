@@ -62,6 +62,12 @@ type RuleContext struct {
 	// can index it directly and fall back to what they already know about the
 	// name, e.g. utils.IsECMAScriptGlobal.
 	Globals map[string]utils.GlobalAccess
+	// SourceType is the authored `languageOptions.sourceType` (or legacy
+	// `languageOptions.parserOptions.sourceType`) for this file: "module",
+	// "script", "commonjs", or "" when unset. Rules that choose between ESM
+	// `import` and CJS `require` autofix forms should read this; when empty,
+	// fall back to structural detection such as ast.IsExternalModule.
+	SourceType string
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every

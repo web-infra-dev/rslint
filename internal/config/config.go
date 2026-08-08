@@ -966,6 +966,25 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 	return globals
 }
 
+// ExtractSourceType reads the effective module kind from a merged
+// `languageOptions`. Prefers `languageOptions.sourceType`, then the legacy
+// `languageOptions.parserOptions.sourceType`. Returns "" when unset or not a
+// string — callers should fall back to structural ESM detection.
+func ExtractSourceType(langOpts *LanguageOptions) string {
+	if langOpts == nil || langOpts.Raw == nil {
+		return ""
+	}
+	if s, ok := langOpts.Raw["sourceType"].(string); ok {
+		return s
+	}
+	parserOptions, ok := langOpts.Raw["parserOptions"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := parserOptions["sourceType"].(string)
+	return s
+}
+
 // RulePluginPrefix extracts the plugin prefix from a rule name.
 // "@typescript-eslint/no-explicit-any" → "@typescript-eslint"
 // "import/no-unresolved" → "import"

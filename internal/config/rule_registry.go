@@ -62,6 +62,7 @@ func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig
 	}
 
 	globals := ExtractGlobals(mergedConfig.LanguageOptions)
+	sourceType := ExtractSourceType(mergedConfig.LanguageOptions)
 	var enabledRules []linter.ConfiguredRule
 	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
@@ -83,6 +84,7 @@ func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig
 					Name:               ruleName,
 					Settings:           CloneSettings(mergedConfig.Settings),
 					Globals:            globals,
+					SourceType:         sourceType,
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,

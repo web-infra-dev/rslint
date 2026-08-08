@@ -59,6 +59,29 @@ func TestExtractGlobals_NoLanguageOptions(t *testing.T) {
 	}
 }
 
+func TestExtractSourceType(t *testing.T) {
+	if got := ExtractSourceType(nil); got != "" {
+		t.Errorf("ExtractSourceType(nil) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{}); got != "" {
+		t.Errorf("ExtractSourceType(empty) = %q, want \"\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{"sourceType": "module"}}); got != "module" {
+		t.Errorf("ExtractSourceType(sourceType) = %q, want \"module\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{
+		"parserOptions": map[string]any{"sourceType": "script"},
+	}}); got != "script" {
+		t.Errorf("ExtractSourceType(parserOptions.sourceType) = %q, want \"script\"", got)
+	}
+	if got := ExtractSourceType(&LanguageOptions{Raw: map[string]any{
+		"sourceType":    "module",
+		"parserOptions": map[string]any{"sourceType": "script"},
+	}}); got != "module" {
+		t.Errorf("ExtractSourceType prefers languageOptions.sourceType, got %q", got)
+	}
+}
+
 func TestMergeLanguageOptions_MergesGlobalsByName(t *testing.T) {
 	base := &LanguageOptions{Raw: map[string]any{
 		"globals": map[string]any{
