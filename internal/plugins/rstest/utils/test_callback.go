@@ -118,6 +118,22 @@ func resolveRstestTestCallback(
 	return info
 }
 
+// ResolveNamedRstestCallback returns the function declaration node and name
+// when a Rstest test call passes its callback by reference to a hoisted
+// function declaration (e.g. test('x', run); function run() { ... }). It
+// mirrors jest's ResolveNamedFunctionCallback: inline functions and const
+// function expressions are left to the enclosing-call ancestor walk, so only a
+// KindFunctionDeclaration node is returned. The overload-aware argument
+// resolution (timeout vs options callback position) is shared with the callback
+// collector via resolveRstestTestCallback.
+func ResolveNamedRstestCallback(ctx rule.RuleContext, call *ast.CallExpression) (*ast.Node, string) {
+	info := resolveRstestTestCallback(ctx, call)
+	if info.functionNode != nil && info.functionNode.Kind == ast.KindFunctionDeclaration {
+		return info.functionNode, info.name
+	}
+	return nil, info.name
+}
+
 func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rstestCallbackInfo {
 	if argument == nil {
 		return rstestCallbackInfo{}
