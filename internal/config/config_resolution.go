@@ -45,9 +45,11 @@ func (config RslintConfig) matchConfigEntries(
 	globalIgnorePatterns []IgnorePattern,
 	entryIgnorePatterns [][]IgnorePattern,
 ) (configMatchKey, bool) {
-	if len(globalIgnorePatterns) > 0 &&
-		(isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) ||
-			isFileIgnored(filePath, globalIgnorePatterns, cwd)) {
+	if len(globalIgnorePatterns) > 0 && isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
+		return configMatchKey{}, false
+	}
+	matchPath := newFileMatchPath(filePath, cwd)
+	if len(globalIgnorePatterns) > 0 && matchPath.isIgnored(globalIgnorePatterns) {
 		return configMatchKey{}, false
 	}
 
@@ -63,12 +65,12 @@ func (config RslintConfig) matchConfigEntries(
 		if isGlobalIgnoreEntry(entry) {
 			continue
 		}
-		if hasFileSelectors(entry) && !isFileMatchedByConfigEntry(filePath, entry, cwd) {
+		if hasFileSelectors(entry) && !matchPath.matchesConfigEntry(entry) {
 			continue
 		}
 
 		ignores := entryIgnorePatternsAt(entryIgnorePatterns, index, entry)
-		if isFileIgnored(filePath, ignores, cwd) {
+		if len(ignores) > 0 && matchPath.isIgnored(ignores) {
 			continue
 		}
 

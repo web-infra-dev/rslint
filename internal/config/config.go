@@ -760,6 +760,34 @@ func normalizePathWithCaseSensitivity(filePath, cwd string, useCaseSensitive boo
 	}))
 }
 
+// fileMatchPath keeps the path representations shared by config-entry
+// selectors and file-level ignores for one resolution. It initializes lazily
+// so directory-blocked files and entries without path matchers do no extra
+// normalization work.
+type fileMatchPath struct {
+	original   string
+	cwd        string
+	normalized string
+	unix       string
+	ready      bool
+}
+
+func newFileMatchPath(filePath string, cwd string) fileMatchPath {
+	return fileMatchPath{original: filePath, cwd: cwd}
+}
+
+func (path *fileMatchPath) normalizedPaths() (string, string) {
+	if !path.ready {
+		path.normalized = path.original
+		if path.cwd != "" {
+			path.normalized = normalizePath(path.original, path.cwd)
+		}
+		path.unix = strings.ReplaceAll(path.normalized, "\\", "/")
+		path.ready = true
+	}
+	return path.normalized, path.unix
+}
+
 // MergedConfig is the final computed configuration for a single file
 type MergedConfig struct {
 	Rules           map[string]*RuleConfig
@@ -861,14 +889,19 @@ func hasFileSelectors(entry ConfigEntry) bool {
 }
 
 func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) bool {
-	if isFileMatched(filePath, entry.Files, cwd) {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesConfigEntry(entry)
+}
+
+func (path *fileMatchPath) matchesConfigEntry(entry ConfigEntry) bool {
+	if path.matchesAny(entry.Files) {
 		return true
 	}
 	for _, group := range entry.FilePatternGroups {
 		// ESLint treats an empty nested selector as a vacuously true AND group.
 		matched := true
 		for _, pattern := range group {
-			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
+			if !path.matchesSingle(pattern) {
 				matched = false
 				break
 			}
@@ -928,46 +961,45 @@ func cloneConfigValue(value any) any {
 
 // isFileMatched checks if a file matches any of the given glob patterns
 func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesAny(patterns)
+}
+
+func (path *fileMatchPath) matchesAny(patterns []string) bool {
 	for _, pattern := range patterns {
-		if isSingleFilePatternMatched(filePath, pattern, cwd) {
+		if path.matchesSingle(pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
+func (path *fileMatchPath) matchesSingle(pattern string) bool {
 	negated := false
 	for strings.HasPrefix(pattern, "!") {
 		negated = !negated
 		pattern = strings.TrimPrefix(pattern, "!")
 	}
-	matched := isPositiveFilePatternMatched(filePath, pattern, cwd)
+	matched := path.matchesPositive(pattern)
 	if negated {
 		return !matched
 	}
 	return matched
 }
 
-func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	var normalizedPath string
-	if cwd != "" {
-		normalizedPath = normalizePath(filePath, cwd)
-	} else {
-		normalizedPath = filePath
-	}
+func (path *fileMatchPath) matchesPositive(pattern string) bool {
+	normalizedPath, unixPath := path.normalizedPaths()
 
 	normalizedPattern := normalizePattern(pattern)
 
 	if utils.MatchGlob(normalizedPattern, normalizedPath) {
 		return true
 	}
-	if normalizedPath != filePath {
-		if utils.MatchGlob(normalizedPattern, filePath) {
+	if normalizedPath != path.original {
+		if utils.MatchGlob(normalizedPattern, path.original) {
 			return true
 		}
 	}
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
 		if utils.MatchGlob(normalizedPattern, unixPath) {
 			return true
