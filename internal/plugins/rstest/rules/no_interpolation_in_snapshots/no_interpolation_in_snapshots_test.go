@@ -28,6 +28,10 @@ func TestNoInterpolationInSnapshotsRule(t *testing.T) {
 			{Code: "toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);"},
 			{Code: `expect(something).toThrowErrorMatchingInlineSnapshot();`},
 			{Code: "expect(something).toThrowErrorMatchingInlineSnapshot(`No interpolation`);"},
+			{Code: "expect(something).toThrowErrorMatchingInlineSnapshot(`No interpolation`, `case ${id}`);"},
+			{Code: "expect(something).toMatchInlineSnapshot({}, `No interpolation`, `case ${id}`);"},
+			{Code: "expect(something).toMatchInlineSnapshot(`No interpolation`, `case ${id}`);"},
+			{Code: "const snapshot: string = `No interpolation`;\nexpect(something).toMatchInlineSnapshot(snapshot, `case ${id}`);"},
 
 			// Snapshot matchers whose expected value lives outside the source
 			// file: updating them never rewrites the argument, so interpolation
@@ -119,10 +123,34 @@ func TestNoInterpolationInSnapshotsRule(t *testing.T) {
 						Column:    41,
 						EndColumn: 51,
 					},
+				},
+			},
+			{
+				Code: "expect(something).toMatchInlineSnapshot({}, `${snapshot}`, `case ${id}`);",
+				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "noInterpolation",
-						Column:    53,
-						EndColumn: 64,
+						Column:    45,
+						EndColumn: 58,
+					},
+				},
+			},
+			{
+				Code: "const properties = {};\nexpect(something).toMatchInlineSnapshot(properties, `${snapshot}`, `case ${id}`);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noInterpolation",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: "expect(something).toThrowErrorMatchingInlineSnapshot(`${snapshot}`, `case ${id}`);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noInterpolation",
+						Column:    54,
+						EndColumn: 67,
 					},
 				},
 			},
