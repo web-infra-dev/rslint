@@ -86,12 +86,11 @@ func GetStaticStringValue(node *ast.Node) string {
 // astUtils.isSpecificId / isSpecificMemberAccess shape: outer parentheses and
 // optional chaining are transparent, TS-only assertion wrappers are not.
 //
-// globals is the config-declared `languageOptions.globals` / `/* global */`
-// set (ctx.Globals); when it explicitly turns the referenced name `off`,
-// the identifier no longer resolves to a known global and this returns
-// false. Pass nil to skip that check (e.g. for callers whose upstream ESLint
-// rule doesn't consult scope at all).
-func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) bool {
+// override returns the final explicitly authored access for a name. When it
+// turns the referenced name `off`, the identifier no longer resolves to a
+// known global. Pass nil to skip that check (e.g. for callers whose upstream
+// ESLint rule doesn't consult scope at all).
+func IsGlobalParseIntCallee(callee *ast.Node, override func(string) GlobalAccess) bool {
 	callee = ast.SkipParentheses(callee)
 	if callee == nil {
 		return false
@@ -101,7 +100,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) b
 		if callee.AsIdentifier().Text != "parseInt" || IsShadowed(callee, "parseInt") {
 			return false
 		}
-		return globals["parseInt"] != GlobalAccessOff
+		return override == nil || override("parseInt") != GlobalAccessOff
 	}
 
 	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
@@ -114,7 +113,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) b
 		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
 		return false
 	}
-	return globals["Number"] != GlobalAccessOff
+	return override == nil || override("Number") != GlobalAccessOff
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference

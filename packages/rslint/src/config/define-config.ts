@@ -129,6 +129,8 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
  * Language-specific configuration.
  */
 export interface LanguageOptions {
+  /** ECMAScript edition used for language globals; omitted defaults to `'latest'`. */
+  ecmaVersion?: number | 'latest';
   parserOptions?: ParserOptions;
   /**
    * Global variables available in this file's scope, e.g. from a browser

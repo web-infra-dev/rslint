@@ -98,7 +98,7 @@ var RadixRule = rule.Rule{
 				if call == nil {
 					return
 				}
-				if !utils.IsGlobalParseIntCallee(call.Expression, ctx.Globals) {
+				if !utils.IsGlobalParseIntCallee(call.Expression, ctx.Globals.Override) {
 					return
 				}
 				checkArguments(ctx, node, call)

@@ -130,11 +130,13 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{
 				Code:    `(window).foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}},
 			},
 			{
 				Code:    `((window)).foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 12, EndLine: 1, EndColumn: 15}},
 			},
 
@@ -142,11 +144,13 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{
 				Code:    `window[0]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"0"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 9}},
 			},
 			{
 				Code:    "window[`foo`]()",
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
 			},
 
@@ -157,21 +161,25 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{
 				Code:    `window[null]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"null"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
 			},
 			{
 				Code:    `window[true]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"true"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
 			},
 			{
 				Code:    `window[false]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"false"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
 			},
 			{
 				Code:    `window[123n]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"123"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
 			},
 
@@ -206,28 +214,6 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "customMessage", Message: "Unexpected use of 'foo'. second wins", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
 			},
 
-			// ---- Intentional divergence: rslint doesn't model ESLint's environment/
-			// languageOptions.globals, so globalThis/self/window (and configured
-			// globalObjects) are always recognized as global-object roots when
-			// checkGlobalObject is enabled — regardless of any declared environment.
-			// See the "SKIP" cases in the upstream file's valid list and the rule
-			// doc's "Differences from ESLint" section.
-			{
-				Code:    `window.foo()`,
-				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}},
-			},
-			{
-				Code:    `self.foo()`,
-				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 6, EndLine: 1, EndColumn: 9}},
-			},
-			{
-				Code:    `globalThis.foo()`,
-				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 12, EndLine: 1, EndColumn: 15}},
-			},
-
 			// ---- Options coverage: bare (unwrapped) string matching the CLI single-option shape ----
 			{
 				Code:    `foo`,
@@ -238,6 +224,7 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{
 				Code:    `window.foo()`,
 				Options: map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}},
 			},
 
@@ -266,6 +253,7 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			{
 				Code:    `window[0x10000000000000000n]()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"18446744073709551616"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 28}},
 			},
 		},

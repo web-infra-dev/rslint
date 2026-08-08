@@ -19,19 +19,22 @@ func findEnclosingFunction(node *ast.Node) *ast.Node {
 	return ast.FindAncestor(node.Parent, ast.IsFunctionLikeDeclaration)
 }
 
-// isGlobalReference checks if an identifier refers to a global variable (not shadowed locally).
+// isGlobalReference checks the effective global scope rather than TypeScript's
+// default libraries, so Reflect follows ecmaVersion and authored overrides.
 func isGlobalReference(node *ast.Node, ctx rule.RuleContext) bool {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
-	if ctx.TypeChecker == nil {
-		return true
-	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-	if symbol == nil {
+	name := node.AsIdentifier().Text
+	if !ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
-	return utils.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			return !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+		}
+	}
+	return !utils.IsShadowed(node, name)
 }
 
 // matchGlobalMethodCall checks if a CallExpression calls objectName.methodName

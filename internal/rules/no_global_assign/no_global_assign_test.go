@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1033,7 +1034,6 @@ func TestNoGlobalAssignRule(t *testing.T) {
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
 				},
 			},
-
 			// A readonly project global is read-only like a builtin
 			{
 				Code:    `myGlobal = 1;`,
@@ -1074,6 +1074,38 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Code: `/* global myGlobal: readonly */ /* global myGlobal: bogus */ myGlobal = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 62},
+				},
+			},
+		},
+	)
+}
+
+func TestNoGlobalAssignECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoGlobalAssignRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `Promise = replacement;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `Promise = replacement;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code:            `Promise = replacement;`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Globals:         map[string]any{"Promise": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 1},
 				},
 			},
 		},

@@ -64,7 +64,7 @@ var JsxNoUndefRule = rule.Rule{
 			if utils.IsShadowed(identNode, name) {
 				return
 			}
-			if checkGlobals && ctx.Globals[name].IsDeclared() {
+			if checkGlobals && ctx.Globals.Access(name).IsDeclared() {
 				return
 			}
 			ctx.ReportNode(identNode, rule.RuleMessage{

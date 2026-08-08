@@ -10,9 +10,12 @@ import (
 type ConfiguredRule struct {
 	Name     string
 	Settings map[string]interface{}
+	// LanguageOptions is normalized once from the effective per-file config and
+	// used to construct ctx.Globals. Its zero value selects latest.
+	LanguageOptions rule.LanguageOptions
 	// Globals is the config-declared `languageOptions.globals` for this file
 	// (name → access level). The linter merges this with inline `/* global */`
-	// comments before exposing the combined result to rules as ctx.Globals.
+	// comments and the selected language globals inside ctx.Globals.
 	// Inline globals and disable directives use candidate-gated lazy comment
 	// collection, so rules never parse either source themselves. Nil when the
 	// config declares none.

@@ -139,7 +139,8 @@ var NoRestrictedGlobalsRule = rule.Rule{
 				}
 
 				// checkGlobalObject: `window.foo`, `self['foo']`, `globalThis.foo`, ...
-				if opts.checkGlobalObject && opts.globalObjects[name] && !utils.IsShadowed(node, name) {
+				if opts.checkGlobalObject && opts.globalObjects[name] &&
+					ctx.Globals.Access(name).IsDeclared() && !utils.IsShadowed(node, name) {
 					checkGlobalObjectAccess(node, name, opts, report)
 				}
 			},

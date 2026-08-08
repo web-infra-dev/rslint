@@ -16,11 +16,11 @@ import (
 // directly (rslint has no eslint-scope-equivalent). This covers the common
 // cases exercised by the ESLint test suite. The rule reports shadowing against
 // declarations visible within the file plus, when `builtinGlobals` is on, the
-// global scope: ECMAScript builtins, default-library symbols (when a type
-// checker is available), and globals declared via config
-// `languageOptions.globals` or `/* global */` comments (`ctx.Globals`), where
-// an explicit `off` setting un-declares the name. Concepts rslint does not
-// expose (for example `parserOptions.globalReturn`) remain unmodeled.
+// effective ESLint global scope from `ctx.Globals`: ECMAScript builtins and
+// globals declared via config `languageOptions.globals` or `/* global */`
+// comments, where an explicit `off` setting un-declares the name. Concepts
+// rslint does not expose (for example `parserOptions.globalReturn`) remain
+// unmodeled.
 
 type hoistMode int
 
@@ -1259,27 +1259,13 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 			strings.HasSuffix(filename, ".d.cts") ||
 			strings.HasSuffix(filename, ".d.mts")
 
-		// Pre-compute the set of default-library globals. We seed with a
-		// hard-coded ECMAScript list (so the rule works without a
-		// TypeChecker, and so it still flags `var Object = 0` at module
-		// scope where TypeChecker would resolve `Object` to the local
-		// binding), then union in whatever the default library exposes.
+		// Build the set solely from ESLint's effective global scope. TypeScript
+		// default-library value symbols such as window/top/console describe the
+		// type-checking environment, not languageOptions.globals, and must not make
+		// this core scope rule depend on whether a TypeChecker is available.
 		builtinGlobals := map[string]bool{}
 		if opts.builtinGlobals {
-			utils.AddECMAScriptGlobals(builtinGlobals)
-			utils.AddDefaultLibraryGlobals(builtinGlobals, ctx.Program, ctx.TypeChecker)
-			// Config `languageOptions.globals` and `/* global */` comments
-			// declare additional globals beyond the ECMAScript/lib set. An
-			// explicit `off` setting un-declares the builtin from the global
-			// scope (ESLint removes the variable entirely), so shadowing it
-			// no longer reports.
-			for name, access := range ctx.Globals {
-				if access.IsDeclared() {
-					builtinGlobals[name] = true
-				} else {
-					delete(builtinGlobals, name)
-				}
-			}
+			ctx.Globals.ApplyTo(builtinGlobals)
 		}
 		b.builtinGlobals = builtinGlobals
 

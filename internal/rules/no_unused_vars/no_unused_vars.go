@@ -2481,7 +2481,7 @@ func newRule() rule.Rule {
 
 			ensureCollected(ctx.SourceFile.AsNode())
 			if opts.Vars != "local" {
-				for _, inlineGlobal := range ctx.InlineGlobals {
+				for _, inlineGlobal := range ctx.Globals.InlineDeclarations() {
 					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
 						continue
 					}

@@ -198,6 +198,21 @@ See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and u
 
 - **Type:** `object`
 
+#### languageOptions.ecmaVersion
+
+- **Type:** `number | 'latest'`
+- **Default:** `'latest'`
+
+Selects the standard ECMAScript globals exposed to native rules. Accepted numbers match ESLint/Espree: `3`, `5`, edition aliases `6` through `17`, or years `2015` through `2026`. Edition aliases are normalized to their year (`6` is ES2015 and `17` is ES2026). The `'latest'` value remains semantic rather than being frozen into the config, so it follows the ESLint version targeted by rslint. This option currently selects globals; it does not change TypeScript's parser target.
+
+```ts
+{
+  languageOptions: {
+    ecmaVersion: 'latest',
+  },
+}
+```
+
 #### languageOptions.parserOptions.projectService
 
 - **Type:** `boolean`

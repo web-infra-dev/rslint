@@ -8,23 +8,16 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-label-var
 //
-// Strategy: hybrid. ESLint's `getVariableByName` walks the scope chain all the
-// way to the global scope, catching both file-local declarations and globals
-// from `env`/`globals`. We approximate it with three complementary checks:
+// ESLint's `getVariableByName` walks the scope chain all the way to the global
+// scope. The same-file binding check and framework globals view cover those
+// two layers without allowing TypeScript libraries to change the result:
 //
 //  1. utils.IsShadowed — fast, works without type info; covers every binding
 //     declared inside the current source file (var/let/const, function, class,
 //     enum, namespace, import, parameter, catch, for-init, function-expression
 //     name, hoisted vars).
-//  2. ctx.Globals — catches names declared via config `languageOptions.globals`
-//     or `/* global foo */` comments, mirroring ESLint's env/globals config.
-//  3. ctx.TypeChecker.GetSymbolsInScope — when type info is available, also
-//     catches globals provided by the tsconfig `lib` (e.g. `window`, `Promise`,
-//     `console`).
-//
-// On a JS file with no tsconfig only steps 1-2 run, so the rule still catches
-// the dominant case (label clashing with a sibling declaration or a declared
-// global).
+//  2. ctx.Globals — catches the selected ECMAScript edition plus config and
+//     inline globals, including explicit `off` overrides.
 var NoLabelVarRule = rule.Rule{
 	Name: "no-label-var",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -48,19 +41,8 @@ var NoLabelVarRule = rule.Rule{
 					return
 				}
 
-				if ctx.Globals[name].IsDeclared() {
+				if ctx.Globals.Access(name).IsDeclared() {
 					report(node)
-					return
-				}
-
-				if ctx.TypeChecker == nil {
-					return
-				}
-				for _, sym := range ctx.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
-					if sym != nil && sym.Name == name {
-						report(node)
-						return
-					}
 				}
 			},
 		}

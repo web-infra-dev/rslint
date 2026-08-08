@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -35,13 +36,9 @@ func TestPreferObjectSpreadUpstream(t *testing.T) {
 			{Code: "\n        import Object from 'foo';\n        Object.assign({ foo: 'bar' });\n        "},
 			{Code: "\n        import { Something as Object } from 'foo';\n        Object.assign({ foo: 'bar' });\n        "},
 			{Code: "\n        import { Object, Array } from 'globals';\n        Object.assign({ foo: 'bar' });\n        "},
-			// SKIP: relies on ESLint's ecmaVersion 2018 default not declaring
-			// `globalThis` as a known global, so ReferenceTracker never chains
-			// through it. rslint always recognizes `globalThis` regardless of
-			// any ecmaVersion-like setting — see "Differences from ESLint".
-			{Code: `globalThis.Object.assign({}, foo)`, Skip: true},
-			{Code: `globalThis.Object.assign({}, { foo: 'bar' })`, Skip: true},
-			{Code: `globalThis.Object.assign({}, baz, { foo: 'bar' })`, Skip: true},
+			{Code: `globalThis.Object.assign({}, foo)`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2018}},
+			{Code: `globalThis.Object.assign({}, { foo: 'bar' })`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
+			{Code: `globalThis.Object.assign({}, baz, { foo: 'bar' })`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
 			{Code: "\n                var globalThis = foo;\n                globalThis.Object.assign({}, foo)\n                "},
 			{Code: `class C { #assign; foo() { Object.#assign({}, foo); } }`},
 
