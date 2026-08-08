@@ -4,7 +4,9 @@ import (
 	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_explicit_any.schema.json
@@ -104,6 +106,20 @@ func isWithinKeyofAny(node *ast.Node) bool {
 	return typeOp != nil && typeOp.Operator == ast.KindKeyOfKeyword
 }
 
+func anyKeywordRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	const keyword = "any"
+	end := node.End()
+	start := end - len(keyword)
+	text := sourceFile.Text()
+	// Parsed keyword nodes end at the token boundary, so the validated suffix
+	// avoids rescanning leading trivia. Reparsed or synthetic nodes keep the
+	// scanner-backed behavior.
+	if start >= 0 && end <= len(text) && text[start:end] == keyword {
+		return core.NewTextRange(start, end)
+	}
+	return utils.TrimNodeTextRange(sourceFile, node)
+}
+
 var NoExplicitAnyRule = rule.CreateRule(rule.Rule{
 	Name:   "no-explicit-any",
 	Schema: rule.NewSchema(schemaJSON),
@@ -115,32 +131,44 @@ var NoExplicitAnyRule = rule.CreateRule(rule.Rule{
 				if opts.IgnoreRestArgs && isAnyInRestParameter(node) {
 					return
 				}
-				if isWithinKeyofAny(node) {
-					if opts.FixToUnknown {
-						ctx.ReportNodeWithFixes(node, buildUnexpectedAnyMessage(), rule.RuleFixReplace(ctx.SourceFile, node.Parent, "PropertyKey"))
-					} else {
-						ctx.ReportNodeWithSuggestions(node, buildUnexpectedAnyMessage(), rule.RuleSuggestion{
-							Message:  buildSuggestPropertyKeyMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node.Parent, "PropertyKey")},
+
+				reportRange := anyKeywordRange(ctx.SourceFile, node)
+				isKeyofAny := isWithinKeyofAny(node)
+				if opts.FixToUnknown {
+					if isKeyofAny {
+						ctx.ReportRangeWithDeferredFixes(reportRange, buildUnexpectedAnyMessage(), func() []rule.RuleFix {
+							return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node.Parent, "PropertyKey")}
 						})
+						return
 					}
+					ctx.ReportRangeWithDeferredFixes(reportRange, buildUnexpectedAnyMessage(), func() []rule.RuleFix {
+						return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, "unknown")}
+					})
 					return
 				}
 
-				if opts.FixToUnknown {
-					ctx.ReportNodeWithFixes(node, buildUnexpectedAnyMessage(), rule.RuleFixReplace(ctx.SourceFile, node, "unknown"))
-				} else {
-					ctx.ReportNodeWithSuggestions(node, buildUnexpectedAnyMessage(),
-						rule.RuleSuggestion{
-							Message:  buildSuggestUnknownMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, "unknown")},
-						},
-						rule.RuleSuggestion{
-							Message:  buildSuggestNeverMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, "never")},
-						},
-					)
+				if isKeyofAny {
+					ctx.ReportRangeWithDeferredSuggestions(reportRange, buildUnexpectedAnyMessage(), func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message:  buildSuggestPropertyKeyMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node.Parent, "PropertyKey")},
+						}}
+					})
+					return
 				}
+
+				ctx.ReportRangeWithDeferredSuggestions(reportRange, buildUnexpectedAnyMessage(), func() []rule.RuleSuggestion {
+					return []rule.RuleSuggestion{
+						{
+							Message:  buildSuggestUnknownMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, "unknown")},
+						},
+						{
+							Message:  buildSuggestNeverMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, "never")},
+						},
+					}
+				})
 			},
 		}
 	},
