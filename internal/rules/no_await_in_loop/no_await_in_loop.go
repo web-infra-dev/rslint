@@ -137,7 +137,8 @@ func isFunctionNode(node *ast.Node) bool {
 
 // NoAwaitInLoopRule disallows await inside of loops
 var NoAwaitInLoopRule = rule.Rule{
-	Name: "no-await-in-loop",
+	Name:   "no-await-in-loop",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindAwaitExpression: func(node *ast.Node) {

@@ -24,7 +24,8 @@ var msg = rule.RuleMessage{
 }
 
 var NoNewFuncRule = rule.Rule{
-	Name: "no-new-func",
+	Name:   "no-new-func",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// isGlobalFunction checks whether an identifier resolves to the
 		// built-in Function (from lib.d.ts), not a user-declared one.

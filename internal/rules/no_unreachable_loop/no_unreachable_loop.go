@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
@@ -265,11 +264,11 @@ func loopBitForKind(kind ast.Kind) loopKindSet {
 
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	ignore, _ := optsMap["ignore"].([]interface{})
+	m, _ := options[0].(map[string]any)
+	ignore, _ := m["ignore"].([]interface{})
 	for _, item := range ignore {
 		name, _ := item.(string)
 		for _, loop := range loopKinds {

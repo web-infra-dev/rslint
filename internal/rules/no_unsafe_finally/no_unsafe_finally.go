@@ -65,7 +65,8 @@ func isInFinally(node *ast.Node, isSentinel func(*ast.Node) bool, label *ast.Nod
 
 // NoUnsafeFinallyRule disallows control flow statements in finally blocks
 var NoUnsafeFinallyRule = rule.Rule{
-	Name: "no-unsafe-finally",
+	Name:   "no-unsafe-finally",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {

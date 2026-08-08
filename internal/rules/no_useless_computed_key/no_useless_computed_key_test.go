@@ -34,15 +34,15 @@ func TestNoUselessComputedKeyRule(t *testing.T) {
 			{Code: `var { a: b } = obj;`},
 
 			// ---- Class members with enforceForClassMembers: true ----
-			{Code: `class Foo { a() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { 'a'() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { [x]() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { ['constructor']() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { static ['prototype']() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `(class { 'a'() {} })`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `(class { [x]() {} })`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `(class { ['constructor']() {} })`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `(class { static ['prototype']() {} })`, Options: map[string]interface{}{"enforceForClassMembers": true}},
+			{Code: `class Foo { a() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { 'a'() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { [x]() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { ['constructor']() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { static ['prototype']() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `(class { 'a'() {} })`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `(class { [x]() {} })`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `(class { ['constructor']() {} })`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `(class { static ['prototype']() {} })`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
 
 			// ---- Class members with default options ----
 			{Code: `class Foo { 'x'() {} }`},
@@ -51,16 +51,16 @@ func TestNoUselessComputedKeyRule(t *testing.T) {
 			{Code: `class Foo { prototype() {} }`},
 
 			// ---- Class members with enforceForClassMembers: false ----
-			{Code: `class Foo { ['x']() {} }`, Options: map[string]interface{}{"enforceForClassMembers": false}},
-			{Code: `(class { ['x']() {} })`, Options: map[string]interface{}{"enforceForClassMembers": false}},
-			{Code: `class Foo { static ['constructor']() {} }`, Options: map[string]interface{}{"enforceForClassMembers": false}},
-			{Code: `class Foo { ['prototype']() {} }`, Options: map[string]interface{}{"enforceForClassMembers": false}},
+			{Code: `class Foo { ['x']() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": false}}},
+			{Code: `(class { ['x']() {} })`, Options: []any{map[string]interface{}{"enforceForClassMembers": false}}},
+			{Code: `class Foo { static ['constructor']() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": false}}},
+			{Code: `class Foo { ['prototype']() {} }`, Options: []any{map[string]interface{}{"enforceForClassMembers": false}}},
 
 			// ---- Class fields ----
-			{Code: `class Foo { a }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { ['constructor'] }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { static ['constructor'] }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class Foo { static ['prototype'] }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
+			{Code: `class Foo { a }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { ['constructor'] }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { static ['constructor'] }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class Foo { static ['prototype'] }`, Options: []any{map[string]interface{}{"enforceForClassMembers": true}}},
 
 			// BigInt literals: browsers throw on bigint property names, so
 			// the rule deliberately leaves them alone.
@@ -341,7 +341,7 @@ func TestNoUselessComputedKeyRule(t *testing.T) {
 			{
 				Code:    `class Foo { ['0']() {} }`,
 				Output:  []string{`class Foo { '0'() {} }`},
-				Options: map[string]interface{}{"enforceForClassMembers": true},
+				Options: []any{map[string]interface{}{"enforceForClassMembers": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessarilyComputedProperty", Line: 1, Column: 13},
 				},
@@ -349,7 +349,7 @@ func TestNoUselessComputedKeyRule(t *testing.T) {
 			{
 				Code:    `class Foo { ['0+1,234']() {} }`,
 				Output:  []string{`class Foo { '0+1,234'() {} }`},
-				Options: map[string]interface{}{},
+				Options: []any{map[string]interface{}{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessarilyComputedProperty", Line: 1, Column: 13},
 				},

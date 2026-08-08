@@ -451,7 +451,8 @@ func buildFixes(sf *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 
 // https://eslint.org/docs/latest/rules/prefer-exponentiation-operator
 var PreferExponentiationOperatorRule = rule.Rule{
-	Name: "prefer-exponentiation-operator",
+	Name:   "prefer-exponentiation-operator",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		message := buildUseExponentiationMessage()

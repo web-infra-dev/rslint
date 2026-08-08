@@ -161,23 +161,23 @@ func TestNoConstantConditionRule(t *testing.T) {
 			{Code: `if ([...x]+'' === 'y'){}`},
 
 			// Loop options - checkLoops: false
-			{Code: `while(true);`, Options: map[string]interface{}{"checkLoops": false}},
-			{Code: `for(;true;);`, Options: map[string]interface{}{"checkLoops": false}},
-			{Code: `do{}while(true)`, Options: map[string]interface{}{"checkLoops": false}},
+			{Code: `while(true);`, Options: []any{map[string]interface{}{"checkLoops": false}}},
+			{Code: `for(;true;);`, Options: []any{map[string]interface{}{"checkLoops": false}}},
+			{Code: `do{}while(true)`, Options: []any{map[string]interface{}{"checkLoops": false}}},
 
 			// Loop options - checkLoops: "none"
-			{Code: `while(true);`, Options: map[string]interface{}{"checkLoops": "none"}},
-			{Code: `for(;true;);`, Options: map[string]interface{}{"checkLoops": "none"}},
-			{Code: `do{}while(true)`, Options: map[string]interface{}{"checkLoops": "none"}},
+			{Code: `while(true);`, Options: []any{map[string]interface{}{"checkLoops": "none"}}},
+			{Code: `for(;true;);`, Options: []any{map[string]interface{}{"checkLoops": "none"}}},
+			{Code: `do{}while(true)`, Options: []any{map[string]interface{}{"checkLoops": "none"}}},
 
 			// Loop options - checkLoops: "allExceptWhileTrue"
-			{Code: `while(true);`, Options: map[string]interface{}{"checkLoops": "allExceptWhileTrue"}},
+			{Code: `while(true);`, Options: []any{map[string]interface{}{"checkLoops": "allExceptWhileTrue"}}},
 			{Code: `while(true);`}, // default
 
 			// Loop options - checkLoops: "all"
-			{Code: `while(a == b);`, Options: map[string]interface{}{"checkLoops": "all"}},
-			{Code: `do{ }while(x);`, Options: map[string]interface{}{"checkLoops": "all"}},
-			{Code: `for (let x = 0; x <= 10; x++) {};`, Options: map[string]interface{}{"checkLoops": "all"}},
+			{Code: `while(a == b);`, Options: []any{map[string]interface{}{"checkLoops": "all"}}},
+			{Code: `do{ }while(x);`, Options: []any{map[string]interface{}{"checkLoops": "all"}}},
+			{Code: `for (let x = 0; x <= 10; x++) {};`, Options: []any{map[string]interface{}{"checkLoops": "all"}}},
 
 			// Generator functions
 			{Code: `function* foo(){while(true){yield 'foo';}}`},
@@ -658,7 +658,7 @@ func TestNoConstantConditionRule(t *testing.T) {
 			},
 			{
 				Code:    `while(true);`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
@@ -865,21 +865,21 @@ func TestNoConstantConditionRule(t *testing.T) {
 			// Loop options - checkLoops: "all"
 			{
 				Code:    `while(x = 1);`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `do{ }while(x = 1)`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `for (;true;) {};`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
@@ -888,70 +888,70 @@ func TestNoConstantConditionRule(t *testing.T) {
 			// Generator functions with constant conditions
 			{
 				Code:    `function* foo(){while(true){} yield 'foo';}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function* foo(){while(true){} yield 'foo';}`,
-				Options: map[string]interface{}{"checkLoops": true},
+				Options: []any{map[string]interface{}{"checkLoops": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function* foo(){while(true){if (true) {yield 'foo';}}}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function* foo(){while(true){if (true) {yield 'foo';}}}`,
-				Options: map[string]interface{}{"checkLoops": true},
+				Options: []any{map[string]interface{}{"checkLoops": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function* foo(){while(true){yield 'foo';} while(true) {}}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function* foo(){while(true){yield 'foo';} while(true) {}}`,
-				Options: map[string]interface{}{"checkLoops": true},
+				Options: []any{map[string]interface{}{"checkLoops": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `var a = function* foo(){while(true){} yield 'foo';}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `var a = function* foo(){while(true){} yield 'foo';}`,
-				Options: map[string]interface{}{"checkLoops": true},
+				Options: []any{map[string]interface{}{"checkLoops": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `while (true) { function* foo() {yield;}}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `while (true) { function* foo() {yield;}}`,
-				Options: map[string]interface{}{"checkLoops": true},
+				Options: []any{map[string]interface{}{"checkLoops": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
@@ -976,14 +976,14 @@ func TestNoConstantConditionRule(t *testing.T) {
 			},
 			{
 				Code:    `function foo() {while (true) {function* bar() {while (true) {yield;}}}}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
 				Code:    `function foo() {while (true) {const bar = function*() {while (true) {yield;}}}}`,
-				Options: map[string]interface{}{"checkLoops": "all"},
+				Options: []any{map[string]interface{}{"checkLoops": "all"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},

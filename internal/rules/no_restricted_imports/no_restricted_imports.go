@@ -1,6 +1,7 @@
 package no_restricted_imports
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_restricted_imports.schema.json
+var schemaJSON []byte
 
 // specifierInfo holds the node and type-only status of an import/export specifier,
 // used to report errors on the correct AST location.
@@ -204,7 +208,7 @@ type Engine struct {
 }
 
 // NewEngine parses options and returns an Engine.
-func NewEngine(options any) *Engine {
+func NewEngine(options []any) *Engine {
 	g, p := parseOptions(options)
 	return &Engine{grouped: g, patterns: p}
 }
@@ -256,7 +260,7 @@ func IsTypeOnlyDeclaration(node *ast.Node) bool {
 // Without this short-circuit, conflicting duplicate entries (e.g. two `paths`
 // for the same name with allowTypeImports both true and false) would diverge
 // from upstream — upstream skips on any "true", rslint core checks per-entry.
-func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
+func BuildAllowTypeImportSourceFilter(options []any) func(source string) bool {
 	grouped, patterns := parseOptions(options)
 	if len(grouped) == 0 && len(patterns) == 0 {
 		return nil
@@ -305,14 +309,9 @@ func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
 //   1. Array of strings/objects: ["fs", { name: "foo", importNames: ["bar"] }]
 //   2. Single object with paths/patterns: [{ paths: [...], patterns: [...] }]
 
-func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
+func parseOptions(arr []any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
 	groupedPaths = make(map[string][]restrictedPathEntry)
 
-	// config.rules unwraps a single configured option to a bare value — a map
-	// for an object option, or a string for a string option such as
-	// ["error","import1"]. NormalizeOptions re-wraps either into eslint
-	// context.options form so each arrives uniformly as arr[0].
-	arr := rule.NormalizeOptions(options)
 	if len(arr) == 0 {
 		return groupedPaths, patternGroups
 	}
@@ -431,9 +430,9 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 // --- Rule Definition ---
 
 var NoRestrictedImportsRule = rule.Rule{
-	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		groupedPaths, patternGroups := parseOptions(options)
 
 		if len(groupedPaths) == 0 && len(patternGroups) == 0 {

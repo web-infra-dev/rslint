@@ -1,10 +1,15 @@
 package no_extend_native
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_extend_native.schema.json
+var schemaJSON []byte
 
 // nativeBuiltins lists ECMAScript globals whose first letter is uppercase.
 // Mirrors ESLint's `Object.keys(astUtils.ECMASCRIPT_GLOBALS).filter(b => b[0].toUpperCase() === b[0])`,
@@ -34,19 +39,19 @@ type options struct {
 	exceptions map[string]bool
 }
 
-func parseOptions(opts any) options {
-	result := options{exceptions: make(map[string]bool)}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if exceptions, ok := optsMap["exceptions"].([]interface{}); ok {
-			for _, e := range exceptions {
-				if s, ok := e.(string); ok {
-					result.exceptions[s] = true
-				}
-			}
+func parseOptions(rawOptions []any) options {
+	opts := options{exceptions: make(map[string]bool)}
+	if len(rawOptions) == 0 {
+		return opts
+	}
+	m, _ := rawOptions[0].(map[string]any)
+	exceptions, _ := m["exceptions"].([]any)
+	for _, e := range exceptions {
+		if s, ok := e.(string); ok {
+			opts.exceptions[s] = true
 		}
 	}
-	return result
+	return opts
 }
 
 // isAssignmentOperator reports whether the given binary operator is a
@@ -111,10 +116,10 @@ func skipParensUp(node *ast.Node) *ast.Node {
 
 // https://eslint.org/docs/latest/rules/no-extend-native
 var NoExtendNativeRule = rule.Rule{
-	Name: "no-extend-native",
-	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.LegacyUnwrapOptions(_opts)
-		o := parseOptions(opts)
+	Name:   "no-extend-native",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		o := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {

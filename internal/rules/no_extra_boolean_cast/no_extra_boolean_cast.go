@@ -1,11 +1,16 @@
 package no_extra_boolean_cast
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_extra_boolean_cast.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-extra-boolean-cast
 
@@ -14,19 +19,19 @@ type options struct {
 	enforceForInnerExpressions bool
 }
 
-func parseOptions(opts any) options {
-	result := options{}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
-		return result
+func parseOptions(rawOptions []any) options {
+	opts := options{}
+	if len(rawOptions) == 0 {
+		return opts
 	}
-	if v, ok := optsMap["enforceForLogicalOperands"].(bool); ok {
-		result.enforceForLogicalOperands = v
+	m, _ := rawOptions[0].(map[string]any)
+	if v, ok := m["enforceForLogicalOperands"].(bool); ok {
+		opts.enforceForLogicalOperands = v
 	}
-	if v, ok := optsMap["enforceForInnerExpressions"].(bool); ok {
-		result.enforceForInnerExpressions = v
+	if v, ok := m["enforceForInnerExpressions"].(bool); ok {
+		opts.enforceForInnerExpressions = v
 	}
-	return result
+	return opts
 }
 
 // effectiveParent returns the first non-parenthesized ancestor of node,
@@ -348,9 +353,9 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 // Reports `!!expr` (double negation) and `Boolean(expr)` calls in
 // contexts that already coerce to boolean.
 var NoExtraBooleanCastRule = rule.Rule{
-	Name: "no-extra-boolean-cast",
-	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
+	Name:   "no-extra-boolean-cast",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
 		opts := parseOptions(ruleOptions)
 
 		negationMsg := rule.RuleMessage{

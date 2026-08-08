@@ -1,6 +1,7 @@
 package one_var
 
 import (
+	_ "embed"
 	"sort"
 	"strings"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed one_var.schema.json
+var schemaJSON []byte
 
 const (
 	modeAlways      = "always"
@@ -86,29 +90,22 @@ func (b *blockScope) get(key string) *funcScope {
 	return nil
 }
 
-// parseOptions normalizes the weakly-typed ESLint options shape — string,
-// `[string]`, object, or `[object]` — into oneVarOptions. The `initialized` /
-// `uninitialized` keys override the corresponding bucket of every per-kind
-// typeOpts (matching upstream's distribution).
-func parseOptions(opts any) oneVarOptions {
+// parseOptions turns the single option — a mode string or a per-kind object —
+// into oneVarOptions. The `initialized` / `uninitialized` keys override the
+// corresponding bucket of every per-kind typeOpts (matching upstream's
+// distribution).
+func parseOptions(options []any) oneVarOptions {
 	const defaultMode = modeAlways
 
 	var rawString string
 	var rawObject map[string]interface{}
 
-	switch v := opts.(type) {
-	case string:
-		rawString = v
-	case []interface{}:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok {
-				rawString = s
-			} else if m, ok := v[0].(map[string]interface{}); ok {
-				rawObject = m
-			}
+	if len(options) > 0 {
+		if s, ok := options[0].(string); ok {
+			rawString = s
+		} else if m, ok := options[0].(map[string]interface{}); ok {
+			rawObject = m
 		}
-	case map[string]interface{}:
-		rawObject = v
 	}
 
 	result := oneVarOptions{}
@@ -674,9 +671,9 @@ func currentScope(key string, funcStack []funcScope, blockStack []blockScope) *f
 }
 
 var OneVarRule = rule.Rule{
-	Name: "one-var",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "one-var",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		needsVarScope := hasMode(opts.var_, modeAlways)
 		needsBlockScope := hasMode(opts.let_, modeAlways) ||

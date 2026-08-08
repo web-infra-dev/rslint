@@ -1,18 +1,21 @@
 package no_empty
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_empty.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-empty
 var NoEmptyRule = rule.Rule{
-	Name: "no-empty",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-empty",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -112,16 +115,17 @@ type noEmptyOptions struct {
 	allowEmptyCatch bool
 }
 
-func parseOptions(opts any) noEmptyOptions {
+func parseOptions(options []any) noEmptyOptions {
 	result := noEmptyOptions{
 		allowEmptyCatch: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allow, ok := optsMap["allowEmptyCatch"].(bool); ok {
-			result.allowEmptyCatch = allow
-		}
+	optsMap, _ := options[0].(map[string]any)
+	if allow, ok := optsMap["allowEmptyCatch"].(bool); ok {
+		result.allowEmptyCatch = allow
 	}
 
 	return result

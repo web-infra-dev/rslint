@@ -1,16 +1,20 @@
 package no_multi_assign
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_multi_assign.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-multi-assign
 var NoMultiAssignRule = rule.Rule{
-	Name: "no-multi-assign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-multi-assign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -70,13 +74,14 @@ type noMultiAssignOptions struct {
 	ignoreNonDeclaration bool
 }
 
-func parseOptions(options any) noMultiAssignOptions {
+func parseOptions(options []any) noMultiAssignOptions {
 	opts := noMultiAssignOptions{ignoreNonDeclaration: false}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["ignoreNonDeclaration"].(bool); ok {
-			opts.ignoreNonDeclaration = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["ignoreNonDeclaration"].(bool); ok {
+		opts.ignoreNonDeclaration = v
 	}
 	return opts
 }

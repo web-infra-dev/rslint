@@ -16,7 +16,8 @@ import (
 // `[]` is empty (the rule fires); `[^]` is permitted (the leading `^` makes
 // it match any character).
 var NoEmptyCharacterClassRule = rule.Rule{
-	Name: "no-empty-character-class",
+	Name:   "no-empty-character-class",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {

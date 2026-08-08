@@ -67,7 +67,8 @@ func isReturnStatementInConstructor(node *ast.Node) bool {
 
 // NoConstructorReturnRule disallows returning values in constructors
 var NoConstructorReturnRule = rule.Rule{
-	Name: "no-constructor-return",
+	Name:   "no-constructor-return",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			// Check return statements

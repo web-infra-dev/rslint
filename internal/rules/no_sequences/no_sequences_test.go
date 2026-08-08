@@ -32,14 +32,14 @@ func TestNoSequencesRule(t *testing.T) {
 			{Code: `a => ((doSomething(), a))`},
 
 			// Options object without the "allowInParentheses" property
-			{Code: `var foo = (1, 2);`, Options: map[string]interface{}{}},
+			{Code: `var foo = (1, 2);`, Options: []any{map[string]interface{}{}}},
 
 			// Explicitly set option "allowInParentheses" to default value
-			{Code: `var foo = (1, 2);`, Options: map[string]interface{}{"allowInParentheses": true}},
+			{Code: `var foo = (1, 2);`, Options: []any{map[string]interface{}{"allowInParentheses": true}}},
 
 			// allowInParentheses: false — for-init / for-update are always allowed
-			{Code: `for ((i = 0, j = 0); test; );`, Options: map[string]interface{}{"allowInParentheses": false}},
-			{Code: `for (; test; (i++, j++));`, Options: map[string]interface{}{"allowInParentheses": false}},
+			{Code: `for ((i = 0, j = 0); test; );`, Options: []any{map[string]interface{}{"allowInParentheses": false}}},
+			{Code: `for (; test; (i++, j++));`, Options: []any{map[string]interface{}{"allowInParentheses": false}}},
 
 			// https://github.com/eslint/eslint/issues/14572 — return of a parenthesised sequence
 			{Code: `const foo = () => { return ((bar = 123), 10) }`},
@@ -171,70 +171,70 @@ func TestNoSequencesRule(t *testing.T) {
 			// ---- allowInParentheses: false — sequences are flagged even inside parens
 			{
 				Code:    `var foo = (1, 2);`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 13},
 				},
 			},
 			{
 				Code:    `(0,eval)("foo()");`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 3},
 				},
 			},
 			{
 				Code:    `foo(a, (b, c), d);`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 10},
 				},
 			},
 			{
 				Code:    `do {} while ((doSomething(), !!test));`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 28},
 				},
 			},
 			{
 				Code:    `for (; (doSomething(), !!test); );`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 22},
 				},
 			},
 			{
 				Code:    `if ((doSomething(), !!test));`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 19},
 				},
 			},
 			{
 				Code:    `switch ((doSomething(), val)) {}`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 23},
 				},
 			},
 			{
 				Code:    `while ((doSomething(), !!test));`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 22},
 				},
 			},
 			{
 				Code:    `with ((doSomething(), val)) {}`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 21},
 				},
 			},
 			{
 				Code:    `a => ((doSomething(), a))`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 21},
 				},
@@ -271,14 +271,14 @@ func TestNoSequencesRule(t *testing.T) {
 			// allowInParentheses:false still reports when wrapped
 			{
 				Code:    `for (x in (a, b)) {}`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 13},
 				},
 			},
 			{
 				Code:    `for (x of (a, b)) {}`,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCommaExpression", Line: 1, Column: 13},
 				},
@@ -367,7 +367,7 @@ func TestNoSequencesRule(t *testing.T) {
 			{
 				Code:    `const x = <div id={(a, b)}/>;`,
 				Tsx:     true,
-				Options: map[string]interface{}{"allowInParentheses": false},
+				Options: []any{map[string]interface{}{"allowInParentheses": false}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedCommaExpression", Line: 1, Column: 22}},
 			},
 

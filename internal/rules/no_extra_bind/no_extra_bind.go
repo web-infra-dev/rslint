@@ -58,7 +58,8 @@ type bindMatch struct {
 
 // https://eslint.org/docs/latest/rules/no-extra-bind
 var NoExtraBindRule = rule.Rule{
-	Name: "no-extra-bind",
+	Name:   "no-extra-bind",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		type scopeInfo struct {
 			match     *bindMatch

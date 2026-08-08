@@ -1,6 +1,7 @@
 package curly
 
 import (
+	_ "embed"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed curly.schema.json
+var schemaJSON []byte
 
 // curlyOptions mirrors ESLint's positional options: the first element selects
 // the mode ("all" | "multi" | "multi-line" | "multi-or-nest"); the second, when
@@ -20,24 +24,15 @@ type curlyOptions struct {
 	consistent  bool
 }
 
-func parseOptions(options any) curlyOptions {
+func parseOptions(options []any) curlyOptions {
 	opts := curlyOptions{}
 
 	var first, second string
-	switch v := options.(type) {
-	case string:
-		first = v
-	case []interface{}:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok {
-				first = s
-			}
-		}
-		if len(v) > 1 {
-			if s, ok := v[1].(string); ok {
-				second = s
-			}
-		}
+	if len(options) > 0 {
+		first, _ = options[0].(string)
+	}
+	if len(options) > 1 {
+		second, _ = options[1].(string)
 	}
 
 	switch first {
@@ -85,9 +80,9 @@ type curlyChecker struct {
 // CurlyRule enforces consistent brace usage on control statements.
 // https://eslint.org/docs/latest/rules/curly
 var CurlyRule = rule.Rule{
-	Name: "curly",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "curly",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		c := &curlyChecker{
 			ctx:     ctx,
 			sf:      ctx.SourceFile,

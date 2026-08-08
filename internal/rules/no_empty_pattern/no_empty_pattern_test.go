@@ -25,21 +25,21 @@ func TestNoEmptyPatternRule(t *testing.T) {
 			// allowObjectPatternsAsParameters: direct parameter
 			{
 				Code:    `function foo({}) {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 			},
 			// allowObjectPatternsAsParameters: parameter with empty object default
 			{
 				Code:    `function foo({} = {}) {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 			},
 			// allowObjectPatternsAsParameters: arrow function
 			{
 				Code:    `({}) => {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 			},
 			{
 				Code:    `({} = {}) => {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -95,7 +95,7 @@ func TestNoEmptyPatternRule(t *testing.T) {
 			// allowObjectPatternsAsParameters: non-empty default should still report
 			{
 				Code:    `function foo({} = {a: 1}) {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 14},
 				},
@@ -103,7 +103,7 @@ func TestNoEmptyPatternRule(t *testing.T) {
 			// allowObjectPatternsAsParameters: non-object default should still report
 			{
 				Code:    `function foo({} = bar) {}`,
-				Options: map[string]interface{}{"allowObjectPatternsAsParameters": true},
+				Options: []any{map[string]interface{}{"allowObjectPatternsAsParameters": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 14},
 				},

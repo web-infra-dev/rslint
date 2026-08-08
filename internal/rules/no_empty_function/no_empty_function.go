@@ -1,6 +1,7 @@
 package no_empty_function
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,11 +10,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_empty_function.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/no-empty-function
 var NoEmptyFunctionRule = rule.Rule{
-	Name: "no-empty-function",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-empty-function",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {
@@ -67,27 +71,19 @@ type noEmptyFunctionOptions struct {
 	allow map[string]bool
 }
 
-func parseOptions(options any) noEmptyFunctionOptions {
-	result := noEmptyFunctionOptions{allow: map[string]bool{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		return result
+func parseOptions(options []any) noEmptyFunctionOptions {
+	opts := noEmptyFunctionOptions{allow: map[string]bool{}}
+	if len(options) == 0 {
+		return opts
 	}
-
-	switch allow := optsMap["allow"].(type) {
-	case []interface{}:
-		for _, item := range allow {
-			if s, ok := item.(string); ok {
-				result.allow[s] = true
-			}
-		}
-	case []string:
-		for _, item := range allow {
-			result.allow[item] = true
+	m, _ := options[0].(map[string]any)
+	allow, _ := m["allow"].([]any)
+	for _, item := range allow {
+		if s, ok := item.(string); ok {
+			opts.allow[s] = true
 		}
 	}
-
-	return result
+	return opts
 }
 
 func isAllowedEmptyFunction(node *ast.Node, opts noEmptyFunctionOptions) bool {

@@ -1,16 +1,20 @@
 package no_empty_pattern
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_empty_pattern.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-empty-pattern
 var NoEmptyPatternRule = rule.Rule{
-	Name: "no-empty-pattern",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-empty-pattern",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -92,16 +96,17 @@ type emptyPatternOptions struct {
 	allowObjectPatternsAsParameters bool
 }
 
-func parseOptions(opts any) emptyPatternOptions {
+func parseOptions(options []any) emptyPatternOptions {
 	result := emptyPatternOptions{
 		allowObjectPatternsAsParameters: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allow, ok := optsMap["allowObjectPatternsAsParameters"].(bool); ok {
-			result.allowObjectPatternsAsParameters = allow
-		}
+	optsMap, _ := options[0].(map[string]any)
+	if allow, ok := optsMap["allowObjectPatternsAsParameters"].(bool); ok {
+		result.allowObjectPatternsAsParameters = allow
 	}
 
 	return result

@@ -1,11 +1,15 @@
 package no_restricted_syntax
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_restricted_syntax.schema.json
+var schemaJSON []byte
 
 // NoRestrictedSyntaxRule is the rslint port of ESLint's `no-restricted-syntax`.
 //
@@ -17,9 +21,9 @@ import (
 //
 // https://eslint.org/docs/latest/rules/no-restricted-syntax
 var NoRestrictedSyntaxRule = rule.Rule{
-	Name: "no-restricted-syntax",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-syntax",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		entries := parseRuleOptions(options)
 		if len(entries) == 0 {
 			return rule.RuleListeners{}
@@ -90,34 +94,20 @@ func (e ruleEntry) formatMessage() string {
 	return fmt.Sprintf("Using '%s' is not allowed.", e.selector)
 }
 
-// parseRuleOptions normalises the loosely-typed options value handed to
-// the rule into a list of ruleEntry. ESLint accepts a mix of strings and
-// `{ selector, message? }` objects; rslint receives a single string, a
-// single object, or an []interface{} depending on how config.go unwrapped
-// the array. Selectors that fail to parse are silently dropped — ESLint
-// rejects the whole config in that case, but for runtime resilience we
-// prefer to drop the offending entry over panicking.
-func parseRuleOptions(opts any) []ruleEntry {
-	if opts == nil {
-		return nil
-	}
+// parseRuleOptions turns the rule's options — a variadic list of selectors,
+// each either a string or a `{ selector, message? }` object — into ruleEntry
+// values. Selectors that fail to parse are silently dropped; ESLint rejects
+// the whole config in that case, but for runtime resilience we prefer to drop
+// the offending entry over panicking.
+func parseRuleOptions(options []any) []ruleEntry {
 	var entries []ruleEntry
-	switch v := opts.(type) {
-	case string:
-		entries = append(entries, buildEntryFromString(v))
-	case map[string]interface{}:
-		if e, ok := buildEntryFromObject(v); ok {
-			entries = append(entries, e)
-		}
-	case []interface{}:
-		for _, item := range v {
-			switch x := item.(type) {
-			case string:
-				entries = append(entries, buildEntryFromString(x))
-			case map[string]interface{}:
-				if e, ok := buildEntryFromObject(x); ok {
-					entries = append(entries, e)
-				}
+	for _, item := range options {
+		switch x := item.(type) {
+		case string:
+			entries = append(entries, buildEntryFromString(x))
+		case map[string]interface{}:
+			if e, ok := buildEntryFromObject(x); ok {
+				entries = append(entries, e)
 			}
 		}
 	}

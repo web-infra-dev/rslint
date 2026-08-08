@@ -10,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-dupe-args
 var NoDupeArgsRule = rule.Rule{
-	Name: "no-dupe-args",
+	Name:   "no-dupe-args",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// NOTE: Unlike ESLint which reports once per duplicated name on the function node,
 		// we report on each individual duplicate occurrence for more precise diagnostics.

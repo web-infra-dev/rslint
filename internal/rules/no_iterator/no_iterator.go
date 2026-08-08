@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-iterator
 var NoIteratorRule = rule.Rule{
-	Name: "no-iterator",
+	Name:   "no-iterator",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{

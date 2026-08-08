@@ -31,7 +31,7 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			{Code: `function Object() {} Object = 'test';`},
 
 			// Exception option
-			{Code: `Object = 0;`, Options: map[string]interface{}{"exceptions": []interface{}{"Object"}}},
+			{Code: `Object = 0;`, Options: []any{map[string]any{"exceptions": []any{"Object"}}}},
 
 			// Read-only usage (not a write reference)
 			{Code: `var x = String(123);`},

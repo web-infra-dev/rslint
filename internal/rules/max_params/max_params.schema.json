@@ -1,0 +1,40 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "object",
+          "properties": {
+            "maximum": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "countVoidThis": {
+              "type": "boolean",
+              "description": "Whether to count a `this` declaration when the type is `void`."
+            },
+            "countThis": {
+              "enum": ["never", "except-void", "always"],
+              "description": "Whether to count a `this` declaration."
+            }
+          },
+          "additionalProperties": false,
+          "not": {
+            "required": ["countVoidThis", "countThis"]
+          }
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
