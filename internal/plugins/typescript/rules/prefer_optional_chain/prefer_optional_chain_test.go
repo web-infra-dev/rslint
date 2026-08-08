@@ -10,6 +10,10 @@ import (
 )
 
 func TestPreferOptionalChainRule(t *testing.T) {
+	if !PreferOptionalChainRule.RequiresTypeInfo {
+		t.Fatal("prefer-optional-chain must require type information")
+	}
+
 	// =====================================================================
 	// GENERATED BASE CASES (mirrors JS BaseCases invocations)
 	// =====================================================================
