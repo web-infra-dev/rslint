@@ -54,6 +54,10 @@ func parseOptions(options any) curlyOptions {
 	return opts
 }
 
+func (o curlyOptions) allMode() bool {
+	return !o.multiOnly && !o.multiLine && !o.multiOrNest
+}
+
 // expectation is a tri-state mirroring ESLint's `expected` (true / false / null).
 type expectation int
 
@@ -89,11 +93,27 @@ var CurlyRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		c := &curlyChecker{
-			ctx:     ctx,
-			sf:      ctx.SourceFile,
-			text:    ctx.SourceFile.Text(),
-			lineMap: ctx.SourceFile.ECMALineMap(),
-			opts:    parseOptions(options),
+			ctx:  ctx,
+			sf:   ctx.SourceFile,
+			text: ctx.SourceFile.Text(),
+			opts: parseOptions(options),
+		}
+
+		// The default/"all" mode only checks whether each body is a block. Keep
+		// it off the multi-mode path, which also inspects statements, tokens,
+		// comments, and lines. "all" plus "consistent" has the same semantics.
+		if c.opts.allMode() {
+			// Reuse one bound listener so setup does not allocate one closure per
+			// supported statement kind on every file.
+			listener := c.checkAllStatement
+			return rule.RuleListeners{
+				ast.KindIfStatement:    listener,
+				ast.KindWhileStatement: listener,
+				ast.KindDoStatement:    listener,
+				ast.KindForStatement:   listener,
+				ast.KindForInStatement: listener,
+				ast.KindForOfStatement: listener,
+			}
 		}
 
 		return rule.RuleListeners{
@@ -117,7 +137,53 @@ var CurlyRule = rule.Rule{
 	},
 }
 
+func (c *curlyChecker) checkAllStatement(node *ast.Node) {
+	switch node.Kind {
+	case ast.KindIfStatement:
+		c.checkAllIfStatement(node)
+	case ast.KindWhileStatement:
+		c.checkAllBody(node.AsWhileStatement().Statement, "while", true)
+	case ast.KindDoStatement:
+		c.checkAllBody(node.AsDoStatement().Statement, "do", false)
+	case ast.KindForStatement:
+		c.checkAllBody(node.AsForStatement().Statement, "for", true)
+	case ast.KindForInStatement:
+		c.checkAllBody(node.AsForInOrOfStatement().Statement, "for-in", false)
+	case ast.KindForOfStatement:
+		c.checkAllBody(node.AsForInOrOfStatement().Statement, "for-of", false)
+	}
+}
+
+func (c *curlyChecker) checkAllIfStatement(node *ast.Node) {
+	parent := node.Parent
+	isElseIf := parent != nil && parent.Kind == ast.KindIfStatement &&
+		parent.AsIfStatement().ElseStatement == node
+	if isElseIf {
+		return
+	}
+
+	for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
+		ifStmt := current.AsIfStatement()
+		c.checkAllBody(ifStmt.ThenStatement, "if", true)
+		alt := ifStmt.ElseStatement
+		if alt != nil && alt.Kind != ast.KindIfStatement {
+			c.checkAllBody(alt, "else", false)
+			break
+		}
+	}
+}
+
+func (c *curlyChecker) checkAllBody(body *ast.Node, name string, condition bool) {
+	if body.Kind == ast.KindBlock {
+		return
+	}
+	c.reportMissingBraces(body, name, condition)
+}
+
 func (c *curlyChecker) lineOf(pos int) int {
+	if c.lineMap == nil {
+		c.lineMap = c.sf.ECMALineMap()
+	}
 	return scanner.ComputeLineOfPosition(c.lineMap, pos)
 }
 
@@ -130,13 +196,27 @@ func (c *curlyChecker) checkIfStatement(node *ast.Node) {
 	if isElseIf {
 		return
 	}
-	for _, pc := range c.prepareIfChecks(node) {
+
+	if !c.opts.consistent {
+		for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
+			ifStmt := current.AsIfStatement()
+			c.check(c.prepareCheck(current, ifStmt.ThenStatement, "if", true))
+			alt := ifStmt.ElseStatement
+			if alt != nil && alt.Kind != ast.KindIfStatement {
+				c.check(c.prepareCheck(current, alt, "else", false))
+				break
+			}
+		}
+		return
+	}
+
+	for _, pc := range c.prepareConsistentIfChecks(node) {
 		c.check(pc)
 	}
 }
 
-func (c *curlyChecker) prepareIfChecks(node *ast.Node) []preparedCheck {
-	checks := []preparedCheck{}
+func (c *curlyChecker) prepareConsistentIfChecks(node *ast.Node) []preparedCheck {
+	checks := make([]preparedCheck, 0, 2)
 
 	for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
 		ifStmt := current.AsIfStatement()
@@ -148,31 +228,29 @@ func (c *curlyChecker) prepareIfChecks(node *ast.Node) []preparedCheck {
 		}
 	}
 
-	if c.opts.consistent {
-		// If any node should have, or already has, braces then they all must.
-		anyExpected := false
-		for _, pc := range checks {
-			var v bool
-			switch pc.expected {
-			case expectBraces:
-				v = true
-			case expectNoBraces:
-				v = false
-			default:
-				v = pc.actual
-			}
-			if v {
-				anyExpected = true
-				break
-			}
+	// If any node should have, or already has, braces then they all must.
+	anyExpected := false
+	for _, pc := range checks {
+		var v bool
+		switch pc.expected {
+		case expectBraces:
+			v = true
+		case expectNoBraces:
+			v = false
+		default:
+			v = pc.actual
 		}
-		target := expectNoBraces
-		if anyExpected {
-			target = expectBraces
+		if v {
+			anyExpected = true
+			break
 		}
-		for i := range checks {
-			checks[i].expected = target
-		}
+	}
+	target := expectNoBraces
+	if anyExpected {
+		target = expectBraces
+	}
+	for i := range checks {
+		checks[i].expected = target
 	}
 
 	return checks
@@ -232,24 +310,35 @@ func (c *curlyChecker) check(pc preparedCheck) {
 		return
 	}
 
-	bodyRange := utils.TrimNodeTextRange(c.sf, pc.body)
-
 	if wantBraces {
-		fixText := "{" + c.text[bodyRange.Pos():bodyRange.End()] + "}"
-		c.ctx.ReportRangeWithFixes(
-			bodyRange,
-			c.message(true, pc.condition, pc.name),
-			rule.RuleFixReplaceRange(bodyRange, fixText),
-		)
+		c.reportMissingBraces(pc.body, pc.name, pc.condition)
 		return
 	}
 
 	// Unnecessary braces: body is a block statement.
-	if fix, ok := c.buildRemoveBracesFix(pc.node, pc.body, bodyRange); ok {
-		c.ctx.ReportRangeWithFixes(bodyRange, c.message(false, pc.condition, pc.name), fix)
-	} else {
-		c.ctx.ReportRange(bodyRange, c.message(false, pc.condition, pc.name))
-	}
+	bodyRange := utils.TrimNodeTextRange(c.sf, pc.body)
+	c.ctx.ReportRangeWithDeferredFixes(
+		bodyRange,
+		c.message(false, pc.condition, pc.name),
+		func() []rule.RuleFix {
+			if fix, ok := c.buildRemoveBracesFix(pc.node, pc.body, bodyRange); ok {
+				return []rule.RuleFix{fix}
+			}
+			return nil
+		},
+	)
+}
+
+func (c *curlyChecker) reportMissingBraces(body *ast.Node, name string, condition bool) {
+	bodyRange := utils.TrimNodeTextRange(c.sf, body)
+	c.ctx.ReportRangeWithDeferredFixes(
+		bodyRange,
+		c.message(true, condition, name),
+		func() []rule.RuleFix {
+			fixText := "{" + c.text[bodyRange.Pos():bodyRange.End()] + "}"
+			return []rule.RuleFix{rule.RuleFixReplaceRange(bodyRange, fixText)}
+		},
+	)
 }
 
 func (c *curlyChecker) message(missing, condition bool, name string) rule.RuleMessage {
