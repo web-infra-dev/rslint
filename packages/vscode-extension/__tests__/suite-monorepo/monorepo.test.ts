@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
 import { revertTextDocument } from '../utils/documents';
+import { CoreResolver } from '../../src/CoreResolver';
 
 suite('rslint monorepo multi-config support', function () {
   this.timeout(120000);
@@ -26,7 +27,81 @@ suite('rslint monorepo multi-config support', function () {
     });
   }
 
+  suiteSetup(async () => {
+    const sourceCore = path.dirname(
+      require.resolve('@rslint/core/package.json'),
+    );
+    const nestedCore = path.join(
+      getWorkspaceRoot(),
+      'packages/foo/node_modules/@rslint/core',
+    );
+    await fs.promises.mkdir(nestedCore, { recursive: true });
+    await Promise.all([
+      fs.promises.copyFile(
+        path.join(sourceCore, 'package.json'),
+        path.join(nestedCore, 'package.json'),
+      ),
+      fs.promises.cp(
+        path.join(sourceCore, 'dist'),
+        path.join(nestedCore, 'dist'),
+        { recursive: true, force: false, errorOnExist: true },
+      ),
+    ]);
+    await fs.promises.symlink(
+      path.join(sourceCore, 'node_modules'),
+      path.join(nestedCore, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  });
+
   // ======== Basic multi-config resolution ========
+
+  test('root and nested physical core copies run concurrently', async () => {
+    const rootDoc = await openFile('src/index.ts');
+    const fooDoc = await openFile('packages/foo/src/index.ts');
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(workspaceFolder);
+
+    const resolver = new CoreResolver();
+    const [rootCore, fooCore] = await Promise.all([
+      resolver.resolve(rootDoc, workspaceFolder),
+      resolver.resolve(fooDoc, workspaceFolder),
+    ]);
+    assert.notStrictEqual(
+      rootCore.installation.identity,
+      fooCore.installation.identity,
+    );
+    assert.strictEqual(
+      rootCore.installation.version,
+      fooCore.installation.version,
+    );
+
+    await vscode.window.showTextDocument(rootDoc, { preview: false });
+    await vscode.window.showTextDocument(fooDoc, { preview: false });
+    const [rootDiagnostics, fooDiagnostics] = await Promise.all([
+      waitForDiagnostics(rootDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-explicit-any'),
+        ),
+      ),
+      waitForDiagnostics(fooDoc, (diagnostics) =>
+        diagnostics.some((diagnostic) =>
+          diagnostic.message.includes('no-unsafe-member-access'),
+        ),
+      ),
+    ]);
+
+    assert.ok(
+      rootDiagnostics.some((diagnostic) =>
+        diagnostic.message.includes('no-explicit-any'),
+      ),
+    );
+    assert.ok(
+      fooDiagnostics.some((diagnostic) =>
+        diagnostic.message.includes('no-unsafe-member-access'),
+      ),
+    );
+  });
 
   test('root file should use root config (no-explicit-any: error)', async () => {
     const doc = await openFile('src/index.ts');

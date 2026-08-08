@@ -76,7 +76,7 @@ suite('workspace document router', () => {
     await workspace.fs.delete(testDirectory, { recursive: true });
   });
 
-  test('hands an open document to the longest active root', async () => {
+  test('hands an open document to its explicitly selected runtime', async () => {
     const router = new WorkspaceDocumentRouter();
     const parent = new FakeRoutingRuntime(
       parentFolder.uri.toString(),
@@ -87,11 +87,13 @@ suite('workspace document router', () => {
       childFolder,
     );
 
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
     assert.strictEqual(router.getServerOpenOwner(document), parent.rootKey);
     parent.events.length = 0;
 
     await router.activate(child);
+    await router.assign(document, child.rootKey);
     assert.strictEqual(router.getServerOpenOwner(document), child.rootKey);
     assert.deepStrictEqual(
       parent.events.filter((event) => event.includes(document.uri.toString())),
@@ -105,6 +107,7 @@ suite('workspace document router', () => {
 
     child.events.length = 0;
     parent.events.length = 0;
+    await router.assign(document, parent.rootKey);
     await router.deactivate(child.rootKey);
     assert.strictEqual(router.getServerOpenOwner(document), parent.rootKey);
     assert.deepStrictEqual(
@@ -129,6 +132,7 @@ suite('workspace document router', () => {
       childFolder.uri.toString(),
       childFolder,
     );
+    await router.assign(document, child.rootKey);
     await router.activate(parent);
     await router.activate(child);
 
@@ -165,6 +169,7 @@ suite('workspace document router', () => {
       parentFolder.uri.toString(),
       parentFolder,
     );
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
 
     let forwarded = 0;
@@ -187,6 +192,7 @@ suite('workspace document router', () => {
       parentFolder.uri.toString(),
       parentFolder,
     );
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
     parent.events.length = 0;
 
@@ -210,6 +216,7 @@ suite('workspace document router', () => {
       parentFolder.uri.toString(),
       parentFolder,
     );
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
     parent.events.length = 0;
 
@@ -239,11 +246,13 @@ suite('workspace document router', () => {
       childFolder.uri.toString(),
       childFolder,
     );
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
     await router.resetServerSession(parent);
     parent.events.length = 0;
 
     await router.activate(child);
+    await router.assign(document, child.rootKey);
 
     assert.strictEqual(router.getServerOpenOwner(document), child.rootKey);
     assert.strictEqual(
@@ -267,6 +276,7 @@ suite('workspace document router', () => {
       parentFolder.uri.toString(),
       parentFolder,
     );
+    await router.assign(staleDocument, parent.rootKey);
     await router.activate(parent);
     const didOpen = router.createMiddleware(parent).didOpen;
     assert.ok(didOpen);
@@ -316,6 +326,7 @@ suite('workspace document router', () => {
       parentFolder.uri.toString(),
       parentFolder,
     );
+    await router.assign(staleDocument, parent.rootKey);
     await router.activate(parent);
     const firstDidOpen = router.createMiddleware(parent).didOpen;
     assert.ok(firstDidOpen);
@@ -363,6 +374,7 @@ suite('workspace document router', () => {
     );
     const oldMiddleware = router.createMiddleware(oldRuntime);
     const replacementMiddleware = router.createMiddleware(replacement);
+    await router.assign(document, oldRuntime.rootKey);
     await router.activate(oldRuntime);
     await router.deactivate(oldRuntime.rootKey);
     await router.activate(replacement);
@@ -391,6 +403,7 @@ suite('workspace document router', () => {
       childFolder.uri.toString(),
       childFolder,
     );
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
 
     let release!: () => void;
@@ -412,6 +425,7 @@ suite('workspace document router', () => {
     );
 
     await router.activate(child);
+    await router.assign(document, child.rootKey);
     release();
     assert.strictEqual(await Promise.resolve(action), undefined);
     await router.closeAll();
@@ -428,10 +442,12 @@ suite('workspace document router', () => {
       childFolder,
     );
     child.failOpen = true;
+    await router.assign(document, parent.rootKey);
     await router.activate(parent);
+    await router.activate(child);
 
     await assert.rejects(
-      router.activate(child),
+      router.assign(document, child.rootKey),
       /failed to activate document owner/,
     );
     assert.strictEqual(router.getServerOpenOwner(document), parent.rootKey);
