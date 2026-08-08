@@ -67,7 +67,7 @@ jobs:
           # The Windows runner can exhaust its commit limit with up to 64
           # package builds/test binaries in flight. Keep every package and
           # test, but cap inter-package concurrency to bound peak memory use.
-          $packageParallelism = 16
+          $packageParallelism = 32
 
           # Pre-build shared dependencies to warm the build cache
           go build -p $packageParallelism ./cmd/... ./internal/...
