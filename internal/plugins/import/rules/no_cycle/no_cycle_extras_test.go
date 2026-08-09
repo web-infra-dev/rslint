@@ -43,6 +43,13 @@ func TestNoCycleExtras(t *testing.T) {
 			// ---- Real-user: #1647 ignoreExternal skips external folders reached through a relative intermediate ----
 			{Code: `import { externalDepthTwo } from "./no-cycle/external-depth-two"; export const rootValue = externalDepthTwo; export type RootType = string;`, Options: map[string]interface{}{"ignoreExternal": true}, Settings: map[string]interface{}{"import/external-module-folders": []interface{}{"no-cycle/external"}}},
 
+			// ---- Dimension 3: reaching a cycle is not joining one ----
+			// The linted file imports into a pair that imports each other. It is
+			// not part of that component, so nothing about it is this file's
+			// cycle — the rule reports membership, never reachability.
+			{Code: `import { reachedPairA } from "./no-cycle/reached-pair-a"; export const rootValue = reachedPairA; export type RootType = string;`},
+			{Code: `import { reachedPairA } from "./no-cycle/reached-pair-a"; export const rootValue = reachedPairA; export type RootType = string;`, Options: map[string]interface{}{"allowUnsafeDynamicCyclicDependency": true}},
+
 			// Locks in upstream checkSourceValue() arm 1: unresolved imports return without reporting.
 			{Code: `import missing from "./no-cycle/does-not-exist"; ` + rootExports},
 
@@ -145,6 +152,24 @@ func TestNoCycleExtras(t *testing.T) {
 				Options: map[string]interface{}{"allowUnsafeDynamicCyclicDependency": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					cycleError(messageViaDepthOne),
+				},
+			},
+
+			// ---- Dimension 3: the route survives a file that also imports off the cycle ----
+			// tail-mid imports a leaf before it imports its way back here, so the
+			// search past it has to step over a file that leads nowhere. Both
+			// configurations take the same confined search, so both are locked in.
+			{
+				Code: `import { tailMid } from "./no-cycle/tail-mid"; export const rootValue = tailMid; export type RootType = string;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					cycleError("Dependency cycle via ./tail-back:2"),
+				},
+			},
+			{
+				Code:    `import { tailMid } from "./no-cycle/tail-mid"; export const rootValue = tailMid; export type RootType = string;`,
+				Options: map[string]interface{}{"allowUnsafeDynamicCyclicDependency": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					cycleError("Dependency cycle via ./tail-back:2"),
 				},
 			},
 
