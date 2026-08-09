@@ -1,10 +1,15 @@
 package no_param_reassign
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoParamReassignRule(t *testing.T) {
@@ -860,4 +865,161 @@ function foo(a: any) { a = 1; }`,
 			},
 		},
 	)
+}
+
+func TestNoParamReassignDemandAndDisableParity(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+function direct(a: number) {
+  /* leading */ a = 1;
+}
+function lineDisabled(a: number) {
+  // eslint-disable-next-line no-param-reassign
+  a = 2;
+}
+/* eslint-disable no-param-reassign */
+function blockDisabled(a: { x: number }) {
+  a.x = 3;
+}
+/* eslint-enable no-param-reassign */
+function property(a: { x: number }) {
+  a.x = 4;
+}
+function ignoredExact(ignored: { x: number }) {
+  ignored.x = 5;
+}
+function ignoredRegex(ctxValue: { x: number }) {
+  ctxValue.x = 6;
+}
+function shadowed(a: number) {
+  { let a = 0; a = 7; }
+}`
+
+	root := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(root.Dir, "no-param-reassign-demand.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
+	program, err := utils.CreateProgram(
+		true,
+		fs,
+		root.Dir,
+		"tsconfig.json",
+		utils.CreateCompilerHost(root.Dir, fs),
+	)
+	if err != nil {
+		t.Fatalf("CreateProgram: %v", err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatalf("source file not found for %s", filePath)
+	}
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	t.Cleanup(done)
+
+	type expectedDiagnostic struct {
+		pos         int
+		messageID   string
+		description string
+	}
+	want := []expectedDiagnostic{
+		{
+			pos:         strings.Index(code, "/* leading */ a = 1") + len("/* leading */ "),
+			messageID:   "assignmentToFunctionParam",
+			description: "Assignment to function parameter 'a'.",
+		},
+		{
+			pos:         strings.Index(code, "a.x = 4"),
+			messageID:   "assignmentToFunctionParamProp",
+			description: "Assignment to property of function parameter 'a'.",
+		},
+	}
+	options := []any{map[string]interface{}{
+		"props":                               true,
+		"ignorePropertyModificationsFor":      []interface{}{"ignored"},
+		"ignorePropertyModificationsForRegex": []interface{}{"^ctx"},
+	}}
+
+	for _, checkerCase := range []struct {
+		name        string
+		typeChecker bool
+	}{
+		{name: "with type checker", typeChecker: true},
+		{name: "without type checker", typeChecker: false},
+	} {
+		t.Run(checkerCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, demand := range []rule.EditDemand{
+				rule.EditDemandNone,
+				rule.EditDemandAutofix,
+				rule.EditDemandSuggestion,
+				rule.EditDemandAll,
+			} {
+				comments := rule.NewCommentStore(sourceFile)
+				var diagnostics []rule.RuleDiagnostic
+				checker := typeChecker
+				if !checkerCase.typeChecker {
+					checker = nil
+				}
+				ctx := (rule.RuleContext{
+					SourceFile:     sourceFile,
+					Program:        program,
+					TypeChecker:    checker,
+					Comments:       comments,
+					DisableManager: rule.NewDisableManager(sourceFile, comments),
+				}).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+					Demand: demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				})
+
+				listeners := NoParamReassignRule.Run(ctx, options)
+				var walk func(*ast.Node) bool
+				walk = func(node *ast.Node) bool {
+					if listener := listeners[node.Kind]; listener != nil {
+						listener(node)
+					}
+					node.ForEachChild(walk)
+					return false
+				}
+				walk(sourceFile.AsNode())
+
+				if len(diagnostics) != len(want) {
+					t.Fatalf("demand %d: diagnostics = %#v, want %d", demand, diagnostics, len(want))
+				}
+				for i, diagnostic := range diagnostics {
+					if diagnostic.Range.Pos() != want[i].pos || diagnostic.Range.End() != want[i].pos+1 {
+						t.Errorf(
+							"demand %d diagnostic %d: range = [%d,%d), want [%d,%d)",
+							demand,
+							i,
+							diagnostic.Range.Pos(),
+							diagnostic.Range.End(),
+							want[i].pos,
+							want[i].pos+1,
+						)
+					}
+					if diagnostic.Message.Id != want[i].messageID ||
+						diagnostic.Message.Description != want[i].description {
+						t.Errorf("demand %d diagnostic %d: message = %#v, want %#v", demand, i, diagnostic.Message, want[i])
+					}
+					if diagnostic.RuleName != NoParamReassignRule.Name || diagnostic.Severity != rule.SeverityWarning {
+						t.Errorf(
+							"demand %d diagnostic %d: identity = %s/%d, want %s/%d",
+							demand,
+							i,
+							diagnostic.RuleName,
+							diagnostic.Severity,
+							NoParamReassignRule.Name,
+							rule.SeverityWarning,
+						)
+					}
+					if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+						t.Errorf("demand %d diagnostic %d unexpectedly contains edit artifacts", demand, i)
+					}
+				}
+			}
+		})
+	}
 }

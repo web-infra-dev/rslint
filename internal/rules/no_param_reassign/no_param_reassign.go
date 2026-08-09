@@ -182,8 +182,16 @@ func isModifyingProp(ident *ast.Node) bool {
 // Without TypeChecker: falls back to a scope walk — the reference refers to
 // the parameter unless an intermediate scope introduces its own binding with
 // the same name.
-func isSameBinding(ident *ast.Node, name string, paramDecl *ast.Node, paramSymbol *ast.Symbol, fn *ast.Node, ctx rule.RuleContext) bool {
-	if ctx.TypeChecker != nil && paramSymbol != nil {
+func isSameBinding(ident *ast.Node, binding *paramBinding, fn *ast.Node, ctx rule.RuleContext) bool {
+	if ctx.TypeChecker != nil {
+		if !binding.symbolResolved {
+			binding.symbol = ctx.TypeChecker.GetSymbolAtLocation(binding.ident)
+			binding.symbolResolved = true
+		}
+		paramSymbol := binding.symbol
+		if paramSymbol == nil {
+			return !utils.IsNameShadowedBetween(ident, fn, binding.name)
+		}
 		refSym := utils.GetReferenceSymbol(ident, ctx.TypeChecker)
 		if refSym == nil {
 			return false
@@ -192,9 +200,9 @@ func isSameBinding(ident *ast.Node, name string, paramDecl *ast.Node, paramSymbo
 			return true
 		}
 		// Parameter properties: two symbols share a Parameter decl.
-		return paramDecl != nil && refSym.ValueDeclaration == paramDecl
+		return binding.decl != nil && refSym.ValueDeclaration == binding.decl
 	}
-	return !utils.IsNameShadowedBetween(ident, fn, name)
+	return !utils.IsNameShadowedBetween(ident, fn, binding.name)
 }
 
 func isIgnoredPropertyAssignment(opts Options, name string) bool {
@@ -210,14 +218,16 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 }
 
 // paramBinding holds the bits needed to decide whether an identifier elsewhere
-// in the function refers to this parameter — both the symbol (when a
-// TypeChecker is available) and the declaration node (Parameter or
-// BindingElement) as a fallback discriminator.
+// in the function refers to this parameter. The symbol is resolved lazily on
+// the first possible write; most functions never need it. The declaration node
+// (Parameter or BindingElement) remains the fallback discriminator.
 type paramBinding struct {
-	ident  *ast.Node
-	name   string
-	decl   *ast.Node // `ident.Parent` — Parameter or BindingElement
-	symbol *ast.Symbol
+	ident                   *ast.Node
+	name                    string
+	decl                    *ast.Node // `ident.Parent` — Parameter or BindingElement
+	symbol                  *ast.Symbol
+	symbolResolved          bool
+	ignorePropertyMutations bool
 }
 
 // checkFunction walks every identifier inside `fn` and reports reassignments
@@ -231,11 +241,12 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 			continue
 		}
 		utils.CollectBindingNames(param.Name(), func(ident *ast.Node, n string) {
-			b := paramBinding{ident: ident, name: n, decl: ident.Parent}
-			if ctx.TypeChecker != nil {
-				b.symbol = ctx.TypeChecker.GetSymbolAtLocation(ident)
-			}
-			bindings = append(bindings, b)
+			bindings = append(bindings, paramBinding{
+				ident:                   ident,
+				name:                    n,
+				decl:                    ident.Parent,
+				ignorePropertyMutations: opts.Props && isIgnoredPropertyAssignment(opts, n),
+			})
 		})
 	}
 	if len(bindings) == 0 {
@@ -244,7 +255,7 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 
 	// Skip the declaration identifiers themselves when walking.
 	skipSet := make(map[*ast.Node]struct{}, len(bindings))
-	// Quick name lookup for the slices.Contains hot path.
+	// Avoid binding work for identifiers that cannot name a parameter.
 	byName := make(map[string]*paramBinding, len(bindings))
 	for i := range bindings {
 		skipSet[bindings[i].ident] = struct{}{}
@@ -260,15 +271,19 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 			return
 		}
 		if node.Kind == ast.KindIdentifier {
-			if _, skip := skipSet[node]; !skip {
-				name := node.AsIdentifier().Text
-				if b := byName[name]; b != nil && isSameBinding(node, name, b.decl, b.symbol, fn, ctx) {
-					if _, already := reported[node]; !already {
-						if utils.IsWriteReference(node) {
-							reported[node] = struct{}{}
+			name := node.AsIdentifier().Text
+			if b := byName[name]; b != nil {
+				_, skip := skipSet[node]
+				_, already := reported[node]
+				if !skip && !already {
+					isDirectWrite := utils.IsWriteReference(node)
+					isPropertyWrite := !isDirectWrite && opts.Props &&
+						!b.ignorePropertyMutations && isModifyingProp(node)
+					if (isDirectWrite || isPropertyWrite) && isSameBinding(node, b, fn, ctx) {
+						reported[node] = struct{}{}
+						if isDirectWrite {
 							ctx.ReportNode(node, buildAssignmentMessage(name))
-						} else if opts.Props && !isIgnoredPropertyAssignment(opts, name) && isModifyingProp(node) {
-							reported[node] = struct{}{}
+						} else {
 							ctx.ReportNode(node, buildPropAssignmentMessage(name))
 						}
 					}
