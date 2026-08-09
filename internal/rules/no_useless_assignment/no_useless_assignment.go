@@ -206,6 +206,7 @@ func analyzeRoot(
 	readNodes := make(map[*ast.Node]*ast.Symbol)
 	trackedState := make(map[*ast.Symbol]bool)
 	var assignments []*assignment
+	var readsScratch []*ast.Node
 
 	for _, raw := range raws {
 		tracked, known := trackedState[raw.sym]
@@ -216,7 +217,8 @@ func analyzeRoot(
 				// this same code path: a read from a nested function may run at
 				// any time, so no assignment to the variable can be proven
 				// unused.
-				reads := readReferences(ctx, raw.sym)
+				readsScratch = appendReadReferences(readsScratch[:0], ctx, raw.sym)
+				reads := readsScratch
 				if len(reads) == 0 {
 					// An entirely unread variable is `no-unused-vars`' business.
 					tracked = false
@@ -257,10 +259,10 @@ func analyzeRoot(
 
 	graph := cfg.Build(root, hooks(readNodes, assignByIdent))
 
-	dead := deadWrites(graph, assignments)
+	markDeadWrites(graph, assignments)
 	var reports []*ast.Node
 	for _, a := range assignments {
-		if !a.silent && dead[a] {
+		if !a.silent && a.dead {
 			reports = append(reports, a.identifier)
 		}
 	}
@@ -368,11 +370,11 @@ func collectLocallyExportedSymbols(ctx *rule.RuleContext) map[*ast.Symbol]bool {
 	return symbols
 }
 
-// readReferences returns the identifiers that read sym. A compound assignment
-// or an update expression reads its target before writing it, so those count
-// as reads too.
-func readReferences(ctx *rule.RuleContext, sym *ast.Symbol) []*ast.Node {
-	var reads []*ast.Node
+// appendReadReferences appends the identifiers that read sym to reads. A
+// compound assignment or an update expression reads its target before writing
+// it, so those count as reads too. The caller reuses reads across symbols in
+// one root to avoid allocating a short-lived slice for every binding.
+func appendReadReferences(reads []*ast.Node, ctx *rule.RuleContext, sym *ast.Symbol) []*ast.Node {
 	for _, ref := range ctx.Refs.References(sym) {
 		if !utils.IsWriteReference(ref) || isReadWriteReference(ref) {
 			reads = append(reads, ref)

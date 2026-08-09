@@ -129,6 +129,9 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
     v = arr;
   } finally { console.log(v); }
 }`},
+			// A finally write is copied into the returning and fallthrough CFG
+			// paths. A read on either copy keeps the assignment live.
+			{Code: `function f(c) { let v = 0; g(v); try { if (c) return; } finally { v = 1; } g(v); }`},
 
 			// ---- A TS assertion wrapper around an assignment target is not a
 			// pattern: the write is invisible to the rule, so it neither
@@ -523,6 +526,24 @@ var obj;`,
 				Code: `function f() { try { for (var i = 0;; i++) { break; } return 1; } catch (e) {} let x = 1; x = 2; return x; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryAssignment", Line: 1, Column: 84, EndLine: 1, EndColumn: 85},
+				},
+			},
+
+			// Every copy of a finally write is dead here, so its inline site and
+			// additional site must agree on the report.
+			{
+				Code: `function f(c) { let v = 0; g(v); try { if (c) return; } finally { v = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 67, EndLine: 1, EndColumn: 68},
+				},
+			},
+			// Multiple live variables share the reverse CFG work queue. Only the
+			// two stores after the loop are dead.
+			{
+				Code: `function f(c) { let a = 0, b = 0; g(a, b); while (c()) { a = 1; b = 1; if (c()) continue; g(a, b); } a = 2; b = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 102, EndLine: 1, EndColumn: 103},
+					{MessageId: "unnecessaryAssignment", Line: 1, Column: 109, EndLine: 1, EndColumn: 110},
 				},
 			},
 
