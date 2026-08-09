@@ -984,19 +984,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			},
 		},
 	}
+	runOpts.PreparedPlan = linter.PrepareLintPlan(runOpts)
 	// Dispatch eslint-plugin rules to the Node worker in parallel with the
 	// native lint pass; results are awaited + merged before output / --fix.
 	// ONLY when plugins are actually configured — otherwise the whole reverse-
-	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
-	// over every file) is skipped so the native-only path pays nothing for the
-	// feature.
+	// dispatch is skipped so the native-only path pays nothing for the feature.
+	// Both paths consume the same prepared file/rule plan.
 	hasEslintPlugins := len(eslintPlugins) > 0
 	pluginResolver := pluginConfigResolver{
 		lintResolver: fileConfigResolver,
 	}
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
-		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
+		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginResolver)
 		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
 	}
 
@@ -1134,12 +1134,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					},
 				},
 			}
+			fixRunOpts.PreparedPlan = linter.PrepareLintPlan(fixRunOpts)
 			// Re-dispatch plugin rules each pass (only when configured): the
 			// worker re-reads the post-fix file content, and merging here keeps
 			// plugin diagnostics from being lost when allDiags is replaced.
+			// Each pass prepares a fresh plan for the rebuilt target binding.
 			var fixPluginCh <-chan []rule.RuleDiagnostic
 			if hasEslintPlugins {
-				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
+				fixPluginInputs := buildPluginFileInputs(fixRunOpts.PreparedPlan, pluginConfigResolver{
 					lintResolver: fixConfigResolver,
 				})
 				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)

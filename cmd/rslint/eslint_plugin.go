@@ -40,13 +40,12 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	return wireKey, resolver.ConfigForFile(configPath)
 }
 
-// buildPluginFileInputs collects, from RunLinter's lint targets, the files that
-// have eslint-plugin rules and assembles their dispatch inputs. It reuses
-// linter.CollectLintTargets so the dispatched file set matches the native pass
-// exactly, and reuses each target's already-loaded *ast.SourceFile as the
-// rebuild frame so Go never re-reads or re-decodes the file.
-func buildPluginFileInputs(runOpts linter.RunLinterOptions, resolver pluginConfigResolver) []linter.EslintPluginFileInput {
-	targets := linter.CollectLintTargets(runOpts)
+// buildPluginFileInputs projects third-party plugin inputs from the same
+// prepared file/rule plan consumed by native linting. Each target's already-
+// loaded *ast.SourceFile is reused as the rebuild frame, so Go never re-reads
+// or re-decodes the file.
+func buildPluginFileInputs(plan *linter.LintPlan, resolver pluginConfigResolver) []linter.EslintPluginFileInput {
+	targets := plan.Targets()
 	if len(targets) == 0 {
 		return nil
 	}
