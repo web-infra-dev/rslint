@@ -423,6 +423,56 @@ func TestNoUnusedVarsTypeOnlyLocalExports(t *testing.T) {
 	)
 }
 
+func TestNoUnusedVarsUsedFastPath(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const used = 1; consume(used);`},
+			{
+				Code: `const _used = 1; consume(_used);`,
+				Options: map[string]interface{}{
+					"varsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": false,
+				},
+			},
+			{
+				Code: `function use(_arg) { consume(_arg); } use(1);`,
+				Options: map[string]interface{}{
+					"args":                    "all",
+					"argsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": false,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `const _used = 1; consume(_used);`,
+				Options: map[string]interface{}{
+					"varsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUsedIgnoredError("_used", ". Used vars must not match /^_/u", 1, 7, 12),
+				},
+			},
+			{
+				Code: `function use(_arg) { consume(_arg); } use(1);`,
+				Options: map[string]interface{}{
+					"args":                    "all",
+					"argsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUsedIgnoredError("_arg", ". Used args must not match /^_/u", 1, 14, 18),
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsWithoutSourceFile(t *testing.T) {
 	t.Parallel()
 	listeners := NoUnusedVarsRule.Run(rule.RuleContext{}, nil)
