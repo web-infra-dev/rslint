@@ -13,7 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed no-unused-vars.schema.json
+//go:embed no_unused_vars.schema.json
 var schemaJSON []byte
 
 type Config struct {
