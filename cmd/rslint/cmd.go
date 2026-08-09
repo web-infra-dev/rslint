@@ -827,13 +827,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	programs := realProgramSet.Programs
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
+	enforcePlugins := usesJSConfig
 	var (
-		targetPlan                 lintTargetPlan
-		typeInfoFiles              map[string]struct{}
-		targetsByProgram           [][]string
-		targetPathBySourcePath     map[string]string
-		configPathBySourcePath     map[string]string
-		ownerConfigDirBySourcePath map[string]string
+		targetPlan             lintTargetPlan
+		typeInfoFiles          map[string]struct{}
+		targetsByProgram       [][]string
+		targetPathBySourcePath map[string]string
+		standaloneGapGroups    [][]resolvedLintTarget
+		fileConfigResolver     *lintConfigResolver
 	)
 	// --type-check-only is program-wide and pays no lint-target discovery,
 	// fallback, config-resolution, or Program-binding cost.
@@ -865,7 +866,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				return 1
 			}
 		}
-		binding, err := bindLintTargetPlan(realProgramSet, targetPlan, currentDirectory, buildContext, singleThreaded)
+		binding, resolver, err := bindCLILintTargetPlan(
+			realProgramSet,
+			targetPlan,
+			currentDirectory,
+			buildContext,
+			singleThreaded,
+			lintConfigResolverOptions{
+				ConfigMap:        configMap,
+				Config:           rslintConfig,
+				CurrentDirectory: currentDirectory,
+				EnforcePlugins:   enforcePlugins,
+			},
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -874,8 +887,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		typeInfoFiles = binding.TypeInfoFiles
 		targetsByProgram = binding.TargetsByProgram
 		targetPathBySourcePath = binding.TargetPathBySourcePath
-		configPathBySourcePath = binding.ConfigPathBySourcePath
-		ownerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
+		standaloneGapGroups = binding.standaloneGapGroups
+		fileConfigResolver = resolver
 	}
 
 	// Initial build (including any fallback) is complete. Evict entries for
@@ -885,7 +898,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Rebuild real Programs and bind the original stable target plan again on
 	// every fix pass. A target can move between a tsconfig Program and fallback
 	// when fixes change the import graph.
-	createPrograms := func() (lintTargetBinding, error) {
+	createPrograms := func() (lintTargetBinding, *lintConfigResolver, error) {
 		var rebuilt lintProgramSet
 		var err error
 		if configMap != nil {
@@ -894,9 +907,21 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			rebuilt, err = createProgramSetForConfig(currentDirectory, rslintConfig, singleThreaded, buildContext)
 		}
 		if err != nil {
-			return lintTargetBinding{}, err
+			return lintTargetBinding{}, nil, err
 		}
-		return bindLintTargetPlan(rebuilt, targetPlan, currentDirectory, buildContext, singleThreaded)
+		return bindCLILintTargetPlan(
+			rebuilt,
+			targetPlan,
+			currentDirectory,
+			buildContext,
+			singleThreaded,
+			lintConfigResolverOptions{
+				ConfigMap:        configMap,
+				Config:           rslintConfig,
+				CurrentDirectory: currentDirectory,
+				EnforcePlugins:   enforcePlugins,
+			},
+		)
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -916,18 +941,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}()
 
-	enforcePlugins := usesJSConfig
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		Config:                     rslintConfig,
-		CurrentDirectory:           currentDirectory,
-		EnforcePlugins:             enforcePlugins,
-		TypeInfoFiles:              typeInfoFiles,
-		ConfigPathBySourcePath:     configPathBySourcePath,
-		OwnerConfigDirBySourcePath: ownerConfigDirBySourcePath,
-		SourceMappingsCanonical:    true,
-		FS:                         fs,
-	})
 	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 		return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
 	}
@@ -950,6 +963,21 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		typeCheckOnly,
 	)
 	for _, diagnostic := range syntaxDiagnostics {
+		diagnosticsChan <- diagnostic
+	}
+	standaloneSyntaxDiagnostics, standaloneLintedFileCount, err := collectStandaloneGapSyntacticDiagnostics(
+		standaloneGapGroups,
+		currentDirectory,
+		buildContext,
+		singleThreaded,
+	)
+	if err != nil {
+		close(diagnosticsChan)
+		wg.Wait()
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	for _, diagnostic := range standaloneSyntaxDiagnostics {
 		diagnosticsChan <- diagnostic
 	}
 
@@ -1008,7 +1036,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 1
 	}
 
-	lintedfileCount := lintResult.LintedFileCount
+	lintedfileCount := lintResult.LintedFileCount + standaloneLintedFileCount
 
 	wg.Wait()
 	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
@@ -1056,7 +1084,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
 		// Skip if nothing was fixed in the first pass (no need to re-lint).
 		for pass := 1; pass <= maxFixPasses && fixedCount > 0; pass++ {
-			newBinding, err := createPrograms()
+			newBinding, fixConfigResolver, err := createPrograms()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error rebuilding Programs after fixes: %v\n", err)
 				return 1
@@ -1080,17 +1108,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixTargetPathBySourcePath := newBinding.TargetPathBySourcePath
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			fixTypeInfoFiles := newBinding.TypeInfoFiles
-			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-				ConfigMap:                  configMap,
-				Config:                     rslintConfig,
-				CurrentDirectory:           currentDirectory,
-				EnforcePlugins:             enforcePlugins,
-				TypeInfoFiles:              fixTypeInfoFiles,
-				ConfigPathBySourcePath:     newBinding.ConfigPathBySourcePath,
-				OwnerConfigDirBySourcePath: newBinding.OwnerConfigDirBySourcePath,
-				SourceMappingsCanonical:    true,
-				FS:                         fs,
-			})
 			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return fixConfigResolver.ActiveRulesForFile(sourceFile.FileName())
 			}
@@ -1113,6 +1130,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				typeCheckOnly,
 			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
+			fixStandaloneDiagnostics, _, standaloneErr := collectStandaloneGapSyntacticDiagnostics(
+				newBinding.standaloneGapGroups,
+				currentDirectory,
+				buildContext,
+				singleThreaded,
+			)
+			if standaloneErr != nil {
+				fmt.Fprintf(os.Stderr, "error rebuilding Programs after fixes: %v\n", standaloneErr)
+				return 1
+			}
+			passDiags = append(passDiags, fixStandaloneDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,

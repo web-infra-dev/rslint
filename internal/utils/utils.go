@@ -435,6 +435,18 @@ func LineContentEnd(text string, nextLineStart int) int {
 // Used by RunLinterInProgram to skip files during program source file iteration.
 var ExcludePaths = []string{"/node_modules/", "bundled:"}
 
+// IsExcludedLintPath applies the linter's path-substring exclusions to one
+// normalized source path. Exact-target and transient syntax-only paths share
+// this predicate so their linted-file counts cannot drift.
+func IsExcludedLintPath(path string, excludePaths []string) bool {
+	for _, pattern := range excludePaths {
+		if strings.Contains(path, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
 // exclusions used by lint target discovery and fallback Program roots.

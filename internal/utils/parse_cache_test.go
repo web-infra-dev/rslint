@@ -284,6 +284,52 @@ func TestCachingHost_SourceSnapshotSharedAcrossParseOptions(t *testing.T) {
 	}
 }
 
+func TestSourceSnapshotHost_SharesTextWithoutRetainingAST(t *testing.T) {
+	fileName := "/virtual/transient.ts"
+	oldText := "export const value = 1;\n"
+	newText := "export const value = 2;\n"
+	fs := newMemoryReadFS(map[string]string{fileName: oldText})
+	cache := &ParseCache{}
+	regularHost := WithParseCache(CreateCompilerHost("/virtual", fs), cache)
+	transientHost := WithSourceSnapshots(CreateCompilerHost("/virtual", fs), cache)
+	opts := testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{})
+
+	regular := regularHost.GetSourceFile(opts)
+	fs.set(fileName, newText)
+	transientA := transientHost.GetSourceFile(opts)
+	transientB := transientHost.GetSourceFile(opts)
+	if regular == nil || transientA == nil || transientB == nil {
+		t.Fatal("regular and transient hosts must parse the shared snapshot")
+	}
+	if transientA.Text() != oldText || transientB.Text() != oldText {
+		t.Fatal("transient parses must observe the generation's authoritative source snapshot")
+	}
+	if transientA == regular || transientB == regular || transientA == transientB {
+		t.Fatal("transient parses must not reuse or publish cached AST objects")
+	}
+	if got := fs.readCount(fileName); got != 1 {
+		t.Fatalf("regular and transient hosts must share one source read, got %d", got)
+	}
+
+	entryCount := 0
+	cache.m.Range(func(_, _ any) bool {
+		entryCount++
+		return true
+	})
+	if entryCount != 1 {
+		t.Fatalf("transient parses changed the AST cache size: got %d, want 1", entryCount)
+	}
+
+	cache.InvalidateSourceSnapshots()
+	updated := transientHost.GetSourceFile(opts)
+	if updated == nil || updated.Text() != newText {
+		t.Fatalf("transient host did not observe the new source generation: %v", updated)
+	}
+	if got := fs.readCount(fileName); got != 2 {
+		t.Fatalf("new source generation must perform one new read, got %d", got)
+	}
+}
+
 func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {
 	tmpDir := t.TempDir()
 	fileName := tspath.NormalizePath(filepath.Join(tmpDir, "shared.ts"))

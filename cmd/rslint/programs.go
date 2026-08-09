@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/module"
+	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -290,6 +294,17 @@ func parallelGitignoreAndPrograms(
 	return configWithIgnores, programs, nil
 }
 
+func fallbackCompilerOptions() *core.CompilerOptions {
+	return &core.CompilerOptions{
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}
+}
+
 // createFallbackProgram creates a Program for selected lint targets not
 // included in any existing Program. It uses minimal compiler options sufficient
 // for AST parsing (no type checking).
@@ -299,14 +314,12 @@ func createFallbackProgram(
 	configDir string,
 	buildContext *utils.ProgramBuildContext,
 ) (*compiler.Program, error) {
-	program, err := buildContext.CreateProgramFromOptionsLenient(singleThreaded, configDir, &core.CompilerOptions{
-		Target:    core.ScriptTargetESNext,
-		Module:    core.ModuleKindESNext,
-		Jsx:       core.JsxEmitPreserve,
-		AllowJs:   core.TSTrue,
-		NoLib:     core.TSTrue,
-		NoResolve: core.TSTrue,
-	}, gapFiles)
+	program, err := buildContext.CreateProgramFromOptionsLenient(
+		singleThreaded,
+		configDir,
+		fallbackCompilerOptions(),
+		gapFiles,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create fallback Program for %d lint target(s): %w", len(gapFiles), err)
 	}
@@ -433,6 +446,7 @@ type lintTargetBinding struct {
 	TargetPathBySourcePath     map[string]string
 	ConfigPathBySourcePath     map[string]string
 	OwnerConfigDirBySourcePath map[string]string
+	standaloneGapGroups        [][]resolvedLintTarget
 }
 
 func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
@@ -770,16 +784,16 @@ func orderedProgramIndexesForConfig(set lintProgramSet, configDir string) []int 
 	return indexes
 }
 
-// bindLintTargetPlan binds every stable target to a Program from its governing
-// config. Calling this for each fix pass recomputes gap status from the current
-// import graph instead of retaining an initial gap classification.
-func bindLintTargetPlan(
+// bindLintTargetsToRealPrograms resolves every stable target against the real
+// Programs declared by its governing config. Gap mappings are published before
+// a fallback policy is chosen so config resolution sees the same lexical,
+// canonical, and owner identities in either path.
+func bindLintTargetsToRealPrograms(
 	set lintProgramSet,
 	plan lintTargetPlan,
-	currentDirectory string,
 	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
-) (lintTargetBinding, error) {
+) (lintTargetBinding, []resolvedLintTarget) {
 	fsys := buildContext.FS()
 	binding := lintTargetBinding{
 		Programs:                   append([]*compiler.Program(nil), set.Programs...),
@@ -824,45 +838,76 @@ func bindLintTargetPlan(
 		if !bound {
 			gaps = append(gaps, target)
 			binding.GapFiles = append(binding.GapFiles, target.Path)
+			storeSourcePathMapping(
+				binding.OwnerConfigDirBySourcePath,
+				target.Path,
+				target.CanonicalPath,
+				target.OwnerConfigDir,
+			)
+			storeSourcePathMapping(
+				binding.ConfigPathBySourcePath,
+				target.Path,
+				target.CanonicalPath,
+				configPathForLintTarget(target, fsys),
+			)
 		}
 	}
+	return binding, gaps
+}
 
-	if len(gaps) > 0 {
-		useCaseSensitive := true
-		if fsys != nil {
-			useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+func appendFallbackPrograms(
+	binding *lintTargetBinding,
+	gaps []resolvedLintTarget,
+	currentDirectory string,
+	buildContext *utils.ProgramBuildContext,
+	singleThreaded bool,
+) error {
+	if len(gaps) == 0 {
+		return nil
+	}
+	fsys := buildContext.FS()
+	useCaseSensitive := true
+	if fsys != nil {
+		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+	}
+	for _, fallbackTargets := range groupFallbackTargets(gaps, currentDirectory, useCaseSensitive) {
+		fallbackFiles := make([]string, 0, len(fallbackTargets))
+		for _, gap := range fallbackTargets {
+			fallbackFiles = append(fallbackFiles, gap.Path)
 		}
-		for _, fallbackTargets := range groupFallbackTargets(gaps, currentDirectory, useCaseSensitive) {
-			fallbackFiles := make([]string, 0, len(fallbackTargets))
-			for _, gap := range fallbackTargets {
-				fallbackFiles = append(fallbackFiles, gap.Path)
+		fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, buildContext)
+		if err != nil {
+			return err
+		}
+		if fallback == nil {
+			return fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(fallbackTargets))
+		}
+		fallbackIndex := len(binding.Programs)
+		binding.Programs = append(binding.Programs, fallback)
+		binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
+		for _, gap := range fallbackTargets {
+			sourceFile := exactProgramSourceFile(fallback, gap.Path)
+			if sourceFile == nil {
+				return fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
 			}
-			fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, buildContext)
-			if err != nil {
-				return lintTargetBinding{}, err
-			}
-			if fallback == nil {
-				return lintTargetBinding{}, fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(fallbackTargets))
-			}
-			fallbackIndex := len(binding.Programs)
-			binding.Programs = append(binding.Programs, fallback)
-			binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
-			for _, gap := range fallbackTargets {
-				sourceFile := exactProgramSourceFile(fallback, gap.Path)
-				if sourceFile == nil {
-					return lintTargetBinding{}, fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
-				}
-				sourcePath := sourceFile.FileName()
-				binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
+			sourcePath := sourceFile.FileName()
+			binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
+			if tspath.NormalizePath(sourcePath) != gap.Path {
 				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, gap.CanonicalPath, gap.OwnerConfigDir)
-				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, gap.CanonicalPath, configPathForLintTarget(gap, fsys))
-				if tspath.NormalizePath(sourcePath) != gap.Path {
-					storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.CanonicalPath, gap.Path)
-				}
+				storeSourcePathMapping(
+					binding.ConfigPathBySourcePath,
+					sourcePath,
+					gap.CanonicalPath,
+					binding.ConfigPathBySourcePath[tspath.NormalizePath(gap.Path)],
+				)
+				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.CanonicalPath, gap.Path)
 			}
 		}
 	}
+	return nil
+}
 
+func finalizeLintTargetBinding(binding *lintTargetBinding) {
 	for i := range binding.TargetsByProgram {
 		sort.Strings(binding.TargetsByProgram[i])
 	}
@@ -872,7 +917,319 @@ func bindLintTargetPlan(
 	if len(binding.TargetPathBySourcePath) == 0 {
 		binding.TargetPathBySourcePath = nil
 	}
+}
+
+// bindLintTargetPlan binds every stable target to a Program from its governing
+// config. API callers retain this conservative path. The CLI may defer the
+// fallback decision until it knows whether any gap has an executable rule.
+// Calling either path for each fix pass recomputes gap status from the current
+// import graph instead of retaining an initial gap classification.
+func bindLintTargetPlan(
+	set lintProgramSet,
+	plan lintTargetPlan,
+	currentDirectory string,
+	buildContext *utils.ProgramBuildContext,
+	singleThreaded bool,
+) (lintTargetBinding, error) {
+	binding, gaps := bindLintTargetsToRealPrograms(set, plan, buildContext, singleThreaded)
+	if err := appendFallbackPrograms(&binding, gaps, currentDirectory, buildContext, singleThreaded); err != nil {
+		return lintTargetBinding{}, err
+	}
+	finalizeLintTargetBinding(&binding)
 	return binding, nil
+}
+
+func anyGapHasActiveRules(
+	gaps []resolvedLintTarget,
+	resolver *lintConfigResolver,
+	singleThreaded bool,
+) bool {
+	if len(gaps) == 0 || resolver == nil {
+		return false
+	}
+	hasRules := func(gap resolvedLintTarget) bool {
+		return len(resolver.ActiveRulesForFile(gap.Path)) > 0
+	}
+	workerCount := min(runtime.GOMAXPROCS(0), len(gaps))
+	if singleThreaded || workerCount < 2 {
+		for _, gap := range gaps {
+			if hasRules(gap) {
+				return true
+			}
+		}
+		return false
+	}
+
+	var found atomic.Bool
+	chunkSize := (len(gaps) + workerCount - 1) / workerCount
+	work := core.NewWorkGroup(false)
+	for worker := range workerCount {
+		start := worker * chunkSize
+		end := min(start+chunkSize, len(gaps))
+		if start >= end {
+			continue
+		}
+		chunk := gaps[start:end]
+		work.Queue(func() {
+			for _, gap := range chunk {
+				if found.Load() {
+					return
+				}
+				if hasRules(gap) {
+					found.Store(true)
+					return
+				}
+			}
+		})
+	}
+	work.RunAndWait()
+	return found.Load()
+}
+
+func allGapRootsSupportedByFallback(gaps []resolvedLintTarget, useCaseSensitive bool) bool {
+	options := fallbackCompilerOptions()
+	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(
+		options,
+		tspath.AllSupportedExtensions,
+	)
+	for _, gap := range gaps {
+		if !tspath.HasExtension(gap.Path) {
+			return false
+		}
+		fileName := tspath.GetCanonicalFileName(gap.Path, useCaseSensitive)
+		supported := false
+		for _, extensions := range supportedExtensions {
+			if tspath.FileExtensionIsOneOf(fileName, extensions) {
+				supported = true
+				break
+			}
+		}
+		if !supported {
+			return false
+		}
+	}
+	return true
+}
+
+// bindCLILintTargetPlan keeps the API's Program-backed contract separate from
+// the CLI syntax-only fast path. A single active rule on any gap retains the
+// complete legacy fallback set so cross-file and Program-dependent rules see
+// exactly the same roots as before.
+func bindCLILintTargetPlan(
+	set lintProgramSet,
+	plan lintTargetPlan,
+	currentDirectory string,
+	buildContext *utils.ProgramBuildContext,
+	singleThreaded bool,
+	resolverOptions lintConfigResolverOptions,
+) (lintTargetBinding, *lintConfigResolver, error) {
+	binding, gaps := bindLintTargetsToRealPrograms(set, plan, buildContext, singleThreaded)
+	resolverOptions.TypeInfoFiles = binding.TypeInfoFiles
+	if len(gaps) == 0 {
+		// Preserve the no-gap invariant: nil means every bound target has type
+		// information and avoids a redundant per-file membership lookup.
+		resolverOptions.TypeInfoFiles = nil
+	}
+	resolverOptions.ConfigPathBySourcePath = binding.ConfigPathBySourcePath
+	resolverOptions.OwnerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
+	resolverOptions.SourceMappingsCanonical = true
+	resolverOptions.FS = buildContext.FS()
+	resolver := newLintConfigResolver(resolverOptions)
+	if len(gaps) == 0 {
+		finalizeLintTargetBinding(&binding)
+		return binding, resolver, nil
+	}
+
+	useCaseSensitive := true
+	if fsys := buildContext.FS(); fsys != nil {
+		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+	}
+	// Direct parsing is valid only for roots the fallback Program itself would
+	// admit. Unsupported explicit targets must retain the legacy failure path.
+	if anyGapHasActiveRules(gaps, resolver, singleThreaded) || !allGapRootsSupportedByFallback(gaps, useCaseSensitive) {
+		if err := appendFallbackPrograms(&binding, gaps, currentDirectory, buildContext, singleThreaded); err != nil {
+			return lintTargetBinding{}, nil, err
+		}
+	} else {
+		binding.standaloneGapGroups = groupFallbackTargets(gaps, currentDirectory, useCaseSensitive)
+	}
+	finalizeLintTargetBinding(&binding)
+	return binding, resolver, nil
+}
+
+type fallbackSourceParser struct {
+	host     compiler.CompilerHost
+	options  *core.CompilerOptions
+	resolver *module.Resolver
+}
+
+func newFallbackSourceParser(
+	currentDirectory string,
+	buildContext *utils.ProgramBuildContext,
+) *fallbackSourceParser {
+	options := fallbackCompilerOptions()
+	host := buildContext.NewTransientCompilerHost(currentDirectory)
+	return &fallbackSourceParser{
+		host:     host,
+		options:  options,
+		resolver: module.NewResolver(host, options, "", ""),
+	}
+}
+
+func (p *fallbackSourceParser) sourceFileMetaData(fileName string) ast.SourceFileMetaData {
+	packageJsonScope := p.resolver.GetPackageScopeForPath(tspath.GetDirectoryPath(fileName))
+	moduleResolutionKind := p.options.GetModuleResolutionKind()
+
+	var packageJsonType, packageJsonDirectory string
+	if packageJsonScope.Exists() {
+		packageJsonDirectory = packageJsonScope.PackageDirectory
+		if value, ok := packageJsonScope.Contents.Type.GetValue(); ok {
+			hasExplicitFormat := tspath.FileExtensionIsOneOf(fileName, []string{
+				tspath.ExtensionMts,
+				tspath.ExtensionCts,
+				tspath.ExtensionMjs,
+				tspath.ExtensionCjs,
+			})
+			usesNodeFormat := core.ModuleResolutionKindNode16 <= moduleResolutionKind &&
+				moduleResolutionKind <= core.ModuleResolutionKindNodeNext
+			if (!hasExplicitFormat && usesNodeFormat) || strings.Contains(fileName, "/node_modules/") {
+				packageJsonType = value
+			}
+		}
+	}
+
+	return ast.SourceFileMetaData{
+		PackageJsonType:      packageJsonType,
+		PackageJsonDirectory: packageJsonDirectory,
+		ImpliedNodeFormat:    ast.GetImpliedNodeFormatForFile(fileName, packageJsonType),
+	}
+}
+
+func (p *fallbackSourceParser) parse(target resolvedLintTarget) *ast.SourceFile {
+	fileName := tspath.GetNormalizedAbsolutePath(target.Path, p.host.GetCurrentDirectory())
+	metadata := p.sourceFileMetaData(fileName)
+	return p.host.GetSourceFile(ast.SourceFileParseOptions{
+		FileName: fileName,
+		Path: tspath.ToPath(
+			fileName,
+			p.host.GetCurrentDirectory(),
+			p.host.FS().UseCaseSensitiveFileNames(),
+		),
+		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(fileName, p.options, metadata),
+	})
+}
+
+func (p *fallbackSourceParser) syntacticDiagnostics(file *ast.SourceFile) []*ast.Diagnostic {
+	diagnostics := append([]*ast.Diagnostic(nil), file.Diagnostics()...)
+	diagnostics = append(diagnostics, file.JSDiagnostics()...)
+	if ast.IsSourceFileJS(file) && !ast.IsCheckJSEnabledForFile(file, p.options) {
+		diagnostics = append(diagnostics, compiler.GetAdditionalJSSyntacticDiagnostics(file, p.options)...)
+	}
+	return compiler.SortAndDeduplicateDiagnostics(diagnostics)
+}
+
+type standaloneGapParseResult struct {
+	fileName    string
+	path        tspath.Path
+	diagnostics []rule.RuleDiagnostic
+	err         error
+}
+
+type standaloneGapRef struct {
+	groupIndex  int
+	targetIndex int
+}
+
+func collectStandaloneGapSyntacticDiagnostics(
+	groups [][]resolvedLintTarget,
+	currentDirectory string,
+	buildContext *utils.ProgramBuildContext,
+	singleThreaded bool,
+) ([]rule.RuleDiagnostic, int32, error) {
+	if len(groups) == 0 {
+		return nil, 0, nil
+	}
+	parsers := make([]*fallbackSourceParser, len(groups))
+	results := make([][]standaloneGapParseResult, len(groups))
+	var refs []standaloneGapRef
+	for groupIndex, group := range groups {
+		// A resolver's package.json cache uses the host's case-sensitivity for
+		// path keys. Keep collision groups isolated exactly as fallback Programs
+		// were, so distinct exact-case roots can never share package metadata.
+		parsers[groupIndex] = newFallbackSourceParser(currentDirectory, buildContext)
+		results[groupIndex] = make([]standaloneGapParseResult, len(group))
+		for targetIndex := range group {
+			refs = append(refs, standaloneGapRef{groupIndex: groupIndex, targetIndex: targetIndex})
+		}
+	}
+
+	parse := func(ref standaloneGapRef) {
+		target := groups[ref.groupIndex][ref.targetIndex]
+		parser := parsers[ref.groupIndex]
+		file := parser.parse(target)
+		if file == nil {
+			results[ref.groupIndex][ref.targetIndex].err = fmt.Errorf(
+				"fallback Program did not contain lint target %q",
+				target.Path,
+			)
+			return
+		}
+
+		diagnostics := parser.syntacticDiagnostics(file)
+		converted := make([]rule.RuleDiagnostic, len(diagnostics))
+		for i, diagnostic := range diagnostics {
+			converted[i] = typeScriptRuleDiagnostic(file, diagnostic)
+		}
+		results[ref.groupIndex][ref.targetIndex] = standaloneGapParseResult{
+			fileName:    file.FileName(),
+			path:        file.Path(),
+			diagnostics: converted,
+		}
+	}
+
+	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
+	if singleThreaded || workerCount < 2 {
+		for _, ref := range refs {
+			parse(ref)
+		}
+	} else {
+		chunkSize := (len(refs) + workerCount - 1) / workerCount
+		work := core.NewWorkGroup(false)
+		for worker := range workerCount {
+			start := worker * chunkSize
+			end := min(start+chunkSize, len(refs))
+			if start >= end {
+				continue
+			}
+			chunk := refs[start:end]
+			work.Queue(func() {
+				for _, ref := range chunk {
+					parse(ref)
+				}
+			})
+		}
+		work.RunAndWait()
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	var lintedFileCount int32
+	for _, group := range results {
+		seen := make(map[string]struct{}, len(group))
+		for _, result := range group {
+			if result.err != nil {
+				return nil, 0, result.err
+			}
+			diagnostics = append(diagnostics, result.diagnostics...)
+			if _, exists := seen[result.fileName]; exists {
+				continue
+			}
+			seen[result.fileName] = struct{}{}
+			if !utils.IsExcludedLintPath(string(result.path), utils.ExcludePaths) {
+				lintedFileCount++
+			}
+		}
+	}
+	return diagnostics, lintedFileCount, nil
 }
 
 func discoverLintFilesMultiConfig(
@@ -924,6 +1281,19 @@ type syntacticDiagnosticKey struct {
 	end  int
 }
 
+func typeScriptRuleDiagnostic(file *ast.SourceFile, diagnostic *ast.Diagnostic) rule.RuleDiagnostic {
+	return rule.RuleDiagnostic{
+		RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
+		SourceFile:   file,
+		FilePath:     file.FileName(),
+		Range:        diagnostic.Loc(),
+		Message:      rule.RuleMessage{Description: diagnostic.String()},
+		Severity:     rule.SeverityError,
+		Origin:       rule.DiagnosticOriginTypeScript,
+		PreFormatted: true,
+	}
+}
+
 func collectTargetSyntacticDiagnostics(
 	programs []*compiler.Program,
 	targetsByProgram [][]string,
@@ -968,16 +1338,7 @@ func collectTargetSyntacticDiagnostics(
 					continue
 				}
 				seen[key] = struct{}{}
-				diagnostics = append(diagnostics, rule.RuleDiagnostic{
-					RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
-					SourceFile:   file,
-					FilePath:     file.FileName(),
-					Range:        loc,
-					Message:      rule.RuleMessage{Description: diagnostic.String()},
-					Severity:     rule.SeverityError,
-					Origin:       rule.DiagnosticOriginTypeScript,
-					PreFormatted: true,
-				})
+				diagnostics = append(diagnostics, typeScriptRuleDiagnostic(file, diagnostic))
 			}
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -568,14 +567,7 @@ func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 	for _, file := range opts.Program.GetSourceFiles() {
 		p := string(file.Path())
 		// skip lint node_modules and bundled files
-		skipFile := false
-		for _, skipPattern := range opts.ExcludePaths {
-			if strings.Contains(p, skipPattern) {
-				skipFile = true
-				break
-			}
-		}
-		if skipFile {
+		if utils.IsExcludedLintPath(p, opts.ExcludePaths) {
 			continue
 		}
 		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
@@ -609,14 +601,7 @@ func collectExactFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 		}
 		seen[fileName] = struct{}{}
 		p := string(file.Path())
-		skipFile := false
-		for _, skipPattern := range opts.ExcludePaths {
-			if strings.Contains(p, skipPattern) {
-				skipFile = true
-				break
-			}
-		}
-		if skipFile {
+		if utils.IsExcludedLintPath(p, opts.ExcludePaths) {
 			continue
 		}
 		if opts.FileFilter != nil && !opts.FileFilter(fileName) {

@@ -281,6 +281,7 @@ type cachingCompilerHost struct {
 	compiler.CompilerHost
 	cache              *ParseCache
 	useSourceSnapshots bool
+	cacheAST           bool
 }
 
 // WithParseCache wraps host with the shared parse cache. A nil cache returns
@@ -290,6 +291,22 @@ type cachingCompilerHost struct {
 // paths (rule_tester, --api getAstInfo) and grow without bound in
 // long-running processes.
 func WithParseCache(host compiler.CompilerHost, cache *ParseCache) compiler.CompilerHost {
+	if cache == nil {
+		return host
+	}
+	return &cachingCompilerHost{
+		CompilerHost:       host,
+		cache:              cache,
+		useSourceSnapshots: cache.bindSourceSnapshotFS(host.FS()),
+		cacheAST:           true,
+	}
+}
+
+// WithSourceSnapshots preserves the run/request source-generation contract but
+// bypasses the parsed-AST cache. It is used for transient SourceFiles that have
+// no Program owner and should become collectible as soon as their syntax result
+// is consumed.
+func WithSourceSnapshots(host compiler.CompilerHost, cache *ParseCache) compiler.CompilerHost {
 	if cache == nil {
 		return host
 	}
@@ -307,14 +324,20 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 		if !ok {
 			return nil // I1: failed reads are never published
 		}
-		return h.cache.acquireSnapshot(opts, snapshot)
+		if h.cacheAST {
+			return h.cache.acquireSnapshot(opts, snapshot)
+		}
+		return parser.ParseSourceFile(opts, snapshot.text, core.GetScriptKindFromFileName(opts.FileName))
 	}
 
 	text, ok := h.FS().ReadFile(opts.FileName)
 	if !ok {
 		return nil // same as the default host, and never cached
 	}
-	return h.cache.acquire(opts, text)
+	if h.cacheAST {
+		return h.cache.acquire(opts, text)
+	}
+	return parser.ParseSourceFile(opts, text, core.GetScriptKindFromFileName(opts.FileName))
 }
 
 func (h *cachingCompilerHost) acquireSourceSnapshot(
