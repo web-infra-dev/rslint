@@ -256,6 +256,38 @@ foo.map((baz, i) => cloneElement(someChild, { key: i }))
 		// stack is empty; the props-key check short-circuits.
 		{Code: `React.createElement('Foo', { key: i })`, Tsx: true},
 		{Code: `React.cloneElement(child, { key: i })`, Tsx: true},
+		{
+			Code: `
+import { cloneElement } from 'react';
+cloneElement(child, { key: i });
+`,
+			Tsx: true,
+		},
+		// A local declaration or parameter can shadow a top-level React
+		// import. The bare callee must resolve to that nearest binding and
+		// therefore is not treated as an imported React factory.
+		{
+			Code: `
+import { cloneElement } from 'react';
+foo.map((item, i) => {
+  const cloneElement = (...args) => args;
+  return cloneElement(item, { key: i });
+});
+`,
+			Tsx: true,
+		},
+		{
+			Code: `
+import { cloneElement } from 'react';
+foo.map((item, i) => {
+  function render(cloneElement) {
+    return cloneElement(item, { key: i });
+  }
+  return render((...args) => args);
+});
+`,
+			Tsx: true,
+		},
 		// Iterator with a `thisArg` third argument — `args[0]` is the
 		// callback, the third arg is irrelevant. Index named `i` lives
 		// on the stack inside the callback.
@@ -389,6 +421,17 @@ foo.map((baz, i) => cloneElement(someChild, { ...someChild.props, key: i }))
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noArrayIndex", Line: 4, Column: 72},
+			},
+		},
+		{
+			Code: `
+import { cloneElement as makeElement } from 'react';
+
+foo.map((baz, i) => makeElement(someChild, { key: i }))
+`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noArrayIndex", Line: 4, Column: 51},
 			},
 		},
 
