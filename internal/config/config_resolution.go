@@ -44,9 +44,18 @@ func (config RslintConfig) matchConfigEntries(
 	cwd string,
 	globalIgnorePatterns []IgnorePattern,
 	entryIgnorePatterns [][]IgnorePattern,
+	directoryBlocks *directoryBlockMatcher,
 ) (configMatchKey, bool) {
-	if len(globalIgnorePatterns) > 0 && isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
-		return configMatchKey{}, false
+	if len(globalIgnorePatterns) > 0 {
+		var blocked bool
+		if directoryBlocks == nil {
+			blocked = isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd)
+		} else {
+			blocked = directoryBlocks.blocksFileDirectory(filePath)
+		}
+		if blocked {
+			return configMatchKey{}, false
+		}
 	}
 	matchPath := newFileMatchPath(filePath, cwd)
 	if len(globalIgnorePatterns) > 0 && matchPath.isIgnored(globalIgnorePatterns) {

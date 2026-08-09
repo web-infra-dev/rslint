@@ -519,30 +519,66 @@ func gitIgnoreNodeGlob(pattern IgnorePattern) string {
 // `!` and file-level patterns are excluded by Kind. Shared by GetConfigForFile
 // (lint) and canPruneDir (walk).
 func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
+	var candidates []string
+	firstPattern := true
 	for i := range patterns {
 		p := patterns[i]
 		if p.Negated || p.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
-			return true
-		}
-		// Split+Join enumerated the prefixes ending immediately before every
-		// slash. Scan those same boundaries so each prefix is a zero-copy view
-		// into dirPath instead of allocating a segment slice and joined string.
-		for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
-			partial := dirPath[:slash]
-			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
+		// Preserve the allocation-free early-match path for the common single
+		// pattern case. Build reusable candidates only when another positive
+		// directory pattern would otherwise repeat every synthetic `/x` value.
+		if firstPattern {
+			firstPattern = false
+			if directoryPatternAbsolutelyBlocks(p, dirPath) {
 				return true
 			}
-			next := strings.IndexByte(dirPath[slash+1:], '/')
-			if next < 0 {
-				break
+			continue
+		}
+		if candidates == nil {
+			candidates = directoryBlockCandidates(dirPath)
+		}
+		for _, candidate := range candidates {
+			if ignorePatternMatches(p, candidate) {
+				return true
 			}
-			slash += next + 1
 		}
 	}
 	return false
+}
+
+func directoryPatternAbsolutelyBlocks(pattern IgnorePattern, dirPath string) bool {
+	if ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x") {
+		return true
+	}
+	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
+		partial := dirPath[:slash]
+		if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
+			return true
+		}
+		next := strings.IndexByte(dirPath[slash+1:], '/')
+		if next < 0 {
+			break
+		}
+		slash += next + 1
+	}
+	return false
+}
+
+func directoryBlockCandidates(dirPath string) []string {
+	candidates := make([]string, 0, 2+2*strings.Count(dirPath, "/"))
+	candidates = append(candidates, dirPath, dirPath+"/x")
+	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
+		partial := dirPath[:slash]
+		candidates = append(candidates, partial, partial+"/x")
+		next := strings.IndexByte(dirPath[slash+1:], '/')
+		if next < 0 {
+			break
+		}
+		slash += next + 1
+	}
+	return candidates
 }
 
 // canPruneDir reports whether a directory walk may skip dirPath entirely. It is

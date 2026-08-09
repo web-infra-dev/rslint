@@ -286,6 +286,35 @@ func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 	}
 }
 
+func TestFileConfigResolverConcurrentDirectoryBlockCache(t *testing.T) {
+	config := RslintConfig{
+		{Ignores: []string{"dist/**"}},
+		{Files: []string{"**/*.ts"}, Settings: Settings{}},
+	}
+	resolver := NewFileConfigResolver(config, "/repo", false)
+
+	var waitGroup sync.WaitGroup
+	results := make(chan *MergedConfig, 128)
+	for index := range 128 {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			results <- resolver.ConfigForFile(fmt.Sprintf("/repo/src/pkg/file-%d.ts", index))
+		}()
+	}
+	waitGroup.Wait()
+	close(results)
+	for merged := range results {
+		if merged == nil {
+			t.Fatal("non-ignored file resolved to nil config")
+		}
+	}
+
+	if merged := resolver.ConfigForFile("/repo/dist/pkg/blocked.ts"); merged != nil {
+		t.Fatal("directory-blocked file resolved to a config")
+	}
+}
+
 type configuredRuleView struct {
 	name               string
 	settings           map[string]interface{}
