@@ -19,12 +19,17 @@ var MaxParamsRule = rule.Rule{
 		check := func(node *ast.Node) {
 			params := node.Parameters()
 			effective := len(params)
-			if thisParam := ast.GetThisParameter(node); thisParam != nil {
+			if effective <= opts.max {
+				return
+			}
+			if effective != 0 {
 				switch opts.countThis {
 				case countThisNever:
-					effective--
+					if ast.IsThisParameter(params[0]) {
+						effective--
+					}
 				case countThisExceptVoid:
-					if utils.IsThisVoidParameter(thisParam) {
+					if utils.IsThisVoidParameter(params[0]) {
 						effective--
 					}
 				}

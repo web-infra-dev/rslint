@@ -81,6 +81,11 @@ func TestMaxParamsExtras(t *testing.T) {
 
 			// ---- Real-user: eslint/eslint#20107 countThis never for typed this ----
 			{Code: "function doSomething(this: MyType, param1: unknown, param2: unknown): unknown {}", Options: option(map[string]interface{}{"max": 2, "countThis": "never"})},
+
+			// Reporting remains suppressible after the parameter-count fast path.
+			{Code: "/* eslint-disable test */\nfunction f(a, b, c, d) {}"},
+			{Code: "// eslint-disable-next-line test\nfunction f(a, b, c, d) {}"},
+			{Code: "function f(a, b, c, d) {} // eslint-disable-line test"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: declaration/container forms ----
@@ -296,6 +301,14 @@ func TestMaxParamsExtras(t *testing.T) {
 				Code:    `app.get("/users/:id", function routeHandler(req, res, next, logger) { res.end(); });`,
 				Options: option(map[string]interface{}{"max": 3}),
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Function 'routeHandler'", 4, 3)}},
+			},
+			// A scoped enable resumes reporting without changing the diagnostic.
+			{
+				Code: "/* eslint-disable test */\n" +
+					"function hidden(a, b, c, d) {}\n" +
+					"/* eslint-enable test */\n" +
+					"function visible(a, b, c, d) {}",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Function 'visible'", 4, 3), Line: 4, Column: 1}},
 			},
 		},
 	)
