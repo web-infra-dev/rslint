@@ -26,6 +26,29 @@ const (
 	maxConstantPropertyResolveDepth    = 8
 )
 
+type sourceDeprecationLookupKind uint8
+
+const (
+	sourceDeprecationAny sourceDeprecationLookupKind = iota
+	sourceDeprecationVariable
+	sourceDeprecationStructuralProperty
+	sourceDeprecationMethod
+	sourceDeprecationFunction
+	sourceDeprecationProperty
+)
+
+type sourceDeprecationLookupKey struct {
+	kind          sourceDeprecationLookupKind
+	name          string
+	argCount      int
+	matchArgCount bool
+}
+
+type sourceDeprecationInfo struct {
+	isDeprecated bool
+	reason       string
+}
+
 func buildDeprecatedMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "deprecated",
@@ -1535,11 +1558,6 @@ func deprecatedFunctionInfoByNameInSource(ctx rule.RuleContext, name string, arg
 	return found && allDeprecated, reason
 }
 
-func deprecatedReasonByNameInSource(ctx rule.RuleContext, name string) string {
-	_, reason := deprecatedInfoByNameInSource(ctx, name, false)
-	return reason
-}
-
 func deprecatedPropertyInfoByNameInSource(ctx rule.RuleContext, name string) (bool, string) {
 	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == "" {
 		return false, ""
@@ -1704,6 +1722,38 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			return rule.RuleListeners{}
 		}
 		allowSpecifiers := parseAllowSpecifiers(options)
+		var sourceDeprecationCache map[sourceDeprecationLookupKey]sourceDeprecationInfo
+		lookupSourceDeprecation := func(kind sourceDeprecationLookupKind, name string, argCount int, matchArgCount bool) (bool, string) {
+			key := sourceDeprecationLookupKey{
+				kind:          kind,
+				name:          name,
+				argCount:      argCount,
+				matchArgCount: matchArgCount,
+			}
+			if info, ok := sourceDeprecationCache[key]; ok {
+				return info.isDeprecated, info.reason
+			}
+			info := sourceDeprecationInfo{}
+			switch kind {
+			case sourceDeprecationAny:
+				info.isDeprecated, info.reason = deprecatedInfoByNameInSource(ctx, name, false)
+			case sourceDeprecationVariable:
+				info.isDeprecated, info.reason = deprecatedVariableInfoByNameInSource(ctx, name)
+			case sourceDeprecationStructuralProperty:
+				info.isDeprecated, info.reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
+			case sourceDeprecationMethod:
+				info.isDeprecated, info.reason = deprecatedMethodInfoByNameInSource(ctx, name, argCount, matchArgCount)
+			case sourceDeprecationFunction:
+				info.isDeprecated, info.reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, matchArgCount)
+			case sourceDeprecationProperty:
+				info.isDeprecated, info.reason = deprecatedPropertyInfoByNameInSource(ctx, name)
+			}
+			if sourceDeprecationCache == nil {
+				sourceDeprecationCache = make(map[sourceDeprecationLookupKey]sourceDeprecationInfo)
+			}
+			sourceDeprecationCache[key] = info
+			return info.isDeprecated, info.reason
+		}
 		// A reference is allowed when the type at that location matches a
 		// specifier, or when the referenced value itself does — an export whose
 		// type carries a different name is only reachable through the latter.
@@ -1824,14 +1874,16 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			return false
 		}
-		reportedRanges := map[string]bool{}
-		reportRange := func(diagnosticRange core.TextRange, message rule.RuleMessage) {
-			key := strconv.Itoa(diagnosticRange.Pos()) + ":" + strconv.Itoa(diagnosticRange.End())
-			if reportedRanges[key] {
-				return
+		var reportedRanges map[core.TextRange]struct{}
+		claimRange := func(diagnosticRange core.TextRange) bool {
+			if _, reported := reportedRanges[diagnosticRange]; reported {
+				return false
 			}
-			reportedRanges[key] = true
-			ctx.ReportRange(diagnosticRange, message)
+			if reportedRanges == nil {
+				reportedRanges = make(map[core.TextRange]struct{})
+			}
+			reportedRanges[diagnosticRange] = struct{}{}
+			return true
 		}
 		// Two parallel detection paths: (1) TypeScript's GetSuggestionDiagnostics for
 		// symbol/type-driven deprecations, and (2) AST listeners for cases the type
@@ -1884,6 +1936,9 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				} else if isAllowed(node) {
 					continue
 				}
+				if !claimRange(diagnosticRange) {
+					continue
+				}
 				message := buildDeprecatedMessage(name)
 				if reason := deprecatedReasonFromDiagnostic(diagnostic); reason != "" {
 					message = buildDeprecatedWithReasonMessage(name, reason)
@@ -1911,11 +1966,11 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					}
 				}
 				if message.Id != "deprecatedWithReason" {
-					if reason := deprecatedReasonByNameInSource(ctx, name); reason != "" {
+					if _, reason := lookupSourceDeprecation(sourceDeprecationAny, name, 0, false); reason != "" {
 						message = buildDeprecatedWithReasonMessage(name, reason)
 					}
 				}
-				reportRange(diagnosticRange, message)
+				ctx.ReportRange(diagnosticRange, message)
 			}
 		}
 		checkIdentifier := func(node *ast.Node) {
@@ -1936,31 +1991,43 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			reportName := name
 			isDeprecated, reason := getDeprecationReason(ctx, node)
-			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedVariableInfoByNameInSource(ctx, name)
+			localNonDeprecated := false
+			if !isDeprecated {
+				localNonDeprecated = isLocalNonDeprecatedSymbol(ctx, node)
 			}
-			if !isDeprecated && isPropertyAccessName(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
+			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) && !localNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationVariable, name, 0, false)
+			}
+			if !isDeprecated && isPropertyAccessName(node) && !localNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationStructuralProperty, name, 0, false)
 				if !isDeprecated {
 					argCount, matchArgCount := propertyAccessCallArgCount(node)
-					isDeprecated, reason = deprecatedMethodInfoByNameInSource(ctx, name, argCount, matchArgCount)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationMethod, name, argCount, matchArgCount)
 					if isDeprecated && isPropertyAccessCalleeName(node) {
 						reportName = propertyAccessDisplayName(ctx.SourceFile, node)
 					}
 				}
 			}
-			if !isDeprecated && isBindingElementNameOrProperty(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedPropertyInfoByNameInSource(ctx, name)
+			if !isDeprecated && isBindingElementNameOrProperty(node) && !localNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationProperty, name, 0, false)
 			}
-			if !isDeprecated && !isLocalNonDeprecatedSymbol(ctx, node) {
+			if !isDeprecated && !localNonDeprecated {
 				argCount, matchArgCount := callArgCountForIdentifierCallee(node)
 				if matchArgCount {
-					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, true)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationFunction, name, argCount, true)
 				} else if isIdentifierTaggedTemplateTag(node) {
-					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, 0, false)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationFunction, name, 0, false)
 				}
 			}
 			if !isDeprecated {
+				return
+			}
+			if isAllowed(node) {
+				return
+			}
+			trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+			diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+			if !claimRange(diagnosticRange) {
 				return
 			}
 			symbol := symbolAtLocation(ctx.TypeChecker, node)
@@ -1969,9 +2036,6 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			if symbol != nil && symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement {
 				symbol = nil
-			}
-			if isAllowed(node) {
-				return
 			}
 			message := buildDeprecatedMessage(reportName)
 			if reason != "" {
@@ -1988,12 +2052,11 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				}
 			}
 			if message.Id != "deprecatedWithReason" {
-				if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
+				if _, reasonByName := lookupSourceDeprecation(sourceDeprecationAny, name, 0, false); reasonByName != "" {
 					message = buildDeprecatedWithReasonMessage(reportName, reasonByName)
 				}
 			}
-			trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+			ctx.ReportRange(diagnosticRange, message)
 		}
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -2056,12 +2119,17 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				isDeprecated := symbolIsDeprecated(ctx.TypeChecker, propertySymbol)
 				sourceDeprecated, sourceReason := false, ""
 				if !isDeprecated && propertySymbol == nil && attributesType != nil && !utils.IsTypeAnyType(attributesType) && !utils.IsTypeUnknownType(attributesType) {
-					sourceDeprecated, sourceReason = deprecatedPropertyInfoByNameInSource(ctx, nameText)
+					sourceDeprecated, sourceReason = lookupSourceDeprecation(sourceDeprecationProperty, nameText, 0, false)
 				}
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
 				if isAllowed(nameNode) {
+					return
+				}
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
 					return
 				}
 				message := buildDeprecatedMessage(nameText)
@@ -2076,8 +2144,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if message.Id != "deprecatedWithReason" && sourceReason != "" {
 					message = buildDeprecatedWithReasonMessage(nameText, sourceReason)
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				elementAccess := node.AsElementAccessExpression()
@@ -2097,12 +2164,17 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				isDeprecated := symbolIsDeprecated(ctx.TypeChecker, propertySymbol)
 				sourceDeprecated, sourceReason := false, ""
 				if !isDeprecated && propertySymbol == nil && objectType != nil && rawObjectType != nil && !utils.IsTypeAnyType(rawObjectType) && !utils.IsTypeUnknownType(rawObjectType) && !utils.IsTypeAnyType(objectType) && !utils.IsTypeUnknownType(objectType) {
-					sourceDeprecated, sourceReason = deprecatedStructuralPropertyInfoByNameInSource(ctx, propertyName)
+					sourceDeprecated, sourceReason = lookupSourceDeprecation(sourceDeprecationStructuralProperty, propertyName, 0, false)
 				}
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
 				if isObjectTypeAllowed(elementAccess.Expression) {
+					return
+				}
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, elementAccess.ArgumentExpression)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
 					return
 				}
 				message := buildDeprecatedMessage(propertyName)
@@ -2117,8 +2189,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if message.Id != "deprecatedWithReason" && sourceReason != "" {
 					message = buildDeprecatedWithReasonMessage(propertyName, sourceReason)
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, elementAccess.ArgumentExpression)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				access := node.AsPropertyAccessExpression()
@@ -2141,6 +2212,11 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if isAllowed(nameNode) {
 					return
 				}
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
+					return
+				}
 				_, reason := getDeprecationReason(ctx, nameNode)
 				message := buildDeprecatedMessage(name)
 				if reason != "" {
@@ -2154,12 +2230,11 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					}
 				}
 				if message.Id != "deprecatedWithReason" {
-					if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
+					if _, reasonByName := lookupSourceDeprecation(sourceDeprecationAny, name, 0, false); reasonByName != "" {
 						message = buildDeprecatedWithReasonMessage(name, reasonByName)
 					}
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 		}
 	},
