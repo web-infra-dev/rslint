@@ -512,25 +512,40 @@ func isConstRstestVariableDeclaration(declaration *ast.Node) bool {
 }
 
 func directRstestAPIState(profile rstestAPIProfile, name string) rstestAPIState {
-	switch name {
-	case "test", "it":
-		if profile == rstestProfilePlaywright && name == "it" {
-			return rstestAPIInvalid
-		}
-		return rstestAPITestWithExtend
-	case "describe":
-		return rstestAPIDescribe
-	default:
-		// Both profiles expose the same four hooks: @rstest/playwright
-		// re-exports them (packages/playwright/src/index.ts:2-9). Hooks accept
-		// no chained members, which holds by construction: applyRstestChainPart
-		// has no rstestAPIHook branch, so any member invalidates the chain.
-		if testFramework.IsHookName(name) {
-			return rstestAPIHook
-		}
+	states, ok := rstestDirectAPIStates[name]
+	if !ok {
 		return rstestAPIInvalid
 	}
+	return states[profile]
 }
+
+var rstestDirectAPIStates = func() map[string][2]rstestAPIState {
+	states := map[string][2]rstestAPIState{
+		"test": {
+			rstestProfileCore:       rstestAPITestWithExtend,
+			rstestProfilePlaywright: rstestAPITestWithExtend,
+		},
+		"it": {
+			rstestProfileCore:       rstestAPITestWithExtend,
+			rstestProfilePlaywright: rstestAPIInvalid,
+		},
+		"describe": {
+			rstestProfileCore:       rstestAPIDescribe,
+			rstestProfilePlaywright: rstestAPIDescribe,
+		},
+	}
+	// Both profiles expose the same four hooks: @rstest/playwright re-exports
+	// them (packages/playwright/src/index.ts:2-9). Hooks accept no chained
+	// members, which holds by construction: applyRstestChainPart has no
+	// rstestAPIHook branch, so any member invalidates the chain.
+	for _, name := range testFramework.HooksOrder {
+		states[name] = [2]rstestAPIState{
+			rstestProfileCore:       rstestAPIHook,
+			rstestProfilePlaywright: rstestAPIHook,
+		}
+	}
+	return states
+}()
 
 func applyRstestChainPart(profile rstestAPIProfile, state rstestAPIState, part rstestChainPart) rstestAPIState {
 	switch state {

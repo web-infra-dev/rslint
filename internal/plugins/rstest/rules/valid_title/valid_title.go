@@ -423,6 +423,7 @@ var ValidTitleRule = rule.Rule{
 			}
 			return rule.RuleListeners{}
 		}
+		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -432,7 +433,7 @@ var ValidTitleRule = rule.Rule{
 				// The two older rules in this plugin use the narrow
 				// ParseRstestFnCall, which is a historical choice rather than a
 				// contract.
-				parsed := rstestUtils.ParseRstestFnCallWithOfficialExtensions(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return
 				}

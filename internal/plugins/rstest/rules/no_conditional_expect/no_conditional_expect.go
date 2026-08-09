@@ -21,14 +21,14 @@ var NoConditionalExpectRule = shared.NewRule(shared.Config{
 		if !sourceMayContainConditionalRstestExpect(ctx.SourceFile) {
 			return shared.Runtime{Skip: true}
 		}
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
 		return shared.Runtime{
-			TestCallbackFunctions: callbacks.Functions,
-			ClassifyCall: func(node *ast.Node, checkExpect bool) (bool, bool) {
-				return callbacks.TestCalls[node],
-					checkExpect &&
-						callbacks.IsExpectCandidate(node) &&
-						rstestUtils.IsRstestExpectCall(node, ctx, callbacks)
+			TestCallbackFunctions: analysis.Callbacks().Functions,
+			IsTestCall: func(node *ast.Node) bool {
+				return analysis.ParseTestCall(node) != nil
+			},
+			IsExpectCall: func(node *ast.Node) bool {
+				return analysis.IsExpectCall(node)
 			},
 		}
 	},
