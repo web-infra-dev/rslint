@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
@@ -27,7 +28,7 @@ func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName strin
 	if ctx.Program == nil || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return false, false
 	}
-	return hasExport(ctx, ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(ctx))
+	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx)))
 }
 
 // exportKey is one (file, name) lookup in flight, so a re-export chain that
@@ -38,26 +39,26 @@ type exportKey struct {
 	name string
 }
 
-func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
-	link := resolveExportLinkForLookup(ctx, origin, builder.index.settings, moduleSpecifier)
+func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
+	link := resolveExportLinkForLookup(builder.program(), origin, builder.index.settings, moduleSpecifier)
 	if link.Target == nil {
 		return false, false
 	}
-	return sourceFileHasExport(ctx, link.Target, exportName, builder)
+	return sourceFileHasExport(link.Target, exportName, builder)
 }
 
 // resolveExportLinkForLookup is the name-lookup counterpart of
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
-func resolveExportLinkForLookup(ctx rule.RuleContext, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := rslint_utils.ResolveModuleFile(ctx.Program, origin, moduleSpecifier)
+func resolveExportLinkForLookup(program *compiler.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
+	_, sourceFile, ok := rslint_utils.ResolveModuleFile(program, origin, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
 	return exportLink{Target: sourceFile, Resolved: true}
 }
 
-func sourceFileHasExport(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
+func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder *exportBuilder) (bool, bool) {
 	if sourceFile == nil || !ast.IsExternalModule(sourceFile) {
 		return false, false
 	}
@@ -85,22 +86,22 @@ func sourceFileHasExport(ctx rule.RuleContext, sourceFile *ast.SourceFile, expor
 
 		switch stmt.Kind {
 		case ast.KindExportAssignment:
-			if exportName == defaultExportName && exportAssignmentHasDefault(ctx, sourceFile, stmt.AsExportAssignment()) {
+			if exportName == defaultExportName && exportAssignmentHasDefault(builder.program(), sourceFile, stmt.AsExportAssignment()) {
 				return true, true
 			}
 		case ast.KindNamespaceExportDeclaration:
-			if exportName == defaultExportName && compilerOptionsESModuleInterop(ctx) {
+			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) {
 				return true, true
 			}
 		case ast.KindExportDeclaration:
-			found, done := exportDeclarationHasName(ctx, sourceFile, stmt.AsExportDeclaration(), exportName, builder)
+			found, done := exportDeclarationHasName(sourceFile, stmt.AsExportDeclaration(), exportName, builder)
 			if done {
 				return found, true
 			}
 		}
 	}
 
-	if exportName == defaultExportName && compilerOptionsESModuleInterop(ctx) && sourceFileHasDirectNamespaceExport(sourceFile) {
+	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) && sourceFileHasDirectNamespaceExport(sourceFile) {
 		return true, true
 	}
 
@@ -132,7 +133,7 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 	return false
 }
 
-func exportAssignmentHasDefault(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
+func exportAssignmentHasDefault(program *compiler.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
 	if exportAssignment == nil {
 		return false
 	}
@@ -154,7 +155,7 @@ func exportAssignmentHasDefault(ctx rule.RuleContext, sourceFile *ast.SourceFile
 	if kind != exportAssignmentLocalDeclarationModule {
 		return true
 	}
-	return compilerOptionsESModuleInterop(ctx)
+	return compilerOptionsESModuleInterop(program)
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression
@@ -179,11 +180,11 @@ func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.
 //
 //nolint:staticcheck // esModuleInterop still needs to be inspected for import/export compatibility.
-func compilerOptionsESModuleInterop(ctx rule.RuleContext) bool {
-	if ctx.Program == nil || ctx.Program.Options() == nil {
+func compilerOptionsESModuleInterop(program *compiler.Program) bool {
+	if program == nil || program.Options() == nil {
 		return false
 	}
-	options := ctx.Program.Options()
+	options := program.Options()
 	if options.ESModuleInterop != core.TSUnknown {
 		return options.ESModuleInterop == core.TSTrue
 	}
@@ -312,7 +313,7 @@ func exportDeclarationAddsNamespaceExport(exportDecl *ast.ExportDeclaration) boo
 	return false
 }
 
-func exportDeclarationHasName(ctx rule.RuleContext, sourceFile *ast.SourceFile, exportDecl *ast.ExportDeclaration, exportName string, builder *exportBuilder) (bool, bool) {
+func exportDeclarationHasName(sourceFile *ast.SourceFile, exportDecl *ast.ExportDeclaration, exportName string, builder *exportBuilder) (bool, bool) {
 	if exportDecl == nil {
 		return false, false
 	}
@@ -321,7 +322,7 @@ func exportDeclarationHasName(ctx rule.RuleContext, sourceFile *ast.SourceFile, 
 		if exportDecl.ModuleSpecifier == nil || exportName == defaultExportName {
 			return false, false
 		}
-		found, ok := hasExport(ctx, sourceFile, exportDecl.ModuleSpecifier, exportName, builder)
+		found, ok := hasExport(sourceFile, exportDecl.ModuleSpecifier, exportName, builder)
 		if !ok {
 			return true, true
 		}
@@ -358,7 +359,7 @@ func exportDeclarationHasName(ctx rule.RuleContext, sourceFile *ast.SourceFile, 
 				return false, true
 			}
 
-			hasName, ok := hasExport(ctx, sourceFile, exportDecl.ModuleSpecifier, localName, builder)
+			hasName, ok := hasExport(sourceFile, exportDecl.ModuleSpecifier, localName, builder)
 			if !ok {
 				return true, true
 			}

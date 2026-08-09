@@ -4,7 +4,9 @@ import (
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // ModuleIndex answers what each file of one Program says about its own
@@ -15,11 +17,18 @@ import (
 // answers that for every rule, not just these. This holds the part that is
 // specific to eslint-plugin-import — export maps, and the `import/` settings
 // that decide which references count.
+//
+// The index is shared by every file of the run, so it holds the Program it was
+// built for rather than taking a RuleContext per call: a context belongs to
+// one file, and nothing cached here may depend on which file happened to ask
+// first.
 type ModuleIndex struct {
+	program  *compiler.Program
 	settings *ModuleSettings
 
-	mu      sync.Mutex
-	exports map[*ast.SourceFile]*localExports
+	exports rslint_utils.LazyMap[*ast.SourceFile, *localExports]
+
+	mu sync.Mutex
 	// exportMaps holds the fully merged export maps that turned out not to
 	// depend on where the query that built them started. The builder decides
 	// which those are; see exportMapOf.
@@ -36,15 +45,16 @@ type indexKey struct {
 // on the first rule of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := SettingsFor(ctx)
-	return CachedByProgram(ctx.Program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
-		return newModuleIndex(settings)
+	program := ctx.Program
+	return rule.CachedByProgram(program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
+		return newModuleIndex(program, settings)
 	})
 }
 
-func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
+func newModuleIndex(program *compiler.Program, settings *ModuleSettings) *ModuleIndex {
 	return &ModuleIndex{
+		program:    program,
 		settings:   settings,
-		exports:    make(map[*ast.SourceFile]*localExports),
 		exportMaps: make(map[*ast.SourceFile]*ExportMap),
 	}
 }
@@ -52,28 +62,13 @@ func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
 // localExportsOf returns what file says about its own exports, with every
 // module specifier resolved and none of them followed. The result is shared
 // with every other caller and must not be modified.
-func (index *ModuleIndex) localExportsOf(ctx rule.RuleContext, file *ast.SourceFile) *localExports {
+func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil
 	}
-
-	index.mu.Lock()
-	exports, ok := index.exports[file]
-	index.mu.Unlock()
-	if ok {
-		return exports
-	}
-
-	exports = collectLocalExports(ctx, file, index.settings)
-
-	index.mu.Lock()
-	if existing, ok := index.exports[file]; ok {
-		exports = existing
-	} else {
-		index.exports[file] = exports
-	}
-	index.mu.Unlock()
-	return exports
+	return index.exports.Get(file, func() *localExports {
+		return collectLocalExports(index.program, file, index.settings)
+	})
 }
 
 // cachedExportMap returns the merged export map of a file whose closure was

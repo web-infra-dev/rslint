@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -77,7 +77,7 @@ type importedModule struct {
 	NamespaceName string
 }
 
-func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
+func collectLocalExports(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
 	local := &localExports{}
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return local
@@ -88,15 +88,15 @@ func collectLocalExports(ctx rule.RuleContext, sourceFile *ast.SourceFile, setti
 			continue
 		}
 		if stmt.Kind == ast.KindImportDeclaration {
-			local.Imports = append(local.Imports, importBinding(ctx, sourceFile, settings, stmt.AsImportDeclaration()))
+			local.Imports = append(local.Imports, importBinding(program, sourceFile, settings, stmt.AsImportDeclaration()))
 		}
-		local.appendStatement(ctx, sourceFile, settings, stmt)
+		local.appendStatement(program, sourceFile, settings, stmt)
 	}
 
 	return local
 }
 
-func (local *localExports) appendStatement(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
+func (local *localExports) appendStatement(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
 	if isExportedDeclaration(stmt) {
 		if names := exportedDeclarationNames(stmt); len(names) > 0 {
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
@@ -116,11 +116,11 @@ func (local *localExports) appendStatement(ctx rule.RuleContext, sourceFile *ast
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
 		}
 	case ast.KindExportDeclaration:
-		local.appendExportDeclaration(ctx, sourceFile, settings, stmt.AsExportDeclaration())
+		local.appendExportDeclaration(program, sourceFile, settings, stmt.AsExportDeclaration())
 	}
 }
 
-func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
+func (local *localExports) appendExportDeclaration(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
 	if exportDecl == nil {
 		return
 	}
@@ -131,7 +131,7 @@ func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 		}
 		local.Steps = append(local.Steps, exportStep{
 			Kind: exportStepStar,
-			Link: resolveExportLink(ctx, sourceFile, settings, exportDecl.ModuleSpecifier),
+			Link: resolveExportLink(program, sourceFile, settings, exportDecl.ModuleSpecifier),
 		})
 		return
 	}
@@ -144,7 +144,7 @@ func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 		}
 		step := exportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
 		if step.FromModule {
-			step.Link = resolveExportLink(ctx, sourceFile, settings, exportDecl.ModuleSpecifier)
+			step.Link = resolveExportLink(program, sourceFile, settings, exportDecl.ModuleSpecifier)
 		}
 		for _, spec := range namedExports.Elements.Nodes {
 			if spec == nil || spec.Kind != ast.KindExportSpecifier {
@@ -181,12 +181,12 @@ func (local *localExports) appendExportDeclaration(ctx rule.RuleContext, sourceF
 	}
 }
 
-func importBinding(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
+func importBinding(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
 	binding := importedModule{}
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return binding
 	}
-	binding.Link = resolveExportLink(ctx, sourceFile, settings, importDecl.ModuleSpecifier)
+	binding.Link = resolveExportLink(program, sourceFile, settings, importDecl.ModuleSpecifier)
 
 	importClause := importDecl.ImportClause.AsImportClause()
 	if importClause == nil || importClause.NamedBindings == nil || importClause.NamedBindings.Kind != ast.KindNamespaceImport {
@@ -201,11 +201,11 @@ func importBinding(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *M
 
 // resolveExportLink answers what getExportMap would answer for one specifier,
 // without building the target's map.
-func resolveExportLink(ctx rule.RuleContext, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	if ctx.Program == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+func resolveExportLink(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
+	if program == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return exportLink{}
 	}
-	_, target, ok := rslint_utils.ResolveModuleFile(ctx.Program, sourceFile, moduleSpecifier)
+	_, target, ok := rslint_utils.ResolveModuleFile(program, sourceFile, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
 		return exportLink{}
 	}

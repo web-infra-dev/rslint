@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -15,12 +16,17 @@ type ExportMeta struct {
 // ExportMap records the statically visible exports of an ES module. It does
 // not synthesize default exports from compiler interop settings; HasExport
 // keeps that looser existence check for rules that need it.
+//
+// A map handed to a rule is read-only and shared: one map answers for its file
+// however many files import it, and files are linted concurrently. That is why
+// nothing here that writes is exported — only the builder in this package, which
+// owns a map until it publishes it, may fill one in.
 type ExportMap struct {
 	exports    map[string]*ExportMeta
 	hasUnknown bool
 }
 
-func NewExportMap() *ExportMap {
+func newExportMap() *ExportMap {
 	return &ExportMap{
 		exports: make(map[string]*ExportMeta),
 	}
@@ -54,7 +60,7 @@ func (m *ExportMap) Get(name string) *ExportMeta {
 	return m.exports[name]
 }
 
-func (m *ExportMap) Set(name string, meta *ExportMeta) {
+func (m *ExportMap) set(name string, meta *ExportMeta) {
 	if m == nil || name == "" {
 		return
 	}
@@ -64,13 +70,13 @@ func (m *ExportMap) Set(name string, meta *ExportMeta) {
 	m.exports[name] = meta
 }
 
-func (m *ExportMap) AddUnknown() {
+func (m *ExportMap) addUnknown() {
 	if m != nil {
 		m.hasUnknown = true
 	}
 }
 
-func (m *ExportMap) MergeFrom(other *ExportMap, includeDefault bool) {
+func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 	if m == nil || other == nil {
 		return
 	}
@@ -78,21 +84,24 @@ func (m *ExportMap) MergeFrom(other *ExportMap, includeDefault bool) {
 		if !includeDefault && name == defaultExportName {
 			continue
 		}
-		m.Set(name, meta)
+		m.set(name, meta)
 	}
 	if other.hasUnknown {
-		m.AddUnknown()
+		m.addUnknown()
 	}
 }
 
 // GetExportMap resolves moduleSpecifier from ctx.SourceFile and returns a
 // recursive export map. The second result is false when no export map is
 // available, matching eslint-plugin-import's "imports == null" branch.
+//
+// The map is read-only and may be shared with every other file of the run that
+// imports the same module; so may any ExportMeta.Namespace reached through it.
 func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
 	if ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx, ctx.SourceFile, moduleSpecifier, newExportBuilder(ctx))
+	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx)))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export
@@ -106,7 +115,6 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 // which module the query entered from, so those maps stay private to the
 // query that built them.
 type exportBuilder struct {
-	ctx      rule.RuleContext
 	index    *ModuleIndex
 	building map[*ast.SourceFile]*ExportMap
 	seen     map[exportKey]bool
@@ -121,10 +129,9 @@ type exportBuilder struct {
 	sawCycle bool
 }
 
-func newExportBuilder(ctx rule.RuleContext) *exportBuilder {
+func newExportBuilder(index *ModuleIndex) *exportBuilder {
 	return &exportBuilder{
-		ctx:      ctx,
-		index:    IndexFor(ctx),
+		index:    index,
 		building: make(map[*ast.SourceFile]*ExportMap),
 		seen:     make(map[exportKey]bool),
 		onStack:  make(map[*ast.SourceFile]bool),
@@ -132,12 +139,23 @@ func newExportBuilder(ctx rule.RuleContext) *exportBuilder {
 	}
 }
 
-func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
-	if ctx.Program == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+// program is the Program every file this builder reaches belongs to. It comes
+// from the index rather than from a RuleContext, because the index is shared by
+// every file of the run and a context belongs to one of them.
+func (builder *exportBuilder) program() *compiler.Program {
+	if builder.index == nil {
+		return nil
+	}
+	return builder.index.program
+}
+
+func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
+	program := builder.program()
+	if program == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return nil, false
 	}
 
-	link := resolveExportLink(ctx, origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLink(program, origin, builder.index.settings, moduleSpecifier)
 	if !link.Resolved {
 		return nil, false
 	}
@@ -155,7 +173,7 @@ func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier 
 // which is exactly the case a cycle-free closure rules out.
 func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap {
 	if sourceFile == nil {
-		return NewExportMap()
+		return newExportMap()
 	}
 	if existing := builder.building[sourceFile]; existing != nil {
 		if builder.onStack[sourceFile] || builder.unstable[sourceFile] {
@@ -167,13 +185,13 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 		return cached
 	}
 
-	exports := NewExportMap()
+	exports := newExportMap()
 	builder.building[sourceFile] = exports
 	builder.onStack[sourceFile] = true
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.localExportsOf(builder.ctx, sourceFile)
+	local := builder.index.localExportsOf(sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
@@ -192,22 +210,22 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 	switch step.Kind {
 	case exportStepNames:
 		for _, name := range step.Names {
-			exports.Set(name, nil)
+			exports.set(name, nil)
 		}
 
 	case exportStepLocalDefault:
 		if meta, ok := builder.namespaceImportMeta(local, step.Local); ok {
-			exports.Set(defaultExportName, meta)
+			exports.set(defaultExportName, meta)
 		} else {
-			exports.Set(defaultExportName, nil)
+			exports.set(defaultExportName, nil)
 		}
 
 	case exportStepStar:
 		if !step.Link.Resolved {
-			exports.AddUnknown()
+			exports.addUnknown()
 			return
 		}
-		exports.MergeFrom(builder.exportMapOf(step.Link.Target), false)
+		exports.mergeFrom(builder.exportMapOf(step.Link.Target), false)
 
 	case exportStepNamed:
 		var dependency *ExportMap
@@ -217,9 +235,9 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 		for _, spec := range step.Specs {
 			if !step.FromModule {
 				if meta, ok := builder.namespaceImportMeta(local, spec.LocalIdent); ok {
-					exports.Set(spec.Exported, meta)
+					exports.set(spec.Exported, meta)
 				} else {
-					exports.Set(spec.Exported, nil)
+					exports.set(spec.Exported, nil)
 				}
 				continue
 			}
@@ -227,13 +245,13 @@ func (builder *exportBuilder) applyStep(exports *ExportMap, local *localExports,
 				continue
 			}
 			if dependency == nil {
-				exports.Set(spec.Exported, nil)
+				exports.set(spec.Exported, nil)
 				continue
 			}
 			if !dependency.Has(spec.Local) {
 				continue
 			}
-			exports.Set(spec.Exported, dependency.Get(spec.Local))
+			exports.set(spec.Exported, dependency.Get(spec.Local))
 		}
 	}
 }
