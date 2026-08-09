@@ -103,10 +103,12 @@ var NoConditionalExpectRule = shared.NewRule(shared.Config{
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		return shared.Runtime{
 			TestCallbackFunctions: collectTestFunctionCallbacks(ctx),
-			ClassifyCall: func(node *ast.Node) (bool, bool) {
+			ClassifyCall: func(node *ast.Node, checkExpect bool) (bool, bool) {
 				parsed := jestUtils.ParseJestFnCall(node, ctx)
 				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest,
-					parsed != nil && parsed.Kind == jestUtils.JestFnTypeExpect
+					checkExpect &&
+						parsed != nil &&
+						parsed.Kind == jestUtils.JestFnTypeExpect
 			},
 		}
 	},

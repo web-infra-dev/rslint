@@ -137,8 +137,88 @@ func IsRstestExpectCall(
 	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
 		return false
 	}
-	_, ok := rstestExpectMemberIndex(node, testFramework.GetMemberEntries(node), ctx, callbacks)
+	if isImportMetaRstestExpectCall(node) {
+		return true
+	}
+	entries := firstRstestExpectEntries(node)
+	if entries.count == 0 || entries.first == nil || entries.first.Kind != ast.KindIdentifier {
+		return false
+	}
+	_, ok := rstestExpectRootIndex(entries.first, entries.secondName, entries.count > 1, ctx, callbacks)
 	return ok
+}
+
+type rstestExpectEntries struct {
+	first      *ast.Node
+	secondName string
+	count      uint8
+}
+
+func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
+	if name == "" {
+		return
+	}
+	switch entries.count {
+	case 0:
+		entries.first = node
+	case 1:
+		entries.secondName = name
+	}
+	if entries.count < 2 {
+		entries.count++
+	}
+}
+
+func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return rstestExpectEntries{}
+	}
+
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return rstestExpectEntries{
+			first: node,
+			count: 1,
+		}
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		entries := firstRstestExpectEntries(property.Expression)
+		name := property.Name()
+		if name != nil {
+			switch name.Kind {
+			case ast.KindIdentifier:
+				entries.append(name.AsIdentifier().Text, name)
+			case ast.KindPrivateIdentifier:
+				entries.append(name.AsPrivateIdentifier().Text, name)
+			}
+		}
+		return entries
+	case ast.KindElementAccessExpression:
+		element := node.AsElementAccessExpression()
+		entries := firstRstestExpectEntries(element.Expression)
+		name := ast.SkipParentheses(element.ArgumentExpression)
+		if name == nil {
+			return rstestExpectEntries{}
+		}
+		switch name.Kind {
+		case ast.KindIdentifier:
+			entries.append(name.AsIdentifier().Text, name)
+		case ast.KindStringLiteral:
+			entries.append(name.AsStringLiteral().Text, name)
+		case ast.KindNoSubstitutionTemplateLiteral:
+			entries.append(name.AsNoSubstitutionTemplateLiteral().Text, name)
+		default:
+			return rstestExpectEntries{}
+		}
+		return entries
+	case ast.KindCallExpression:
+		return firstRstestExpectEntries(node.AsCallExpression().Expression)
+	case ast.KindTaggedTemplateExpression:
+		return firstRstestExpectEntries(node.AsTaggedTemplateExpression().Tag)
+	default:
+		return rstestExpectEntries{}
+	}
 }
 
 // ParseRstestExpectCall parses node as a Rstest expect call, resolving the
@@ -276,11 +356,46 @@ func rstestExpectMemberIndex(
 	if len(entries) == 0 || entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
 		return 0, false
 	}
-	root := entries[0].Node
-	if index, ok := contextExpectMemberIndex(root, entries, ctx, callbacks); ok {
-		return index, true
+	secondName := ""
+	if len(entries) > 1 {
+		secondName = entries[1].Name
 	}
-	return importedOrGlobalExpectMemberIndex(root, entries, ctx)
+	return rstestExpectRootIndex(entries[0].Node, secondName, len(entries) > 1, ctx, callbacks)
+}
+
+func rstestExpectRootIndex(
+	root *ast.Node,
+	secondName string,
+	hasSecond bool,
+	ctx rule.RuleContext,
+	callbacks RstestTestCallbacks,
+) (int, bool) {
+	if root == nil || root.Kind != ast.KindIdentifier {
+		return 0, false
+	}
+	localName := root.AsIdentifier().Text
+	if ctx.TypeChecker == nil {
+		return 0, localName == "expect"
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
+	if symbol == nil {
+		return 0, localName == "expect"
+	}
+	kind, ok := callbacks.expectRoots[symbol]
+	if !ok {
+		kind = classifyRstestExpectRoot(localName, root, symbol, ctx, callbacks)
+		if callbacks.expectRoots != nil {
+			callbacks.expectRoots[symbol] = kind
+		}
+	}
+	switch kind {
+	case rstestExpectRootDirect:
+		return 0, true
+	case rstestExpectRootReceiver:
+		return 1, hasSecond && secondName == "expect"
+	default:
+		return 0, false
+	}
 }
 
 func classifyRstestExpectCall(
@@ -567,56 +682,36 @@ func isMemberAccessNode(node *ast.Node) bool {
 	}
 }
 
-// contextExpectMemberIndex resolves expect calls that come from a test context
-// parameter: ({ expect }) => expect(x)... at index 0, ctx => ctx.expect(x)...
-// at index 1.
-func contextExpectMemberIndex(
+type rstestExpectRootKind uint8
+
+const (
+	rstestExpectRootNone rstestExpectRootKind = iota
+	rstestExpectRootDirect
+	rstestExpectRootReceiver
+)
+
+func classifyRstestExpectRoot(
+	localName string,
 	root *ast.Node,
-	entries []testFramework.MemberEntry,
+	symbol *ast.Symbol,
 	ctx rule.RuleContext,
 	callbacks RstestTestCallbacks,
-) (int, bool) {
-	if ctx.TypeChecker == nil {
-		return 0, false
-	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
-	if symbol == nil {
-		return 0, false
-	}
+) rstestExpectRootKind {
 	if callbacks.ContextExpectNames[symbol] {
-		return 0, true
+		return rstestExpectRootDirect
 	}
-	if callbacks.ContextReceivers[symbol] &&
-		len(entries) > 1 &&
-		entries[1].Name == "expect" {
-		return 1, true
-	}
-	return 0, false
-}
-
-// importedOrGlobalExpectMemberIndex resolves expect calls whose root is an
-// import, a global, a require binding, an import.meta.rstest alias, or a
-// module namespace: direct bindings put expect at index 0, receiver objects at
-// index 1.
-func importedOrGlobalExpectMemberIndex(
-	root *ast.Node,
-	entries []testFramework.MemberEntry,
-	ctx rule.RuleContext,
-) (int, bool) {
-	localName := root.AsIdentifier().Text
-	var symbol *ast.Symbol
-	if ctx.TypeChecker != nil {
-		symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
+	if callbacks.ContextReceivers[symbol] {
+		return rstestExpectRootReceiver
 	}
 
 	if name, _, ok := resolveImportMetaRstestBinding(symbol); ok {
-		return 0, name == "expect"
+		if name == "expect" {
+			return rstestExpectRootDirect
+		}
+		return rstestExpectRootNone
 	}
 	if isImportMetaRstestObjectAlias(symbol) {
-		if len(entries) > 1 && entries[1].Name == "expect" {
-			return 1, true
-		}
-		return 0, false
+		return rstestExpectRootReceiver
 	}
 
 	for _, module := range []string{RstestImportModule, RstestPlaywrightImportModule} {
@@ -628,15 +723,13 @@ func importedOrGlobalExpectMemberIndex(
 			module,
 		)
 		if name == "expect" {
-			return 0, true
+			return rstestExpectRootDirect
 		}
-		if testFramework.IsModuleNamespaceSymbol(symbol, module) &&
-			len(entries) > 1 &&
-			entries[1].Name == "expect" {
-			return 1, true
+		if testFramework.IsModuleNamespaceSymbol(symbol, module) {
+			return rstestExpectRootReceiver
 		}
 	}
-	return 0, false
+	return rstestExpectRootNone
 }
 
 func isImportMetaRstestExpectCall(node *ast.Node) bool {

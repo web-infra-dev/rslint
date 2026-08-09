@@ -4,41 +4,16 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
+	TestCalls          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
-	fnCalls            *rstestFnCallCache
-}
-
-// rstestFnCallCache memoizes call parsing so that the collection walk and the
-// rule traversal that follows it do not each parse every call expression.
-type rstestFnCallCache struct {
-	ctx    rule.RuleContext
-	parsed map[*ast.Node]*ParsedRstestFnCall
-}
-
-func (cache *rstestFnCallCache) parse(node *ast.Node) *ParsedRstestFnCall {
-	if cache == nil {
-		return nil
-	}
-	if parsed, ok := cache.parsed[node]; ok {
-		return parsed
-	}
-	parsed := ParseRstestFnCallWithOfficialExtensions(node, cache.ctx)
-	cache.parsed[node] = parsed
-	return parsed
-}
-
-// ParseFnCall parses node the way CollectRstestTestCallbacks did, reusing the
-// cached result when the collection walk already visited node.
-func (callbacks RstestTestCallbacks) ParseFnCall(node *ast.Node) *ParsedRstestFnCall {
-	if callbacks.fnCalls == nil {
-		return nil
-	}
-	return callbacks.fnCalls.parse(node)
+	ExpectRootNames    map[string]bool
+	expectRoots        map[*ast.Symbol]rstestExpectRootKind
 }
 
 type rstestCallbackInfo struct {
@@ -47,14 +22,14 @@ type rstestCallbackInfo struct {
 }
 
 func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
+	candidateNames := collectRstestCallCandidateNames(ctx.SourceFile)
 	result := RstestTestCallbacks{
 		Functions:          map[*ast.Node]bool{},
+		TestCalls:          map[*ast.Node]bool{},
 		ContextReceivers:   map[*ast.Symbol]bool{},
 		ContextExpectNames: map[*ast.Symbol]bool{},
-		fnCalls: &rstestFnCallCache{
-			ctx:    ctx,
-			parsed: map[*ast.Node]*ParsedRstestFnCall{},
-		},
+		ExpectRootNames:    candidateNames.expect,
+		expectRoots:        map[*ast.Symbol]rstestExpectRootKind{},
 	}
 	pending := map[string][]*ParsedRstestFnCall{}
 
@@ -64,13 +39,17 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 			return
 		}
 		if node.Kind == ast.KindCallExpression {
-			parsed := result.fnCalls.parse(node)
-			if parsed != nil && parsed.Kind == RstestFnTypeTest {
-				info := resolveRstestTestCallback(ctx, node.AsCallExpression())
-				if info.functionNode != nil {
-					recordRstestCallback(ctx, &result, info.functionNode, parsed)
-				} else if info.name != "" {
-					pending[info.name] = append(pending[info.name], parsed)
+			root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+			if root == nil || candidateNames.test[root.AsIdentifier().Text] {
+				parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
+				if parsed != nil && parsed.Kind == RstestFnTypeTest {
+					result.TestCalls[node] = true
+					info := resolveRstestTestCallback(ctx, node.AsCallExpression())
+					if info.functionNode != nil {
+						recordRstestCallback(ctx, &result, info.functionNode, parsed)
+					} else if info.name != "" {
+						pending[info.name] = append(pending[info.name], parsed)
+					}
 				}
 			}
 		}
@@ -87,6 +66,191 @@ func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
 		resolvePendingRstestCallbacks(ctx, &result, pending)
 	}
 	return result
+}
+
+func (callbacks RstestTestCallbacks) IsExpectCandidate(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return false
+	}
+	root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	return root == nil ||
+		root.Kind != ast.KindIdentifier ||
+		callbacks.ExpectRootNames[root.AsIdentifier().Text]
+}
+
+type rstestAliasCandidate struct {
+	localName string
+	rootName  string
+}
+
+type rstestCallCandidateNames struct {
+	test   map[string]bool
+	expect map[string]bool
+}
+
+func collectRstestCallCandidateNames(sourceFile *ast.SourceFile) rstestCallCandidateNames {
+	candidates := rstestCallCandidateNames{
+		test: map[string]bool{
+			"test": true,
+			"it":   true,
+		},
+		expect: map[string]bool{
+			"expect": true,
+		},
+	}
+	if sourceFile == nil {
+		return candidates
+	}
+
+	aliases := make([]rstestAliasCandidate, 0)
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		switch node.Kind {
+		case ast.KindImportDeclaration:
+			collectRstestImportCandidates(node.AsImportDeclaration(), candidates)
+		case ast.KindVariableDeclaration:
+			collectRstestVariableCandidates(node, candidates, &aliases)
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile.Node.AsNode())
+
+	for changed := true; changed; {
+		changed = false
+		for _, alias := range aliases {
+			if !candidates.test[alias.localName] && candidates.test[alias.rootName] {
+				candidates.test[alias.localName] = true
+				changed = true
+			}
+			if !candidates.expect[alias.localName] && candidates.expect[alias.rootName] {
+				candidates.expect[alias.localName] = true
+				changed = true
+			}
+		}
+	}
+	return candidates
+}
+
+func collectRstestImportCandidates(
+	declaration *ast.ImportDeclaration,
+	candidates rstestCallCandidateNames,
+) {
+	if declaration == nil ||
+		declaration.ModuleSpecifier == nil ||
+		!isRstestImportModule(declaration.ModuleSpecifier.Text()) ||
+		declaration.ImportClause == nil ||
+		declaration.ImportClause.IsTypeOnly() {
+		return
+	}
+	clause := declaration.ImportClause.AsImportClause()
+	if clause == nil || clause.NamedBindings == nil {
+		return
+	}
+	switch clause.NamedBindings.Kind {
+	case ast.KindNamespaceImport:
+		namespace := clause.NamedBindings.AsNamespaceImport()
+		if namespace != nil && namespace.Name() != nil {
+			localName := namespace.Name().Text()
+			candidates.test[localName] = true
+			candidates.expect[localName] = true
+		}
+	case ast.KindNamedImports:
+		named := clause.NamedBindings.AsNamedImports()
+		if named == nil || named.Elements == nil {
+			return
+		}
+		for _, element := range named.Elements.Nodes {
+			specifier := element.AsImportSpecifier()
+			if specifier == nil || specifier.IsTypeOnly || specifier.Name() == nil {
+				continue
+			}
+			importedName := specifier.Name().Text()
+			if specifier.PropertyName != nil {
+				importedName = specifier.PropertyName.Text()
+			}
+			localName := specifier.Name().Text()
+			switch importedName {
+			case "test", "it":
+				candidates.test[localName] = true
+			case "expect":
+				candidates.expect[localName] = true
+			}
+		}
+	}
+}
+
+func collectRstestVariableCandidates(
+	node *ast.Node,
+	candidates rstestCallCandidateNames,
+	aliases *[]rstestAliasCandidate,
+) {
+	if node == nil || node.Kind != ast.KindVariableDeclaration {
+		return
+	}
+	declaration := node.AsVariableDeclaration()
+	if declaration == nil || declaration.Name() == nil || declaration.Initializer == nil {
+		return
+	}
+	name := declaration.Name()
+	initializer := ast.SkipParentheses(declaration.Initializer)
+	if name.Kind == ast.KindObjectBindingPattern &&
+		(isRstestRequireCall(initializer) || isImportMetaRstest(initializer)) {
+		pattern := name.AsBindingPattern()
+		if pattern == nil || pattern.Elements == nil {
+			return
+		}
+		for _, element := range pattern.Elements.Nodes {
+			binding := element.AsBindingElement()
+			if binding == nil || binding.Name() == nil || binding.Name().Kind != ast.KindIdentifier {
+				continue
+			}
+			importedName := binding.Name().Text()
+			if binding.PropertyName != nil {
+				importedName = binding.PropertyName.Text()
+			}
+			localName := binding.Name().Text()
+			switch importedName {
+			case "test", "it":
+				candidates.test[localName] = true
+			case "expect":
+				candidates.expect[localName] = true
+			}
+		}
+		return
+	}
+	if name.Kind != ast.KindIdentifier || node.Parent == nil ||
+		node.Parent.Kind != ast.KindVariableDeclarationList ||
+		node.Parent.Flags&ast.NodeFlagsConst == 0 {
+		return
+	}
+	localName := name.AsIdentifier().Text
+	if isRstestRequireCall(initializer) || isImportMetaRstest(initializer) {
+		candidates.test[localName] = true
+		candidates.expect[localName] = true
+		return
+	}
+	root := testFramework.ResolveFirstIdentifier(initializer)
+	if root != nil && root.Kind == ast.KindIdentifier {
+		*aliases = append(*aliases, rstestAliasCandidate{
+			localName: localName,
+			rootName:  root.AsIdentifier().Text,
+		})
+	}
+}
+
+func isRstestRequireCall(node *ast.Node) bool {
+	return testFramework.IsModuleRequireCall(node, RstestImportModule) ||
+		testFramework.IsModuleRequireCall(node, RstestPlaywrightImportModule)
+}
+
+func isRstestImportModule(name string) bool {
+	return name == RstestImportModule || name == RstestPlaywrightImportModule
 }
 
 func resolveRstestTestCallback(
@@ -235,6 +399,7 @@ func recordRstestCallback(
 	name := parameter.Name()
 	switch name.Kind {
 	case ast.KindIdentifier:
+		result.ExpectRootNames[name.AsIdentifier().Text] = true
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
 			result.ContextReceivers[symbol] = true
 		}
@@ -262,6 +427,7 @@ func recordRstestCallback(
 			if propertyName != "expect" {
 				continue
 			}
+			result.ExpectRootNames[binding.Name().AsIdentifier().Text] = true
 			if symbol := ctx.TypeChecker.GetSymbolAtLocation(binding.Name()); symbol != nil {
 				result.ContextExpectNames[symbol] = true
 			}

@@ -18,16 +18,14 @@
 package no_conditional_expect
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type Runtime struct {
 	TestCallbackFunctions map[*ast.Node]bool
-	ClassifyCall          func(*ast.Node) (isTest bool, isExpect bool)
+	ClassifyCall          func(*ast.Node, bool) (isTest bool, isExpect bool)
+	Skip                  bool
 }
 
 type Config struct {
@@ -46,19 +44,41 @@ func isPromiseCatchCall(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	name := calleeChainName(node.AsCallExpression().Expression)
-	return name == "catch" || strings.HasSuffix(name, ".catch")
+	return trailingCalleeName(node.AsCallExpression().Expression) == "catch"
 }
 
-// calleeChainName is deliberately member-entry based rather than
-// testFramework.CalleeChainName, which is a different function despite the
-// name: CalleeChainName drops a property segment whose left side failed to
-// resolve, so foo[dynamic]().catch(fn) yields "" there and would stop being
-// reported, while member entries still yield "catch". This rule only needs the
-// trailing segment, so keep it on GetMemberEntries.
-func calleeChainName(node *ast.Node) string {
-	entries := testFramework.GetMemberEntries(node)
-	return testFramework.JoinMemberEntries(entries)
+func trailingCalleeName(node *ast.Node) string {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		name := node.AsPropertyAccessExpression().Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			return name.AsIdentifier().Text
+		}
+	case ast.KindElementAccessExpression:
+		name := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+		if name == nil {
+			return ""
+		}
+		switch name.Kind {
+		case ast.KindIdentifier:
+			return name.AsIdentifier().Text
+		case ast.KindStringLiteral:
+			return name.AsStringLiteral().Text
+		case ast.KindNoSubstitutionTemplateLiteral:
+			return name.AsNoSubstitutionTemplateLiteral().Text
+		}
+	case ast.KindCallExpression:
+		return trailingCalleeName(node.AsCallExpression().Expression)
+	case ast.KindTaggedTemplateExpression:
+		return trailingCalleeName(node.AsTaggedTemplateExpression().Tag)
+	}
+	return ""
 }
 
 func isConditionalNode(node *ast.Node) bool {
@@ -86,10 +106,13 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
+			if runtime.Skip {
+				return rule.RuleListeners{}
+			}
 			testCaseDepth := 0
 			conditionalDepth := 0
 			promiseCatchDepth := 0
-			callExpressionFrames := map[*ast.Node]callExpressionFrame{}
+			var callExpressionFrames map[*ast.Node]callExpressionFrame
 
 			inTestCase := func() bool {
 				return testCaseDepth > 0
@@ -155,13 +178,21 @@ func NewRule(config Config) rule.Rule {
 				ast.KindCallExpression: func(node *ast.Node) {
 					isTest := false
 					isExpect := false
-					if runtime.ClassifyCall != nil {
-						isTest, isExpect = runtime.ClassifyCall(node)
-					}
 					isCatch := isPromiseCatchCall(node)
-					callExpressionFrames[node] = callExpressionFrame{
-						isTest:  isTest,
-						isCatch: isCatch,
+					if runtime.ClassifyCall != nil {
+						checkExpect := isCatch ||
+							inPromiseCatch() ||
+							(inTestCase() && conditionalDepth > 0)
+						isTest, isExpect = runtime.ClassifyCall(node, checkExpect)
+					}
+					if isTest || isCatch {
+						if callExpressionFrames == nil {
+							callExpressionFrames = make(map[*ast.Node]callExpressionFrame)
+						}
+						callExpressionFrames[node] = callExpressionFrame{
+							isTest:  isTest,
+							isCatch: isCatch,
+						}
 					}
 
 					if isTest {
@@ -181,8 +212,9 @@ func NewRule(config Config) rule.Rule {
 					}
 				},
 				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-					frame, ok := callExpressionFrames[node]
-					if ok {
+					frame := callExpressionFrame{}
+					if callExpressionFrames != nil {
+						frame = callExpressionFrames[node]
 						delete(callExpressionFrames, node)
 					}
 					if frame.isTest {
