@@ -1,6 +1,8 @@
 package no_interpolation_in_snapshots
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
@@ -61,14 +63,85 @@ func getInlineSnapshotArgument(ctx rule.RuleContext, matcherName string, call *a
 	}
 }
 
+func sourceMayContainInterpolatedSnapshot(sourceFile *ast.SourceFile) bool {
+	return sourceFile == nil || strings.Contains(sourceFile.Text(), "${")
+}
+
+func mayContainInterpolatedInlineSnapshot(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if isInlineSnapshotMatcherCallee(call.Expression) &&
+			hasInterpolatedTemplateArgument(call.Arguments) {
+			return true
+		}
+		return mayContainInterpolatedInlineSnapshot(call.Expression)
+	case ast.KindPropertyAccessExpression:
+		return mayContainInterpolatedInlineSnapshot(
+			node.AsPropertyAccessExpression().Expression,
+		)
+	case ast.KindElementAccessExpression:
+		return mayContainInterpolatedInlineSnapshot(
+			node.AsElementAccessExpression().Expression,
+		)
+	default:
+		return false
+	}
+}
+
+func isInlineSnapshotMatcherCallee(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	name := ""
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		if property.Name() != nil {
+			name = property.Name().Text()
+		}
+	case ast.KindElementAccessExpression:
+		element := node.AsElementAccessExpression()
+		name, _ = internalUtils.GetStaticStringLiteralValue(
+			ast.SkipParentheses(element.ArgumentExpression),
+		)
+	}
+	return rstestUtils.RSTEST_INLINE_SNAPSHOT_MATCHERS[name]
+}
+
+func hasInterpolatedTemplateArgument(arguments *ast.NodeList) bool {
+	if arguments == nil {
+		return false
+	}
+	for _, argument := range arguments.Nodes {
+		argument = ast.SkipParentheses(argument)
+		if argument != nil && argument.Kind == ast.KindTemplateExpression {
+			return true
+		}
+	}
+	return false
+}
+
 var NoInterpolationInSnapshotsRule = rule.Rule{
 	Name:   "rstest/no-interpolation-in-snapshots",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		if !sourceMayContainInterpolatedSnapshot(ctx.SourceFile) {
+			return rule.RuleListeners{}
+		}
 		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
+				if rstestUtils.FindTopMostCallExpression(node) != node ||
+					!mayContainInterpolatedInlineSnapshot(node) {
+					return
+				}
 				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
