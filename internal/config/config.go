@@ -734,6 +734,11 @@ func normalizePattern(pattern string) string {
 // aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
 // `!` negation cannot undo it.
 func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
+	dirPath, ok := ignoreDirectoryPath(filePath, cwd)
+	return ok && isDirAbsolutelyBlocked(dirPath, patterns)
+}
+
+func ignoreDirectoryPath(filePath string, cwd string) (string, bool) {
 	var dirPath string
 	if cwd != "" {
 		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
@@ -743,9 +748,36 @@ func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string
 	dirPath = strings.ReplaceAll(dirPath, "\\", "/")
 	dirPath = strings.TrimSuffix(dirPath, "/")
 	if dirPath == "" || dirPath == "." {
+		return "", false
+	}
+	return dirPath, true
+}
+
+// directoryBlockMatcher caches path-only directory decisions for one immutable
+// ignore-pattern set and cwd. The exact lexical parent is the key: no case,
+// separator, realpath, or filesystem equivalence is introduced by the cache.
+type directoryBlockMatcher struct {
+	patterns []IgnorePattern
+	cwd      string
+	results  publishOnceCache[string, bool]
+}
+
+func newDirectoryBlockMatcher(patterns []IgnorePattern, cwd string) *directoryBlockMatcher {
+	if len(patterns) == 0 {
+		return nil
+	}
+	return &directoryBlockMatcher{patterns: patterns, cwd: cwd}
+}
+
+func (matcher *directoryBlockMatcher) blocksFileDirectory(filePath string) bool {
+	if matcher == nil {
 		return false
 	}
-	return isDirAbsolutelyBlocked(dirPath, patterns)
+	lexicalDirectory := tspath.GetDirectoryPath(filePath)
+	return matcher.results.getOrInit(lexicalDirectory, func() bool {
+		dirPath, ok := ignoreDirectoryPath(filePath, matcher.cwd)
+		return ok && isDirAbsolutelyBlocked(dirPath, matcher.patterns)
+	})
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -864,7 +896,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 // patterns supplied by the caller, so repeated calls against the same config
 // (one per lint target) don't re-parse the same ignore pattern strings.
 func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
-	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil)
+	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil, nil)
 	if !matched {
 		return nil
 	}
