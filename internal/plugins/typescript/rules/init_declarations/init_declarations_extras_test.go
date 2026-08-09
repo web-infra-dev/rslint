@@ -24,9 +24,15 @@
 package init_declarations
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -37,6 +43,12 @@ func TestInitDeclarationsExtras(t *testing.T) {
 		t,
 		&InitDeclarationsRule,
 		[]rule_tester.ValidTestCase{
+			// The optimized "always" path skips an entire for-loop declaration
+			// list, including a mix of initialized and uninitialized declarators.
+			{Code: `for (let i = 0, j; i < 1; i++) {}`, Options: arrayOption("always")},
+			// The optimized ignore path likewise skips the whole list in "never".
+			{Code: `for (let i = 0, j; i < 1; i++) {}`, Options: arrayOption("never", map[string]interface{}{"ignoreForLoopInit": true})},
+
 			// ---- Dimension 4: declaration/container forms — variable kind ----
 			// `using` / `await using` join const in CONSTANT_BINDINGS: they require
 			// an initializer at parse time, so "never" must not report them.
@@ -369,6 +381,34 @@ let result =
       `, Options: arrayOption("always")},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Plain identifiers with leading trivia use the validated range fast
+			// path without inheriting the comment from the node's full start.
+			{
+				Code:    `let /*lead*/ plain: number;`,
+				Options: arrayOption("always"),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "initialized", Line: 1, Column: 14, EndLine: 1, EndColumn: 19, Message: "Variable 'plain' should be initialized on declaration."},
+				},
+			},
+			// Escaped identifiers cannot use End-len(decodedName); they must retain
+			// the scanner fallback and underline the complete source token.
+			{
+				Code:    `let \u0066oo: number;`,
+				Options: arrayOption("always"),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "initialized", Line: 1, Column: 5, EndLine: 1, EndColumn: 13, Message: "Variable 'foo' should be initialized on declaration."},
+				},
+			},
+			// The "never" path starts a full-declarator range at the validated
+			// identifier token, excluding leading trivia just like ReportNode.
+			{
+				Code:    `let /*lead*/ value: number = 1;`,
+				Options: arrayOption("never"),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notInitialized", Line: 1, Column: 14, EndLine: 1, EndColumn: 31, Message: "Variable 'value' should not be initialized on declaration."},
+				},
+			},
+
 			// ---- Dimension 4: declaration/container forms — let with type annotation ----
 			// Mirrors typescript-eslint's getReportLoc narrowing for "always":
 			// underlines only the identifier, not the trailing annotation.
@@ -695,7 +735,7 @@ function f(x: number) {
 			{
 				Code:    `const { x } = (obj as { x: number }), y = 1;`,
 				Options: arrayOption("never"),
-				Errors: []rule_tester.InvalidTestCaseError{},
+				Errors:  []rule_tester.InvalidTestCaseError{},
 			},
 
 			// Real-user: variable inside an IIFE's body still reports.
@@ -779,4 +819,81 @@ namespace Plain {
 			},
 		},
 	)
+}
+
+func TestInitDeclarationsEditDemandAndDisableParity(t *testing.T) {
+	const source = `let visible: number;
+// eslint-disable-next-line @typescript-eslint/init-declarations
+let nextLine: number;
+let sameLine: number; // eslint-disable-line @typescript-eslint/init-declarations
+/* eslint-disable @typescript-eslint/init-declarations */
+let scoped: number;
+/* eslint-enable @typescript-eslint/init-declarations */
+let visibleAgain: number;
+`
+
+	program, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(source, "edit-demand.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name   string
+		demand rule.EditDemand
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix demand", demand: rule.EditDemandAutofix},
+		{name: "suggestion demand", demand: rule.EditDemandSuggestion},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var diagnostics []rule.RuleDiagnostic
+			_, err := linter.RunLinter(linter.RunLinterOptions{
+				Programs:       []*compiler.Program{program},
+				SingleThreaded: true,
+				TargetFiles:    [][]string{{sourceFile.FileName()}},
+				ExcludePaths:   []string{},
+				GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+					return []linter.ConfiguredRule{{
+						Name:     "@typescript-eslint/init-declarations",
+						Severity: rule.SeverityWarning,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							return InitDeclarationsRule.Run(ctx, nil)
+						},
+					}}
+				},
+				Consumer: rule.DiagnosticConsumer{
+					Demand: test.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(diagnostics) != 2 {
+				t.Fatalf("diagnostics = %d, want 2", len(diagnostics))
+			}
+			wantNames := []string{"visible", "visibleAgain"}
+			for index, diagnostic := range diagnostics {
+				name := wantNames[index]
+				start := strings.Index(source, "let "+name) + len("let ")
+				wantRange := core.NewTextRange(start, start+len(name))
+				if diagnostic.Range != wantRange {
+					t.Errorf("diagnostic %d range = %v, want %v", index, diagnostic.Range, wantRange)
+				}
+				if diagnostic.Message.Id != "initialized" ||
+					diagnostic.Message.Description != "Variable '"+name+"' should be initialized on declaration." ||
+					diagnostic.Message.Data["idName"] != name {
+					t.Errorf("diagnostic %d message changed: %#v", index, diagnostic.Message)
+				}
+				if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+					t.Errorf("diagnostic %d leaked edit artifacts under demand %v: %#v", index, test.demand, diagnostic)
+				}
+			}
+		})
+	}
 }
