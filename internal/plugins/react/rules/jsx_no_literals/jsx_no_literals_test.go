@@ -139,7 +139,7 @@ class Comp1 extends Component {
   {intl.formatText(message)}
 </Foo>
 `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"noStrings": true, "ignoreProps": true},
 		},
 		{
@@ -148,7 +148,7 @@ class Comp1 extends Component {
   {translate('my.translate.key')}
 </Foo>
 `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"noStrings": true, "ignoreProps": true},
 		},
 
@@ -169,14 +169,14 @@ class Comp1 extends Component {
   }
 }
 `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"noStrings": true, "ignoreProps": true},
 		},
 
 		// ---- Template literals in non-JSX contexts are ignored ----
 		{
-			Code: "\nclass Comp1 extends Component {\n  render() {\n    let foo = `bar`;\n    return <div />;\n  }\n}\n",
-			Tsx:  true,
+			Code:    "\nclass Comp1 extends Component {\n  render() {\n    let foo = `bar`;\n    return <div />;\n  }\n}\n",
+			Tsx:     true,
 			Options: map[string]interface{}{"noStrings": true},
 		},
 
@@ -1371,7 +1371,7 @@ export const WithAttributesAndChildren = ({}) => (
 `,
 			Tsx: true,
 			Options: map[string]interface{}{
-				"allowedStrings": []interface{}{"foo"},
+				"allowedStrings":   []interface{}{"foo"},
 				"elementOverrides": map[string]interface{}{"T": map[string]interface{}{}},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1789,6 +1789,15 @@ export const WithAttributesAndChildren = ({}) => (
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "literalNotInJSXExpressionInElement", Message: `Missing JSX expression container around literal string: "foo" in T`},
+			},
+		},
+		// `//` is ordinary text in JSX, but a JavaScript-mode scanner treats it
+		// as a line comment and can skip past the JsxText node's end.
+		{
+			Code: "<div>\n  // {EXISTING_CODE_MARKER}<br />\n</div>",
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "literalNotInJSXExpression", Message: `Missing JSX expression container around literal string: "//"`, Line: 2, Column: 3, EndLine: 2, EndColumn: 5},
 			},
 		},
 	})
