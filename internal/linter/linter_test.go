@@ -334,15 +334,19 @@ func TestListenerRegistryResetReleasesAndReusesListeners(t *testing.T) {
 	registry.add(ast.KindIdentifier, func(*ast.Node) { calls = append(calls, "first") })
 	registry.add(ast.KindIdentifier, func(*ast.Node) { calls = append(calls, "second") })
 	registry.add(rule.ListenerOnExit(ast.KindIdentifier), func(*ast.Node) { calls = append(calls, "exit") })
+	registry.add(rule.ListenerOnFileFinalize(), func(*ast.Node) { calls = append(calls, "finalize") })
 
-	if len(registry.activeKinds) != 2 {
-		t.Fatalf("activeKinds has %d entries, want 2", len(registry.activeKinds))
+	if len(registry.activeKinds) != 3 || !registry.hasFileFinalizers {
+		t.Fatalf("registry active state = (%d, %v), want 3 kinds with a finalizer", len(registry.activeKinds), registry.hasFileFinalizers)
 	}
 	identifierCapacity := cap(registry.byKind[ast.KindIdentifier])
 	registry.reset()
 
 	if len(registry.activeKinds) != 0 {
 		t.Fatalf("activeKinds has %d entries after reset, want 0", len(registry.activeKinds))
+	}
+	if registry.hasFileFinalizers {
+		t.Fatal("registry retained the file-finalizer fast-path flag after reset")
 	}
 	for kind, listeners := range registry.byKind {
 		if len(listeners) != 0 {

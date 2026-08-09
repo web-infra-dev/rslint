@@ -87,6 +87,7 @@ func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig
 					Globals:            globals,
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
+					Needs:              ruleImpl.Needs,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
 					Options:            options,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

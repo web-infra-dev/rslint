@@ -692,6 +692,24 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 	}
 }
 
+func TestRuleRegistryPropagatesRuleNeeds(t *testing.T) {
+	registry := NewRuleRegistry()
+	needs := rule.RuleNeeds{Refs: rule.RefNeedReferences | rule.RefNeedBindingDeclarations}
+	registry.Register("needs-test", rule.Rule{
+		Name:  "needs-test",
+		Needs: needs,
+		Run: func(rule.RuleContext, []any) rule.RuleListeners {
+			return nil
+		},
+	})
+	configured := registry.GetEnabledRulesForMergedConfig(&MergedConfig{
+		Rules: map[string]*RuleConfig{"needs-test": {Level: "error"}},
+	}, false)
+	if len(configured) != 1 || configured[0].Needs != needs {
+		t.Fatalf("configured Needs = %#v, want %#v", configured, needs)
+	}
+}
+
 func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 	RegisterAllRules()
 

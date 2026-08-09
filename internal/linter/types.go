@@ -22,6 +22,9 @@ type ConfiguredRule struct {
 	Globals          map[string]utils.GlobalAccess
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
+	// Needs is the rule's static shared-analysis capability ceiling. The rule
+	// still opts individual files in dynamically from Rule.Run.
+	Needs rule.RuleNeeds
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
 	// worker (mounted via the config's object-form `plugins`) rather than natively
 	// in Go. The linter splits these out and dispatches them; its Run is a

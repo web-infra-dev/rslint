@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -292,6 +293,7 @@ type configuredRuleView struct {
 	globals            map[string]utils.GlobalAccess
 	severity           int
 	requiresTypeInfo   bool
+	needs              rule.RuleNeeds
 	isEslintPluginRule bool
 	options            []any
 	hasRun             bool
@@ -306,6 +308,7 @@ func configuredRuleViews(rules []linter.ConfiguredRule) []configuredRuleView {
 			globals:            configuredRule.Globals,
 			severity:           int(configuredRule.Severity),
 			requiresTypeInfo:   configuredRule.RequiresTypeInfo,
+			needs:              configuredRule.Needs,
 			isEslintPluginRule: configuredRule.IsEslintPluginRule,
 			options:            configuredRule.Options,
 			hasRun:             configuredRule.Run != nil,

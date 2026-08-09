@@ -99,8 +99,9 @@ type programLintResult struct {
 }
 
 type listenerRegistry struct {
-	byKind      map[ast.Kind][]func(node *ast.Node)
-	activeKinds []ast.Kind
+	byKind            map[ast.Kind][]func(node *ast.Node)
+	activeKinds       []ast.Kind
+	hasFileFinalizers bool
 }
 
 func newListenerRegistry() listenerRegistry {
@@ -116,6 +117,9 @@ func (r *listenerRegistry) add(kind ast.Kind, listener func(node *ast.Node)) {
 		r.activeKinds = append(r.activeKinds, kind)
 	}
 	r.byKind[kind] = append(listeners, listener)
+	if kind == rule.ListenerOnFileFinalize() {
+		r.hasFileFinalizers = true
+	}
 }
 
 func (r *listenerRegistry) listeners(kind ast.Kind) []func(node *ast.Node) {
@@ -132,6 +136,7 @@ func (r *listenerRegistry) reset() {
 		r.byKind[kind] = listeners[:0]
 	}
 	r.activeKinds = r.activeKinds[:0]
+	r.hasFileFinalizers = false
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered
@@ -209,8 +214,9 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		// identifiers the binder scope walk can't resolve (declared outside
 		// this file); nil there just disables the fallback.
 		var refs *rule.RefStore
+		var refCollector rule.RefCollector
 		if opts.Program != nil {
-			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker)
+			refs, refCollector = rule.NewRefStoreWithCollector(file, opts.Program.Options(), fileChecker)
 		}
 
 		// One lazy byte-order-mark answer shared by every rule in this file.
@@ -222,7 +228,10 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			sourceBOM = rule.NewSourceBOM(opts.Program.Host().FS(), file.FileName())
 		}
 
-		for ruleIndex, r := range rules {
+		var declaredRefNeeds rule.RefNeeds
+		for ruleIndex := range rules {
+			r := &rules[ruleIndex]
+			declaredRefNeeds |= r.Needs.Refs
 			ctx := rule.RuleContext{
 				SourceFile:     file,
 				Cwd:            opts.Cwd,
@@ -234,9 +243,10 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				BOM:            sourceBOM,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
-			}.WithDiagnosticConsumer(
+			}.WithRuleConfiguration(
 				r.Name,
 				r.Severity,
+				r.Needs,
 				consumer,
 			)
 
@@ -262,9 +272,34 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			}
 		}
 
+		// A dynamic request from Rule.Run selects one private observer on the
+		// existing Identifier enter path. Files without a request retain the
+		// original enter function: no observer, per-node branch, collection map,
+		// or allocation. Legacy rules may continue to query RefStore lazily
+		// without declaring Needs.
+		var refObserver rule.RefObserver
+		if declaredRefNeeds != 0 {
+			refObserver = refCollector.Start()
+		}
+		var fileFinalizers []func(node *ast.Node)
+		if registeredListeners.hasFileFinalizers {
+			fileFinalizers = registeredListeners.listeners(rule.ListenerOnFileFinalize())
+		}
+
 		runListeners := func(kind ast.Kind, node *ast.Node) {
 			for _, listener := range registeredListeners.listeners(kind) {
 				listener(node)
+			}
+		}
+		runEnterListeners := runListeners
+		if refObserver.Active() {
+			runEnterListeners = func(kind ast.Kind, node *ast.Node) {
+				for _, listener := range registeredListeners.listeners(kind) {
+					listener(node)
+				}
+				if kind == ast.KindIdentifier {
+					refObserver.Observe(node)
+				}
 			}
 		}
 
@@ -285,7 +320,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
-			runListeners(node.Kind, node)
+			runEnterListeners(node.Kind, node)
 			kind := rule.ListenerOnAllowPattern(node.Kind)
 			runListeners(kind, node)
 
@@ -316,7 +351,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
-			runListeners(node.Kind, node)
+			runEnterListeners(node.Kind, node)
 
 			switch node.Kind {
 			case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
@@ -340,6 +375,15 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			return false
 		}
 		file.Node.ForEachChild(childVisitor)
+		if refObserver.Active() {
+			refCollector.Complete()
+		}
+		// File finalizers run after every real-node enter/exit listener and
+		// after RefStore is complete, but before timing merge and registry
+		// reset so they retain ordinary rule ordering and attribution.
+		for _, finalize := range fileFinalizers {
+			finalize(file.AsNode())
+		}
 		if opts.Timing != nil {
 			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
 		}

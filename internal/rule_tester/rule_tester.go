@@ -218,6 +218,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 						LanguageOptions: languageOptions,
 						Globals:         globals,
 						Severity:        rule.SeverityError,
+						Needs:           r.Needs,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
 						},

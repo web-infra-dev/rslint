@@ -16,11 +16,12 @@ type RuleTiming struct {
 	// Kind is RuleKindNative or RuleKindJS, depending on which side
 	// executed the rule.
 	Kind string
-	// Time is the total time spent in the rule: building its listeners
-	// (Run) plus every listener invocation during AST traversal, including
-	// any diagnostics/fix construction those listeners perform. Files are
-	// linted by parallel workers, so the sum over all rules can exceed the
-	// run's wall-clock time.
+	// Time is the total time spent in the rule: building its listeners (Run)
+	// plus every listener invocation during AST traversal and file finalization,
+	// including diagnostics, fixes, and shared-fact queries those listeners
+	// perform. Framework observers shared by several rules are not attributed to
+	// an arbitrary first consumer. Files are linted by parallel workers, so the
+	// sum over all rules can exceed the run's wall-clock time.
 	Time time.Duration
 	// Files is the number of distinct files the rule executed on. A file
 	// re-linted by --fix passes counts once, while its time keeps accruing.

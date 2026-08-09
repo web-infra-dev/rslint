@@ -16,7 +16,7 @@ import (
 // and per-file locals the way the linter guarantees before constructing a
 // RefStore in production), and returns both the bound source file and its
 // RefStore for direct inspection.
-func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind, source string) (*ast.SourceFile, *RefStore) {
+func newBoundRefStore(t testing.TB, fileName string, scriptKind core.ScriptKind, source string) (*ast.SourceFile, *RefStore) {
 	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: fileName,

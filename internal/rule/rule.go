@@ -101,6 +101,7 @@ const (
 	lastOnAllowPatternOnExitTokenKind    ast.Kind = 4000
 	lastOnNotAllowPatternTokenKind       ast.Kind = 5000
 	lastOnNotAllowPatternOnExitTokenKind ast.Kind = 6000
+	listenerOnFileFinalizeKind           ast.Kind = lastOnNotAllowPatternOnExitTokenKind + 1
 )
 
 func ListenerOnExit(kind ast.Kind) ast.Kind {
@@ -115,11 +116,24 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 	return kind + lastOnAllowPatternOnExitTokenKind
 }
 
+// ListenerOnFileFinalize returns the dedicated per-file finalize event kind.
+// The linter dispatches it once after all real-node enter/exit listeners and
+// after shared RefStore collection is complete. It is intentionally distinct
+// from ListenerOnExit(ast.KindSourceFile): the SourceFile root is not part of
+// the ordinary listener traversal.
+func ListenerOnFileFinalize() ast.Kind {
+	return listenerOnFileFinalizeKind
+}
+
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
+	// Needs declares the upper bound of shared analyses this rule may request
+	// for an individual file. Declaration alone does not materialize anything;
+	// Rule.Run opts a file in through the corresponding RuleContext request.
+	Needs RuleNeeds
 	// IsEslintPluginRule marks a placeholder rule whose actual execution
 	// happens in a Node worker — an ESLint-plugin rule mounted via the
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
@@ -141,6 +155,7 @@ func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		Needs:            r.Needs,
 		Schema:           r.Schema,
 		Run:              r.Run,
 	}

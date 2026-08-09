@@ -252,6 +252,7 @@ Rules are defined in `internal/rule/rule.go`:
 type Rule struct {
     Name             string
     RequiresTypeInfo bool
+    Needs            RuleNeeds
     Run              func(ctx RuleContext, options []any) RuleListeners
 }
 
@@ -301,6 +302,7 @@ func (*RuleContext) ReportNodeWithDeferredFixesAndSuggestions(
 func (*RuleContext) ReportRangeWithDeferredFixesAndSuggestions(
     ..., func() []RuleFix, func() []RuleSuggestion,
 )
+func (RuleContext) RequestRefs(needs RefNeeds) bool
 ```
 
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
@@ -309,25 +311,66 @@ for the first consumer; later consumers share that list. A source without `//`
 or `/*` takes a cheap byte-scan fast path. Inline-global parsing first checks
 for an exact raw-text directive candidate, so ordinary files do not force
 comment collection.
-The linter also creates one shared `RefStore` handle per file. Its candidate
-identifier walk is deferred until the first reference query, and binder name
-resolution is then performed once per queried symbol name. Rules query it with
-binder declaration symbols instead of repeating AST walks or TypeChecker
-lookups; files whose rules never request references do not materialize the
-index. `Resolve` (identifier → symbol) and `References` (symbol → identifiers)
-try the binder scope walk first, which answers most queries without ever
-touching the TypeChecker; when the binder can't place an identifier — a
-symbol declared outside the file (cross-file, `.d.ts`, standard-library
-globals) — `Resolve` falls back to the TypeChecker, at the cost of a round
-trip for that identifier, and `References` picks up that same fallback
-automatically when queried with a symbol `Resolve` obtained that way. Without
-a TypeChecker (`NewRefStore`'s third argument is `nil`), that fallback is a
-no-op and both methods only ever see symbols declared in the current file.
-`ResolveInFile` is the explicit binder-only forward lookup: it never takes the
-TypeChecker fallback even when one is available. ESLint scope rules such as
-`no-undef` use this path so DOM/lib, ambient `.d.ts`, and cross-file TypeScript
-symbols cannot make their result depend on whether the file happened to receive
-a checker.
+The linter also creates one shared `RefStore` handle per file. It is the single
+owner for authored binding occurrences, explicit lexical references and
+syntax-only import provenance; there is no parallel BindingStore or ScopeStore.
+The direct APIs expose neutral facts — read/write role, value/type/namespace
+space, exact declaration occurrence, syntactic container helpers, nearest
+function/outside-function-body relationships and local import syntax — but
+deliberately do not decide whether a binding is used, captured, shadowed or
+exported. These syntactic containers are not an ESLint Scope/Variable model;
+computed names, function-name scopes and parameter environments remain visible
+as syntax for a consumer to interpret. A parameter property exposes distinct
+lexical-parameter and class-member symbol identities. Import facts never
+resolve a module or follow an alias target and are independent of ModuleGraph.
+Nodes passed to direct node APIs must belong to the store's source file; the hot
+query path does not add an ancestor walk solely to validate that precondition.
+Raw TypeScript binder identities are also not a drop-in replacement for
+typescript-eslint Variables: class inner/outer name scopes, `with`, Annex-B
+block functions and namespace-member scopes can require a later compatible
+view to split or reinterpret one binder symbol. Scope-sensitive rule migrations
+must validate that view against scope-manager rather than infer `used`,
+`shadowed` or `captured` directly from these facts.
+
+Rules declare a static `Rule.Needs.Refs` ceiling and call `RequestRefs` during
+`Rule.Run` only for files that need a complete collection. After all rule
+initializers run, the linter activates one private Identifier observer on its
+existing enter traversal when at least one request is active. The normal
+traversal then collects each requested feature once per file for all requesting
+rules. No request selects the original traversal path: there is no observer,
+collection map or per-node branch. Declaration/import observation stores only
+compact name-node slices; full fact structs and their syntactic ancestor fields
+materialize once, on the first complete query, and are then shared.
+
+Only the linter retains the `RefCollector`/`RefObserver` traversal control
+capability. `RuleContext` exposes the same single `RefStore` for requests and
+queries, but a rule cannot seal a partial stream as complete; the collector
+owns no second store or analysis data. A complete-file query made before
+traversal finishes discards the partial logical collection, reuses its allocated
+storage and performs a complete prepass over every currently streaming feature;
+partial or live results are never returned. Existing rules need no metadata
+migration: the compatible lazy prepass remains available to any caller of
+`References`, `BindingDeclarations` or `ImportBindings`.
+
+`--timing` continues to attribute only each rule's `Run` and registered
+listeners. The shared Identifier observer is intentionally not charged to the
+first requesting rule and cannot be isolated without per-node clocks or double
+counting. Queries, lazy materialization and an early-query fallback still run
+inside — and are charged to — the listener that invokes them. Any rule
+migration must therefore validate end-to-end traversal/wall time (and fallback
+rate), not claim framework savings from its per-rule timing line alone.
+
+Reference name resolution remains lazy per queried symbol name. `Resolve`
+(identifier → symbol) and `References` (symbol → identifiers) try the binder
+scope walk first, which answers most queries without touching the TypeChecker;
+when the binder cannot place an identifier — a symbol declared outside the file
+(cross-file, `.d.ts`, standard-library globals) — `Resolve` falls back to the
+TypeChecker and `References` preserves that identity. Raw declarations in a
+global script or an external module's `declare global` block are reconciled to
+their checker-merged global identity only when queried. `ResolveInFile` remains
+the explicit binder-only lookup and never takes that fallback. The RefStore
+does not add a general per-node resolution cache: binder-local,
+checker-fallback and checker-merged reverse-index identities remain separate.
 Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
 its zero value means the moving `latest` edition. The linter uses it to build
 one `Globals` value for each native rule context. `Globals` owns the
@@ -400,8 +443,15 @@ This allows one AST traversal to serve many rules.
 - **OnExit**: synthetic listener kind created by `ListenerOnExit(kind)`
 - **OnAllowPattern**: synthetic listener kind used for pattern/destructuring contexts
 - **OnNotAllowPattern**: synthetic listener kind used for non-pattern contexts of the same AST shape
+- **OnFileFinalize**: dedicated once-per-file event dispatched after all real
+  node enter/exit callbacks and after RefStore collection is complete
 
-Those synthetic kinds are defined by offsetting real `ast.Kind` values. They are a rule-framework dispatch mechanism, not native ts-go node kinds.
+Those synthetic kinds are a rule-framework dispatch mechanism, not native
+ts-go node kinds. `OnFileFinalize` is intentionally not
+`ListenerOnExit(ast.KindSourceFile)`: the SourceFile root is outside the normal
+node-listener traversal. Finalizers run before timing merge and listener-registry
+reset, so their work retains normal rule ordering, attribution and per-file
+lifetime.
 
 ## 7. Diagnostics & Autofixes
 
@@ -1082,7 +1132,12 @@ goroutines remain outside that guarantee.
 - **Buffered Diagnostic Collection**: CLI mode funnels diagnostics through a buffered channel before formatting, which reduces contention between lint tasks and output handling
 - **On-Demand AST Encoding**: API/WASM responses only include encoded source files when `IncludeEncodedSourceFiles` is requested
 - **Lazy Shared Comments**: each file owns one `CommentStore`; directive consumers and comment-aware rules materialize its canonical comment list only when needed and reuse the result. Rule-specific text checks avoid scanner work when their comment syntax cannot occur
-- **Lazy Shared References**: each file exposes one `RefStore`; its candidate identifier walk is deferred until first use, and each queried symbol name is binder-resolved once for reuse across native rules
+- **Demand-Driven Shared Reference Facts**: each file exposes one `RefStore`.
+  Legacy complete queries use a lazy prepass; declared per-file requests collect
+  references, binding occurrences and import provenance through the existing
+  Identifier dispatch during the main traversal. No-request files add no
+  listener or collection allocation, and each queried symbol name remains
+  binder-resolved once for reuse across native rules
 - **Task-Local Listener Reuse**: each checker-shard task owns one sparse listener registry and reuses its map and per-kind slice capacity across that task's serial files. Registries are never shared across tasks or requests
 - **Direct Rule Reporting Methods**: each rule context stores one compact immutable reporter state; its reporting methods replace the former family of per-rule bound closures
 - **Demand-Driven Native Edits**: native consumers explicitly request optional
@@ -1293,10 +1348,13 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  Match Config Shape -> Reuse/Merge Immutable Config and Enabled Rules        │
 │            │                                                                 │
 │            ▼                                                                 │
-│  Run Rule Initializers -> Register Listeners                                 │
+│  Run Rule Initializers -> Register Listeners / RefStore Requests             │
 │            │                                                                 │
 │            ▼                                                                 │
-│  Single DFS AST Traversal -> Listener Dispatch                               │
+│  Single DFS AST Traversal -> Listener Dispatch / Requested Ref Facts         │
+│            │                                                                 │
+│            ▼                                                                 │
+│  Complete Shared Ref Facts -> File Finalizers                                │
 │            │                                                                 │
 │            ▼                                                                 │
 │  Native Edit Demand -> Report / Suppress -> Deferred Edit Materialization    │
@@ -1374,12 +1432,15 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Program Registry**: Run-scoped set of Programs keyed by normalized declared tsconfig path, plus the governing configs and project declaration order associated with each Program
 - **project.Session**: ts-go project manager used by LSP for inferred/configured projects and overlays
 - **Rule Context**: Runtime environment through which a rule reads file/program/checker state and reports findings
+- **RefStore**: Per-file owner of binder resolution, explicit references,
+  authored binding occurrences and syntax-only import provenance; complete
+  collections are lazy or gathered on demand during the linter traversal
 - **RuleFix**: Text edit represented as a range plus replacement text; fixes are merged and applied after diagnostics are collected
 - **Rule Registry**: Shared registry of rule implementations and config-to-rule resolution logic; the registry is implemented in `internal/config/rule_registry.go` and populated by `RegisterAllRules()` in `internal/config/config.go`
 - **RuleSuggestion**: Suggested edit attached to a diagnostic that is surfaced to the user but not treated as a default autofix
 - **Severity**: Effective diagnostic level for a configured rule, such as `off`, `warn`, or `error`
 - **Source Code Fixer**: Fix-application layer that merges non-overlapping `RuleFix` edits and rewrites file contents
-- **Synthetic Listener Kind**: rslint-defined pseudo-kind such as `OnExit`, `OnAllowPattern`, or `OnNotAllowPattern` used to distinguish traversal contexts beyond raw AST kinds
+- **Synthetic Listener Kind**: rslint-defined pseudo-kind such as `OnExit`, `OnAllowPattern`, `OnNotAllowPattern`, or `OnFileFinalize` used to distinguish traversal contexts beyond raw AST kinds
 - **TypeChecker**: ts-go semantic engine acquired from a `Program` and used by type-aware rules for symbol and type queries
 - **Type-aware Rule**: Rule that requires the TypeChecker and semantic information
 - **TypeScript-Go**: Go port of the TypeScript compiler that supplies AST, checker, Program, project/session, scanner, and VFS

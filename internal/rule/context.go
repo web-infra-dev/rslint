@@ -56,11 +56,12 @@ type RuleContext struct {
 	// utils.ForEachComment. The first consumer computes the list and every
 	// later consumer for this file reuses it.
 	Comments *CommentStore
-	// Refs lazily provides the per-file identifier-reference index. Rules
-	// that need "all references to this declared symbol" should query this
-	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
-	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
-	// Nil when no program is available.
+	// Refs is the single per-file owner of explicit references, authored
+	// binding occurrences, and syntax-only import provenance. Complete-file
+	// collections stay lazy unless a rule declares and requests them; direct
+	// node queries do not require a request. Reference keys are binder symbols
+	// (node.Symbol()); see RefStore for identity boundaries. Nil when no program
+	// is available.
 	Refs *RefStore
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
@@ -72,13 +73,44 @@ type RuleContext struct {
 	reporter       ruleContextReporter
 }
 
+// WithRuleNeeds binds the static RefStore capability ceiling declared by one
+// rule for a directly constructed context. The linter uses the combined
+// WithRuleConfiguration path to avoid a second RuleContext value copy.
+func (ctx RuleContext) WithRuleNeeds(needs RuleNeeds) RuleContext {
+	if !needs.Refs.IsValid() {
+		panic("rule: invalid RefStore needs")
+	}
+	ctx.reporter.refNeeds = needs.Refs
+	return ctx
+}
+
+// RequestRefs opts the current file into complete-file RefStore collection.
+// needs must be a subset of the rule's declared Rule.Needs. Calls made during
+// Rule.Run are collected by the linter's existing traversal; a later call is
+// correctness-safe but falls back to a complete lazy prepass.
+func (ctx RuleContext) RequestRefs(needs RefNeeds) bool {
+	if !needs.IsValid() {
+		panic("rule: invalid RefStore request")
+	}
+	if needs&^ctx.reporter.refNeeds != 0 {
+		panic("rule: requested undeclared RefStore needs")
+	}
+	if ctx.Refs == nil {
+		return false
+	}
+	ctx.Refs.request(needs)
+	return true
+}
+
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the
 // rule-specific metadata here avoids allocating a family of bound reporting
 // closures for every rule context.
 type ruleContextReporter struct {
 	ruleName string
 	severity DiagnosticSeverity
-	consumer DiagnosticConsumer
+	demand   EditDemand
+	refNeeds RefNeeds
+	report   func(RuleDiagnostic)
 }
 
 // WithReporter returns a context configured to report diagnostics for one
@@ -111,16 +143,45 @@ func (ctx RuleContext) WithDiagnosticConsumer(
 	if !consumer.Demand.IsValid() {
 		panic("rule: invalid edit demand")
 	}
-	ctx.reporter = ruleContextReporter{
-		ruleName: ruleName,
-		severity: severity,
-		consumer: consumer,
+	ctx.reporter.ruleName = ruleName
+	ctx.reporter.severity = severity
+	ctx.reporter.demand = consumer.Demand
+	ctx.reporter.report = consumer.Report
+	return ctx
+}
+
+// WithRuleConfiguration binds both the rule's shared-analysis ceiling and its
+// diagnostic consumer in one context copy. The linter uses this combined path
+// for every configured rule; compatibility callers that do not declare shared
+// needs continue to use WithDiagnosticConsumer.
+func (ctx RuleContext) WithRuleConfiguration(
+	ruleName string,
+	severity DiagnosticSeverity,
+	needs RuleNeeds,
+	consumer DiagnosticConsumer,
+) RuleContext {
+	if ctx.SourceFile == nil {
+		panic("rule: reporter requires a source file")
 	}
+	if consumer.Report == nil {
+		panic("rule: reporter requires a diagnostic handler")
+	}
+	if !consumer.Demand.IsValid() {
+		panic("rule: invalid edit demand")
+	}
+	if !needs.Refs.IsValid() {
+		panic("rule: invalid RefStore needs")
+	}
+	ctx.reporter.ruleName = ruleName
+	ctx.reporter.severity = severity
+	ctx.reporter.demand = consumer.Demand
+	ctx.reporter.refNeeds = needs.Refs
+	ctx.reporter.report = consumer.Report
 	return ctx
 }
 
 func (ctx *RuleContext) requireReporter() {
-	if ctx.reporter.consumer.Report == nil {
+	if ctx.reporter.report == nil {
 		panic("rule: uninitialized RuleContext reporter")
 	}
 }
@@ -133,7 +194,7 @@ func (ctx *RuleContext) shouldReportRange(textRange core.TextRange) bool {
 
 func (ctx *RuleContext) emitRange(textRange core.TextRange, msg RuleMessage, fixes *[]RuleFix, suggestions *[]RuleSuggestion) {
 	reporter := &ctx.reporter
-	reporter.consumer.Report(RuleDiagnostic{
+	reporter.report(RuleDiagnostic{
 		RuleName:    reporter.ruleName,
 		Range:       textRange,
 		Message:     msg,
@@ -173,10 +234,10 @@ func (ctx *RuleContext) reportRange(textRange core.TextRange, msg RuleMessage, f
 	if !ctx.shouldReportRange(textRange) {
 		return
 	}
-	if ctx.reporter.consumer.Demand&EditDemandAutofix == 0 {
+	if ctx.reporter.demand&EditDemandAutofix == 0 {
 		fixes = nil
 	}
-	if ctx.reporter.consumer.Demand&EditDemandSuggestion == 0 {
+	if ctx.reporter.demand&EditDemandSuggestion == 0 {
 		suggestions = nil
 	}
 	ctx.emitRange(textRange, msg, fixes, suggestions)
@@ -187,7 +248,7 @@ func (ctx *RuleContext) reportRangeWithDeferredFixes(textRange core.TextRange, m
 		return
 	}
 
-	if ctx.reporter.consumer.Demand&EditDemandAutofix != 0 {
+	if ctx.reporter.demand&EditDemandAutofix != 0 {
 		built := build()
 		if len(built) > 0 {
 			ctx.emitRangeWithFixes(textRange, msg, built)
@@ -202,7 +263,7 @@ func (ctx *RuleContext) reportRangeWithDeferredSuggestions(textRange core.TextRa
 		return
 	}
 
-	if ctx.reporter.consumer.Demand&EditDemandSuggestion != 0 {
+	if ctx.reporter.demand&EditDemandSuggestion != 0 {
 		built := build()
 		if len(built) > 0 {
 			ctx.emitRangeWithSuggestions(textRange, msg, built)
@@ -223,12 +284,12 @@ func (ctx *RuleContext) reportRangeWithDeferredFixesAndSuggestions(
 	}
 
 	var fixes []RuleFix
-	if ctx.reporter.consumer.Demand&EditDemandAutofix != 0 {
+	if ctx.reporter.demand&EditDemandAutofix != 0 {
 		fixes = buildFixes()
 	}
 
 	var suggestions []RuleSuggestion
-	if ctx.reporter.consumer.Demand&EditDemandSuggestion != 0 {
+	if ctx.reporter.demand&EditDemandSuggestion != 0 {
 		suggestions = buildSuggestions()
 	}
 

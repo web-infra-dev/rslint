@@ -166,6 +166,7 @@ fieldset
 figcaption
 fileless
 finalizer
+finalizers
 fixall
 flaggable
 flowto
@@ -401,6 +402,7 @@ Prag
 preact
 prebundle
 predeclare
+prepass
 preresolved
 Prettier
 prioritises
