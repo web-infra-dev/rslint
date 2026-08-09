@@ -2,9 +2,16 @@ package no_cycle
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+// This file owns the rule's dependency graph: how one is built from the
+// Program's module references, and every question the rule asks of it —
+// including the search, which is a property of the graph rather than of the
+// file that started it. no_cycle.go holds what is left: option parsing, the
+// per-file entry point, and the message.
 
 // graphKey identifies one shape of the dependency graph. The references
 // themselves come from the shared module index, so only what turns a
@@ -35,10 +42,18 @@ type moduleNode struct {
 type moduleGraph struct {
 	nodes []moduleNode
 	index map[*ast.SourceFile]int32
-	// group[i] is i's strongly connected component over edge. A reference can
-	// only close a cycle when its target reaches the importer again, which
-	// puts the two in one group, so a file whose every target sits in another
-	// group needs no search at all.
+	// group[i] is i's strongly connected component over edge — over the whole
+	// edge set, never over the smaller expand. A reference can only close a
+	// cycle when its target reaches the importer again, which puts the two in
+	// one group, so a file whose every target sits in another group needs no
+	// search at all.
+	//
+	// Computing the groups over the larger of the two edge sets is what lets
+	// detectCycle confine itself to one group under either configuration: a
+	// route walked over expand is also a route over edge, so its every file
+	// both reaches the importer and is reached from it, which is what sharing
+	// its group means. A group can therefore hold files no expand route
+	// reaches, but never miss one that a route does.
 	group []int32
 }
 
@@ -52,7 +67,7 @@ func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
-	return import_utils.CachedByProgram(ctx.Program, key, func() *moduleGraph {
+	return rule.CachedByProgram(ctx.Program, key, func() *moduleGraph {
 		return buildModuleGraph(ctx, settings, opts)
 	})
 }
@@ -132,14 +147,7 @@ func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOption
 	if !opts.ignoreExternal {
 		return false
 	}
-	return settings.IsExternalPath(edge.Text(), moduleReferencePath(edge))
-}
-
-func moduleReferencePath(edge rule.ModuleEdge) string {
-	if edge.Target != nil {
-		return edge.Target.FileName()
-	}
-	return edge.ResolvedPath
+	return settings.IsExternalPath(edge.Text(), edge.Path())
 }
 
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's
@@ -249,4 +257,126 @@ func (graph *moduleGraph) computeGroups() {
 type groupFrame struct {
 	node int32
 	edge int32
+}
+
+// isReportCandidate reports whether reference r of file self is one a report
+// could come from, which is also the only kind the rule searches from. It has
+// to be an edge this configuration keeps, it has to point at another file —
+// direct self imports belong to import/no-self-import, and a dynamic import is
+// not a cycle when the configuration says so — and its target has to share
+// self's group, because a reported reference has a route from its target back
+// to self and so leaves the two mutually reachable.
+func (graph *moduleGraph) isReportCandidate(opts ruleOptions, self int32, r int) bool {
+	node := &graph.nodes[self]
+	target := node.edge[r]
+	if target < 0 || target == self {
+		return false
+	}
+	if opts.allowUnsafeDynamicCyclicDependency && node.refs[r].Dynamic() {
+		return false
+	}
+	return graph.group[target] == graph.group[self]
+}
+
+// hasCyclicCandidate reports whether any reference of self could be reported,
+// which answers nearly every file in a healthy project from the group numbers
+// alone, without walking the graph or allocating a traversal set.
+func (graph *moduleGraph) hasCyclicCandidate(opts ruleOptions, self int32) bool {
+	for r := range graph.nodes[self].refs {
+		if graph.isReportCandidate(opts, self, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// queuedModule is one breadth-first search entry. It keeps a parent link into
+// the queue instead of a copy of the route so far, and names the reference it
+// arrived through, so a route is materialized only for a path that closes a
+// cycle.
+type queuedModule struct {
+	node    int32
+	parent  int32
+	viaNode int32
+	viaRef  int32
+	depth   int32
+}
+
+type routeStep struct {
+	value string
+	line  int
+}
+
+// detectCycle walks breadth-first from start looking for a way back to self
+// and returns the route it arrived by. traversed is shared across one file's
+// references, so a target an earlier reference already ruled out is not
+// searched again — which stays faithful because a search that leaves self's
+// group can never come back into it, so the references this file skips as
+// non-candidates would not have reached anything these searches visit.
+//
+// The walk stays inside self's group: every file on a route back to self both
+// reaches self and is reached from it, which is what that group means. That
+// holds under allowUnsafeDynamicCyclicDependency too, even though the walk
+// then follows expand rather than edge, because expand is a subset of the edge
+// set the groups were computed over — see moduleGraph.group.
+func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed map[int32]bool, start int32) ([]routeStep, bool) {
+	group := graph.group[self]
+
+	queue := []queuedModule{{node: start, parent: -1, viaNode: -1, viaRef: -1}}
+	for head := 0; head < len(queue); head++ {
+		next := queue[head]
+		if traversed[next.node] {
+			continue
+		}
+		traversed[next.node] = true
+
+		for r, target := range graph.nodes[next.node].expand {
+			if target < 0 || traversed[target] {
+				continue
+			}
+			if target == self {
+				return graph.routeTo(queue, head), true
+			}
+			if int(next.depth)+1 >= opts.maxDepth {
+				continue
+			}
+			if graph.group[target] != group {
+				continue
+			}
+			queue = append(queue, queuedModule{
+				node:    target,
+				parent:  int32(head),
+				viaNode: next.node,
+				viaRef:  int32(r),
+				depth:   next.depth + 1,
+			})
+		}
+	}
+
+	return nil, false
+}
+
+// routeTo follows the parent links back from a queue entry, materializing the
+// specifier and source line of every reference the search passed through.
+func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
+	depth := int(queue[index].depth)
+	route := make([]routeStep, depth)
+	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
+		next := queue[index]
+		edge := &graph.nodes[next.viaNode].refs[next.viaRef]
+		route[routeIndex] = routeStep{
+			value: edge.Text(),
+			line:  sourceLine(edge.From, edge.Specifier),
+		}
+		index = int(next.parent)
+	}
+	return route
+}
+
+func sourceLine(sourceFile *ast.SourceFile, source *ast.Node) int {
+	if sourceFile == nil || source == nil {
+		return 1
+	}
+	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, source.Pos())
+	return line + 1
 }

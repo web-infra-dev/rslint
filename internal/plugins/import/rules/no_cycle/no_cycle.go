@@ -7,10 +7,12 @@ import (
 	"math"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+// The dependency graph this rule reads, and every question asked of it, live
+// in graph.go. What is left here is the rule itself: its options, the per-file
+// entry point, and the message it reports.
 
 //go:embed no_cycle.schema.json
 var schemaJSON []byte
@@ -22,23 +24,6 @@ type ruleOptions struct {
 	ignoreExternal                     bool
 	allowUnsafeDynamicCyclicDependency bool
 	syntax                             rule.ModuleSyntax
-}
-
-type routeStep struct {
-	value string
-	line  int
-}
-
-// queuedModule is one breadth-first search entry. It keeps a parent link into
-// the queue instead of a copy of the route so far, and names the reference it
-// arrived through, so a route is materialized only for a path that closes a
-// cycle.
-type queuedModule struct {
-	node    int32
-	parent  int32
-	viaNode int32
-	viaRef  int32
-	depth   int32
 }
 
 // NoCycleRule forbids dependency paths that resolve back to the linted module.
@@ -154,17 +139,9 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	}
 
 	node := &graph.nodes[self]
-	stayInGroup := !opts.allowUnsafeDynamicCyclicDependency
 	traversed := make(map[int32]bool)
 	for r := range node.refs {
-		if !graph.isSearchable(opts, self, r) {
-			continue
-		}
-		// A search confined to the group only ever rules out references whose
-		// target is in it, so the ones outside can be skipped outright. The
-		// unconfined search shares its traversal set with every reference, and
-		// skipping any of them would change what the later ones see.
-		if stayInGroup && graph.group[node.edge[r]] != graph.group[self] {
+		if !graph.isReportCandidate(opts, self, r) {
 			continue
 		}
 		route, found := graph.detectCycle(opts, self, traversed, node.edge[r])
@@ -178,106 +155,6 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 		}
 		ctx.ReportNode(reportNode, messageCycle(route))
 	}
-}
-
-// isSearchable reports whether reference r of file self is one the rule
-// searches from: an edge this configuration keeps, pointing at another file.
-// Direct self imports belong to import/no-self-import, and a dynamic import
-// is not a cycle when the configuration says so.
-func (graph *moduleGraph) isSearchable(opts ruleOptions, self int32, r int) bool {
-	node := &graph.nodes[self]
-	target := node.edge[r]
-	if target < 0 || target == self {
-		return false
-	}
-	return !opts.allowUnsafeDynamicCyclicDependency || !node.refs[r].Dynamic()
-}
-
-// hasCyclicCandidate reports whether any reference of self could be reported.
-// A reported reference has a route from its target back to self, and self
-// imports the target, so the two are mutually reachable and share a group.
-func (graph *moduleGraph) hasCyclicCandidate(opts ruleOptions, self int32) bool {
-	node := &graph.nodes[self]
-	for r := range node.refs {
-		if graph.isSearchable(opts, self, r) && graph.group[node.edge[r]] == graph.group[self] {
-			return true
-		}
-	}
-	return false
-}
-
-// detectCycle walks breadth-first from start looking for a way back to self
-// and returns the route it arrived by. traversed is shared across one file's
-// references, so a target an earlier reference already ruled out is not
-// searched again.
-//
-// The walk stays inside self's strongly connected group: every file on a route
-// back to self both reaches self and is reached from it, which is what that
-// group means, so a file outside it can neither lie on a route nor lead to
-// one. Withholding dynamic edges breaks that correspondence, because the
-// group numbers still describe the edges the search no longer follows, so
-// such a configuration searches the whole graph instead.
-func (graph *moduleGraph) detectCycle(opts ruleOptions, self int32, traversed map[int32]bool, start int32) ([]routeStep, bool) {
-	group := graph.group[self]
-	stayInGroup := !opts.allowUnsafeDynamicCyclicDependency
-
-	queue := []queuedModule{{node: start, parent: -1, viaNode: -1, viaRef: -1}}
-	for head := 0; head < len(queue); head++ {
-		next := queue[head]
-		if traversed[next.node] {
-			continue
-		}
-		traversed[next.node] = true
-
-		for r, target := range graph.nodes[next.node].expand {
-			if target < 0 || traversed[target] {
-				continue
-			}
-			if target == self {
-				return graph.routeTo(queue, head), true
-			}
-			if int(next.depth)+1 >= opts.maxDepth {
-				continue
-			}
-			if stayInGroup && graph.group[target] != group {
-				continue
-			}
-			queue = append(queue, queuedModule{
-				node:    target,
-				parent:  int32(head),
-				viaNode: next.node,
-				viaRef:  int32(r),
-				depth:   next.depth + 1,
-			})
-		}
-	}
-
-	return nil, false
-}
-
-// routeTo follows the parent links back from a queue entry, materializing the
-// specifier and source line of every reference the search passed through.
-func (graph *moduleGraph) routeTo(queue []queuedModule, index int) []routeStep {
-	depth := int(queue[index].depth)
-	route := make([]routeStep, depth)
-	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
-		next := queue[index]
-		edge := &graph.nodes[next.viaNode].refs[next.viaRef]
-		route[routeIndex] = routeStep{
-			value: edge.Text(),
-			line:  sourceLine(edge.From, edge.Specifier),
-		}
-		index = int(next.parent)
-	}
-	return route
-}
-
-func sourceLine(sourceFile *ast.SourceFile, source *ast.Node) int {
-	if sourceFile == nil || source == nil {
-		return 1
-	}
-	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, source.Pos())
-	return line + 1
 }
 
 func messageCycle(route []routeStep) rule.RuleMessage {
