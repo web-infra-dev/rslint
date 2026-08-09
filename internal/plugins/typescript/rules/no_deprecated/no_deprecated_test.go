@@ -353,6 +353,62 @@ func TestNoDeprecatedReportsLetInitializedToUndefinedInTsxFixture(t *testing.T) 
 	}
 }
 
+func TestNoDeprecatedDeduplicatesExactRanges(t *testing.T) {
+	t.Parallel()
+	const code = `
+interface Legacy {
+  /** @deprecated Use current instead. */
+  old(): void;
+}
+declare const legacy: Legacy;
+legacy.old();
+legacy.old();
+`
+	diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+		"main.ts": code,
+	}, "main.ts", nil)
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", diagnostics)
+	}
+	for index, diagnostic := range diagnostics {
+		if diagnostic.Message.Id != "deprecatedWithReason" ||
+			diagnostic.Message.Description != "`legacy.old` is deprecated. Use current instead." {
+			t.Fatalf("diagnostic %d message = %#v", index, diagnostic.Message)
+		}
+		if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != "old" {
+			t.Fatalf("diagnostic %d range text = %q, want old", index, got)
+		}
+		if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+			t.Fatalf("diagnostic %d unexpectedly included edits: %#v", index, diagnostic)
+		}
+	}
+}
+
+func TestNoDeprecatedRespectsScopedLineDisables(t *testing.T) {
+	t.Parallel()
+	const code = `
+interface Legacy {
+  /** @deprecated */
+  old(): void;
+}
+declare const legacy: Legacy;
+// eslint-disable-next-line test
+legacy.old();
+legacy.old(); // eslint-disable-line test
+legacy.old();
+`
+	diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+		"main.ts": code,
+	}, "main.ts", nil)
+	if len(diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+	}
+	wantStart := strings.LastIndex(code, "old")
+	if diagnostics[0].Range.Pos() != wantStart || diagnostics[0].Range.End() != wantStart+len("old") {
+		t.Fatalf("diagnostic range = %#v, want [%d, %d)", diagnostics[0].Range, wantStart, wantStart+len("old"))
+	}
+}
+
 func TestNoDeprecatedIgnoresNameOnlyFallbackForElementAccessAndJsxAny(t *testing.T) {
 	t.Parallel()
 
