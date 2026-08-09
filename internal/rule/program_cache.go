@@ -1,4 +1,4 @@
-package utils
+package rule
 
 import (
 	"runtime"
@@ -8,16 +8,15 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 )
 
-// programCaches holds each Program's derived import state for as long as that
-// Program lives. The module graph the core linter owns covers what a file
-// imports, which every rule may want; what stays here is the part only these
-// rules know how to read — a file's own exports, the merged export maps built
-// from them, and whatever a single rule derives on top.
+// programCaches holds state derived from a Program for as long as that Program
+// lives. Anything that is a property of the Program rather than of one file —
+// a module's exports, a rule's whole-project index — belongs here, so that the
+// first file of a run that needs it pays for it and the rest reuse it.
 //
 // The key is a weak pointer, so an entry never keeps its Program alive, and a
-// cleanup drops the entry once the Program is collected. Nothing reachable
-// from an entry points back at the Program: source files do not, and neither
-// the index nor the values callers store hold a reference of their own.
+// cleanup drops the entry once the Program is collected. Callers must keep
+// that property: nothing stored here may hold a strong reference back to the
+// Program. Source files do not, which is why they are safe to store.
 var programCaches sync.Map // weak.Pointer[compiler.Program] -> *programCache
 
 type programCache struct {
@@ -59,10 +58,13 @@ func cacheFor(program *compiler.Program) *programCache {
 // when rules on different files run concurrently, and only its key is
 // untyped: what comes back is whatever T the caller asked for.
 //
-// A rule keys by whatever configuration changes the value it stores, so two
+// A caller keys by whatever configuration changes the value it stores, so two
 // rule configurations that disagree about the shape of that value get their
-// own entries. Use an unexported key type so that keys from different
-// packages cannot collide.
+// own entries. Use an unexported key type so that keys from different packages
+// cannot collide.
+//
+// The value is shared with every later caller, and rules on different files
+// run concurrently, so build must return something no caller will mutate.
 func CachedByProgram[T any](program *compiler.Program, key any, build func() T) T {
 	if program == nil {
 		return build()

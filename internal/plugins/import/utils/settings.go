@@ -30,8 +30,9 @@ type settingsKey struct {
 // notably their regexps — happens inside the build, once per Program and key.
 func SettingsFor(ctx rule.RuleContext) *ModuleSettings {
 	key := moduleSettingsKey(ctx.Settings)
-	return CachedByProgram(ctx.Program, settingsKey{settings: key}, func() *ModuleSettings {
-		return compileModuleSettings(ctx.Settings)
+	settings := ctx.Settings
+	return rule.CachedByProgram(ctx.Program, settingsKey{settings: key}, func() *ModuleSettings {
+		return compileModuleSettings(settings)
 	})
 }
 

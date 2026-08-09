@@ -1,8 +1,6 @@
 package rule
 
 import (
-	"sync"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -69,6 +67,16 @@ func (edge ModuleEdge) Text() string {
 	return edge.Specifier.Text()
 }
 
+// Path is the file the reference names: the Program's file for it when there
+// is one, and otherwise the path it resolved to. Empty when it resolves
+// nowhere.
+func (edge ModuleEdge) Path() string {
+	if edge.Target != nil {
+		return edge.Target.FileName()
+	}
+	return edge.ResolvedPath
+}
+
 // Dynamic reports whether the reference is an `import()` call, which defers
 // loading rather than requiring the module up front.
 func (edge ModuleEdge) Dynamic() bool {
@@ -86,9 +94,11 @@ func (edge ModuleEdge) Dynamic() bool {
 // anything under node_modules counts — is the rule's own question.
 type ModuleGraph struct {
 	program *compiler.Program
-
-	mu    sync.Mutex
-	edges map[moduleEdgeKey][]ModuleEdge
+	// Collection is pure, so LazyMap's build-outside-the-lock contract holds:
+	// two files racing on their first request for one key cost one redundant
+	// collection at worst, which is cheaper than serializing every file in the
+	// run behind one mutex.
+	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
 }
 
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
@@ -99,10 +109,7 @@ type moduleEdgeKey struct {
 }
 
 func NewModuleGraph(program *compiler.Program) *ModuleGraph {
-	return &ModuleGraph{
-		program: program,
-		edges:   make(map[moduleEdgeKey][]ModuleEdge),
-	}
+	return &ModuleGraph{program: program}
 }
 
 // Files returns every file of the Program, in the Program's own order. A
@@ -124,26 +131,9 @@ func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []Mod
 	}
 
 	key := moduleEdgeKey{file: file, syntax: syntax}
-	graph.mu.Lock()
-	edges, ok := graph.edges[key]
-	graph.mu.Unlock()
-	if ok {
-		return edges
-	}
-
-	// Collected outside the lock: collection is pure, so two files racing on
-	// their first request cost one redundant collection at worst, which is
-	// cheaper than serializing every file in the run behind one mutex.
-	edges = graph.collect(file, syntax)
-
-	graph.mu.Lock()
-	if existing, ok := graph.edges[key]; ok {
-		edges = existing
-	} else {
-		graph.edges[key] = edges
-	}
-	graph.mu.Unlock()
-	return edges
+	return graph.edges.Get(key, func() []ModuleEdge {
+		return graph.collect(file, syntax)
+	})
 }
 
 func (graph *ModuleGraph) collect(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
