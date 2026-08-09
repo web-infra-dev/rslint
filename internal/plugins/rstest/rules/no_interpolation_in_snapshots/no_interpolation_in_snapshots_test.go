@@ -220,8 +220,8 @@ func TestNoInterpolationInSnapshotsRule(t *testing.T) {
 				},
 			},
 
-			// The test context is the only expect source that cannot be resolved
-			// without CollectRstestTestCallbacks.
+			// The test context is the only expect source that requires
+			// RstestCallAnalysis.Callbacks to discover the local root.
 			{
 				Code: "test(\"case\", ctx => ctx.expect(value).toMatchInlineSnapshot(`${interpolated}`));",
 				Errors: []rule_tester.InvalidTestCaseError{

@@ -65,13 +65,11 @@ var NoInterpolationInSnapshotsRule = rule.Rule{
 	Name:   "rstest/no-interpolation-in-snapshots",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// expect bound to a test context parameter — test("x", ({ expect }) => ...)
-		// — can only be recognized through the collected callbacks.
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
 				}

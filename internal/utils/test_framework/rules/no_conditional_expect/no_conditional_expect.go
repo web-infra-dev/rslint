@@ -24,7 +24,8 @@ import (
 
 type Runtime struct {
 	TestCallbackFunctions map[*ast.Node]bool
-	ClassifyCall          func(*ast.Node, bool) (isTest bool, isExpect bool)
+	IsTestCall            func(*ast.Node) bool
+	IsExpectCall          func(*ast.Node) bool
 	Skip                  bool
 }
 
@@ -177,13 +178,9 @@ func NewRule(config Config) rule.Rule {
 
 				ast.KindCallExpression: func(node *ast.Node) {
 					isTest := false
-					isExpect := false
 					isCatch := isPromiseCatchCall(node)
-					if runtime.ClassifyCall != nil {
-						checkExpect := isCatch ||
-							inPromiseCatch() ||
-							(inTestCase() && conditionalDepth > 0)
-						isTest, isExpect = runtime.ClassifyCall(node, checkExpect)
+					if runtime.IsTestCall != nil {
+						isTest = runtime.IsTestCall(node)
 					}
 					if isTest || isCatch {
 						if callExpressionFrames == nil {
@@ -201,7 +198,12 @@ func NewRule(config Config) rule.Rule {
 					if isCatch {
 						promiseCatchDepth++
 					}
-					if !isExpect {
+					checkExpect := isCatch ||
+						inPromiseCatch() ||
+						(inTestCase() && conditionalDepth > 0)
+					if !checkExpect ||
+						runtime.IsExpectCall == nil ||
+						!runtime.IsExpectCall(node) {
 						return
 					}
 					if inTestCase() && conditionalDepth > 0 {

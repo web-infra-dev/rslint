@@ -101,14 +101,29 @@ func resolvePendingTestCallbackNames(
 var NoConditionalExpectRule = shared.NewRule(shared.Config{
 	Name: "jest/no-conditional-expect",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		// The shared traversal calls IsTestCall and, only when an assertion can
+		// report, IsExpectCall consecutively for the same node. This one-entry
+		// cache avoids parsing that node twice; a miss only affects performance.
+		var lastNode *ast.Node
+		var lastParsed *jestUtils.ParsedJestFnCall
+		parseCall := func(node *ast.Node) *jestUtils.ParsedJestFnCall {
+			if node == lastNode {
+				return lastParsed
+			}
+			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			lastNode = node
+			lastParsed = parsed
+			return parsed
+		}
 		return shared.Runtime{
 			TestCallbackFunctions: collectTestFunctionCallbacks(ctx),
-			ClassifyCall: func(node *ast.Node, checkExpect bool) (bool, bool) {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
-				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest,
-					checkExpect &&
-						parsed != nil &&
-						parsed.Kind == jestUtils.JestFnTypeExpect
+			IsTestCall: func(node *ast.Node) bool {
+				parsed := parseCall(node)
+				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest
+			},
+			IsExpectCall: func(node *ast.Node) bool {
+				parsed := parseCall(node)
+				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeExpect
 			},
 		}
 	},
