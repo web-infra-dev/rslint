@@ -3,7 +3,11 @@ package explicit_function_return_type
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1566,4 +1570,112 @@ const foo = () => {};
 			},
 		},
 	})
+}
+
+func TestReturnTrackingAndEditDemandParity(t *testing.T) {
+	const code = `
+function mixed(flag: boolean) {
+  if (flag) return (): void => {};
+  return 0;
+}
+
+function allFunctions(flag: boolean) {
+  if (flag) return ((): void => {});
+  function nested(): number { return 1; }
+  return function (): void {};
+}
+
+function bare(flag: boolean) {
+  if (flag) return;
+  return (): void => {};
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function lineDisabled() {
+  return 1;
+}
+
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+function scopedDisabled() {
+  return 1;
+}
+/* eslint-enable @typescript-eslint/explicit-function-return-type */
+`
+
+	demands := []struct {
+		name   string
+		demand rule.EditDemand
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix", demand: rule.EditDemandAutofix},
+		{name: "suggestions", demand: rule.EditDemandSuggestion},
+		{name: "all edits", demand: rule.EditDemandAll},
+	}
+	for _, testCase := range demands {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := runExplicitFunctionReturnTypeWithDemand(t, code, testCase.demand)
+			if len(diagnostics) != 2 {
+				t.Fatalf("diagnostics = %#v, want 2", diagnostics)
+			}
+			for index, wantHead := range []string{"function mixed", "function bare"} {
+				diagnostic := diagnostics[index]
+				if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != wantHead {
+					t.Errorf("diagnostic %d range text = %q, want %q", index, got, wantHead)
+				}
+				if diagnostic.Message.Id != "missingReturnType" ||
+					diagnostic.Message.Description != "Missing return type on function." ||
+					diagnostic.RuleName != ExplicitFunctionReturnTypeRule.Name ||
+					diagnostic.Severity != rule.SeverityError {
+					t.Errorf("diagnostic %d identity = %#v", index, diagnostic)
+				}
+				if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+					t.Errorf("diagnostic %d unexpectedly materialized edits: %#v", index, diagnostic)
+				}
+			}
+		})
+	}
+}
+
+func runExplicitFunctionReturnTypeWithDemand(
+	t *testing.T,
+	code string,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/source.ts",
+		Path:     "/source.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	diagnostics := make([]rule.RuleDiagnostic, 0, 2)
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(
+		ExplicitFunctionReturnTypeRule.Name,
+		rule.SeverityError,
+		rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	)
+
+	listeners := ExplicitFunctionReturnTypeRule.Run(ctx, nil)
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		node.ForEachChild(visit)
+		if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+			listener(node)
+		}
+		return false
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
 }
