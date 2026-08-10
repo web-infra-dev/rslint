@@ -54,7 +54,7 @@ func ParseTypeOrValueSpecifier(raw any) (TypeOrValueSpecifier, bool) {
 		}, true
 	}
 
-	fields, ok := raw.(map[string]interface{})
+	fields, ok := raw.(map[string]any)
 	if !ok {
 		return TypeOrValueSpecifier{}, false
 	}
@@ -105,7 +105,7 @@ func ParseTypeOrValueSpecifier(raw any) (TypeOrValueSpecifier, bool) {
 // when the value is not a list or when any entry matches neither specifier
 // shape, so a malformed option falls back to the rule's default.
 func ParseTypeOrValueSpecifiers(raw any) []TypeOrValueSpecifier {
-	items, ok := raw.([]interface{})
+	items, ok := raw.([]any)
 	if !ok {
 		return nil
 	}
@@ -126,7 +126,7 @@ func parseNameList(raw any) (NameList, bool) {
 	if str, ok := raw.(string); ok {
 		return NameList{str}, true
 	}
-	items, ok := raw.([]interface{})
+	items, ok := raw.([]any)
 	if !ok {
 		return nil, false
 	}

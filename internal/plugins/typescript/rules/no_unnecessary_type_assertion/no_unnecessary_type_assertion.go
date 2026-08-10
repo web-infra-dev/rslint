@@ -58,11 +58,8 @@ func parseOptions(options []any) NoUnnecessaryTypeAssertionOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
-	if raw, ok := optsMap["typesToIgnore"].([]interface{}); ok {
+	optsMap, _ := options[0].(map[string]any)
+	if raw, ok := optsMap["typesToIgnore"].([]any); ok {
 		opts.TypesToIgnore = utils.ToStringSlice(raw)
 	}
 	if value, ok := optsMap["checkLiteralConstAssertions"].(bool); ok {

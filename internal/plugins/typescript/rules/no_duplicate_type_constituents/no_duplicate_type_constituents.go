@@ -54,10 +54,7 @@ func parseOptions(options []any) NoDuplicateTypeConstituentsOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
+	optsMap, _ := options[0].(map[string]any)
 	if value, ok := optsMap["ignoreIntersections"].(bool); ok {
 		opts.IgnoreIntersections = value
 	}

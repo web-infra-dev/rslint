@@ -41,14 +41,11 @@ func parseOptions(options []any) PromiseFunctionAsyncOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
+	optsMap, _ := options[0].(map[string]any)
 	if value, ok := optsMap["allowAny"].(bool); ok {
 		opts.AllowAny = value
 	}
-	if raw, ok := optsMap["allowedPromiseNames"].([]interface{}); ok {
+	if raw, ok := optsMap["allowedPromiseNames"].([]any); ok {
 		opts.AllowedPromiseNames = utils.ToStringSlice(raw)
 	}
 	if value, ok := optsMap["checkArrowFunctions"].(bool); ok {

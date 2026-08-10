@@ -51,11 +51,8 @@ func parseOptions(options []any) NoBaseToStringOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
-	if raw, ok := optsMap["ignoredTypeNames"].([]interface{}); ok {
+	optsMap, _ := options[0].(map[string]any)
+	if raw, ok := optsMap["ignoredTypeNames"].([]any); ok {
 		opts.IgnoredTypeNames = utils.ToStringSlice(raw)
 	}
 	return opts

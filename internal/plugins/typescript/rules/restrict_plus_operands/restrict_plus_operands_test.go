@@ -8,68 +8,40 @@ import (
 )
 
 func TestParseOptions(t *testing.T) {
-	type optionValues struct {
-		allowAny                bool
-		allowBoolean            bool
-		allowNullish            bool
-		allowNumberAndString    bool
-		allowRegExp             bool
-		skipCompoundAssignments bool
-	}
-	resolve := func(t *testing.T, options []any) optionValues {
-		t.Helper()
-		got := parseOptions(options)
-		value := func(name string, pointer *bool) bool {
-			t.Helper()
-			if pointer == nil {
-				t.Fatalf("resolved option %s is nil", name)
-				return false
-			}
-			return *pointer
-		}
-		return optionValues{
-			allowAny:                value("allowAny", got.AllowAny),
-			allowBoolean:            value("allowBoolean", got.AllowBoolean),
-			allowNullish:            value("allowNullish", got.AllowNullish),
-			allowNumberAndString:    value("allowNumberAndString", got.AllowNumberAndString),
-			allowRegExp:             value("allowRegExp", got.AllowRegExp),
-			skipCompoundAssignments: value("skipCompoundAssignments", got.SkipCompoundAssignments),
-		}
-	}
 	tests := []struct {
 		name    string
 		options []any
-		want    optionValues
+		want    RestrictPlusOperandsOptions
 	}{
 		{
 			name: "defaults",
-			want: optionValues{
-				allowAny:             true,
-				allowBoolean:         true,
-				allowNullish:         true,
-				allowNumberAndString: true,
-				allowRegExp:          true,
+			want: RestrictPlusOperandsOptions{
+				AllowAny:             true,
+				AllowBoolean:         true,
+				AllowNullish:         true,
+				AllowNumberAndString: true,
+				AllowRegExp:          true,
 			},
 		},
 		{
 			name: "serialized partial overrides",
-			options: []any{map[string]interface{}{
+			options: []any{map[string]any{
 				"allowAny":                false,
 				"allowNullish":            false,
 				"skipCompoundAssignments": true,
 			}},
-			want: optionValues{
-				allowBoolean:            true,
-				allowNumberAndString:    true,
-				allowRegExp:             true,
-				skipCompoundAssignments: true,
+			want: RestrictPlusOperandsOptions{
+				AllowBoolean:            true,
+				AllowNumberAndString:    true,
+				AllowRegExp:             true,
+				SkipCompoundAssignments: true,
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := resolve(t, test.options); got != test.want {
+			if got := parseOptions(test.options); got != test.want {
 				t.Fatalf("resolved options = %+v, want %+v", got, test.want)
 			}
 		})

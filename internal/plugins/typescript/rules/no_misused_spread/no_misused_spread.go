@@ -90,10 +90,7 @@ func parseOptions(options []any) NoMisusedSpreadOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
+	optsMap, _ := options[0].(map[string]any)
 	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allow"]); specifiers != nil {
 		opts.Allow = specifiers
 	}

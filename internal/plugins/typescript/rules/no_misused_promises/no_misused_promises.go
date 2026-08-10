@@ -102,10 +102,7 @@ func parseOptions(options []any) NoMisusedPromisesOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, ok := options[0].(map[string]interface{})
-	if !ok {
-		return opts
-	}
+	optsMap, _ := options[0].(map[string]any)
 	if value, ok := optsMap["checksConditionals"].(bool); ok {
 		opts.ChecksConditionals = value
 	}
@@ -117,7 +114,7 @@ func parseOptions(options []any) NoMisusedPromisesOptions {
 	switch value := optsMap["checksVoidReturn"].(type) {
 	case bool:
 		opts.ChecksVoidReturn = value
-	case map[string]interface{}:
+	case map[string]any:
 		if v, ok := value["arguments"].(bool); ok {
 			opts.ChecksVoidReturnOpts.Arguments = v
 		}

@@ -383,7 +383,7 @@ func TestTypeMatchesSomeSpecifierDistinguishesOmittedAndEmptyFilePath(t *testing
 	defer done()
 
 	demo := typeOfTestAlias(t, program, c, filePath)
-	decode := func(raw map[string]interface{}) TypeOrValueSpecifier {
+	decode := func(raw map[string]any) TypeOrValueSpecifier {
 		t.Helper()
 		specifier, ok := ParseTypeOrValueSpecifier(raw)
 		assert.Assert(t, ok)
@@ -391,9 +391,9 @@ func TestTypeMatchesSomeSpecifierDistinguishesOmittedAndEmptyFilePath(t *testing
 	}
 
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
-		decode(map[string]interface{}{"from": "file", "name": "Demo"}),
+		decode(map[string]any{"from": "file", "name": "Demo"}),
 	}, nil, program), true)
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
-		decode(map[string]interface{}{"from": "file", "name": "Demo", "path": ""}),
+		decode(map[string]any{"from": "file", "name": "Demo", "path": ""}),
 	}, nil, program), false)
 }
