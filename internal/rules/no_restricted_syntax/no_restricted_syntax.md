@@ -84,22 +84,17 @@ configurations and in the upstream `no-restricted-syntax` test suite:
   the semantic classes `:statement`, `:expression`, `:declaration`,
   `:function`, and `:pattern`.
 
-### Known differences from ESLint
-
-The following differences may affect an existing ESLint
-`no-restricted-syntax` configuration when it is used with rslint:
+## Differences from ESLint
 
 - ESLint rejects the configuration when a selector has invalid syntax. rslint
-  currently skips that selector and continues with the remaining selectors, so
-  the restriction expressed by the invalid selector is not enforced.
-- Selectors for standard JavaScript nodes and commonly used TypeScript shapes
-  are supported. A selector that targets a TS-ESTree-only node or field may not
-  match yet. For example, `ClassBody > MethodDefinition` does not match because
-  tsgo does not expose `ClassBody` as a separate AST node. Such selectors can
-  therefore produce fewer diagnostics than the same ESLint configuration.
-- ESLint accepts esquery's `!` subject marker in selector listener names, for
-  example `!IfStatement > BlockStatement`. rslint does not currently support
-  this marker and skips selectors that use it.
+  ignores only that selector and continues with the remaining selectors, so
+  its restriction is not enforced.
+- Selectors that target TS-ESTree-only nodes or fields may report fewer
+  diagnostics than ESLint. For example, `ClassBody > MethodDefinition`
+  produces no diagnostics in rslint because tsgo has no separate `ClassBody`
+  node.
+- rslint ignores selectors using the `!` subject marker, such as
+  `!IfStatement > BlockStatement`, while ESLint accepts them.
 
 ## Original Documentation
 
