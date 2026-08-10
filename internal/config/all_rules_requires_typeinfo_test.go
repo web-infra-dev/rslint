@@ -8,6 +8,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"path"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"sort"
@@ -87,13 +90,69 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 type ruleSourceParser struct {
 	fset  *token.FileSet
 	files map[string]*ast.File
+	// modulePath and moduleRoot translate the import-path-rooted file names
+	// that -trimpath builds report back into on-disk paths; both are empty
+	// when the module root could not be located.
+	modulePath string
+	moduleRoot string
 }
 
 func newRuleSourceParser() *ruleSourceParser {
+	modulePath, moduleRoot := findModule()
 	return &ruleSourceParser{
-		fset:  token.NewFileSet(),
-		files: make(map[string]*ast.File),
+		fset:       token.NewFileSet(),
+		files:      make(map[string]*ast.File),
+		modulePath: modulePath,
+		moduleRoot: moduleRoot,
 	}
+}
+
+// findModule walks up from the test's working directory (the package source
+// directory, per `go test`) to the enclosing go.mod, returning its module path
+// and the directory holding it. Both are empty if no go.mod is found.
+func findModule() (modulePath, moduleRoot string) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", ""
+	}
+	for {
+		data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		if err == nil {
+			return modulePathFromGoMod(string(data)), dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", ""
+		}
+		dir = parent
+	}
+}
+
+func modulePathFromGoMod(contents string) string {
+	for line := range strings.SplitSeq(contents, "\n") {
+		if fields := strings.Fields(line); len(fields) >= 2 && fields[0] == "module" {
+			return strings.Trim(fields[1], `"`)
+		}
+	}
+	return ""
+}
+
+// resolveSourcePath maps the file name runtime reports for a function to a path
+// that can be opened. Ordinary builds report absolute paths; -trimpath builds
+// report the file's import path instead (`<module path>/internal/...`), which
+// only resolves once the module path prefix is swapped for the module root.
+func (p *ruleSourceParser) resolveSourcePath(file string) (string, error) {
+	if filepath.IsAbs(file) {
+		return file, nil
+	}
+	if p.modulePath == "" || p.moduleRoot == "" {
+		return "", fmt.Errorf("cannot resolve trimmed path %s: no enclosing go.mod found", file)
+	}
+	rel, ok := strings.CutPrefix(path.Clean(filepath.ToSlash(file)), p.modulePath+"/")
+	if !ok {
+		return "", fmt.Errorf("cannot resolve trimmed path %s: not inside module %s", file, p.modulePath)
+	}
+	return filepath.Join(p.moduleRoot, filepath.FromSlash(rel)), nil
 }
 
 // runBodyFor returns the *ast.BlockStmt of the FuncLit registered as a rule's
@@ -116,6 +175,10 @@ func (p *ruleSourceParser) runBodyFor(run any) (*ast.BlockStmt, string, error) {
 	file, line := fn.FileLine(fn.Entry())
 	if file == "" {
 		return nil, "", errors.New("FileLine returned empty file for Run pointer")
+	}
+	file, err := p.resolveSourcePath(file)
+	if err != nil {
+		return nil, "", err
 	}
 	parsed, err := p.parseFile(file)
 	if err != nil {
