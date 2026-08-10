@@ -47,8 +47,26 @@ ruleTester.run('no-disabled-tests', {} as never, {
     {
       code: 'test.for([1]).skip("case", () => {}); describe.each([1]).skip("suite", () => {});',
     },
+    { code: 'import.meta.rstest.test.todo("case");' },
+    {
+      code: 'import { test } from "@rstest/playwright"; test("case", () => {});',
+    },
+    {
+      code: 'import { it } from "@rstest/playwright"; it.skip("case", () => {});',
+    },
   ],
   invalid: [
+    {
+      code: 'import.meta.rstest.test.skip("case", () => {});',
+      errors: [{ line: 1, column: 1, messageId: 'skippedTest' }],
+    },
+    {
+      code: [
+        'import { test } from "@rstest/playwright";',
+        'test.skip("case", () => {});',
+      ].join('\n'),
+      errors: [{ line: 2, column: 1, messageId: 'skippedTest' }],
+    },
     {
       code: 'test.skip("case", () => {});',
       errors: [
