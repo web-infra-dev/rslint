@@ -95,6 +95,35 @@ function escapeForRegExp(identifier: string): string {
   return identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Every top-level type/interface a compiled schema declares, in order. */
+function declaredTypeNames(ts: string): string[] {
+  return [...ts.matchAll(/^export (?:type|interface) ([A-Za-z0-9_$]+)/gm)].map(
+    (match) => match[1],
+  );
+}
+
+/**
+ * Returns the name json-schema-to-typescript actually declared for the type it
+ * was asked to call `requestedName`.
+ *
+ * It normalizes the name it is handed rather than emitting it verbatim: asked
+ * for `JsxA11yAltTextOptions` it declares `JsxA11YAltTextOptions`. Referencing
+ * the requested name would then point at a type no declaration defines, and
+ * TypeScript silently widens that rule's options to `any` — so `RulesRecord`
+ * must reference what was emitted, not what was asked for. Case is the only
+ * thing that differs, which is why the match ignores it.
+ */
+function findDeclaredTypeName(
+  ts: string,
+  requestedName: string,
+): string | null {
+  return (
+    declaredTypeNames(ts).find(
+      (name) => name.toLowerCase() === requestedName.toLowerCase(),
+    ) ?? null
+  );
+}
+
 /**
  * Renames the helper types json-schema-to-typescript emits alongside a rule's
  * main type so they can't collide with another rule's.
@@ -110,24 +139,15 @@ function escapeForRegExp(identifier: string): string {
  *
  * The main type is left untouched — it is the name `RulesRecord` references.
  */
-function namespaceHelperTypes(ts: string, typeName: string): string {
-  const declared = new Set<string>();
-  for (const match of ts.matchAll(
-    /^export (?:type|interface) ([A-Za-z0-9_$]+)/gm,
-  )) {
-    declared.add(match[1]);
-  }
-
+function namespaceHelperTypes(ts: string, mainTypeName: string): string {
   let namespaced = ts;
-  for (const name of declared) {
-    // json-schema-to-typescript may re-case the name it was handed, so match
-    // the main type case-insensitively rather than by exact equality.
-    if (name.toLowerCase() === typeName.toLowerCase()) {
+  for (const name of new Set(declaredTypeNames(ts))) {
+    if (name === mainTypeName) {
       continue;
     }
     namespaced = namespaced.replace(
       new RegExp(`\\b${escapeForRegExp(name)}\\b`, 'g'),
-      `${typeName}${name}`,
+      `${mainTypeName}${name}`,
     );
   }
   return namespaced;
@@ -148,12 +168,20 @@ async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
       continue;
     }
 
-    const typeName = `${ruleIdToTypeName(ruleId)}Options`;
-    const ts = await compile(schema, typeName, {
+    const requestedName = `${ruleIdToTypeName(ruleId)}Options`;
+    const ts = await compile(schema, requestedName, {
       bannerComment: '',
       additionalProperties: false,
       style: { semi: true },
     });
+    const typeName = findDeclaredTypeName(ts, requestedName);
+    if (typeName === null) {
+      throw new Error(
+        `generate-rule-option-types: json-schema-to-typescript declared no type ` +
+          `named like ${requestedName} for rule ${ruleId}; ` +
+          `it declared ${declaredTypeNames(ts).join(', ') || '<nothing>'}`,
+      );
+    }
     typeDeclarations.push(namespaceHelperTypes(ts.trim(), typeName));
     recordProperties.push(
       `${comment}${JSON.stringify(ruleId)}?: RuleEntry<${typeName}>;`,
