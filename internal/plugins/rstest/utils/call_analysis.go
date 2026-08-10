@@ -54,7 +54,7 @@ func (analysis *RstestCallAnalysis) parseFnCallCandidate(
 	if parsed, ok := analysis.fnCalls[node]; ok {
 		return parsed
 	}
-	parsed := ParseRstestFnCallWithOfficialExtensions(node, analysis.ctx)
+	parsed := parseRstestFnCall(node, analysis.ctx)
 	analysis.fnCalls[node] = parsed
 	return parsed
 }

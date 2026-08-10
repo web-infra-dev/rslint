@@ -57,28 +57,12 @@ const (
 	rstestProfilePlaywright
 )
 
-// ParseRstestFnCall parses a final Rstest test/describe/hook registration
-// call; callers distinguish the three through Kind. Factory calls such as
-// test.each(cases), test.runIf(condition), and test.extend(fixtures) are
-// intentionally not returned.
-func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall {
-	return parseRstestFnCall(node, ctx, false, false)
-}
-
-func ParseRstestFnCallWithOfficialExtensions(
-	node *ast.Node,
-	ctx rule.RuleContext,
-) *ParsedRstestFnCall {
-	return parseRstestFnCall(node, ctx, true, true)
-}
-
 // IsTypeOfRstestFnCall reports whether node parses as a Rstest registration
 // call of one of the given kinds. What this plugin owns is the entry point:
-// parsing runs with official extensions enabled (import.meta + playwright),
-// the same choice RstestTestCallbacks.ParseFnCall makes. The kind matching
-// itself is shared with jest through testFramework.IsCallOfKind.
+// parsing includes import.meta and playwright, while kind matching is shared
+// with jest through testFramework.IsCallOfKind.
 func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
-	parsed := ParseRstestFnCallWithOfficialExtensions(node, ctx)
+	parsed := parseRstestFnCall(node, ctx)
 	if parsed == nil {
 		return false
 	}
@@ -88,8 +72,6 @@ func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestF
 func parseRstestFnCall(
 	node *ast.Node,
 	ctx rule.RuleContext,
-	includeImportMeta bool,
-	includePlaywright bool,
 ) *ParsedRstestFnCall {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
@@ -106,10 +88,8 @@ func parseRstestFnCall(
 			ctx,
 			nil,
 			0,
-			includeImportMeta,
-			includePlaywright,
 		)
-	} else if includeImportMeta {
+	} else {
 		var importMetaRoot *ast.Node
 		importMetaRoot, parts, rootInvoked, ok = parseImportMetaRstestChain(call.Expression)
 		if ok && !rootInvoked && importMetaRoot != nil && len(parts) > 0 {
@@ -341,8 +321,6 @@ func resolveRstestRoot(
 	ctx rule.RuleContext,
 	visited map[*ast.Symbol]bool,
 	depth int,
-	includeImportMeta bool,
-	includePlaywright bool,
 ) (rstestResolvedAPI, int, bool) {
 	if root == nil || root.Kind != ast.KindIdentifier || depth > 16 {
 		return rstestResolvedAPI{}, 0, false
@@ -353,7 +331,7 @@ func resolveRstestRoot(
 	if ctx.TypeChecker != nil {
 		symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
 	}
-	for _, profile := range rstestProfiles(includePlaywright) {
+	for _, profile := range rstestAllProfiles {
 		module := profileImportModule(profile)
 		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 			localName,
@@ -373,21 +351,19 @@ func resolveRstestRoot(
 		}
 	}
 
-	if includeImportMeta {
-		if name, originalNode, ok := resolveImportMetaRstestBinding(symbol); ok {
-			if state := directRstestAPIState(rstestProfileCore, name); state != rstestAPIInvalid {
-				return rstestResolvedAPI{
-					name:         name,
-					state:        state,
-					originalNode: originalNode,
-					mode:         RSTEST_IMPORT_MODE,
-					profile:      rstestProfileCore,
-				}, 0, true
-			}
+	if name, originalNode, ok := resolveImportMetaRstestBinding(symbol); ok {
+		if state := directRstestAPIState(rstestProfileCore, name); state != rstestAPIInvalid {
+			return rstestResolvedAPI{
+				name:         name,
+				state:        state,
+				originalNode: originalNode,
+				mode:         RSTEST_IMPORT_MODE,
+				profile:      rstestProfileCore,
+			}, 0, true
 		}
 	}
 
-	for _, profile := range rstestProfiles(includePlaywright) {
+	for _, profile := range rstestAllProfiles {
 		if testFramework.IsModuleNamespaceSymbol(symbol, profileImportModule(profile)) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 				return rstestResolvedAPI{}, 0, false
@@ -417,7 +393,7 @@ func resolveRstestRoot(
 		}
 		initializer := declaration.AsVariableDeclaration().Initializer
 		aliasRoot, aliasParts, aliasRootInvoked, ok := parseRstestChain(initializer)
-		if includeImportMeta && !ok && isImportMetaRstest(initializer) {
+		if !ok && isImportMetaRstest(initializer) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 				continue
 			}
@@ -450,8 +426,6 @@ func resolveRstestRoot(
 			ctx,
 			visited,
 			depth+1,
-			includeImportMeta,
-			includePlaywright,
 		)
 		if !ok {
 			continue
@@ -655,12 +629,7 @@ func profileImportModule(profile rstestAPIProfile) string {
 	return RstestImportModule
 }
 
-func rstestProfiles(includePlaywright bool) []rstestAPIProfile {
-	if includePlaywright {
-		return []rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
-	}
-	return []rstestAPIProfile{rstestProfileCore}
-}
+var rstestAllProfiles = [...]rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
 
 func isImportMetaRstest(node *ast.Node) bool {
 	// SkipParentheses dereferences its argument, so the nil check has to come
