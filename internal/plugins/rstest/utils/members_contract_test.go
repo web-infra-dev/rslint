@@ -21,7 +21,7 @@ var misalignedMembersProbe = rule.Rule{
 	Name:             "rstest/members-alignment-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				parsed := analysis.ParseFnCall(node)
@@ -78,7 +78,7 @@ var semanticFlagProbe = rule.Rule{
 	Name:             "rstest/semantic-flag-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				parsed := analysis.ParseFnCall(node)

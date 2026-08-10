@@ -20,9 +20,24 @@ type RstestCallAnalysis struct {
 	hasTests    bool
 }
 
-// NewRstestCallAnalysis creates one file-scoped owner for Rstest call
-// candidates and semantic parse caches.
-func NewRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
+type rstestCallAnalysisFileCacheKey struct{}
+
+// GetRstestCallAnalysis returns the analysis shared by every Rstest rule that
+// lints the same file. Manually-constructed contexts without a file cache keep
+// the standalone behavior used by rule and parser tests.
+func GetRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
+	analysisCtx := rule.RuleContext{
+		SourceFile:  ctx.SourceFile,
+		TypeChecker: ctx.TypeChecker,
+	}
+	return rule.CachedByFile(
+		ctx,
+		rstestCallAnalysisFileCacheKey{},
+		func() *RstestCallAnalysis { return newRstestCallAnalysis(analysisCtx) },
+	)
+}
+
+func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 	analysis := &RstestCallAnalysis{
 		ctx:         ctx,
 		candidates:  cloneRstestCandidateSeeds(),

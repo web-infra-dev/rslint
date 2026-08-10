@@ -18,7 +18,7 @@ var hookParseProbe = rule.Rule{
 	Name:             "rstest/hook-parse-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				parsed := analysis.ParseFnCall(node)
@@ -135,7 +135,7 @@ var hookKindProbe = rule.Rule{
 	Name:             "rstest/hook-kind-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if analysis.ParseFnCall(node) == nil {
