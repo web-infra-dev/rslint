@@ -90,6 +90,49 @@ function getRuleDocUrl(ruleId: string): string {
   }
 }
 
+/** Escapes a TypeScript identifier for use inside a RegExp. */
+function escapeForRegExp(identifier: string): string {
+  return identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Renames the helper types json-schema-to-typescript emits alongside a rule's
+ * main type so they can't collide with another rule's.
+ *
+ * Helpers are named after the schema's `$defs` keys, which are chosen per rule
+ * and repeat across rules — `no-restricted-imports` and `return-await` both
+ * define `NameList`, and several jest rules define `Matcher`. Each rule
+ * compiles independently, so every one of them emits a top-level
+ * `export type NameList`, and the concatenated `.d.ts` then declares the same
+ * name several times. Prefixing each helper with the rule's own type name
+ * keeps them distinct; helpers are only referenced from within their own
+ * rule's block, so renaming them there is complete.
+ *
+ * The main type is left untouched — it is the name `RulesRecord` references.
+ */
+function namespaceHelperTypes(ts: string, typeName: string): string {
+  const declared = new Set<string>();
+  for (const match of ts.matchAll(
+    /^export (?:type|interface) ([A-Za-z0-9_$]+)/gm,
+  )) {
+    declared.add(match[1]);
+  }
+
+  let namespaced = ts;
+  for (const name of declared) {
+    // json-schema-to-typescript may re-case the name it was handed, so match
+    // the main type case-insensitively rather than by exact equality.
+    if (name.toLowerCase() === typeName.toLowerCase()) {
+      continue;
+    }
+    namespaced = namespaced.replace(
+      new RegExp(`\\b${escapeForRegExp(name)}\\b`, 'g'),
+      `${typeName}${name}`,
+    );
+  }
+  return namespaced;
+}
+
 async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
   const typeDeclarations: string[] = [];
   const recordProperties: string[] = [];
@@ -111,7 +154,7 @@ async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
       additionalProperties: false,
       style: { semi: true },
     });
-    typeDeclarations.push(ts.trim());
+    typeDeclarations.push(namespaceHelperTypes(ts.trim(), typeName));
     recordProperties.push(
       `${comment}${JSON.stringify(ruleId)}?: RuleEntry<${typeName}>;`,
     );

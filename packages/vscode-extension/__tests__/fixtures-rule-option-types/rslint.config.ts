@@ -25,6 +25,12 @@ export const typeCheckOnly = defineConfig([
     rules: {
       // @ts-expect-error `allow` must be a string[], not a number.
       'no-console': ['error', { allow: 123 }],
+      // A plugin rule, whose generated type name is derived from a rule ID
+      // carrying both a scope and digits — the shape most likely to drift
+      // between the name `RulesRecord` references and the name the generated
+      // declaration actually uses.
+      // @ts-expect-error `ignoreNonDOM` must be a boolean, not a string.
+      'jsx-a11y/no-autofocus': ['error', { ignoreNonDOM: 'yes' }],
     },
   },
 ]);

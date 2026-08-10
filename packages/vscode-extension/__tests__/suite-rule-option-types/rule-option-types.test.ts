@@ -93,13 +93,20 @@ suite('rslint generated rule-option types', function () {
       ),
       `'@rslint/core' must resolve so its generated types are actually in effect. Diagnostics: ${diagnostics.map((d) => d.message).join(' | ')}`,
     );
-    assert.ok(
-      !diagnostics.some((d) =>
-        String(d.message).includes("Unused '@ts-expect-error'"),
-      ),
-      "no-console's generated `allow` type must reject a non-string[] value " +
-        '(`{ allow: 123 }`) — if this fires, generate-rule-option-types ' +
-        "stopped constraining options to the rule's real JSON Schema.",
+    // Every `@ts-expect-error` in the fixture marks an option value that the
+    // rule's JSON Schema rejects, so each one must be triggered. An unused one
+    // means that rule's generated type stopped constraining its options —
+    // typically because `RulesRecord` references a type name that no
+    // declaration in the emitted `.d.ts` actually defines, which silently
+    // degrades the options to `any`.
+    const unusedExpectErrorLines = diagnostics
+      .filter((d) => String(d.message).includes("Unused '@ts-expect-error'"))
+      .map((d) => d.range.start.line + 1);
+    assert.deepStrictEqual(
+      unusedExpectErrorLines,
+      [],
+      'generated rule-option types stopped constraining options for the rule(s) ' +
+        `configured at rslint.config.ts line(s) ${unusedExpectErrorLines.join(', ')}`,
     );
   });
 });
