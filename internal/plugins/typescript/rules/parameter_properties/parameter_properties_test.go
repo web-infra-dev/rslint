@@ -1,9 +1,14 @@
 package parameter_properties
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -60,6 +65,9 @@ class Foo {
 		// --- Semantically invalid: rest / destructured parameter properties ---
 		{Code: `class Foo { constructor(private ...name: string[]) {} }`},
 		{Code: `class Foo { constructor(private [test]: [string]) {} }`},
+
+		// A modifier outside a constructor does not create a parameter property.
+		{Code: `class Foo { method(private value: string) {} }`},
 
 		// ============================================================
 		// prefer: "parameter-property" — valid cases
@@ -456,6 +464,13 @@ class Foo {
 			Code:   "\nclass Foo {\n  constructor(public readonly name: string) {}\n}",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferClassProperty", Line: 3, Column: 15}},
 		},
+		{
+			Code: `
+class Child extends Base {
+  constructor(override member: string) { super(); }
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferClassProperty", Line: 3, Column: 15}},
+		},
 
 		// --- Mixed: one param-property + one plain ---
 		{
@@ -796,6 +811,18 @@ class Foo {
 			Options: map[string]interface{}{"prefer": "parameter-property"},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferParameterProperty", Line: 3, Column: 3}},
 		},
+		{
+			Code: `
+class Foo {
+  member: string;
+  constructor(unrelated: string, member: string) {
+    this.unrelated = unrelated;
+    this.member = member;
+  }
+}`,
+			Options: map[string]interface{}{"prefer": "parameter-property"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferParameterProperty", Line: 3, Column: 3}},
+		},
 
 		// --- Property after constructor ---
 		{
@@ -980,4 +1007,101 @@ class Outer {
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferParameterProperty", Line: 4, Column: 5}},
 		},
 	})
+}
+
+func runParameterPropertiesWithDemand(
+	t *testing.T,
+	code string,
+	options []any,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/parameter-properties-demand.ts",
+		Path:     "/parameter-properties-demand.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	diagnostics := make([]rule.RuleDiagnostic, 0, 1)
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(
+		ParameterPropertiesRule.Name,
+		rule.SeverityError,
+		rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	)
+	listeners := ParameterPropertiesRule.Run(ctx, options)
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		node.ForEachChild(visit)
+		if listener := listeners[rule.ListenerOnExit(node.Kind)]; listener != nil {
+			listener(node)
+		}
+		return false
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
+}
+
+func TestParameterPropertiesEditDemandAndSuppression(t *testing.T) {
+	const code = `class Foo { constructor(private member: string) {} }`
+	wantStart := strings.Index(code, "private")
+	wantRange := core.NewTextRange(wantStart, wantStart+len("private member: string"))
+
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		diagnostics := runParameterPropertiesWithDemand(t, code, nil, demand)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		diagnostic := diagnostics[0]
+		if diagnostic.Range != wantRange {
+			t.Fatalf("demand %d range = %#v, want %#v", demand, diagnostic.Range, wantRange)
+		}
+		if diagnostic.Message.Id != "preferClassProperty" ||
+			diagnostic.Message.Description != "Property member should be declared as a class property." {
+			t.Fatalf("demand %d message = %#v", demand, diagnostic.Message)
+		}
+		if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+			t.Fatalf("demand %d unexpectedly materialized edits", demand)
+		}
+	}
+
+	scopedDisabled := runParameterPropertiesWithDemand(
+		t,
+		"/* eslint-disable @typescript-eslint/parameter-properties */\n"+code,
+		nil,
+		rule.EditDemandAll,
+	)
+	if len(scopedDisabled) != 0 {
+		t.Fatalf("scoped-disabled diagnostics = %d, want 0", len(scopedDisabled))
+	}
+
+	const lineDisabled = `class Foo {
+  // eslint-disable-next-line @typescript-eslint/parameter-properties
+  member: string;
+  constructor(member: string) { this.member = member; }
+}`
+	lineDisabledDiagnostics := runParameterPropertiesWithDemand(
+		t,
+		lineDisabled,
+		[]any{map[string]interface{}{"prefer": "parameter-property"}},
+		rule.EditDemandAll,
+	)
+	if len(lineDisabledDiagnostics) != 0 {
+		t.Fatalf("line-disabled diagnostics = %d, want 0", len(lineDisabledDiagnostics))
+	}
 }
