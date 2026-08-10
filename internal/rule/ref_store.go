@@ -42,10 +42,11 @@ import (
 // identifiers. A RefStore belongs to one lintFile invocation and is therefore
 // used serially by that file's rule initializers and listeners.
 type RefStore struct {
-	sourceFile *ast.SourceFile
-	resolver   binder.NameResolver
-	tc         *checker.Checker
-	walked     bool
+	sourceFile        *ast.SourceFile
+	resolver          binder.NameResolver
+	tc                *checker.Checker
+	fileScopeDefaults FileScopeDefaults
+	walked            bool
 	// candidates maps identifier text to the reference-position identifiers
 	// still awaiting resolution; entries move into refs on first query.
 	candidates map[string][]*ast.Node
@@ -61,8 +62,9 @@ type RefStore struct {
 // a fallback by Resolve for identifiers the binder scope walk can't place,
 // and by References when asked about a symbol that fallback produced; nil
 // disables both (Resolve then never falls back, and References behaves as if
-// every such symbol were never queried).
-func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker) *RefStore {
+// every such symbol were never queried). fileScopeDefaults supplies only
+// declaration-less bindings and top-level scope facts resolved by the linter.
+func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker, fileScopeDefaults FileScopeDefaults) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
 		// A script file's own top-level locals are never consulted by the
@@ -73,9 +75,10 @@ func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *
 		resolver.Globals = sourceFile.Locals
 	}
 	return &RefStore{
-		sourceFile: sourceFile,
-		resolver:   resolver,
-		tc:         tc,
+		sourceFile:        sourceFile,
+		resolver:          resolver,
+		tc:                tc,
+		fileScopeDefaults: fileScopeDefaults,
 	}
 }
 
@@ -217,6 +220,42 @@ func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
 		return nil
 	}
 	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
+// IsDefinedInFile reports whether a reference-position identifier is defined
+// by the file's lexical scope graph or by a non-global binding supplied by its
+// default language environment. It never consults the TypeChecker and does not
+// manufacture an ast.Symbol for an implicit file binding.
+func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return false
+	}
+	if s.binderReferenceSymbol(node, referenceMeaning(node)) != nil {
+		return true
+	}
+	return s.fileScopeDefaults.defines(node.Text())
+}
+
+// IsNameDefinedInFile reports whether name is visible in the value scope at
+// location through a declaration in this file or a binding supplied by the
+// file's default language environment. Unlike IsDefinedInFile, location need
+// not itself be a reference-position identifier. The TypeChecker is never
+// consulted.
+func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
+	if s == nil || location == nil || name == "" {
+		return false
+	}
+	if s.resolver.Resolve(location, name, ast.SymbolFlagsValue, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
+		return true
+	}
+	return s.fileScopeDefaults.defines(name)
+}
+
+// HasNonGlobalTopLevelScope reports whether the file's default language
+// environment places source declarations in a scope outside the global scope.
+// This supplements parser module classification for scope-oriented rules.
+func (s *RefStore) HasNonGlobalTopLevelScope() bool {
+	return s != nil && s.fileScopeDefaults.nonGlobalTopLevelScope
 }
 
 // binderReferenceSymbol resolves one reference without checker work. A named

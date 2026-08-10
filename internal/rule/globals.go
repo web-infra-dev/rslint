@@ -105,15 +105,16 @@ var ecmaScriptGlobalIntroducedIn = map[string]int{
 // rules. It keeps each authored source separate while answering the effective
 // access after applying ESLint's precedence:
 //
-//	ECMAScript edition < languageOptions.globals < inline /* global */ comments
+//	ECMAScript edition < file language defaults < languageOptions.globals < inline /* global */ comments
 //
 // Its zero value represents the latest ECMAScript edition with no authored
 // overrides.
 type Globals struct {
-	languageOptions    LanguageOptions
-	configOverrides    map[string]utils.GlobalAccess
-	inlineOverrides    map[string]utils.GlobalAccess
-	inlineDeclarations []InlineGlobal
+	languageOptions     LanguageOptions
+	fileLanguageGlobals FileLanguageGlobals
+	configOverrides     map[string]utils.GlobalAccess
+	inlineOverrides     map[string]utils.GlobalAccess
+	inlineDeclarations  []InlineGlobal
 }
 
 // NewGlobals constructs the per-file globals view. All maps and slices are
@@ -121,24 +122,28 @@ type Globals struct {
 // stores that produced them.
 func NewGlobals(
 	languageOptions LanguageOptions,
+	fileLanguageGlobals FileLanguageGlobals,
 	configOverrides map[string]utils.GlobalAccess,
 	inlineOverrides map[string]utils.GlobalAccess,
 	inlineDeclarations []InlineGlobal,
 ) Globals {
 	return Globals{
-		languageOptions:    languageOptions,
-		configOverrides:    configOverrides,
-		inlineOverrides:    inlineOverrides,
-		inlineDeclarations: inlineDeclarations,
+		languageOptions:     languageOptions,
+		fileLanguageGlobals: fileLanguageGlobals,
+		configOverrides:     configOverrides,
+		inlineOverrides:     inlineOverrides,
+		inlineDeclarations:  inlineDeclarations,
 	}
 }
 
 // LanguageAccess returns the globals implicitly supplied by the selected
-// language options. ECMAScript globals are the only native source today and
-// are read-only in ESLint's scope model. Future sourceType-provided global
-// names compose here; wrapper-local bindings belong to the scope/RefStore
-// layer instead.
+// ECMAScript edition and the file's default language environment. File
+// language globals compose after edition globals, matching ESLint's default
+// config. Wrapper-local bindings belong to the scope/RefStore layer instead.
 func (g Globals) LanguageAccess(name string) utils.GlobalAccess {
+	if access := g.fileLanguageGlobals.access(name); access != utils.GlobalAccessUnset {
+		return access
+	}
 	introduced, ok := ecmaScriptGlobalIntroducedIn[name]
 	if ok && introduced <= g.languageOptions.EffectiveECMAVersion() {
 		return utils.GlobalAccessReadonly
@@ -163,7 +168,7 @@ func (g Globals) ConfigOverride(name string) utils.GlobalAccess {
 }
 
 // Override returns the final explicitly authored access: an inline setting
-// wins over languageOptions.globals. It excludes ECMAScript language globals.
+// wins over languageOptions.globals. It excludes implicit language defaults.
 func (g Globals) Override(name string) utils.GlobalAccess {
 	if access, ok := g.inlineOverrides[name]; ok {
 		return access
@@ -181,7 +186,7 @@ func (g Globals) ConfiguredAccess(name string) utils.GlobalAccess {
 }
 
 // Access returns the final effective access for name. Inline comments win over
-// languageOptions.globals, which wins over the selected language edition.
+// languageOptions.globals, which wins over the file and edition defaults.
 func (g Globals) Access(name string) utils.GlobalAccess {
 	if access, ok := g.inlineOverrides[name]; ok {
 		return access
@@ -196,16 +201,23 @@ func (g Globals) InlineDeclarations() []InlineGlobal {
 	return g.inlineDeclarations
 }
 
-// ApplyTo applies this view to dst. Every known ECMAScript name is first set
-// or removed according to the selected edition, preventing a TypeScript
-// default-library seed from reintroducing a future-edition global. Explicit
-// config and inline settings are then applied in precedence order.
+// ApplyTo applies this view to dst. Every known ECMAScript and file-language
+// name is first set or removed according to the selected defaults, preventing
+// a TypeScript default-library seed from reintroducing a disabled name.
+// Explicit config and inline settings are then applied in precedence order.
 func (g Globals) ApplyTo(dst map[string]bool) {
 	for name := range ecmaScriptGlobalIntroducedIn {
 		if g.Access(name).IsDeclared() {
 			dst[name] = true
 		} else {
 			delete(dst, name)
+		}
+	}
+	for _, entry := range fileLanguageGlobalCatalog {
+		if g.Access(entry.name).IsDeclared() {
+			dst[entry.name] = true
+		} else {
+			delete(dst, entry.name)
 		}
 	}
 	for name := range g.configOverrides {
