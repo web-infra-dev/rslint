@@ -92,11 +92,21 @@ allMatch := utils.Every(items, func(item T) bool { return condition })
 
 ### Rule Options Parsing
 
+Rule options do not require an `internal/utils` helper. The framework passes
+ESLint's normalized `context.options` array to `Run`; guard the slice length
+before reading the first positional option:
+
 ```go
-// Extract options map from rule options (handles both array and object format)
-optsMap := utils.GetOptionsMap(options)
-if optsMap != nil {
-    // Parse options from optsMap...
+func parseOptions(options []any) Options {
+    opts := Options{/* defaults */}
+    if len(options) == 0 {
+        return opts
+    }
+    optsMap, _ := options[0].(map[string]any)
+    if value, ok := optsMap["someOption"].(bool); ok {
+        opts.SomeOption = value
+    }
+    return opts
 }
 ```
 
