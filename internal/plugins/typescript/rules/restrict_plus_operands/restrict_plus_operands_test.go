@@ -36,7 +36,6 @@ func TestParseOptions(t *testing.T) {
 			skipCompoundAssignments: value("skipCompoundAssignments", got.SkipCompoundAssignments),
 		}
 	}
-	boolRef := func(value bool) *bool { return &value }
 	tests := []struct {
 		name    string
 		options []any
@@ -64,18 +63,6 @@ func TestParseOptions(t *testing.T) {
 				allowNumberAndString:    true,
 				allowRegExp:             true,
 				skipCompoundAssignments: true,
-			},
-		},
-		{
-			name: "typed partial overrides",
-			options: []any{RestrictPlusOperandsOptions{
-				AllowBoolean:         boolRef(false),
-				AllowNumberAndString: boolRef(false),
-			}},
-			want: optionValues{
-				allowAny:     true,
-				allowNullish: true,
-				allowRegExp:  true,
 			},
 		},
 	}

@@ -126,10 +126,10 @@ func resolveBasePath(ctx rule.RuleContext, configured string) string {
 
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]any)
 
 	opts.basePath, _ = optsMap["basePath"].(string)
 

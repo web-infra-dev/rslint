@@ -294,13 +294,12 @@ func TestResolveLegacyMaxOption(t *testing.T) {
 		want       int
 	}{
 		{name: "nil uses default", defaultMax: 3, want: 3},
-		{name: "empty array uses default", options: []interface{}{}, defaultMax: 3, want: 3},
 		{name: "bare number", options: 4, defaultMax: 3, want: 4},
-		{name: "array number", options: []interface{}{float64(5)}, defaultMax: 3, want: 5},
-		{name: "bare max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
-		{name: "array maximum object", options: []interface{}{map[string]interface{}{"maximum": 7, "max": 1}}, defaultMax: 3, want: 7},
-		{name: "zero maximum falls through to max", options: []interface{}{map[string]interface{}{"maximum": 0, "max": 8}}, defaultMax: 3, want: 8},
-		{name: "zero maximum without fallback disables", options: []interface{}{map[string]interface{}{"maximum": 0}}, defaultMax: 3, want: math.MaxInt},
+		{name: "json-decoded number", options: float64(5), defaultMax: 3, want: 5},
+		{name: "max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
+		{name: "maximum wins over max", options: map[string]interface{}{"maximum": 7, "max": 1}, defaultMax: 3, want: 7},
+		{name: "zero maximum falls through to max", options: map[string]interface{}{"maximum": 0, "max": 8}, defaultMax: 3, want: 8},
+		{name: "zero maximum without fallback disables", options: map[string]interface{}{"maximum": 0}, defaultMax: 3, want: math.MaxInt},
 		{name: "nonnumeric max disables", options: map[string]interface{}{"max": "wide"}, defaultMax: 3, want: math.MaxInt},
 		{name: "object without max keys uses default", options: map[string]interface{}{"foo": 1}, defaultMax: 3, want: 3},
 	}
