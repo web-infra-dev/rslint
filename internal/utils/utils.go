@@ -543,23 +543,6 @@ func CoerceIntegral(v any) (int, bool) {
 	return CoerceInt(v)
 }
 
-// GetOptionsString extracts a string option from the weakly-typed options parameter.
-// It handles both direct string format ("value") and array format (["value"]).
-func GetOptionsString(opts any) string {
-	if opts == nil {
-		return ""
-	}
-	if s, ok := opts.(string); ok {
-		return s
-	}
-	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
-		if s, ok := arr[0].(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
 // extracting only the string elements. Returns nil if the input is nil, not an array,
 // or contains no strings. Useful for parsing rule options from JSON config.

@@ -185,7 +185,11 @@ func checkFirst(ctx rule.RuleContext, options []any) {
 		return
 	}
 
-	absoluteFirst := utils.GetOptionsString(options) == "absolute-first"
+	absoluteFirst := false
+	if len(options) > 0 {
+		mode, _ := options[0].(string)
+		absoluteFirst = mode == "absolute-first"
+	}
 	body := statements.Nodes
 
 	nonImportCount := 0
