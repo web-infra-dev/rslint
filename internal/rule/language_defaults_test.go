@@ -51,14 +51,14 @@ func TestResolveLanguageDefaults(t *testing.T) {
 				}
 			}
 
-			if got := refsInit.defines("arguments"); got != test.commonJS {
-				t.Errorf("refsInit.defines(arguments) = %v, want %v", got, test.commonJS)
+			if got := refsInit.hasImplicitWrapperBinding("arguments"); got != test.commonJS {
+				t.Errorf("refsInit.hasImplicitWrapperBinding(arguments) = %v, want %v", got, test.commonJS)
 			}
 			if got := refsInit.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
 				t.Errorf("nonGlobalTopLevelScope = %v, want %v", got, test.nonGlobalTopLevelScope)
 			}
 			for _, name := range []string{"exports", "global", "module", "require", "process"} {
-				if refsInit.defines(name) {
+				if refsInit.hasImplicitWrapperBinding(name) {
 					t.Errorf("refsInit unexpectedly defines %q", name)
 				}
 			}
