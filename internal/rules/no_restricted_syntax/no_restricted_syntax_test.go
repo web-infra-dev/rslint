@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	tsparser "github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -1401,7 +1401,7 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 		t.Fatal("expected a string dispatch plan")
 	}
 
-	sourceFile := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/dispatch-attack.ts",
 		Path:     "/dispatch-attack.ts",
 	}, `foo; bar; function foo() {} object.foo;`, core.ScriptKindTS)
