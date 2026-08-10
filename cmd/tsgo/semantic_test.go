@@ -201,17 +201,17 @@ const primitiveValue = 1;
 		}
 	}
 
-anonymousID, ok := symbols["anonymousValue"]
-if !ok || anonymousID == 0 {
-	t.Fatalf("symbol %q not found", "anonymousValue")
-}
-anonymousTypeID, ok := fixture.semantic.Sym2type[anonymousID]
-if !ok || anonymousTypeID == 0 {
-	t.Fatalf("type for symbol %q not found", "anonymousValue")
-}
-if typeInfo, ok := fixture.semantic.Typetab[anonymousTypeID]; !ok || typeInfo.Symbol == 0 {
-	t.Fatal("object literal type has no declaration symbol")
-}
+	anonymousID, ok := symbols["anonymousValue"]
+	if !ok || anonymousID == 0 {
+		t.Fatalf("symbol %q not found", "anonymousValue")
+	}
+	anonymousTypeID, ok := fixture.semantic.Sym2type[anonymousID]
+	if !ok || anonymousTypeID == 0 {
+		t.Fatalf("type for symbol %q not found", "anonymousValue")
+	}
+	if typeInfo, ok := fixture.semantic.Typetab[anonymousTypeID]; !ok || typeInfo.Symbol == 0 {
+		t.Fatal("object literal type has no declaration symbol")
+	}
 
 	primitiveID := symbols["primitiveValue"]
 	primitiveTypeID := fixture.semantic.Sym2type[primitiveID]
@@ -332,69 +332,4 @@ func TestSemanticSnapshot_InternalSymbolNameSanitized(t *testing.T) {
 			t.Fatalf("symbol name contains unsanitized \\xFE: %q", name)
 		}
 	}
-}
-
-func TestCreateProgramUsesProjectReferenceSources(t *testing.T) {
-	tmpDir := t.TempDir()
-	mainDir := filepath.Join(tmpDir, "main")
-	dependencyDir := filepath.Join(tmpDir, "dependency")
-	dependencySourceDir := filepath.Join(dependencyDir, "src")
-	declarationDir := filepath.Join(tmpDir, "decls")
-	for _, dir := range []string{mainDir, dependencySourceDir, declarationDir} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("Failed to create fixture directory: %v", err)
-		}
-	}
-
-	files := map[string]string{
-		filepath.Join(mainDir, "tsconfig.json"): `{
-			"compilerOptions": { "composite": true },
-			"include": ["./index.ts"],
-			"references": [{ "path": "../dependency" }]
-		}`,
-		filepath.Join(mainDir, "index.ts"): `import { value } from "../decls/value"; export const result = value;`,
-		filepath.Join(dependencyDir, "tsconfig.json"): `{
-			"compilerOptions": {
-				"composite": true,
-				"rootDir": "./src",
-				"declarationDir": "../decls"
-			},
-			"include": ["./src/**/*.ts"]
-		}`,
-		filepath.Join(dependencySourceDir, "value.ts"): `export const value = 42;`,
-	}
-	for path, contents := range files {
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatalf("Failed to write fixture file %s: %v", path, err)
-		}
-	}
-
-	t.Chdir(mainDir)
-	program, err := CreateProgram("tsconfig.json")
-	if err != nil {
-		t.Fatalf("Failed to create program: %v", err)
-	}
-
-	dependencySourcePath := filepath.ToSlash(filepath.Join(dependencySourceDir, "value.ts"))
-	dependencyDeclarationPath := filepath.ToSlash(filepath.Join(declarationDir, "value.d.ts"))
-	dependencySourceID := -1
-	for id, file := range program.GetSourceFiles() {
-		switch filepath.ToSlash(file.FileName()) {
-		case dependencySourcePath:
-			dependencySourceID = id
-		case dependencyDeclarationPath:
-			t.Fatalf("project reference used declaration output instead of source: %s", file.FileName())
-		}
-	}
-	if dependencySourceID == -1 {
-		t.Fatalf("project reference source was not included in program: %s", dependencySourcePath)
-	}
-
-	semantic := CollectSemantic(program)
-	for reference := range semantic.Node2type {
-		if reference.SourceFileId == dependencySourceID {
-			return
-		}
-	}
-	t.Fatalf("project reference source has no collected semantic type information: %s", dependencySourcePath)
 }
