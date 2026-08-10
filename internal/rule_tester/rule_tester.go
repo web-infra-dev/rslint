@@ -138,8 +138,8 @@ type ESLintTestSuite struct {
 // rule whose defaults live in its schema sees them in tests too, exactly as it
 // would at runtime.
 //
-// Rules that declare no schema yet run whatever the test case passes,
-// preserving the pre-schema behavior.
+// Ad-hoc rules constructed directly in tests may declare no schema; they run
+// whatever the test case passes, unvalidated.
 //
 // It is exported so test harnesses that call a rule's Run directly instead of
 // going through [RunRuleTester] (e.g. to inspect diagnostics across multiple

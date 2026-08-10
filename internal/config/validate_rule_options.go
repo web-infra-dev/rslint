@@ -33,12 +33,12 @@ func (e RuleOptionsError) Error() string {
 //
 // It is meant to run as a separate step right after configuration is
 // resolved and before linting starts, so a bad config fails fast instead of
-// surfacing mid-lint. Validation is skipped for rules that declare no schema
-// yet (rule.Rule.Schema == nil — the pre-framework status quo), for rules
-// not present in the registry (unknown names are not an error here — making
-// them fatal is planned separately), and for disabled ("off") entries.
-// ESLint-plugin rules mounted via the config's object-form `plugins` never
-// carry a Go schema; the Node worker's own ESLint validates their options.
+// surfacing mid-lint. Validation is skipped for rules not present in the
+// registry (unknown names are not an error here — making them fatal is
+// planned separately) and for disabled ("off") entries. ESLint-plugin rules
+// mounted via the config's object-form `plugins` are registered without a Go
+// schema (rule.Rule.Schema == nil) and are skipped too; the Node worker's
+// own ESLint validates their options.
 //
 // Each entry's options are validated independently, mirroring ESLint, which
 // validates every config array element's options rather than only the final

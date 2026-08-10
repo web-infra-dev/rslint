@@ -10,10 +10,18 @@ import (
 // user's config); this sweep front-loads that failure into CI, playing the
 // role a MustCompile-at-init would — without making every rslint process pay
 // startup compilation for hundreds of schemas.
+//
+// It also enforces that every registered rule declares a schema. Only
+// ESLint-plugin placeholder rules run without one — the Node worker's own
+// ESLint validates their options.
 func TestAllRules_DeclaredSchemasCompile(t *testing.T) {
 	RegisterAllRules()
 	for name, ruleImpl := range GlobalRuleRegistry.GetAllRules() {
+		if ruleImpl.IsEslintPluginRule {
+			continue
+		}
 		if ruleImpl.Schema == nil {
+			t.Errorf("rule %s declares no options schema; every registered rule must declare one", name)
 			continue
 		}
 		if _, err := ruleImpl.Schema.Compile(); err != nil {
