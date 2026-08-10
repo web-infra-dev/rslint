@@ -2,7 +2,6 @@ package no_cycle
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -102,13 +101,6 @@ func parseMaxDepth(raw any) (int, bool) {
 			return 0, false
 		}
 		return normalizeDepth(int(value))
-	case json.Number:
-		if i, err := value.Int64(); err == nil {
-			return normalizeDepth(int(i))
-		}
-		if f, err := value.Float64(); err == nil {
-			return normalizeDepth(int(f))
-		}
 	case string:
 		if value == "∞" {
 			return unlimitedDepth, true
