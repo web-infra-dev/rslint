@@ -658,19 +658,6 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool 
 	return found
 }
 
-// nodeIsAtField returns whether `node` is positioned at the named ESTree
-// field on `parent`. Resolution uses the field-mapping helpers (see
-// fields.go).
-func nodeIsAtField(node, parent *ast.Node, field string) bool {
-	candidates := nodesAtField(parent, field)
-	for _, c := range candidates {
-		if c == node {
-			return true
-		}
-	}
-	return false
-}
-
 func nodeIsAtFieldPath(node, ancestor *ast.Node, path []string) bool {
 	ancestor = unwrapEstreeNode(ancestor)
 	if len(path) == 0 {
