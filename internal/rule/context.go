@@ -39,6 +39,7 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
+	fileCache  *FileCache
 	// Cwd is the normalized working directory of the linting process, the
 	// counterpart of ESLint's `process.cwd()`. Rules that resolve configured
 	// relative paths should use it instead of the Program's current directory,

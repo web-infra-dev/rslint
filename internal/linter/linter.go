@@ -231,6 +231,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		if opts.Program != nil {
 			sourceBOM = rule.NewSourceBOM(opts.Program.Host().FS(), file.FileName())
 		}
+		fileCache := rule.NewFileCache()
 
 		for ruleIndex, r := range rules {
 			ctx := rule.RuleContext{
@@ -245,7 +246,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Modules:        moduleGraph,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
-			}.WithDiagnosticConsumer(
+			}.WithFileCache(fileCache).WithDiagnosticConsumer(
 				r.Name,
 				r.Severity,
 				consumer,
