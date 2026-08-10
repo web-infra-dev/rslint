@@ -70,7 +70,7 @@ catalog:
   buffer: ^6.0.3
   cross-env: ^10.1.0
   esbuild-plugin-polyfill-node: ^0.3.0
-  memfs: ^4.64.0
+  memfs: ^4.68.0
   prebundle: ^1.6.5
   '@radix-ui/react-label': ^2.1.13
   '@radix-ui/react-select': ^2.3.5
