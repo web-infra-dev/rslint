@@ -166,7 +166,7 @@ async function moveArtifacts() {
     // Move the rule options JSON Schema dump (a single, platform-independent
     // artifact named `rule-schemas`, uploaded once from the `build` job's
     // linux-amd64 leg) to the fixed path
-    // scripts/generate-rule-option-types.mjs reads — see
+    // the generate-rule-option-types rslib plugin reads — see
     // packages/rslint/rslib.config.ts's onAfterBuild hook, which runs during
     // publish-npm's `build:js` step.
     const ruleSchemasSrc = path.join(

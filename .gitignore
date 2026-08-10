@@ -164,8 +164,8 @@ npm/rslint/*/*.node
 npm/rslint/*/rslint
 npm/rslint/*/rslint.exe
 
-# rule options JSON Schema dump (cmd/dump-rule-schemas), consumed by
-# scripts/generate-rule-option-types.mjs at build:js time; never committed
+# rule options JSON Schema dump (tools/dump_rule_schemas), consumed by the
+# generate-rule-option-types rslib plugin at build:js time; never committed
 packages/rslint/rule-schemas.json
 
 .idea
