@@ -1,9 +1,13 @@
 package utils_test
 
 import (
+	"runtime"
 	"testing"
+	"time"
+	"weak"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
@@ -192,4 +196,49 @@ func TestExportMapCyclicReexportRepeatedQuery(t *testing.T) {
 			t.Fatalf("repeated query: export %q present=%v, want %v", name, got[name], want[name])
 		}
 	}
+}
+
+// TestIndexReleasesItsProgram is the failure the Program cache is actually
+// exposed to. The cache keys entries by a weak pointer and drops them from a
+// cleanup on the Program, so an entry that reaches its own Program keeps it
+// reachable, the cleanup never runs, and the entry never goes.
+//
+// The editor is where that bites: a buffer edit produces a new Program, so a
+// leak of one Program per lint is a leak per keystroke, over a Program that
+// holds every file of the project. A test that stores an int into the cache
+// passes whatever the real entries hold; this one stores what a rule asking
+// for an export map really stores.
+func TestIndexReleasesItsProgram(t *testing.T) {
+	var key weak.Pointer[compiler.Program]
+
+	// The Program, its contexts, and the map built from it are confined to
+	// this call, so afterwards only the cache could still be holding it.
+	func() {
+		contexts := contextsForFiles(t, map[string]string{
+			"release-entry.ts":  `import { value } from "./release-target"; export const used = value;`,
+			"release-target.ts": `export const value = 1;`,
+		}, "release-entry.ts")
+
+		key = weak.Make(contexts[0].Program)
+
+		// Reach the index the way import/namespace and import/default do, so
+		// the entry under test is a populated ModuleIndex rather than an
+		// empty one.
+		if _, ok := import_utils.GetExportMap(contexts[0], firstImportSpecifier(t, contexts[0].SourceFile)); !ok {
+			t.Fatal("GetExportMap returned no map for the fixture")
+		}
+	}()
+
+	// Cleanups run on a collection and then on their own goroutine, so the
+	// Program goes shortly after it becomes unreachable rather than at a point
+	// this test can name.
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if key.Value() == nil {
+			return
+		}
+		runtime.GC()
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("the import index outlived its program")
 }

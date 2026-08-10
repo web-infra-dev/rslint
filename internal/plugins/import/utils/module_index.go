@@ -18,12 +18,13 @@ import (
 // specific to eslint-plugin-import — export maps, and the `import/` settings
 // that decide which references count.
 //
-// The index is shared by every file of the run, so it holds the Program it was
-// built for rather than taking a RuleContext per call: a context belongs to
-// one file, and nothing cached here may depend on which file happened to ask
-// first.
+// The index lives in the Program cache, so it must not hold the Program it was
+// built for: an entry that did would keep its Program reachable forever, the
+// weak key's cleanup would never run, and every editor keystroke — each of
+// which produces a new Program — would strand one. The Program is therefore
+// passed in by whoever is asking; every file of one run shares it, so any
+// caller's is the same one.
 type ModuleIndex struct {
-	program  *compiler.Program
 	settings *ModuleSettings
 
 	exports rslint_utils.LazyMap[*ast.SourceFile, *localExports]
@@ -45,15 +46,13 @@ type indexKey struct {
 // on the first rule of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := SettingsFor(ctx)
-	program := ctx.Program
-	return rule.CachedByProgram(program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
-		return newModuleIndex(program, settings)
+	return rule.CachedByProgram(ctx.Program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
+		return newModuleIndex(settings)
 	})
 }
 
-func newModuleIndex(program *compiler.Program, settings *ModuleSettings) *ModuleIndex {
+func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
 	return &ModuleIndex{
-		program:    program,
 		settings:   settings,
 		exportMaps: make(map[*ast.SourceFile]*ExportMap),
 	}
@@ -62,12 +61,12 @@ func newModuleIndex(program *compiler.Program, settings *ModuleSettings) *Module
 // localExportsOf returns what file says about its own exports, with every
 // module specifier resolved and none of them followed. The result is shared
 // with every other caller and must not be modified.
-func (index *ModuleIndex) localExportsOf(file *ast.SourceFile) *localExports {
+func (index *ModuleIndex) localExportsOf(program *compiler.Program, file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil
 	}
 	return index.exports.Get(file, func() *localExports {
-		return collectLocalExports(index.program, file, index.settings)
+		return collectLocalExports(program, file, index.settings)
 	})
 }
 

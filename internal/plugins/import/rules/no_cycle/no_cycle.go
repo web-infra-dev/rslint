@@ -121,6 +121,15 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 		return
 	}
 
+	// Every report sits on a reference this file wrote, so a file that wrote
+	// none has no answer to look up. Asking that of the file alone, before the
+	// graph, is what keeps an import-free file off the build: the graph spans
+	// the whole Program, and the editor discards it on every keystroke, so
+	// there is no run to amortize it over on that path.
+	if len(ctx.Modules.Edges(ctx.SourceFile, opts.syntax)) == 0 {
+		return
+	}
+
 	graph := moduleGraphFor(ctx, opts)
 	if graph == nil {
 		return

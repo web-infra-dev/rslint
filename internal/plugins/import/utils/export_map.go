@@ -101,7 +101,7 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 	if ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx)))
+	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export
@@ -115,7 +115,12 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 // which module the query entered from, so those maps stay private to the
 // query that built them.
 type exportBuilder struct {
-	index    *ModuleIndex
+	index *ModuleIndex
+	// prog is the Program every file this builder reaches belongs to. It is
+	// held here, on a value that lasts one query, rather than on the index,
+	// which lasts as long as the Program cache entry and must not keep its
+	// Program alive.
+	prog     *compiler.Program
 	building map[*ast.SourceFile]*ExportMap
 	seen     map[exportKey]bool
 	// onStack holds the files whose maps are still being filled, so that
@@ -129,9 +134,10 @@ type exportBuilder struct {
 	sawCycle bool
 }
 
-func newExportBuilder(index *ModuleIndex) *exportBuilder {
+func newExportBuilder(index *ModuleIndex, program *compiler.Program) *exportBuilder {
 	return &exportBuilder{
 		index:    index,
+		prog:     program,
 		building: make(map[*ast.SourceFile]*ExportMap),
 		seen:     make(map[exportKey]bool),
 		onStack:  make(map[*ast.SourceFile]bool),
@@ -139,14 +145,11 @@ func newExportBuilder(index *ModuleIndex) *exportBuilder {
 	}
 }
 
-// program is the Program every file this builder reaches belongs to. It comes
-// from the index rather than from a RuleContext, because the index is shared by
-// every file of the run and a context belongs to one of them.
 func (builder *exportBuilder) program() *compiler.Program {
-	if builder.index == nil {
+	if builder == nil {
 		return nil
 	}
-	return builder.index.program
+	return builder.prog
 }
 
 func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
@@ -191,7 +194,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.localExportsOf(sourceFile)
+	local := builder.index.localExportsOf(builder.program(), sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}
