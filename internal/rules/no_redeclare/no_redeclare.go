@@ -41,10 +41,10 @@ type ruleVariant struct {
 
 func parseOptionsWith(opts []any, defaults options, allowIgnoreDeclarationMerge bool) options {
 	result := defaults
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(opts) == 0 {
 		return result
 	}
+	optsMap, _ := opts[0].(map[string]interface{})
 	if v, ok := optsMap["builtinGlobals"].(bool); ok {
 		result.builtinGlobals = v
 	}

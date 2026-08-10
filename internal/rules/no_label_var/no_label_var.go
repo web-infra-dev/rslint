@@ -19,7 +19,8 @@ import (
 //  2. ctx.Globals — catches the selected ECMAScript edition plus config and
 //     inline globals, including explicit `off` overrides.
 var NoLabelVarRule = rule.Rule{
-	Name: "no-label-var",
+	Name:   "no-label-var",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{

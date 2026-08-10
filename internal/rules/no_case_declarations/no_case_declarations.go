@@ -12,7 +12,8 @@ var unexpectedMessage = rule.RuleMessage{
 
 // https://eslint.org/docs/latest/rules/no-case-declarations
 var NoCaseDeclarationsRule = rule.Rule{
-	Name: "no-case-declarations",
+	Name:   "no-case-declarations",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCaseBlock: func(node *ast.Node) {

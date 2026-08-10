@@ -1,11 +1,15 @@
 package no_bitwise
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_bitwise.schema.json
+var schemaJSON []byte
 
 // bitwiseOperatorKinds is the set of AST token kinds that represent bitwise
 // operators (both binary forms like `|`, `<<` and their assignment variants,
@@ -32,18 +36,18 @@ type noBitwiseOptions struct {
 	int32Hint bool
 }
 
-func parseOptions(opts any) noBitwiseOptions {
+func parseOptions(options []any) noBitwiseOptions {
 	result := noBitwiseOptions{
 		allow:     map[string]bool{},
 		int32Hint: false,
 	}
-
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return result
 	}
 
-	if raw, ok := optsMap["allow"].([]interface{}); ok {
+	optsMap, _ := options[0].(map[string]any)
+
+	if raw, ok := optsMap["allow"].([]any); ok {
 		for _, v := range raw {
 			if s, ok := v.(string); ok {
 				result.allow[s] = true
@@ -90,9 +94,9 @@ func buildUnexpectedMessage(operator string) rule.RuleMessage {
 // NoBitwiseRule disallows bitwise operators.
 // https://eslint.org/docs/latest/rules/no-bitwise
 var NoBitwiseRule = rule.Rule{
-	Name: "no-bitwise",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-bitwise",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		// report emits the diagnostic after shared allow / int32Hint filtering.

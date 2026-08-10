@@ -852,3 +852,22 @@ func TestObjectShorthandConsistentMatrix(t *testing.T) {
 		},
 	)
 }
+
+// TestObjectShorthandMethodsIgnorePatternSchema locks in the fail-fast
+// behavior for an invalid methodsIgnorePattern. The rule compiles the option
+// as an ECMAScript regex, so an unparsable pattern would otherwise be dropped
+// and the rule would silently lint as if no pattern were configured. Marking
+// it `format: "regex"` moves the failure to config validation — upstream
+// declares a bare string.
+func TestObjectShorthandMethodsIgnorePatternSchema(t *testing.T) {
+	invalid := []any{"methods", map[string]any{"methodsIgnorePattern": "("}}
+	if err := ObjectShorthandRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid methodsIgnorePattern regex to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{"methods", map[string]any{"methodsIgnorePattern": "(?<=a)b"}}
+	if err := ObjectShorthandRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid methodsIgnorePattern regex to pass schema validation, got: %v", err)
+	}
+}

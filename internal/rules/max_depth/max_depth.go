@@ -1,6 +1,7 @@
 package max_depth
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,12 +9,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_depth.schema.json
+var schemaJSON []byte
+
 // MaxDepthRule enforces a maximum depth that blocks can be nested in a function.
 // https://eslint.org/docs/latest/rules/max-depth
 var MaxDepthRule = rule.Rule{
-	Name: "max-depth",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-depth",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		maxDepth := parseMaxDepth(options)
 
 		// Stack of depth counters, one per scope-bearing container. The
@@ -122,7 +126,10 @@ func buildTooDeeplyMessage(depth, maxDepth int) rule.RuleMessage {
 
 // parseMaxDepth resolves the configured maximum depth. max-depth shares
 // ESLint's legacy `maximum || max` option behavior with several max-* rules.
-func parseMaxDepth(options any) int {
+func parseMaxDepth(options []any) int {
 	const defaultMax = 4
-	return utils.ResolveLegacyMaxOption(options, defaultMax)
+	if len(options) == 0 {
+		return defaultMax
+	}
+	return utils.ResolveLegacyMaxOption(options[0], defaultMax)
 }

@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "builtinGlobals": {
+          "type": "boolean"
+        },
+        "hoist": {
+          "enum": ["all", "functions", "never", "types", "functions-and-types"]
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignoreOnInitialization": {
+          "type": "boolean"
+        },
+        "ignoreTypeValueShadow": {
+          "type": "boolean"
+        },
+        "ignoreFunctionTypeParameterNameValueShadow": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -40,10 +40,10 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// ---- Dimension 4: invalid argument count stays outside this rule ----
 			{Code: "new RegExp('a', 'g', 'extra');"},
 
-			// ---- Options: direct map shape with default-equivalent false ----
+			// ---- Options: explicit default-equivalent false ----
 			{
 				Code:    "new RegExp(/a/);",
-				Options: map[string]interface{}{"disallowRedundantWrapping": false},
+				Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": false}},
 			},
 
 			// N/A: declaration/container forms do not affect this expression-only rule.
@@ -192,7 +192,7 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			// ---- Real-user: eslint/eslint#16504 disallowRedundantWrapping reports regex literal args ----
 			{
 				Code:    "new RegExp((/a/) as RegExp);",
-				Options: map[string]interface{}{"disallowRedundantWrapping": true},
+				Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unexpectedRedundantRegExp",
 					Line:      1,
@@ -205,7 +205,7 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 			},
 			{
 				Code:    "new RegExp(/a/i, 'g');",
-				Options: map[string]interface{}{"disallowRedundantWrapping": true},
+				Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unexpectedRedundantRegExpWithFlags",
 					Message:   "Use regular expression literal with flags instead of the 'RegExp' constructor.",

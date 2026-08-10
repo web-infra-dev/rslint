@@ -15,7 +15,8 @@ var noOctalMessage = rule.RuleMessage{
 
 // https://eslint.org/docs/latest/rules/no-octal
 var NoOctalRule = rule.Rule{
-	Name: "no-octal",
+	Name:   "no-octal",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 		return rule.RuleListeners{

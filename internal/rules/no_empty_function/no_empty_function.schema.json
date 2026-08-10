@@ -1,0 +1,35 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "functions",
+              "arrowFunctions",
+              "generatorFunctions",
+              "methods",
+              "generatorMethods",
+              "getters",
+              "setters",
+              "constructors",
+              "asyncFunctions",
+              "asyncMethods",
+              "privateConstructors",
+              "protectedConstructors",
+              "decoratedFunctions",
+              "overrideMethods"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

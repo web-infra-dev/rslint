@@ -1,6 +1,7 @@
 package require_atomic_updates
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed require_atomic_updates.schema.json
+var schemaJSON []byte
 
 func messageNonAtomicUpdate(value string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -1122,21 +1126,26 @@ func (a *analyzer) walkForStatement(node *ast.Node, state *analysisState) {
 	}
 }
 
+// parseOptions returns the `allowProperties` option.
+func parseOptions(options []any) bool {
+	allowProperties := false
+	if len(options) == 0 {
+		return allowProperties
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowProperties"].(bool); ok {
+		allowProperties = v
+	}
+	return allowProperties
+}
+
 // RequireAtomicUpdatesRule disallows assignments that can lead to race conditions
 // due to usage of `await` or `yield`.
 var RequireAtomicUpdatesRule = rule.Rule{
-	Name: "require-atomic-updates",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		allowProperties := false
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if v, ok := optsMap["allowProperties"]; ok {
-				if b, ok := v.(bool); ok {
-					allowProperties = b
-				}
-			}
-		}
+	Name:   "require-atomic-updates",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		allowProperties := parseOptions(options)
 
 		enterFunction := func(node *ast.Node) {
 			flags := ast.GetFunctionFlags(node)

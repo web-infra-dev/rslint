@@ -1,31 +1,38 @@
 package no_global_assign
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_global_assign.schema.json
+var schemaJSON []byte
+
 type options struct {
 	exceptions map[string]bool
 }
 
-func parseOptions(opts any) options {
-	var result options
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if exceptions, ok := optsMap["exceptions"].([]interface{}); ok {
-			for _, e := range exceptions {
-				if s, ok := e.(string); ok {
-					if result.exceptions == nil {
-						result.exceptions = make(map[string]bool, len(exceptions))
-					}
-					result.exceptions[s] = true
-				}
+func parseOptions(rawOptions []any) options {
+	var opts options
+	if len(rawOptions) == 0 {
+		return opts
+	}
+	m, _ := rawOptions[0].(map[string]any)
+	exceptions, _ := m["exceptions"].([]any)
+	for _, e := range exceptions {
+		if s, ok := e.(string); ok {
+			// Allocate only once a real exception shows up, so files that
+			// configure none never pay for the map.
+			if opts.exceptions == nil {
+				opts.exceptions = make(map[string]bool, len(exceptions))
 			}
+			opts.exceptions[s] = true
 		}
 	}
-	return result
+	return opts
 }
 
 // isWriteThroughTypeAssertion checks if the identifier reaches its assignment target
@@ -65,10 +72,10 @@ func isReadonlyGlobal(ctx rule.RuleContext, name string) bool {
 
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
-	Name: "no-global-assign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := parseOptions(options)
+	Name:   "no-global-assign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		opts := parseOptions(rawOptions)
 		// A single-entry cache covers the common case of repeated writes to one
 		// global without allocating maps for files that report once.
 		cache := struct {

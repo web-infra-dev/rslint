@@ -1,12 +1,17 @@
 package arrow_body_style
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed arrow_body_style.schema.json
+var schemaJSON []byte
 
 // arrow-body-style enforces or disallows braces around arrow function bodies.
 // https://eslint.org/docs/latest/rules/arrow-body-style
@@ -22,23 +27,19 @@ type options struct {
 	requireReturnForObjectLiteral bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(opts []any) options {
 	o := options{style: styleAsNeeded}
-	if arr, ok := opts.([]interface{}); ok {
-		if len(arr) > 0 {
-			if s, ok := arr[0].(string); ok && s != "" {
-				o.style = s
-			}
-		}
-		if len(arr) > 1 {
-			if m, ok := arr[1].(map[string]interface{}); ok {
-				if v, ok := m["requireReturnForObjectLiteral"].(bool); ok {
-					o.requireReturnForObjectLiteral = v
-				}
-			}
-		}
-	} else if s, ok := opts.(string); ok && s != "" {
+	if len(opts) == 0 {
+		return o
+	}
+	if s, ok := opts[0].(string); ok && s != "" {
 		o.style = s
+	}
+	if len(opts) > 1 {
+		m, _ := opts[1].(map[string]any)
+		if v, ok := m["requireReturnForObjectLiteral"].(bool); ok {
+			o.requireReturnForObjectLiteral = v
+		}
 	}
 	return o
 }
@@ -247,9 +248,9 @@ func buildBlockBodyFixes(
 }
 
 var ArrowBodyStyleRule = rule.Rule{
-	Name: "arrow-body-style",
-	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.LegacyUnwrapOptions(_opts)
+	Name:   "arrow-body-style",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, opts []any) rule.RuleListeners {
 		o := parseOptions(opts)
 		always := o.style == styleAlways
 		asNeeded := o.style == styleAsNeeded

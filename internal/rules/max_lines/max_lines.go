@@ -1,6 +1,7 @@
 package max_lines
 
 import (
+	_ "embed"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,14 +11,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_lines.schema.json
+var schemaJSON []byte
+
 // MaxLinesRule enforces a maximum number of lines per file.
 // https://eslint.org/docs/latest/rules/max-lines
 var MaxLinesRule = rule.Rule{
-	Name: "max-lines",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-lines",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// The linter never fires a KindSourceFile listener, so run eagerly.
-		checkMaxLines(ctx, options)
+		checkMaxLines(ctx, parseOptions(options))
 		return rule.RuleListeners{}
 	},
 }
@@ -28,40 +32,25 @@ type maxLinesOptions struct {
 	skipBlankLines bool
 }
 
-func parseOptions(opts any) maxLinesOptions {
+// parseOptions reads the single option, which is either a bare maximum
+// (`["error", 2]`) or an object (`["error", { max: 2, ... }]`).
+func parseOptions(options []any) maxLinesOptions {
 	result := maxLinesOptions{max: 300}
-	if opts == nil {
+	if len(options) == 0 {
 		return result
 	}
-	// JS tests pass options as [2] or [{ max: 2, ... }].
-	if arr, ok := opts.([]interface{}); ok {
-		if len(arr) == 0 {
-			return result
-		}
-		opts = arr[0]
+	result.max = utils.ResolveLegacyMaxOption(options[0], 300)
+	m, _ := options[0].(map[string]interface{})
+	if v, ok := m["skipComments"].(bool); ok {
+		result.skipComments = v
 	}
-	if n, ok := utils.CoerceInt(opts); ok {
-		result.max = n
-		return result
-	}
-	if m, ok := opts.(map[string]interface{}); ok {
-		if v, ok := m["max"]; ok {
-			if n, ok := utils.CoerceInt(v); ok {
-				result.max = n
-			}
-		}
-		if v, ok := m["skipComments"].(bool); ok {
-			result.skipComments = v
-		}
-		if v, ok := m["skipBlankLines"].(bool); ok {
-			result.skipBlankLines = v
-		}
+	if v, ok := m["skipBlankLines"].(bool); ok {
+		result.skipBlankLines = v
 	}
 	return result
 }
 
-func checkMaxLines(ctx rule.RuleContext, options any) {
-	opts := parseOptions(options)
+func checkMaxLines(ctx rule.RuleContext, opts maxLinesOptions) {
 	sourceFile := ctx.SourceFile
 	text := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)

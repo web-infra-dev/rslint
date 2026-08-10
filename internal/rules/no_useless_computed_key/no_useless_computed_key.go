@@ -1,26 +1,30 @@
 package no_useless_computed_key
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_useless_computed_key.schema.json
+var schemaJSON []byte
 
 type Options struct {
 	EnforceForClassMembers bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{EnforceForClassMembers: true}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["enforceForClassMembers"].(bool); ok {
-			opts.EnforceForClassMembers = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["enforceForClassMembers"].(bool); ok {
+		opts.EnforceForClassMembers = v
 	}
 	return opts
 }
@@ -124,9 +128,9 @@ func hasCommentsBetween(text string, start, end int) bool {
 
 // https://eslint.org/docs/latest/rules/no-useless-computed-key
 var NoUselessComputedKeyRule = rule.Rule{
-	Name: "no-useless-computed-key",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-useless-computed-key",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		// check inspects a container node (PropertyAssignment / Method /

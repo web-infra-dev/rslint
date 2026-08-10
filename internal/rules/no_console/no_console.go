@@ -5,7 +5,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_console.schema.json
@@ -15,8 +14,7 @@ var schemaJSON []byte
 var NoConsoleRule = rule.Rule{
 	Name:   "no-console",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		reportIfConsole := func(node *ast.Node, consoleIdent *ast.Node, propertyName string) {
@@ -109,18 +107,20 @@ func (o *consoleOptions) isAllowed(method string) bool {
 	return o.allow[method]
 }
 
-func parseOptions(opts any) consoleOptions {
+func parseOptions(options []any) consoleOptions {
 	result := consoleOptions{
 		allow: make(map[string]bool),
 	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allowArr, ok := optsMap["allow"].([]interface{}); ok {
-			for _, item := range allowArr {
-				if str, ok := item.(string); ok {
-					result.allow[str] = true
-				}
+	if len(options) == 0 {
+		return result
+	}
+
+	optsMap, _ := options[0].(map[string]any)
+	if allowArr, ok := optsMap["allow"].([]any); ok {
+		for _, item := range allowArr {
+			if str, ok := item.(string); ok {
+				result.allow[str] = true
 			}
 		}
 	}

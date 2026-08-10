@@ -53,7 +53,8 @@ func isGlobalThisOrWindow(node *ast.Node, globals rule.Globals) bool {
 
 // https://eslint.org/docs/latest/rules/no-alert
 var NoAlertRule = rule.Rule{
-	Name: "no-alert",
+	Name:   "no-alert",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

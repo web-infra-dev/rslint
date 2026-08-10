@@ -1,41 +1,33 @@
 package getter_return
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed getter_return.schema.json
+var schemaJSON []byte
 
 // Options for getter-return rule
 type Options struct {
 	AllowImplicit bool `json:"allowImplicit"`
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		AllowImplicit: false,
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	// Parse options with dual-format support (handles both array and object formats)
-	var optsMap map[string]interface{}
-	var ok bool
-
-	// Handle array format: [{ option: value }]
-	if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-		optsMap, ok = optArray[0].(map[string]interface{})
-	} else {
-		// Handle direct object format: { option: value }
-		optsMap, ok = options.(map[string]interface{})
-	}
-
-	if ok {
-		if v, ok := optsMap["allowImplicit"].(bool); ok {
-			opts.AllowImplicit = v
-		}
+	optsMap, _ := options[0].(map[string]any)
+	if v, ok := optsMap["allowImplicit"].(bool); ok {
+		opts.AllowImplicit = v
 	}
 	return opts
 }
@@ -98,9 +90,9 @@ func reportGetterReturn(ctx rule.RuleContext, funcNode *ast.Node, reportNode *as
 
 // GetterReturnRule enforces return statements in getters
 var GetterReturnRule = rule.Rule{
-	Name: "getter-return",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "getter-return",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -13,7 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-//go:embed no-unused-vars.schema.json
+//go:embed no_unused_vars.schema.json
 var schemaJSON []byte
 
 type Config struct {
@@ -259,21 +259,25 @@ func parseOptions(options []any) Config {
 		CaughtErrors: "all",
 	}
 
-	if len(options) > 0 {
-		if vars, ok := options[0].(string); ok {
-			config.Vars = vars
-			return compilePatterns(config)
-		}
+	if len(options) == 0 {
+		return compilePatterns(config)
 	}
 
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	// The first option is either the shorthand string form ("all" / "local",
+	// which only sets `vars`) or the full option object.
+	if vars, ok := options[0].(string); ok {
+		config.Vars = vars
+		return compilePatterns(config)
+	}
+
+	if optsMap, ok := options[0].(map[string]any); ok {
 		parseOptionsFromMap(optsMap, &config)
 	}
 
 	return compilePatterns(config)
 }
 
-func parseOptionsFromMap(optsMap map[string]interface{}, config *Config) {
+func parseOptionsFromMap(optsMap map[string]any, config *Config) {
 	if val, ok := optsMap["vars"].(string); ok {
 		config.Vars = val
 	}

@@ -28,15 +28,15 @@ func TestNoShadowRestrictedNamesRule(t *testing.T) {
 			{Code: `import { undefined as undef } from 'foo';`},
 			{
 				Code:    `let globalThis;`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{
 				Code:    `class globalThis {}`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{
 				Code:    `import { baz as globalThis } from 'foo';`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{Code: `globalThis.foo`},
 			{Code: `const foo = globalThis`},
@@ -298,19 +298,19 @@ func TestNoShadowRestrictedNamesExtended(t *testing.T) {
 			// ---- reportGlobalThis: false ----
 			{
 				Code:    `function globalThis(globalThis) { var globalThis; }`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{
 				Code:    `class globalThis {}`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{
 				Code:    `import globalThis from 'm'`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			{
 				Code:    `for (var globalThis of arr) {}`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 			},
 			// Other restricted names still reported even with the option off.
 
@@ -449,7 +449,7 @@ func TestNoShadowRestrictedNamesExtended(t *testing.T) {
 			{Code: `declare function f(x: number): number; declare function f(x: string): string;`},
 
 			// ---- Global augmentation (type-level) ----
-			{Code: `declare global { var globalThis: any; }`, Options: map[string]interface{}{"reportGlobalThis": false}},
+			{Code: `declare global { var globalThis: any; }`, Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}}},
 
 			// ---- Dynamic import destructure uses read context for the module namespace ----
 			{Code: `async function f() { const { x } = await import('m'); }`},
@@ -1021,7 +1021,7 @@ func TestNoShadowRestrictedNamesExtended(t *testing.T) {
 			},
 			{
 				Code:    `let globalThis;`,
-				Options: map[string]interface{}{"reportGlobalThis": true},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "shadowingRestrictedName", Line: 1, Column: 5},
 				},
@@ -1030,7 +1030,7 @@ func TestNoShadowRestrictedNamesExtended(t *testing.T) {
 			// ---- 15. reportGlobalThis: false still reports other restricted names ----
 			{
 				Code:    `function globalThis(NaN) {}`,
-				Options: map[string]interface{}{"reportGlobalThis": false},
+				Options: []interface{}{map[string]interface{}{"reportGlobalThis": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "shadowingRestrictedName", Line: 1, Column: 21, Message: "Shadowing of global property 'NaN'."},
 				},

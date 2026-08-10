@@ -1,6 +1,7 @@
 package radix
 
 import (
+	_ "embed"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed radix.schema.json
+var schemaJSON []byte
 
 var missingParametersMsg = rule.RuleMessage{
 	Id:          "missingParameters",
@@ -90,7 +94,8 @@ func hasTrailingComma(sourceText string, lastArgEnd, callEnd int) bool {
 
 // https://eslint.org/docs/latest/rules/radix
 var RadixRule = rule.Rule{
-	Name: "radix",
+	Name:   "radix",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

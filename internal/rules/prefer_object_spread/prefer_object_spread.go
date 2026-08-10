@@ -730,7 +730,8 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, args []*ast.Node) []rule.R
 
 // https://eslint.org/docs/latest/rules/prefer-object-spread
 var PreferObjectSpreadRule = rule.Rule{
-	Name: "prefer-object-spread",
+	Name:   "prefer-object-spread",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		tracker := &objectTracker{
 			ctx:       ctx,

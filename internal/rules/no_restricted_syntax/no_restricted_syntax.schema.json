@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": {
+    "oneOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["selector"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "uniqueItems": true,
+  "minItems": 0
+}

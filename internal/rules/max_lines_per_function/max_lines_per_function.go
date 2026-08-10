@@ -1,6 +1,7 @@
 package max_lines_per_function
 
 import (
+	_ "embed"
 	"fmt"
 	"unicode"
 
@@ -11,12 +12,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_lines_per_function.schema.json
+var schemaJSON []byte
+
 // MaxLinesPerFunctionRule enforces a maximum number of lines per function.
 // https://eslint.org/docs/latest/rules/max-lines-per-function
 var MaxLinesPerFunctionRule = rule.Rule{
-	Name: "max-lines-per-function",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-lines-per-function",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		sourceFile := ctx.SourceFile
 		text := sourceFile.Text()
@@ -93,38 +97,23 @@ type maxLinesPerFunctionOptions struct {
 	iifes          bool
 }
 
-func parseOptions(opts any) maxLinesPerFunctionOptions {
+// parseOptions reads the single option, which is either a bare maximum
+// (`["error", 50]`) or an object (`["error", { max: 50, ... }]`).
+func parseOptions(options []any) maxLinesPerFunctionOptions {
 	result := maxLinesPerFunctionOptions{max: 50}
-	if opts == nil {
+	if len(options) == 0 {
 		return result
 	}
-	// JS tests pass options as [50] or [{ max: 50, ... }]; the CLI may pass a
-	// bare number, bare object, or array-wrapped value.
-	if arr, ok := opts.([]interface{}); ok {
-		if len(arr) == 0 {
-			return result
-		}
-		opts = arr[0]
+	result.max = utils.ResolveLegacyMaxOption(options[0], 50)
+	m, _ := options[0].(map[string]interface{})
+	if v, ok := m["skipComments"].(bool); ok {
+		result.skipComments = v
 	}
-	if n, ok := utils.CoerceInt(opts); ok {
-		result.max = n
-		return result
+	if v, ok := m["skipBlankLines"].(bool); ok {
+		result.skipBlankLines = v
 	}
-	if m, ok := opts.(map[string]interface{}); ok {
-		if v, ok := m["max"]; ok {
-			if n, ok := utils.CoerceInt(v); ok {
-				result.max = n
-			}
-		}
-		if v, ok := m["skipComments"].(bool); ok {
-			result.skipComments = v
-		}
-		if v, ok := m["skipBlankLines"].(bool); ok {
-			result.skipBlankLines = v
-		}
-		if v, ok := m["IIFEs"].(bool); ok {
-			result.iifes = v
-		}
+	if v, ok := m["IIFEs"].(bool); ok {
+		result.iifes = v
 	}
 	return result
 }

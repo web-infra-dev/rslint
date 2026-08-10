@@ -300,20 +300,20 @@ foo(x?: any) { return x; }
 				Code: `abstract class A {
 abstract foo(): void;
 }`,
-				Options: 0, // Abstract method has no body → not visited.
+				Options: map[string]interface{}{"max": 0}, // Abstract method has no body → not visited.
 			},
 			{
 				Code: `declare class A {
 foo(): void;
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 			{
 				Code: `interface I {
 foo(): void;
 bar(x: string): void;
 }`,
-				Options: 0, // MethodSignature isn't in our listeners at all.
+				Options: map[string]interface{}{"max": 0}, // MethodSignature isn't in our listeners at all.
 			},
 
 			// --- Class static blocks are NOT visited (ESLint also doesn't).
@@ -326,7 +326,7 @@ let z = 3;
 let w = 4;
 }
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 
 			// --- Generator method (non-async)
@@ -741,7 +741,7 @@ return this;
 				Code: `interface I {
 foo?(): void;
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 
 			// --- Function expression with own id matching outer var name (the
@@ -1849,20 +1849,6 @@ class A { method() { return 1; } }
 				},
 			},
 
-			// Negative max fires on everything (defensive — ESLint's schema
-			// rejects this, but our parser accepts the value, fires on >= 0).
-			// Ports of similar guard rails in max-lines.
-			{
-				Code:    "function f() {\nreturn 1;\n}",
-				Options: map[string]interface{}{"max": -1},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "exceed",
-						Message:   "Function 'f' has too many lines (3). Maximum allowed is -1.",
-					},
-				},
-			},
-
 			// Function expression in array literal — visited and reported
 			// normally.
 			{
@@ -1883,7 +1869,7 @@ let b = 2;
 			// when max=0 the lineCount=1 still exceeds.
 			{
 				Code:    "class A { method() { return 1; } }",
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",

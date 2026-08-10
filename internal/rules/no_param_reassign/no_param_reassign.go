@@ -1,26 +1,30 @@
 package no_param_reassign
 
 import (
-	"regexp"
+	_ "embed"
 	"slices"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_param_reassign.schema.json
+var schemaJSON []byte
+
 type Options struct {
 	Props                               bool
 	IgnorePropertyModificationsFor      []string
-	IgnorePropertyModificationsForRegex []*regexp.Regexp
+	IgnorePropertyModificationsForRegex []*regexp2.Regexp
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{Props: false}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if props, ok := optsMap["props"].(bool); ok {
 		opts.Props = props
 	}
@@ -34,8 +38,12 @@ func parseOptions(options any) Options {
 	if arr, ok := optsMap["ignorePropertyModificationsForRegex"].([]interface{}); ok {
 		for _, v := range arr {
 			if s, ok := v.(string); ok {
-				// ESLint uses the "u" flag; Go's regexp is UTF-8 by default.
-				if re, err := regexp.Compile(s); err == nil {
+				// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`,
+				// so patterns using lookaround, backreferences, or `\p{...}` behave the
+				// same as upstream (Go's RE2 supports none of those). An unparsable
+				// pattern is rejected up front by the schema's `format: "regex"`, so
+				// the compile-error branch here is only defensive.
+				if re, err := utils.CompileRegexp2(s, utils.JSUnicodeRegexOptions); err == nil {
 					opts.IgnorePropertyModificationsForRegex = append(opts.IgnorePropertyModificationsForRegex, re)
 				}
 			}
@@ -210,7 +218,7 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 		return true
 	}
 	for _, re := range opts.IgnorePropertyModificationsForRegex {
-		if re.MatchString(name) {
+		if utils.Regexp2MatchString(re, name) {
 			return true
 		}
 	}
@@ -300,9 +308,9 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 }
 
 var NoParamReassignRule = rule.Rule{
-	Name: "no-param-reassign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-param-reassign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		handler := func(node *ast.Node) {
 			checkFunction(node, opts, ctx)

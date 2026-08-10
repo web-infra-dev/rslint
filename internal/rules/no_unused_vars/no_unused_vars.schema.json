@@ -13,7 +13,8 @@
               "enum": ["all", "local"]
             },
             "varsIgnorePattern": {
-              "type": "string"
+              "type": "string",
+              "format": "regex"
             },
             "args": {
               "enum": ["all", "after-used", "none"]
@@ -22,16 +23,19 @@
               "type": "boolean"
             },
             "argsIgnorePattern": {
-              "type": "string"
+              "type": "string",
+              "format": "regex"
             },
             "caughtErrors": {
               "enum": ["all", "none"]
             },
             "caughtErrorsIgnorePattern": {
-              "type": "string"
+              "type": "string",
+              "format": "regex"
             },
             "destructuredArrayIgnorePattern": {
-              "type": "string"
+              "type": "string",
+              "format": "regex"
             },
             "ignoreClassWithStaticInitBlock": {
               "type": "boolean"

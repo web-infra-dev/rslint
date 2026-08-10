@@ -12,7 +12,8 @@ import (
 // nodes, so walk through them with `ast.SkipParentheses` to match ESLint on
 // forms like `(new Foo());`.
 var NoNewRule = rule.Rule{
-	Name: "no-new",
+	Name:   "no-new",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {

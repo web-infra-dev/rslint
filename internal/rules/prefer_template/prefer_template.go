@@ -12,7 +12,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/prefer-template
 var PreferTemplateRule = rule.Rule{
-	Name: "prefer-template",
+	Name:   "prefer-template",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Tracks concat chains already reported, keyed by the top binary
 		// expression's position, so nested literals don't double-report.

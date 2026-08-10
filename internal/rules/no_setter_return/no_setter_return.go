@@ -166,7 +166,8 @@ func isSetterFunction(node *ast.Node, ctx rule.RuleContext) bool {
 // Setters cannot meaningfully return values; any return value is silently ignored.
 // A bare `return;` (without a value) is allowed for control flow.
 var NoSetterReturnRule = rule.Rule{
-	Name: "no-setter-return",
+	Name:   "no-setter-return",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {

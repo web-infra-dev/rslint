@@ -1,6 +1,7 @@
 package prefer_const
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,25 +10,29 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed prefer_const.schema.json
+var schemaJSON []byte
+
 type preferConstOptions struct {
 	destructuring          string // "any" or "all", default "any"
 	ignoreReadBeforeAssign bool   // default false
 }
 
-func parseOptions(opts any) preferConstOptions {
+func parseOptions(options []any) preferConstOptions {
 	result := preferConstOptions{
 		destructuring:          "any",
 		ignoreReadBeforeAssign: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if d, ok := optsMap["destructuring"].(string); ok && (d == "any" || d == "all") {
-			result.destructuring = d
-		}
-		if v, ok := optsMap["ignoreReadBeforeAssign"].(bool); ok {
-			result.ignoreReadBeforeAssign = v
-		}
+	m, _ := options[0].(map[string]any)
+	if d, ok := m["destructuring"].(string); ok {
+		result.destructuring = d
+	}
+	if v, ok := m["ignoreReadBeforeAssign"].(bool); ok {
+		result.ignoreReadBeforeAssign = v
 	}
 
 	return result
@@ -85,8 +90,9 @@ type preferConstState struct {
 
 // https://eslint.org/docs/latest/rules/prefer-const
 var PreferConstRule = rule.Rule{
-	Name: "prefer-const",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	Name:   "prefer-const",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
 		// A real let declaration necessarily contains this exact byte sequence.
 		// False positives (for example in comments) only take the normal path;
@@ -95,7 +101,6 @@ var PreferConstRule = rule.Rule{
 			return nil
 		}
 
-		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		state := preferConstState{
 			ctx:              &ctx,

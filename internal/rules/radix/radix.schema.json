@@ -1,0 +1,10 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["always", "as-needed"]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

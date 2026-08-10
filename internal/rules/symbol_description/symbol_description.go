@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/symbol-description
 var SymbolDescriptionRule = rule.Rule{
-	Name: "symbol-description",
+	Name:   "symbol-description",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

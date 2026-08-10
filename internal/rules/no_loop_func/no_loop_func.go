@@ -452,7 +452,8 @@ func (s *RunState) checkForLoopsCore(node *ast.Node) {
 // NoLoopFuncRule disallows function declarations that contain unsafe
 // references to variable(s) inside loop statements.
 var NoLoopFuncRule = rule.Rule{
-	Name: "no-loop-func",
+	Name:   "no-loop-func",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		s := &RunState{
 			Ctx:          ctx,
