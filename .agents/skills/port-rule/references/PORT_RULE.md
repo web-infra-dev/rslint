@@ -330,7 +330,6 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())`, and for "what does this identifier resolve to" use `ctx.Refs.Resolve(node)`, which also resolves symbols declared outside this file (globals/ambient/cross-file) via its checker fallback — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Resolving Identifiers and Collecting References](AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs))
-- `GetOptionsMap` — options parsing (handles both array and map inputs)
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
@@ -407,7 +406,7 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). The framework normalizes options before calling the rule, so write `parseOptions` to take that slice directly, guard its length, and read the first positional option from `options[0]`:
 
 ```go
 Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -417,17 +416,20 @@ Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
-    optsMap := utils.GetOptionsMap(options)
-    if optsMap != nil {
-        // Parse options from optsMap...
+    if len(options) == 0 {
+        return opts
+    }
+    optsMap, _ := options[0].(map[string]any)
+    if value, ok := optsMap["someOption"].(bool); ok {
+        opts.SomeOption = value
     }
     return opts
 }
 ```
 
-`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
+Do not call `rule.NormalizeOptions` inside `Run` or make `parseOptions` accept a bare map. Configuration loading and `rule_tester.ResolveTestCaseOptions` already normalize inputs to `[]any`; the rule should consume that single representation.
 
-For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...), guarding each position with the corresponding length check before access.
 
 #### Options schema
 
@@ -562,12 +564,12 @@ These docstrings are how a reader (or `grep`) confirms a file is doing its assig
 - Use `rule_tester.RunRuleTester` in each test file (one `Test<Name>` function per file is typical; multiple are fine when it improves grouping).
 - Shared fixtures (option-map literals, expected message strings) can live as package-level vars; both files share the same Go package so they compose freely.
 - Invalid cases **MUST** include `Line` and `Column` assertions.
-- Use `map[string]interface{}` to pass options in Go tests.
+- Use `map[string]any` to pass object options in Go tests.
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
-**Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
+**Options coverage — MUST exercise JSON-decoded shapes.** `rule_tester.ResolveTestCaseOptions` normalizes each test case's options to `[]any` and validates them against the rule's schema before `Run` executes. Use JSON-shaped maps and slices in tests; a typed options struct does not model configuration input and will be rejected by an object schema.
 
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). This catches bugs like missing `GetOptionsMap` integration, wrong JSON tag casing, and option-name typos that typed structs silently hide. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both shapes, nil options, empty arrays, malformed values, and nested specifier arrays.
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field uses JSON-shaped values. For a single object option, prefer `map[string]any{...}`; use `[]any{...}` when the rule genuinely has multiple positional options. Both forms reach `Run` as a normalized `[]any`, so do not duplicate a single-object case solely to test bare versus array-wrapped input. These cases catch missing `len(options)` / `options[0]` parsing, wrong key casing, and option-name typos.
 
 **Debug Flags**:
 
