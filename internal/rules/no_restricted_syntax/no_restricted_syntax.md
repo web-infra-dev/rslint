@@ -84,14 +84,22 @@ configurations and in the upstream `no-restricted-syntax` test suite:
   the semantic classes `:statement`, `:expression`, `:declaration`,
   `:function`, and `:pattern`.
 
-### Known differences
+### Known differences from ESLint
 
-- esquery's subject indicator (`!`) is not implemented.
-- The ESTree facade covers standard JavaScript nodes and common TypeScript
-  shapes, but it does not yet expose every TS-ESTree-only node/field or every
-  virtual ESTree wrapper (for example `ClassBody`).
-- Invalid selectors are ignored by the runtime parser; ESLint normally rejects
-  them earlier during configuration validation.
+The following differences may affect an existing ESLint
+`no-restricted-syntax` configuration when it is used with rslint:
+
+- ESLint rejects the configuration when a selector has invalid syntax. rslint
+  currently skips that selector and continues with the remaining selectors, so
+  the restriction expressed by the invalid selector is not enforced.
+- Selectors for standard JavaScript nodes and commonly used TypeScript shapes
+  are supported. A selector that targets a TS-ESTree-only node or field may not
+  match yet. For example, `ClassBody > MethodDefinition` does not match because
+  tsgo does not expose `ClassBody` as a separate AST node. Such selectors can
+  therefore produce fewer diagnostics than the same ESLint configuration.
+- ESLint accepts esquery's `!` subject marker in selector listener names, for
+  example `!IfStatement > BlockStatement`. rslint does not currently support
+  this marker and skips selectors that use it.
 
 ## Original Documentation
 
