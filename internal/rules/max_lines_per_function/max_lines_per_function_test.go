@@ -4,7 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -2061,4 +2065,225 @@ return x + y;
 			},
 		},
 	)
+}
+
+func TestMaxLinesPerFunctionLazyLineStateParity(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&MaxLinesPerFunctionRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `declare function signature(): void;
+(function () { return 1; })();`,
+				Options: map[string]interface{}{"max": 0, "IIFEs": false},
+			},
+			{
+				Code: "function singleLine() { return 1; }",
+				Options: map[string]interface{}{
+					"max":            1,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+			},
+			{
+				Code:    "function split() {\u2028return 1;\u2029}",
+				Options: 3,
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `/** docs */
+function one() { return 1; }`,
+				Options: map[string]interface{}{
+					"max":            0,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'one' has too many lines (1). Maximum allowed is 0.",
+						Line:      2,
+						Column:    1,
+						EndLine:   2,
+						EndColumn: 29,
+					},
+				},
+			},
+			{
+				Code: `declare function signature(): void;
+(function () { return 0; })();
+function short() { return 1; }
+function long() {
+// comment
+
+return 1;
+}`,
+				Options: map[string]interface{}{
+					"max":            2,
+					"IIFEs":          false,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'long' has too many lines (3). Maximum allowed is 2.",
+						Line:      4,
+						Column:    1,
+						EndLine:   8,
+						EndColumn: 2,
+					},
+				},
+			},
+			{
+				Code:    "function split() {\u2028return 1;\u2029}",
+				Options: 2,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'split' has too many lines (3). Maximum allowed is 2.",
+					},
+				},
+			},
+		},
+	)
+}
+
+func TestMaxLinesPerFunctionDisableDirectives(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		code            string
+		wantDiagnostics int
+	}{
+		{
+			name: "scoped block",
+			code: `/* rslint-disable max-lines-per-function */
+function blockDisabled() {}
+/* rslint-enable max-lines-per-function */`,
+		},
+		{
+			name: "next line",
+			code: `/* eslint-disable-next-line max-lines-per-function */
+function lineDisabled() {}`,
+		},
+		{
+			name: "different rule",
+			code: `/* eslint-disable-next-line another-rule */
+function enabled() {}`,
+			wantDiagnostics: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/disable-directive.ts",
+				Path:     "/disable-directive.ts",
+			}, testCase.code, core.ScriptKindTS)
+			node := sourceFile.Statements.Nodes[0]
+			comments := rule.NewCommentStore(sourceFile)
+			diagnostics := 0
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				Comments:       comments,
+				DisableManager: rule.NewDisableManager(sourceFile, comments),
+			}.WithDiagnosticConsumer(
+				MaxLinesPerFunctionRule.Name,
+				rule.SeverityWarning,
+				rule.DiagnosticConsumer{
+					Report: func(rule.RuleDiagnostic) {
+						diagnostics++
+					},
+				},
+			)
+
+			listener := MaxLinesPerFunctionRule.Run(ctx, []any{0})[node.Kind]
+			listener(node)
+			if diagnostics != testCase.wantDiagnostics {
+				t.Fatalf("diagnostics = %d, want %d", diagnostics, testCase.wantDiagnostics)
+			}
+		})
+	}
+}
+
+func TestMaxLinesPerFunctionEditDemandParity(t *testing.T) {
+	const code = "function one() { return 1; }"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, code, core.ScriptKindTS)
+	node := sourceFile.Statements.Nodes[0]
+
+	for _, testCase := range []struct {
+		name   string
+		demand rule.EditDemand
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix", demand: rule.EditDemandAutofix},
+		{name: "suggestions", demand: rule.EditDemandSuggestion},
+		{name: "all edits", demand: rule.EditDemandAll},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			comments := rule.NewCommentStore(sourceFile)
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				Comments:       comments,
+				DisableManager: rule.NewDisableManager(sourceFile, comments),
+			}.WithDiagnosticConsumer(
+				MaxLinesPerFunctionRule.Name,
+				rule.SeverityWarning,
+				rule.DiagnosticConsumer{
+					Demand: testCase.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			)
+
+			listener := MaxLinesPerFunctionRule.Run(ctx, []any{0})[node.Kind]
+			listener(node)
+
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			diagnostic := diagnostics[0]
+			if diagnostic.Range != core.NewTextRange(0, len(code)) {
+				t.Fatalf("range = %v, want [0,%d)", diagnostic.Range, len(code))
+			}
+			if diagnostic.Message.Description != "Function 'one' has too many lines (1). Maximum allowed is 0." {
+				t.Fatalf("message = %q", diagnostic.Message.Description)
+			}
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+				t.Fatalf("unexpected edit artifacts: fixes=%v suggestions=%v", diagnostic.FixesPtr, diagnostic.Suggestions)
+			}
+		})
+	}
+}
+
+func TestIsSingleLineRange(t *testing.T) {
+	for _, testCase := range []struct {
+		name             string
+		text             string
+		startPos, endPos int
+		want             bool
+	}{
+		{name: "ASCII", text: "function f() {}", startPos: 0, endPos: 15, want: true},
+		{name: "range after line break", text: "before\nfunction f() {}", startPos: 7, endPos: 22, want: true},
+		{name: "LF", text: "a\nb", startPos: 0, endPos: 3},
+		{name: "CR", text: "a\rb", startPos: 0, endPos: 3},
+		{name: "line separator", text: "a\u2028b", startPos: 0, endPos: 5},
+		{name: "paragraph separator", text: "a\u2029b", startPos: 0, endPos: 5},
+		{name: "empty", text: "abc", startPos: 1, endPos: 1, want: true},
+		{name: "synthetic start", text: "abc", startPos: -1, endPos: 3},
+		{name: "end past source", text: "abc", startPos: 0, endPos: 4},
+		{name: "reversed", text: "abc", startPos: 2, endPos: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := isSingleLineRange(testCase.text, testCase.startPos, testCase.endPos); got != testCase.want {
+				t.Fatalf("isSingleLineRange(%q, %d, %d) = %v, want %v", testCase.text, testCase.startPos, testCase.endPos, got, testCase.want)
+			}
+		})
+	}
 }

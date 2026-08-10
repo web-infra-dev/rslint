@@ -406,6 +406,27 @@ func TestNoUnreachableLoopExtras(t *testing.T) {
 				},
 			},
 
+			// ---- A `for` incrementor inside a `try` block ----
+			// The incrementor is laid out before the body, so it is one of the
+			// throwable nodes the `try` block forks on even when the body always
+			// leaves the loop abruptly; the `catch` clause and the loop after
+			// the statement stay reachable.
+			{
+				Code: `function f() { try { for (var i = 0;; i++) { break; } return 1; } catch (e) {} for (var v of items) { return 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 22, EndLine: 1, EndColumn: 54},
+					{MessageId: "invalid", Line: 1, Column: 80, EndLine: 1, EndColumn: 114},
+				},
+			},
+			// Without an incrementor the `try` block holds no throwable node,
+			// so nothing reaches the `catch` clause or the code after it.
+			{
+				Code: `function f() { try { for (var i = 0;;) { break; } return 1; } catch (e) {} for (var v of items) { return 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalid", Line: 1, Column: 22, EndLine: 1, EndColumn: 50},
+				},
+			},
+
 			// ---- Labelled jump targets ----
 			{
 				Code: `outer: { for (;;) break outer; }`,

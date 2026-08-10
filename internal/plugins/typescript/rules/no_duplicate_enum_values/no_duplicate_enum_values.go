@@ -99,7 +99,8 @@ func duplicateValueMessage(value enumValue) rule.RuleMessage {
 }
 
 var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
-	Name: "no-duplicate-enum-values",
+	Name:   "no-duplicate-enum-values",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {

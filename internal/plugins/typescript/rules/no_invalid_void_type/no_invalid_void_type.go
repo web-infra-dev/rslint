@@ -1,6 +1,7 @@
 package no_invalid_void_type
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,9 +9,32 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_invalid_void_type.schema.json
+var schemaJSON []byte
+
 type NoInvalidVoidTypeOptions struct {
 	AllowInGenericTypeArguments interface{} `json:"allowInGenericTypeArguments"`
 	AllowAsThisParameter        bool        `json:"allowAsThisParameter"`
+}
+
+func parseOptions(options []any) NoInvalidVoidTypeOptions {
+	opts := NoInvalidVoidTypeOptions{
+		AllowInGenericTypeArguments: true,
+		AllowAsThisParameter:        false,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, exists := optsMap["allowInGenericTypeArguments"]; exists {
+		opts.AllowInGenericTypeArguments = v
+	}
+	if v, exists := optsMap["allowAsThisParameter"]; exists {
+		if b, isBool := v.(bool); isBool {
+			opts.AllowAsThisParameter = b
+		}
+	}
+	return opts
 }
 
 // isAllowInGenericTruthy returns true when allowInGenericTypeArguments is not false
@@ -247,36 +271,10 @@ func hasOverloadSignatures(ctx rule.RuleContext, node *ast.Node) bool {
 }
 
 var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
-	Name: "no-invalid-void-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoInvalidVoidTypeOptions{
-			AllowInGenericTypeArguments: true,
-			AllowAsThisParameter:        false,
-		}
-
-		// Parse options with dual-format support
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if v, exists := optsMap["allowInGenericTypeArguments"]; exists {
-					opts.AllowInGenericTypeArguments = v
-				}
-				if v, exists := optsMap["allowAsThisParameter"]; exists {
-					if b, isBool := v.(bool); isBool {
-						opts.AllowAsThisParameter = b
-					}
-				}
-			}
-		}
+	Name:   "no-invalid-void-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		reportNotReturn := func(node *ast.Node) {
 			msgId := getNotReturnMessageId(opts)

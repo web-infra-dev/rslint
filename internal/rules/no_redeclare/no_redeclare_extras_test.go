@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -458,6 +459,28 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// Export and type-only import wrappers must not hide their declarations.
 			invalidRedeclared("export default function initialize() {} function initialize() {}", "initialize", 1, 50),
 			invalidRedeclared("import type {Model} from './types'; type Model = {};", "Model", 1, 42),
+		},
+	)
+}
+
+func TestNoRedeclareECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoRedeclareRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            "var Promise = 0;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            "var Promise = 0;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Promise", 1, 5)},
+			},
 		},
 	)
 }

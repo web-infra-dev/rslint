@@ -81,26 +81,26 @@ const bar: number = foo()!;
 type Foo = number;
 const foo = (3 + 5) as Foo;
       `,
-			Options: NoUnnecessaryTypeAssertionOptions{TypesToIgnore: []string{"Foo"}},
+			Options: map[string]interface{}{"typesToIgnore": []interface{}{"Foo"}},
 		},
 		{
 			Code:    "const foo = (3 + 5) as any;",
-			Options: NoUnnecessaryTypeAssertionOptions{TypesToIgnore: []string{"any"}},
+			Options: map[string]interface{}{"typesToIgnore": []interface{}{"any"}},
 		},
 		{
 			Code:    "(Syntax as any).ArrayExpression = 'foo';",
-			Options: NoUnnecessaryTypeAssertionOptions{TypesToIgnore: []string{"any"}},
+			Options: map[string]interface{}{"typesToIgnore": []interface{}{"any"}},
 		},
 		{
 			Code:    "const foo = (3 + 5) as string;",
-			Options: NoUnnecessaryTypeAssertionOptions{TypesToIgnore: []string{"string"}},
+			Options: map[string]interface{}{"typesToIgnore": []interface{}{"string"}},
 		},
 		{
 			Code: `
 type Foo = number;
 const foo = <Foo>(3 + 5);
       `,
-			Options: NoUnnecessaryTypeAssertionOptions{TypesToIgnore: []string{"Foo"}},
+			Options: map[string]interface{}{"typesToIgnore": []interface{}{"Foo"}},
 		},
 		{Code: `
 let bar: number;
@@ -405,7 +405,7 @@ foo!;
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:    "const a = `a` as const;",
-			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Options: map[string]interface{}{"checkLiteralConstAssertions": true},
 			Output:  []string{"const a = `a`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -416,7 +416,7 @@ foo!;
 		},
 		{
 			Code:    "const a = 'a' as const;",
-			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Options: map[string]interface{}{"checkLiteralConstAssertions": true},
 			Output:  []string{"const a = 'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -427,7 +427,7 @@ foo!;
 		},
 		{
 			Code:    "const a = <const>'a';",
-			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Options: map[string]interface{}{"checkLiteralConstAssertions": true},
 			Output:  []string{"const a = 'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -1330,7 +1330,7 @@ class T {
   readonly a = 'a' as const;
 }
       `,
-			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Options: map[string]interface{}{"checkLiteralConstAssertions": true},
 			Output: []string{`
 class T {
   readonly a = 'a';
@@ -1457,7 +1457,7 @@ enum T {
 declare const a: T.Value1;
 const b = a as const;
       `,
-			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Options: map[string]interface{}{"checkLiteralConstAssertions": true},
 			Output: []string{`
 enum T {
   Value1,

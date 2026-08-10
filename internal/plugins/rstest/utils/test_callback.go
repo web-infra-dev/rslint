@@ -10,35 +10,6 @@ type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
-	fnCalls            *rstestFnCallCache
-}
-
-// rstestFnCallCache memoizes call parsing so that the collection walk and the
-// rule traversal that follows it do not each parse every call expression.
-type rstestFnCallCache struct {
-	ctx    rule.RuleContext
-	parsed map[*ast.Node]*ParsedRstestFnCall
-}
-
-func (cache *rstestFnCallCache) parse(node *ast.Node) *ParsedRstestFnCall {
-	if cache == nil {
-		return nil
-	}
-	if parsed, ok := cache.parsed[node]; ok {
-		return parsed
-	}
-	parsed := ParseRstestFnCallWithOfficialExtensions(node, cache.ctx)
-	cache.parsed[node] = parsed
-	return parsed
-}
-
-// ParseFnCall parses node the way CollectRstestTestCallbacks did, reusing the
-// cached result when the collection walk already visited node.
-func (callbacks RstestTestCallbacks) ParseFnCall(node *ast.Node) *ParsedRstestFnCall {
-	if callbacks.fnCalls == nil {
-		return nil
-	}
-	return callbacks.fnCalls.parse(node)
 }
 
 type rstestCallbackInfo struct {
@@ -46,45 +17,39 @@ type rstestCallbackInfo struct {
 	name         string
 }
 
-func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
-	result := RstestTestCallbacks{
+func newRstestTestCallbacks() RstestTestCallbacks {
+	return RstestTestCallbacks{
 		Functions:          map[*ast.Node]bool{},
 		ContextReceivers:   map[*ast.Symbol]bool{},
 		ContextExpectNames: map[*ast.Symbol]bool{},
-		fnCalls: &rstestFnCallCache{
-			ctx:    ctx,
-			parsed: map[*ast.Node]*ParsedRstestFnCall{},
-		},
 	}
+}
+
+func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallbacks {
+	ctx := analysis.ctx
+	result := newRstestTestCallbacks()
 	pending := map[string][]*ParsedRstestFnCall{}
 
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node.Kind == ast.KindCallExpression {
-			parsed := result.fnCalls.parse(node)
-			if parsed != nil && parsed.Kind == RstestFnTypeTest {
-				info := resolveRstestTestCallback(ctx, node.AsCallExpression())
-				if info.functionNode != nil {
-					recordRstestCallback(ctx, &result, info.functionNode, parsed)
-				} else if info.name != "" {
-					pending[info.name] = append(pending[info.name], parsed)
-				}
+	for _, node := range analysis.calls {
+		parsed := analysis.ParseTestCall(node)
+		if parsed != nil {
+			info := resolveRstestTestCallback(ctx, node.AsCallExpression())
+			if info.functionNode != nil {
+				recordRstestCallback(analysis, &result, info.functionNode, parsed)
+			} else if info.name != "" {
+				pending[info.name] = append(pending[info.name], parsed)
 			}
 		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
 	}
 
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-	if len(pending) > 0 {
-		resolvePendingRstestCallbacks(ctx, &result, pending)
+	for name, parsedCalls := range pending {
+		function := analysis.functions[name]
+		if function == nil {
+			continue
+		}
+		for _, parsed := range parsedCalls {
+			recordRstestCallback(analysis, &result, function, parsed)
+		}
 	}
 	return result
 }
@@ -154,63 +119,13 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	return rstestCallbackInfo{}
 }
 
-func resolvePendingRstestCallbacks(
-	ctx rule.RuleContext,
-	result *RstestTestCallbacks,
-	pending map[string][]*ParsedRstestFnCall,
-) {
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
-		name := ""
-		var function *ast.Node
-		switch node.Kind {
-		case ast.KindFunctionDeclaration:
-			declaration := node.AsFunctionDeclaration()
-			if declaration != nil && declaration.Name() != nil {
-				name = declaration.Name().Text()
-				function = node
-			}
-		case ast.KindVariableDeclaration:
-			declaration := node.AsVariableDeclaration()
-			if declaration != nil && declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier {
-				name = declaration.Name().AsIdentifier().Text
-				if declaration.Initializer != nil {
-					initializer := ast.SkipParentheses(declaration.Initializer)
-					if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-						function = initializer
-					}
-				}
-			}
-		}
-
-		if function != nil {
-			for _, parsed := range pending[name] {
-				recordRstestCallback(ctx, result, function, parsed)
-			}
-			delete(pending, name)
-		}
-
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-}
-
 func recordRstestCallback(
-	ctx rule.RuleContext,
+	analysis *RstestCallAnalysis,
 	result *RstestTestCallbacks,
 	function *ast.Node,
 	parsed *ParsedRstestFnCall,
 ) {
+	ctx := analysis.ctx
 	if function == nil {
 		return
 	}
@@ -229,12 +144,16 @@ func recordRstestCallback(
 		return
 	}
 	parameter := parameters[contextIndex].AsParameterDeclaration()
-	if parameter == nil || parameter.Name() == nil || ctx.TypeChecker == nil {
+	if parameter == nil || parameter.Name() == nil {
 		return
 	}
 	name := parameter.Name()
 	switch name.Kind {
 	case ast.KindIdentifier:
+		analysis.addExpectRootName(name.AsIdentifier().Text)
+		if ctx.TypeChecker == nil {
+			return
+		}
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
 			result.ContextReceivers[symbol] = true
 		}
@@ -260,6 +179,10 @@ func recordRstestCallback(
 				}
 			}
 			if propertyName != "expect" {
+				continue
+			}
+			analysis.addExpectRootName(binding.Name().AsIdentifier().Text)
+			if ctx.TypeChecker == nil {
 				continue
 			}
 			if symbol := ctx.TypeChecker.GetSymbolAtLocation(binding.Name()); symbol != nil {

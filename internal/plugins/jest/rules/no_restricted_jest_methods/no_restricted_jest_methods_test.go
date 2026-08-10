@@ -167,6 +167,28 @@ jest.advanceTimersByTime();
 					},
 				},
 			},
+			// The reported range starts at the first member entry — the method
+			// name, since the `jest` head is not a member entry — whose Pos()
+			// includes leading trivia. Without trimming these report from the
+			// whitespace right after the dot.
+			{
+				Code: `jest. /* c */ advanceTimersByTime();`,
+				Options: []interface{}{
+					map[string]interface{}{"advanceTimersByTime": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedJestMethod", Line: 1, Column: 15, EndColumn: 34},
+				},
+			},
+			{
+				Code: "jest.\n  advanceTimersByTime();",
+				Options: []interface{}{
+					map[string]interface{}{"advanceTimersByTime": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedJestMethod", Line: 2, Column: 3, EndLine: 2, EndColumn: 22},
+				},
+			},
 		},
 	)
 }

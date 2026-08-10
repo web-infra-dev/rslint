@@ -259,7 +259,7 @@ func (t *objectTracker) isPristineGlobal(node *ast.Node, name string) bool {
 	if utils.IsShadowed(node, name) {
 		return false
 	}
-	if t.ctx.Globals[name] == utils.GlobalAccessOff {
+	if !t.ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
 	return !t.globals.writtenBefore(name, node.Pos())

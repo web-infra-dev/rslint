@@ -1,8 +1,9 @@
 package prefer_to_have_been_called
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -47,8 +48,18 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 					return
 				}
 
-				matcherReceiver, matcherParent := jestUtils.GetAccessorReceiverAndParent(jestFnCall.MatcherEntry)
-				if matcherParent == nil || matcherReceiver == nil {
+				reportNode := node
+				if jestFnCall.MatcherEntry != nil && jestFnCall.MatcherEntry.Node != nil {
+					reportNode = jestFnCall.MatcherEntry.Node
+				}
+				message := buildPreferMatcherErrorMessage()
+				reportWithoutFix := func() {
+					ctx.ReportNode(reportNode, message)
+				}
+
+				_, matcherAccessor := jestUtils.GetAccessorReceiverAndParent(jestFnCall.MatcherEntry)
+				if matcherAccessor == nil {
+					reportWithoutFix()
 					return
 				}
 
@@ -60,27 +71,59 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 					}
 				}
 
-				replaceStart := matcherReceiver.End()
+				fixes := make([]rule.RuleFix, 0, 4)
+				matcherFix, ok := jestUtils.ReplaceMemberNameFix(
+					ctx,
+					jestFnCall.MatcherEntry,
+					"toHaveBeenCalled",
+				)
+				if !ok {
+					reportWithoutFix()
+					return
+				}
+				fixes = append(fixes, matcherFix)
+
+				callFix, ok := jestUtils.ReplaceCallSuffixFix(ctx.SourceFile, node, "()")
+				if !ok {
+					reportWithoutFix()
+					return
+				}
+				fixes = append(fixes, callFix)
+
 				if notModifier != nil {
-					notReceiver, _ := jestUtils.GetAccessorReceiverAndParent(notModifier)
-					if notReceiver == nil {
+					notIndex := slices.IndexFunc(
+						jestFnCall.MemberEntries,
+						func(entry jestUtils.ParsedJestFnMemberEntry) bool {
+							return entry.Node == notModifier.Node
+						},
+					)
+					removeNotFixes, ok := jestUtils.RemoveMemberAccessorFixes(
+						ctx,
+						jestFnCall.MemberEntries,
+						notIndex,
+					)
+					if !ok {
+						reportWithoutFix()
 						return
 					}
-					replaceStart = notReceiver.End()
-				}
-
-				replacementMatcher := ".not.toHaveBeenCalled"
-				if notModifier != nil {
-					replacementMatcher = ".toHaveBeenCalled"
+					fixes = append(fixes, removeNotFixes...)
+				} else {
+					insertNotFix, ok := jestUtils.InsertMemberBeforeAccessorFix(
+						ctx,
+						jestFnCall.MatcherEntry,
+						"not",
+					)
+					if !ok {
+						reportWithoutFix()
+						return
+					}
+					fixes = append(fixes, insertNotFix)
 				}
 
 				ctx.ReportNodeWithFixes(
-					jestFnCall.MatcherEntry.Node,
-					buildPreferMatcherErrorMessage(),
-					rule.RuleFixReplaceRange(
-						core.NewTextRange(replaceStart, node.End()),
-						replacementMatcher+"()",
-					),
+					reportNode,
+					message,
+					fixes...,
 				)
 			},
 		}

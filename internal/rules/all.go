@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
+	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
@@ -128,6 +129,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
@@ -161,6 +163,7 @@ func GetAllRules() []rule.Rule {
 		array_callback_return.ArrayCallbackReturnRule,
 		arrow_body_style.ArrowBodyStyleRule,
 		complexity.ComplexityRule,
+		consistent_return.ConsistentReturnRule,
 		constructor_super.ConstructorSuperRule,
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
@@ -301,6 +304,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_catch.NoUselessCatchRule,
 		no_useless_escape.NoUselessEscapeRule,
 		no_useless_rename.NoUselessRenameRule,
+		no_useless_return.NoUselessReturnRule,
 		no_useless_constructor.NoUselessConstructorRule,
 		no_prototype_builtins.NoPrototypeBuiltinsRule,
 		require_await.RequireAwaitRule,

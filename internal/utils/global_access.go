@@ -8,8 +8,7 @@ type GlobalAccess uint8
 
 const (
 	// GlobalAccessUnset means no config entry or comment mentions the name.
-	// Callers fall back to whatever they already know about it, e.g.
-	// IsECMAScriptGlobal.
+	// Callers fall back to the language-provided access for the name.
 	GlobalAccessUnset GlobalAccess = iota
 	// GlobalAccessOff removes the name from the global scope, including
 	// built-ins that would otherwise be declared.

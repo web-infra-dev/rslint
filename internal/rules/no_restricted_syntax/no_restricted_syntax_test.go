@@ -1,6 +1,8 @@
 package no_restricted_syntax
 
 import (
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -923,4 +925,193 @@ func TestNoRestrictedSyntaxRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoRestrictedSyntaxOptimizedDispatch(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `class C {}`,
+				Options: []interface{}{
+					"ClassDeclaration[superClass.name='Base']",
+					"ClassDeclaration[superClass.name='Other']",
+				},
+			},
+			{
+				Code: `let value;`,
+				Options: []interface{}{
+					"VariableDeclarator[init.name='foo']",
+					"VariableDeclarator[init.name='bar']",
+				},
+			},
+			{
+				Code: `value instanceof CustomEvent;`,
+				Options: []interface{}{
+					`BinaryExpression[operator='instanceof'][right.name=/^HTML\w+/]`,
+					`BinaryExpression[operator='instanceof'][right.name=/^SVG\w+/]`,
+				},
+			},
+			{
+				Code: `document['body'];`,
+				Options: []interface{}{
+					`MemberExpression[property.name='body']`,
+					`MemberExpression[property.name='head']`,
+				},
+			},
+			{
+				Code:    `new Promise(resolve => resolve());`,
+				Options: []interface{}{`NewExpression[callee.object.name='Intl']`},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `foo;`,
+				Options: []interface{}{
+					map[string]interface{}{"selector": `Identifier[name=/^f/]`, "message": "regex start"},
+					map[string]interface{}{"selector": `Identifier[name='foo']`, "message": "exact"},
+					map[string]interface{}{"selector": `Identifier[name=/o$/]`, "message": "regex end"},
+					map[string]interface{}{"selector": `Identifier[name='bar']`, "message": "other exact"},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "regex start"},
+					{MessageId: "restrictedSyntax", Message: "exact"},
+					{MessageId: "restrictedSyntax", Message: "regex end"},
+				},
+			},
+			{
+				Code: `foo();`,
+				Options: []interface{}{
+					`CallExpression[callee.property.name='query']`,
+					map[string]interface{}{"selector": `CallExpression[callee.name=/^foo$/]`, "message": "fallback"},
+					`CallExpression[callee.property.name='find']`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "fallback"},
+				},
+			},
+			{
+				Code: `'foo';`,
+				Options: []interface{}{
+					`Literal[value='foo']`,
+					`Literal[value='bar']`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'Literal[value='foo']' is not allowed."},
+				},
+			},
+			{
+				Code: `document.body;`,
+				Options: []interface{}{
+					map[string]interface{}{
+						"selector": `MemberExpression[object.name='document'][property.name='body']`,
+						"message":  "first duplicate",
+					},
+					map[string]interface{}{
+						"selector": `MemberExpression[object.name='document'][property.name='body']`,
+						"message":  "second duplicate",
+					},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "first duplicate"},
+					{MessageId: "restrictedSyntax", Message: "second duplicate"},
+				},
+			},
+			{
+				Code: `value instanceof HTMLDivElement;`,
+				Options: []interface{}{
+					`BinaryExpression[operator='instanceof'][right.name=/^HTML\w+/]`,
+					`BinaryExpression[operator='instanceof'][right.name=/^SVG\w+/]`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "restrictedSyntax",
+						Message:   "Using 'BinaryExpression[operator='instanceof'][right.name=/^HTML\\w+/]' is not allowed.",
+					},
+				},
+			},
+			{
+				Code:    `new Intl.DateTimeFormat();`,
+				Options: []interface{}{`NewExpression[callee.object.name='Intl']`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "restrictedSyntax",
+						Message:   "Using 'NewExpression[callee.object.name='Intl']' is not allowed.",
+					},
+				},
+			},
+		},
+	)
+}
+
+func TestNoRestrictedSyntaxDispatchPlanning(t *testing.T) {
+	binaryEntries := []ruleEntry{
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='MouseEvent']`),
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name=/^HTML\w+/]`),
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name=/^SVG\w+/]`),
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='KeyboardEvent']`),
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='PointerEvent']`),
+		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='DragEvent']`),
+	}
+	binaryBucket := buildRuleBucket(binaryEntries)
+	if binaryBucket.dispatch == nil || len(binaryBucket.dispatch.path) != 1 || binaryBucket.dispatch.path[0] != "operator" {
+		t.Fatalf("binary dispatch path is %v, want operator", binaryBucket.dispatch)
+	}
+
+	singleBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`NewExpression[callee.object.name='Intl']`),
+	})
+	if singleBucket.dispatch == nil || len(singleBucket.dispatch.path) != 3 ||
+		singleBucket.dispatch.path[0] != "callee" ||
+		singleBucket.dispatch.path[1] != "object" ||
+		singleBucket.dispatch.path[2] != "name" {
+		t.Fatalf("single-selector dispatch path is %v, want callee.object.name", singleBucket.dispatch)
+	}
+
+	unsupportedBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`Literal[value='text']`),
+	})
+	if unsupportedBucket.dispatch != nil {
+		t.Fatalf("unsupported single-selector path unexpectedly built dispatch %v", unsupportedBucket.dispatch)
+	}
+}
+
+func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
+	options := []any{
+		"Identifier[name='target']",
+		"Identifier[name='other']",
+	}
+	want := cachedRulePlan(options)
+
+	var waitGroup sync.WaitGroup
+	for range 32 {
+		waitGroup.Go(func() {
+			if got := cachedRulePlan(options); got != want {
+				t.Errorf("concurrent cache lookup returned plan %p, want %p", got, want)
+			}
+		})
+	}
+	waitGroup.Wait()
+
+	anchors := make([][]any, 0, maxCachedRulePlans+16)
+	for index := range maxCachedRulePlans + 16 {
+		entryOptions := []any{"Identifier[name='entry" + strconv.Itoa(index) + "']"}
+		anchors = append(anchors, entryOptions)
+		cachedRulePlan(entryOptions)
+	}
+	if len(anchors) != maxCachedRulePlans+16 {
+		t.Fatal("cache anchors were not retained")
+	}
+
+	rulePlanCache.RLock()
+	defer rulePlanCache.RUnlock()
+	if len(rulePlanCache.entries) > maxCachedRulePlans {
+		t.Fatalf("rule plan cache has %d entries, want at most %d", len(rulePlanCache.entries), maxCachedRulePlans)
+	}
+	if len(rulePlanCache.order) != len(rulePlanCache.entries) {
+		t.Fatalf("cache order has %d entries for %d plans", len(rulePlanCache.order), len(rulePlanCache.entries))
+	}
 }

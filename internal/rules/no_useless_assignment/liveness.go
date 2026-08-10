@@ -1,5 +1,7 @@
 package no_useless_assignment
 
+// cspell:ignore worklist
+
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 
@@ -19,9 +21,8 @@ const (
 )
 
 type event struct {
-	kind   eventKind
-	sym    *ast.Symbol
-	assign *assignment
+	kind eventKind
+	sym  *ast.Symbol
 }
 
 type block = cfg.Block[event]
@@ -39,7 +40,12 @@ type writeSite struct {
 type assignment struct {
 	sym        *ast.Symbol
 	identifier *ast.Node
-	sites      []writeSite
+	// Most writes occur at exactly one CFG site. A finally block is copied for
+	// each completion path, so retain only those uncommon additional sites in a
+	// slice instead of allocating one for every assignment.
+	site            writeSite
+	additionalSites []writeSite
+	dead            bool
 	// silent marks an assignment that still overwrites the variable but is
 	// never reported, because it sits in a `try` block.
 	silent bool
@@ -47,21 +53,32 @@ type assignment struct {
 
 // hooks turns the graph builder's reference positions into events. An
 // identifier absent from both maps belongs to a variable this code path does
-// not track.
+// not track, and a reference in an unreachable block belongs to code that never
+// runs — neither says anything about the value an assignment leaves behind.
 func hooks(readNodes map[*ast.Node]*ast.Symbol, assignByIdent map[*ast.Node]*assignment) cfg.Hooks[event] {
 	return cfg.Hooks[event]{
 		Read: func(b *cfg.Builder[event], node *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			if sym, ok := readNodes[node]; ok {
 				b.Emit(event{kind: eventRead, sym: sym})
 			}
 		},
 		Write: func(b *cfg.Builder[event], node *ast.Node) {
+			if !b.Current().Reachable {
+				return
+			}
 			a, ok := assignByIdent[node]
 			if !ok {
 				return
 			}
-			if blk, index := b.Emit(event{kind: eventWrite, sym: a.sym, assign: a}); blk != nil {
-				a.sites = append(a.sites, writeSite{blk: blk, index: index})
+			blk, index := b.Emit(event{kind: eventWrite, sym: a.sym})
+			site := writeSite{blk: blk, index: index}
+			if a.site.blk == nil {
+				a.site = site
+			} else {
+				a.additionalSites = append(a.additionalSites, site)
 			}
 		},
 	}
@@ -76,33 +93,120 @@ type blockState struct {
 	liveOut bool
 }
 
-// deadWrites reports, per assignment, whether every site of that assignment is
-// dead — no read of the variable is reachable before the value is overwritten.
-func deadWrites(graph *cfg.Graph[event], assignments []*assignment) map[*assignment]bool {
+// markDeadWrites records, per assignment, whether every site of that assignment
+// is dead — no read of the variable is reachable before the value is
+// overwritten.
+func markDeadWrites(graph *cfg.Graph[event], assignments []*assignment) {
 	bySymbol := make(map[*ast.Symbol][]*assignment)
 	for _, a := range assignments {
 		bySymbol[a.sym] = append(bySymbol[a.sym], a)
 	}
 
 	states := make([]blockState, len(graph.Blocks))
-	dead := make(map[*assignment]bool, len(assignments))
-	for sym, symAssignments := range bySymbol {
-		computeLiveness(graph.Blocks, states, sym)
-		for _, a := range symAssignments {
-			if len(a.sites) == 0 {
-				continue
-			}
-			isDead := true
-			for _, site := range a.sites {
-				if liveAfter(sym, site, states) {
-					isDead = false
-					break
-				}
-			}
-			dead[a] = isDead
+	if len(bySymbol) == 1 {
+		for sym, symAssignments := range bySymbol {
+			computeLiveness(graph.Blocks, states, sym)
+			markSymbolDead(symAssignments, states)
+		}
+	} else {
+		offsets, predecessors, queue := buildPredecessors(graph.Blocks)
+		for sym, symAssignments := range bySymbol {
+			computeLivenessWithWorklist(graph.Blocks, states, sym, offsets, predecessors, queue)
+			markSymbolDead(symAssignments, states)
 		}
 	}
-	return dead
+}
+
+func markSymbolDead(assignments []*assignment, states []blockState) {
+	for _, a := range assignments {
+		if a.site.blk == nil {
+			continue
+		}
+		isDead := !liveAfter(a.sym, a.site, states)
+		for _, site := range a.additionalSites {
+			if liveAfter(a.sym, site, states) {
+				isDead = false
+				break
+			}
+		}
+		a.dead = isDead
+	}
+}
+
+// buildPredecessors stores the reachable successor edges in reverse as a
+// compact adjacency list. scratch is reused as the per-symbol work queue.
+func buildPredecessors(blocks []*block) (offsets []int, predecessors []int, scratch []int) {
+	offsets = make([]int, len(blocks)+1)
+	for _, blk := range blocks {
+		for _, successor := range blk.Successors {
+			if successor.Reachable {
+				offsets[successor.Index()+1]++
+			}
+		}
+	}
+	for i := 1; i < len(offsets); i++ {
+		offsets[i] += offsets[i-1]
+	}
+
+	predecessors = make([]int, offsets[len(blocks)])
+	scratch = make([]int, len(blocks))
+	copy(scratch, offsets[:len(blocks)])
+	for predecessor, blk := range blocks {
+		for _, successor := range blk.Successors {
+			if !successor.Reachable {
+				continue
+			}
+			index := successor.Index()
+			predecessors[scratch[index]] = predecessor
+			scratch[index]++
+		}
+	}
+	return offsets, predecessors, scratch[:0]
+}
+
+// computeLivenessWithWorklist propagates liveness only through blocks whose
+// live-in state becomes true. This is equivalent to computeLiveness's monotone
+// fixed point, but avoids rescanning the whole graph for every tracked symbol.
+func computeLivenessWithWorklist(
+	blocks []*block,
+	states []blockState,
+	sym *ast.Symbol,
+	offsets []int,
+	predecessors []int,
+	queue []int,
+) {
+	queue = queue[:0]
+	for i, blk := range blocks {
+		var state blockState
+		for _, e := range blk.Events {
+			if e.sym != sym {
+				continue
+			}
+			if e.kind == eventRead {
+				state.use = true
+			} else {
+				state.def = true
+			}
+			break
+		}
+		state.liveIn = state.use
+		states[i] = state
+		if state.liveIn {
+			queue = append(queue, i)
+		}
+	}
+
+	for head := 0; head < len(queue); head++ {
+		blockIndex := queue[head]
+		for _, predecessor := range predecessors[offsets[blockIndex]:offsets[blockIndex+1]] {
+			state := &states[predecessor]
+			state.liveOut = true
+			if !state.liveIn && !state.def {
+				state.liveIn = true
+				queue = append(queue, predecessor)
+			}
+		}
+	}
 }
 
 // computeLiveness runs a backward liveness dataflow for one variable, filling
@@ -135,6 +239,11 @@ func computeLiveness(blocks []*block, states []blockState, sym *ast.Symbol) {
 			state := &states[i]
 			liveOut := false
 			for _, successor := range blocks[i].Successors {
+				if !successor.Reachable {
+					// The code after an abrupt exit never runs, so a read in
+					// it keeps nothing alive.
+					continue
+				}
 				if states[successor.Index()].liveIn {
 					liveOut = true
 					break

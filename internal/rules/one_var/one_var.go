@@ -182,17 +182,13 @@ func optsKey(kind string) string {
 	return kind
 }
 
-// isRequireDecl reports whether the declarator's initializer is a `require(...)`
+// isRequireInitializer reports whether an initializer is a `require(...)`
 // call. Mirrors ESLint's `isRequire` (which looks at `init.callee.name` directly,
 // effectively ignoring parens because espree strips them). tsgo preserves
 // parens as explicit nodes, so we apply SkipParentheses on both the initializer
 // and the callee to match the effective ESLint behavior.
-func isRequireDecl(decl *ast.Node) bool {
-	vd := decl.AsVariableDeclaration()
-	if vd == nil || vd.Initializer == nil {
-		return false
-	}
-	init := ast.SkipParentheses(vd.Initializer)
+func isRequireInitializer(initializer *ast.Node) bool {
+	init := ast.SkipParentheses(initializer)
 	if init == nil || init.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -225,9 +221,9 @@ func collectDeclarationStats(decls []*ast.Node, inspectRequires bool) declaratio
 			stats.uninitialized++
 		} else {
 			stats.initialized++
-		}
-		if inspectRequires && isRequireDecl(d) {
-			stats.requires++
+			if inspectRequires && isRequireInitializer(vd.Initializer) {
+				stats.requires++
+			}
 		}
 	}
 	return stats
@@ -850,65 +846,76 @@ var OneVarRule = rule.Rule{
 			}
 		}
 
-		startBlock := func(*ast.Node) {
-			if needsBlockScope {
-				blockStack = append(blockStack, blockScope{})
-			}
+		listenerCount := 1
+		if needsVarScope {
+			listenerCount += 16
 		}
-		endBlock := func(*ast.Node) {
-			if needsBlockScope && len(blockStack) > 0 {
-				blockStack = blockStack[:len(blockStack)-1]
-			}
+		if needsBlockScope {
+			listenerCount += 10
 		}
-		startFunction := func(*ast.Node) {
-			if needsVarScope {
+		listeners := make(rule.RuleListeners, listenerCount)
+		listeners[ast.KindVariableDeclarationList] = checkDeclList
+
+		if needsVarScope {
+			// Every function body that can contain declarations is visited as a
+			// KindBlock below. Concise arrow bodies cannot contain declarations,
+			// so function boundaries only need to maintain the var scope.
+			startFunction := func(*ast.Node) {
 				funcStack = append(funcStack, funcScope{})
 			}
-			startBlock(nil)
-		}
-		endFunction := func(*ast.Node) {
-			if needsVarScope && len(funcStack) > 0 {
-				funcStack = funcStack[:len(funcStack)-1]
+			endFunction := func(*ast.Node) {
+				if len(funcStack) > 0 {
+					funcStack = funcStack[:len(funcStack)-1]
+				}
 			}
-			endBlock(nil)
+
+			listeners[ast.KindFunctionDeclaration] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindFunctionDeclaration)] = endFunction
+			listeners[ast.KindFunctionExpression] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindFunctionExpression)] = endFunction
+			listeners[ast.KindArrowFunction] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = endFunction
+			listeners[ast.KindMethodDeclaration] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindMethodDeclaration)] = endFunction
+			listeners[ast.KindGetAccessor] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindGetAccessor)] = endFunction
+			listeners[ast.KindSetAccessor] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindSetAccessor)] = endFunction
+			listeners[ast.KindConstructor] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindConstructor)] = endFunction
+			listeners[ast.KindClassStaticBlockDeclaration] = startFunction
+			listeners[rule.ListenerOnExit(ast.KindClassStaticBlockDeclaration)] = endFunction
 		}
 
-		return rule.RuleListeners{
-			ast.KindFunctionDeclaration:                              startFunction,
-			rule.ListenerOnExit(ast.KindFunctionDeclaration):         endFunction,
-			ast.KindFunctionExpression:                               startFunction,
-			rule.ListenerOnExit(ast.KindFunctionExpression):          endFunction,
-			ast.KindArrowFunction:                                    startFunction,
-			rule.ListenerOnExit(ast.KindArrowFunction):               endFunction,
-			ast.KindMethodDeclaration:                                startFunction,
-			rule.ListenerOnExit(ast.KindMethodDeclaration):           endFunction,
-			ast.KindGetAccessor:                                      startFunction,
-			rule.ListenerOnExit(ast.KindGetAccessor):                 endFunction,
-			ast.KindSetAccessor:                                      startFunction,
-			rule.ListenerOnExit(ast.KindSetAccessor):                 endFunction,
-			ast.KindConstructor:                                      startFunction,
-			rule.ListenerOnExit(ast.KindConstructor):                 endFunction,
-			ast.KindClassStaticBlockDeclaration:                      startFunction,
-			rule.ListenerOnExit(ast.KindClassStaticBlockDeclaration): endFunction,
+		if needsBlockScope {
+			startBlock := func(*ast.Node) {
+				blockStack = append(blockStack, blockScope{})
+			}
+			endBlock := func(*ast.Node) {
+				if len(blockStack) > 0 {
+					blockStack = blockStack[:len(blockStack)-1]
+				}
+			}
 
-			ast.KindBlock:                                startBlock,
-			rule.ListenerOnExit(ast.KindBlock):           endBlock,
-			ast.KindForStatement:                         startBlock,
-			rule.ListenerOnExit(ast.KindForStatement):    endBlock,
-			ast.KindForInStatement:                       startBlock,
-			rule.ListenerOnExit(ast.KindForInStatement):  endBlock,
-			ast.KindForOfStatement:                       startBlock,
-			rule.ListenerOnExit(ast.KindForOfStatement):  endBlock,
-			ast.KindSwitchStatement:                      startBlock,
-			rule.ListenerOnExit(ast.KindSwitchStatement): endBlock,
-			// NOTE: TypeScript `namespace N { ... }` and `declare module 'x' { ... }`
-			// have a TSModuleBlock body in the AST, but ESLint's one-var rule
-			// does NOT register any listener for it — declarations inside live
-			// in the enclosing function scope. Mirror upstream by NOT pushing
-			// a new scope on ModuleBlock entry. (Verified against ESLint v10.2.1
-			// on `namespace A { var a } namespace B { var a }` reports combine.)
-
-			ast.KindVariableDeclarationList: checkDeclList,
+			listeners[ast.KindBlock] = startBlock
+			listeners[rule.ListenerOnExit(ast.KindBlock)] = endBlock
+			listeners[ast.KindForStatement] = startBlock
+			listeners[rule.ListenerOnExit(ast.KindForStatement)] = endBlock
+			listeners[ast.KindForInStatement] = startBlock
+			listeners[rule.ListenerOnExit(ast.KindForInStatement)] = endBlock
+			listeners[ast.KindForOfStatement] = startBlock
+			listeners[rule.ListenerOnExit(ast.KindForOfStatement)] = endBlock
+			listeners[ast.KindSwitchStatement] = startBlock
+			listeners[rule.ListenerOnExit(ast.KindSwitchStatement)] = endBlock
 		}
+
+		// NOTE: TypeScript `namespace N { ... }` and `declare module 'x' { ... }`
+		// have a TSModuleBlock body in the AST, but ESLint's one-var rule
+		// does NOT register any listener for it — declarations inside live
+		// in the enclosing function scope. Mirror upstream by NOT pushing
+		// a new scope on ModuleBlock entry. (Verified against ESLint v10.2.1
+		// on `namespace A { var a } namespace B { var a }` reports combine.)
+
+		return listeners
 	},
 }

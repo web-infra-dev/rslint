@@ -10,7 +10,11 @@ import { Rslint } from './Rslint';
 import { setupStatusBar } from './statusBar';
 import { registerCommands } from './commands';
 import { WorkspaceDocumentRouter } from './WorkspaceDocumentRouter';
-import { WorkspaceRslintCoordinator } from './WorkspaceRslintCoordinator';
+import { CoreResolver } from './CoreResolver';
+import { RuntimeManager } from './RuntimeManager';
+
+const CORE_TOPOLOGY_GLOB =
+  '**/{package-lock.json,pnpm-lock.yaml,yarn.lock,node_modules/@rslint/core/package.json}';
 
 /** Extension-wide owner for shared UI, channels and workspace runtimes. */
 export class Extension {
@@ -18,18 +22,17 @@ export class Extension {
   private readonly globalDisposables: Disposable[] = [];
   private outputChannel: OutputChannel | undefined;
   private lspOutputChannel: OutputChannel | undefined;
-  private workspaceFolderListener: Disposable | undefined;
   private router: WorkspaceDocumentRouter | undefined;
-  private coordinator: WorkspaceRslintCoordinator | undefined;
+  private runtimeManager: RuntimeManager | undefined;
   private closePromise: Promise<void> | undefined;
   private activated = false;
 
-  constructor(private readonly context: ExtensionContext) {
+  constructor(context: ExtensionContext) {
     Logger.setDefaultLogLevel(context);
     this.logger = new Logger('Rslint (extension)').useDefaultLogLevel();
   }
 
-  public async activate(): Promise<void> {
+  public activate(): void {
     if (this.activated) return;
     this.activated = true;
     this.logger.info('Rslint extension activating...');
@@ -42,13 +45,14 @@ export class Extension {
       window.createOutputChannel('Rslint Language Server(LSP)'));
 
     const router = new WorkspaceDocumentRouter();
-    const coordinator = new WorkspaceRslintCoordinator(
+    const runtimeManager = new RuntimeManager(
       router,
-      (workspaceFolder, rootKey) =>
+      new CoreResolver(),
+      (resolved) =>
         new Rslint({
-          rootKey,
-          extensionUri: this.context.extensionUri,
-          workspaceFolder,
+          rootKey: resolved.key,
+          workspaceFolder: resolved.workspaceFolder,
+          installation: resolved.installation,
           outputChannel,
           lspOutputChannel,
           router,
@@ -56,7 +60,7 @@ export class Extension {
       this.logger,
     );
     this.router = router;
-    this.coordinator = coordinator;
+    this.runtimeManager = runtimeManager;
 
     // Install every global facility before awaiting a root. A slow or broken
     // config must not create an event-listener gap or hide commands/channels.
@@ -64,16 +68,50 @@ export class Extension {
     this.globalDisposables.push(
       ...registerCommands(outputChannel, lspOutputChannel),
     );
-    this.workspaceFolderListener = workspace.onDidChangeWorkspaceFolders(
-      (event) => {
-        coordinator.handleWorkspaceFoldersChanged(
-          event,
-          workspace.workspaceFolders ?? [],
+    const reconcile = (reason: string) => {
+      runtimeManager.clearResolutionCache();
+      void runtimeManager.reconcileOpenDocuments().catch((error: unknown) => {
+        this.logger.error(
+          `Failed to reconcile runtimes after ${reason}`,
+          error,
         );
-      },
+      });
+    };
+    this.globalDisposables.push(
+      workspace.onDidOpenTextDocument((document) => {
+        void runtimeManager.reconcile(document).catch((error: unknown) => {
+          this.logger.error(
+            `Failed to open ${document.uri} with Rslint`,
+            error,
+          );
+        });
+      }),
+      workspace.onDidCloseTextDocument((document) => {
+        runtimeManager.documentClosed(document);
+      }),
+      workspace.onDidChangeWorkspaceFolders(() => {
+        reconcile('workspace-folder change');
+      }),
+      workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('rslint.corePath')) {
+          reconcile('configuration change');
+        }
+      }),
     );
+    const topologyWatcher =
+      workspace.createFileSystemWatcher(CORE_TOPOLOGY_GLOB);
+    topologyWatcher.onDidCreate(() => {
+      reconcile('dependency change');
+    });
+    topologyWatcher.onDidChange(() => {
+      reconcile('dependency change');
+    });
+    topologyWatcher.onDidDelete(() => {
+      reconcile('dependency change');
+    });
+    this.globalDisposables.push(topologyWatcher);
 
-    await coordinator.initialize(workspace.workspaceFolders ?? []);
+    runtimeManager.initialize(workspace.textDocuments);
     this.logger.info('Rslint extension activated successfully');
   }
 
@@ -88,26 +126,18 @@ export class Extension {
   private async closeImpl(): Promise<void> {
     this.logger.info('Rslint extension deactivating...');
     const errors: unknown[] = [];
-    // Stop accepting topology changes before withdrawing any active root.
-    try {
-      this.workspaceFolderListener?.dispose();
-    } catch (error) {
-      errors.push(error);
-    }
-    this.workspaceFolderListener = undefined;
-
-    try {
-      await this.coordinator?.close();
-    } catch (error) {
-      errors.push(error);
-    }
-
+    // Stop accepting document/topology changes before withdrawing runtimes.
     for (const disposable of this.globalDisposables.splice(0).reverse()) {
       try {
         disposable.dispose();
       } catch (error) {
         errors.push(error);
       }
+    }
+    try {
+      await this.runtimeManager?.close();
+    } catch (error) {
+      errors.push(error);
     }
     try {
       this.outputChannel?.dispose();
@@ -121,7 +151,7 @@ export class Extension {
       errors.push(error);
     }
     this.lspOutputChannel = undefined;
-    this.coordinator = undefined;
+    this.runtimeManager = undefined;
     this.router = undefined;
 
     for (const error of errors) {

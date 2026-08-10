@@ -20,6 +20,7 @@ type FileConfigResolver struct {
 	// call is pure waste at thousands-of-files scale.
 	globalIgnorePatterns []IgnorePattern
 	entryIgnorePatterns  [][]IgnorePattern
+	directoryBlocks      *directoryBlockMatcher
 
 	filePlans  publishOnceCache[string, *effectiveConfigPlan]
 	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
@@ -27,12 +28,14 @@ type FileConfigResolver struct {
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
 func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool) *FileConfigResolver {
+	globalIgnorePatterns := extractConfigIgnores(config)
 	return &FileConfigResolver{
 		config:               config,
 		cwd:                  cwd,
 		enforcePlugins:       enforcePlugins,
-		globalIgnorePatterns: extractConfigIgnores(config),
+		globalIgnorePatterns: globalIgnorePatterns,
 		entryIgnorePatterns:  parseEntryIgnorePatterns(config),
+		directoryBlocks:      newDirectoryBlockMatcher(globalIgnorePatterns, cwd),
 	}
 }
 
@@ -63,6 +66,7 @@ func (r *FileConfigResolver) planForFile(filePath string) *effectiveConfigPlan {
 			r.cwd,
 			r.globalIgnorePatterns,
 			r.entryIgnorePatterns,
+			r.directoryBlocks,
 		)
 		if !matched {
 			return nil

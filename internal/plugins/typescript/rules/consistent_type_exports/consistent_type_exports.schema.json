@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fixMixedExportsWithInlineTypeSpecifier": {
+          "type": "boolean",
+          "description": "Whether the rule will autofix \"mixed\" export cases using TS inline type specifiers."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

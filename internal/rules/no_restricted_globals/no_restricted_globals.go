@@ -20,13 +20,21 @@ type globalEntry struct {
 	message    string
 }
 
+type sourceBindingState uint8
+
+const (
+	sourceBindingUnchecked sourceBindingState = iota
+	sourceBindingAbsent
+	sourceBindingPresent
+)
+
 type options struct {
 	restrictedGlobals map[string]globalEntry
 	checkGlobalObject bool
-	globalObjects     map[string]bool
+	globalObjects     map[string]sourceBindingState
 }
 
-func parseOptions(optionsList []any) options {
+func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (options, bool) {
 	isGlobalsObject := false
 	var globalsObjectMap map[string]interface{}
 	if len(optionsList) > 0 {
@@ -60,15 +68,18 @@ func parseOptions(optionsList []any) options {
 	}
 
 	restrictedGlobals := make(map[string]globalEntry, len(rawGlobals))
+	mayUseRestrictedGlobal := sourceIdentifiers == nil
 	for _, item := range rawGlobals {
+		var name string
 		switch v := item.(type) {
 		case string:
 			if v == "" {
 				continue
 			}
-			restrictedGlobals[v] = globalEntry{}
+			name = v
+			restrictedGlobals[name] = globalEntry{}
 		case map[string]interface{}:
-			name, _ := v["name"].(string)
+			name, _ = v["name"].(string)
 			if name == "" {
 				continue
 			}
@@ -78,35 +89,56 @@ func parseOptions(optionsList []any) options {
 				restrictedGlobals[name] = globalEntry{}
 			}
 		}
+		if !mayUseRestrictedGlobal && name != "" {
+			_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+		}
 	}
 
-	globalObjects := make(map[string]bool, len(defaultGlobalObjects)+len(userGlobalObjects))
-	for _, name := range defaultGlobalObjects {
-		globalObjects[name] = true
-	}
-	for _, name := range userGlobalObjects {
-		globalObjects[name] = true
+	var globalObjects map[string]sourceBindingState
+	if checkGlobalObject {
+		globalObjects = make(map[string]sourceBindingState, len(defaultGlobalObjects)+len(userGlobalObjects))
+		for _, name := range defaultGlobalObjects {
+			globalObjects[name] = sourceBindingUnchecked
+		}
+		for _, name := range userGlobalObjects {
+			globalObjects[name] = sourceBindingUnchecked
+		}
 	}
 
 	return options{
 		restrictedGlobals: restrictedGlobals,
 		checkGlobalObject: checkGlobalObject,
 		globalObjects:     globalObjects,
-	}
+	}, mayUseRestrictedGlobal
 }
 
 var NoRestrictedGlobalsRule = rule.Rule{
 	Name: "no-restricted-globals",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := parseOptions(options)
+		var sourceIdentifiers map[string]string
+		if ctx.SourceFile != nil {
+			sourceIdentifiers = ctx.SourceFile.Identifiers
+		}
+		opts, mayUseRestrictedGlobal := parseOptions(options, sourceIdentifiers)
 
 		// If no globals are restricted, there's nothing to check.
 		if len(opts.restrictedGlobals) == 0 {
-			return rule.RuleListeners{}
+			return nil
+		}
+		if opts.checkGlobalObject {
+			for name := range opts.globalObjects {
+				if !ctx.Globals.Access(name).IsDeclared() {
+					delete(opts.globalObjects, name)
+				} else if !mayUseRestrictedGlobal {
+					_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+				}
+			}
+		}
+		if !mayUseRestrictedGlobal {
+			return nil
 		}
 
-		report := func(node *ast.Node, name string) {
-			entry := opts.restrictedGlobals[name]
+		report := func(node *ast.Node, name string, entry globalEntry) {
 			if entry.hasMessage {
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "customMessage",
@@ -126,6 +158,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 					return
 				}
 				name := node.Text()
+				entry, restricted := opts.restrictedGlobals[name]
 
 				// Direct reference to a restricted global identifier. ESLint's own
 				// "declared elsewhere" and "through" branches only require that the
@@ -133,18 +166,81 @@ var NoRestrictedGlobalsRule = rule.Rule{
 				// recognized global — so a configured global (even one set to
 				// `off`) can't suppress this rule, and "not locally shadowed" is
 				// the only check needed here.
-				if _, restricted := opts.restrictedGlobals[name]; restricted &&
-					!isInTypeContext(node) && !utils.IsShadowed(node, name) {
-					report(node, name)
+				if restricted && !isInTypeContext(node) && !utils.IsShadowed(node, name) {
+					report(node, name, entry)
 				}
 
 				// checkGlobalObject: `window.foo`, `self['foo']`, `globalThis.foo`, ...
-				if opts.checkGlobalObject && opts.globalObjects[name] && !utils.IsShadowed(node, name) {
-					checkGlobalObjectAccess(node, name, opts, report)
+				if opts.checkGlobalObject {
+					if binding, globalObject := opts.globalObjects[name]; globalObject &&
+						isUnshadowedGlobalObject(opts.globalObjects, ctx.SourceFile, node, name, binding) {
+						checkGlobalObjectAccess(node, name, opts, report)
+					}
 				}
 			},
 		}
 	},
+}
+
+func isUnshadowedGlobalObject(
+	globalObjects map[string]sourceBindingState,
+	sourceFile *ast.SourceFile,
+	node *ast.Node,
+	name string,
+	binding sourceBindingState,
+) bool {
+	if binding == sourceBindingUnchecked {
+		if sourceHasValueBinding(sourceFile, name) {
+			binding = sourceBindingPresent
+		} else {
+			binding = sourceBindingAbsent
+		}
+		globalObjects[name] = binding
+	}
+	return binding == sourceBindingAbsent || !utils.IsShadowed(node, name)
+}
+
+// sourceHasValueBinding reports whether any lexical scope in sourceFile
+// declares name in the value namespace. The binder links locals containers in
+// source order, so a miss proves that no reference in the file can shadow the
+// configured global object. Files without binder metadata conservatively fall
+// back to the exact per-reference shadowing check.
+func sourceHasValueBinding(sourceFile *ast.SourceFile, name string) bool {
+	if sourceFile == nil || !sourceFile.IsBound() {
+		return true
+	}
+	for container := sourceFile.AsNode(); container != nil; {
+		data := container.LocalsContainerData()
+		if data == nil {
+			return true
+		}
+		if len(data.Locals) != 0 &&
+			utils.IsValueSymbolDeclaredInFile(data.Locals[name], sourceFile) {
+			return true
+		}
+		if (container.Kind == ast.KindFunctionExpression || container.Kind == ast.KindClassExpression) &&
+			container.Name() != nil && container.Name().Text() == name {
+			return true
+		}
+		container = data.NextContainer
+	}
+	return sourceHasNamedExpressionBinding(sourceFile, name)
+}
+
+func sourceHasNamedExpressionBinding(sourceFile *ast.SourceFile, name string) bool {
+	found := false
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if (node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindClassExpression) &&
+			node.Name() != nil && node.Name().Text() == name {
+			found = true
+			return true
+		}
+		node.ForEachChild(visit)
+		return found
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return found
 }
 
 // checkGlobalObjectAccess walks up a chain of member accesses rooted at a
@@ -153,7 +249,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 // self-access hops, and reports the final accessed property if its name is
 // restricted. Mirrors ESLint's `astUtils.getVariableByName` + reference walk
 // in the rule's `Program:exit` handler.
-func checkGlobalObjectAccess(node *ast.Node, globalObjectName string, opts options, report func(*ast.Node, string)) {
+func checkGlobalObjectAccess(node *ast.Node, globalObjectName string, opts options, report func(*ast.Node, string, globalEntry)) {
 	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 	for utils.IsSpecificMemberAccess(parent, "", globalObjectName) {
 		parent = ast.WalkUpParenthesizedExpressions(parent.Parent)
@@ -163,8 +259,8 @@ func checkGlobalObjectAccess(node *ast.Node, globalObjectName string, opts optio
 	if !ok {
 		return
 	}
-	if _, restricted := opts.restrictedGlobals[propName]; restricted {
-		report(propNode, propName)
+	if entry, restricted := opts.restrictedGlobals[propName]; restricted {
+		report(propNode, propName, entry)
 	}
 }
 
@@ -205,6 +301,13 @@ func shouldSkip(node *ast.Node) bool {
 	if parent == nil {
 		return true
 	}
+	// Member names are a frequent collision with common restricted names such
+	// as `name` and `length`, and checking them does not require the broader
+	// declaration-name classification below.
+	if parent.Kind == ast.KindPropertyAccessExpression &&
+		parent.AsPropertyAccessExpression().Name() == node {
+		return true
+	}
 
 	// Skip declaration names (var/let/const/function/class/enum/import/
 	// parameter names, and member names: methods, properties, accessors,
@@ -212,12 +315,6 @@ func shouldSkip(node *ast.Node) bool {
 	// (`{foo}`) are declaration-shaped but also read the outer binding, so
 	// they must NOT be skipped.
 	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment {
-		return true
-	}
-
-	// Skip property names in member access (obj.prop -> skip "prop").
-	if parent.Kind == ast.KindPropertyAccessExpression &&
-		parent.AsPropertyAccessExpression().Name() == node {
 		return true
 	}
 

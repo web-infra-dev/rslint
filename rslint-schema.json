@@ -84,6 +84,16 @@
       "type": "object",
       "description": "Language-specific configuration options",
       "properties": {
+        "ecmaVersion": {
+          "description": "ECMAScript edition used for language globals. Omitted or \"latest\" follows the ESLint version targeted by rslint.",
+          "default": "latest",
+          "oneOf": [
+            { "const": "latest" },
+            { "type": "integer", "enum": [3, 5] },
+            { "type": "integer", "minimum": 6, "maximum": 17 },
+            { "type": "integer", "minimum": 2015, "maximum": 2026 }
+          ]
+        },
         "parserOptions": {
           "$ref": "#/definitions/ParserOptions",
           "description": "Parser-specific configuration options"

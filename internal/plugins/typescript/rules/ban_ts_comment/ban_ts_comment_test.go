@@ -665,3 +665,42 @@ func TestBanTsCommentSuggestionDemand(t *testing.T) {
 		}
 	}
 }
+
+// TestBanTsCommentDescriptionFormatSchema locks in that `descriptionFormat`
+// is validated as a regex. The rule compiles it to check each directive's
+// description, so an unparsable pattern would otherwise be dropped and the
+// directive would go unchecked. Upstream's schema declares a bare string.
+func TestBanTsCommentDescriptionFormatSchema(t *testing.T) {
+	invalid := []any{map[string]any{
+		"ts-ignore": map[string]any{"descriptionFormat": "("},
+	}}
+	if err := BanTsCommentRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid descriptionFormat regex to fail schema validation")
+	}
+	valid := []any{map[string]any{
+		"ts-ignore": map[string]any{"descriptionFormat": "^: TS\\d+ because .+$"},
+	}}
+	if err := BanTsCommentRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid descriptionFormat regex to pass schema validation, got: %v", err)
+	}
+}
+
+// TestBanTsCommentDescriptionFormatLookahead locks in that `descriptionFormat`
+// is matched with the same ECMAScript regex engine the schema validates it
+// against (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never flag a mismatched description.
+func TestBanTsCommentDescriptionFormatLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &BanTsCommentRule, []rule_tester.ValidTestCase{
+		{
+			Code:    "// @ts-expect-error: explanation",
+			Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^(?!: TODO).*$"}},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "// @ts-expect-error: TODO fix me",
+			Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^(?!: TODO).*$"}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "tsDirectiveCommentDescriptionNotMatchPattern"}},
+		},
+	})
+}

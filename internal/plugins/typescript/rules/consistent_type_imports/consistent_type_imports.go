@@ -1,9 +1,14 @@
 package consistent_type_imports
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed consistent_type_imports.schema.json
+var schemaJSON []byte
 
 type ConsistentTypeImportsOptions struct {
 	Prefer                  string `json:"prefer"`
@@ -13,44 +18,36 @@ type ConsistentTypeImportsOptions struct {
 
 // ConsistentTypeImportsRule enforces consistent type imports
 var ConsistentTypeImportsRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-type-imports",
-	Run:  run,
+	Name:   "consistent-type-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func parseOptions(options []any) ConsistentTypeImportsOptions {
 	opts := ConsistentTypeImportsOptions{
 		Prefer:                  "type-imports",
 		DisallowTypeAnnotations: true,
 		FixStyle:                "separate-type-imports",
 	}
-
-	// Parse options
-	if options != nil {
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if optMap, ok := optArray[0].(map[string]interface{}); ok {
-				if prefer, ok := optMap["prefer"].(string); ok {
-					opts.Prefer = prefer
-				}
-				if disallow, ok := optMap["disallowTypeAnnotations"].(bool); ok {
-					opts.DisallowTypeAnnotations = disallow
-				}
-				if fixStyle, ok := optMap["fixStyle"].(string); ok {
-					opts.FixStyle = fixStyle
-				}
-			}
-		} else if optMap, ok := options.(map[string]interface{}); ok {
-			if prefer, ok := optMap["prefer"].(string); ok {
-				opts.Prefer = prefer
-			}
-			if disallow, ok := optMap["disallowTypeAnnotations"].(bool); ok {
-				opts.DisallowTypeAnnotations = disallow
-			}
-			if fixStyle, ok := optMap["fixStyle"].(string); ok {
-				opts.FixStyle = fixStyle
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
+
+	optMap, _ := options[0].(map[string]interface{})
+	if prefer, ok := optMap["prefer"].(string); ok {
+		opts.Prefer = prefer
+	}
+	if disallow, ok := optMap["disallowTypeAnnotations"].(bool); ok {
+		opts.DisallowTypeAnnotations = disallow
+	}
+	if fixStyle, ok := optMap["fixStyle"].(string); ok {
+		opts.FixStyle = fixStyle
+	}
+	return opts
+}
+
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	checkImportDeclaration := func(node *ast.Node) {
 		importDecl := node.AsImportDeclaration()

@@ -82,20 +82,22 @@ var NoFocusedTestsRule = rule.Rule{
 					})
 					if idx >= 0 {
 						entry := jestFnCall.MemberEntries[idx]
-						startRange := entry.Node.Loc.Pos() - 1
-						endRange := entry.Node.Loc.End()
-						if entry.Node.Kind != ast.KindIdentifier {
-							endRange = entry.Node.End() + 1
+						removalFixes, ok := jestUtils.RemoveMemberAccessorFixes(
+							ctx,
+							jestFnCall.MemberEntries,
+							idx,
+						)
+						if !ok {
+							ctx.ReportNode(entry.Node, buildErrorFocusedTestMessage())
+							return
 						}
 
 						ctx.ReportNodeWithSuggestions(
 							entry.Node,
 							buildErrorFocusedTestMessage(),
 							rule.RuleSuggestion{
-								Message: buildErrorSuggestRemoveFocusMessage(),
-								FixesArr: []rule.RuleFix{
-									rule.RuleFixRemoveRange(core.NewTextRange(startRange, endRange)),
-								},
+								Message:  buildErrorSuggestRemoveFocusMessage(),
+								FixesArr: removalFixes,
 							},
 						)
 					}

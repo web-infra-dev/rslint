@@ -247,16 +247,16 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 		t.Fatalf("expected zero linted files for an empty target plan, got %d", result.LintedFileCount)
 	}
 
-	targets := CollectLintTargets(RunLinterOptions{
+	targets := PrepareLintPlan(RunLinterOptions{
 		Programs:       []*compiler.Program{program},
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			return noopRule()
 		},
-	})
+	}).Targets()
 	if len(targets) != 0 {
-		t.Fatalf("CollectLintTargets should also see zero files for an empty target plan, got %+v", targets)
+		t.Fatalf("PrepareLintPlan should also see zero files for an empty target plan, got %+v", targets)
 	}
 }
 
@@ -284,16 +284,16 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 		t.Fatalf("expected only lib.ts to be linted, got %v", linted)
 	}
 
-	targets := CollectLintTargets(RunLinterOptions{
+	targets := PrepareLintPlan(RunLinterOptions{
 		Programs:       []*compiler.Program{program},
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			return noopRule()
 		},
-	})
+	}).Targets()
 	if len(targets) != 1 || targets[0].File.FileName() != target || len(targets[0].Rules) == 0 {
-		t.Fatalf("CollectLintTargets should mirror native exact targeting, got %+v", targets)
+		t.Fatalf("PrepareLintPlan should mirror native exact targeting, got %+v", targets)
 	}
 }
 

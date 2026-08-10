@@ -2884,3 +2884,142 @@ func TestOneVarStatementLocalModesOnlyRegisterDeclarationListener(t *testing.T) 
 		})
 	}
 }
+
+func TestOneVarScopeModesOnlyRegisterRequiredBoundaryListeners(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name            string
+		options         []any
+		wantListeners   int
+		requireFunction bool
+		requireBlock    bool
+	}{
+		{
+			name: "var scope only",
+			options: []any{map[string]interface{}{
+				"var": modeAlways,
+			}},
+			wantListeners:   17,
+			requireFunction: true,
+		},
+		{
+			name: "block scope only",
+			options: []any{map[string]interface{}{
+				"let": modeAlways,
+			}},
+			wantListeners: 11,
+			requireBlock:  true,
+		},
+		{
+			name:            "var and block scopes",
+			options:         []any{modeAlways},
+			wantListeners:   27,
+			requireFunction: true,
+			requireBlock:    true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			listeners := OneVarRule.Run(rule.RuleContext{}, testCase.options)
+			if len(listeners) != testCase.wantListeners {
+				t.Fatalf("listeners = %d, want %d", len(listeners), testCase.wantListeners)
+			}
+			if got := listeners[ast.KindFunctionDeclaration] != nil; got != testCase.requireFunction {
+				t.Errorf("function listener present = %t, want %t", got, testCase.requireFunction)
+			}
+			if got := listeners[ast.KindBlock] != nil; got != testCase.requireBlock {
+				t.Errorf("block listener present = %t, want %t", got, testCase.requireBlock)
+			}
+		})
+	}
+}
+
+func TestOneVarBlockOnlyFunctionBodyScopes(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&OneVarRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `let outer; function inner() { let inner; }`,
+				Options: []interface{}{map[string]interface{}{
+					"let": modeAlways,
+				}},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `function outer() { let first; function inner() { let only; } let second; }`,
+				Output: nil,
+				Options: []interface{}{map[string]interface{}{
+					"let": modeAlways,
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combine"},
+				},
+			},
+		},
+	)
+}
+
+func TestOneVarDisableDirectives(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		code string
+	}{
+		{
+			name: "next line",
+			code: "let first;\n/* eslint-disable-next-line one-var */\nlet second;",
+		},
+		{
+			name: "scoped",
+			code: "/* eslint-disable one-var */\nlet first;\nlet second;\n/* eslint-enable one-var */",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+			program, sourceFile, err := helper.CreateTestProgram(testCase.code, "disable-directives.ts", "tsconfig.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			diagnosticCount := 0
+			linter.LintSingleFile(linter.LintSingleFileOptions{
+				Program:      program,
+				File:         sourceFile.FileName(),
+				HasTypeInfo:  true,
+				ExcludePaths: []string{},
+				GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+					return []linter.ConfiguredRule{
+						{
+							Name:     OneVarRule.Name,
+							Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return OneVarRule.Run(ctx, []any{map[string]interface{}{
+									"let": modeAlways,
+								}})
+							},
+						},
+					}
+				},
+				Consumer: rule.DiagnosticConsumer{
+					Demand: rule.EditDemandNone,
+					Report: func(rule.RuleDiagnostic) {
+						diagnosticCount++
+					},
+				},
+			})
+
+			if diagnosticCount != 0 {
+				t.Fatalf("diagnostics = %d, want 0", diagnosticCount)
+			}
+		})
+	}
+}

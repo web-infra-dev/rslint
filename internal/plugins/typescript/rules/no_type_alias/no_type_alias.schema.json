@@ -1,0 +1,61 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "$defs": {
+        "expandedOptions": {
+          "type": "string",
+          "enum": [
+            "always",
+            "never",
+            "in-unions",
+            "in-intersections",
+            "in-unions-and-intersections"
+          ]
+        },
+        "simpleOptions": {
+          "type": "string",
+          "enum": ["always", "never"]
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "allowAliases": {
+          "$ref": "#/items/0/$defs/expandedOptions",
+          "description": "Whether to allow direct one-to-one type aliases."
+        },
+        "allowCallbacks": {
+          "$ref": "#/items/0/$defs/simpleOptions",
+          "description": "Whether to allow type aliases for callbacks."
+        },
+        "allowConditionalTypes": {
+          "$ref": "#/items/0/$defs/simpleOptions",
+          "description": "Whether to allow type aliases for conditional types."
+        },
+        "allowConstructors": {
+          "$ref": "#/items/0/$defs/simpleOptions",
+          "description": "Whether to allow type aliases with constructors."
+        },
+        "allowGenerics": {
+          "$ref": "#/items/0/$defs/simpleOptions",
+          "description": "Whether to allow type aliases with generic types."
+        },
+        "allowLiterals": {
+          "$ref": "#/items/0/$defs/expandedOptions",
+          "description": "Whether to allow type aliases with object literal types."
+        },
+        "allowMappedTypes": {
+          "$ref": "#/items/0/$defs/expandedOptions",
+          "description": "Whether to allow type aliases with mapped types."
+        },
+        "allowTupleTypes": {
+          "$ref": "#/items/0/$defs/expandedOptions",
+          "description": "Whether to allow type aliases with tuple types."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

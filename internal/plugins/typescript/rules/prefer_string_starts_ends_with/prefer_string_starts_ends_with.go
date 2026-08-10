@@ -1,6 +1,7 @@
 package prefer_string_starts_ends_with
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_string_starts_ends_with.schema.json
+var schemaJSON []byte
 
 func buildPreferStartsWithMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -410,25 +414,15 @@ func needsParentheses(node *ast.Node) bool {
 
 var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-string-starts-ends-with",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := defaultOpts
 
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if allowSingleElementEquality, ok := optsMap["allowSingleElementEquality"].(string); ok {
-					opts.AllowSingleElementEquality = utils.Ref(allowSingleElementEquality)
-				}
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
+			if allowSingleElementEquality, ok := optsMap["allowSingleElementEquality"].(string); ok {
+				opts.AllowSingleElementEquality = utils.Ref(allowSingleElementEquality)
 			}
 		}
 

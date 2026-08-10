@@ -40,9 +40,9 @@ async function activateAndRun(
       throw new Error(`Extension ${extensionId} is unavailable`);
     }
 
-    // Extension.activate() is the public readiness contract. Await it before
-    // loading any tests so cold-start saves and code-action requests cannot run
-    // while the language client and workspace configuration are still starting.
+    // Await extension activation so shared commands, channels, and document
+    // listeners are installed. Per-document runtimes intentionally start in
+    // the background; behavior tests wait for their observed diagnostics.
     await runBeforeDeadline(
       () => extension.activate(),
       startupDeadline,

@@ -111,6 +111,12 @@ function extractDefault(mod: unknown): unknown {
 
 /**
  * Validate and strip non-serializable fields from the config.
+ *
+ * A preset may expand to several entries, so an authored config array may hold
+ * arrays one level deep; those are flattened here — this is the one place every
+ * config passes through, including the ones that never go through
+ * `defineConfig` (the API's `overrideConfig`, rule-tester configs). Reported
+ * indices are positions in the flattened list.
  */
 export function normalizeConfig(config: unknown): Record<string, unknown>[] {
   if (!Array.isArray(config)) {
@@ -119,15 +125,29 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     );
   }
 
+  const entries: unknown[] = [];
   for (let index = 0; index < config.length; index++) {
     if (!Object.prototype.hasOwnProperty.call(config, index)) {
       throw new Error(
-        `[rslint] Config entry at index ${index}: unexpected undefined config`,
+        `[rslint] Config entry at index ${entries.length}: unexpected undefined config`,
       );
+    }
+    const value: unknown = config[index];
+    if (!Array.isArray(value)) {
+      entries.push(value);
+      continue;
+    }
+    for (let nested = 0; nested < value.length; nested++) {
+      if (!Object.prototype.hasOwnProperty.call(value, nested)) {
+        throw new Error(
+          `[rslint] Config entry at index ${entries.length}: unexpected undefined config`,
+        );
+      }
+      entries.push(value[nested]);
     }
   }
 
-  return config.map((rawEntry: unknown, index: number) => {
+  return entries.map((rawEntry: unknown, index: number) => {
     if (rawEntry === null) {
       throw new Error(
         `[rslint] Config entry at index ${index}: unexpected null config`,

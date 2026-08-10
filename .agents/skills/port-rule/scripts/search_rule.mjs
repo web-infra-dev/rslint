@@ -232,7 +232,7 @@ async function searchGithubPlugin(pluginName, ruleName) {
 async function searchRule(ruleName) {
   const { plugin, rule } = parseRuleName(ruleName);
 
-  let result = null;
+  let result;
 
   if (plugin === 'eslint') {
     result = await searchEslintCore(rule);

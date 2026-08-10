@@ -1,6 +1,8 @@
 package no_base_to_string
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -9,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_base_to_string.schema.json
+var schemaJSON []byte
 
 func certaintyToString(certainty usefulness) string {
 	switch certainty {
@@ -37,7 +42,22 @@ func buildBaseToStringMessage(name string, certainty usefulness) rule.RuleMessag
 }
 
 type NoBaseToStringOptions struct {
-	IgnoredTypeNames []string
+	IgnoredTypeNames []string `json:"ignoredTypeNames"`
+}
+
+func parseOptions(options []any) NoBaseToStringOptions {
+	opts := NoBaseToStringOptions{
+		IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	return opts
 }
 
 type usefulness uint32
@@ -50,15 +70,10 @@ const (
 
 var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Name:             "no-base-to-string",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoBaseToStringOptions)
-		if !ok {
-			opts = NoBaseToStringOptions{
-				IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		var collectToStringCertainty func(
 			t *checker.Type,

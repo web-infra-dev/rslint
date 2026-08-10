@@ -1,11 +1,17 @@
 package require_array_sort_compare
 
 import (
+	_ "embed"
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed require_array_sort_compare.schema.json
+var schemaJSON []byte
 
 func buildRequireCompareMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,21 +21,33 @@ func buildRequireCompareMessage() rule.RuleMessage {
 }
 
 type RequireArraySortCompareOptions struct {
-	IgnoreStringArrays *bool
+	IgnoreStringArrays *bool `json:"ignoreStringArrays"`
+}
+
+func parseOptions(options []any) RequireArraySortCompareOptions {
+	opts := RequireArraySortCompareOptions{
+		IgnoreStringArrays: utils.Ref(true),
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	if opts.IgnoreStringArrays == nil {
+		opts.IgnoreStringArrays = utils.Ref(true)
+	}
+	return opts
 }
 
 var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 	Name:             "require-array-sort-compare",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(RequireArraySortCompareOptions)
-		if !ok {
-			opts = RequireArraySortCompareOptions{}
-		}
-		if opts.IgnoreStringArrays == nil {
-			opts.IgnoreStringArrays = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

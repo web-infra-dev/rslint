@@ -13,7 +13,10 @@
 //     for the path that leaves the `try` statement through `return`, `throw`,
 //     or a suspended `yield`; `break` and `continue` do not take that path;
 //   - `&&`, `||`, `??`, `?:`, optional chains, and destructuring defaults fork
-//     around the operand they may skip.
+//     around the operand they may skip;
+//   - the code after a `return`, `throw`, `break`, or `continue` is laid out in
+//     blocks nothing reaches rather than dropped, keeping the edge that leads
+//     into it.
 //
 // The graph carries no meaning of its own beyond that shape. A consumer names
 // an event type and supplies Hooks; the builder calls them where a reference is
@@ -27,10 +30,24 @@ import (
 )
 
 // Block is one basic block: the events its consumer recorded, in evaluation
-// order, and the blocks control can reach from it.
+// order, and the blocks led to from it.
+//
+// Successors spans the whole graph, unreachable blocks included, so a walk that
+// only wants the code that runs skips the blocks whose Reachable is false.
 type Block[E any] struct {
 	Events     []E
 	Successors []*Block[E]
+
+	// Reachable reports whether control can arrive here. The code after an
+	// abrupt exit is laid out in unreachable blocks rather than dropped, and a
+	// consumer's hooks run in them, so a rule can ask what would have run had
+	// the exit not been there.
+	//
+	// It is settled when the block is entered, from the edges that lead into
+	// it by then. Every block is entered after the edges that could make it
+	// reachable exist: a block only ever gains an edge afterwards from code
+	// laid out inside it, which is unreachable whenever the block itself is.
+	Reachable bool
 
 	index       int
 	hasIncoming bool
@@ -42,15 +59,23 @@ func (blk *Block[E]) Index() int {
 	return blk.index
 }
 
-// Graph is the control-flow graph of one code path root. Blocks[0] is the entry
-// block; the rest are in construction order, which no analysis should depend on.
+// Graph is the control-flow graph of one code path root, unreachable blocks
+// included. Blocks[0] is the entry block; the rest are in construction order,
+// which no analysis should depend on.
+//
+// EndReachable reports whether control can run off the end of the root — the
+// question ESLint answers with `isAnySegmentReachable(codePath.currentSegments)`
+// at the root's `:exit`. It is false when every path out of the root returns,
+// throws, or loops forever.
 type Graph[E any] struct {
-	Blocks []*Block[E]
+	Blocks       []*Block[E]
+	EndReachable bool
 }
 
 // Hooks are the points where a consumer turns a position in the walk into an
-// event. Every hook may be nil, and every one is called only from a position
-// control can reach, so Builder.Emit always lands somewhere.
+// event. Every hook may be nil, and every one is called from every position the
+// walk reaches, whether or not control can arrive there — a consumer that has
+// no use for unreachable code checks Builder.Current for it.
 //
 // Read runs where node is evaluated as a read, Write where its value is stored;
 // a target that is read before it is written — a compound assignment, an update
@@ -120,6 +145,7 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 	b := &Builder[E]{hooks: hooks}
 	b.cur = b.newBlock()
 	b.cur.hasIncoming = true
+	b.cur.Reachable = true
 
 	switch root.Kind {
 	case ast.KindSourceFile:
@@ -147,15 +173,12 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 		}
 	}
 
-	return &Graph[E]{Blocks: b.blocks}
+	return &Graph[E]{Blocks: b.blocks, EndReachable: b.cur.Reachable}
 }
 
 // parameter models a parameter binding: its default value is skipped when an
 // argument was passed.
 func (b *Builder[E]) parameter(node *ast.Node) {
-	if b.cur == nil {
-		return
-	}
 	parameter := node.AsParameterDeclaration()
 	if parameter == nil {
 		return
@@ -168,19 +191,15 @@ func (b *Builder[E]) parameter(node *ast.Node) {
 // blocks
 // ---------------------------------------------------------------------------
 
-// Current returns the block being filled, or nil when the position is
-// unreachable.
+// Current returns the block being filled. Its Reachable field says whether the
+// position control is at is one control can arrive at.
 func (b *Builder[E]) Current() *Block[E] {
 	return b.cur
 }
 
 // Emit records one event in the current block and returns where it landed, so a
-// consumer can refer back to it. The block is nil when the position is
-// unreachable and nothing was recorded.
+// consumer can refer back to it.
 func (b *Builder[E]) Emit(e E) (*Block[E], int) {
-	if b.cur == nil {
-		return nil, 0
-	}
 	index := len(b.cur.Events)
 	b.cur.Events = append(b.cur.Events, e)
 	return b.cur, index
@@ -197,17 +216,36 @@ func (b *Builder[E]) link(from, to *Block[E]) {
 		return
 	}
 	from.Successors = append(from.Successors, to)
-	to.hasIncoming = true
+	if from.Reachable {
+		to.hasIncoming = true
+	}
 }
 
-// enter makes blk the current block when something can reach it, and marks the
-// path unreachable otherwise.
+// enter makes blk the current block and settles its reachability, so every edge
+// that could make it reachable has to be linked before it is entered.
 func (b *Builder[E]) enter(blk *Block[E]) {
-	if blk.hasIncoming {
-		b.cur = blk
-	} else {
-		b.cur = nil
-	}
+	blk.Reachable = blk.hasIncoming
+	b.cur = blk
+}
+
+// makeUnreachable ends the path at the current block and carries the walk on in
+// a fresh block nothing reaches. The edge into it is recorded, but — unlike
+// every other edge — it does not make its target something control arrives at,
+// which is what leaving through it meant in the first place. That is why the
+// block is never entered: its reachability is settled here, as false.
+func (b *Builder[E]) makeUnreachable() {
+	next := b.newBlock()
+	b.cur.Successors = append(b.cur.Successors, next)
+	b.cur = next
+}
+
+// enterDisconnected makes blk current when the position the walk stands at is
+// one control arrives at, rather than when an edge into blk already is. It is
+// how a block whose only edge in is laid out later still gets laid out here,
+// which is the order ESLint traverses one in.
+func (b *Builder[E]) enterDisconnected(blk *Block[E]) {
+	blk.hasIncoming = blk.hasIncoming || b.cur.Reachable
+	b.enter(blk)
 }
 
 func (b *Builder[E]) read(node *ast.Node) {
@@ -229,7 +267,7 @@ func (b *Builder[E]) reachedStatement(node *ast.Node) {
 }
 
 func (b *Builder[E]) loop(node *ast.Node) {
-	if b.hooks.Loop != nil && b.cur != nil && node != nil {
+	if b.hooks.Loop != nil && node != nil {
 		b.hooks.Loop(b, node)
 	}
 }
@@ -273,7 +311,7 @@ func (b *Builder[E]) returnFrame() int {
 // a `try` that has a `finally`). Later throwable nodes in the same block reuse
 // that first fork, matching ESLint's approximation.
 func (b *Builder[E]) firstThrowableFork() {
-	if b.cur == nil {
+	if !b.cur.Reachable {
 		return
 	}
 	i := b.throwFrame()
@@ -289,7 +327,7 @@ func (b *Builder[E]) firstThrowableFork() {
 	b.link(b.cur, throwTarget(f))
 	next := b.newBlock()
 	b.link(b.cur, next)
-	b.cur = next
+	b.enter(next)
 }
 
 // snapshotForks records the "already forked" state of every enclosing `try` so

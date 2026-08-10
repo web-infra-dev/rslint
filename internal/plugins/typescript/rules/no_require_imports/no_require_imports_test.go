@@ -515,3 +515,41 @@ configValidator.addSchema(require('./a.json'));
 		},
 	})
 }
+
+// TestNoRequireImportsAllowSchema locks in that each `allow` entry is
+// validated as a regex. The rule compiles every entry to match import paths,
+// so an unparsable one would otherwise be dropped and that path would keep
+// reporting. Upstream's schema declares a plain array of strings.
+func TestNoRequireImportsAllowSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allow": []any{"("}}}
+	if err := NoRequireImportsRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allow pattern to fail schema validation")
+	}
+	valid := []any{map[string]any{"allow": []any{"/package\\.json$"}}}
+	if err := NoRequireImportsRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
+	}
+}
+
+// TestNoRequireImportsAllowLookahead locks in that `allow` patterns are
+// matched with the same ECMAScript regex engine the schema validates them
+// against (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never allow anything.
+func TestNoRequireImportsAllowLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRequireImportsRule, []rule_tester.ValidTestCase{
+		{Code: "require('foo');", Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}}},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "require('barbaz');",
+			Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noRequireImports",
+					Line:      1,
+					Column:    1,
+				},
+			},
+		},
+	})
+}

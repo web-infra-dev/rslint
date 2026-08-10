@@ -3,12 +3,14 @@ package unicode_bom
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -36,7 +38,12 @@ func TestUnicodeBomOnDisk(t *testing.T) {
 		// A UTF-16 file is decoded to UTF-8 and loses its mark on the way, so
 		// it counts as marked just like a UTF-8 one.
 		{name: "utf-16 mark", bytes: "\xFF\xFE" + utf16LE(source), wantReport: true},
+		{name: "utf-16 big-endian mark", bytes: "\xFE\xFF" + utf16BE(source), wantReport: true},
+		// The raw UTF-16 byte count equals the decoded UTF-8 byte count here.
+		// Non-ASCII text must therefore stay on the authoritative header path.
+		{name: "equal-length utf-16 mark", bytes: "\xFF\xFE" + utf16LE("日本"), wantText: "日本", wantReport: true},
 		{name: "no mark", bytes: source},
+		{name: "no mark with non-ascii text", bytes: "const 日本 = 1;\n"},
 		// Real-user: eslint#6580 / #4878 — files written by Windows editors
 		// where the mark sits ahead of a shebang.
 		{
@@ -67,6 +74,53 @@ func TestUnicodeBomOnDisk(t *testing.T) {
 				"the mark never reaches the source text")
 		})
 	}
+}
+
+// TestUnicodeBomUnmarkedDiskFastPath proves that an unchanged, unmarked ASCII
+// disk file is decided from metadata without asking the BOM source to reopen
+// the file. The ordinary diagnostics tests continue to lock in the result.
+func TestUnicodeBomUnmarkedDiskFastPath(t *testing.T) {
+	t.Parallel()
+
+	filePath := writeFixture(t, "var a = 123;\n")
+	fs := &countingBOMFileSystem{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+
+	assert.Equal(t, 0, len(lintFile(t, filePath, fs)))
+	assert.Equal(t, int64(0), fs.calls.Load(), "the fast path must not reread the file header")
+}
+
+// TestUnicodeBomFastPathDefersToOverlay ensures a virtual source remains
+// authoritative even when it shadows a real disk file whose metadata would
+// otherwise qualify for the shortcut.
+func TestUnicodeBomFastPathDefersToOverlay(t *testing.T) {
+	t.Parallel()
+
+	const source = "var a = 123;\n"
+	filePath := writeFixture(t, source)
+	fs := utils.NewOverlayVFS(
+		bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		map[string]string{filePath: utils.BOM + source},
+	)
+
+	diagnostics := lintFile(t, filePath, fs)
+	assert.Equal(t, 1, len(diagnostics))
+	assert.Equal(t, "unexpected", diagnostics[0].Message.Id)
+}
+
+// TestUnicodeBomFastPathRejectsStaleStat covers the BOM-only rewrite used by
+// multi-pass fixing. cachedvfs can still hold the marked file's old size; that
+// metadata must not make the newly unmarked source look marked again.
+func TestUnicodeBomFastPathRejectsStaleStat(t *testing.T) {
+	t.Parallel()
+
+	const source = "var a = 123;\n"
+	filePath := writeFixture(t, utils.BOM+source)
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	assert.Assert(t, fs.Stat(filePath) != nil, "failed to prime the VFS stat cache")
+	assert.NilError(t, os.WriteFile(filePath, []byte(source), 0o644))
+
+	assert.Equal(t, 0, len(lintFile(t, filePath, fs)),
+		"stale marked-file metadata must fall back to the current header")
 }
 
 // TestUnicodeBomFixRewritesFile walks a marked file through a full lint, fix
@@ -110,6 +164,12 @@ func lintOnDisk(t *testing.T, filePath string) []rule.RuleDiagnostic {
 	t.Helper()
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	return lintFile(t, filePath, fs)
+}
+
+func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
+	t.Helper()
+
 	host := utils.CreateCompilerHost(filepath.Dir(filePath), fs)
 	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
 		Module:       core.ModuleKindESNext,
@@ -150,12 +210,30 @@ func lintOnDisk(t *testing.T, filePath string) []rule.RuleDiagnostic {
 	return diagnostics
 }
 
-// utf16LE encodes ASCII source as little-endian UTF-16, without a mark — the
+type countingBOMFileSystem struct {
+	vfs.FS
+	calls atomic.Int64
+}
+
+func (fs *countingBOMFileSystem) SourceHasBOM(path string) bool {
+	fs.calls.Add(1)
+	return utils.SourceHasBOM(fs.FS, path)
+}
+
+// utf16LE encodes BMP source as little-endian UTF-16, without a mark — the
 // caller prepends one.
 func utf16LE(source string) string {
 	encoded := make([]byte, 0, len(source)*2)
 	for _, r := range source {
 		encoded = append(encoded, byte(r), byte(r>>8))
+	}
+	return string(encoded)
+}
+
+func utf16BE(source string) string {
+	encoded := make([]byte, 0, len(source)*2)
+	for _, r := range source {
+		encoded = append(encoded, byte(r>>8), byte(r))
 	}
 	return string(encoded)
 }

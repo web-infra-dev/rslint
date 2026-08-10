@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -89,6 +88,9 @@ type runProgramOptions struct {
 	// Timing, when non-nil, receives per-rule execution timings. nil disables
 	// instrumentation entirely (listeners are registered unwrapped).
 	Timing *TimingCollector
+	// PreparedPlan supplies the already-collected files and resolved rules for
+	// this Program. nil preserves the direct collection/callback path.
+	PreparedPlan *programLintPlan
 }
 
 type programLintResult struct {
@@ -152,10 +154,12 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		return programLintResult{}
 	}
 
-	// Collect files to lint (applying all filters). Shared with
-	// CollectLintTargets so the eslint-plugin dispatch path observes the
-	// exact same file set as native linting.
-	filesToLint := collectFilesToLint(opts)
+	preparedPlan := opts.PreparedPlan
+	if preparedPlan == nil {
+		plan := prepareProgramLintPlan(opts)
+		preparedPlan = &plan
+	}
+	filesToLint := preparedPlan.files
 
 	result := programLintResult{lintedFileCount: int32(len(filesToLint))}
 
@@ -224,9 +228,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Cwd:            opts.Cwd,
 				Program:        opts.Program,
 				Settings:       r.Settings,
-				ConfigGlobals:  r.Globals,
-				InlineGlobals:  inlineGlobalDeclarations,
-				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
+				Globals:        rule.NewGlobals(r.LanguageOptions, r.Globals, inlineGlobals, inlineGlobalDeclarations),
 				Comments:       comments,
 				Refs:           refs,
 				BOM:            sourceBOM,
@@ -368,15 +370,8 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 	ctx := context.Background()
 	rulesByFile := make(map[*ast.SourceFile][]ConfiguredRule, len(filesToLint))
 	checkerGroups := make(map[*checker.Checker][]*ast.SourceFile)
-	for _, file := range filesToLint {
-		if shouldSkipRulesForSyntax(opts, file, ctx) {
-			continue
-		}
-		rules := filterRulesForTypeInfo(
-			getRulesForFile(file),
-			file.FileName(),
-			opts.TypeInfoFiles,
-		)
+	for fileIndex, file := range filesToLint {
+		rules := preparedPlan.rules[fileIndex]
 		if opts.CollectExecutedRules && len(rules) > 0 {
 			if result.executedRules == nil {
 				result.executedRules = make(map[string]struct{}, len(rules))
@@ -422,7 +417,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 
 // filterNativeRules removes Node-dispatched ESLint plugin placeholders from
 // the native pass without mutating the resolver's shared cached slice. The
-// original list remains available to CollectLintTargets for plugin dispatch.
+// prepared plan retains the original list for host-side plugin dispatch.
 func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
 	firstPlugin := -1
 	for i, configuredRule := range rules {
@@ -479,6 +474,10 @@ func shouldSkipRulesForSyntax(opts runProgramOptions, file *ast.SourceFile, ctx 
 // group is created and no per-program goroutines are spawned. This is how
 // callers run a pure type-check pass (--type-check-only) without paying
 // lint-side setup cost.
+// When opts.PreparedPlan is present, Phase 1 consumes its stable per-Program
+// files and resolved rules without repeating target collection or invoking
+// GetRulesForFile. CLI/API hosts use this to share one plan with optional
+// third-party plugin dispatch; other callers retain the direct path.
 //
 // Phase 2 — type-check (skipped when opts.TypeCheck is false): each
 // non-skipped program is handed to runTypeCheckAcrossPrograms, which
@@ -504,38 +503,24 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	// Phase 1: lint rules per program (parallel). Skipped when no rule
 	// handler was supplied — see doc above.
 	if opts.GetRulesForFile != nil {
+		if opts.PreparedPlan != nil {
+			if len(opts.PreparedPlan.programs) != len(opts.Programs) {
+				return nil, errors.New("linter: prepared lint plan does not match Programs")
+			}
+			for programIndex, programPlan := range opts.PreparedPlan.programs {
+				if programPlan.program != opts.Programs[programIndex] {
+					return nil, errors.New("linter: prepared lint plan does not match Programs")
+				}
+			}
+		}
 		programResults := make([]programLintResult, len(opts.Programs))
 		wg := core.NewWorkGroup(opts.SingleThreaded)
-		for i, program := range opts.Programs {
-			var perProgramFilter FileFilter
-			if i < len(opts.PerProgramFilter) {
-				perProgramFilter = opts.PerProgramFilter[i]
+		for i := range opts.Programs {
+			var prepared *programLintPlan
+			if opts.PreparedPlan != nil {
+				prepared = &opts.PreparedPlan.programs[i]
 			}
-			var targetFiles []string
-			if opts.TargetFiles != nil && i < len(opts.TargetFiles) {
-				targetFiles = opts.TargetFiles[i]
-			}
-			filter := perProgramFilter
-			if opts.TargetFiles == nil {
-				ownedFiles := buildOwnedFileSet(program)
-				filter = composeOwnedFilter(perProgramFilter, ownedFiles)
-			}
-
-			programOpts := runProgramOptions{
-				Program:              program,
-				Cwd:                  opts.Cwd,
-				Scope:                opts.Scope,
-				ExcludePaths:         opts.ExcludePaths,
-				FileFilter:           filter,
-				TargetFiles:          targetFiles,
-				HasTargetFiles:       opts.TargetFiles != nil,
-				GetRulesForFile:      opts.GetRulesForFile,
-				CollectExecutedRules: true,
-				SyntaxErrorFiles:     opts.SyntaxErrorFiles,
-				SingleThreaded:       opts.SingleThreaded,
-				TypeInfoFiles:        opts.TypeInfoFiles,
-				Timing:               opts.Timing,
-			}
+			programOpts := runProgramOptionsFor(opts, i, prepared)
 			programIndex := i
 			programOptions := programOpts
 			wg.Queue(func() {
@@ -567,10 +552,9 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}, nil
 }
 
-// collectFilesToLint applies the ExcludePaths / Scope / FileFilter layers
-// to a program's source files. Shared by runLintRulesInProgram (native
-// lint) and CollectLintTargets (eslint-plugin dispatch) so both observe an
-// identical file set.
+// collectFilesToLint applies the ExcludePaths / Scope / FileFilter layers to a
+// program's source files. PrepareLintPlan retains this exact result when native
+// execution and a host-side consumer need to share the same file/rule plan.
 func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 	if opts.HasTargetFiles {
 		return collectExactFilesToLint(opts)
@@ -641,115 +625,6 @@ func collectExactFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 		filesToLint = append(filesToLint, file)
 	}
 	return filesToLint
-}
-
-// LintTarget is one file paired with the rules configured for it, as
-// resolved by RunLinterOptions.GetRulesForFile.
-type LintTarget struct {
-	File  *ast.SourceFile
-	Rules []ConfiguredRule
-}
-
-// CollectLintTargets resolves, for every file RunLinter would lint, the
-// rules configured for it — WITHOUT running them. The CLI/LSP host uses it
-// to split out eslint-plugin rules and dispatch them to the Node worker in
-// parallel with native linting, reusing the exact same file-set filtering
-// as RunLinter (exact TargetFiles when present, otherwise Scope / legacy
-// owned-file filtering, plus ExcludePaths and per-program filters).
-func CollectLintTargets(opts RunLinterOptions) []LintTarget {
-	if opts.GetRulesForFile == nil {
-		return nil
-	}
-	excludePaths := opts.ExcludePaths
-	if excludePaths == nil {
-		excludePaths = utils.ExcludePaths
-	}
-	var targets []LintTarget
-	for i, program := range opts.Programs {
-		var perProgramFilter FileFilter
-		if i < len(opts.PerProgramFilter) {
-			perProgramFilter = opts.PerProgramFilter[i]
-		}
-		var targetFiles []string
-		if opts.TargetFiles != nil && i < len(opts.TargetFiles) {
-			targetFiles = opts.TargetFiles[i]
-		}
-		filter := perProgramFilter
-		if opts.TargetFiles == nil {
-			filter = composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
-		}
-		files := collectFilesToLint(runProgramOptions{
-			Program:          program,
-			Scope:            opts.Scope,
-			ExcludePaths:     excludePaths,
-			FileFilter:       filter,
-			TargetFiles:      targetFiles,
-			HasTargetFiles:   opts.TargetFiles != nil,
-			SyntaxErrorFiles: opts.SyntaxErrorFiles,
-			TypeInfoFiles:    opts.TypeInfoFiles,
-		})
-		targets = append(targets, collectLintTargetsForFiles(opts, program, files)...)
-	}
-	return targets
-}
-
-// collectLintTargetsForFiles resolves rules for one program's lint target
-// files in parallel. Unlike the real lint pass, this has no type-checker
-// affinity to preserve, so files are simply chunked evenly across goroutines.
-// This is what turns the serial per-file config/glob resolution — the
-// dominant cost on large repos with many ignore/files patterns — into a
-// wall-clock win before the real, already-parallel lint pass even starts.
-func collectLintTargetsForFiles(opts RunLinterOptions, program *compiler.Program, files []*ast.SourceFile) []LintTarget {
-	if len(files) == 0 {
-		return nil
-	}
-	shardCount := runtime.GOMAXPROCS(0)
-	if opts.SingleThreaded {
-		shardCount = 1
-	} else if shardCount > len(files) {
-		shardCount = len(files)
-	}
-	if shardCount < 1 {
-		shardCount = 1
-	}
-	chunkSize := (len(files) + shardCount - 1) / shardCount
-	shardResults := make([][]LintTarget, shardCount)
-
-	wg := core.NewWorkGroup(opts.SingleThreaded)
-	for shard := range shardCount {
-		start := shard * chunkSize
-		end := min(start+chunkSize, len(files))
-		if start >= end {
-			continue
-		}
-		shardIndex := shard
-		shardFiles := files[start:end]
-		wg.Queue(func() {
-			ctx := context.Background()
-			var result []LintTarget
-			for _, file := range shardFiles {
-				if shouldSkipRulesForSyntax(runProgramOptions{
-					Program:          program,
-					SyntaxErrorFiles: opts.SyntaxErrorFiles,
-				}, file, ctx) {
-					continue
-				}
-				rules := filterRulesForTypeInfo(opts.GetRulesForFile(file), file.FileName(), opts.TypeInfoFiles)
-				if len(rules) == 0 {
-					continue
-				}
-				result = append(result, LintTarget{File: file, Rules: rules})
-			}
-			shardResults[shardIndex] = result
-		})
-	}
-	wg.RunAndWait()
-
-	var targets []LintTarget
-	for _, result := range shardResults {
-		targets = append(targets, result...)
-	}
-	return targets
 }
 
 // LintSingleFile runs lint rules against a single file in a single program.

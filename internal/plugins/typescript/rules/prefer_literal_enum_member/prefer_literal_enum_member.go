@@ -1,9 +1,14 @@
 package prefer_literal_enum_member
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed prefer_literal_enum_member.schema.json
+var schemaJSON []byte
 
 func buildNotLiteralMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -20,22 +25,12 @@ func buildNotLiteralOrBitwiseExpressionMessage() rule.RuleMessage {
 }
 
 var PreferLiteralEnumMemberRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-literal-enum-member",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "prefer-literal-enum-member",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowBitwise := false
-
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
+		if len(options) > 0 {
+			if optsMap, ok := options[0].(map[string]interface{}); ok {
 				if allowBitwiseExpressions, ok := optsMap["allowBitwiseExpressions"].(bool); ok {
 					allowBitwise = allowBitwiseExpressions
 				}

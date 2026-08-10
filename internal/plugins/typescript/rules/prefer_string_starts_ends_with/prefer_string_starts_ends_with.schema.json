@@ -1,0 +1,18 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowSingleElementEquality": {
+          "type": "string",
+          "description": "Whether to allow equality checks against the first or last element of a string.",
+          "enum": ["always", "never"]
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

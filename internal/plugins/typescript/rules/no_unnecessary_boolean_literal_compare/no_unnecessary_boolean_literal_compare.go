@@ -1,6 +1,7 @@
 package no_unnecessary_boolean_literal_compare
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unnecessary_boolean_literal_compare.schema.json
+var schemaJSON []byte
 
 func buildComparingNullableToFalseMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -53,6 +57,26 @@ type NoUnnecessaryBooleanLiteralCompareOptions struct {
 	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing,omitempty"`
 }
 
+func parseOptions(options []any) NoUnnecessaryBooleanLiteralCompareOptions {
+	opts := NoUnnecessaryBooleanLiteralCompareOptions{}
+	if len(options) > 0 {
+		if optsJSON, err := json.Marshal(options[0]); err == nil {
+			// Convert the configured option object to JSON and back into the struct.
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	if opts.AllowComparingNullableBooleansToFalse == nil {
+		opts.AllowComparingNullableBooleansToFalse = utils.Ref(true)
+	}
+	if opts.AllowComparingNullableBooleansToTrue == nil {
+		opts.AllowComparingNullableBooleansToTrue = utils.Ref(true)
+	}
+	if opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing == nil {
+		opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = utils.Ref(false)
+	}
+	return opts
+}
+
 type booleanComparison struct {
 	expression                  *ast.Expression
 	literalBooleanInComparison  bool
@@ -66,31 +90,10 @@ func isBooleanType(t *checker.Type) bool {
 
 var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-boolean-literal-compare",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoUnnecessaryBooleanLiteralCompareOptions)
-		if !ok {
-			opts = NoUnnecessaryBooleanLiteralCompareOptions{}
-			if optionsArray, ok := options.([]interface{}); ok && len(optionsArray) > 0 {
-				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-			} else if optsMap, ok := options.(map[string]interface{}); ok {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.AllowComparingNullableBooleansToFalse == nil {
-			opts.AllowComparingNullableBooleansToFalse = utils.Ref(true)
-		}
-		if opts.AllowComparingNullableBooleansToTrue == nil {
-			opts.AllowComparingNullableBooleansToTrue = utils.Ref(true)
-		}
-		if opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing == nil {
-			opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(

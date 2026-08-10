@@ -33,10 +33,7 @@ func TestNoThisAliasRule(t *testing.T) {
 			{Code: `const [foo, bar] = this;`},
 			{Code: `const self = this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
 			{Code: `const \u0073elf = this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
-			{
-				Code:    `const nested = this;`,
-				Options: []interface{}{[]interface{}{map[string]interface{}{"allowedNames": []interface{}{"nested"}}}},
-			},
+			{Code: `const nested = this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"nested"}}},
 			{Code: `let self = 1; self ||= this;`, Options: map[string]interface{}{"allowedNames": []interface{}{"self"}}},
 			{Code: `setTimeout(() => { this.doWork(); });`},
 		},

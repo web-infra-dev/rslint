@@ -249,6 +249,8 @@ type Foo = {
 		{Code: `var HOUR = 3600;`},
 		{Code: `foo[0xABn]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
 		{Code: `foo[5.0000000000000001]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: "// eslint-disable-next-line test\nf(42);"},
+		{Code: "/* eslint-disable test */\nf(42);\n/* eslint-enable test */"},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Core ESLint: enforceConst ----
 		{
@@ -781,5 +783,13 @@ type Foo = {
 		{Code: `var stats = {avg: 42};`, Options: map[string]interface{}{"detectObjects": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42."}}},
 		{Code: `min = 1;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}}},
 		{Code: `function f() { return 60; }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 60."}}},
+		{
+			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 24},
+				{MessageId: "noMagic", Message: "No magic number: -(7).", Line: 1, Column: 40},
+				{MessageId: "noMagic", Message: "No magic number: 9n.", Line: 1, Column: 59},
+			},
+		},
 	})
 }

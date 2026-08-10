@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
-	"time"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
@@ -42,92 +41,101 @@ func (f *parallelProgramTestFS) WriteFile(path string, content string) error {
 }
 
 type blockingRealpathQuery struct {
-	calls   atomic.Int32
-	started chan struct{}
-	release chan struct{}
+	calls       atomic.Int32
+	release     chan struct{}
+	releaseOnce sync.Once
 }
 
 func newBlockingRealpathQuery() *blockingRealpathQuery {
 	return &blockingRealpathQuery{
-		started: make(chan struct{}, 64),
 		release: make(chan struct{}),
 	}
 }
 
 func (q *blockingRealpathQuery) run(path string) string {
 	q.calls.Add(1)
-	q.started <- struct{}{}
 	<-q.release
 	return path
+}
+
+func (q *blockingRealpathQuery) releaseAll() {
+	q.releaseOnce.Do(func() { close(q.release) })
 }
 
 func TestParallelProgramFSCoalescesConcurrentRealpathMisses(t *testing.T) {
 	t.Parallel()
 
-	gate := newBlockingRealpathQuery()
-	cached := newParallelProgramFS(&parallelProgramTestFS{realpath: gate.run})
+	synctest.Test(t, func(t *testing.T) {
+		gate := newBlockingRealpathQuery()
+		defer gate.releaseAll()
+		cached := newParallelProgramFS(&parallelProgramTestFS{realpath: gate.run})
 
-	const workers = 32
-	start := make(chan struct{})
-	var ready sync.WaitGroup
-	ready.Add(workers)
-	results := make(chan string, workers)
-	for range workers {
-		go func() {
-			ready.Done()
-			<-start
-			results <- cached.Realpath("/same/exact/path")
-		}()
-	}
-	ready.Wait()
-	close(start)
-
-	select {
-	case <-gate.started:
-	case <-time.After(2 * time.Second):
-		t.Fatal("underlying Realpath did not start")
-	}
-	// Keep the owner blocked long enough for every ready goroutine to reach
-	// the cache. A cache stampede would be visible in calls.
-	time.Sleep(50 * time.Millisecond)
-	if got := gate.calls.Load(); got != 1 {
-		t.Fatalf("underlying calls while cold query is blocked = %d, want 1", got)
-	}
-	close(gate.release)
-
-	for range workers {
-		if got := <-results; got != "/same/exact/path" {
-			t.Fatalf("Realpath result = %q", got)
+		const workers = 32
+		start := make(chan struct{})
+		var ready sync.WaitGroup
+		ready.Add(workers)
+		results := make(chan string, workers)
+		for range workers {
+			go func() {
+				ready.Done()
+				<-start
+				results <- cached.Realpath("/same/exact/path")
+			}()
 		}
-	}
-	if got := cached.Realpath("/same/exact/path"); got != "/same/exact/path" {
-		t.Fatalf("warm Realpath result = %q", got)
-	}
-	if got := gate.calls.Load(); got != 1 {
-		t.Fatalf("underlying calls after warm query = %d, want 1", got)
-	}
+		ready.Wait()
+		close(start)
+
+		// Wait until the owner is blocked in the underlying filesystem and all
+		// other goroutines are blocked on its flight. This observes the same
+		// state as a sleep, without depending on host scheduling speed.
+		synctest.Wait()
+		if got := gate.calls.Load(); got != 1 {
+			t.Fatalf("underlying calls while cold query is blocked = %d, want 1", got)
+		}
+		gate.releaseAll()
+
+		for range workers {
+			if got := <-results; got != "/same/exact/path" {
+				t.Fatalf("Realpath result = %q", got)
+			}
+		}
+		if got := cached.Realpath("/same/exact/path"); got != "/same/exact/path" {
+			t.Fatalf("warm Realpath result = %q", got)
+		}
+		if got := gate.calls.Load(); got != 1 {
+			t.Fatalf("underlying calls after warm query = %d, want 1", got)
+		}
+	})
 }
 
 func TestParallelProgramFSDoesNotSerializeDifferentPaths(t *testing.T) {
 	t.Parallel()
 
-	gate := newBlockingRealpathQuery()
-	cached := newParallelProgramFS(&parallelProgramTestFS{realpath: gate.run})
-	results := make(chan string, 2)
-	go func() { results <- cached.Realpath("/first") }()
-	go func() { results <- cached.Realpath("/second") }()
+	synctest.Test(t, func(t *testing.T) {
+		gate := newBlockingRealpathQuery()
+		defer gate.releaseAll()
+		cached := newParallelProgramFS(&parallelProgramTestFS{realpath: gate.run})
+		results := make(chan string, 2)
+		go func() { results <- cached.Realpath("/first") }()
+		go func() { results <- cached.Realpath("/second") }()
 
-	for range 2 {
-		select {
-		case <-gate.started:
-		case <-time.After(2 * time.Second):
-			t.Fatal("different paths were serialized behind one query")
+		// Both goroutines must independently reach the underlying filesystem
+		// before either query is released. synctest makes that observation
+		// independent of runner load while retaining the concurrency assertion.
+		synctest.Wait()
+		if got := gate.calls.Load(); got != 2 {
+			t.Fatalf("concurrent underlying calls for different paths = %d, want 2", got)
 		}
-	}
-	close(gate.release)
-	for range 2 {
-		<-results
-	}
+		gate.releaseAll()
+
+		seen := make(map[string]bool, 2)
+		for range 2 {
+			seen[<-results] = true
+		}
+		if !seen["/first"] || !seen["/second"] || len(seen) != 2 {
+			t.Fatalf("Realpath results for different paths = %v", seen)
+		}
+	})
 }
 
 func TestParallelProgramFSPanicReleasesWaitersAndRetries(t *testing.T) {

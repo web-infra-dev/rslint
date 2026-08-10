@@ -5,7 +5,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestOnlyThrowErrorRule(t *testing.T) {
@@ -139,10 +138,10 @@ function fun<T extends Error>(t: T): void {
 			Code: `
 throw undefined;
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}}},
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allow":                []interface{}{map[string]interface{}{"from": "lib", "name": "undefined"}},
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		{
@@ -150,20 +149,20 @@ throw undefined;
 class CustomError implements Error {}
 throw new CustomError();
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}},
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allow":                []interface{}{map[string]interface{}{"from": "file", "name": "CustomError"}},
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		{
 			Code: `
 throw new Map();
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allow":                []interface{}{map[string]interface{}{"from": "lib", "name": "Map"}},
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		{
@@ -174,10 +173,10 @@ throw new Map();
 			// Skip: 'errors' module doesn't exist in test fixtures, so createError()
 			// resolves to 'any' and can't match the package specifier.
 			Skip: true,
-			Options: OnlyThrowErrorOptions{
-				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"}},
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allow":                []interface{}{map[string]interface{}{"from": "package", "name": "ErrorLike", "package": "errors"}},
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		// allowRethrowing: valid cases
@@ -188,10 +187,10 @@ try {
   throw e;
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		{
@@ -211,10 +210,10 @@ try {
   }
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		{
@@ -223,10 +222,10 @@ Promise.reject('foo').catch(e => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 		},
 		// allow string shorthand with generic union
@@ -237,9 +236,7 @@ function func<T1, T2>() {
   throw err;
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromString, Name: []string{"Promise"}}},
-			},
+			Options: map[string]interface{}{"allow": []interface{}{"Promise"}},
 		},
 		// throw await resolving to Error with allowThrowingAny: false
 		{
@@ -248,9 +245,7 @@ async function foo() {
   throw await Promise.resolve(new Error('error'));
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowThrowingAny: utils.Ref(false),
-			},
+			Options: map[string]interface{}{"allowThrowingAny": false},
 		},
 		// generator with typed return
 		{
@@ -259,9 +254,7 @@ function* foo(): Generator<number, void, Error> {
   throw yield 303;
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowThrowingAny: utils.Ref(false),
-			},
+			Options: map[string]interface{}{"allowThrowingAny": false},
 		},
 	}, []rule_tester.InvalidTestCase{
 		{
@@ -600,7 +593,7 @@ function fun(value: any) {
   throw value;
 }
       `,
-			Options: OnlyThrowErrorOptions{AllowThrowingAny: utils.Ref(false)},
+			Options: map[string]interface{}{"allowThrowingAny": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "object",
@@ -613,7 +606,7 @@ function fun(value: unknown) {
   throw value;
 }
       `,
-			Options: OnlyThrowErrorOptions{AllowThrowingUnknown: utils.Ref(false)},
+			Options: map[string]interface{}{"allowThrowingUnknown": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "object",
@@ -637,10 +630,10 @@ function fun<T extends number>(t: T): void {
 class UnknownError implements Error {}
 throw new UnknownError();
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}},
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allow":                []interface{}{map[string]interface{}{"from": "file", "name": "CustomError"}},
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -656,10 +649,10 @@ Promise.reject('foo').catch(e => {
   throw x;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -673,10 +666,10 @@ Promise.reject('foo').catch((...e) => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -691,10 +684,10 @@ Promise.reject('foo').catch(...x, e => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -709,10 +702,10 @@ Promise.reject('foo').then(...x, e => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -728,10 +721,10 @@ Promise.reject('foo').then(onFulfilled, ...x, e => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -745,10 +738,10 @@ Promise.reject('foo').then((...e) => {
   throw e;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -762,10 +755,10 @@ Promise.reject('foo').then(e => {
   throw globalThis;
 });
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowRethrowing:      utils.Ref(true),
-				AllowThrowingAny:     utils.Ref(false),
-				AllowThrowingUnknown: utils.Ref(false),
+			Options: map[string]interface{}{
+				"allowRethrowing":      true,
+				"allowThrowingAny":     false,
+				"allowThrowingUnknown": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -781,9 +774,7 @@ function func<T1, T2>() {
   throw err;
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromString, Name: []string{"Promise"}}},
-			},
+			Options: map[string]interface{}{"allow": []interface{}{"Promise"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "object",
@@ -797,9 +788,7 @@ async function foo() {
   throw await bar;
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowThrowingAny: utils.Ref(false),
-			},
+			Options: map[string]interface{}{"allowThrowingAny": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "object",
@@ -813,9 +802,7 @@ async function foo() {
   throw await Promise.resolve<number>(303);
 }
       `,
-			Options: OnlyThrowErrorOptions{
-				AllowThrowingAny: utils.Ref(false),
-			},
+			Options: map[string]interface{}{"allowThrowingAny": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "object",

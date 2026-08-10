@@ -31,8 +31,16 @@ ruleTester.run('no-undef', {
     // === Labels ===
     'loop: for (var i = 0; i < 10; i++) { break loop; }',
 
-    // === Built-in globals via lib ===
+    // === ECMAScript language globals ===
     'var p = new Promise<void>((resolve) => resolve());',
+    {
+      code: 'Promise; JSON;',
+      languageOptions: { ecmaVersion: 6 },
+    },
+    {
+      code: 'Temporal;',
+      languageOptions: { ecmaVersion: 'latest' },
+    },
 
     // === Type-only positions: type annotations ===
     'type MyType = string; var x: MyType;',
@@ -701,6 +709,18 @@ ruleTester.run('no-undef', {
     // === Optional call on undeclared ===
     {
       code: 'undefOptionalCall123?.();',
+      errors: [{ messageId: 'undef' }],
+    },
+
+    // === languageOptions.ecmaVersion reaches native global resolution ===
+    {
+      code: 'Promise;',
+      languageOptions: { ecmaVersion: 5 },
+      errors: [{ messageId: 'undef' }],
+    },
+    {
+      code: 'Temporal;',
+      languageOptions: { ecmaVersion: 2025 },
       errors: [{ messageId: 'undef' }],
     },
   ],

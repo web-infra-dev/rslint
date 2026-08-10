@@ -1,0 +1,27 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "$defs": {
+        "arrayOption": {
+          "type": "string",
+          "enum": ["array", "generic", "array-simple"]
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "$ref": "#/items/0/$defs/arrayOption",
+          "description": "The array type expected for mutable cases."
+        },
+        "readonly": {
+          "$ref": "#/items/0/$defs/arrayOption",
+          "description": "The array type expected for readonly cases. If omitted, the value for `default` will be used."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

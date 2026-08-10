@@ -38,9 +38,26 @@ func checkRejectCall(ctx rule.RuleContext, callExpression *ast.Node, allowEmptyR
 		return
 	}
 	first := args[0]
-	if !utils.CouldBeError(first) || utils.IsUndefinedIdentifier(first) {
+	isGlobalUndefined := utils.IsUndefinedIdentifier(first) &&
+		isEffectiveGlobalIdentifier(ctx, ast.SkipParentheses(first), "undefined")
+	if !utils.CouldBeError(first) || isGlobalUndefined {
 		ctx.ReportNode(callExpression, buildRejectAnErrorMessage())
 	}
+}
+
+// isEffectiveGlobalIdentifier mirrors SourceCode#isGlobalReference for the
+// native scope model while also honoring ecmaVersion and authored overrides.
+func isEffectiveGlobalIdentifier(ctx rule.RuleContext, node *ast.Node, name string) bool {
+	if node == nil || !ast.IsIdentifier(node) || node.AsIdentifier().Text != name ||
+		!ctx.Globals.Access(name).IsDeclared() {
+		return false
+	}
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			return !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+		}
+	}
+	return !utils.IsShadowed(node, name)
 }
 
 var PreferPromiseRejectErrorsRule = rule.Rule{
@@ -50,7 +67,9 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if utils.IsSpecificMemberAccess(node.AsCallExpression().Expression, "Promise", "reject") {
+				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				if utils.IsSpecificMemberAccess(callee, "Promise", "reject") &&
+					isEffectiveGlobalIdentifier(ctx, ast.SkipParentheses(utils.AccessExpressionObject(callee)), "Promise") {
 					checkRejectCall(ctx, node, opts.AllowEmptyReject)
 				}
 			},
@@ -62,7 +81,7 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 				// are NOT unwrapped: ESLint's identifier check fails on them, so
 				// `new (Promise as any)(...)` is not recognized as a Promise constructor.
 				callee := ast.SkipParentheses(node.AsNewExpression().Expression)
-				if callee == nil || !ast.IsIdentifier(callee) || callee.AsIdentifier().Text != "Promise" {
+				if !isEffectiveGlobalIdentifier(ctx, callee, "Promise") {
 					return
 				}
 				args := node.Arguments()

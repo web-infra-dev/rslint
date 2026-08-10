@@ -965,7 +965,8 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
+				Code:    `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
@@ -1374,6 +1375,28 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 					{MessageId: "zwj"},
 				},
 			},
+		},
+	)
+}
+
+func TestNoMisleadingCharacterClassGlobalAvailability(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoMisleadingCharacterClassRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `window.RegExp("[Á]", "")`},
+			{Code: `self.RegExp("[Á]", "")`},
+			{Code: `global.RegExp("[Á]", "")`},
+			{Code: `globalThis.RegExp("[Á]", "")`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: `window.RegExp("[Á]", "")`, Globals: map[string]any{"window": "off"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `window.RegExp("[Á]", "")`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `self.RegExp("[Á]", "")`, Globals: map[string]any{"self": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `global.RegExp("[Á]", "")`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `globalThis.RegExp("[Á]", "")`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
 		},
 	)
 }

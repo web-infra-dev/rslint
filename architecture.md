@@ -128,7 +128,7 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                                                 | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests to `internal/api`, `internal/linter`, and `internal/inspector`                                                                                                                              |
 | `packages/rule-tester/`        | Forked `@typescript-eslint/rule-tester` package used in tests                                                                               | JS-side rule testing support that complements Go-side helpers                                                                                                                                                                                                                          |
 | `packages/utils/`              | Shared JavaScript utilities                                                                                                                 | Shared support package for the JS/website tooling layer                                                                                                                                                                                                                                |
-| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                                       | Launches `cmd/rslint --lsp`, starts `rslint/configRefresh`, serves reverse load/activate/commit/abort and plugin-lint requests, and consumes diagnostics/code actions from `internal/lsp`                                                                                              |
+| `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                                       | Resolves the nearest project-local `@rslint/core` per open document, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime                                                    |
 | `packages/tsgo/`               | JS wrapper package for the `tsgo` tool                                                                                                      | JavaScript-facing wrapper around `cmd/tsgo` output                                                                                                                                                                                                                                     |
 | `typescript-go/`               | Git submodule containing TypeScript compiler Go port                                                                                        | Provides parser, AST, checker, `Program`, `project.Session`, diagnostics, scanner, and VFS primitives used throughout the backend                                                                                                                                                      |
 | `shim/`                        | Generated bridge packages exposing ts-go internals                                                                                          | Bridge layer between repository Go code and `typescript-go` internals; generated and updated by `tools/`                                                                                                                                                                               |
@@ -275,9 +275,7 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
-    ConfigGlobals  map[string]utils.GlobalAccess
-    InlineGlobals  []InlineGlobal
-    Globals        map[string]utils.GlobalAccess
+    Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
     Program        *compiler.Program
@@ -325,15 +323,29 @@ trip for that identifier, and `References` picks up that same fallback
 automatically when queried with a symbol `Resolve` obtained that way. Without
 a TypeChecker (`NewRefStore`'s third argument is `nil`), that fallback is a
 no-op and both methods only ever see symbols declared in the current file.
-`ConfigGlobals` preserves the effective `languageOptions.globals` source,
-`InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
-resolved map after inline settings override configuration. Rules consume this
-context data instead of scanning comments independently. Every authored alias
-is normalized to one of ESLint's three access levels — `utils.GlobalAccess`,
-whose zero value means neither source mentioned the name, so a rule that
-indexes it falls back to what it already knows about the name. Booleans follow
-the `globals` package: `true` is writable, `false` is read-only. The Node
-plugin scope seeds the same levels into its scope manager for
+`ResolveInFile` is the explicit binder-only forward lookup: it never takes the
+TypeChecker fallback even when one is available. ESLint scope rules such as
+`no-undef` use this path so DOM/lib, ambient `.d.ts`, and cross-file TypeScript
+symbols cannot make their result depend on whether the file happened to receive
+a checker.
+Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
+its zero value means the moving `latest` edition. The linter uses it to build
+one `Globals` value for each native rule context. `Globals` owns the
+ESLint-versioned language-global set, the authored
+`languageOptions.globals` source, inline `/* global */` settings and ranges,
+and the effective access after applying their precedence. Rules use
+`Globals.Access` for standard language-global decisions and its narrower source
+accessors only when upstream behavior depends on provenance, instead of
+rebuilding the merge. A rule whose upstream semantics add another source, such
+as TypeScript library globals, applies this view last so `ecmaVersion` and
+authored overrides remain authoritative. This keeps the language-global
+composition point extensible for future language options such as `sourceType`
+without exposing those options directly to every rule; non-global wrapper
+bindings remain a scope/`RefStore` concern.
+Every authored alias is normalized to one of ESLint's three access levels —
+`utils.GlobalAccess`, whose zero value means no source mentioned the name.
+Booleans follow the `globals` package: `true` is writable, `false` is read-only.
+The Node plugin scope seeds the same levels into its scope manager for
 ESLint-compatible scope APIs.
 The linter binds immutable rule name, severity, and diagnostic-sink metadata to
 each context once. The reporting methods use that state directly rather than
@@ -474,12 +486,13 @@ Rslint supports two configuration formats following ESLint flat config semantics
 Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`:
 
 ```typescript
-import { defineConfig, ts } from '@rslint/core';
+import { defineConfig, js, ts } from '@rslint/core';
 
 export default defineConfig([
   {
     ignores: ['**/dist/**', '**/fixtures/**'],
   },
+  js.configs.recommended,
   ts.configs.recommended,
   {
     rules: {
@@ -529,7 +542,7 @@ Each entry in the config array supports:
 | ----------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `files`           | `(string \| string[])[]`                   | Non-empty selector list; top-level selectors are ORed and nested selectors are ANDed |
 | `ignores`         | `string[]`                                 | Glob patterns excluded by this entry                                                 |
-| `languageOptions` | `object`                                   | Parser options such as `project` and `projectService`                                |
+| `languageOptions` | `object`                                   | `ecmaVersion`, globals, and parser options such as project settings                  |
 | `rules`           | `Record<string, …>`                        | Rule level or `[level, options]`                                                     |
 | `plugins`         | `string[] \| Record<string, ESLintPlugin>` | Native plugin declarations or third-party plugin instances                           |
 | `settings`        | `Record<string, …>`                        | Shared settings available in `RuleContext`                                           |
@@ -547,6 +560,12 @@ config/ownership catalog and observes `.gitignore` sources during the same
 directory walk. Explicit loading first selects the exact module unconditionally,
 then freezes that invocation-wide owner's Git projection with the same frontier
 without probing nested config candidates. Neither path collects lint targets.
+For LSP, the client's first `rslint/configRefresh` may include one absolute
+`configPath`. The server fixes that optional path for its lifetime: later client
+refreshes must repeat the same choice, while Go-owned `.gitignore` refreshes
+reuse it internally. Changing between automatic discovery and an explicit path,
+or changing the path itself, requires a new server process. Explicit LSP mode
+uses only the selected JS/TS module and does not load JSON fallback config.
 Go owns candidate discovery, default exclusions, config hierarchy, authored and
 Git directory reachability, the frozen Git projection for each owner, and final
 effective IDs. Node only
@@ -672,42 +691,50 @@ The transport and target phase differ by surface:
   loader boundary as the final suffix of every successful config. Their global
   ignores and negations therefore participate in staged reachability and are
   published exactly once; an empty catalog uses the same override directly.
-- The extension owns shared UI, commands, and output channels once. Its
-  `WorkspaceRslintCoordinator` keys desired and active roots by workspace-folder
-  URI (not display name), subscribes to folder changes before awaiting any root,
-  and independently starts or closes one `Rslint` runtime per URI generation.
-  One slow or failed root therefore cannot serialize healthy roots; terminal
-  shutdown still attempts every per-root close before releasing shared
-  resources. If an old generation does not confirm that it closed, its URI slot
-  remains quarantined: no replacement starts, and the retained error is
-  included in terminal shutdown. Each runtime owns its native server children,
-  config watcher, transaction adapter, plugin pool, request handlers, and
-  workspace logger. A process owner covers automatic LanguageClient restarts,
-  terminates any still-live prior child before a restart spawn, blocks new
-  spawns once closing begins, and awaits stdio close after bounded forced
-  termination of any child that survives protocol shutdown. A closing-aware
-  client error handler forbids restart, and per-root close waits for the pending
-  initialize/state tail before extension-wide channels are released.
-- Every runtime keeps a workspace-relative document selector, while
-  `WorkspaceDocumentRouter` is the single authority for overlapping selectors.
-  Among ready roots it assigns an open supported document to the longest
-  matching URI root. A root activation or removal performs an ordered
+- The extension owns shared UI, commands, and output channels once. For each
+  open supported file, `CoreResolver` follows normal `node_modules` ancestry or
+  the resource-scoped `rslint.corePath` override to an exact
+  `@rslint/core` package. There is no bundled fallback and no alternate PnP
+  execution path. That package supplies the Go binary, config-module host,
+  protocol version, and lazily loaded ESLint-plugin worker host as one coherent
+  runtime boundary.
+- `RuntimeManager` keys a runtime by VS Code workspace-folder URI plus the
+  package directory's normalized physical realpath. Documents resolving through
+  symlinks to the same installation share its process and worker state; distinct
+  physical copies remain isolated even when their version strings match. Only
+  installations selected by currently open documents start. Reference release
+  closes an unused runtime, while a document switch starts and validates the
+  replacement before withdrawing its last-good owner. An unconfirmed close
+  quarantines that exact runtime key so a replacement cannot overlap a possibly
+  live process. Terminal shutdown still attempts every runtime close before
+  releasing shared resources.
+- Each runtime owns its native server children, config watcher, transaction
+  adapter, plugin pool, request handlers, and workspace logger. A process owner
+  covers automatic LanguageClient restarts, terminates any still-live prior
+  child before a restart spawn, blocks new spawns once closing begins, and
+  awaits stdio close after bounded forced termination of any child that survives
+  protocol shutdown. A closing-aware client error handler forbids restart.
+- Every runtime retains a workspace-relative document selector, while
+  `WorkspaceDocumentRouter` is the single authority for the selectors' overlap.
+  The manager assigns each document explicitly to the runtime selected by local
+  package resolution. An assignment change performs an ordered
   `didClose`/diagnostic-clear/`didOpen` handoff using the document's current
   in-memory text, without requiring the editor to close. Middleware admits
   changes, saves, diagnostics, and code actions only for the exact active
   runtime that currently owns the server-open document. Exact runtime identity
-  rejects diagnostics from a replaced same-URI client, while a document epoch
+  rejects diagnostics from a replaced same-key client, while a document epoch
   rejects code actions that finish after an ownership change. When the
   LanguageClient automatically restarts a native server, the router invalidates
-  every recorded server-open session for that runtime—including documents that
-  closed during the feature-listener gap—before LanguageClient replays
-  `didOpen`, so the replacement process receives every still-open document
-  exactly once and a later same-URI reopen cannot inherit stale ownership. The
-  reset is queued as soon as a running transport exits and repeated at the next
-  `Running` transition; root removal also drains any exact-runtime session that
-  disappeared from VS Code's open-document list during that gap.
-- Each root starts `rslint/configRefresh`, and Go scans that process cwd with a
-  transaction-scoped cached VFS. Go sends
+  every recorded server-open session for that runtime before LanguageClient
+  replays `didOpen`, so the replacement process receives each still-open owned
+  document exactly once.
+- Each selected runtime starts `rslint/configRefresh`. With no `configPath`, Go
+  scans that process's workspace-folder cwd with a transaction-scoped cached
+  VFS. A client may instead repeat one fixed absolute JS/TS `configPath` on
+  every refresh; Go loads exactly that module while retaining the process cwd
+  as its invocation-wide matching root. The client owns change notifications
+  for the explicit path, while Go's existing `.gitignore` watcher refreshes
+  the already-fixed source. Go sends
   `rslint/loadConfigs` and
   `rslint/activateConfigs`, then commits or aborts the matching plugin-host state
   through `rslint/commitConfigs` / `rslint/abortConfigs`. `fresh` loads cache-bust the config entry
@@ -889,8 +916,8 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
 5. **Program Registry**: plain lint builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order. Planning fixes those identities and stable slots serially, then independent Programs fill the slots through a bounded worker pool.
 6. **Program Binding**: each target is bound by exact lexical or canonical filesystem identity to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through a non-project-backed fallback Program
-7. **Rule Resolution**: `getRulesForFile` resolves enabled rules from the stable lint-target path, never the Program source alias, and filters type-aware rules off no-type-info gap files
-8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
+7. **Rule Plan Preparation**: `PrepareLintPlan()` retains every selected file by Program and resolves each eligible file's complete rule set once from the stable lint-target path, never the Program source alias. The immutable result preserves syntax-error and zero-rule files for native accounting while exposing the non-empty file/rule projection needed by third-party plugin dispatch. CLI and native API reuse the same plan for plugin and native execution; LSP keeps its single-document `LintSingleFile` path.
+8. **Rule Execution**: `RunLinter()` schedules per-Program work over the prepared plan; the unexported `runLintRulesInProgram()` retains the existing TypeChecker-exclusive grouping and filters the native subset without resolving rules again. The CLI supplies a native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds real Programs, and rebinds the unchanged target plan after each pass; a file may move between a real Program and fallback as its import graph changes
 11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
@@ -904,16 +931,21 @@ The main Go workload work groups and pools below honor `--singleThreaded`.
 The flag serializes these workload stages, but IPC transport, diagnostic
 collection, and plugin dispatch may still use infrastructure goroutines.
 
-1. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
+1. **Lint-plan work group** (`PrepareLintPlan()` via `core.NewWorkGroup`)
+   - Resolves per-file rules into stable per-Program slots with at most
+     `min(GOMAXPROCS, selected file count)` workers.
+   - `--singleThreaded` resolves the same slots serially in Program/file order.
+
+2. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
    - Schedules per-Program lint work; runs rules in parallel within a Program.
    - `--singleThreaded` collapses the work group to serial execution.
 
-2. **Type-check work group** (`runTypeCheckAcrossPrograms`)
+3. **Type-check work group** (`runTypeCheckAcrossPrograms`)
    - Schedules diagnostics for real tsconfig Programs and merges results in
      stable Program order.
    - `--singleThreaded` computes Program diagnostics serially.
 
-3. **Staged catalog discovery and Program creation**
+4. **Staged catalog discovery and Program creation**
    - A bounded Go worker pool scans one reachable sibling frontier at a time.
      Config-boundary nodes are suspended, batched after that frontier is
      processed, and resumed only after the Node result is merged.
@@ -939,7 +971,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      worker and serializes module evaluation within each Node frontier batch.
      Coordinator batches and results remain ordered in either mode.
 
-4. **Lint-target directory walker** (`internal/config/file_discovery.go`)
+5. **Lint-target directory walker** (`internal/config/file_discovery.go`)
    - `DiscoverLintTargets` uses a fixed-size worker pool (`walkPool`) that
      walks the directory tree. `DiscoverLintFiles` is the path-only
      compatibility wrapper. Live goroutine count is capped at `workers`, not
@@ -958,7 +990,7 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      scheduling-dependent non-determinism that a parallel walker would
      otherwise introduce.
 
-5. **Program source identity index** (`bindLintTargetPlan`)
+6. **Program source identity index** (`bindLintTargetPlan`)
    - Direct lexical Program lookups remain synchronous. The target identity
      maps are not allocated until one misses. The binder then builds the
      governing config's Program indexes in one canonicalization batch, reusing
@@ -1034,6 +1066,10 @@ goroutines remain outside that guarantee.
 - **Program-Level Parallelism**: configured Program construction uses a bounded, stable-slot worker pool, and `RunLinter` queues subsequent lint work per Program through `core.NewWorkGroup`; `--singleThreaded` forces both flows to run serially
 - **Single-Walk Rule Dispatch**: each file is traversed once, with rules registering listeners up front and sharing the same AST walk
 - **Early Filtering**: exact lint target plans, skip paths, global-ignore filters, and gap-file type filtering reduce work before listeners run
+- **Shared Prepared Lint Plan**: CLI and native API resolve each selected
+  file's complete rule set once into immutable per-Program slots. Native
+  execution and optional third-party plugin dispatch consume projections of the
+  same plan instead of repeating target collection or rule resolution
 
 ### Performance Optimizations
 
@@ -1057,16 +1093,17 @@ goroutines remain outside that guarantee.
 - **Exact Config-Shape Interning**: a `FileConfigResolver` parses global and
   entry-local ignores once, maps each exact file path to its complete matched
   flat-config entry bitset, and merges/prepares enabled rules once per unique
-  bitset. CLI/API native and third-party plugin collection can share the fully
-  published immutable plan. LSP keeps its existing per-document resolver
-  lifetime; per-file rule runtime state stays outside every plan.
+  bitset. The prepared lint plan references these published immutable rule
+  slices without moving per-file runtime state into the config cache. LSP keeps
+  its existing per-document resolver lifetime.
 
 ### Caching Strategy
 
 - **LSP Session Reuse**: `internal/lsp` builds a shared ts-go `project.Session`, so configured projects, inferred projects, and overlay document state are reused across requests.
 - **LSP Standalone Program Ownership**: rslint retains standalone Programs only for declared custom projects that the main Session does not own. The owner is keyed by the exact config path, receives serialized LSP document events, and uses ts-go's incremental Program update only for known source changes. Config, project-shape, and covered filesystem changes discard the affected resident state. Filesystem reads made during Program construction and lazy checker work are mapped to client watchers with ts-go's existing watch utilities; registration failure falls back to fresh standalone construction. Clients without watched-file support also retain the fresh behavior. No second Session or rslint ParseCache is introduced.
 - **Parse Cache in LSP**: the LSP server passes a shared ts-go `project.ParseCache` into the session to avoid re-parsing from scratch on every change.
-- **Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop.
+- **Incremental LSP Document Sync**: editor changes reach the server immediately and are applied in order to both rslint's document mirror and the ts-go Session overlay. rslint selects the mandatory LSP UTF-16 encoding so incoming changes, native diagnostics, plugin diagnostics, and edits share VS Code's coordinate model. Whole-document changes remain a supported protocol fallback.
+- **Server-Owned Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop. The server remains the single owner of the 200 ms typing debounce; open and save diagnostics stay immediate, while save, fix-all, and close discard redundant pending work for their target document.
 - **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.
 - **Parallel Program Realpath Queries**: when a CLI or lint API request actually builds multiple Programs concurrently, `ProgramBuildContext` derives a Program-only VFS view that coalesces same-path `Realpath` cold queries across those compiler hosts. Completed realpath and empty-result values remain request-local. Exact path strings are used as keys without cleaning, separator rewriting, case folding, or realpath-key merging. Existence checks and all other operations continue through the existing VFS stack. Serial Program builds, config discovery, target binding, LSP, and `cmd/tsgo` retain their existing filesystem paths and cache lifecycles.
 - **Resolver-Scoped Effective Config Plans**: each `FileConfigResolver` owns
@@ -1209,7 +1246,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 
 ### Key Interfaces
 
-- **Config → Registry**: map merged config into enabled `ConfiguredRule` values
+- **Config → Registry**: map merged config into enabled `ConfiguredRule` values, including normalized per-file language options
 - **Programs → Linter**: ts-go `Program` instances define the compilation contexts the linter runs against
 - **Rules → RuleContext**: rules interact only through the framework-provided context/reporting API
 - **Integrations → Linter / Inspector**:
@@ -1279,13 +1316,14 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  VS Code Extension (shared UI / channels)                                   │
-│     ├── WorkspaceRslintCoordinator (URI identity + generations)             │
-│     ├── WorkspaceDocumentRouter (longest-ready-root ownership)               │
-│     └── Rslint runtime per active root                                       │
+│     ├── CoreResolver (nearest local core per open document)                  │
+│     ├── RuntimeManager (workspace URI + physical core identity)              │
+│     ├── WorkspaceDocumentRouter (explicit document ownership)                │
+│     └── Rslint runtime per selected installation                             │
 │             └──────── rslint/configRefresh ────────────────┐                 │
 │             ◄──────── load / activate / commit / abort     │                 │
 │                                                            ▼                 │
-│                                             cmd/rslint --lsp per root         │
+│                                  local core's cmd/rslint --lsp per runtime   │
 │     │                                                                        │
 │     ▼                                                                        │
 │  internal/lsp + ts-go project.Session                                        │
@@ -1322,7 +1360,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Code Action**: LSP action derived from diagnostics, suggestions, or bulk-fix operations such as quick fix and fix all
 - **Comment Store**: short-lived per-file provider that lazily computes and shares the canonical source comment list
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
-- **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
+- **ConfiguredRule**: Rule implementation plus resolved severity, settings, language options, globals, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
 - **Fallback Program**: Extra non-project-backed `Program` created from selected lint targets that are not covered by a tsconfig Program associated with their governing config; fallback files do not enable type-aware rules or participate in program-wide type-check
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file

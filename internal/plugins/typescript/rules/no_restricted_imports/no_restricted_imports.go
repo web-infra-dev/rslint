@@ -22,6 +22,7 @@
 package no_restricted_imports
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -30,10 +31,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_restricted_imports.schema.json
+var schemaJSON []byte
+
 var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
-	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		engine := core.NewEngine(options)
 		if !engine.IsActive() {
 			return rule.RuleListeners{}

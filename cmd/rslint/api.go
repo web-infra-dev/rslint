@@ -606,8 +606,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		diagnosticCollector(diagnostic)
 	}
 
-	// Build one run descriptor shared by native lint and plugin target
-	// collection, keeping both paths on the exact same file/rule selection.
+	// Build one run descriptor and prepared plan shared by native lint and
+	// plugin dispatch, keeping both paths on the exact same file/rule selection.
 	runOpts := linter.RunLinterOptions{
 		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
@@ -672,6 +672,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			Report: diagnosticCollector,
 		},
 	}
+	runOpts.PreparedPlan = linter.PrepareLintPlan(runOpts)
 
 	// Metadata is the feature gate: without it there is no plugin target walk,
 	// goroutine, or reverse request. With metadata, dispatch starts before the
@@ -689,7 +690,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			}
 			pluginConfigDirByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
-		pluginInputs := buildPluginFileInputs(runOpts, pluginConfigResolver{
+		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginConfigResolver{
 			lintResolver:           fileConfigResolver,
 			pluginConfigDirByOwner: pluginConfigDirByOwner,
 		})

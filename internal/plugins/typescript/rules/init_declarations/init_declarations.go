@@ -1,12 +1,16 @@
 package init_declarations
 
 import (
-	"fmt"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed init_declarations.schema.json
+var schemaJSON []byte
 
 // InitDeclarationsRule mirrors @typescript-eslint/init-declarations, which wraps
 // the ESLint core init-declarations rule and additionally:
@@ -22,9 +26,9 @@ import (
 // Upstream wrapper: packages/eslint-plugin/src/rules/init-declarations.ts
 // Upstream base rule: eslint/lib/rules/init-declarations.js
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
-	Name: "init-declarations",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "init-declarations",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -44,43 +48,21 @@ type initDeclarationsOptions struct {
 	ignoreForLoopInit bool
 }
 
-// parseOptions accepts every shape config.go can hand a rule that uses ESLint's
-// `["mode", { ...sub-options }]` schema:
-//   - nil → defaults
-//   - "always" / "never" (string, from `['<level>', '<mode>']` — single-element
-//     option arrays are unwrapped by config.go)
-//   - []interface{}{"<mode>", map[string]interface{}{...}} (multi-element form,
-//     not unwrapped)
-//   - map[string]interface{}{...} (defensive — the CLI single-option fallback
-//     when only the sub-option object is supplied)
-func parseOptions(raw any) initDeclarationsOptions {
+// parseOptions reads ESLint's `["<mode>", { ...sub-options }]` options array:
+// the mode string in slot 0 (defaulting to "always"), and the sub-option
+// object — only meaningful for "never" — in slot 1.
+func parseOptions(options []any) initDeclarationsOptions {
 	opts := initDeclarationsOptions{mode: "always"}
 
-	if raw == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	var modeStr string
-	var subOpts map[string]interface{}
-
-	switch v := raw.(type) {
-	case string:
-		modeStr = v
-	case []interface{}:
-		if len(v) > 0 {
-			modeStr, _ = v[0].(string)
-		}
-		if len(v) > 1 {
-			subOpts, _ = v[1].(map[string]interface{})
-		}
-	case map[string]interface{}:
-		subOpts = v
-	}
-
-	if modeStr == "always" || modeStr == "never" {
+	if modeStr, _ := options[0].(string); modeStr == "always" || modeStr == "never" {
 		opts.mode = modeStr
 	}
-	if subOpts != nil {
+	if len(options) > 1 {
+		subOpts, _ := options[1].(map[string]interface{})
 		if b, ok := subOpts["ignoreForLoopInit"].(bool); ok {
 			opts.ignoreForLoopInit = b
 		}
@@ -104,15 +86,50 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts ini
 		return
 	}
 
+	inForLoop := isForLoopParent(parent)
+
+	if opts.mode == "always" {
+		// Upstream considers every for-loop binding initialized, even without
+		// an explicit initializer. Skip the whole list before inspecting names.
+		if inForLoop {
+			return
+		}
+
+		for _, decl := range declList.Declarations.Nodes {
+			varDecl := decl.AsVariableDeclaration()
+			if varDecl == nil || varDecl.Initializer != nil {
+				continue
+			}
+
+			nameNode := varDecl.Name()
+			// Upstream only reports for `id.type === "Identifier"`;
+			// destructuring patterns are silently skipped.
+			if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+				continue
+			}
+
+			idName := nameNode.AsIdentifier().Text
+			ctx.ReportRange(identifierReportRange(ctx.SourceFile, nameNode, idName), buildMessage("initialized", idName))
+		}
+		return
+	}
+
+	// The remaining path is mode="never". Ignored loop initializers and
+	// constant bindings exempt the entire declaration list, so avoid walking
+	// each declarator in those common no-report cases.
+	if opts.ignoreForLoopInit && inForLoop {
+		return
+	}
+
 	// CONSTANT_BINDINGS in upstream = {const, using, await using}. They require
 	// an initializer at parse time, so "never" mode must never report them as
 	// `notInitialized`. utils.GetVarDeclListKind centralizes the
 	// `await using = NodeFlagsConst|NodeFlagsUsing` encoding so we don't have
 	// to repeat it here.
 	kind := utils.GetVarDeclListKind(node)
-	isConstantBinding := kind == "const" || kind == "using" || kind == "await using"
-
-	inForLoop := isForLoopParent(parent)
+	if kind == "const" || kind == "using" || kind == "await using" {
+		return
+	}
 
 	for _, decl := range declList.Declarations.Nodes {
 		varDecl := decl.AsVariableDeclaration()
@@ -120,65 +137,60 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts ini
 			continue
 		}
 
+		hasExplicitInit := varDecl.Initializer != nil
+		// Outside a for-loop, "never" only reports explicit initializers. A
+		// for-loop binding is initialized in the upstream sense even when its
+		// declarator has no initializer (`for (var x in xs)`).
+		if !hasExplicitInit && !inForLoop {
+			continue
+		}
+
 		nameNode := varDecl.Name()
-		// Upstream only reports for `id.type === "Identifier"`; destructuring
-		// patterns (`{a} = ...`, `[a] = ...`) are silently skipped.
 		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 			continue
 		}
+
 		idName := nameNode.AsIdentifier().Text
-
-		hasExplicitInit := varDecl.Initializer != nil
-		// Mirror ESLint's `isInitialized`: for-loop bindings are considered
-		// initialized regardless of `Initializer` — `for (var i;;)` should not
-		// trip "always", and `for (var x in arr)` should still trip "never".
-		initialized := hasExplicitInit || inForLoop
-
-		var messageId string
-		switch {
-		case opts.mode == "always" && !initialized:
-			messageId = "initialized"
-		case opts.mode == "never" && initialized && !isConstantBinding:
-			if opts.ignoreForLoopInit && inForLoop {
-				continue
-			}
-			messageId = "notInitialized"
-		}
-		if messageId == "" {
-			continue
-		}
-
-		msg := buildMessage(messageId, idName)
+		reportRange := identifierReportRange(ctx.SourceFile, nameNode, idName)
 
 		// Mirror typescript-eslint's `getReportLoc`: when the declarator has no
 		// explicit init, narrow the report to the identifier so the diagnostic
-		// doesn't underline a trailing type annotation. This covers BOTH paths
-		// that produce a no-init report:
-		//   - "always" + !initialized → "initialized"
-		//   - "never" + in-for-loop + Initializer==nil → "notInitialized"
-		//     (e.g. `for (var x: T;;)` or `for (var x in arr)`)
-		if !hasExplicitInit {
-			ctx.ReportNode(nameNode, msg)
-		} else {
+		// doesn't underline a trailing type annotation. An initialized
+		// declarator reports from the same identifier start through its init.
+		if hasExplicitInit {
 			// Declarator has an init expression — report the full declarator
 			// (id + type + init) to match upstream's diagnostic ranges.
-			ctx.ReportNode(decl, msg)
+			reportRange = core.NewTextRange(reportRange.Pos(), decl.End())
 		}
+		ctx.ReportRange(reportRange, buildMessage("notInitialized", idName))
 	}
 }
 
 func buildMessage(messageId, idName string) rule.RuleMessage {
 	var desc string
 	if messageId == "initialized" {
-		desc = fmt.Sprintf("Variable '%s' should be initialized on declaration.", idName)
+		desc = "Variable '" + idName + "' should be initialized on declaration."
 	} else {
-		desc = fmt.Sprintf("Variable '%s' should not be initialized on declaration.", idName)
+		desc = "Variable '" + idName + "' should not be initialized on declaration."
 	}
 	return rule.RuleMessage{
 		Id:          messageId,
 		Description: desc,
 		Data:        map[string]string{"idName": idName},
 	}
+}
+
+// identifierReportRange avoids rescanning the common plain-identifier path.
+// Escaped, synthetic, reparsed, malformed, or otherwise unusual identifiers
+// retain the scanner-based behavior through the validated fallback.
+func identifierReportRange(sourceFile *ast.SourceFile, nameNode *ast.Node, idName string) core.TextRange {
+	end := nameNode.End()
+	start := end - len(idName)
+	text := sourceFile.Text()
+	if idName != "" && start >= 0 && start <= end && end <= len(text) && text[start:end] == idName {
+		return core.NewTextRange(start, end)
+	}
+	return utils.TrimNodeTextRange(sourceFile, nameNode)
 }
 
 // isForLoopParent reports whether the VariableDeclarationList's parent is a

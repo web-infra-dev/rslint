@@ -445,6 +445,27 @@ func TestPreferToBeRule(t *testing.T) {
 					{MessageId: "useToBeUndefined", Line: 1, Column: 15},
 				},
 			},
+			{
+				Code:   `expect("a string")[("not")].toBeUndefined();`,
+				Output: []string{`expect("a string").toBeDefined();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToBeDefined"},
+				},
+			},
+			{
+				Code:   `expect("a string")?.["not"].toBeUndefined?.();`,
+				Output: []string{`expect("a string")?.toBeDefined?.();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToBeDefined"},
+				},
+			},
+			{
+				Code:   `(expect("a string")?.["not"]).toBeUndefined();`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToBeDefined"},
+				},
+			},
 		},
 	)
 }

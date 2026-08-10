@@ -57,7 +57,7 @@ func collectKinds(sel selector, s *kindSet) {
 			s.markUniverse()
 			return
 		}
-		ks := kindsForEstreeName(v.Name)
+		ks := v.Kinds
 		if ks == nil {
 			// Unknown ESTree name — collapse to the empty set so that this
 			// selector is never registered. The user's selector simply
@@ -101,7 +101,7 @@ func collectKinds(sel selector, s *kindSet) {
 func matches(sel selector, node *ast.Node, mc *matchContext) bool {
 	switch v := sel.(type) {
 	case identifierSelector:
-		return matchesIdentifier(v.Name, node)
+		return matchesIdentifier(v, node)
 	case classSelector:
 		if !matches(v.Inner, node, mc) {
 			return false
@@ -138,11 +138,11 @@ func matches(sel selector, node *ast.Node, mc *matchContext) bool {
 // matchesIdentifier evaluates the bare type-name portion of a selector.
 // "*" matches everything; ESTree-mapped names match their tsgo kinds with
 // extra refinement for kinds that fuse multiple ESTree shapes.
-func matchesIdentifier(name string, node *ast.Node) bool {
-	if name == "*" {
+func matchesIdentifier(sel identifierSelector, node *ast.Node) bool {
+	if sel.Name == "*" {
 		return true
 	}
-	ks := kindsForEstreeName(name)
+	ks := sel.Kinds
 	if ks == nil {
 		return false
 	}
@@ -156,7 +156,7 @@ func matchesIdentifier(name string, node *ast.Node) bool {
 	if !matchedKind {
 		return false
 	}
-	return refineEstreeMatch(name, node)
+	return refineEstreeMatch(sel.Name, node)
 }
 
 // refineEstreeMatch tightens the tsgo→ESTree match for kinds that tsgo
@@ -335,6 +335,20 @@ func matchesClass(node *ast.Node, class string) bool {
 // matchesAttr resolves the attribute path against the node and compares
 // the obtained value with the operator/right-hand side of the selector.
 func matchesAttr(node *ast.Node, path []string, op attrOp, value attrValue, mc *matchContext) bool {
+	if (op == attrEqual || op == attrNotEqual) &&
+		(value.Kind == attrValueString || value.Kind == attrValueIdent || value.Kind == attrValueRegex) {
+		if text, ok, handled := lookupStringAttrPath(node, path, mc); handled {
+			if !ok {
+				return false
+			}
+			equal := attrStringEquals(text, value)
+			if op == attrNotEqual {
+				return !equal
+			}
+			return equal
+		}
+	}
+
 	val, ok := lookupAttrPath(node, path, mc)
 	if op == attrPresent {
 		// Presence: any non-zero, non-nil value passes.
@@ -347,6 +361,54 @@ func matchesAttr(node *ast.Node, path []string, op attrOp, value attrValue, mc *
 		return false
 	}
 	return compareAttr(val, op, value)
+}
+
+// lookupStringAttrPath avoids boxing the overwhelmingly common string-valued
+// selector paths (for example object.name, callee.property.name, and operator).
+// handled is false when the path reaches a non-string ESTree facade, in which
+// case the generic interface-based resolver retains the exact behavior.
+func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text string, ok bool, handled bool) {
+	if len(path) == 0 {
+		return "", false, false
+	}
+
+	var current interface{} = node
+	for index, segment := range path {
+		if index != len(path)-1 {
+			next, found := stepAttrPath(current, segment, mc)
+			if !found {
+				return "", false, true
+			}
+			current = next
+			continue
+		}
+
+		switch value := current.(type) {
+		case *ast.Node:
+			if value == nil {
+				return "", false, true
+			}
+			switch segment {
+			case "name":
+				name, found := readNameAttr(value)
+				if !found {
+					return "", false, true
+				}
+				return attrAsString(name), true, true
+			case "operator":
+				text, found := readOperatorAttrString(value)
+				return text, found, true
+			case "type":
+				return estreeNameForKind(value), true, true
+			}
+		case metaIdentifier:
+			if segment == "name" {
+				return value.name, true, true
+			}
+		}
+		return "", false, false
+	}
+	return "", false, false
 }
 
 // matchesCombinator handles `>` (parent), descendant, `+` (prev sibling),
@@ -636,13 +698,31 @@ func attrEquals(left interface{}, right attrValue) bool {
 	case attrValueIdent:
 		return attrAsString(left) == right.Ident
 	case attrValueRegex:
-		s := attrAsString(left)
-		re, err := regexp2.Compile(right.Regex, regexpFlags(right.Flags))
-		if err != nil {
+		return attrStringEquals(attrAsString(left), right)
+	}
+	return false
+}
+
+func attrStringEquals(left string, right attrValue) bool {
+	switch right.Kind {
+	case attrValueString:
+		return left == right.Str
+	case attrValueIdent:
+		return left == right.Ident
+	case attrValueRegex:
+		if right.regexPrefix != "" && !strings.HasPrefix(left, right.regexPrefix) {
 			return false
 		}
-		ok, _ := re.MatchString(s)
-		return ok
+		re := right.compiledRegex
+		if re == nil {
+			var err error
+			re, err = regexp2.Compile(right.Regex, regexpFlags(right.Flags))
+			if err != nil {
+				return false
+			}
+		}
+		matched, err := re.MatchString(left)
+		return err == nil && matched
 	}
 	return false
 }
@@ -1283,6 +1363,14 @@ func readRawAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 }
 
 func readOperatorAttr(node *ast.Node) (interface{}, bool) {
+	text, ok := readOperatorAttrString(node)
+	if !ok {
+		return nil, false
+	}
+	return text, true
+}
+
+func readOperatorAttrString(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindBinaryExpression:
 		return operatorTokenText(node.AsBinaryExpression().OperatorToken.Kind), true
@@ -1305,7 +1393,7 @@ func readOperatorAttr(node *ast.Node) (interface{}, bool) {
 	case ast.KindYieldExpression:
 		return "yield", true
 	}
-	return nil, false
+	return "", false
 }
 
 func operatorTokenText(k ast.Kind) string {

@@ -46,6 +46,7 @@ For directory or no-argument lint runs, global ignores in a parent config preven
 export default defineConfig([
   // Global ignore — blocks directory target discovery in these directories
   { ignores: ['**/fixtures/**', 'e2e/**'] },
+  js.configs.recommended,
   ts.configs.recommended,
   // ...
 ]);
@@ -78,12 +79,13 @@ rslint --init
 A typical TypeScript project configuration:
 
 ```ts
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
 
 export default defineConfig([
   // Global ignores — files excluded from all rules
   globalIgnores(['**/dist/**', '**/fixtures/**']),
-  // Preset with recommended rules
+  // Presets with recommended rules
+  js.configs.recommended,
   ts.configs.recommended,
   // Custom rule overrides
   {
@@ -94,6 +96,10 @@ export default defineConfig([
   },
 ]);
 ```
+
+:::tip
+When using both JavaScript and TypeScript recommended presets, place `js.configs.recommended` before `ts.configs.recommended`. The TypeScript preset disables ESLint core rules that are handled by TypeScript-aware rules, and later config entries override earlier ones.
+:::
 
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
@@ -191,6 +197,21 @@ See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and u
 ### languageOptions
 
 - **Type:** `object`
+
+#### languageOptions.ecmaVersion
+
+- **Type:** `number | 'latest'`
+- **Default:** `'latest'`
+
+Selects the standard ECMAScript globals exposed to native rules. Accepted numbers match ESLint/Espree: `3`, `5`, edition aliases `6` through `17`, or years `2015` through `2026`. Edition aliases are normalized to their year (`6` is ES2015 and `17` is ES2026). The `'latest'` value remains semantic rather than being frozen into the config, so it follows the ESLint version targeted by rslint. This option currently selects globals; it does not change TypeScript's parser target.
+
+```ts
+{
+  languageOptions: {
+    ecmaVersion: 'latest',
+  },
+}
+```
 
 #### languageOptions.parserOptions.projectService
 

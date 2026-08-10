@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -74,12 +75,27 @@ func newConfigRefreshTestServer(t *testing.T) (*Server, <-chan *lsproto.Message,
 }
 
 func startConfigRefreshForTest(s *Server, reason string) <-chan configRefreshTestResult {
+	return startConfigRefreshRequestForTest(s, configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          reason,
+	})
+}
+
+func startExplicitConfigRefreshForTest(s *Server, reason string, configPath string) <-chan configRefreshTestResult {
+	return startConfigRefreshRequestForTest(s, configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          reason,
+		ConfigPath: optionalConfigRefreshPath{
+			Value:   configPath,
+			Present: true,
+		},
+	})
+}
+
+func startConfigRefreshRequestForTest(s *Server, request configRefreshRequest) <-chan configRefreshTestResult {
 	result := make(chan configRefreshTestResult, 1)
 	go func() {
-		response, err := s.handleConfigRefresh(context.Background(), map[string]any{
-			"protocolVersion": discovery.ConfigDiscoveryProtocolVersion,
-			"reason":          reason,
-		})
+		response, err := s.handleConfigRefresh(context.Background(), request)
 		result <- configRefreshTestResult{response: response, err: err}
 	}()
 	return result
@@ -240,6 +256,24 @@ func awaitConfigRefreshResult(t *testing.T, result <-chan configRefreshTestResul
 	}
 }
 
+func completeSuccessfulConfigRefreshForTest(
+	t *testing.T,
+	s *Server,
+	outgoing <-chan *lsproto.Message,
+	entries config.RslintConfig,
+) discovery.ConfigLoadBatchRequest {
+	t.Helper()
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, loadResponse := loadedConfigResponse(t, loadMessage, entries)
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	return loadRequest
+}
+
 func writeConfigCandidate(t *testing.T, root string) {
 	t.Helper()
 	if err := os.WriteFile(
@@ -259,6 +293,10 @@ func installLastGoodConfig(s *Server, root string) {
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
 	s.configDiscoveryHasLastGood = true
+	// Tests using this helper model a catalog committed by an earlier automatic
+	// initial refresh, then exercise a later config/dependency/watch refresh.
+	s.configRefreshInitialized = true
+	s.configRefreshConfigPath = ""
 }
 
 func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
@@ -319,6 +357,214 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	registered, ok := config.GlobalRuleRegistry.GetRule(pluginRuleName)
 	if !ok || !registered.IsEslintPluginRule {
 		t.Fatalf("plugin placeholder %q was not registered: %+v", pluginRuleName, registered)
+	}
+}
+
+func TestConfigRefreshRequestPreservesConfigPathPresence(t *testing.T) {
+	tests := []struct {
+		name        string
+		params      string
+		wantPresent bool
+		wantPath    string
+		wantError   bool
+	}{
+		{name: "absent", params: `{"protocolVersion":2,"reason":"initial"}`},
+		{name: "string", params: `{"protocolVersion":2,"reason":"initial","configPath":"/repo/custom.config.mjs"}`, wantPresent: true, wantPath: "/repo/custom.config.mjs"},
+		{name: "null", params: `{"protocolVersion":2,"reason":"initial","configPath":null}`, wantError: true},
+		{name: "number", params: `{"protocolVersion":2,"reason":"initial","configPath":42}`, wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := []byte(`{"jsonrpc":"2.0","id":1,"method":"rslint/configRefresh","params":` + test.params + `}`)
+			var message lsproto.Message
+			if err := json.Unmarshal(data, &message); err != nil {
+				t.Fatalf("unmarshal request: %v", err)
+			}
+			request, err := decodeParams[configRefreshRequest](message.AsRequest())
+			if test.wantError {
+				if err == nil {
+					t.Fatal("invalid configPath decoded successfully")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("decode configRefresh: %v", err)
+			}
+			if request.ConfigPath.Present != test.wantPresent || request.ConfigPath.Value != test.wantPath {
+				t.Fatalf("decoded configPath = %+v", request.ConfigPath)
+			}
+		})
+	}
+}
+
+func TestNormalizeLSPExplicitConfigPath(t *testing.T) {
+	root := t.TempDir()
+	for _, extension := range []string{".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"} {
+		configPath := filepath.Join(root, "custom.config"+extension)
+		if got, err := normalizeLSPExplicitConfigPath(configPath); err != nil || got != tspath.NormalizePath(configPath) {
+			t.Fatalf("normalize %q = %q, %v", configPath, got, err)
+		}
+	}
+	for _, configPath := range []string{
+		"",
+		"relative.config.mjs",
+		"file:///repo/custom.config.mjs",
+		filepath.Join(root, "rslint.jsonc"),
+		filepath.Join(root, "custom.config.MJS"),
+		filepath.Join(root, "custom.config.mjs") + "\x00suffix",
+	} {
+		if _, err := normalizeLSPExplicitConfigPath(configPath); err == nil {
+			t.Fatalf("invalid configPath %q was accepted", configPath)
+		}
+	}
+}
+
+func TestHandleConfigRefreshRequiresInitialBeforeMutation(t *testing.T) {
+	s, _, _ := newConfigRefreshTestServer(t)
+	_, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          "config-change",
+	})
+	if err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+		t.Fatalf("configRefresh error = %v, want InvalidParams", err)
+	}
+	if s.configRefreshInitialized || s.configDiscoveryActive {
+		t.Fatal("non-initial refresh mutated config source state")
+	}
+}
+
+func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	if err := os.WriteFile(filepath.Join(root, "rslint.jsonc"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	externalRoot := t.TempDir()
+	configPath := filepath.Join(externalRoot, "generated-rstack-config.cjs")
+	if err := os.WriteFile(configPath, []byte("module.exports = [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	initial := startExplicitConfigRefreshForTest(s, "initial", configPath)
+	loadRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
+		t.Fatalf("explicit initial refresh failed: %v", completed.err)
+	}
+	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, configPath)
+	}
+	if loadRequest.Candidates[0].ConfigDirectory != root {
+		t.Fatalf("explicit configDirectory = %q, want cwd %q", loadRequest.Candidates[0].ConfigDirectory, root)
+	}
+	if !s.configRefreshInitialized || s.configRefreshConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("fixed config path = %q, initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
+	}
+	if s.rslintConfigPath != "" || len(s.jsonConfig) != 0 {
+		t.Fatalf("explicit config retained JSON fallback: path=%q config=%+v", s.rslintConfigPath, s.jsonConfig)
+	}
+	if value, found := configRuleValue(s.jsConfigs[root], "no-debugger"); !found || value != "error" {
+		t.Fatalf("explicit config was not committed at cwd: %+v", s.jsConfigs)
+	}
+
+	reload := startExplicitConfigRefreshForTest(s, "config-change", configPath)
+	reloadRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Rules: config.Rules{"no-console": "error"},
+	}})
+	if completed := awaitConfigRefreshResult(t, reload); completed.err != nil {
+		t.Fatalf("same-path refresh failed: %v", completed.err)
+	}
+	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("same-path candidates = %+v", reloadRequest.Candidates)
+	}
+
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("generated/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	watchResult := make(chan error, 1)
+	go func() {
+		watchResult <- s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+			Changes: []*lsproto.FileEvent{{
+				Uri:  documentURIFromPath(gitignorePath),
+				Type: lsproto.FileChangeTypeChanged,
+			}},
+		})
+	}()
+	watchRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Rules: config.Rules{"no-console": "error"},
+	}})
+	if err := <-watchResult; err != nil {
+		t.Fatalf("explicit .gitignore refresh failed: %v", err)
+	}
+	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("explicit watcher candidates = %+v", watchRequest.Candidates)
+	}
+
+	for _, request := range []configRefreshRequest{
+		{ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion, Reason: "config-change"},
+		{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+			Reason:          "config-change",
+			ConfigPath: optionalConfigRefreshPath{
+				Value:   filepath.Join(externalRoot, "other.config.cjs"),
+				Present: true,
+			},
+		},
+	} {
+		if _, err := s.handleConfigRefresh(context.Background(), request); err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+			t.Fatalf("changed selection error = %v, want InvalidParams", err)
+		}
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("rejected selection started reverse request: %+v", message)
+	default:
+	}
+}
+
+func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.T) {
+	config.RegisterAllRules()
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	configPath := filepath.Join(t.TempDir(), "generated-rstack-config.mjs")
+	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	initial := startExplicitConfigRefreshForTest(s, "initial", configPath)
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, loadResponse := failedConfigResponse(t, loadMessage, "synthetic explicit load failure")
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	completed := awaitConfigRefreshResult(t, initial)
+	if completed.err != nil {
+		t.Fatalf("initial explicit failure stopped the LSP: %v", completed.err)
+	}
+	if completed.response.TransactionID != loadRequest.TransactionID {
+		t.Fatalf("explicit recovery response = %+v", completed.response)
+	}
+	if s.configRefreshConfigPath != tspath.NormalizePath(configPath) || !s.configRefreshInitialized {
+		t.Fatalf("failed initial load lost fixed path: path=%q initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
+	}
+	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable || s.configDiscoveryHasLastGood {
+		t.Fatalf("explicit failure state: unavailable=%t lastGood=%t", unavailable, s.configDiscoveryHasLastGood)
+	}
+	if _, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          "config-change",
+	}); err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+		t.Fatalf("explicit path omission error = %v, want InvalidParams", err)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("omitted explicit path started reverse request: %+v", message)
+	default:
 	}
 }
 
@@ -1158,9 +1404,9 @@ func TestConfigRefreshProtocolRegistration(t *testing.T) {
 func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) {
 	s := newTestServer()
 	s.eslintPluginConfigGeneration = "last-good"
-	_, err := s.handleConfigRefresh(context.Background(), map[string]any{
-		"protocolVersion": discovery.ConfigDiscoveryProtocolVersion + 1,
-		"reason":          "initial",
+	_, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion + 1,
+		Reason:          "initial",
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported config refresh protocol") {
 		t.Fatalf("configRefresh error = %v", err)

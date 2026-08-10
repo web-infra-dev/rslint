@@ -659,7 +659,9 @@ func (state *ruleState) referenceFromIdentifier(node *ast.Node) (reference, bool
 			return reference{}, false
 		}
 	}
-	if !isWatchedBuiltin(name) || state.isLocalNonAliasIdentifier(node) {
+	if !isWatchedBuiltin(name) ||
+		!state.isAvailableBareGlobal(name) ||
+		state.isLocalNonAliasIdentifier(node) {
 		return reference{}, false
 	}
 	return reference{name: name}, true
@@ -849,7 +851,7 @@ func (state *ruleState) globalReferenceInfoFromPath(path []string, root *ast.Nod
 	}
 
 	if globalObjectNames[path[0]] {
-		if state.isLocalNonAliasIdentifier(root) {
+		if !state.isAvailableGlobalObject(path[0]) || state.isLocalNonAliasIdentifier(root) {
 			return globalReference{}, false
 		}
 		return globalReference{path: slices.Clone(path[1:]), source: referenceSourceGlobalObject}, true
@@ -861,11 +863,19 @@ func (state *ruleState) globalReferenceInfoFromPath(path []string, root *ast.Nod
 		return globalReference{}, false
 	}
 
-	if state.isLocalNonAliasIdentifier(root) {
+	if !state.isAvailableBareGlobal(path[0]) || state.isLocalNonAliasIdentifier(root) {
 		return globalReference{}, false
 	}
 
 	return globalReference{path: slices.Clone(path), source: referenceSourceBareGlobal}, true
+}
+
+func (state *ruleState) isAvailableGlobalObject(name string) bool {
+	return state.ctx.Globals.Access(name).IsDeclared()
+}
+
+func (state *ruleState) isAvailableBareGlobal(name string) bool {
+	return state.ctx.Globals.Access(name).IsDeclared()
 }
 
 func (state *ruleState) expressionPath(node *ast.Node) ([]string, *ast.Node, bool) {

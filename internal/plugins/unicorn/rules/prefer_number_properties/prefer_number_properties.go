@@ -65,6 +65,7 @@ var PreferNumberPropertiesRule = rule.Rule{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.AsIdentifier().Text
 				if !isTrackedGlobalName(name) || !enabled(name, opts) ||
+					!ctx.Globals.Access(name).IsDeclared() ||
 					utils.IsNonReferenceIdentifier(node) || isShadowed(&ctx, node, name) {
 					return
 				}
@@ -178,7 +179,8 @@ func globalMemberReference(ctx *rule.RuleContext, node *ast.Node, opts preferNum
 		return globalReference{}, false
 	}
 	objectName := object.AsIdentifier().Text
-	if !isGlobalObjectName(objectName) || isShadowed(ctx, object, objectName) {
+	if !isGlobalObjectName(objectName) || !ctx.Globals.Access(objectName).IsDeclared() ||
+		isShadowed(ctx, object, objectName) {
 		return globalReference{}, false
 	}
 

@@ -202,6 +202,23 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	return s.checkerReferenceSymbol(node, meaning)
 }
 
+// ResolveInFile returns the symbol a reference-position identifier resolves to
+// using only the binder's lexical scope walk. Unlike Resolve, it never asks the
+// TypeChecker to supply a declaration from lib files, ambient .d.ts files, or
+// another source file.
+//
+// Imported bindings and declarations authored in this source file are still
+// visible because their binder symbols live in the file's own scope graph.
+// This distinction is required by ESLint-compatible rules such as no-undef:
+// their answer must not change merely because rslint happened to construct a
+// TypeChecker for the file.
+func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
 // binderReferenceSymbol resolves one reference without checker work. A named
 // export nested in a namespace needs one extra guard: the binder exposes that
 // export's own alias in the namespace's Exports table. If no local declaration
@@ -421,6 +438,14 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
+	// Heritage clauses parse dotted names as PropertyAccessExpressions rather
+	// than QualifiedNames. In a type-only heritage position, the root of that
+	// property-access chain still names a namespace and must skip a same-named
+	// value binding. A class `extends` expression is not part of a type node, so
+	// it deliberately continues to the value-space branch below.
+	if isTypeOnlyPropertyAccessQualifier(n) {
+		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
 	if ast.IsExpressionNode(n) {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
 	}
@@ -433,4 +458,20 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsType | ast.SymbolFlagsAlias
 	}
 	return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+}
+
+// isTypeOnlyPropertyAccessQualifier reports whether n is the lexical root of
+// an expression-shaped qualified name used as a type. TypeScript represents
+// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
+// PropertyAccessExpression, even though N has namespace meaning there.
+func isTypeOnlyPropertyAccessQualifier(n *ast.Node) bool {
+	entity := n
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	return entity != n && ast.IsPartOfTypeNode(entity)
 }

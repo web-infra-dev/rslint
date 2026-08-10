@@ -1,9 +1,15 @@
 package explicit_member_accessibility
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -769,7 +775,7 @@ class Test {
 		},
 		// Computed key from a template literal.
 		{
-			Code: "\nclass Test {\n  [`foo`] = 1;\n}\n      ",
+			Code:    "\nclass Test {\n  [`foo`] = 1;\n}\n      ",
 			Options: map[string]interface{}{"accessibility": "no-public"},
 		},
 		// ---- static + accessor / abstract + accessor + override ----
@@ -3722,4 +3728,177 @@ class Test {
 			},
 		},
 	})
+}
+
+func runExplicitMemberAccessibilityWithDemand(
+	t *testing.T,
+	code string,
+	rawOptions any,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+
+	options := rule_tester.ResolveTestCaseOptions(t, &ExplicitMemberAccessibilityRule, rawOptions)
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/source.ts",
+		Path:     "/source.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	diagnostics := make([]rule.RuleDiagnostic, 0, 4)
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(
+		ExplicitMemberAccessibilityRule.Name,
+		rule.SeverityError,
+		rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	)
+
+	listeners := ExplicitMemberAccessibilityRule.Run(ctx, options)
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
+}
+
+func TestExplicitMemberAccessibilityEditDemand(t *testing.T) {
+	assertSameIdentity := func(left, right []rule.RuleDiagnostic) {
+		t.Helper()
+		if len(left) != len(right) {
+			t.Fatalf("diagnostic counts = %d and %d", len(left), len(right))
+		}
+		for index := range left {
+			if left[index].Range != right[index].Range ||
+				left[index].Message.Id != right[index].Message.Id ||
+				left[index].Message.Description != right[index].Message.Description ||
+				!reflect.DeepEqual(left[index].Message.Data, right[index].Message.Data) ||
+				left[index].RuleName != right[index].RuleName ||
+				left[index].Severity != right[index].Severity {
+				t.Fatalf("diagnostic %d changed identity:\nleft  %#v\nright %#v", index, left[index], right[index])
+			}
+		}
+	}
+	assertNoEdits := func(diagnostics []rule.RuleDiagnostic) {
+		t.Helper()
+		for index, diagnostic := range diagnostics {
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+				t.Fatalf("diagnostic %d unexpectedly materialized edits: %#v", index, diagnostic)
+			}
+		}
+	}
+
+	const explicitCode = `class Example {
+  @decorator
+  static method() {}
+  property = 1;
+  constructor(readonly value: string) {}
+}`
+	diagnosticsOnly := runExplicitMemberAccessibilityWithDemand(t, explicitCode, nil, rule.EditDemandNone)
+	wrongAutofixDemand := runExplicitMemberAccessibilityWithDemand(t, explicitCode, nil, rule.EditDemandAutofix)
+	suggestions := runExplicitMemberAccessibilityWithDemand(t, explicitCode, nil, rule.EditDemandSuggestion)
+	allExplicitEdits := runExplicitMemberAccessibilityWithDemand(t, explicitCode, nil, rule.EditDemandAll)
+	if len(diagnosticsOnly) != 4 {
+		t.Fatalf("explicit diagnostic count = %d, want 4", len(diagnosticsOnly))
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{wrongAutofixDemand, suggestions, allExplicitEdits} {
+		assertSameIdentity(diagnosticsOnly, diagnostics)
+	}
+	assertNoEdits(diagnosticsOnly)
+	assertNoEdits(wrongAutofixDemand)
+	for _, diagnostics := range [][]rule.RuleDiagnostic{suggestions, allExplicitEdits} {
+		for diagnosticIndex, diagnostic := range diagnostics {
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 3 {
+				t.Fatalf("diagnostic %d suggestion artifacts = %#v", diagnosticIndex, diagnostic)
+			}
+			for suggestionIndex, replacement := range []string{"public ", "private ", "protected "} {
+				suggestion := (*diagnostic.Suggestions)[suggestionIndex]
+				if len(suggestion.FixesArr) != 1 || suggestion.FixesArr[0].Text != replacement ||
+					suggestion.FixesArr[0].Range != core.NewTextRange(diagnostic.Range.Pos(), diagnostic.Range.Pos()) {
+					t.Fatalf("diagnostic %d suggestion %d = %#v", diagnosticIndex, suggestionIndex, suggestion)
+				}
+			}
+		}
+	}
+
+	const noPublicCode = `class Example {
+  public /* keep */ static property = 1;
+  public constructor(public /* keep */ readonly value: string) {}
+  public method() {}
+}`
+	noPublicOptions := map[string]any{"accessibility": "no-public"}
+	noPublicDiagnostics := runExplicitMemberAccessibilityWithDemand(t, noPublicCode, noPublicOptions, rule.EditDemandNone)
+	wrongSuggestionDemand := runExplicitMemberAccessibilityWithDemand(t, noPublicCode, noPublicOptions, rule.EditDemandSuggestion)
+	autofixes := runExplicitMemberAccessibilityWithDemand(t, noPublicCode, noPublicOptions, rule.EditDemandAutofix)
+	allNoPublicEdits := runExplicitMemberAccessibilityWithDemand(t, noPublicCode, noPublicOptions, rule.EditDemandAll)
+	if len(noPublicDiagnostics) != 4 {
+		t.Fatalf("no-public diagnostic count = %d, want 4", len(noPublicDiagnostics))
+	}
+	for _, diagnostics := range [][]rule.RuleDiagnostic{wrongSuggestionDemand, autofixes, allNoPublicEdits} {
+		assertSameIdentity(noPublicDiagnostics, diagnostics)
+	}
+	assertNoEdits(noPublicDiagnostics)
+	assertNoEdits(wrongSuggestionDemand)
+	for _, diagnostics := range [][]rule.RuleDiagnostic{autofixes, allNoPublicEdits} {
+		for diagnosticIndex, diagnostic := range diagnostics {
+			if diagnostic.Suggestions != nil || diagnostic.FixesPtr == nil || len(*diagnostic.FixesPtr) != 1 ||
+				(*diagnostic.FixesPtr)[0].Text != "" {
+				t.Fatalf("diagnostic %d autofix artifacts = %#v", diagnosticIndex, diagnostic)
+			}
+		}
+	}
+	fixedSource, unapplied, fixed := linter.ApplyRuleFixes(noPublicCode, autofixes)
+	const wantFixedSource = `class Example {
+  /* keep */ static property = 1;
+  constructor(/* keep */ readonly value: string) {}
+  method() {}
+}`
+	if !fixed || len(unapplied) != 0 || fixedSource != wantFixedSource {
+		t.Fatalf("fixed source:\n%s\nwant:\n%s\nunapplied: %#v", fixedSource, wantFixedSource, unapplied)
+	}
+
+	const disabledCode = `class Example {
+  // eslint-disable-next-line @typescript-eslint/explicit-member-accessibility
+  disabledMethod() {}
+  /* eslint-disable @typescript-eslint/explicit-member-accessibility */
+  disabledProperty = 1;
+  /* eslint-enable @typescript-eslint/explicit-member-accessibility */
+  reportedProperty = 2;
+}`
+	notSuppressed := runExplicitMemberAccessibilityWithDemand(t, disabledCode, nil, rule.EditDemandSuggestion)
+	if len(notSuppressed) != 1 || notSuppressed[0].Suggestions == nil ||
+		notSuppressed[0].Message.Description != "Missing accessibility modifier on class property reportedProperty." {
+		t.Fatalf("disable-directive diagnostics = %#v", notSuppressed)
+	}
+}
+
+func TestRequiresQuoting(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{name: "", want: true},
+		{name: "_value"},
+		{name: "$value"},
+		{name: "éclair"},
+		{name: "变量1"},
+		{name: "1value", want: true},
+		{name: "foo-bar", want: true},
+		{name: "a·b", want: true},
+	}
+	for _, testCase := range tests {
+		if got := requiresQuoting(testCase.name); got != testCase.want {
+			t.Errorf("requiresQuoting(%q) = %v, want %v", testCase.name, got, testCase.want)
+		}
+	}
 }

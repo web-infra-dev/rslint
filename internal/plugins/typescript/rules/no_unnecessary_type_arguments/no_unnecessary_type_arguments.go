@@ -28,6 +28,7 @@ func isInTypeContext(node *ast.Node) bool {
 
 var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-arguments",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getTypeParametersFromType := func(node *ast.Node, nodeName *ast.Node) []*ast.Node {

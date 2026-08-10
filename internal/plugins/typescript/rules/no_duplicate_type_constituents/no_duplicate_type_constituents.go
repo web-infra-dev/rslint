@@ -1,6 +1,8 @@
 package no_duplicate_type_constituents
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_duplicate_type_constituents.schema.json
+var schemaJSON []byte
 
 func buildDuplicateMessage(unionOrIntersection unionOrIntersection, previous string) rule.RuleMessage {
 	var msg string
@@ -38,22 +43,32 @@ const (
 )
 
 type NoDuplicateTypeConstituentsOptions struct {
-	IgnoreIntersections bool
-	IgnoreUnions        bool
+	IgnoreIntersections bool `json:"ignoreIntersections"`
+	IgnoreUnions        bool `json:"ignoreUnions"`
+}
+
+func parseOptions(options []any) NoDuplicateTypeConstituentsOptions {
+	opts := NoDuplicateTypeConstituentsOptions{
+		IgnoreIntersections: false,
+		IgnoreUnions:        false,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if optsMap, ok := options[0].(map[string]interface{}); ok {
+		if optsJSON, err := json.Marshal(optsMap); err == nil {
+			_ = json.Unmarshal(optsJSON, &opts)
+		}
+	}
+	return opts
 }
 
 var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-duplicate-type-constituents",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoDuplicateTypeConstituentsOptions)
-		if !ok {
-			opts = NoDuplicateTypeConstituentsOptions{
-				IgnoreIntersections: false,
-				IgnoreUnions:        false,
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		unwindedParentType := func(node *ast.Node, kind ast.Kind) *ast.Node {
 			for {

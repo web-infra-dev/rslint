@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -345,6 +346,40 @@ func TestNoExtendNativeRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
+			},
+		},
+	)
+}
+
+func TestNoExtendNativeECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoExtendNativeRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `Promise.prototype.p = 0`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 5}},
+			{Code: `Temporal.prototype.p = 0`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025}},
+			{
+				Code:    `AsyncIterator.prototype.p = 0`,
+				Globals: map[string]any{"AsyncIterator": "readonly"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `Promise.prototype.p = 0`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
+			},
+			{
+				Code:            `Promise.prototype.p = 0`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Globals:         map[string]any{"Promise": "readonly"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
+			},
+			{
+				Code:   `Temporal.prototype.p = 0`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
 			},
 		},
 	)

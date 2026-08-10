@@ -1,6 +1,7 @@
 package max_params
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,14 +9,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_params.schema.json
+var schemaJSON []byte
+
 // MaxParamsRule enforces a maximum number of parameters in function
 // definitions. Mirrors @typescript-eslint/max-params, which extends ESLint
 // core's max-params with the `countVoidThis` option.
 //
 // https://typescript-eslint.io/rules/max-params
 var MaxParamsRule = rule.CreateRule(rule.Rule{
-	Name: "max-params",
-	Run:  run,
+	Name:   "max-params",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 const defaultMax = 3
@@ -25,8 +30,7 @@ type ruleOptions struct {
 	countVoidThis bool
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 
 	check := func(node *ast.Node) {
@@ -68,22 +72,19 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 }
 
 // parseOptions mirrors @typescript-eslint/max-params' schema: a single
-// optional object with `max`, `maximum`, and `countVoidThis`. Other shapes
-// (bare integer, integer-in-array) fall through to defaults — upstream
-// rejects them at schema validation, and rslint has no schema layer to
-// reproduce that, so we treat them as "no option" rather than guess.
+// optional object with `max`, `maximum`, and `countVoidThis`.
 //
 // `option.maximum || option.max` follows JS truthy coercion: a present-but-
 // zero `maximum` falls through to `max`; a present-but-falsy value with no
 // fallback leaves `numParams = undefined` upstream, which makes every
 // `count > undefined` comparison false. The shared legacy max helper models
 // that disabled state with MaxInt.
-func parseOptions(o any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	out := ruleOptions{max: defaultMax}
-	m := utils.GetOptionsMap(o)
-	if m == nil {
+	if len(options) == 0 {
 		return out
 	}
+	m, _ := options[0].(map[string]interface{})
 	out.max = utils.ResolveLegacyMaxOption(m, defaultMax)
 	if v, ok := m["countVoidThis"]; ok {
 		if b, ok := v.(bool); ok {

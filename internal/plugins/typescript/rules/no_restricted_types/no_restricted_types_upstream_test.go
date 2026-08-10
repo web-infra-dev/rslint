@@ -14,7 +14,7 @@ import (
 
 // optionsArr wraps a single options object the way upstream's
 // `options: [{...}]` ships it across the JS bridge — exercising the
-// `GetOptionsMap` JSON path rather than a typed-struct shortcut.
+// decoded-JSON map path rather than a typed-struct shortcut.
 func optionsArr(o map[string]interface{}) []interface{} {
 	return []interface{}{o}
 }

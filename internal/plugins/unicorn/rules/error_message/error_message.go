@@ -113,7 +113,8 @@ var ErrorMessageRule = rule.Rule{
 				return
 			}
 
-			if isLocalReference(ctx, callee, constructorName) {
+			if !ctx.Globals.Access(constructorName).IsDeclared() ||
+				isLocalReference(ctx, callee, constructorName) {
 				return
 			}
 

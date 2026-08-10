@@ -118,6 +118,11 @@ suite('Rslint lifecycle', () => {
     const outputChannel = window.createOutputChannel(
       `Rslint lifecycle hang ${Date.now()}`,
     );
+    const unhandledRejections: unknown[] = [];
+    const recordUnhandledRejection = (reason: unknown): void => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', recordUnhandledRejection);
     let closing = false;
     let spawnCount = 0;
     let initializeReceived!: () => void;
@@ -151,28 +156,38 @@ suite('Rslint lifecycle', () => {
       },
     );
 
-    const startPromise = client.start();
-    void startPromise.catch(() => undefined);
-    await waitForPromiseSettlement(
-      receivedInitialize,
-      2_000,
-      'initialize request probe',
-    );
-    assert.strictEqual(client.state, State.Starting);
+    try {
+      const startPromise = client.start();
+      void startPromise.catch(() => undefined);
+      await waitForPromiseSettlement(
+        receivedInitialize,
+        2_000,
+        'initialize request probe',
+      );
+      assert.strictEqual(client.state, State.Starting);
+      closing = true;
+      owner.beginClose();
+      await disposeLanguageClient(client);
+      await owner.close();
+      await waitForPromiseSettlement(
+        startPromise,
+        2_000,
+        'hung language client start',
+      );
+      await assert.rejects(startPromise);
 
-    closing = true;
-    owner.beginClose();
-    await disposeLanguageClient(client);
-    await owner.close();
-    await waitForPromiseSettlement(
-      startPromise,
-      2_000,
-      'hung language client start',
-    );
-
-    assert.strictEqual(client.state, State.Stopped);
-    assert.strictEqual(spawnCount, 1, 'closing must suppress restart');
-    outputChannel.dispose();
+      assert.strictEqual(client.state, State.Stopped);
+      assert.strictEqual(spawnCount, 1, 'closing must suppress restart');
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      assert.deepStrictEqual(unhandledRejections, []);
+    } finally {
+      process.off('unhandledRejection', recordUnhandledRejection);
+      closing = true;
+      owner.beginClose();
+      await disposeLanguageClient(client).catch(() => undefined);
+      await owner.close();
+      outputChannel.dispose();
+    }
   });
 
   test('resets document sessions as soon as a Running server exits', () => {

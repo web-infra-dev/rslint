@@ -1,6 +1,7 @@
 package prefer_nullish_coalescing
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_nullish_coalescing.schema.json
+var schemaJSON []byte
 
 func buildNoStrictNullCheckMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -71,12 +75,12 @@ func defaultOptions() Options {
 	}
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := defaultOptions()
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
 		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = v
 	}
@@ -1034,9 +1038,9 @@ func getTypeFlags(t *checker.Type) checker.TypeFlags {
 
 var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-nullish-coalescing",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks)

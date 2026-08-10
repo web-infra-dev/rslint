@@ -12,8 +12,8 @@ import (
 // kept in roughly the same order so a diff against that file is tractable.
 //
 // Cases that depend on upstream's env-based globals are converted to use
-// `builtinGlobals` against well-known ECMAScript / TypeScript default-library
-// names so the underlying semantics are still exercised. Config
+// `builtinGlobals` against well-known ECMAScript names or explicit configured
+// globals so the underlying semantics are still exercised. Config
 // `languageOptions.globals` and `/* global */` comments are modeled via
 // `ctx.Globals` (see the dedicated cases below).
 func TestNoShadowTSESLintRule(t *testing.T) {
@@ -60,6 +60,10 @@ function foo() {
   var Object = 0;
 }
 			`},
+			// parserOptions.lib / TypeScript's default libraries do not configure
+			// ESLint host globals, even for the typescript-eslint variant.
+			{Code: `function foo(window: number, top: number, console: number) {}`,
+				Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ---- ctx.Globals: an explicit `off` setting (config
 			// `Array: "off"` / `/* global Array: off */`) un-declares the
@@ -126,8 +130,7 @@ const x = 1;
 			`},
 
 			// ---- ignoreTypeValueShadow + builtinGlobals interaction ----
-			// SKIP equivalent: rslint doesn't model `languageOptions.globals` configuration,
-			// but the no-globals form is the same as `type Foo = 1` at module scope.
+			// The no-globals form is the same as `type Foo = 1` at module scope.
 			{Code: `type Foo = 1;`},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"ignoreTypeValueShadow": true}},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"builtinGlobals": false, "ignoreTypeValueShadow": false}},

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -47,6 +48,10 @@ func TestNoLabelVarRule(t *testing.T) {
 
 			// ---- Declared global that does not clash with the label name ----
 			{Code: `q: for(;;) { break q; }`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
+
+			// TypeScript libraries do not implicitly populate ESLint's global scope.
+			{Code: `window: for (;;) { break window; }`},
+			{Code: `console: for (;;) { break console; }`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -234,27 +239,54 @@ func TestNoLabelVarRule(t *testing.T) {
 				},
 			},
 
-			// ---- Globals from tsgo lib (strategy B path; requires TypeChecker) ----
+			// ---- Host globals must be configured explicitly ----
 			{
-				Code: `window: for (;;) { break window; }`,
+				Code:    `window: for (;;) { break window; }`,
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `console: for (;;) { break console; }`,
+				Code:    `console: for (;;) { break console; }`,
+				Globals: map[string]any{"console": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `Promise: for (;;) { break Promise; }`,
+				Code:            `Promise: for (;;) { break Promise; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `Array: for (;;) { break Array; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
+				},
+			},
+		},
+	)
+}
+
+func TestNoLabelVarECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoLabelVarRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `Promise: for (;;) { break Promise; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `Promise: for (;;) { break Promise; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},

@@ -259,5 +259,20 @@ ruleTester.run('no-restricted-matchers', {} as never, {
         },
       ],
     },
+    {
+      // The reported range starts at the first member entry, whose leading
+      // trivia must not be included.
+      code: 'expect(a). /* c */ toBe(b)',
+      options: [{ toBe: null }],
+      errors: [
+        {
+          messageId: 'restrictedChain',
+          data: { restriction: 'toBe' },
+          column: 20,
+          endColumn: 24,
+          line: 1,
+        },
+      ],
+    },
   ],
 });

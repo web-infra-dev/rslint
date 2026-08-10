@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -11,7 +12,7 @@ import (
 // (https://github.com/eslint/eslint/blob/main/tests/lib/rules/no-shadow.js),
 // in roughly the same order so that a diff against that file is tractable.
 // Framework-level concepts that rslint doesn't model
-// (languageOptions.globals / env / parserOptions.globalReturn / script-vs-
+// (env / parserOptions.globalReturn / script-vs-
 // module sourceType distinction) are marked `Skip: true` with a comment
 // pointing at the reason.
 func TestNoShadowRule(t *testing.T) {
@@ -120,6 +121,11 @@ func TestNoShadowRule(t *testing.T) {
 			{Code: `function foo() { var Object = 0; }`},
 			// A declared global does not shadow when `builtinGlobals` is off.
 			{Code: `function foo() { var top = 0; }`, Globals: map[string]any{"top": "readonly"}},
+			// TypeScript's default libraries are not ESLint environments. Host
+			// names remain absent until languageOptions.globals declares them.
+			{Code: `function foo() { var window = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var console = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ---- builtinGlobals + explicit `off` setting ----
 			// Config `Object: "off"` / `/* global Object: off */` un-declares
@@ -1611,6 +1617,30 @@ let y;`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.
 				B = A,
 			}
 		`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+		},
+	)
+}
+
+func TestNoShadowECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoShadowRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `function foo() { var Promise = 0; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Options:         map[string]interface{}{"builtinGlobals": true},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `function foo() { var Promise = 0; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'Promise' is already a global variable."}},
+			},
 		},
 	)
 }
