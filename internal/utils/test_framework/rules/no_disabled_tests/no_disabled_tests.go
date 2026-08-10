@@ -12,10 +12,15 @@ type ParsedCall struct {
 	HasTodo bool
 }
 
+type Runtime struct {
+	Parse                   func(*ast.Node) *ParsedCall
+	IsStandaloneSkippedCall func(*ast.Node) bool
+	Skip                    bool
+}
+
 type Config struct {
-	Name                    string
-	Parse                   func(*ast.Node, rule.RuleContext) *ParsedCall
-	IsStandaloneSkippedCall func(*ast.Node, rule.RuleContext) bool
+	Name    string
+	Prepare func(rule.RuleContext) Runtime
 	// HasOptionsOverload marks frameworks whose test API accepts a
 	// `(description, options, fn?)` overload. For those, a two-argument call
 	// passing an options object registers a test without a body.
@@ -56,15 +61,19 @@ func NewRule(config Config) rule.Rule {
 		Name:   config.Name,
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			runtime := config.Prepare(ctx)
+			if runtime.Skip {
+				return rule.RuleListeners{}
+			}
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
-					if config.IsStandaloneSkippedCall != nil &&
-						config.IsStandaloneSkippedCall(node, ctx) {
+					if runtime.IsStandaloneSkippedCall != nil &&
+						runtime.IsStandaloneSkippedCall(node) {
 						ctx.ReportNode(node, buildErrorSkippedTestMessage())
 						return
 					}
 
-					parsed := config.Parse(node, ctx)
+					parsed := runtime.Parse(node)
 					if parsed == nil || parsed.Call == nil ||
 						parsed.Call.Kind != testFramework.FnKindDescribe &&
 							parsed.Call.Kind != testFramework.FnKindTest {
