@@ -1,4 +1,5 @@
 import { defineConfig } from '@rslib/core';
+import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-types';
 
 /**
  * Single rslib build for all of `@rslint/core`'s JS: the public library surface
@@ -51,6 +52,7 @@ const librarySurface = {
     },
   },
   dts: { bundle: true },
+  plugins: [generateRuleOptionTypesPlugin()],
 };
 
 const workerBase = {

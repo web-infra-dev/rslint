@@ -72,6 +72,7 @@
     "espree": "catalog:",
     "esquery": "catalog:",
     "globals": "catalog:",
+    "json-schema-to-typescript": "catalog:",
     "tinyglobby": "catalog:",
     "typescript": "catalog:"
   },
@@ -87,8 +88,8 @@
     "@rslint/native-darwin-arm64": "workspace:*",
     "@rslint/native-darwin-x64": "workspace:*",
     "@rslint/native-linux-arm64-gnu": "workspace:*",
-    "@rslint/native-linux-x64-gnu": "workspace:*",
     "@rslint/native-linux-arm64-musl": "workspace:*",
+    "@rslint/native-linux-x64-gnu": "workspace:*",
     "@rslint/native-linux-x64-musl": "workspace:*",
     "@rslint/native-win32-arm64-msvc": "workspace:*",
     "@rslint/native-win32-x64-msvc": "workspace:*"

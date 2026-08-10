@@ -252,6 +252,11 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-unicode-bom'),
       tests: path.resolve(__dirname, './suite-unicode-bom'),
     },
+    {
+      name: 'Generated rule-option-types tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
+      tests: path.resolve(__dirname, './suite-rule-option-types'),
+    },
   ];
 
   const failures: unknown[] = [];
