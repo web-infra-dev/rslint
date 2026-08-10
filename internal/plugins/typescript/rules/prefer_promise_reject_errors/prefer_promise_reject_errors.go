@@ -2,7 +2,6 @@ package prefer_promise_reject_errors
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -21,33 +20,28 @@ func buildRejectAnErrorMessage() rule.RuleMessage {
 }
 
 type PreferPromiseRejectErrorsOptions struct {
-	AllowEmptyReject     *bool `json:"allowEmptyReject"`
-	AllowThrowingAny     *bool `json:"allowThrowingAny"`
-	AllowThrowingUnknown *bool `json:"allowThrowingUnknown"`
+	AllowEmptyReject     bool
+	AllowThrowingAny     bool
+	AllowThrowingUnknown bool
 }
 
 func parseOptions(options []any) PreferPromiseRejectErrorsOptions {
-	opts := PreferPromiseRejectErrorsOptions{
-		AllowEmptyReject:     utils.Ref(false),
-		AllowThrowingAny:     utils.Ref(false),
-		AllowThrowingUnknown: utils.Ref(false),
-	}
+	opts := PreferPromiseRejectErrorsOptions{}
 	if len(options) == 0 {
 		return opts
 	}
-	if optsMap, ok := options[0].(map[string]interface{}); ok {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
 	}
-	if opts.AllowEmptyReject == nil {
-		opts.AllowEmptyReject = utils.Ref(false)
+	if value, ok := optsMap["allowEmptyReject"].(bool); ok {
+		opts.AllowEmptyReject = value
 	}
-	if opts.AllowThrowingAny == nil {
-		opts.AllowThrowingAny = utils.Ref(false)
+	if value, ok := optsMap["allowThrowingAny"].(bool); ok {
+		opts.AllowThrowingAny = value
 	}
-	if opts.AllowThrowingUnknown == nil {
-		opts.AllowThrowingUnknown = utils.Ref(false)
+	if value, ok := optsMap["allowThrowingUnknown"].(bool); ok {
+		opts.AllowThrowingUnknown = value
 	}
 	return opts
 }
@@ -64,17 +58,17 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 				argument := callExpression.Arguments.Nodes[0]
 				t := ctx.TypeChecker.GetTypeAtLocation(argument)
 
-				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
+				if opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
 					return
 				}
-				if *opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
+				if opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
 					return
 				}
 
 				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, t) {
 					return
 				}
-			} else if *opts.AllowEmptyReject {
+			} else if opts.AllowEmptyReject {
 				return
 			}
 			ctx.ReportNode(&callExpression.Node, buildRejectAnErrorMessage())

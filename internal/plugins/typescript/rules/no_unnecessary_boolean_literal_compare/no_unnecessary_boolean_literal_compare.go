@@ -2,7 +2,6 @@ package no_unnecessary_boolean_literal_compare
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -52,27 +51,31 @@ func buildNoStrictNullCheckMessage() rule.RuleMessage {
 }
 
 type NoUnnecessaryBooleanLiteralCompareOptions struct {
-	AllowComparingNullableBooleansToFalse                  *bool `json:"allowComparingNullableBooleansToFalse,omitempty"`
-	AllowComparingNullableBooleansToTrue                   *bool `json:"allowComparingNullableBooleansToTrue,omitempty"`
-	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing,omitempty"`
+	AllowComparingNullableBooleansToFalse                  bool
+	AllowComparingNullableBooleansToTrue                   bool
+	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing bool
 }
 
 func parseOptions(options []any) NoUnnecessaryBooleanLiteralCompareOptions {
-	opts := NoUnnecessaryBooleanLiteralCompareOptions{}
-	if len(options) > 0 {
-		if optsJSON, err := json.Marshal(options[0]); err == nil {
-			// Convert the configured option object to JSON and back into the struct.
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
+	opts := NoUnnecessaryBooleanLiteralCompareOptions{
+		AllowComparingNullableBooleansToFalse: true,
+		AllowComparingNullableBooleansToTrue:  true,
 	}
-	if opts.AllowComparingNullableBooleansToFalse == nil {
-		opts.AllowComparingNullableBooleansToFalse = utils.Ref(true)
+	if len(options) == 0 {
+		return opts
 	}
-	if opts.AllowComparingNullableBooleansToTrue == nil {
-		opts.AllowComparingNullableBooleansToTrue = utils.Ref(true)
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
 	}
-	if opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing == nil {
-		opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = utils.Ref(false)
+	if value, ok := optsMap["allowComparingNullableBooleansToFalse"].(bool); ok {
+		opts.AllowComparingNullableBooleansToFalse = value
+	}
+	if value, ok := optsMap["allowComparingNullableBooleansToTrue"].(bool); ok {
+		opts.AllowComparingNullableBooleansToTrue = value
+	}
+	if value, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
+		opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = value
 	}
 	return opts
 }
@@ -101,7 +104,7 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 			compilerOptions.StrictNullChecks,
 		)
 
-		if !isStrictNullChecks && !*opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
+		if !isStrictNullChecks && !opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
 			ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())
 		}
 
@@ -178,7 +181,7 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if comparison.expressionIsNullableBoolean && ((comparison.literalBooleanInComparison && *opts.AllowComparingNullableBooleansToTrue) || (!comparison.literalBooleanInComparison && *opts.AllowComparingNullableBooleansToFalse)) {
+				if comparison.expressionIsNullableBoolean && ((comparison.literalBooleanInComparison && opts.AllowComparingNullableBooleansToTrue) || (!comparison.literalBooleanInComparison && opts.AllowComparingNullableBooleansToFalse)) {
 					return
 				}
 

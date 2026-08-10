@@ -328,7 +328,7 @@ func invertComparisonType(ct NullishComparisonType) NullishComparisonType {
 
 // isValidBooleanCheckType checks if a node's type is valid for boolean
 // truthiness in optional chain detection. disallowFalsyLiteral controls
-// whether falsy literal types (false, 0, '', 0n) cause rejection — set to
+// whether falsy literal types (false, 0, ”, 0n) cause rejection — set to
 // true for guard operands, false for the last operand in a chain.
 // Matches upstream's `isValidFalseBooleanCheckType(node, disallowFalsyLiteral, ...)`.
 func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
@@ -372,22 +372,22 @@ func (a *OperandAnalyzer) isValidBooleanCheckTypeImpl(node *ast.Node, disallowFa
 			continue
 		}
 
-		if derefBoolDefault(opts.CheckAny, true) && flags&checker.TypeFlagsAny != 0 {
+		if opts.CheckAny && flags&checker.TypeFlagsAny != 0 {
 			continue
 		}
-		if derefBoolDefault(opts.CheckUnknown, true) && flags&checker.TypeFlagsUnknown != 0 {
+		if opts.CheckUnknown && flags&checker.TypeFlagsUnknown != 0 {
 			continue
 		}
-		if derefBoolDefault(opts.CheckString, true) && flags&checker.TypeFlagsStringLike != 0 {
+		if opts.CheckString && flags&checker.TypeFlagsStringLike != 0 {
 			continue
 		}
-		if derefBoolDefault(opts.CheckNumber, true) && flags&checker.TypeFlagsNumberLike != 0 {
+		if opts.CheckNumber && flags&checker.TypeFlagsNumberLike != 0 {
 			continue
 		}
-		if derefBoolDefault(opts.CheckBoolean, true) && flags&checker.TypeFlagsBooleanLike != 0 {
+		if opts.CheckBoolean && flags&checker.TypeFlagsBooleanLike != 0 {
 			continue
 		}
-		if derefBoolDefault(opts.CheckBigInt, true) && flags&checker.TypeFlagsBigIntLike != 0 {
+		if opts.CheckBigInt && flags&checker.TypeFlagsBigIntLike != 0 {
 			continue
 		}
 		if flags&checker.TypeFlagsTypeParameter != 0 {
@@ -431,22 +431,22 @@ func (a *OperandAnalyzer) isValidBooleanCheckTypeImpl(node *ast.Node, disallowFa
 
 func (a *OperandAnalyzer) isTypePartValidForBoolean(flags checker.TypeFlags) bool {
 	opts := a.opts
-	if derefBoolDefault(opts.CheckAny, true) && flags&checker.TypeFlagsAny != 0 {
+	if opts.CheckAny && flags&checker.TypeFlagsAny != 0 {
 		return true
 	}
-	if derefBoolDefault(opts.CheckUnknown, true) && flags&checker.TypeFlagsUnknown != 0 {
+	if opts.CheckUnknown && flags&checker.TypeFlagsUnknown != 0 {
 		return true
 	}
-	if derefBoolDefault(opts.CheckString, true) && flags&checker.TypeFlagsStringLike != 0 {
+	if opts.CheckString && flags&checker.TypeFlagsStringLike != 0 {
 		return true
 	}
-	if derefBoolDefault(opts.CheckNumber, true) && flags&checker.TypeFlagsNumberLike != 0 {
+	if opts.CheckNumber && flags&checker.TypeFlagsNumberLike != 0 {
 		return true
 	}
-	if derefBoolDefault(opts.CheckBoolean, true) && flags&checker.TypeFlagsBooleanLike != 0 {
+	if opts.CheckBoolean && flags&checker.TypeFlagsBooleanLike != 0 {
 		return true
 	}
-	if derefBoolDefault(opts.CheckBigInt, true) && flags&checker.TypeFlagsBigIntLike != 0 {
+	if opts.CheckBigInt && flags&checker.TypeFlagsBigIntLike != 0 {
 		return true
 	}
 	if flags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsNever) != 0 {
@@ -482,7 +482,7 @@ func isValidChainTarget(node *ast.Node, allowIdentifier bool) bool {
 }
 
 // isFalsyLiteralType checks if a type is a specific falsy literal value:
-// false, 0, '', or 0n. These appear in discriminated unions like `false | { a: string }`
+// false, 0, ”, or 0n. These appear in discriminated unions like `false | { a: string }`
 // where truthiness is used as a type discriminator rather than a null guard.
 func isFalsyLiteralType(t *checker.Type) bool {
 	flags := checker.Type_flags(t)

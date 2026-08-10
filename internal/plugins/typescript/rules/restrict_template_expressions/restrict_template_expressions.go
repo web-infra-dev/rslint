@@ -2,7 +2,6 @@ package restrict_template_expressions
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -25,21 +24,6 @@ type RestrictTemplateExpressionsOptions struct {
 	AllowRegExp  bool
 }
 
-// parseAllow decodes the `allow` option — type specifiers written either in
-// the string shorthand or in object form — through TypeOrValueSpecifier's own
-// UnmarshalJSON rather than re-deriving both shapes by hand.
-func parseAllow(raw any) []utils.TypeOrValueSpecifier {
-	rawJSON, err := json.Marshal(raw)
-	if err != nil {
-		return nil
-	}
-	var allow []utils.TypeOrValueSpecifier
-	if err := json.Unmarshal(rawJSON, &allow); err != nil {
-		return nil
-	}
-	return allow
-}
-
 func parseOptions(options []any) RestrictTemplateExpressionsOptions {
 	opts := RestrictTemplateExpressionsOptions{
 		Allow: []utils.TypeOrValueSpecifier{{
@@ -60,7 +44,7 @@ func parseOptions(options []any) RestrictTemplateExpressionsOptions {
 		return opts
 	}
 	if raw, ok := optsMap["allow"]; ok {
-		opts.Allow = parseAllow(raw)
+		opts.Allow = utils.ParseTypeOrValueSpecifiers(raw)
 	}
 	if v, ok := optsMap["allowAny"].(bool); ok {
 		opts.AllowAny = v

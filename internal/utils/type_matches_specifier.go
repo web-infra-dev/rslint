@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -18,25 +17,6 @@ import (
 
 type TypeOrValueSpecifierFrom uint8
 
-// unmarshal TypeOrValueSpecifierFrom from JSON string
-func (s *TypeOrValueSpecifierFrom) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return fmt.Errorf("failed to unmarshal TypeOrValueSpecifierFrom: %w", err)
-	}
-	switch str {
-	case "file":
-		*s = TypeOrValueSpecifierFromFile
-	case "lib":
-		*s = TypeOrValueSpecifierFromLib
-	case "package":
-		*s = TypeOrValueSpecifierFromPackage
-	default:
-		return fmt.Errorf("unknown TypeOrValueSpecifierFrom value: %s", str)
-	}
-	return nil
-}
-
 const (
 	TypeOrValueSpecifierFromFile TypeOrValueSpecifierFrom = iota
 	TypeOrValueSpecifierFromLib
@@ -48,59 +28,117 @@ const (
 
 type NameList []string
 
-// unmarshal a string or a list of strings to NameList
-func (s *NameList) UnmarshalJSON(data []byte) error {
-	var singleName string
-	if err := json.Unmarshal(data, &singleName); err == nil {
-		*s = NameList{singleName}
-		return nil
-	}
-
-	var names []string
-	if err := json.Unmarshal(data, &names); err != nil {
-		return fmt.Errorf("failed to unmarshal NameList: %w", err)
-	}
-	*s = names
-	return nil
-}
-
 type TypeOrValueSpecifier struct {
-	From TypeOrValueSpecifierFrom `json:"from"`
-	Name NameList                 `json:"name"`
+	From TypeOrValueSpecifierFrom
+	Name NameList
 	// Can be used when From == TypeOrValueSpecifierFromFile
-	Path string `json:"path"`
+	Path string
 	// Can be used when From == TypeOrValueSpecifierFromPackage
-	Package string `json:"package"`
+	Package string
 	// pathProvided distinguishes an omitted path from an explicitly empty one.
 	// Both decode to Path == "", but upstream treats only the omitted form as
 	// matching declarations anywhere in the current project.
 	pathProvided bool
 }
 
-// UnmarshalJSON handles both string shorthand ("Promise") and object form
-// ({"from": "lib", "name": "Promise"}) for TypeOrValueSpecifier, matching
-// the original TypeScript-ESLint TypeOrValueSpecifier union type.
-func (s *TypeOrValueSpecifier) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err == nil {
-		*s = TypeOrValueSpecifier{
+// ParseTypeOrValueSpecifier decodes one entry of a type specifier option from
+// its configured value, handling both the string shorthand ("Promise") and the
+// object form ({"from": "lib", "name": "Promise"}), matching the original
+// TypeScript-ESLint TypeOrValueSpecifier union type. It reports false for a
+// value that matches neither shape.
+func ParseTypeOrValueSpecifier(raw any) (TypeOrValueSpecifier, bool) {
+	if str, ok := raw.(string); ok {
+		return TypeOrValueSpecifier{
 			From: TypeOrValueSpecifierFromString,
 			Name: NameList{str},
+		}, true
+	}
+
+	fields, ok := raw.(map[string]interface{})
+	if !ok {
+		return TypeOrValueSpecifier{}, false
+	}
+
+	var specifier TypeOrValueSpecifier
+	if raw, ok := fields["from"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
 		}
+		switch str {
+		case "file":
+			specifier.From = TypeOrValueSpecifierFromFile
+		case "lib":
+			specifier.From = TypeOrValueSpecifierFromLib
+		case "package":
+			specifier.From = TypeOrValueSpecifierFromPackage
+		default:
+			return TypeOrValueSpecifier{}, false
+		}
+	}
+	if raw, ok := fields["name"]; ok {
+		names, ok := parseNameList(raw)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Name = names
+	}
+	if raw, ok := fields["path"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Path = str
+		specifier.pathProvided = true
+	}
+	if raw, ok := fields["package"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Package = str
+	}
+	return specifier, true
+}
+
+// ParseTypeOrValueSpecifiers decodes a list of type specifiers. It returns nil
+// when the value is not a list or when any entry matches neither specifier
+// shape, so a malformed option falls back to the rule's default.
+func ParseTypeOrValueSpecifiers(raw any) []TypeOrValueSpecifier {
+	items, ok := raw.([]interface{})
+	if !ok {
 		return nil
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
+	specifiers := make([]TypeOrValueSpecifier, 0, len(items))
+	for _, item := range items {
+		specifier, ok := ParseTypeOrValueSpecifier(item)
+		if !ok {
+			return nil
+		}
+		specifiers = append(specifiers, specifier)
 	}
-	type Alias TypeOrValueSpecifier
-	var alias Alias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
+	return specifiers
+}
+
+// parseNameList decodes a specifier's `name`, written either as a single name
+// or as a list of them.
+func parseNameList(raw any) (NameList, bool) {
+	if str, ok := raw.(string); ok {
+		return NameList{str}, true
 	}
-	*s = TypeOrValueSpecifier(alias)
-	_, s.pathProvided = fields["path"]
-	return nil
+	items, ok := raw.([]interface{})
+	if !ok {
+		return nil, false
+	}
+	names := make(NameList, 0, len(items))
+	for _, item := range items {
+		str, ok := item.(string)
+		if !ok {
+			return nil, false
+		}
+		names = append(names, str)
+	}
+	return names, true
 }
 
 func specifierNameMatchesWithCalleeNames(

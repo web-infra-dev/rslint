@@ -2,7 +2,6 @@ package no_base_to_string
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -42,7 +41,7 @@ func buildBaseToStringMessage(name string, certainty usefulness) rule.RuleMessag
 }
 
 type NoBaseToStringOptions struct {
-	IgnoredTypeNames []string `json:"ignoredTypeNames"`
+	IgnoredTypeNames []string
 }
 
 func parseOptions(options []any) NoBaseToStringOptions {
@@ -52,10 +51,12 @@ func parseOptions(options []any) NoBaseToStringOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	if optsMap, ok := options[0].(map[string]interface{}); ok {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
+	}
+	if raw, ok := optsMap["ignoredTypeNames"].([]interface{}); ok {
+		opts.IgnoredTypeNames = utils.ToStringSlice(raw)
 	}
 	return opts
 }

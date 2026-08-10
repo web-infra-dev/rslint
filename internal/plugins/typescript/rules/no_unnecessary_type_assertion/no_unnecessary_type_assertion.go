@@ -2,7 +2,6 @@ package no_unnecessary_type_assertion
 
 import (
 	_ "embed"
-	"encoding/json"
 	"slices"
 	"strings"
 
@@ -46,10 +45,10 @@ func buildUnnecessaryAssertionMessage() rule.RuleMessage {
 
 type NoUnnecessaryTypeAssertionOptions struct {
 	// TODO(port): maybe typeOrValueSpecifier?
-	TypesToIgnore []string `json:"typesToIgnore"`
+	TypesToIgnore []string
 	// Whether to check const assertions on literal values
 	// When true, reports cases like `const foo = 'bar' as const` where the assertion is unnecessary
-	CheckLiteralConstAssertions bool `json:"checkLiteralConstAssertions"`
+	CheckLiteralConstAssertions bool
 }
 
 func parseOptions(options []any) NoUnnecessaryTypeAssertionOptions {
@@ -59,10 +58,15 @@ func parseOptions(options []any) NoUnnecessaryTypeAssertionOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	if optsMap, ok := options[0].(map[string]interface{}); ok {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
+	}
+	if raw, ok := optsMap["typesToIgnore"].([]interface{}); ok {
+		opts.TypesToIgnore = utils.ToStringSlice(raw)
+	}
+	if value, ok := optsMap["checkLiteralConstAssertions"].(bool); ok {
+		opts.CheckLiteralConstAssertions = value
 	}
 	return opts
 }

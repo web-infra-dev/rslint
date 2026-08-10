@@ -11,7 +11,6 @@ package strict_boolean_expressions
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"regexp"
 
@@ -25,23 +24,6 @@ import (
 
 //go:embed strict_boolean_expressions.schema.json
 var schemaJSON []byte
-
-// Options mirrors typescript-eslint's option shape. Pointer-typed booleans
-// distinguish "user explicitly set false" from "user did not set, fall back to
-// upstream default" — important because upstream defaults are split: string /
-// number / nullable-object default to `true`, everything else defaults to
-// `false`.
-type Options struct {
-	AllowAny                                               *bool `json:"allowAny"`
-	AllowNullableBoolean                                   *bool `json:"allowNullableBoolean"`
-	AllowNullableEnum                                      *bool `json:"allowNullableEnum"`
-	AllowNullableNumber                                    *bool `json:"allowNullableNumber"`
-	AllowNullableObject                                    *bool `json:"allowNullableObject"`
-	AllowNullableString                                    *bool `json:"allowNullableString"`
-	AllowNumber                                            *bool `json:"allowNumber"`
-	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"`
-	AllowString                                            *bool `json:"allowString"`
-}
 
 type resolvedOptions struct {
 	allowAny                                               bool
@@ -68,48 +50,37 @@ func parseOptions(options []any) resolvedOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	optsMap, _ := options[0].(map[string]interface{})
-	if optsMap == nil {
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
 		return opts
 	}
 
-	// Round-trip via JSON to fill the pointer-typed Options struct, which keeps
-	// "explicitly set to false" distinguishable from "not set at all".
-	jsonBytes, err := json.Marshal(optsMap)
-	if err != nil {
-		return opts
+	if value, ok := optsMap["allowAny"].(bool); ok {
+		opts.allowAny = value
 	}
-	var parsed Options
-	if err := json.Unmarshal(jsonBytes, &parsed); err != nil {
-		return opts
+	if value, ok := optsMap["allowNullableBoolean"].(bool); ok {
+		opts.allowNullableBoolean = value
 	}
-
-	if parsed.AllowAny != nil {
-		opts.allowAny = *parsed.AllowAny
+	if value, ok := optsMap["allowNullableEnum"].(bool); ok {
+		opts.allowNullableEnum = value
 	}
-	if parsed.AllowNullableBoolean != nil {
-		opts.allowNullableBoolean = *parsed.AllowNullableBoolean
+	if value, ok := optsMap["allowNullableNumber"].(bool); ok {
+		opts.allowNullableNumber = value
 	}
-	if parsed.AllowNullableEnum != nil {
-		opts.allowNullableEnum = *parsed.AllowNullableEnum
+	if value, ok := optsMap["allowNullableObject"].(bool); ok {
+		opts.allowNullableObject = value
 	}
-	if parsed.AllowNullableNumber != nil {
-		opts.allowNullableNumber = *parsed.AllowNullableNumber
+	if value, ok := optsMap["allowNullableString"].(bool); ok {
+		opts.allowNullableString = value
 	}
-	if parsed.AllowNullableObject != nil {
-		opts.allowNullableObject = *parsed.AllowNullableObject
+	if value, ok := optsMap["allowNumber"].(bool); ok {
+		opts.allowNumber = value
 	}
-	if parsed.AllowNullableString != nil {
-		opts.allowNullableString = *parsed.AllowNullableString
+	if value, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
+		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = value
 	}
-	if parsed.AllowNumber != nil {
-		opts.allowNumber = *parsed.AllowNumber
-	}
-	if parsed.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing != nil {
-		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = *parsed.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing
-	}
-	if parsed.AllowString != nil {
-		opts.allowString = *parsed.AllowString
+	if value, ok := optsMap["allowString"].(bool); ok {
+		opts.allowString = value
 	}
 	return opts
 }

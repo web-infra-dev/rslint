@@ -2,7 +2,6 @@ package only_throw_error
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -14,32 +13,37 @@ import (
 var schemaJSON []byte
 
 type OnlyThrowErrorOptions struct {
-	Allow                []utils.TypeOrValueSpecifier `json:"allow"`
-	AllowRethrowing      *bool                        `json:"allowRethrowing"`
-	AllowThrowingAny     *bool                        `json:"allowThrowingAny"`
-	AllowThrowingUnknown *bool                        `json:"allowThrowingUnknown"`
+	Allow                []utils.TypeOrValueSpecifier
+	AllowRethrowing      bool
+	AllowThrowingAny     bool
+	AllowThrowingUnknown bool
 }
 
 func parseOptions(options []any) OnlyThrowErrorOptions {
-	opts := OnlyThrowErrorOptions{}
-	if len(options) > 0 {
-		if optsMap, ok := options[0].(map[string]interface{}); ok {
-			if optsJSON, err := json.Marshal(optsMap); err == nil {
-				_ = json.Unmarshal(optsJSON, &opts)
-			}
-		}
+	opts := OnlyThrowErrorOptions{
+		Allow:                []utils.TypeOrValueSpecifier{},
+		AllowRethrowing:      true,
+		AllowThrowingAny:     true,
+		AllowThrowingUnknown: true,
 	}
-	if opts.Allow == nil {
-		opts.Allow = []utils.TypeOrValueSpecifier{}
+	if len(options) == 0 {
+		return opts
 	}
-	if opts.AllowRethrowing == nil {
-		opts.AllowRethrowing = utils.Ref(true)
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
 	}
-	if opts.AllowThrowingAny == nil {
-		opts.AllowThrowingAny = utils.Ref(true)
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allow"]); specifiers != nil {
+		opts.Allow = specifiers
 	}
-	if opts.AllowThrowingUnknown == nil {
-		opts.AllowThrowingUnknown = utils.Ref(true)
+	if value, ok := optsMap["allowRethrowing"].(bool); ok {
+		opts.AllowRethrowing = value
+	}
+	if value, ok := optsMap["allowThrowingAny"].(bool); ok {
+		opts.AllowThrowingAny = value
+	}
+	if value, ok := optsMap["allowThrowingUnknown"].(bool); ok {
+		opts.AllowThrowingUnknown = value
 	}
 	return opts
 }
@@ -170,7 +174,7 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 			ast.KindThrowStatement: func(node *ast.Node) {
 				expr := node.Expression()
 
-				if *opts.AllowRethrowing && isRethrownError(ctx, expr) {
+				if opts.AllowRethrowing && isRethrownError(ctx, expr) {
 					return
 				}
 
@@ -185,11 +189,11 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
+				if opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
 					return
 				}
 
-				if *opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
+				if opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
 					return
 				}
 

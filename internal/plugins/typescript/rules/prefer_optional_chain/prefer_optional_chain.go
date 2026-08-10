@@ -2,25 +2,66 @@ package prefer_optional_chain
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed prefer_optional_chain.schema.json
 var schemaJSON []byte
 
 type PreferOptionalChainOptions struct {
-	AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing *bool `json:"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing"`
-	CheckAny                                                           *bool `json:"checkAny"`
-	CheckUnknown                                                       *bool `json:"checkUnknown"`
-	CheckString                                                        *bool `json:"checkString"`
-	CheckNumber                                                        *bool `json:"checkNumber"`
-	CheckBoolean                                                       *bool `json:"checkBoolean"`
-	CheckBigInt                                                        *bool `json:"checkBigInt"`
-	RequireNullish                                                     *bool `json:"requireNullish"`
+	AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing bool
+	CheckAny                                                           bool
+	CheckUnknown                                                       bool
+	CheckString                                                        bool
+	CheckNumber                                                        bool
+	CheckBoolean                                                       bool
+	CheckBigInt                                                        bool
+	RequireNullish                                                     bool
+}
+
+func parseOptions(options []any) PreferOptionalChainOptions {
+	opts := PreferOptionalChainOptions{
+		CheckAny:     true,
+		CheckUnknown: true,
+		CheckString:  true,
+		CheckNumber:  true,
+		CheckBoolean: true,
+		CheckBigInt:  true,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, ok := options[0].(map[string]interface{})
+	if !ok {
+		return opts
+	}
+	if value, ok := optsMap["allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing"].(bool); ok {
+		opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing = value
+	}
+	if value, ok := optsMap["checkAny"].(bool); ok {
+		opts.CheckAny = value
+	}
+	if value, ok := optsMap["checkUnknown"].(bool); ok {
+		opts.CheckUnknown = value
+	}
+	if value, ok := optsMap["checkString"].(bool); ok {
+		opts.CheckString = value
+	}
+	if value, ok := optsMap["checkNumber"].(bool); ok {
+		opts.CheckNumber = value
+	}
+	if value, ok := optsMap["checkBoolean"].(bool); ok {
+		opts.CheckBoolean = value
+	}
+	if value, ok := optsMap["checkBigInt"].(bool); ok {
+		opts.CheckBigInt = value
+	}
+	if value, ok := optsMap["requireNullish"].(bool); ok {
+		opts.RequireNullish = value
+	}
+	return opts
 }
 
 func buildPreferOptionalChainMessage() rule.RuleMessage {
@@ -42,40 +83,7 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Schema:           rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := PreferOptionalChainOptions{}
-		if len(options) > 0 {
-			if optsMap, ok := options[0].(map[string]interface{}); ok {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-
-		// Set defaults
-		if opts.CheckAny == nil {
-			opts.CheckAny = utils.Ref(true)
-		}
-		if opts.CheckUnknown == nil {
-			opts.CheckUnknown = utils.Ref(true)
-		}
-		if opts.CheckString == nil {
-			opts.CheckString = utils.Ref(true)
-		}
-		if opts.CheckNumber == nil {
-			opts.CheckNumber = utils.Ref(true)
-		}
-		if opts.CheckBoolean == nil {
-			opts.CheckBoolean = utils.Ref(true)
-		}
-		if opts.CheckBigInt == nil {
-			opts.CheckBigInt = utils.Ref(true)
-		}
-		if opts.RequireNullish == nil {
-			opts.RequireNullish = utils.Ref(false)
-		}
-		if opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing == nil {
-			opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing = utils.Ref(false)
-		}
+		opts := parseOptions(options)
 
 		analyzer := NewOperandAnalyzer(ctx, opts)
 		chainAnalyzer := NewChainAnalyzer(ctx, opts)
@@ -126,10 +134,3 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 		}
 	},
 })
-
-func derefBoolDefault(b *bool, defaultVal bool) bool {
-	if b == nil {
-		return defaultVal
-	}
-	return *b
-}
