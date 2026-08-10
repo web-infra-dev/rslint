@@ -152,10 +152,10 @@ func parseOptions(rawOptions []any) options {
 		exclude:         utils.NewSetFromItems[string](),
 	}
 
-	optsMap := utils.GetOptionsMap(rawOptions)
-	if optsMap == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOptions[0].(map[string]any)
 
 	if useErrorIsError, ok := optsMap["useErrorIsError"].(bool); ok {
 		opts.useErrorIsError = useErrorIsError

@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed filename_case.schema.json
@@ -87,10 +86,10 @@ type options struct {
 func parseOptions(rawOpts []any) options {
 	opts := options{caseCount: 1, multipleFileExtensions: true}
 	opts.cases[0] = allCases[2] // kebabCase
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]any)
 
 	if v, ok := optsMap["case"].(string); ok {
 		if c, found := caseForKey(v); found {

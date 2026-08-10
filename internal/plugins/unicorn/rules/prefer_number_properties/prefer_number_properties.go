@@ -90,10 +90,10 @@ func parseOptions(options []any) preferNumberPropertiesOptions {
 		checkInfinity: false,
 		checkNaN:      true,
 	}
-	optionsMap := utils.GetOptionsMap(options)
-	if optionsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optionsMap, _ := options[0].(map[string]any)
 	if value, ok := optionsMap["checkInfinity"].(bool); ok {
 		opts.checkInfinity = value
 	}

@@ -43,10 +43,9 @@ type RestrictPlusOperandsOptions struct {
 }
 
 func parseOptions(options []any) RestrictPlusOperandsOptions {
-	opts, ok := rule.LegacyUnwrapOptions(options).(RestrictPlusOperandsOptions)
-	if !ok {
-		opts = RestrictPlusOperandsOptions{}
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	opts := RestrictPlusOperandsOptions{}
+	if len(options) > 0 {
+		if optsMap, ok := options[0].(map[string]any); ok {
 			if value, ok := optsMap["allowAny"].(bool); ok {
 				opts.AllowAny = utils.Ref(value)
 			}

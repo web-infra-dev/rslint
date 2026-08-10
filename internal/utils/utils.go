@@ -458,8 +458,6 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
-// GetOptionsMap extracts a map[string]interface{} from rule options.
-// It handles both array format [{ option: value }] and direct object format { option: value }.
 // ExtractRegexPatternAndFlags splits a RegularExpressionLiteral's text (e.g. "/pattern/gi")
 // into the pattern and flags portions. Returns ("", "") for malformed input.
 func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
@@ -473,43 +471,18 @@ func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
 	return text[1 : lastSlash+1], text[lastSlash+2:]
 }
 
-func GetOptionsMap(opts any) map[string]interface{} {
-	if opts == nil {
-		return nil
-	}
-
-	var optsMap map[string]interface{}
-	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = opts.(map[string]interface{})
-	}
-
-	return optsMap
-}
-
-// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape.
-// It handles number forms (`3` / `[3]`) plus object forms (`{max: 3}` /
-// `[{maximum: 3}]`). `maximum` wins only when it coerces to a non-zero number;
-// otherwise `max` is used. If either key is present but neither yields a
-// numeric threshold, ESLint ends up comparing against `undefined`, which never
-// reports; MaxInt gives the same observable behavior in Go.
-func ResolveLegacyMaxOption(options any, defaultMax int) int {
-	if options == nil {
-		return defaultMax
-	}
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return defaultMax
-		}
-		if n, ok := CoerceInt(arr[0]); ok {
-			return n
-		}
-	} else if n, ok := CoerceInt(options); ok {
+// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape:
+// the single option element is either a bare number (`3`) or an object
+// (`{max: 3}` / `{maximum: 3}`). `maximum` wins only when it coerces to a
+// non-zero number; otherwise `max` is used. If either key is present but
+// neither yields a numeric threshold, ESLint ends up comparing against
+// `undefined`, which never reports; MaxInt gives the same observable behavior
+// in Go.
+func ResolveLegacyMaxOption(option any, defaultMax int) int {
+	if n, ok := CoerceInt(option); ok {
 		return n
 	}
-
-	m := GetOptionsMap(options)
+	m, _ := option.(map[string]interface{})
 	if m == nil {
 		return defaultMax
 	}
@@ -568,23 +541,6 @@ func CoerceIntegral(v any) (int, bool) {
 		}
 	}
 	return CoerceInt(v)
-}
-
-// GetOptionsString extracts a string option from the weakly-typed options parameter.
-// It handles both direct string format ("value") and array format (["value"]).
-func GetOptionsString(opts any) string {
-	if opts == nil {
-		return ""
-	}
-	if s, ok := opts.(string); ok {
-		return s
-	}
-	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
-		if s, ok := arr[0].(string); ok {
-			return s
-		}
-	}
-	return ""
 }
 
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
