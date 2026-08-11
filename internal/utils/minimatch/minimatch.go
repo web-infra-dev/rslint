@@ -36,6 +36,8 @@ package minimatch
 
 import (
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/dlclark/regexp2"
 )
@@ -82,19 +84,38 @@ const (
 	star = qmark + "*?"
 	// anyChar matches any single character, the way JavaScript's `[^]` does.
 	anyChar = `[\s\S]`
+	// nonTerminator matches any single character a JavaScript `.` does, which
+	// is every character but a line terminator. regexp2 reads a `.` the way
+	// .NET does, where only a `\n` is left out.
+	nonTerminator = `[^\n\r\u2028\u2029]`
 	// reSpecials are the characters that need escaping in a regexp.
 	reSpecials = `().*{}+?[]^$\!`
-	// maxPatternLength bounds a pattern the way minimatch does.
+	// maxPatternLength bounds a pattern the way minimatch does, counting the
+	// bytes of a pattern where minimatch counts the UTF-16 units of one.
 	maxPatternLength = 1024 * 64
 )
 
+// matchTimeout bounds how long one name may spend in one pattern part. The
+// extended glob syntax compiles to the overlapping alternations a backtracking
+// engine explores exponentially — `+(a|aa)` against a run of `a` that ends in
+// anything else is the shape of it — and regexp2 backtracks. A name that
+// matches settles within microseconds, so a match still running after this has
+// found nothing and is not about to.
+const matchTimeout = time.Second
+
 // braceShortcut detects the brace set that makes expansion worth running. The
 // lookahead rules out a nested `{`, which is what keeps the scan linear.
-var braceShortcut = regexp2.MustCompile(`\{(?:(?!\{).)*\}`, regexp2.None)
+var braceShortcut = boundMatching(regexp2.MustCompile(`\{(?:(?!\{)`+nonTerminator+`)*\}`, regexp2.None))
 
 // neverMatches stands in for a pattern part that failed to compile, looking for
 // a character past the end of the string.
-var neverMatches = regexp2.MustCompile(`$.`, regexp2.None)
+var neverMatches = regexp2.MustCompile(`\z.`, regexp2.None)
+
+// boundMatching holds a compiled pattern to matchTimeout.
+func boundMatching(re *regexp2.Regexp) *regexp2.Regexp {
+	re.MatchTimeout = matchTimeout
+	return re
+}
 
 // patternPart is one path part of a compiled pattern: a `**`, a literal name,
 // or a regexp when the part carries wildcards.
@@ -111,6 +132,7 @@ type Matcher struct {
 	negate  bool
 	comment bool
 	empty   bool
+	invalid bool
 	// set holds one row per brace expansion, each row one part per path part.
 	set [][]patternPart
 }
@@ -118,11 +140,50 @@ type Matcher struct {
 // New compiles pattern. A pattern that cannot be compiled yields a Matcher that
 // matches nothing rather than an error, which is how minimatch behaves.
 func New(pattern string, options Options) *Matcher {
-	pattern = strings.TrimSpace(pattern)
-
 	m := &Matcher{options: options, pattern: pattern}
+
+	// minimatch measures the pattern it was handed before it reads anything
+	// else about it, and refuses to compile one this long. Nothing about the
+	// pattern is honored past that point, a leading `!` included, so a matcher
+	// that says no to every path stands in for the refusal.
+	if len(pattern) > maxPatternLength {
+		m.invalid = true
+		return m
+	}
+
+	m.pattern = trimECMA(pattern)
 	m.make()
 	return m
+}
+
+// trimECMA trims the pattern the way String.prototype.trim does. Go's
+// strings.TrimSpace reads a different set of characters as blank: it trims
+// U+0085, which JavaScript keeps, and keeps U+FEFF, which JavaScript trims.
+func trimECMA(pattern string) string {
+	return strings.TrimFunc(pattern, isStrWhiteSpace)
+}
+
+// isStrWhiteSpace reports whether a character is one JavaScript trims from the
+// edge of a string: a WhiteSpace or a LineTerminator.
+//
+// The rest of the repository spells this utils.IsStrWhiteSpace. Reaching for
+// it would put the whole compiler on this package's import list, where a port
+// of an npm package with its own LICENSE has no business, so the dozen lines
+// live here instead.
+//
+// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
+// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
+func isStrWhiteSpace(r rune) bool {
+	switch r {
+	// LineTerminator
+	case '\n', '\r', 0x2028, 0x2029:
+		return true
+	// WhiteSpace
+	case '\t', '\v', '\f', 0xFEFF:
+		return true
+	}
+	// WhiteSpace, which covers the ordinary space and U+00A0
+	return unicode.Is(unicode.Zs, r)
 }
 
 // Match reports whether path matches pattern. Compile the pattern with New
@@ -178,7 +239,7 @@ func (m *Matcher) parseNegate() {
 }
 
 func (m *Matcher) braceExpand() []string {
-	if m.options.NoBrace || len(m.pattern) > maxPatternLength {
+	if m.options.NoBrace {
 		return []string{m.pattern}
 	}
 	if hasBraces, err := braceShortcut.MatchString(m.pattern); err != nil || !hasBraces {
@@ -213,16 +274,50 @@ func (m *Matcher) parsePart(pattern string) (patternPart, bool) {
 		return patternPart{literal: globUnescape(pattern)}, true
 	}
 
-	flags := regexp2.None
-	if m.options.NoCase {
-		flags = regexp2.IgnoreCase
-	}
-	re, err := regexp2.Compile("^"+source+"$", flags)
+	re, err := regexp2.Compile("^"+endAnchors(source)+`\z`, regexp2.None)
 	if err != nil {
 		// An invalid regular expression can't match anything.
 		re = neverMatches
 	}
-	return patternPart{re: re}, true
+	return patternPart{re: boundMatching(re)}, true
+}
+
+// endAnchors rewrites the end-of-input anchors a source was built with, from
+// the `$` JavaScript reads as the very end of the input to the `\z` regexp2
+// reads that way. A bare `$` also matches ahead of a `\n` that ends the input
+// under the .NET rules regexp2 follows.
+//
+// A `$` a pattern asked for itself was escaped on the way in, and one that
+// rewriting a negated list swept into a character class stands for itself
+// there, so every other one is an anchor.
+//
+// The anchors stay a single character until here so that the source keeps the
+// offsets a negated list recorded while it was being written.
+func endAnchors(source string) string {
+	if !strings.ContainsRune(source, '$') {
+		return source
+	}
+	var anchored strings.Builder
+	escaping := false
+	inClass := false
+	for i := range len(source) {
+		c := source[i]
+		switch {
+		case escaping:
+			escaping = false
+		case c == '\\':
+			escaping = true
+		case inClass:
+			inClass = c != ']'
+		case c == '[':
+			inClass = true
+		case c == '$':
+			anchored.WriteString(`\z`)
+			continue
+		}
+		anchored.WriteByte(c)
+	}
+	return anchored.String()
 }
 
 // patternListItem tracks one open extended glob list while a part is parsed.
@@ -425,6 +520,9 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// finish up the class.
 			hasMagic = true
 			inClass = false
+			if m.options.NoCase {
+				re = re[:reClassStart+1] + caseCloseClass(re[reClassStart+1:])
+			}
 			re += string(c)
 
 		default:
@@ -434,6 +532,14 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 				escaping = false
 			} else if strings.ContainsRune(reSpecials, c) && (c != '^' || !inClass) {
 				re += `\`
+			}
+			// A character class is widened as a whole once it closes, so only
+			// a literal standing on its own is widened here.
+			if m.options.NoCase && !inClass {
+				if class, widened := caseClass(c); widened {
+					re += class
+					continue
+				}
 			}
 			re += string(c)
 		}
@@ -516,7 +622,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 	// A non-empty source has to be kept from matching an empty path part, so
 	// that `a/*` does not match `a/`.
 	if re != "" && hasMagic {
-		re = "(?=.)" + re
+		re = "(?=" + nonTerminator + ")" + re
 	}
 
 	if addPatternStart {
@@ -528,7 +634,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 
 // Match reports whether path matches the compiled pattern.
 func (m *Matcher) Match(path string) bool {
-	if m.comment {
+	if m.invalid || m.comment {
 		return false
 	}
 	if m.empty {

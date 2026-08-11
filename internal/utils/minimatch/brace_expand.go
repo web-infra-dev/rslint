@@ -1,6 +1,8 @@
 package minimatch
 
 import (
+	"errors"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -172,16 +174,15 @@ func expandSequence(n []string, alpha bool) []string {
 
 	// A step of zero would never reach the end of the range, so it counts as
 	// one, the same as a sequence that named no step at all.
-	incr := 1
+	incr := float64(1)
 	if len(n) == 3 {
-		step := sequenceValue(n[2])
-		incr = max(step, -step, 1)
+		incr = max(math.Abs(sequenceValue(n[2])), 1)
 	}
 
-	test := func(i int) bool { return i <= y }
+	test := func(i float64) bool { return i <= y }
 	if y < x {
 		incr = -incr
-		test = func(i int) bool { return i >= y }
+		test = func(i float64) bool { return i >= y }
 	}
 
 	padded := false
@@ -190,15 +191,15 @@ func expandSequence(n []string, alpha bool) []string {
 	}
 
 	members := []string{}
-	for i := x; test(i); i += incr {
+	for i := x; test(i); {
 		var member string
 		if alpha {
-			member = string(rune(i))
+			member = string(rune(int(i)))
 			if member == `\` {
 				member = ""
 			}
 		} else {
-			member = strconv.Itoa(i)
+			member = sequenceString(i)
 			if padded {
 				if need := width - len(member); need > 0 {
 					if i < 0 {
@@ -210,17 +211,60 @@ func expandSequence(n []string, alpha bool) []string {
 			}
 		}
 		members = append(members, member)
+
+		// A step too small to tell apart from nothing at this magnitude would
+		// leave the sequence stuck on one member for good.
+		next := i + incr
+		if next == i {
+			break
+		}
+		i = next
 	}
 	return members
 }
 
+// sequenceString writes a member of a numeric sequence the way JavaScript
+// writes a number: the shortest run of digits that reads back as the same
+// value, with no sign on a zero, and in exponential notation once the decimal
+// point sits past the twenty-first place.
+func sequenceString(value float64) string {
+	switch {
+	case value == 0:
+		return "0"
+	case math.IsInf(value, 1):
+		return "Infinity"
+	case math.IsInf(value, -1):
+		return "-Infinity"
+	}
+
+	sign := ""
+	digits := strconv.FormatFloat(value, 'f', -1, 64)
+	if strings.HasPrefix(digits, "-") {
+		sign, digits = "-", digits[1:]
+	}
+	if len(digits) <= 21 {
+		return sign + digits
+	}
+
+	// A sequence counts in whole numbers, so the digits hold no decimal point
+	// and the exponent is however many of them follow the first.
+	exponent := strconv.Itoa(len(digits) - 1)
+	significant := strings.TrimRight(digits, "0")
+	if len(significant) == 1 {
+		return sign + significant + "e+" + exponent
+	}
+	return sign + significant[:1] + "." + significant[1:] + "e+" + exponent
+}
+
 // sequenceValue reads a sequence endpoint as a number, falling back to the
-// character code of an alphabetic endpoint.
-func sequenceValue(str string) int {
-	if value, err := strconv.Atoi(str); err == nil {
+// character code of an alphabetic endpoint. The number is the float64
+// JavaScript reads it as, so an endpoint too wide to count in whole numbers
+// rounds the way JavaScript rounds it rather than counting on past it.
+func sequenceValue(str string) float64 {
+	if value, err := strconv.ParseFloat(str, 64); err == nil || errors.Is(err, strconv.ErrRange) {
 		return value
 	}
-	return int(str[0])
+	return float64(str[0])
 }
 
 // isPadded reports whether a numeric endpoint asks for zero-padded members,

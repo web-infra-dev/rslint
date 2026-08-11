@@ -137,6 +137,38 @@ func TestMatch(t *testing.T) {
 		{"/src/[!-[]", "/src/a", true},
 		{"/src/[!-[]", "/src/[", false},
 
+		// ---- line terminators ----
+		// The guard that keeps a wildcard from matching an empty name is a
+		// JavaScript `.`, which no line terminator matches, and the end of a
+		// name is the end of it rather than the newline that ends it.
+		{"?", "\r", false},
+		{"?", "\n", false},
+		{"?", "\u2028", false},
+		{"?", "\u2029", false},
+		{"*", "a\n", true},
+		{"a*", "a\r", true},
+		{"a", "a\n", false},
+		{"@(a)", "a\n", false},
+		{"*$", "a$", true},
+		{"*$", "a$\n", false},
+		{"@($|a)", "$", true},
+
+		// The scan that decides a pattern is worth expanding stops at a line
+		// terminator too, so this brace set is never expanded at all.
+		{"{a\rb,c}", "c", false},
+		{"{a\rb,c}", "{a\rb,c}", true},
+		{"{a,c}", "c", true},
+
+		// ---- surrounding whitespace ----
+		// A pattern is trimmed the way JavaScript trims a string, which reads
+		// U+FEFF as blank and U+0085 as a character of its own.
+		{"\ufeffa", "a", true},
+		{"a\ufeff", "a", true},
+		{"\u00a0a", "a", true},
+		{"\va", "a", true},
+		{"\u0085a", "a", false},
+		{"\u0085a", "\u0085a", true},
+
 		// ---- characters outside ASCII ----
 		{"/src/caf*", "/src/café", true},
 		{"/src/*é", "/src/café", true},
@@ -269,6 +301,90 @@ func TestMatchOptions(t *testing.T) {
 	}
 }
 
+// TestMatchNoCase pins NoCase against the `i` flag of a JavaScript regexp
+// written without the `u` flag, which minimatch hands its compiled pattern.
+// JavaScript compares two characters by their uppercase, with the one rule
+// that a character outside ASCII never uppercases into it: U+03A3 Σ, U+03C3 σ
+// and U+03C2 ς are one character to it, while U+212A K and `k` are two, and
+// neither answer is the one Unicode case folding gives.
+func TestMatchNoCase(t *testing.T) {
+	tests := []struct {
+		pattern string
+		path    string
+		want    bool
+	}{
+		{"/src/Server/*.ts", "/src/server/a.ts", true},
+		{"caf\u00e9", "CAF\u00c9", true},
+		{"@(a|b)", "B", true},
+
+		// a capital sigma, a small sigma and a final sigma are one character
+		{"\u03a3", "\u03c2", true},
+		{"\u03a3", "\u03c3", true},
+		{"\u03c2", "\u03a3", true},
+		{"[\u03a3]", "\u03c2", true},
+
+		// a kelvin sign is not a `k`, and a long s is not an `s`
+		{"\u212a", "k", false},
+		{"k", "\u212a", false},
+		{"K", "k", true},
+		{"[a-z]", "\u212a", false},
+		{"[a-z]", "\u017f", false},
+		{"[a-z]", "K", true},
+		{"[a-z]", "s", true},
+
+		// a capital eszett does not uppercase onto the small one
+		{"\u00df", "\u1e9e", false},
+
+		// a negated class turns down whatever the widened class covers
+		{"[!a]", "A", false},
+		{"[!a-z]", "K", false},
+
+		// a `-` that ends a class stands for itself, widened class or not
+		{"[a-]", "a", true},
+		{"[a-]", "A", true},
+		{"[a-]", "-", true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.pattern+" vs "+test.path, func(t *testing.T) {
+			got := minimatch.Match(test.pattern, test.path, minimatch.Options{NoCase: true})
+			if got != test.want {
+				t.Errorf("Match(%q, %q, NoCase) = %v, want %v", test.pattern, test.path, got, test.want)
+			}
+		})
+	}
+}
+
+// TestMatchOverLongPattern covers the length minimatch refuses a pattern past,
+// which it measures before it reads anything else about the pattern. Nothing
+// the pattern says is honored after that, a leading `!` included, so a pattern
+// this long matches nothing rather than everything.
+func TestMatchOverLongPattern(t *testing.T) {
+	longest := strings.Repeat("a/", 32767) + "a"
+	tooLong := strings.Repeat("a/", 32768) + "a"
+
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		want    bool
+	}{
+		{name: "the longest pattern still compiles", pattern: longest, path: longest, want: true},
+		{name: "negating the longest pattern still compiles", pattern: "!" + longest, path: "x", want: true},
+		{name: "one byte past matches nothing", pattern: tooLong, path: tooLong, want: false},
+		{name: "negating one byte past matches nothing either", pattern: "!" + tooLong, path: "x", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := minimatch.Match(test.pattern, test.path, minimatch.Options{})
+			if got != test.want {
+				t.Errorf("Match(<%d bytes>, <%d bytes>) = %v, want %v", len(test.pattern), len(test.path), got, test.want)
+			}
+		})
+	}
+}
+
 // TestMatchManyGlobstars covers a pattern carrying more `**` than any rule
 // would write. Dividing the path between them is a search, and one that misses
 // explores every division, so the answer has to come from a walk that
@@ -326,6 +442,13 @@ func TestBraceExpand(t *testing.T) {
 		{"a{-03..-1}d", []string{"a-03d", "a-02d", "a-01d"}},
 		// A step of zero counts as one.
 		{"a{1..3..0}d", []string{"a1d", "a2d", "a3d"}},
+		// An endpoint is the number JavaScript reads it as, which stops
+		// counting in whole numbers past 2^53 but never wraps around: a step
+		// that would carry the sequence past its end point ends it instead.
+		{"a{2147483647..2147483648}d", []string{"a2147483647d", "a2147483648d"}},
+		{"a{-2147483648..-2147483649}d", []string{"a-2147483648d", "a-2147483649d"}},
+		{"{9223372036854770000..9223372036854775807..4096}", []string{"9223372036854770000", "9223372036854774000"}},
+		{"{-9223372036854770000..-9223372036854775807..4096}", []string{"-9223372036854770000", "-9223372036854774000"}},
 		// The `{a},b}` rewrite starts over at the top level, where an
 		// expansion that reduces to nothing drops out.
 		{"{{}},}", []string{"{}}"}},
