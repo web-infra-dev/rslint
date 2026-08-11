@@ -53,4 +53,5 @@ expect(errorThrowingFunction).toThrowErrorMatchingInlineSnapshot(
 
 ## Original Documentation
 
-- [jest/no-interpolation-in-snapshots](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-interpolation-in-snapshots.md)
+- [eslint-plugin-jest: no-interpolation-in-snapshots](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/docs/rules/no-interpolation-in-snapshots.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/src/rules/no-interpolation-in-snapshots.ts)

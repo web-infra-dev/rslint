@@ -27,4 +27,5 @@ expect(method).toHaveBeenCalled();
 
 ## Original Documentation
 
-- [jest/prefer-to-have-been-called](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-to-have-been-called.md)
+- [eslint-plugin-jest: prefer-to-have-been-called](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-to-have-been-called.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-to-have-been-called.ts)

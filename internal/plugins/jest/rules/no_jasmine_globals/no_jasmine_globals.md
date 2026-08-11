@@ -30,4 +30,5 @@ jest.setTimeout(5000);
 
 ## Original Documentation
 
-- [jest/no-jasmine-globals](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-jasmine-globals.md)
+- [eslint-plugin-jest: no-jasmine-globals](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-jasmine-globals.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-jasmine-globals.ts)

@@ -41,4 +41,5 @@ jest.createMockFromModule('m');
 
 ## Original Documentation
 
-- [jest/no-deprecated-functions](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-deprecated-functions.md)
+- [eslint-plugin-jest: no-deprecated-functions](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-deprecated-functions.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-deprecated-functions.ts)

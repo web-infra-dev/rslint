@@ -80,4 +80,5 @@ setTimeout(1000);
 
 ## Original Documentation
 
-- [jest/no-confusing-set-timeout](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-confusing-set-timeout.md)
+- [eslint-plugin-jest: no-confusing-set-timeout](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-confusing-set-timeout.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-confusing-set-timeout.ts)

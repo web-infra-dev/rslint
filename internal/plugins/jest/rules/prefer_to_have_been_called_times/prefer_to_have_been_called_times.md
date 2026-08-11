@@ -35,4 +35,5 @@ expect(method.mock.calls[0][0]).toStrictEqual(value);
 
 ## Original Documentation
 
-- [jest/prefer-to-have-been-called-times](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-to-have-been-called-times.md)
+- [eslint-plugin-jest: prefer-to-have-been-called-times](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-to-have-been-called-times.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-to-have-been-called-times.ts)

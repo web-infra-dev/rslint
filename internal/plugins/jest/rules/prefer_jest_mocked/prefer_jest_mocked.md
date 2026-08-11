@@ -38,4 +38,5 @@ jest.mocked([].foo).mockReturnValue(1);
 
 ## Original Documentation
 
-- [jest/prefer-jest-mocked](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-jest-mocked.md)
+- [eslint-plugin-jest: prefer-jest-mocked](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.3/docs/rules/prefer-jest-mocked.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.3/src/rules/prefer-jest-mocked.ts)

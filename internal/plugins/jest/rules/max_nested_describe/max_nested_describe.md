@@ -113,4 +113,5 @@ fdescribe('foo', () => {
 
 ## Original Documentation
 
-- [jest/max-nested-describe](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/max-nested-describe.md)
+- [eslint-plugin-jest: max-nested-describe](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/max-nested-describe.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/max-nested-describe.ts)

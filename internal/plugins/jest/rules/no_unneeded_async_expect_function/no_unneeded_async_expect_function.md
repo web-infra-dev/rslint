@@ -49,4 +49,5 @@ as the same safe unwrap because tsgo preserves them explicitly in the AST.
 
 ## Original Documentation
 
-- [jest/no-unneeded-async-expect-function](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-unneeded-async-expect-function.md)
+- [eslint-plugin-jest: no-unneeded-async-expect-function](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/docs/rules/no-unneeded-async-expect-function.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/src/rules/no-unneeded-async-expect-function.ts)

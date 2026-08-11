@@ -38,4 +38,5 @@ expect(a).toThrow();
 
 ## Original Documentation
 
-- [jest/no-alias-methods](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-alias-methods.md)
+- [eslint-plugin-jest: no-alias-methods](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/docs/rules/no-alias-methods.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/src/rules/no-alias-methods.ts)

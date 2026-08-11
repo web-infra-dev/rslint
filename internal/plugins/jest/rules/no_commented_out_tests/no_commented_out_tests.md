@@ -66,4 +66,5 @@ Because the heuristic treats any `test` / `it` / `describe`-like call opening in
 
 ## Original Documentation
 
-- [jest/no-commented-out-tests](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-commented-out-tests.md)
+- [eslint-plugin-jest: no-commented-out-tests](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-commented-out-tests.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-commented-out-tests.ts)

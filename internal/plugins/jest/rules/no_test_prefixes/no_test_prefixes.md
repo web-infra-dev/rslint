@@ -29,4 +29,5 @@ describe.skip('foo');
 
 ## Original Documentation
 
-- [jest/no-test-prefixes](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-test-prefixes.md)
+- [eslint-plugin-jest: no-test-prefixes](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/docs/rules/no-test-prefixes.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/src/rules/no-test-prefixes.ts)

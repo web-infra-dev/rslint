@@ -75,4 +75,5 @@ expect(a).resolves.not.toBe(b);
 
 ## Original Documentation
 
-- [jest/no-restricted-matchers](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-restricted-matchers.md)
+- [eslint-plugin-jest: no-restricted-matchers](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/docs/rules/no-restricted-matchers.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/src/rules/no-restricted-matchers.ts)

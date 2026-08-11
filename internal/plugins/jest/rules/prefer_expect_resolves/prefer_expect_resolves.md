@@ -55,4 +55,5 @@ it('errors', async () => {
 
 ## Original Documentation
 
-- [jest/prefer-expect-resolves](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-expect-resolves.md)
+- [eslint-plugin-jest: prefer-expect-resolves](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-expect-resolves.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-expect-resolves.ts)

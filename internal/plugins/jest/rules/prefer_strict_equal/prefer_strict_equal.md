@@ -18,4 +18,5 @@ expect({ a: 'a', b: undefined }).toStrictEqual({ a: 'a' });
 
 ## Original Documentation
 
-- [jest/prefer-strict-equal](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-strict-equal.md)
+- [eslint-plugin-jest: prefer-strict-equal](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-strict-equal.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-strict-equal.ts)

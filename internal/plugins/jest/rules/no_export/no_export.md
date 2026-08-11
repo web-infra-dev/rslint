@@ -49,4 +49,5 @@ Do not enable this rule on files that are not Jest test files. For shared test u
 
 ## Original Documentation
 
-- [jest/no-export](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-export.md)
+- [eslint-plugin-jest: no-export](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-export.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-export.ts)

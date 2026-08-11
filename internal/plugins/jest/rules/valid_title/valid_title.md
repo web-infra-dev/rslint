@@ -132,4 +132,5 @@ For full option examples and edge cases, see the upstream rule documentation bel
 
 ## Original Documentation
 
-- [jest/valid-title](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/valid-title.md)
+- [eslint-plugin-jest: valid-title](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/valid-title.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/valid-title.ts)

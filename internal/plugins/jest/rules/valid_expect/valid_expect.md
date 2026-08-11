@@ -113,4 +113,5 @@ expect().pass();
 
 ## Original Documentation
 
-- [jest/valid-expect](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/valid-expect.md)
+- [eslint-plugin-jest: valid-expect](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/valid-expect.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/valid-expect.ts)
