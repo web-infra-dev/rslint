@@ -31,7 +31,5 @@ new SuppressedError(error, suppressed, 'message');
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v73.0.0 -->
-
-- [eslint-plugin-unicorn: error-message](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/error-message.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/error-message.js)
+- [eslint-plugin-unicorn: error-message](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/docs/rules/error-message.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/rules/error-message.js)

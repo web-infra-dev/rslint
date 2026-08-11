@@ -157,7 +157,7 @@ Before starting, familiarize yourself with these key source locations:
    - **Priority**: If the user provides an official link, **FIRST** read and analyze that link's content.
    - **Fallback**: If no link is provided, search for the rule documentation (ESLint website or Plugin repo) and source code (GitHub).
    - Find the rule test file (usually `tests/lib/rules/<rule>.js`).
-   - **Source from the latest released tag, not the default branch.** Do not read the rule's behavior off `main`/`master`/HEAD — it may contain half-finished or unreleased changes. Find the upstream project's latest release tag and read the rule's doc/source/tests as they exist at that tag; note the tag, since Phase 2 Step 3 records it in a hidden comment under the rule doc's "Original Documentation" heading — the only record of which upstream version the port targets.
+   - **Source from the latest released tag, not the default branch.** Do not read the rule's behavior off `main`/`master`/HEAD — it may contain half-finished or unreleased changes. Find the upstream project's latest release tag and read the rule's doc/source/tests as they exist at that tag; note the tag, since Phase 2 Step 3 pins the rule doc's links to it — the only record of which upstream version the port targets.
    - **If the rule (or the specific behavior/option being requested) doesn't exist yet at the latest released tag** — only on the default branch, or in an unpublished PR — stop and tell the user instead of porting it anyway. Don't silently port pre-release behavior just because the user's request didn't mention this.
 
 2. **Determine Rule Origin & Deprecation Status**:
@@ -523,32 +523,32 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 
 ## Original Documentation
 
-<!-- upstream: <project>@<released-tag> -->
-
 [Link to ESLint documentation]
 ````
 
-**Record the upstream version as a hidden comment, keep the visible link friendly** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does. Immediately under the `## Original Documentation` heading, add an HTML comment (invisible in the rendered doc) naming the upstream project and the exact released tag you actually read while porting:
+**Pin the upstream version in the link itself** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does. Link the exact released tag you actually read while porting, never a moving ref (`main`, `master`, `HEAD`):
+
+**Plugin rules** (GitHub-hosted, e.g. `eslint-plugin-unicorn`): pin both the doc link and the source-code link to the same tag.
 
 ```markdown
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
-
-- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-thenable.md)
+- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-thenable.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)
 ```
 
+**ESLint core rules**: `eslint.org` cannot be pinned to an exact release — it only freezes _past_ major versions (`/docs/v9.x/`, `/docs/v8.x/`); the current major's `/docs/vN.x/` always redirects to `/docs/latest/`, a moving target. So the version lock lives on the **source-code** link instead, pinned to the `eslint/eslint` GitHub repo at the exact tag. A "Source code" link is therefore **required** for every core rule doc, alongside the friendly unpinned `eslint.org` doc link:
+
 ```markdown
 ## Original Documentation
-
-<!-- upstream: eslint@v10.8.0 -->
 
 - [ESLint no-console](https://eslint.org/docs/latest/rules/no-console)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
 ```
 
-Keep the **visible** link pointing at whatever address is most useful to a reader today — `eslint.org/docs/latest/...` for core rules, `blob/main/...` for plugin repos on GitHub. Do **not** pin the visible link's ref to the tag: `eslint.org` only freezes _past_ major versions (the current major's `/docs/vN.x/` always redirects to `/docs/latest/`, a moving target), and pinning a GitHub `blob/` link to an old tag sends readers to a stale rendering of the page instead of the current one. The comment is the source of truth for alignment; the link is for humans.
+(Most existing core rule docs predate this requirement and don't have a "Source code" line yet — backfilling those is tracked separately; add it for any rule you touch going forward.)
 
-If a later change re-verifies this rule against a newer upstream release, updating the comment's tag is the entire re-alignment record — bump it once the rule's behavior has actually been checked against the newer release, don't bump it preemptively just because a newer tag exists.
+If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively just because a newer tag exists.
 
 **Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
 

@@ -45,7 +45,5 @@ export function success() {}
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
-
-- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-thenable.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-thenable.js)
+- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-thenable.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)

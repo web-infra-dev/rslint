@@ -69,7 +69,5 @@ const missing = NaN;
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v64.0.0 -->
-
-- [eslint-plugin-unicorn: prefer-number-properties](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-number-properties.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/prefer-number-properties.js)
+- [eslint-plugin-unicorn: prefer-number-properties](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-number-properties.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/rules/prefer-number-properties.js)

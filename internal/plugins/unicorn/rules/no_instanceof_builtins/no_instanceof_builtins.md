@@ -104,7 +104,5 @@ When enabled, `Error` checks are reported with an autofix to `Error.isError(valu
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
-
-- [eslint-plugin-unicorn: no-instanceof-builtins](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-instanceof-builtins.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-instanceof-builtins.js)
+- [eslint-plugin-unicorn: no-instanceof-builtins](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-instanceof-builtins.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-instanceof-builtins.js)

@@ -21,6 +21,4 @@ const decimal = number.toFixed(2);
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v64.0.0 -->
-
-- [eslint-plugin-unicorn require-number-to-fixed-digits-argument](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/require-number-to-fixed-digits-argument.md)
+- [eslint-plugin-unicorn require-number-to-fixed-digits-argument](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/require-number-to-fixed-digits-argument.md)

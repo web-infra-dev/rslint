@@ -61,7 +61,5 @@ switch (foo) {
 
 ## Original Documentation
 
-<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
-
-- [eslint-plugin-unicorn: no-useless-switch-case](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-useless-switch-case.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-useless-switch-case.js)
+- [eslint-plugin-unicorn: no-useless-switch-case](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-useless-switch-case.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-useless-switch-case.js)
