@@ -20,5 +20,5 @@ test.todo('i need to write this test');
 
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-todo](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-todo.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-todo.ts)
+- [eslint-plugin-jest: prefer-todo](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-todo.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-todo.ts)

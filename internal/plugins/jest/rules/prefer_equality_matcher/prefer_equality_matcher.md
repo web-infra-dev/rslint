@@ -36,5 +36,5 @@ expect(myObj).not.toStrictEqual(thatObj);
 
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-equality-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-equality-matcher.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-equality-matcher.ts)
+- [eslint-plugin-jest: prefer-equality-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-equality-matcher.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-equality-matcher.ts)

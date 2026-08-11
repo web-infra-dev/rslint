@@ -77,5 +77,5 @@ describe('foo', () => {
 
 ## Original Documentation
 
-- [eslint-plugin-jest: no-duplicate-hooks](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-duplicate-hooks.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-duplicate-hooks.ts)
+- [eslint-plugin-jest: no-duplicate-hooks](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-duplicate-hooks.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-duplicate-hooks.ts)

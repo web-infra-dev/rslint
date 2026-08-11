@@ -34,5 +34,5 @@ expect(uncalledFunction).not.toHaveBeenCalled();
 
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-called-with](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-called-with.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-called-with.ts)
+- [eslint-plugin-jest: prefer-called-with](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-called-with.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-called-with.ts)

@@ -50,5 +50,5 @@ expect(myName > theirName).toBe(true);
 
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-comparison-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/docs/rules/prefer-comparison-matcher.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/src/rules/prefer-comparison-matcher.ts)
+- [eslint-plugin-jest: prefer-comparison-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-comparison-matcher.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-comparison-matcher.ts)

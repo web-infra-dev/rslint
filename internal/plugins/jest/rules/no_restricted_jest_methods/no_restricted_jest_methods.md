@@ -69,5 +69,5 @@ jest.advanceTimersByTime(1000);
 
 ## Original Documentation
 
-- [eslint-plugin-jest: no-restricted-jest-methods](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/docs/rules/no-restricted-jest-methods.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.4/src/rules/no-restricted-jest-methods.ts)
+- [eslint-plugin-jest: no-restricted-jest-methods](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-restricted-jest-methods.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-restricted-jest-methods.ts)

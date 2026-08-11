@@ -53,5 +53,5 @@ myTest('does not have function body');
 
 ## Original Documentation
 
-- [eslint-plugin-jest: no-disabled-tests](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/docs/rules/no-disabled-tests.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/src/rules/no-disabled-tests.ts)
+- [eslint-plugin-jest: no-disabled-tests](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-disabled-tests.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-disabled-tests.ts)

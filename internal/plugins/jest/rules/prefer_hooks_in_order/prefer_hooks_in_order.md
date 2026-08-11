@@ -128,5 +128,5 @@ describe('foo', () => {
 
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-hooks-in-order](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/prefer-hooks-in-order.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/prefer-hooks-in-order.ts)
+- [eslint-plugin-jest: prefer-hooks-in-order](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-hooks-in-order.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-hooks-in-order.ts)

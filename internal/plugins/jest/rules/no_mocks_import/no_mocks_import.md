@@ -22,5 +22,5 @@ require('thing');
 
 ## Original Documentation
 
-- [eslint-plugin-jest: no-mocks-import](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/docs/rules/no-mocks-import.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.2/src/rules/no-mocks-import.ts)
+- [eslint-plugin-jest: no-mocks-import](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-mocks-import.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-mocks-import.ts)

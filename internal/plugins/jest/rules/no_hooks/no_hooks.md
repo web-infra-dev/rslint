@@ -38,5 +38,5 @@ describe("suite", () => {
 
 ## Original Documentation
 
-- [eslint-plugin-jest: no-hooks](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/docs/rules/no-hooks.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.15.1/src/rules/no-hooks.ts)
+- [eslint-plugin-jest: no-hooks](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-hooks.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-hooks.ts)
