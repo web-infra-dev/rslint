@@ -16,6 +16,7 @@ foo != null && foo.bar;
 foo !== undefined && foo.bar;
 typeof foo !== 'undefined' && foo.bar;
 !foo || !foo.bar;
+foo === null || foo.bar !== 'baz';
 (foo || {}).bar;
 (foo ?? {}).bar;
 ```
@@ -30,6 +31,7 @@ foo?.bar;
 foo?.bar;
 foo?.bar;
 !foo?.bar;
+foo?.bar !== 'baz';
 foo?.bar;
 foo?.bar;
 ```

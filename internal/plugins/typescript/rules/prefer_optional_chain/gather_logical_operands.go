@@ -3,6 +3,7 @@ package prefer_optional_chain
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -12,6 +13,29 @@ type OperandValidity int
 const (
 	OperandValid OperandValidity = iota
 	OperandInvalid
+	// OperandLast is a `x.y !== <value>` comparison against something other
+	// than a nullish literal. It cannot guard a chain, only close one.
+	OperandLast
+)
+
+// LastComparisonType is the source-level operator of an OperandLast operand.
+type LastComparisonType int
+
+const (
+	LastComparisonNotEqual LastComparisonType = iota
+	LastComparisonEqual
+	LastComparisonNotStrictEqual
+	LastComparisonStrictEqual
+)
+
+// YodaKind records which side of an OperandLast comparison holds the chain.
+// It is Unknown when both sides could, i.e. `a.b !== a.c`.
+type YodaKind int
+
+const (
+	YodaNo YodaKind = iota
+	YodaYes
+	YodaUnknown
 )
 
 type NullishComparisonType int
@@ -35,6 +59,12 @@ type Operand struct {
 	IsYoda         bool
 	IsTypeof       bool // whether this was a typeof check (typeof x !== 'undefined')
 	UsesNull       bool // for != / == comparisons, whether null was used (vs undefined)
+
+	// For OperandLast only: the expression ComparedNode is compared against,
+	// and the operator joining them.
+	ComparisonValue *ast.Node
+	LastComparison  LastComparisonType
+	Yoda            YodaKind
 }
 
 type OperandAnalyzer struct {
@@ -64,11 +94,9 @@ func (a *OperandAnalyzer) GatherLogicalOperands(node *ast.Node) ([]Operand, ast.
 	a.flattenLogicalOperands(node, operator, &a.operands)
 	operands := a.operands
 
-	// The last operand in the chain is not used as a guard — it's the
-	// chain target. Re-classify it without the falsy-literal restriction
-	// so that types like `boolean` (which contain `false`) can still
-	// appear as the final expression. Matches upstream's `areMoreOperands`
-	// guard that skips the falsy-literal check for the last operand.
+	// The last operand in the chain is not used as a guard — it's the chain
+	// target — so re-classify it without the boolean-check type restriction
+	// that only makes sense for a guard.
 	if len(operands) >= 2 {
 		last := &operands[len(operands)-1]
 		if last.Validity == OperandInvalid {
@@ -77,18 +105,16 @@ func (a *OperandAnalyzer) GatherLogicalOperands(node *ast.Node) ([]Operand, ast.
 				prefix := raw.AsPrefixUnaryExpression()
 				if prefix.Operator == ast.KindExclamationToken {
 					inner := ast.SkipParentheses(prefix.Operand)
-					if isValidChainTarget(inner, true) && a.isValidBooleanCheckTypeNoFalsy(inner) {
+					if isValidChainTarget(inner, true) {
 						last.ComparedNode = inner
 						last.ComparisonType = ComparisonNotBoolean
 						last.Validity = OperandValid
 					}
 				}
 			} else if operator == ast.KindAmpersandAmpersandToken && isValidChainTarget(raw, true) {
-				if a.isValidBooleanCheckTypeNoFalsy(raw) {
-					last.ComparedNode = raw
-					last.ComparisonType = ComparisonBoolean
-					last.Validity = OperandValid
-				}
+				last.ComparedNode = raw
+				last.ComparisonType = ComparisonBoolean
+				last.Validity = OperandValid
 			}
 		}
 	}
@@ -174,16 +200,89 @@ func (a *OperandAnalyzer) classifyOperand(node *ast.Node, chainOperator ast.Kind
 		}
 	}
 
+	// Handle `x.y != something` — a comparison against an arbitrary value.
+	// A comparison against `'undefined'` is only a nullish check with typeof,
+	// which was already handled above, so it never reaches this point valid.
+	if ast.IsBinaryExpression(raw) {
+		bin := raw.AsBinaryExpression()
+		if !isUndefinedStringLiteral(ast.SkipParentheses(bin.Left)) &&
+			!isUndefinedStringLiteral(ast.SkipParentheses(bin.Right)) {
+			result, ok := classifyLastChainOperand(bin)
+			if ok {
+				return result
+			}
+		}
+	}
+
 	return Operand{
 		Node:     node,
 		Validity: OperandInvalid,
 	}
 }
 
+// classifyLastChainOperand handles comparisons like `a.b !== value`, where the
+// compared value is an arbitrary expression rather than a nullish literal. At
+// least one side must be member-based for a chain to be foldable into it.
+func classifyLastChainOperand(bin *ast.BinaryExpression) (Operand, bool) {
+	var comparison LastComparisonType
+	switch bin.OperatorToken.Kind {
+	case ast.KindEqualsEqualsToken:
+		comparison = LastComparisonEqual
+	case ast.KindEqualsEqualsEqualsToken:
+		comparison = LastComparisonStrictEqual
+	case ast.KindExclamationEqualsToken:
+		comparison = LastComparisonNotEqual
+	case ast.KindExclamationEqualsEqualsToken:
+		comparison = LastComparisonNotStrictEqual
+	default:
+		return Operand{}, false
+	}
+
+	left := ast.SkipParentheses(bin.Left)
+	right := ast.SkipParentheses(bin.Right)
+	leftIsMember := isMemberBasedExpression(left)
+	rightIsMember := isMemberBasedExpression(right)
+
+	operand := Operand{
+		Node:           bin.AsNode(),
+		Validity:       OperandLast,
+		LastComparison: comparison,
+	}
+	switch {
+	case leftIsMember && !rightIsMember:
+		operand.ComparedNode, operand.ComparisonValue, operand.Yoda = left, right, YodaNo
+	case !leftIsMember && rightIsMember:
+		operand.ComparedNode, operand.ComparisonValue, operand.Yoda = right, left, YodaYes
+	case leftIsMember && rightIsMember:
+		operand.ComparedNode, operand.ComparisonValue, operand.Yoda = left, right, YodaUnknown
+	default:
+		return Operand{}, false
+	}
+	return operand, true
+}
+
+// isMemberBasedExpression reports whether the node is a property access or a
+// call on one, i.e. `a.b`, `a[b]`, `a.b()`.
+func isMemberBasedExpression(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return true
+	case ast.KindCallExpression:
+		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+		return callee.Kind == ast.KindPropertyAccessExpression ||
+			callee.Kind == ast.KindElementAccessExpression
+	}
+	return false
+}
+
 func (a *OperandAnalyzer) classifyComparisonOperand(bin *ast.BinaryExpression, chainOperator ast.Kind) (Operand, bool) {
 	left := ast.SkipParentheses(bin.Left)
 	right := ast.SkipParentheses(bin.Right)
 	opKind := bin.OperatorToken.Kind
+
+	if !isEqualityOperator(opKind) {
+		return Operand{}, false
+	}
 
 	// Try both orientations for Yoda-style: `null != foo`
 	for _, yoda := range []bool{false, true} {
@@ -205,30 +304,33 @@ func (a *OperandAnalyzer) classifyComparisonOperand(bin *ast.BinaryExpression, c
 			continue
 		}
 
-		var compType NullishComparisonType
-		isNegated := isNegatedComparison(opKind, chainOperator)
+		// A guard only narrows the chain when its sense matches the operator:
+		// `x != null && x.y` and `x == null || x.y`.
+		negated := isNegatedOperator(opKind)
+		if negated == (chainOperator == ast.KindBarBarToken) {
+			continue
+		}
 
+		var compType NullishComparisonType
 		switch {
 		case opKind == ast.KindExclamationEqualsToken || opKind == ast.KindEqualsEqualsToken:
-			if isNegated {
+			if negated {
 				compType = ComparisonNotEqualNullOrUndefined
 			} else {
 				compType = ComparisonEqualNullOrUndefined
 			}
-		case (opKind == ast.KindExclamationEqualsEqualsToken || opKind == ast.KindEqualsEqualsEqualsToken) && isNull:
-			if isNegated {
+		case isNull:
+			if negated {
 				compType = ComparisonNotStrictEqualNull
 			} else {
 				compType = ComparisonStrictEqualNull
 			}
-		case (opKind == ast.KindExclamationEqualsEqualsToken || opKind == ast.KindEqualsEqualsEqualsToken) && isUndefined:
-			if isNegated {
+		default:
+			if negated {
 				compType = ComparisonNotStrictEqualUndefined
 			} else {
 				compType = ComparisonStrictEqualUndefined
 			}
-		default:
-			continue
 		}
 
 		return Operand{
@@ -274,9 +376,14 @@ func (a *OperandAnalyzer) classifyTypeofOperand(bin *ast.BinaryExpression, chain
 			continue
 		}
 
-		isNegated := isNegatedComparison(opKind, chainOperator)
+		// `typeof globalThis !== 'undefined'` asks whether the global exists at
+		// all, which an optional chain cannot express.
+		if ast.IsIdentifier(inner) && typescriptutil.IsReferenceToGlobalIdentifier(a.ctx, inner) {
+			return Operand{Node: bin.AsNode(), Validity: OperandInvalid}, true
+		}
+
 		var compType NullishComparisonType
-		if isNegated {
+		if isNegatedOperator(opKind) {
 			compType = ComparisonNotStrictEqualUndefined
 		} else {
 			compType = ComparisonStrictEqualUndefined
@@ -295,51 +402,29 @@ func (a *OperandAnalyzer) classifyTypeofOperand(bin *ast.BinaryExpression, chain
 	return Operand{}, false
 }
 
-func isNegatedComparison(opKind ast.Kind, chainOperator ast.Kind) bool {
-	isNegatedOp := opKind == ast.KindExclamationEqualsToken || opKind == ast.KindExclamationEqualsEqualsToken
-	if chainOperator == ast.KindAmpersandAmpersandToken {
-		return isNegatedOp
+func isEqualityOperator(opKind ast.Kind) bool {
+	switch opKind {
+	case ast.KindEqualsEqualsToken, ast.KindEqualsEqualsEqualsToken,
+		ast.KindExclamationEqualsToken, ast.KindExclamationEqualsEqualsToken:
+		return true
 	}
-	// For || chains, the sense is reversed
-	return !isNegatedOp
+	return false
 }
 
-func invertComparisonType(ct NullishComparisonType) NullishComparisonType {
-	switch ct {
-	case ComparisonBoolean:
-		return ComparisonNotBoolean
-	case ComparisonNotBoolean:
-		return ComparisonBoolean
-	case ComparisonNotEqualNullOrUndefined:
-		return ComparisonEqualNullOrUndefined
-	case ComparisonEqualNullOrUndefined:
-		return ComparisonNotEqualNullOrUndefined
-	case ComparisonNotStrictEqualNull:
-		return ComparisonStrictEqualNull
-	case ComparisonStrictEqualNull:
-		return ComparisonNotStrictEqualNull
-	case ComparisonNotStrictEqualUndefined:
-		return ComparisonStrictEqualUndefined
-	case ComparisonStrictEqualUndefined:
-		return ComparisonNotStrictEqualUndefined
-	}
-	return ct
+func isNegatedOperator(opKind ast.Kind) bool {
+	return opKind == ast.KindExclamationEqualsToken || opKind == ast.KindExclamationEqualsEqualsToken
 }
 
-// isValidBooleanCheckType checks if a node's type is valid for boolean
-// truthiness in optional chain detection. disallowFalsyLiteral controls
-// whether falsy literal types (false, 0, '', 0n) cause rejection — set to
-// true for guard operands, false for the last operand in a chain.
-// Matches upstream's `isValidFalseBooleanCheckType(node, disallowFalsyLiteral, ...)`.
+// isUndefinedStringLiteral reports whether one side of a comparison is the
+// string `'undefined'`, which only forms a nullish check together with typeof.
+func isUndefinedStringLiteral(node *ast.Node) bool {
+	return ast.IsStringLiteral(node) && node.Text() == "undefined"
+}
+
+// isValidBooleanCheckType reports whether a truthiness check on this node can
+// stand in for a nullish guard. It rejects types that a chain would not narrow
+// the same way, and types the check* options have opted out of.
 func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
-	return a.isValidBooleanCheckTypeImpl(node, true)
-}
-
-func (a *OperandAnalyzer) isValidBooleanCheckTypeNoFalsy(node *ast.Node) bool {
-	return a.isValidBooleanCheckTypeImpl(node, false)
-}
-
-func (a *OperandAnalyzer) isValidBooleanCheckTypeImpl(node *ast.Node, disallowFalsyLiteral bool) bool {
 	if a.ctx.TypeChecker == nil {
 		return true
 	}
@@ -349,110 +434,49 @@ func (a *OperandAnalyzer) isValidBooleanCheckTypeImpl(node *ast.Node, disallowFa
 		return true
 	}
 
-	parts := utils.UnionTypeParts(t)
-
-	// When disallowFalsyLiteral is true, reject if any union constituent is
-	// a falsy literal (false, 0, '', 0n). The truthiness check is narrowing
-	// out a non-nullish falsy value, not guarding against null/undefined.
-	// E.g., `boolean` = `true | false` → has `false` literal → skip.
-	// Skipped for the last operand (chain target, not a guard).
-	if disallowFalsyLiteral {
-		for _, part := range parts {
-			if isFalsyLiteralType(part) {
-				return false
-			}
-		}
+	// Intersection members are compared individually, so `({a: string} & {b: string}) | null`
+	// is judged by its object parts rather than by the intersection as a whole.
+	var parts []*checker.Type
+	for _, part := range utils.UnionTypeParts(t) {
+		parts = append(parts, utils.IntersectionTypeParts(part)...)
 	}
 
-	opts := a.opts
+	// A falsy literal (false, 0, '', 0n) means the check narrows out a
+	// non-nullish falsy value rather than guarding against null/undefined, so
+	// `declare const x: false | {a: string}; x && x.a` must stay as it is.
 	for _, part := range parts {
-		flags := checker.Type_flags(part)
-
-		if flags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) != 0 {
-			continue
+		if isFalsyLiteralType(part) {
+			return false
 		}
-
-		if derefBoolDefault(opts.CheckAny, true) && flags&checker.TypeFlagsAny != 0 {
-			continue
-		}
-		if derefBoolDefault(opts.CheckUnknown, true) && flags&checker.TypeFlagsUnknown != 0 {
-			continue
-		}
-		if derefBoolDefault(opts.CheckString, true) && flags&checker.TypeFlagsStringLike != 0 {
-			continue
-		}
-		if derefBoolDefault(opts.CheckNumber, true) && flags&checker.TypeFlagsNumberLike != 0 {
-			continue
-		}
-		if derefBoolDefault(opts.CheckBoolean, true) && flags&checker.TypeFlagsBooleanLike != 0 {
-			continue
-		}
-		if derefBoolDefault(opts.CheckBigInt, true) && flags&checker.TypeFlagsBigIntLike != 0 {
-			continue
-		}
-		if flags&checker.TypeFlagsTypeParameter != 0 {
-			constraint := checker.Checker_getBaseConstraintOfType(a.ctx.TypeChecker, part)
-			if constraint == nil {
-				continue
-			}
-			constraintValid := true
-			for _, cPart := range utils.UnionTypeParts(constraint) {
-				cFlags := checker.Type_flags(cPart)
-				if cFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) != 0 {
-					continue
-				}
-				if !a.isTypePartValidForBoolean(cFlags) {
-					constraintValid = false
-					break
-				}
-			}
-			if constraintValid {
-				continue
-			}
-		}
-
-		if flags&checker.TypeFlagsObject != 0 {
-			continue
-		}
-
-		if flags&checker.TypeFlagsNever != 0 {
-			continue
-		}
-
-		if flags&checker.TypeFlagsEnum != 0 || flags&checker.TypeFlagsEnumLiteral != 0 {
-			continue
-		}
-
-		return false
 	}
 
-	return true
-}
-
-func (a *OperandAnalyzer) isTypePartValidForBoolean(flags checker.TypeFlags) bool {
+	allowed := checker.TypeFlagsNull | checker.TypeFlagsUndefined | checker.TypeFlagsObject
 	opts := a.opts
-	if derefBoolDefault(opts.CheckAny, true) && flags&checker.TypeFlagsAny != 0 {
-		return true
+	if derefBoolDefault(opts.CheckAny, true) {
+		allowed |= checker.TypeFlagsAny
 	}
-	if derefBoolDefault(opts.CheckUnknown, true) && flags&checker.TypeFlagsUnknown != 0 {
-		return true
+	if derefBoolDefault(opts.CheckUnknown, true) {
+		allowed |= checker.TypeFlagsUnknown
 	}
-	if derefBoolDefault(opts.CheckString, true) && flags&checker.TypeFlagsStringLike != 0 {
-		return true
+	if derefBoolDefault(opts.CheckString, true) {
+		allowed |= checker.TypeFlagsStringLike
 	}
-	if derefBoolDefault(opts.CheckNumber, true) && flags&checker.TypeFlagsNumberLike != 0 {
-		return true
+	if derefBoolDefault(opts.CheckNumber, true) {
+		allowed |= checker.TypeFlagsNumberLike
 	}
-	if derefBoolDefault(opts.CheckBoolean, true) && flags&checker.TypeFlagsBooleanLike != 0 {
-		return true
+	if derefBoolDefault(opts.CheckBoolean, true) {
+		allowed |= checker.TypeFlagsBooleanLike
 	}
-	if derefBoolDefault(opts.CheckBigInt, true) && flags&checker.TypeFlagsBigIntLike != 0 {
-		return true
+	if derefBoolDefault(opts.CheckBigInt, true) {
+		allowed |= checker.TypeFlagsBigIntLike
 	}
-	if flags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsNever) != 0 {
-		return true
+
+	for _, part := range parts {
+		if checker.Type_flags(part)&allowed == 0 {
+			return false
+		}
 	}
-	return false
+	return true
 }
 
 func isValidChainTarget(node *ast.Node, allowIdentifier bool) bool {
@@ -482,7 +506,7 @@ func isValidChainTarget(node *ast.Node, allowIdentifier bool) bool {
 }
 
 // isFalsyLiteralType checks if a type is a specific falsy literal value:
-// false, 0, '', or 0n. These appear in discriminated unions like `false | { a: string }`
+// false, 0, ”, or 0n. These appear in discriminated unions like `false | { a: string }`
 // where truthiness is used as a type discriminator rather than a null guard.
 func isFalsyLiteralType(t *checker.Type) bool {
 	flags := checker.Type_flags(t)

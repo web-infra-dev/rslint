@@ -285,6 +285,15 @@ func isChainPrefix(prefix *ast.Node, chain *ast.Node) bool {
 	p := skipDownwards(prefix)
 	c := skipDownwards(chain)
 
+	// Only an expression that can itself head a chain can be a prefix of one,
+	// so `this && this.foo` is left alone while `this.a && this.a.b` folds.
+	switch p.Kind {
+	case ast.KindIdentifier, ast.KindPropertyAccessExpression,
+		ast.KindElementAccessExpression, ast.KindCallExpression, ast.KindMetaProperty:
+	default:
+		return false
+	}
+
 	// Walk down the left spine of the chain until we find a match
 	for {
 		switch c.Kind {
