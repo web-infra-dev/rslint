@@ -1,6 +1,7 @@
 package no_cycle_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
@@ -54,6 +55,9 @@ func TestNoCycleExtras(t *testing.T) {
 
 			// Locks in upstream detectCycle() maxDepth branch: depth-three is beyond maxDepth 2.
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": 2}}},
+
+			// A json.Number maxDepth is schema-valid and must limit traversal like a plain number.
+			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": json.Number("2")}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Module-augmentation bodies are not present in SourceFile.Imports and must use the full collector.

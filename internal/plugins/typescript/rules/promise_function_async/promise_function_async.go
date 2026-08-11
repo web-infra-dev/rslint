@@ -2,7 +2,6 @@ package promise_function_async
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -21,42 +20,45 @@ func buildMissingAsyncMessage() rule.RuleMessage {
 }
 
 type PromiseFunctionAsyncOptions struct {
-	AllowAny *bool `json:"allowAny,omitempty"`
+	AllowAny bool
 	// TODO(port): TypeOrValueSpecifier
-	AllowedPromiseNames       []string `json:"allowedPromiseNames,omitempty"`
-	CheckArrowFunctions       *bool    `json:"checkArrowFunctions,omitempty"`
-	CheckFunctionDeclarations *bool    `json:"checkFunctionDeclarations,omitempty"`
-	CheckFunctionExpressions  *bool    `json:"checkFunctionExpressions,omitempty"`
-	CheckMethodDeclarations   *bool    `json:"checkMethodDeclarations,omitempty"`
+	AllowedPromiseNames       []string
+	CheckArrowFunctions       bool
+	CheckFunctionDeclarations bool
+	CheckFunctionExpressions  bool
+	CheckMethodDeclarations   bool
 }
 
 func parseOptions(options []any) PromiseFunctionAsyncOptions {
-	opts := PromiseFunctionAsyncOptions{}
-	if len(options) > 0 {
-		if optsMap, ok := options[0].(map[string]interface{}); ok {
-			// Convert the configured option object to JSON and back into the struct.
-			if optsJSON, err := json.Marshal(optsMap); err == nil {
-				_ = json.Unmarshal(optsJSON, &opts)
-			}
-		}
+	opts := PromiseFunctionAsyncOptions{
+		AllowAny:                  true,
+		AllowedPromiseNames:       []string{},
+		CheckArrowFunctions:       true,
+		CheckFunctionDeclarations: true,
+		CheckFunctionExpressions:  true,
+		CheckMethodDeclarations:   true,
 	}
-	if opts.AllowAny == nil {
-		opts.AllowAny = utils.Ref(true)
+	if len(options) == 0 {
+		return opts
 	}
-	if opts.AllowedPromiseNames == nil {
-		opts.AllowedPromiseNames = []string{}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowAny"].(bool); ok {
+		opts.AllowAny = value
 	}
-	if opts.CheckArrowFunctions == nil {
-		opts.CheckArrowFunctions = utils.Ref(true)
+	if raw, ok := optsMap["allowedPromiseNames"].([]any); ok {
+		opts.AllowedPromiseNames = utils.ToStringSlice(raw)
 	}
-	if opts.CheckFunctionDeclarations == nil {
-		opts.CheckFunctionDeclarations = utils.Ref(true)
+	if value, ok := optsMap["checkArrowFunctions"].(bool); ok {
+		opts.CheckArrowFunctions = value
 	}
-	if opts.CheckFunctionExpressions == nil {
-		opts.CheckFunctionExpressions = utils.Ref(true)
+	if value, ok := optsMap["checkFunctionDeclarations"].(bool); ok {
+		opts.CheckFunctionDeclarations = value
 	}
-	if opts.CheckMethodDeclarations == nil {
-		opts.CheckMethodDeclarations = utils.Ref(true)
+	if value, ok := optsMap["checkFunctionExpressions"].(bool); ok {
+		opts.CheckFunctionExpressions = value
+	}
+	if value, ok := optsMap["checkMethodDeclarations"].(bool); ok {
+		opts.CheckMethodDeclarations = value
 	}
 	return opts
 }
@@ -127,7 +129,7 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 			everySignatureReturnsPromise := true
 			for _, signature := range signatures {
 				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-				if !*opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
+				if !opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
 					// Report without auto fixer because the return type is unknown
 					// TODO(port): getFunctionHeadLoc
 					ctx.ReportNode(node, buildMissingAsyncMessage())
@@ -154,19 +156,19 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(), rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, " async "))
 		}
 
-		if *opts.CheckArrowFunctions {
+		if opts.CheckArrowFunctions {
 			listeners[ast.KindArrowFunction] = validateNode
 		}
 
-		if *opts.CheckFunctionDeclarations {
+		if opts.CheckFunctionDeclarations {
 			listeners[ast.KindFunctionDeclaration] = validateNode
 		}
 
-		if *opts.CheckFunctionExpressions {
+		if opts.CheckFunctionExpressions {
 			listeners[ast.KindFunctionExpression] = validateNode
 		}
 
-		if *opts.CheckMethodDeclarations {
+		if opts.CheckMethodDeclarations {
 			listeners[ast.KindMethodDeclaration] = func(node *ast.Node) {
 				if utils.IncludesModifier(node, ast.KindAbstractKeyword) {
 					// Abstract method can't be async

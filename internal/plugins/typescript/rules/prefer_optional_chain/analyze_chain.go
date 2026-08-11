@@ -501,7 +501,7 @@ func (ca *ChainAnalyzer) reportChainWithTail(
 }
 
 func (ca *ChainAnalyzer) shouldUseFix(operands []Operand) bool {
-	if derefBoolDefault(ca.opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing, false) {
+	if ca.opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing {
 		return true
 	}
 
@@ -574,7 +574,7 @@ func (ca *ChainAnalyzer) shouldUseFix(operands []Operand) bool {
 }
 
 func (ca *ChainAnalyzer) shouldSkipForRequireNullish(operands []Operand) bool {
-	if !derefBoolDefault(ca.opts.RequireNullish, false) {
+	if !ca.opts.RequireNullish {
 		return false
 	}
 	if ca.ctx.TypeChecker == nil {
@@ -1192,7 +1192,7 @@ func (ca *ChainAnalyzer) getNodeTextWithTrivia(node *ast.Node) string {
 }
 
 func (ca *ChainAnalyzer) CheckNullishAndReport(node *ast.Node) bool {
-	if !derefBoolDefault(ca.opts.RequireNullish, false) {
+	if !ca.opts.RequireNullish {
 		return false
 	}
 
