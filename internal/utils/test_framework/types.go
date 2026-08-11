@@ -68,11 +68,11 @@ func HookOrderIndex(name string) int {
 	return slices.Index(HooksOrder, name)
 }
 
-// IsCallOfKind reports whether parsed resolved to one of kinds. It is the
-// shared body of jest's IsTypeOfJestFnCall and rstest's IsTypeOfRstestFnCall:
-// each plugin owns which parse entry point to call, this owns what the answer
-// means. An empty kinds list is false rather than "any kind", so a caller that
-// forgets its arguments does not silently match everything.
+// IsCallOfKind reports whether parsed resolved to one of kinds. Framework
+// adapters own which parser or analysis entry point supplies parsed; this
+// helper owns what the kind comparison means. An empty kinds list is false
+// rather than "any kind", so a caller that forgets its arguments does not
+// silently match everything.
 func IsCallOfKind(parsed *ParsedCall, kinds ...FnKind) bool {
 	if parsed == nil || len(kinds) == 0 {
 		return false

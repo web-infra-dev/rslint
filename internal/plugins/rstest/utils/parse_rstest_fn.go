@@ -57,18 +57,6 @@ const (
 	rstestProfilePlaywright
 )
 
-// IsTypeOfRstestFnCall reports whether node parses as a Rstest registration
-// call of one of the given kinds. What this plugin owns is the entry point:
-// parsing includes import.meta and playwright, while kind matching is shared
-// with jest through testFramework.IsCallOfKind.
-func IsTypeOfRstestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...RstestFnType) bool {
-	parsed := parseRstestFnCall(node, ctx)
-	if parsed == nil {
-		return false
-	}
-	return testFramework.IsCallOfKind(&parsed.ParsedCall, kinds...)
-}
-
 func parseRstestFnCall(
 	node *ast.Node,
 	ctx rule.RuleContext,
