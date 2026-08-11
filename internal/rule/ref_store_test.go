@@ -23,8 +23,8 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	_, fileScopeDefaults := ResolveFileLanguageDefaults(fileName)
-	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, fileScopeDefaults)
+	_, refsInit := ResolveLanguageDefaults(fileName)
+	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
 }
 
 // newCheckedRefStore builds a real Program (via the shared fixtures
@@ -49,8 +49,8 @@ func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore
 		t.Fatalf("GetSourceFile(%q) = nil", filePath)
 	}
 	tc, done := program.GetTypeChecker(t.Context())
-	_, fileScopeDefaults := ResolveFileLanguageDefaults(sourceFile.FileName())
-	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, fileScopeDefaults), done
+	_, refsInit := ResolveLanguageDefaults(sourceFile.FileName())
+	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, refsInit), done
 }
 
 // identifiers returns every Identifier node under root with the given text,

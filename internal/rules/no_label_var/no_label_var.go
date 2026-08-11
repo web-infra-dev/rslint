@@ -19,7 +19,7 @@ import (
 //  2. ctx.Refs — resolves binder-owned and implicit names at the label's
 //     location, including function `arguments` and a CommonJS wrapper's
 //     declaration-less `arguments`.
-//  3. ctx.Globals — catches the selected ECMAScript edition, file-language
+//  3. ctx.Globals — catches the selected ECMAScript edition, resolved language
 //     globals, config and inline globals, including explicit `off` overrides.
 var NoLabelVarRule = rule.Rule{
 	Name:   "no-label-var",

@@ -558,7 +558,7 @@ func TestNoRedeclareSchemaMatrix(t *testing.T) {
 	}
 }
 
-func TestNoRedeclareFileLanguageDefaults(t *testing.T) {
+func TestNoRedeclareLanguageDefaults(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.allow-js.json",

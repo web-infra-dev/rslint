@@ -380,7 +380,7 @@ func resolveCallReferences(t *testing.T, source string, withRefs bool) []string 
 	ctx := rule.RuleContext{SourceFile: sourceFile}
 	if withRefs {
 		options := core.CompilerOptions{}
-		ctx.Refs = rule.NewRefStore(sourceFile, &options, nil, rule.FileScopeDefaults{})
+		ctx.Refs = rule.NewRefStore(sourceFile, &options, nil, rule.RefStoreInit{})
 	}
 	state := newRuleState(ctx)
 
@@ -431,7 +431,7 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 		DisableManager: rule.NewDisableManager(sourceFile, comments),
 		Globals: rule.NewGlobals(
 			rule.LanguageOptions{},
-			rule.FileLanguageGlobals{},
+			rule.GlobalsInit{},
 			map[string]utils.GlobalAccess{"WebAssembly": utils.GlobalAccessReadonly},
 			nil,
 			nil,
@@ -443,7 +443,7 @@ func runRuleForTest(t *testing.T, source string, demand rule.EditDemand) []rule.
 		},
 	})
 	options := core.CompilerOptions{}
-	ctx.Refs = rule.NewRefStore(sourceFile, &options, nil, rule.FileScopeDefaults{})
+	ctx.Refs = rule.NewRefStore(sourceFile, &options, nil, rule.RefStoreInit{})
 
 	listeners := NewForBuiltinsRule.Run(ctx, nil)
 	var visit ast.Visitor

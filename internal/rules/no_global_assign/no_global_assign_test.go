@@ -1112,7 +1112,7 @@ func TestNoGlobalAssignECMAVersion(t *testing.T) {
 	)
 }
 
-func TestNoGlobalAssignFileLanguageDefaults(t *testing.T) {
+func TestNoGlobalAssignLanguageDefaults(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.allow-js.json",

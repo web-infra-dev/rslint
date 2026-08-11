@@ -1645,7 +1645,7 @@ func TestNoShadowECMAVersion(t *testing.T) {
 	)
 }
 
-func TestNoShadowFileLanguageDefaults(t *testing.T) {
+func TestNoShadowLanguageDefaults(t *testing.T) {
 	builtinGlobals := map[string]any{"builtinGlobals": true}
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),

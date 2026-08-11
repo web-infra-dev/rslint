@@ -6,7 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func TestResolveFileLanguageDefaults(t *testing.T) {
+func TestResolveLanguageDefaults(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -30,7 +30,7 @@ func TestResolveFileLanguageDefaults(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.fileName, func(t *testing.T) {
 			t.Parallel()
-			globals, bindings := ResolveFileLanguageDefaults(test.fileName)
+			globalsInit, refsInit := ResolveLanguageDefaults(test.fileName)
 
 			wantAccess := map[string]utils.GlobalAccess{}
 			if test.commonJS {
@@ -46,20 +46,20 @@ func TestResolveFileLanguageDefaults(t *testing.T) {
 				"exports", "global", "module", "require",
 				"arguments", "__dirname", "__filename", "process", "Buffer", "console",
 			} {
-				if got, want := globals.access(name), wantAccess[name]; got != want {
-					t.Errorf("globals.access(%q) = %s, want %s", name, got, want)
+				if got, want := globalsInit.access(name), wantAccess[name]; got != want {
+					t.Errorf("globalsInit.access(%q) = %s, want %s", name, got, want)
 				}
 			}
 
-			if got := bindings.defines("arguments"); got != test.commonJS {
-				t.Errorf("bindings.defines(arguments) = %v, want %v", got, test.commonJS)
+			if got := refsInit.defines("arguments"); got != test.commonJS {
+				t.Errorf("refsInit.defines(arguments) = %v, want %v", got, test.commonJS)
 			}
-			if got := bindings.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
+			if got := refsInit.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
 				t.Errorf("nonGlobalTopLevelScope = %v, want %v", got, test.nonGlobalTopLevelScope)
 			}
 			for _, name := range []string{"exports", "global", "module", "require", "process"} {
-				if bindings.defines(name) {
-					t.Errorf("bindings unexpectedly define %q", name)
+				if refsInit.defines(name) {
+					t.Errorf("refsInit unexpectedly defines %q", name)
 				}
 			}
 		})

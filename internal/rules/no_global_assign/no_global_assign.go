@@ -100,7 +100,7 @@ var NoGlobalAssignRule = rule.Rule{
 					return
 				}
 
-				// A real lexical declaration or an implicit file binding (notably
+				// A real lexical declaration or a resolved implicit binding (notably
 				// CommonJS's wrapper-local `arguments`) shadows an effective global
 				// of the same name and is not governed by its readonly setting.
 				if ctx.Refs != nil && ctx.Refs.IsDefinedInFile(node) {

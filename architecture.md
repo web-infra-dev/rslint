@@ -328,14 +328,14 @@ TypeChecker fallback even when one is available. ESLint scope rules such as
 `no-undef` use this path so DOM/lib, ambient `.d.ts`, and cross-file TypeScript
 symbols cannot make their result depend on whether the file happened to receive
 a checker. `IsDefinedInFile` extends that answer with declaration-less bindings
-from the file's default language environment, while `IsNameDefinedInFile`
+from the resolved language defaults, while `IsNameDefinedInFile`
 supports scope rules whose query location is not itself an identifier
 reference. `HasNonGlobalTopLevelScope` exposes the corresponding scope fact
-without exposing a file mode or requiring rules to parse paths.
+without exposing a language mode or requiring rules to parse paths.
 Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
 its zero value means the moving `latest` edition. The linter uses it to build
 one `Globals` value for each native rule context. `Globals` owns the
-ESLint-versioned language-global set, file-language defaults, the authored
+ESLint-versioned language-global set, resolved language defaults, the authored
 `languageOptions.globals` source, inline `/* global */` settings and ranges,
 and the effective access after applying their precedence. Rules use
 `Globals.Access` for standard language-global decisions and its narrower source
@@ -345,17 +345,18 @@ as TypeScript library globals, applies this view last so `ecmaVersion` and
 authored overrides remain authoritative. This keeps the language-global
 composition point extensible for future language options such as `sourceType`
 without exposing those options directly to every rule; non-global wrapper
-bindings remain a scope/`RefStore` concern.
+bindings remain a `RefStore` initialization concern.
 
-Before constructing rule contexts, the linter resolves file-language defaults
-once from the source filename and passes concrete initialization data to
-`Globals` and `RefStore`. `.js` and `.mjs` contribute a non-global top-level
-scope; `.cjs` additionally contributes writable `exports`, read-only `global`,
-`module`, and `require`, plus the wrapper-local `arguments` binding. Other
-extensions contribute no defaults. The resolver does not inspect
-`package.json` or authored `sourceType`; adding `sourceType` later changes this
-single resolution point while consumers continue to receive the same concrete
-global and scope data.
+Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
+once and passes its concrete `GlobalsInit` and `RefStoreInit` results to their
+respective consumers. Today the resolver selects defaults from the source
+filename: `.js` and `.mjs` contribute a non-global top-level scope; `.cjs`
+additionally contributes writable `exports`, read-only `global`, `module`, and
+`require`, plus the wrapper-local `arguments` binding. Other extensions
+contribute no defaults. The resolver does not inspect `package.json` or authored
+`sourceType`; adding `sourceType` later changes the resolver input and this one
+call site, while `Globals`, `RefStore`, and rules keep consuming the same
+initialization types.
 Every authored alias is normalized to one of ESLint's three access levels —
 `utils.GlobalAccess`, whose zero value means no source mentioned the name.
 Booleans follow the `globals` package: `true` is writable, `false` is read-only.

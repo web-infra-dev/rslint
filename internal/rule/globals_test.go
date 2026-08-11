@@ -56,7 +56,7 @@ func TestECMAScriptGlobalsMatchESLint10_8(t *testing.T) {
 			groupIndex++
 		}
 
-		globals := NewGlobals(LanguageOptions{ECMAVersion: version}, FileLanguageGlobals{}, nil, nil, nil)
+		globals := NewGlobals(LanguageOptions{ECMAVersion: version}, GlobalsInit{}, nil, nil, nil)
 		actualCount := 0
 		for name := range ecmaScriptGlobalIntroducedIn {
 			if globals.LanguageAccess(name).IsDeclared() {
@@ -105,7 +105,7 @@ func TestGlobalsPrecedenceMatrix(t *testing.T) {
 			for _, inlineAccess := range levels {
 				config := accessMap(name, configAccess)
 				inline := accessMap(name, inlineAccess)
-				globals := NewGlobals(LanguageOptions{ECMAVersion: 2015}, FileLanguageGlobals{}, config, inline, nil)
+				globals := NewGlobals(LanguageOptions{ECMAVersion: 2015}, GlobalsInit{}, config, inline, nil)
 
 				wantConfigured := language
 				if configAccess != utils.GlobalAccessUnset {
@@ -145,7 +145,7 @@ func TestGlobalsApplyToGatesSeededECMAScriptNames(t *testing.T) {
 
 	globals := NewGlobals(
 		LanguageOptions{ECMAVersion: 5},
-		FileLanguageGlobals{},
+		GlobalsInit{},
 		map[string]utils.GlobalAccess{"customGlobal": utils.GlobalAccessReadonly},
 		map[string]utils.GlobalAccess{"JSON": utils.GlobalAccessOff},
 		nil,
@@ -174,7 +174,7 @@ func TestGlobalsApplyToCanRestoreOlderEditionNameFromConfig(t *testing.T) {
 
 	globals := NewGlobals(
 		LanguageOptions{ECMAVersion: 5},
-		FileLanguageGlobals{},
+		GlobalsInit{},
 		map[string]utils.GlobalAccess{"Promise": utils.GlobalAccessReadonly},
 		nil,
 		nil,
@@ -190,13 +190,13 @@ func TestGlobalsApplyToCanRestoreOlderEditionNameFromConfig(t *testing.T) {
 	}
 }
 
-func TestFileLanguageGlobalsPrecedenceAndApplyTo(t *testing.T) {
+func TestLanguageDefaultsPrecedenceAndApplyTo(t *testing.T) {
 	t.Parallel()
 
-	fileGlobals, _ := ResolveFileLanguageDefaults("/repo/file.cjs")
+	globalsInit, _ := ResolveLanguageDefaults("/repo/file.cjs")
 	globals := NewGlobals(
 		LanguageOptions{},
-		fileGlobals,
+		globalsInit,
 		map[string]utils.GlobalAccess{
 			"exports": utils.GlobalAccessReadonly,
 			"require": utils.GlobalAccessOff,
@@ -247,20 +247,20 @@ func TestFileLanguageGlobalsPrecedenceAndApplyTo(t *testing.T) {
 			t.Errorf("ApplyTo unexpectedly declared %q", name)
 		}
 	}
-	// ApplyTo preserves unrelated seed data; the file defaults themselves must
+	// ApplyTo preserves unrelated seed data; the resolved defaults themselves must
 	// not introduce any of these host names.
 	if !dst["__dirname"] || !dst["process"] {
 		t.Fatal("ApplyTo removed unrelated seed data")
 	}
 }
 
-func TestFileLanguageGlobalsCanBeDisabled(t *testing.T) {
+func TestLanguageDefaultsCanBeDisabled(t *testing.T) {
 	t.Parallel()
 
-	fileGlobals, _ := ResolveFileLanguageDefaults("file.cjs")
+	globalsInit, _ := ResolveLanguageDefaults("file.cjs")
 	globals := NewGlobals(
 		LanguageOptions{},
-		fileGlobals,
+		globalsInit,
 		map[string]utils.GlobalAccess{"require": utils.GlobalAccessReadonly},
 		map[string]utils.GlobalAccess{"require": utils.GlobalAccessOff},
 		nil,
@@ -272,11 +272,11 @@ func TestFileLanguageGlobalsCanBeDisabled(t *testing.T) {
 	}
 }
 
-func TestFileLanguageGlobalsDoNotLeakThroughApplyToSeed(t *testing.T) {
+func TestLanguageDefaultsDoNotLeakThroughApplyToSeed(t *testing.T) {
 	t.Parallel()
 
-	fileGlobals, _ := ResolveFileLanguageDefaults("file.js")
-	globals := NewGlobals(LanguageOptions{}, fileGlobals, nil, nil, nil)
+	globalsInit, _ := ResolveLanguageDefaults("file.js")
+	globals := NewGlobals(LanguageOptions{}, globalsInit, nil, nil, nil)
 	dst := map[string]bool{
 		"exports": true,
 		"global":  true,
@@ -286,9 +286,9 @@ func TestFileLanguageGlobalsDoNotLeakThroughApplyToSeed(t *testing.T) {
 	}
 
 	globals.ApplyTo(dst)
-	for _, entry := range fileLanguageGlobalCatalog {
+	for _, entry := range languageGlobalCatalog {
 		if dst[entry.name] {
-			t.Errorf("ApplyTo retained inactive file-language global %q", entry.name)
+			t.Errorf("ApplyTo retained inactive language-default global %q", entry.name)
 		}
 	}
 	if !dst["custom"] {

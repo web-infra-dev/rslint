@@ -1077,7 +1077,7 @@ func TestNoUndefRule(t *testing.T) {
 	)
 }
 
-func TestNoUndefFileLanguageDefaults(t *testing.T) {
+func TestNoUndefLanguageDefaults(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.allow-js.json",

@@ -295,7 +295,7 @@ func TestNoLabelVarECMAVersion(t *testing.T) {
 	)
 }
 
-func TestNoLabelVarFileLanguageDefaults(t *testing.T) {
+func TestNoLabelVarLanguageDefaults(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.allow-js.json",
