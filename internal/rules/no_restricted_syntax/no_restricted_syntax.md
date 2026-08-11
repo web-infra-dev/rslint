@@ -8,9 +8,8 @@ either a default or user-supplied message.
 
 This is the catch-all rule for restricting language constructs (e.g. banning
 `with`, banning `for-in`, requiring named function declarations) without
-having to write a dedicated rule. The selector grammar matches ESLint's, so
-selectors authored against ESLint's `no-restricted-syntax` configuration are
-expected to work unchanged in rslint.
+having to write a dedicated rule. The core selector grammar follows ESLint's
+esquery-based implementation.
 
 Examples of **incorrect** code for this rule:
 
@@ -71,14 +70,31 @@ configurations and in the upstream `no-restricted-syntax` test suite:
 
 - ESTree node names (e.g. `Identifier`, `FunctionDeclaration`, `BinaryExpression`).
 - Wildcard `*`.
-- Class selectors `.field` (e.g. `Literal.key`).
+- Field selectors, including nested fields (e.g. `Literal.key` and
+  `.body.declarations.init`).
 - Attribute selectors with presence (`[label]`), equality
   (`[name="x"]`, `[kind='using']`), inequality (`!=`), numeric comparisons
-  (`[params.length>2]`), and regex matching (`[regex.flags=/i/]`).
+  (`[params.length>2]`), numeric path segments (`[arguments.0.type='Literal']`),
+  `type(...)`, and regex matching (`[regex.flags=/i/]`). Attribute paths may
+  inspect ESLint's `parent` link.
 - Combinators `>` (direct child), descendant whitespace, `+`
   (adjacent sibling), `~` (general sibling).
 - Pseudo-classes `:is()`, `:matches()`, `:not()`, `:has()`,
-  `:first-child`, `:last-child`, `:nth-child(N)`, `:nth-last-child(N)`.
+  `:first-child`, `:last-child`, `:nth-child(N)`, `:nth-last-child(N)`, and
+  the semantic classes `:statement`, `:expression`, `:declaration`,
+  `:function`, and `:pattern`.
+
+## Differences from ESLint
+
+- ESLint rejects the configuration when a selector has invalid syntax. rslint
+  ignores only that selector and continues with the remaining selectors, so
+  its restriction is not enforced.
+- Selectors that target TS-ESTree-only nodes or fields may report fewer
+  diagnostics than ESLint. For example, `ClassBody > MethodDefinition`
+  produces no diagnostics in rslint because tsgo has no separate `ClassBody`
+  node.
+- rslint ignores selectors using the `!` subject marker, such as
+  `!IfStatement > BlockStatement`, while ESLint accepts them.
 
 ## Original Documentation
 

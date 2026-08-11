@@ -562,6 +562,7 @@ tsgo
 tsgolint
 TSJSDoc
 tsoptions
+tsparser
 tspath
 tsutils
 typeparam
