@@ -54,4 +54,5 @@ When set to `true`, supports TypeScript inline type imports, allowing `import ty
 
 ## Original Documentation
 
-- [eslint-plugin-import/no-duplicates](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-duplicates.md)
+- [eslint-plugin-import: no-duplicates](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-duplicates.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-duplicates.js)
