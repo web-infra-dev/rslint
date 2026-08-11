@@ -388,13 +388,11 @@ func filterByKind(decls []declInfo, kind ast.Kind) []declInfo {
 }
 
 type programGlobalDeclarations struct {
-	ctx                             rule.RuleContext
-	builtinMode                     builtinGlobalsMode
-	builtinGlobals                  bool
-	defaultLibraryTypeGlobals       map[string]bool
-	defaultLibraryTypeGlobalsLoaded bool
-	inlineByName                    map[string]rule.InlineGlobal
-	inlineOrder                     []string
+	ctx            rule.RuleContext
+	builtinMode    builtinGlobalsMode
+	builtinGlobals bool
+	inlineByName   map[string]rule.InlineGlobal
+	inlineOrder    []string
 }
 
 func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinGlobalsMode) *programGlobalDeclarations {
@@ -428,14 +426,7 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 	}
 
 	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {
-		if declarations.ctx.Program != nil && declarations.ctx.TypeChecker != nil {
-			if !declarations.defaultLibraryTypeGlobalsLoaded {
-				declarations.defaultLibraryTypeGlobals = make(map[string]bool)
-				utils.AddDefaultLibraryTypeGlobalNames(declarations.defaultLibraryTypeGlobals, declarations.ctx.Program, declarations.ctx.TypeChecker)
-				declarations.defaultLibraryTypeGlobalsLoaded = true
-			}
-		}
-		isTypeScriptTypeGlobal := declarations.defaultLibraryTypeGlobals[name]
+		isTypeScriptTypeGlobal := rule.IsDefaultTypeScriptTypeGlobal(name)
 		if declarations.ctx.Globals.LanguageAccess(name).IsDeclared() || isTypeScriptTypeGlobal {
 			if declarations.ctx.Globals.ConfigOverride(name) == utils.GlobalAccessOff {
 				if _, hasActiveDirective := declarations.inlineByName[name]; hasActiveDirective {

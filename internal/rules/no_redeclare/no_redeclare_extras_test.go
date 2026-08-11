@@ -22,6 +22,25 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestTypeScriptImplicitBuiltinsDoNotRequireProgram(t *testing.T) {
+	declarations := newProgramGlobalDeclarations(
+		rule.RuleContext{},
+		typescriptDefaults(),
+		builtinGlobalsTypeScriptLibs,
+	)
+
+	for _, name := range []string{"Record", "ImportMeta", "IteratorObjectConstructor"} {
+		if !declarations.isImplicitBuiltin(name) {
+			t.Errorf("expected default TypeScript type global %q to be an implicit builtin", name)
+		}
+	}
+	for _, name := range []string{"NodeListOf", "HTMLElement", "AbortController"} {
+		if declarations.isImplicitBuiltin(name) {
+			t.Errorf("did not expect host-library name %q to be an implicit builtin", name)
+		}
+	}
+}
+
 func TestNoRedeclareExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
