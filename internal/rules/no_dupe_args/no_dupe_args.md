@@ -32,5 +32,3 @@ When a parameter name appears more than twice (e.g., `function foo(a, a, a)`), r
 
 - [ESLint: no-dupe-args](https://eslint.org/docs/latest/rules/no-dupe-args)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-dupe-args.js)
-
-https://eslint.org/docs/latest/rules/no-dupe-args

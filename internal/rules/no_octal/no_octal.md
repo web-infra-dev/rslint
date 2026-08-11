@@ -36,5 +36,3 @@ This rule has no options.
 
 - [ESLint: no-octal](https://eslint.org/docs/latest/rules/no-octal)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-octal.js)
-
-https://eslint.org/docs/latest/rules/no-octal

@@ -50,5 +50,3 @@ if (a) {
 
 - [ESLint: no-dupe-else-if](https://eslint.org/docs/latest/rules/no-dupe-else-if)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-dupe-else-if.js)
-
-https://eslint.org/docs/latest/rules/no-dupe-else-if

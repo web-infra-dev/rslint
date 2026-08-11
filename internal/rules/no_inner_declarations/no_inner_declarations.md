@@ -73,5 +73,3 @@ if (test) {
 
 - [ESLint: no-inner-declarations](https://eslint.org/docs/latest/rules/no-inner-declarations)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-inner-declarations.js)
-
-https://eslint.org/docs/latest/rules/no-inner-declarations

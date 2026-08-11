@@ -66,5 +66,3 @@ async function foo(obj) {
 
 - [ESLint: require-atomic-updates](https://eslint.org/docs/latest/rules/require-atomic-updates)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/require-atomic-updates.js)
-
-[ESLint - require-atomic-updates](https://eslint.org/docs/latest/rules/require-atomic-updates)

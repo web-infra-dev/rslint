@@ -57,5 +57,3 @@ This rule has no options.
 
 - [ESLint: prefer-object-spread](https://eslint.org/docs/latest/rules/prefer-object-spread)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-object-spread.js)
-
-[prefer-object-spread](https://eslint.org/docs/latest/rules/prefer-object-spread)

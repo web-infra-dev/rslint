@@ -36,5 +36,3 @@ The autofix preserves TypeScript type annotations and definite assignment tokens
 
 - [ESLint: no-undef-init](https://eslint.org/docs/latest/rules/no-undef-init)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-undef-init.js)
-
-https://eslint.org/docs/latest/rules/no-undef-init

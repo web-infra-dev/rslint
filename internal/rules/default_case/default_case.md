@@ -38,5 +38,3 @@ switch (a) {
 
 - [ESLint: default-case](https://eslint.org/docs/latest/rules/default-case)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/default-case.js)
-
-https://eslint.org/docs/latest/rules/default-case
