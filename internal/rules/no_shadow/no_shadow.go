@@ -22,9 +22,9 @@ var schemaJSON []byte
 // declarations visible within the file plus, when `builtinGlobals` is on, the
 // effective ESLint global scope from `ctx.Globals`: ECMAScript builtins and
 // globals declared via config `languageOptions.globals` or `/* global */`
-// comments, where an explicit `off` setting un-declares the name. Concepts
-// rslint does not expose (for example `parserOptions.globalReturn`) remain
-// unmodeled.
+// comments. The typescript-eslint variant also includes scope-manager's
+// default TypeScript type globals. Concepts rslint does not expose (for
+// example `parserOptions.globalReturn`) remain unmodeled.
 
 type hoistMode int
 
@@ -43,6 +43,13 @@ type options struct {
 	ignoreOnInitialization                     bool
 	ignoreTypeValueShadow                      bool
 	ignoreFunctionTypeParameterNameValueShadow bool
+}
+
+type ruleVariant struct {
+	defaults                            options
+	includeDefaultTypeScriptTypeGlobals bool
+	typeImportUsesOwnSpecifier          bool
+	reportEnumShadow                    bool
 }
 
 func defaultOptions() options {
@@ -67,7 +74,7 @@ func defaultOptionsTSESLint() options {
 func parseOptionsWith(rawOptions []any, opts options) options {
 	// Always copy the allow map: the caller's `opts` may be a long-lived
 	// defaults instance shared across rule invocations (e.g. the closure
-	// captured by `runWithDefaults`). Mutating in-place would leak state
+	// captured by `runWithVariant`). Mutating in-place would leak state
 	// from one source file's lint run to the next.
 	src := opts.allow
 	opts.allow = make(map[string]bool, len(src)+4)
@@ -205,9 +212,12 @@ func (s *scope) variableScope() *scope {
 // ---------------------------------------------------------------------------
 
 type builder struct {
-	sourceFile     *ast.SourceFile
-	allScopes      []*scope
-	builtinGlobals map[string]bool
+	sourceFile                          *ast.SourceFile
+	allScopes                           []*scope
+	builtinGlobals                      map[string]bool
+	includeDefaultTypeScriptTypeGlobals bool
+	typeImportUsesOwnSpecifier          bool
+	reportEnumShadow                    bool
 }
 
 func (b *builder) push(kind scopeKind, block *ast.Node, parent *scope) *scope {
@@ -1232,28 +1242,40 @@ func (b *builder) visitSwitchCases(sw *ast.SwitchStatement, outer *scope) {
 var NoShadowRule = rule.Rule{
 	Name:   "no-shadow",
 	Schema: rule.NewSchema(schemaJSON),
-	Run:    runWithDefaults(defaultOptions()),
+	Run: runWithVariant(ruleVariant{
+		defaults: defaultOptions(),
+	}),
 }
 
 // RunTSESLint exposes the rule body with typescript-eslint's defaults so the
 // `@typescript-eslint/no-shadow` wrapper can reuse the implementation. The
 // underlying closure is built once at package init — `parseOptionsWith`
 // copies the captured `allow` map per invocation, so this is safe.
-var runTSESLint = runWithDefaults(defaultOptionsTSESLint())
+var runTSESLint = runWithVariant(ruleVariant{
+	defaults:                            defaultOptionsTSESLint(),
+	includeDefaultTypeScriptTypeGlobals: true,
+	typeImportUsesOwnSpecifier:          true,
+	reportEnumShadow:                    true,
+})
 
 func RunTSESLint(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	return runTSESLint(ctx, options)
 }
 
-func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleListeners {
+func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.RuleListeners {
 	return func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
-		opts := parseOptionsWith(rawOptions, defaults)
+		opts := parseOptionsWith(rawOptions, variant.defaults)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
 
-		b := &builder{sourceFile: ctx.SourceFile}
-		global := b.buildProgram(ctx.SourceFile)
+		b := &builder{
+			sourceFile:                          ctx.SourceFile,
+			includeDefaultTypeScriptTypeGlobals: variant.includeDefaultTypeScriptTypeGlobals,
+			typeImportUsesOwnSpecifier:          variant.typeImportUsesOwnSpecifier,
+			reportEnumShadow:                    variant.reportEnumShadow,
+		}
+		b.buildProgram(ctx.SourceFile)
 
 		filename := ""
 		if ctx.SourceFile.AsNode() != nil {
@@ -1263,10 +1285,10 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 			strings.HasSuffix(filename, ".d.cts") ||
 			strings.HasSuffix(filename, ".d.mts")
 
-		// Build the set solely from ESLint's effective global scope. TypeScript
-		// default-library value symbols such as window/top/console describe the
-		// type-checking environment, not languageOptions.globals, and must not make
-		// this core scope rule depend on whether a TypeChecker is available.
+		// Build the configured and language-default globals from ESLint's
+		// effective global scope. The TypeScript variant checks scope-manager's
+		// default type globals separately; host-library value symbols such as
+		// window/top/console are intentionally not inferred from a TypeChecker.
 		builtinGlobals := map[string]bool{}
 		if opts.builtinGlobals {
 			ctx.Globals.ApplyTo(builtinGlobals)
@@ -1295,7 +1317,7 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 				if isDeclFile && v.declareModifier {
 					continue
 				}
-				b.checkVariable(ctx, s, v, opts, global)
+				b.checkVariable(ctx, s, v, opts)
 			}
 		}
 
@@ -1310,11 +1332,21 @@ func isDuplicatedClassNameInClassScope(v *variable) bool {
 }
 
 // checkVariable tests whether `v` shadows a variable in some outer scope.
-func (b *builder) checkVariable(ctx rule.RuleContext, s *scope, v *variable, opts options, global *scope) {
+func (b *builder) checkVariable(ctx rule.RuleContext, s *scope, v *variable, opts options) {
 	shadowed := findShadowed(v, s.parent)
-	shadowedGlobal := shadowed == nil && opts.builtinGlobals && b.builtinGlobals[v.name]
+	shadowedDefaultTypeScriptGlobal := shadowed == nil && opts.builtinGlobals &&
+		b.includeDefaultTypeScriptTypeGlobals && rule.IsDefaultTypeScriptTypeGlobal(v.name)
+	shadowedGlobal := shadowed == nil && opts.builtinGlobals &&
+		(b.builtinGlobals[v.name] || shadowedDefaultTypeScriptGlobal)
 	if shadowed == nil && !shadowedGlobal {
 		return
+	}
+	if shadowedGlobal {
+		merged, first := mergeImplicitGlobalShadow(s, v)
+		if !first {
+			return
+		}
+		v = merged
 	}
 
 	// Ignore function-name-initializer exceptions:
@@ -1338,18 +1370,19 @@ func (b *builder) checkVariable(ctx rule.RuleContext, s *scope, v *variable, opt
 	}
 
 	// TS: ignoreTypeValueShadow
-	if shadowed != nil && opts.ignoreTypeValueShadow && isTypeValueShadow(v, shadowed) {
+	if opts.ignoreTypeValueShadow && isTypeValueShadow(v, shadowed, b.typeImportUsesOwnSpecifier) {
 		return
 	}
 
 	// TS: ignoreFunctionTypeParameterNameValueShadow
-	if opts.ignoreFunctionTypeParameterNameValueShadow && isFunctionTypeParameterShadow(v) {
+	if opts.ignoreFunctionTypeParameterNameValueShadow &&
+		isFunctionTypeParameterNameValueShadow(v, shadowed, shadowedDefaultTypeScriptGlobal) {
 		return
 	}
 
-	// TS: type parameter of a static method shadowing the enclosing class's
-	// type parameter is a no-op at runtime and ESLint ignores it.
-	if isGenericOfStaticMethod(v) {
+	// TS: a static method's type parameter shadowing its enclosing class's
+	// type parameter is a special exception. Other outer bindings still count.
+	if isGenericOfAStaticMethodShadow(v, shadowed) {
 		return
 	}
 
@@ -1367,6 +1400,16 @@ func (b *builder) checkVariable(ctx rule.RuleContext, s *scope, v *variable, opt
 	}
 	if shadowed != nil && shadowed.id != nil {
 		line, column := getLineColumn(b.sourceFile, shadowed.id)
+		if b.reportEnumShadow && hasDefinitionKind(shadowed, defEnumName) {
+			ctx.ReportNode(v.id, rule.RuleMessage{
+				Id: "noEnumShadow",
+				Description: fmt.Sprintf(
+					"Enum members are added to the enum scope, so references to '%s' in enum member initializers resolve to this member instead of the declaration in the upper scope on line %d column %d.",
+					v.name, line, column,
+				),
+			})
+			return
+		}
 		ctx.ReportNode(v.id, rule.RuleMessage{
 			Id: "noShadow",
 			Description: fmt.Sprintf(
@@ -1383,6 +1426,44 @@ func (b *builder) checkVariable(ctx rule.RuleContext, s *scope, v *variable, opt
 	})
 }
 
+// hasDefinitionKind mirrors scope-manager's merged Variable definitions. The
+// local scope model stores each declaration separately, so inspect all
+// same-name declarations when upstream asks whether any definition is an enum.
+func hasDefinitionKind(v *variable, kind defKind) bool {
+	if v == nil || v.scope == nil {
+		return false
+	}
+	for _, definition := range v.scope.byName[v.name] {
+		if definition.kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeImplicitGlobalShadow models scope-manager's one-variable-per-name
+// representation. TypeScript declaration merging can add several definitions
+// to that variable; no-shadow still checks it once, reports its first
+// identifier, and treats it as a value if any definition is value-capable.
+func mergeImplicitGlobalShadow(s *scope, v *variable) (*variable, bool) {
+	definitions := s.byName[v.name]
+	if len(definitions) == 0 || definitions[0] != v {
+		return v, false
+	}
+	if len(definitions) == 1 {
+		return v, true
+	}
+
+	merged := *v
+	for _, definition := range definitions {
+		if isValueVariable(definition) {
+			merged.isValueBinding = true
+			break
+		}
+	}
+	return &merged, true
+}
+
 // findShadowed walks outward from `start` and returns the first outer
 // variable with the same name as `v`, or nil if none is found. Builtin
 // globals are handled separately by checkVariable.
@@ -1395,17 +1476,34 @@ func findShadowed(v *variable, start *scope) *variable {
 	return nil
 }
 
-// isTypeValueShadow mirrors the ESLint/typescript-eslint logic.
-// ESLint's check treats the shadowed binding as a "type import" if ANY
-// specifier in the same ImportDeclaration is type-only — this is a quirk
-// that bubbles the `type` marker across all specifiers of one declaration.
-func isTypeValueShadow(v *variable, shadowed *variable) bool {
-	isInnerValue := v.isValueBinding
+// isTypeValueShadow mirrors the typescript-eslint logic. A nil shadowed
+// variable represents an ESLint implicit global: scope-manager variables with
+// no definition are treated as values for this option, even when the global
+// itself is type-only. Import bindings are also value variables in
+// scope-manager, including `import type` bindings.
+// ESLint core treats the shadowed binding as a type import when any specifier
+// in its ImportDeclaration is type-only. The typescript-eslint extension only
+// checks the current binding's own specifier; the variant flag preserves both
+// upstream behaviors.
+func isTypeValueShadow(v *variable, shadowed *variable, typeImportUsesOwnSpecifier bool) bool {
+	isInnerValue := isValueVariable(v)
+	if shadowed == nil {
+		return !isInnerValue
+	}
 
-	isTypeImport := shadowed.kind == defImport && importHasAnyTypeOnlySpecifier(shadowed.defNode)
-	isShadowedValue := shadowed.isValueBinding && !isTypeImport
+	isTypeImport := shadowed.kind == defImport &&
+		((typeImportUsesOwnSpecifier && shadowed.isTypeOnlyImport) ||
+			(!typeImportUsesOwnSpecifier && importHasAnyTypeOnlySpecifier(shadowed.defNode)))
+	isShadowedValue := isValueVariable(shadowed) && !isTypeImport
 
 	return isInnerValue != isShadowedValue
+}
+
+// isValueVariable translates the builder's declaration metadata to
+// scope-manager's isValueVariable flag. Scope-manager considers every import
+// binding value-capable here, including `import type` bindings.
+func isValueVariable(v *variable) bool {
+	return v != nil && (v.isValueBinding || v.kind == defImport)
 }
 
 // importHasAnyTypeOnlySpecifier returns true when the ImportDeclaration
@@ -1445,9 +1543,9 @@ func importHasAnyTypeOnlySpecifier(node *ast.Node) bool {
 	return false
 }
 
-// isGenericOfStaticMethod returns true when `v` is a type parameter of a
-// method declaration carrying the `static` modifier. ESLint ignores these
-// shadows since the static method runs against a class-independent `this`.
+// isGenericOfStaticMethod reports whether `v` is a type parameter declared by
+// a static method. The caller still has to verify that the shadowed binding is
+// the enclosing class's type parameter.
 func isGenericOfStaticMethod(v *variable) bool {
 	if v.kind != defTypeParameter {
 		return false
@@ -1474,9 +1572,29 @@ func isGenericOfStaticMethod(v *variable) bool {
 	return false
 }
 
+func isGenericOfClass(v *variable) bool {
+	if v == nil || v.kind != defTypeParameter || v.defNode == nil {
+		return false
+	}
+	for cur := v.defNode.Parent; cur != nil; cur = cur.Parent {
+		switch cur.Kind {
+		case ast.KindClassDeclaration, ast.KindClassExpression:
+			return true
+		case ast.KindMethodDeclaration, ast.KindFunctionDeclaration,
+			ast.KindFunctionExpression, ast.KindArrowFunction:
+			return false
+		}
+	}
+	return false
+}
+
+func isGenericOfAStaticMethodShadow(v *variable, shadowed *variable) bool {
+	return shadowed != nil && isGenericOfStaticMethod(v) && isGenericOfClass(shadowed)
+}
+
 // isFunctionTypeParameterShadow returns true when `v` is a parameter of a
-// TS function type / construct signature — its binding lives in a type-level
-// position and ESLint ignores these shadows by default.
+// TS function type / construct signature. Whether the option ignores it also
+// depends on the shadowed variable being value-capable.
 func isFunctionTypeParameterShadow(v *variable) bool {
 	if v.kind != defParameter {
 		return false
@@ -1500,6 +1618,19 @@ func isFunctionTypeParameterShadow(v *variable) bool {
 		return true
 	}
 	return false
+}
+
+func isFunctionTypeParameterNameValueShadow(v *variable, shadowed *variable, shadowedDefaultTypeScriptGlobal bool) bool {
+	if !isFunctionTypeParameterShadow(v) {
+		return false
+	}
+	if shadowed == nil {
+		// TypeScript default globals have an isValueVariable field set to
+		// false. Other ESLint implicit globals have no such field and are
+		// treated as values by the upstream rule.
+		return !shadowedDefaultTypeScriptGlobal
+	}
+	return isValueVariable(shadowed)
 }
 
 // isExternalDeclarationMerging covers the `import type Foo from 'bar'` +
@@ -1563,57 +1694,95 @@ func isInTdz(inner *variable, outer *variable, mode hoistMode) bool {
 	return false
 }
 
-// isFunctionNameInitializerException implements the `var a = function a() {}`
-// / `var A = class A {}` / default-destructuring variants that ESLint ignores.
-//
-// Mirrors ESLint's `isOnInitializer`: requires (a) the inner is a Function-
-// Expression name or ClassExpression inner-name, (b) the inner identifier
-// sits inside the outer binding's declarator/parameter range, and (c) the
-// inner's enclosing scope IS the scope owning the outer binding. Together,
-// (b)+(c) handle arbitrary call/decorator wrappers (`wrap(function x() {})`)
-// without an AST-walk whitelist, while still rejecting unrelated siblings
-// (`const a = 1; const b = function a() {}` — different declarator ranges,
-// so (b) fails and we report).
+// isFunctionNameInitializerException implements the direct initializer cases
+// that ESLint ignores: `var a = function a() {}`, `var A = class A {}`, and
+// their logical/conditional/default-value variants. Calls and TypeScript
+// assertion expressions are not transparent, so `wrap(function a() {})` and
+// `function a() {} as unknown` still report.
 func isFunctionNameInitializerException(inner *variable, outer *variable) bool {
-	if outer.defNode == nil || inner.defNode == nil {
+	if outer == nil || outer.id == nil || inner == nil || inner.defNode == nil {
 		return false
 	}
 	if inner.kind != defFnExprName && (inner.kind != defClassInnerName || inner.defNode.Kind != ast.KindClassExpression) {
 		return false
 	}
-	if inner.scope == nil || inner.scope.parent == nil || outer.scope == nil {
+	initializer := bindingInitializer(outer.id)
+	if initializer == nil {
 		return false
 	}
-	startPos, endPos, ok := outerInitializerLexicalRange(outer.defNode)
-	if !ok {
+	nodeToCheck := inner.defNode
+	if initializer.Pos() > nodeToCheck.Pos() || nodeToCheck.End() > initializer.End() {
 		return false
 	}
-	expr := inner.defNode
-	if startPos > expr.Pos() || expr.End() > endPos {
-		return false
-	}
-	return inner.scope.parent == outer.scope
+	return initializer == unwrapInitializerExpression(nodeToCheck)
 }
 
-// outerInitializerLexicalRange returns the range ESLint's scope manager would
-// expose as the binding's `Definition.parent.range`: the enclosing
-// VariableDeclaration for var/let/const + destructuring elements, and the
-// enclosing function-like node for parameters.
-func outerInitializerLexicalRange(defNode *ast.Node) (int, int, bool) {
-	for cur := defNode; cur != nil; cur = cur.Parent {
+// bindingInitializer returns the default/initializer attached to this exact
+// binding. Stopping at the nearest binding element is important for sibling
+// destructuring entries: the initializer of `b` is not the initializer of `a`.
+func bindingInitializer(identifier *ast.Node) *ast.Node {
+	for cur := identifier.Parent; cur != nil; cur = cur.Parent {
 		switch cur.Kind {
-		case ast.KindVariableDeclaration:
-			return cur.Pos(), cur.End(), true
-		case ast.KindParameter:
-			for p := cur.Parent; p != nil; p = p.Parent {
-				if ast.IsFunctionLike(p) {
-					return p.Pos(), p.End(), true
-				}
+		case ast.KindBindingElement:
+			binding := cur.AsBindingElement()
+			if binding == nil {
+				return nil
 			}
-			return cur.Pos(), cur.End(), true
+			return binding.Initializer
+		case ast.KindVariableDeclaration:
+			declaration := cur.AsVariableDeclaration()
+			if declaration == nil {
+				return nil
+			}
+			return declaration.Initializer
+		case ast.KindParameter:
+			parameter := cur.AsParameterDeclaration()
+			if parameter == nil {
+				return nil
+			}
+			return parameter.Initializer
 		}
 	}
-	return 0, 0, false
+	return nil
+}
+
+// unwrapInitializerExpression follows only the expression shapes that ESTree
+// treats as transparently capable of evaluating to the child: parentheses,
+// logical operands, and the two result branches of a conditional expression.
+func unwrapInitializerExpression(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			parenthesized := parent.AsParenthesizedExpression()
+			if parenthesized == nil || parenthesized.Expression != current {
+				return current
+			}
+			current = parent
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary == nil || binary.OperatorToken == nil ||
+				(binary.Left != current && binary.Right != current) {
+				return current
+			}
+			switch binary.OperatorToken.Kind {
+			case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+				current = parent
+			default:
+				return current
+			}
+		case ast.KindConditionalExpression:
+			conditional := parent.AsConditionalExpression()
+			if conditional == nil || (conditional.WhenTrue != current && conditional.WhenFalse != current) {
+				return current
+			}
+			current = parent
+		default:
+			return current
+		}
+	}
+	return current
 }
 
 // isInInitPatternCall handles the `ignoreOnInitialization` option.
