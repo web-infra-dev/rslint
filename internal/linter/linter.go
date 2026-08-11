@@ -197,6 +197,11 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 
+		// Resolve immutable language initialization once per file. Globals and
+		// RefStore receive their own concrete data and never inspect the current
+		// selection input (the file extension) themselves.
+		globalsInit, refsInit := rule.ResolveLanguageDefaults(file.FileName())
+
 		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
@@ -210,7 +215,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		// this file); nil there just disables the fallback.
 		var refs *rule.RefStore
 		if opts.Program != nil {
-			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker)
+			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker, refsInit)
 		}
 
 		// One lazy byte-order-mark answer shared by every rule in this file.
@@ -228,7 +233,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 				Cwd:            opts.Cwd,
 				Program:        opts.Program,
 				Settings:       r.Settings,
-				Globals:        rule.NewGlobals(r.LanguageOptions, r.Globals, inlineGlobals, inlineGlobalDeclarations),
+				Globals:        rule.NewGlobals(r.LanguageOptions, globalsInit, r.Globals, inlineGlobals, inlineGlobalDeclarations),
 				Comments:       comments,
 				Refs:           refs,
 				BOM:            sourceBOM,

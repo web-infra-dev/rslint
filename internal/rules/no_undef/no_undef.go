@@ -59,7 +59,7 @@ var NoUndefRule = rule.Rule{
 				}
 				// An explicit `off` removes only implicit globals. A declaration or
 				// import authored in this file still defines its references.
-				if ctx.Refs.ResolveInFile(node) != nil {
+				if ctx.Refs.IsDefinedInFile(node) {
 					return
 				}
 

@@ -84,8 +84,8 @@ undeclaredName123;
 				SourceFile:  sourceFile,
 				Program:     program,
 				TypeChecker: tc,
-				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc),
-				Globals: rule.NewGlobals(rule.LanguageOptions{}, map[string]utils.GlobalAccess{
+				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc, rule.RefStoreInit{}),
+				Globals: rule.NewGlobals(rule.LanguageOptions{}, rule.GlobalsInit{}, map[string]utils.GlobalAccess{
 					"myConfiguredGlobal": utils.GlobalAccessReadonly,
 					"myOffGlobal":        utils.GlobalAccessOff,
 					"myOffLocal":         utils.GlobalAccessOff,

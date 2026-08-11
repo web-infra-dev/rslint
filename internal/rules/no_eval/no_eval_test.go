@@ -981,11 +981,13 @@ func TestNoEvalGlobalAvailability(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `window.eval('code')`},
 			{Code: `global.eval('code')`},
+			{Code: `global.eval('code')`, FileName: "commonjs-off.cjs", TSConfig: "tsconfig.allow-js.json", Globals: map[string]any{"global": "off"}},
 			{Code: `globalThis.eval('code')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `window.eval('code')`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
 			{Code: `global.eval('code')`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
+			{Code: `global.eval('code')`, FileName: "commonjs-global.cjs", TSConfig: "tsconfig.allow-js.json", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
 			{Code: `/* global window */ window.eval('code')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
 			{Code: `globalThis.eval('code')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}}},
 		},
