@@ -486,6 +486,16 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b! !== str;"},
 		// A lone `!== null` guard cannot carry an && chain on its own
 		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na !== null && a.b !== u;"},
+
+		// --- A private identifier cannot be optional-chained, so it never closes a chain ---
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: C | null) {\n    foo === null || foo.#bar !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: () => string;\n  m(foo: C | null) {\n    foo === null || foo.#bar() !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: {baz: string};\n  m(foo: C | null) {\n    foo === null || foo.#bar.baz !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: C | null) {\n    foo === null || s !== foo.#bar;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: {baz: C} | null) {\n    foo === null || foo.baz.#bar !== s;\n  }\n}"},
+		{Code: "class C {\n  #bar!: {baz: string};\n  m(foo: C | null) {\n    foo != null && foo.#bar.baz;\n  }\n}"},
+		{Code: "class C {\n  #bar!: {baz: {qux: string}};\n  m(foo: C) {\n    foo.#bar.baz && foo.#bar.baz.qux;\n  }\n}"},
+		{Code: "class C {\n  #bar!: () => {baz: string};\n  m(foo: C | null) {\n    foo && foo.#bar() && foo.#bar().baz;\n  }\n}"},
 	}
 
 	// =====================================================================
