@@ -8,7 +8,7 @@ import (
 )
 
 // This file owns the rule's dependency graph: how one is built from the
-// Program's module references, and every question the rule asks of it —
+// effective source set's module references, and every question the rule asks of it —
 // including the search, which is a property of the graph rather than of the
 // file that started it. no_cycle.go holds what is left: option parsing, the
 // per-file entry point, and the message.
@@ -27,7 +27,7 @@ type graphKey struct {
 
 // moduleNode holds one file's references together with the edges they resolve
 // to. Both are derived from the file's syntax, so the whole node is a property
-// of the Program and is computed once per lint run.
+// of the source set and is computed once per lint run.
 type moduleNode struct {
 	refs []rule.ModuleEdge
 	// edge[i] is the node that reference i points at, or -1 when the
@@ -57,7 +57,7 @@ type moduleGraph struct {
 	group []int32
 }
 
-// moduleGraphFor returns the Program's dependency graph for these options,
+// moduleGraphFor returns the source set's dependency graph for these options,
 // building it on the first file of the run that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 	settings := import_utils.SettingsFor(ctx)
@@ -67,7 +67,7 @@ func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
-	return rule.CachedByProgram(ctx.Program, key, func() *moduleGraph {
+	return rule.CachedBySourceRuntime(ctx, key, func() *moduleGraph {
 		return buildModuleGraph(ctx, settings, opts)
 	})
 }
@@ -131,7 +131,7 @@ func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, fil
 }
 
 // referenceIsTraversable reports whether an edge is one the rule follows: it
-// has to survive into the emitted JavaScript, name a file the Program loaded,
+// has to survive into the emitted JavaScript, name a file the runtime loaded,
 // and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
 func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
 	if edge.TypeOnly || edge.Target == nil {

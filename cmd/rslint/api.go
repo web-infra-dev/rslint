@@ -672,7 +672,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			Report: diagnosticCollector,
 		},
 	}
-	runOpts.PreparedPlan = linter.PrepareLintPlan(runOpts)
+	preparedPlan, err := linter.PrepareLintPlan(runOpts)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing lint plan: %w", err)
+	}
+	runOpts.PreparedPlan = preparedPlan
 
 	// Metadata is the feature gate: without it there is no plugin target walk,
 	// goroutine, or reverse request. With metadata, dispatch starts before the

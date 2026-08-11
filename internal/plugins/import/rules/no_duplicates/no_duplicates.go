@@ -241,7 +241,7 @@ func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) string {
 }
 
 func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, moduleSpecifier *ast.Node) (string, bool) {
-	if r.ctx.Program == nil {
+	if !r.ctx.HasSourceRuntime() {
 		return "", false
 	}
 
@@ -251,12 +251,12 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, module
 		mode, hasOverride = importDecl.Attributes.GetResolutionModeOverride()
 	}
 	if !hasOverride && !r.hasNormalMode {
-		mode = r.ctx.Program.GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)
+		mode = r.ctx.GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)
 		r.normalMode = mode
 		r.hasNormalMode = true
 	}
 
-	resolved := r.ctx.Program.GetResolvedModule(r.ctx.SourceFile, moduleSpecifier.Text(), mode)
+	resolved := r.ctx.GetResolvedModule(r.ctx.SourceFile, moduleSpecifier.Text(), mode)
 	if resolved == nil || resolved.ResolvedFileName == "" {
 		return "", false
 	}

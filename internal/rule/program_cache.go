@@ -69,9 +69,28 @@ func CachedByProgram[T any](program *compiler.Program, key any, build func() T) 
 	if program == nil {
 		return build()
 	}
+	return cachedValueFor(cacheFor(program), key, build)
+}
 
-	cache := cacheFor(program)
+// CachedBySourceRuntime shares derived state across every rule context backed
+// by the same effective source set. Real Programs retain their weak lifetime
+// cache; standalone source sets use the cache owned by their run-scoped module
+// graph and cannot leak beyond that lint run.
+func CachedBySourceRuntime[T any](ctx RuleContext, key any, build func() T) T {
+	if ctx.Program != nil {
+		return CachedByProgram(ctx.Program, key, build)
+	}
+	if ctx.Modules == nil {
+		return build()
+	}
+	return cachedValueFor(&ctx.Modules.cache, key, build)
+}
+
+func cachedValueFor[T any](cache *programCache, key any, build func() T) T {
 	cache.mu.Lock()
+	if cache.values == nil {
+		cache.values = make(map[any]*cachedValue)
+	}
 	entry, ok := cache.values[key]
 	if !ok {
 		entry = &cachedValue{}

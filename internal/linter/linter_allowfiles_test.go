@@ -247,7 +247,7 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 		t.Fatalf("expected zero linted files for an empty target plan, got %d", result.LintedFileCount)
 	}
 
-	targets := PrepareLintPlan(RunLinterOptions{
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
 		Programs:       []*compiler.Program{program},
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
@@ -284,7 +284,7 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 		t.Fatalf("expected only lib.ts to be linted, got %v", linted)
 	}
 
-	targets := PrepareLintPlan(RunLinterOptions{
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
 		Programs:       []*compiler.Program{program},
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},

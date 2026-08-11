@@ -153,6 +153,27 @@ func TestHasExport(t *testing.T) {
 	}
 }
 
+func TestExportQueriesSupportStandaloneSourceRuntime(t *testing.T) {
+	programContext, specifier := contextForImport(t, "./re-export")
+	program := programContext.Program
+	if program == nil {
+		t.Fatal("fixture did not create a Program")
+	}
+
+	standaloneContext := programContext
+	standaloneContext.Program = nil
+	standaloneRuntime := rule.SourceRuntimeForProgram(program)
+	standaloneContext.Modules = rule.NewStandaloneModuleGraph(program.SourceFiles(), standaloneRuntime)
+
+	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
+		t.Fatalf("standalone HasExport = (%v, %v), want (true, true)", found, ok)
+	}
+	exportMap, ok := import_utils.GetExportMap(standaloneContext, specifier)
+	if !ok || exportMap == nil || !exportMap.Has("baz") {
+		t.Fatalf("standalone GetExportMap = (%v, %v), want map containing baz", exportMap, ok)
+	}
+}
+
 func TestGetExportMap(t *testing.T) {
 	t.Parallel()
 

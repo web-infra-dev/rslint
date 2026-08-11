@@ -15,11 +15,12 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-// ParseCache owns two run/request-scoped cache layers shared across Programs:
-// a source snapshot generation keyed by the compiler host's exact normalized
-// file name, and an append-mostly parsed SourceFile cache keyed by every parse
-// input. Multiple tsconfigs can therefore reuse both the source text/hash and
-// the resulting *ast.SourceFile object.
+// ParseCache owns two run/request-scoped cache layers shared across compiler
+// hosts: a source snapshot generation keyed by the host's exact normalized file
+// name, and an append-mostly parsed SourceFile cache keyed by every parse input.
+// Multiple tsconfigs can therefore reuse both layers; transient standalone
+// hosts share only immutable source bytes/hashes and parse inputs, then bind
+// their selected ASTs within their own source runtime.
 //
 // The AST key reuses the upstream project.ParseCacheKey — SourceFileParseOptions
 // (FileName + Path + ExternalModuleIndicatorOptions) + ScriptKind + an xxh3
@@ -281,6 +282,7 @@ type cachingCompilerHost struct {
 	compiler.CompilerHost
 	cache              *ParseCache
 	useSourceSnapshots bool
+	cacheAST           bool
 }
 
 // WithParseCache wraps host with the shared parse cache. A nil cache returns
@@ -290,6 +292,20 @@ type cachingCompilerHost struct {
 // paths (rule_tester, --api getAstInfo) and grow without bound in
 // long-running processes.
 func WithParseCache(host compiler.CompilerHost, cache *ParseCache) compiler.CompilerHost {
+	if cache == nil {
+		return host
+	}
+	return &cachingCompilerHost{
+		CompilerHost:       host,
+		cache:              cache,
+		useSourceSnapshots: cache.bindSourceSnapshotFS(host.FS()),
+		cacheAST:           true,
+	}
+}
+
+// WithSourceSnapshots reuses the invocation's immutable source bytes without
+// retaining parsed standalone ASTs in the Program-owned cache.
+func WithSourceSnapshots(host compiler.CompilerHost, cache *ParseCache) compiler.CompilerHost {
 	if cache == nil {
 		return host
 	}
@@ -307,14 +323,20 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 		if !ok {
 			return nil // I1: failed reads are never published
 		}
-		return h.cache.acquireSnapshot(opts, snapshot)
+		if h.cacheAST {
+			return h.cache.acquireSnapshot(opts, snapshot)
+		}
+		return parser.ParseSourceFile(opts, snapshot.text, core.GetScriptKindFromFileName(opts.FileName))
 	}
 
 	text, ok := h.FS().ReadFile(opts.FileName)
 	if !ok {
 		return nil // same as the default host, and never cached
 	}
-	return h.cache.acquire(opts, text)
+	if h.cacheAST {
+		return h.cache.acquire(opts, text)
+	}
+	return parser.ParseSourceFile(opts, text, core.GetScriptKindFromFileName(opts.FileName))
 }
 
 func (h *cachingCompilerHost) acquireSourceSnapshot(

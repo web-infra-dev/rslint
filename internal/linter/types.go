@@ -47,6 +47,21 @@ func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
 type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
+// StandaloneLintSourceSet is one parser/binder-backed source universe with no
+// TypeScript Program or TypeChecker. Files may include sources excluded from
+// rule execution because cross-file rules still need the complete universe;
+// nil entries and exact pointer duplicates are normalized away in stable
+// order; different ASTs with the same non-empty SourceFile Path are rejected.
+// A nil or empty Files slice is an empty source set. Runtime must own every
+// bound AST exactly and keep its source services stable for the prepared
+// plan's full lifetime and every reuse; a prepared plan may only be reused with
+// the same Runtime identity. Its source lookup methods must not return ASTs
+// outside Files for this source universe.
+type StandaloneLintSourceSet struct {
+	Files   []*ast.SourceFile
+	Runtime rule.SourceRuntime
+}
+
 // FileScope describes user-supplied "lint targets" (CLI args).
 //
 // Both fields are independently nullable:
@@ -95,9 +110,11 @@ type LintResult struct {
 //   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
 //     for syntax errors before resolving or running rules. A non-nil set means
 //     the caller already performed that check and names the invalid files.
-//   - TypeInfoFiles=nil                   → no gap-file distinction. A non-nil
-//     set filters RequiresTypeInfo rules and withholds the TypeChecker for files
-//     outside it. This field never restricts program-wide type-check.
+//   - TypeInfoFiles=nil                   → no gap-file distinction among
+//     Program-backed files. A non-nil set filters RequiresTypeInfo rules and
+//     withholds the TypeChecker for Program files outside it. Standalone files
+//     never have type information regardless of this field. It never restricts
+//     program-wide type-check.
 //   - TypeCheck=false                     → skip the type-check phase
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set
@@ -118,6 +135,7 @@ type LintResult struct {
 // calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
 	Programs       []*compiler.Program
+	Standalone     []StandaloneLintSourceSet
 	SingleThreaded bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
 	// every RuleContext. See RuleContext.Cwd for what rules may assume of it.

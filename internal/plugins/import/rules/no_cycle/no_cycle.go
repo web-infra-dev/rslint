@@ -112,7 +112,7 @@ func normalizeDepth(depth int) (int, bool) {
 }
 
 func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
-	if ctx.SourceFile == nil || ctx.Program == nil {
+	if ctx.SourceFile == nil || !ctx.HasSourceRuntime() {
 		return
 	}
 
@@ -124,7 +124,7 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	// Every report sits on a reference this file wrote, so a file that wrote
 	// none has no answer to look up. Asking that of the file alone, before the
 	// graph, is what keeps an import-free file off the build: the graph spans
-	// the whole Program, and the editor discards it on every keystroke, so
+	// the whole effective source set, and the editor discards it on every keystroke, so
 	// there is no run to amortize it over on that path.
 	if len(ctx.Modules.Edges(ctx.SourceFile, opts.syntax)) == 0 {
 		return

@@ -148,9 +148,9 @@ type typeScriptDiagnosticDedupeKey struct {
 
 // deduplicateTypeScriptDiagnostics joins the lint-target syntax path and the
 // program-wide type-check path. A file governed by a config without a tsconfig
-// can be parsed by the fallback Program while also belonging to another
-// config's real Program; --type-check legitimately visits both, but the same
-// TypeScript diagnostic must be reported once.
+// can be parsed as a standalone source while also belonging to another config's
+// real Program; --type-check legitimately visits both, but the same TypeScript
+// diagnostic must be reported once.
 func deduplicateTypeScriptDiagnostics(
 	diags []rule.RuleDiagnostic,
 	fsys vfs.FS,
@@ -308,7 +308,7 @@ func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions)
 // collectAllowFileWarnings explains, for each CLI-specified file in
 // allowFiles, why it won't be visited by Phase 1 (lint). Program membership
 // is deliberately not consulted: lint targets are resolved before type-info
-// binding, so a file outside every tsconfig can still be linted via fallback.
+// binding, so a file outside every tsconfig can still be linted standalone.
 // Returns nil for empty allowFiles.
 //
 // This is a Phase-1 concern only. In --type-check-only mode the lint phase
@@ -566,7 +566,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 }
 
 // executeLintPipeline runs the full lint flow (config load → program build →
-// lint target plan/fallback binding → lint → optional --fix loop → report) and
+// lint target plan/project-or-gap binding → lint → optional --fix loop → report) and
 // returns the process exit code. Shared by the IPC entry (runCLI) and the wasm
 // native fallback.
 func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
@@ -671,9 +671,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	}
 
-	// Run-scoped Program construction services shared by the initial build,
-	// gap fallbacks, and --fix rebuilds. The context wraps the final VFS view
-	// and is discarded after this invocation; no package-level cache is used.
+	// Run-scoped source services shared by the initial Program build,
+	// standalone gap parsing, compatibility fallbacks, and --fix rebuilds. The
+	// context wraps the final VFS view and is discarded after this invocation;
+	// no package-level cache is used.
 	buildContext := utils.NewProgramBuildContext(fs)
 	fs = buildContext.FS()
 
@@ -823,7 +824,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		allowDirs = []string{cwd}
 	}
 
-	// --- Lint target discovery and fallback Program binding ---
+	// --- Lint target discovery and project/gap binding ---
 	programs := realProgramSet.Programs
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
@@ -834,9 +835,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		targetPathBySourcePath     map[string]string
 		configPathBySourcePath     map[string]string
 		ownerConfigDirBySourcePath map[string]string
+		standaloneGapGroups        [][]resolvedLintTarget
 	)
 	// --type-check-only is program-wide and pays no lint-target discovery,
-	// fallback, config-resolution, or Program-binding cost.
+	// gap binding/parsing, config-resolution, or Program-binding cost.
 	if !typeCheckOnly {
 		targetPlan, err = resolveLintTargetPlan(
 			targetConfigMap,
@@ -865,7 +867,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				return 1
 			}
 		}
-		binding, err := bindLintTargetPlan(realProgramSet, targetPlan, currentDirectory, buildContext, singleThreaded)
+		binding, err := bindCLILintTargetPlan(realProgramSet, targetPlan, currentDirectory, buildContext, singleThreaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -876,15 +878,26 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		targetPathBySourcePath = binding.TargetPathBySourcePath
 		configPathBySourcePath = binding.ConfigPathBySourcePath
 		ownerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
+		standaloneGapGroups = binding.StandaloneGapGroups
 	}
 
-	// Initial build (including any fallback) is complete. Evict entries for
-	// parsed files that ended up in no Program.
+	// Real Program construction and target binding are complete. Evict parsed
+	// AST entries that ended up in no Program before parsing standalone gaps.
 	buildContext.RetainOnlySourceFiles(programs)
+	standaloneSources, standaloneSyntaxDiagnostics, standaloneSyntaxErrorFiles, err := buildStandaloneGapSourceSets(
+		standaloneGapGroups,
+		currentDirectory,
+		buildContext,
+		singleThreaded,
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
 
 	// Rebuild real Programs and bind the original stable target plan again on
-	// every fix pass. A target can move between a tsconfig Program and fallback
-	// when fixes change the import graph.
+	// every fix pass. A target can move between a tsconfig Program and a
+	// standalone gap source set when fixes change the import graph.
 	createPrograms := func() (lintTargetBinding, error) {
 		var rebuilt lintProgramSet
 		var err error
@@ -896,7 +909,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if err != nil {
 			return lintTargetBinding{}, err
 		}
-		return bindLintTargetPlan(rebuilt, targetPlan, currentDirectory, buildContext, singleThreaded)
+		return bindCLILintTargetPlan(rebuilt, targetPlan, currentDirectory, buildContext, singleThreaded)
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -937,10 +950,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// resolved in targetsByProgram.
 	// Programs not backed by a real tsconfig are excluded from --type-check:
 	// their CompilerOptions are synthesized defaults, not the user's tsconfig,
-	// so semantic diagnostics there would be unreliable. This includes the
-	// non-project-backed fallback used for selected files outside tsconfig coverage and
-	// for projects with no tsconfig at all, honoring the "Gap files" contract
-	// in website/docs/en/guide/type-checking.md.
+	// so semantic diagnostics there would be unreliable. Supported CLI gaps are
+	// standalone and therefore absent from this Program mask; the legacy
+	// fallback remains only for roots that ts-go would reject as Program roots.
 	skipTypeCheck := buildTypeCheckSkipMask(programs)
 	syntaxDiagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(
 		programs,
@@ -949,6 +961,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		typeCheck,
 		typeCheckOnly,
 	)
+	syntaxDiagnostics = append(syntaxDiagnostics, standaloneSyntaxDiagnostics...)
+	for fileName := range standaloneSyntaxErrorFiles {
+		syntaxErrorFiles[fileName] = struct{}{}
+	}
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticsChan <- diagnostic
 	}
@@ -967,6 +983,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
+		Standalone:            standaloneSources,
 		SingleThreaded:        singleThreaded,
 		Cwd:                   cwd,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -984,7 +1001,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			},
 		},
 	}
-	runOpts.PreparedPlan = linter.PrepareLintPlan(runOpts)
+	preparedPlan, planErr := linter.PrepareLintPlan(runOpts)
+	if planErr != nil {
+		close(diagnosticsChan)
+		wg.Wait()
+		fmt.Fprintf(os.Stderr, "error preparing lint plan: %v\n", planErr)
+		return 1
+	}
+	runOpts.PreparedPlan = preparedPlan
 	// Dispatch eslint-plugin rules to the Node worker in parallel with the
 	// native lint pass; results are awaited + merged before output / --fix.
 	// ONLY when plugins are actually configured — otherwise the whole reverse-
@@ -1062,7 +1086,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				return 1
 			}
 			newPrograms := newBinding.Programs
-			if len(newPrograms) == 0 {
+			if len(newPrograms) == 0 && len(newBinding.StandaloneGapGroups) == 0 {
 				fmt.Fprintln(os.Stderr, "error rebuilding Programs after fixes: no Program returned")
 				return 1
 			}
@@ -1074,6 +1098,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// end of this function, so its objects are alive regardless and
 			// keeping their entries costs nothing because RetainOnly only deletes.
 			buildContext.RetainOnlySourceFiles(append(slices.Clone(newPrograms), programs...))
+			fixStandaloneSources, fixStandaloneSyntaxDiagnostics, fixStandaloneSyntaxErrorFiles, err := buildStandaloneGapSourceSets(
+				newBinding.StandaloneGapGroups,
+				currentDirectory,
+				buildContext,
+				singleThreaded,
+			)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error rebuilding standalone lint sources after fixes: %v\n", err)
+				return 1
+			}
 
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
@@ -1112,9 +1146,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				typeCheck,
 				typeCheckOnly,
 			)
+			fixSyntaxDiagnostics = append(fixSyntaxDiagnostics, fixStandaloneSyntaxDiagnostics...)
+			for fileName := range fixStandaloneSyntaxErrorFiles {
+				fixSyntaxErrorFiles[fileName] = struct{}{}
+			}
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
+				Standalone:            fixStandaloneSources,
 				SingleThreaded:        singleThreaded,
 				Cwd:                   cwd,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1134,7 +1173,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					},
 				},
 			}
-			fixRunOpts.PreparedPlan = linter.PrepareLintPlan(fixRunOpts)
+			fixPreparedPlan, planErr := linter.PrepareLintPlan(fixRunOpts)
+			if planErr != nil {
+				fmt.Fprintf(os.Stderr, "error preparing lint plan after fixes: %v\n", planErr)
+				return 1
+			}
+			fixRunOpts.PreparedPlan = fixPreparedPlan
 			// Re-dispatch plugin rules each pass (only when configured): the
 			// worker re-reads the post-fix file content, and merging here keeps
 			// plugin diagnostics from being lost when allDiags is replaced.

@@ -63,7 +63,8 @@ func sourceHasPromiseBinding(ctx rule.RuleContext) bool {
 }
 
 func isGlobalPromiseReference(ctx rule.RuleContext, identifier *ast.Node) bool {
-	if ctx.Program != nil && ctx.SourceFile != nil && ctx.SourceFile.IsBound() {
+	compilerOptions := ctx.CompilerOptions()
+	if compilerOptions != nil && ctx.SourceFile != nil && ctx.SourceFile.IsBound() {
 		if ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) && ctx.SourceFile.Locals["Promise"] != nil {
 			// ESLint stores user declarations and configured globals in one
 			// global-scope variable. Any source definition, including a type-only
@@ -73,7 +74,7 @@ func isGlobalPromiseReference(ctx rule.RuleContext, identifier *ast.Node) bool {
 		// RefStore.Resolve falls back to the TypeChecker for globals. This rule
 		// only needs to disprove a global by finding a local binding, so use the
 		// same binder scope walk without paying for that global fallback.
-		resolver := binder.NameResolver{CompilerOptions: ctx.Program.Options()}
+		resolver := binder.NameResolver{CompilerOptions: compilerOptions}
 		if ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) {
 			resolver.Globals = ctx.SourceFile.Locals
 		}

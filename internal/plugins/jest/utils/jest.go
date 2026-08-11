@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -338,21 +337,28 @@ func jestVersionFromPackageJSONText(data string) string {
 }
 
 // readJestVersionFromPackageJson resolves the jest version from the nearest package.json (same package
-// as the current source file) using the TypeScript program's host filesystem.
-func readJestVersionFromPackageJson(program *compiler.Program, sourceFile *ast.SourceFile) string {
-	if program == nil || sourceFile == nil {
+// as the current source file) using the effective source runtime's filesystem.
+func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
+	if ctx.SourceFile == nil {
 		return ""
 	}
-	dir := tspath.GetDirectoryPath(sourceFile.FileName())
-	pkgDir := program.GetNearestAncestorDirectoryWithPackageJson(dir)
+	if !ctx.HasSourceRuntime() {
+		return ""
+	}
+	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())
+	pkgDir := ctx.NearestPackageJSONDirectory(dir)
 	if pkgDir == "" {
 		return ""
 	}
 	pkgPath := tspath.CombinePaths(pkgDir, "package.json")
-	if !program.FileExists(pkgPath) {
+	if !ctx.FileExists(pkgPath) {
 		return ""
 	}
-	text, ok := program.Host().FS().ReadFile(pkgPath)
+	fileSystem := ctx.FileSystem()
+	if fileSystem == nil {
+		return ""
+	}
+	text, ok := fileSystem.ReadFile(pkgPath)
 	if !ok {
 		return ""
 	}
@@ -365,7 +371,7 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	if s, ok := jestVersionFromSettings(ctx.Settings); ok {
 		return s
 	}
-	if v := readJestVersionFromPackageJson(ctx.Program, ctx.SourceFile); v != "" {
+	if v := readJestVersionFromPackageJson(ctx); v != "" {
 		return v
 	}
 
