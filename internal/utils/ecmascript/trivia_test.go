@@ -1,4 +1,4 @@
-package utils
+package ecmascript
 
 import (
 	"testing"
@@ -36,10 +36,10 @@ func TestIsTriviaWhitespaceRune(t *testing.T) {
 
 	// Runes that look whitespace-ish but are NOT ECMAScript WhiteSpace.
 	nonWhitespace := []rune{
-		0x0085, // NEL — in \p{White_Space} but not in ES WhiteSpace
-		0x200B, // ZWSP — category Cf, not Zs
-		0x200C, // ZWNJ
-		0x200D, // ZWJ
+		0x0085,                // NEL — in \p{White_Space} but not in ES WhiteSpace
+		0x200B,                // ZWSP — category Cf, not Zs
+		0x200C,                // ZWNJ
+		0x200D,                // ZWJ
 		'a', '0', '/', 0x4E2D, // CJK "中" — NOT whitespace
 	}
 	for _, r := range nonWhitespace {

@@ -13,6 +13,7 @@ import (
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed valid_title.schema.json
@@ -471,7 +472,7 @@ var ValidTitleRule = rule.Rule{
 				}
 
 				if !co.ignoreSpaces {
-					trimmed := strings.TrimFunc(title, utils.IsStrWhiteSpace)
+					trimmed := ecmascript.Trim(title)
 					if len(trimmed) != len(title) {
 						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 						fix := accidentalSpaceReplacement(raw)

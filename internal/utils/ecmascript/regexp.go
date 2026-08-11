@@ -1,4 +1,3 @@
-// Package ecmascript provides small helpers for ECMAScript syntax.
 package ecmascript
 
 import (

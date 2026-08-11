@@ -153,6 +153,7 @@ ESLint
 esmodule
 espree
 estree
+eszett
 Ethi
 exclam
 execdir

@@ -37,7 +37,6 @@ package minimatch
 import (
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/dlclark/regexp2"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -152,7 +151,7 @@ func New(pattern string, options Options) *Matcher {
 		return m
 	}
 
-	m.pattern = trimECMA(pattern)
+	m.pattern = ecmascript.Trim(pattern)
 	m.make()
 	return m
 }
@@ -178,36 +177,6 @@ func overMaxPatternLength(pattern string) bool {
 		}
 	}
 	return false
-}
-
-// trimECMA trims the pattern the way String.prototype.trim does. Go's
-// strings.TrimSpace reads a different set of characters as blank: it trims
-// U+0085, which JavaScript keeps, and keeps U+FEFF, which JavaScript trims.
-func trimECMA(pattern string) string {
-	return strings.TrimFunc(pattern, isStrWhiteSpace)
-}
-
-// isStrWhiteSpace reports whether a character is one JavaScript trims from the
-// edge of a string: a WhiteSpace or a LineTerminator.
-//
-// The rest of the repository spells this utils.IsStrWhiteSpace. Reaching for
-// it would put the whole compiler on this package's import list, where a port
-// of an npm package with its own LICENSE has no business, so the dozen lines
-// live here instead.
-//
-// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
-// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
-func isStrWhiteSpace(r rune) bool {
-	switch r {
-	// LineTerminator
-	case '\n', '\r', 0x2028, 0x2029:
-		return true
-	// WhiteSpace
-	case '\t', '\v', '\f', 0xFEFF:
-		return true
-	}
-	// WhiteSpace, which covers the ordinary space and U+00A0
-	return unicode.Is(unicode.Zs, r)
 }
 
 // Match reports whether path matches pattern. Compile the pattern with New

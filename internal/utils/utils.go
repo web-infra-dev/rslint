@@ -367,40 +367,6 @@ func IsThisVoidParameter(param *ast.Node) bool {
 	return t != nil && t.Kind == ast.KindVoidKeyword
 }
 
-// Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
-func IsStrWhiteSpace(r rune) bool {
-	// This is different than stringutil.IsWhiteSpaceLike.
-
-	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
-	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
-
-	switch r {
-	// LineTerminator
-	case '\n', '\r', 0x2028, 0x2029:
-		return true
-	// WhiteSpace
-	case '\t', '\v', '\f', 0xFEFF:
-		return true
-	}
-
-	// WhiteSpace
-	return unicode.Is(unicode.Zs, r)
-}
-
-// IsECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
-// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
-// by rules like max-lines / max-lines-per-function for `skipBlankLines`.
-// Go's strings.TrimSpace diverges on U+FEFF (BOM) and U+0085 (NEL), so we
-// can't use it directly.
-func IsECMABlankLine(s string) bool {
-	for _, r := range s {
-		if !IsStrWhiteSpace(r) {
-			return false
-		}
-	}
-	return true
-}
-
 // LineContentEnd returns the byte position just past the last character of the
 // line whose successor starts at nextLineStart — i.e. nextLineStart with its
 // immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
