@@ -26,4 +26,5 @@ const utils = require('./utils');
 
 ## Original Documentation
 
-- [import/no-self-import](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-self-import.md)
+- [eslint-plugin-import: no-self-import](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-self-import.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-self-import.js)

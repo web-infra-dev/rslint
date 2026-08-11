@@ -26,4 +26,5 @@ const styles = require('./styles.css');
 
 ## Original Documentation
 
-- [import/no-webpack-loader-syntax](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-webpack-loader-syntax.md)
+- [eslint-plugin-import: no-webpack-loader-syntax](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-webpack-loader-syntax.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-webpack-loader-syntax.js)

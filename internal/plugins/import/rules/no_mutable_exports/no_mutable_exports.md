@@ -29,4 +29,5 @@ export { count };
 
 ## Original Documentation
 
-https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-mutable-exports.md
+- [eslint-plugin-import: no-mutable-exports](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-mutable-exports.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-mutable-exports.js)

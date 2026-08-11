@@ -140,4 +140,5 @@ reports `Unexpected path "../server/bar" imported in restricted zone. Use the AP
 
 ## Original Documentation
 
-- [import/no-restricted-paths](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-restricted-paths.md)
+- [eslint-plugin-import: no-restricted-paths](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-restricted-paths.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-restricted-paths.js)
