@@ -427,12 +427,8 @@ var ValidTitleRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				// The wider entry point: import.meta.rstest.test(...) and
-				// @rstest/playwright are official registration shapes, and a
-				// title rule holds for them just as it does for @rstest/core.
-				// The two older rules in this plugin use the narrow
-				// ParseRstestFnCall, which is a historical choice rather than a
-				// contract.
+				// import.meta.rstest.test(...) and @rstest/playwright are official
+				// registration shapes, so title validation applies to them too.
 				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return

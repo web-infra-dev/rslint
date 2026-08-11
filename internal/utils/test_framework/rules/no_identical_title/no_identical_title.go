@@ -12,9 +12,14 @@ type ParsedCall struct {
 	Parameterized bool
 }
 
+type Runtime struct {
+	Parse func(*ast.Node) *ParsedCall
+	Skip  bool
+}
+
 type Config struct {
-	Name  string
-	Parse func(*ast.Node, rule.RuleContext) *ParsedCall
+	Name    string
+	Prepare func(rule.RuleContext) Runtime
 }
 
 func buildMultipleTestTitleMessage() rule.RuleMessage {
@@ -49,12 +54,16 @@ func NewRule(config Config) rule.Rule {
 		Name:   config.Name,
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			runtime := config.Prepare(ctx)
+			if runtime.Skip {
+				return rule.RuleListeners{}
+			}
 			contexts := []*titleLayer{newTitleLayer()}
 			var describeCalls []*ast.Node
 
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
-					parsed := config.Parse(node, ctx)
+					parsed := runtime.Parse(node)
 					if parsed == nil || parsed.Call == nil {
 						return
 					}
