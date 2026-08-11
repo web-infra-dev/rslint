@@ -256,17 +256,23 @@ func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
 
 // IsNameDefinedInFile reports whether name is visible in the value scope at
 // location through a declaration in this file or a binding supplied by the
-// resolved file wrapper. Unlike IsDefinedInFile, location need
-// not itself be a reference-position identifier. The TypeChecker is never
-// consulted.
+// resolved file wrapper. Unlike IsDefinedInFile, location need not itself be a
+// reference-position identifier. The TypeChecker is never consulted.
 func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
+	return s.IsNameDefinedInFileWithMeaning(location, name, ast.SymbolFlagsValue)
+}
+
+// IsNameDefinedInFileWithMeaning is IsNameDefinedInFile for an explicit set of
+// declaration spaces. Implicit wrapper bindings participate only in value
+// lookups.
+func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.resolver.Resolve(location, name, ast.SymbolFlagsValue, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
+	if s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
 		return true
 	}
-	return s.HasImplicitWrapperBinding(name)
+	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
 }
 
 // HasNonGlobalTopLevelScope reports whether the resolved language defaults
