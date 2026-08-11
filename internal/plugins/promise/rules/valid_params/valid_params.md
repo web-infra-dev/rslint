@@ -57,4 +57,5 @@ None known.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: valid-params](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/valid-params.md)
+- [eslint-plugin-promise: valid-params](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/valid-params.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/valid-params.js)

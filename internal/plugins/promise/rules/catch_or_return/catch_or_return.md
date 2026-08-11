@@ -103,4 +103,5 @@ None known.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: catch-or-return](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/catch-or-return.md)
+- [eslint-plugin-promise: catch-or-return](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/catch-or-return.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/catch-or-return.js)
