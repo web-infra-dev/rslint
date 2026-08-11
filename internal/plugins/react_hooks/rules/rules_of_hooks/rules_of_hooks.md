@@ -120,4 +120,4 @@ callbacks. Defaults to none.
 ## Original Documentation
 
 - [react.dev — Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
-- [Source code](https://github.com/facebook/react/blob/eslint-plugin-react-hooks@7.1.1/packages/eslint-plugin-react-hooks/src/rules/RulesOfHooks.ts)
+- [Source code](https://github.com/facebook/react/blob/main/packages/eslint-plugin-react-hooks/src/rules/RulesOfHooks.ts)
