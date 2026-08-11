@@ -526,9 +526,10 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 [Link to ESLint documentation]
 ````
 
-**Pin the upstream version in the link itself** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does. Link the exact released tag you actually read while porting, never a moving ref (`main`, `master`, `HEAD`). Which link carries the pin depends on how the upstream project hosts its docs:
+**Pin the upstream version** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does.
 
-**Default — docs are plain files in the project's GitHub repo** (`eslint-plugin-unicorn`, `eslint-plugin-react`, `eslint-plugin-jsx-a11y`, `eslint-plugin-jest`, `eslint-plugin-promise`, `eslint-plugin-import`, and any other plugin whose `docs/rules/*.md` you're reading straight from GitHub): pin **both** the doc link and the source-code link to the same tag — a `blob/<ref>/` URL is a real historical snapshot regardless of the ref.
+- **Source code link**: always required, always a `github.com/.../blob/<tag>/...` link pinned to the exact released tag you read while porting — never `main`/`master`/`HEAD`.
+- **Doc link**: if the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin it to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), match the link style already used by other rules in that family instead — most such sites can't be pinned to an exact release anyway.
 
 ```markdown
 ## Original Documentation
@@ -537,10 +538,6 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 - [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)
 ```
 
-**Exception — the docs live on a separate rendered website that only shows "latest"**: `eslint.org` (ESLint core), `typescript-eslint.io` (`@typescript-eslint`), and `react.dev` (`eslint-plugin-react-hooks`'s "Rules of Hooks" page) all fall in this bucket. None of them can be pinned to an exact release — `eslint.org` only freezes _past major_ versions (`/docs/v9.x/`, `/docs/v8.x/`) and redirects the current major's `/docs/vN.x/` to `/docs/latest/`; `typescript-eslint.io` and `react.dev` don't version their docs at all, ever. **Before assuming a doc site can't be pinned, check** — don't take this list as exhaustive for plugins not yet ported; look for a version selector, an archived-major URL pattern, or a redirect from a numbered path to `latest`/`head`. If you find a real per-release snapshot, use it and add the project to the default case above instead.
-
-For these, the version lock lives on the **source-code** link instead, pinned to the project's own GitHub repo at the exact tag (for a monorepo like `facebook/react` that tags packages independently, e.g. `eslint-plugin-react-hooks@7.1.1`, use that package's own tag, not the repo's main version tag). A "Source code" link is therefore **required** for every rule doc in this bucket, alongside the friendly, unpinned doc-site link:
-
 ```markdown
 ## Original Documentation
 
@@ -548,16 +545,9 @@ For these, the version lock lives on the **source-code** link instead, pinned to
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
 ```
 
-```markdown
-## Original Documentation
+(Most existing ESLint core and `@typescript-eslint` rule docs predate this and don't have a "Source code" line yet — backfilling those is tracked separately; add it for any rule you touch going forward.)
 
-- [typescript-eslint no-unused-vars](https://typescript-eslint.io/rules/no-unused-vars)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.65.0/packages/eslint-plugin/src/rules/no-unused-vars.ts)
-```
-
-(Most existing ESLint core and `@typescript-eslint` rule docs predate this requirement and don't have a "Source code" line yet — backfilling those is tracked separately; add it for any rule you touch going forward.)
-
-If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively just because a newer tag exists.
+If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively.
 
 **Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
 
