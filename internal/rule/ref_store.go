@@ -63,7 +63,7 @@ type RefStore struct {
 // and by References when asked about a symbol that fallback produced; nil
 // disables both (Resolve then never falls back, and References behaves as if
 // every such symbol were never queried). init supplies only declaration-less
-// bindings and top-level scope facts resolved by the linter.
+// wrapper bindings and top-level scope facts resolved by the linter.
 func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker, init RefStoreInit) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
@@ -222,9 +222,27 @@ func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
 	return s.binderReferenceSymbol(node, referenceMeaning(node))
 }
 
+// ResolveInFileWithMeaning is ResolveInFile with an explicit declaration-space
+// meaning. It is for consumers whose reference model intentionally differs
+// from TypeScript's checker semantics, such as ESLint scope variables that can
+// independently be type-capable, value-capable, or both. Like ResolveInFile,
+// it never consults the TypeChecker or declarations outside this source file.
+func (s *RefStore) ResolveInFileWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, meaning)
+}
+
+// HasImplicitWrapperBinding reports whether the resolved file wrapper supplies
+// a declaration-less, non-global binding with name.
+func (s *RefStore) HasImplicitWrapperBinding(name string) bool {
+	return s != nil && name != "" && s.init.hasImplicitWrapperBinding(name)
+}
+
 // IsDefinedInFile reports whether a reference-position identifier is defined
 // by the file's lexical scope graph or by a non-global binding supplied by its
-// default language environment. It never consults the TypeChecker and does not
+// resolved file wrapper. It never consults the TypeChecker and does not
 // manufacture an ast.Symbol for an implicit binding.
 func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
@@ -233,12 +251,12 @@ func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
 	if s.binderReferenceSymbol(node, referenceMeaning(node)) != nil {
 		return true
 	}
-	return s.init.defines(node.Text())
+	return s.HasImplicitWrapperBinding(node.Text())
 }
 
 // IsNameDefinedInFile reports whether name is visible in the value scope at
 // location through a declaration in this file or a binding supplied by the
-// resolved language defaults. Unlike IsDefinedInFile, location need
+// resolved file wrapper. Unlike IsDefinedInFile, location need
 // not itself be a reference-position identifier. The TypeChecker is never
 // consulted.
 func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
@@ -248,7 +266,7 @@ func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
 	if s.resolver.Resolve(location, name, ast.SymbolFlagsValue, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
 		return true
 	}
-	return s.init.defines(name)
+	return s.HasImplicitWrapperBinding(name)
 }
 
 // HasNonGlobalTopLevelScope reports whether the resolved language defaults

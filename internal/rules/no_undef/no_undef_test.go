@@ -284,6 +284,76 @@ func TestNoUndefRule(t *testing.T) {
 
 			// === Import type alias (import type { X as Y }) ===
 			{Code: `import type { PlatformPath as PP } from "path";`},
+			{Code: `import type { Configuration } from "pkg"; Configuration;`},
+
+			// === Import types are type-only, including tsgo's JSDoc reparse ===
+			{Code: `type Config = import("pkg").Configuration;`},
+			{
+				Code:     `/** @type {import("pkg").Configuration} */ const config = {};`,
+				FileName: "jsdoc-import-type.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     `/** @type {import("pkg").Configuration} */ export default {};`,
+				FileName: "jsdoc-import-type.mjs",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     `/** @param {import("pkg").Configuration} config */ function use(config) { return config; }`,
+				FileName: "jsdoc-param-import-type.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\n/** @type {Configuration} */\nconst config = {};",
+				FileName: "jsdoc-import-tag-type-only.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nconst Configuration = {};\nConfiguration;",
+				FileName: "jsdoc-import-tag-local-value.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "const Configuration = {};\n/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-earlier-local-value.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nfunction use(Configuration) { return Configuration; }",
+				FileName: "jsdoc-import-tag-parameter-shadow.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration } from \"types\" */\nimport { Configuration } from \"values\";\nConfiguration;",
+				FileName: "jsdoc-import-tag-real-import.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "import { Configuration } from \"values\";\n/** @import { Configuration } from \"types\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-earlier-real-import.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration as Config } from \"types\" */\nimport Config from \"values\";\nConfig;",
+				FileName: "jsdoc-import-tag-real-default-import.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import * as Types from \"types\" */\nimport * as Types from \"values\";\nTypes;",
+				FileName: "jsdoc-import-tag-real-namespace-import.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Alias } from \"types\" */\nimport { Original as Alias } from \"values\";\nAlias;",
+				FileName: "jsdoc-import-tag-real-aliased-import.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-config-global.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Globals:  map[string]any{"Configuration": "readonly"},
+			},
 
 			// === Re-export alias (export { X as Y } from 'module') ===
 			{Code: `export { resolve as r } from "path";`},
@@ -307,6 +377,153 @@ func TestNoUndefRule(t *testing.T) {
 				Code: `undeclaredFunc();`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @type {import(\"pkg\").Configuration} */\nconst config = {};\nConfiguration;",
+				FileName: "jsdoc-import-type-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration as Config } from \"pkg\" */\nConfig;",
+				FileName: "jsdoc-import-tag-alias-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import * as Types from \"pkg\" */\nTypes;",
+				FileName: "jsdoc-import-tag-namespace-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\ntypeof Configuration;",
+				FileName: "jsdoc-import-tag-typeof-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Options:  map[string]any{"typeof": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 8},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nfunction read() {\n  return Configuration;\n}",
+				FileName: "jsdoc-import-tag-nested-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 10},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nfunction read(Configuration) { return Configuration; }\nConfiguration;",
+				FileName: "jsdoc-import-tag-shadowed-and-unshadowed.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 1},
+				},
+			},
+			{
+				Code:     "function read() {\n  /** @import { Configuration } from \"pkg\" */\n  return Configuration;\n}",
+				FileName: "nested-jsdoc-import-tag-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 10},
+				},
+			},
+			{
+				Code:     "/** @import * as Types from \"pkg\" */\nTypes.Configuration;",
+				FileName: "jsdoc-import-tag-namespace-property-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nconst value = { Configuration };",
+				FileName: "jsdoc-import-tag-shorthand-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 17},
+				},
+			},
+			{
+				Code:     "/** @import Configuration from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-default-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration as Config } from \"one\" */\n/** @import { Other as Config } from \"two\" */\nConfig;",
+				FileName: "jsdoc-import-tag-duplicate-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-off-global.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Globals:  map[string]any{"Configuration": "off"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Component } from \"pkg\" */\nconst el = <Component />;",
+				FileName: "jsdoc-import-tag-jsx-component.jsx",
+				TSConfig: "tsconfig.allowJs.json",
+				Tsx:      true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 13},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nconst value = { [Configuration]: true };",
+				FileName: "jsdoc-import-tag-computed-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 18},
+				},
+			},
+			{
+				Code:     "/** @import { Original } from \"types\" */\nimport { Original as Alias } from \"values\";\nOriginal;",
+				FileName: "jsdoc-import-tag-imported-property-name.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 3, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-runtime-reference.mjs",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @import { Configuration } from \"pkg\" */\nConfiguration;",
+				FileName: "jsdoc-import-tag-runtime-reference.cjs",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
 				},
 			},
 
@@ -1077,6 +1294,557 @@ func TestNoUndefRule(t *testing.T) {
 	)
 }
 
+func TestNoUndefTypeScriptReferenceParity(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUndefRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `type A = Record<string, AsyncIterator<number>>;
+type B = IteratorObjectConstructor;
+const value = {} as const;
+type C = const;`,
+				FileName: "default-esnext-type-globals.ts",
+			},
+			{
+				Code:            `type A = Intl; type B = Reflect; type C = Temporal;`,
+				FileName:        "default-esnext-namespace-globals.ts",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+			{
+				Code:     `export { IteratorObjectConstructor };`,
+				FileName: "default-esnext-dual-export.ts",
+			},
+			{
+				Code:     `type T = Record<string, unknown>;`,
+				FileName: "type-global-survives-config-off.ts",
+				Globals:  map[string]any{"Record": "off"},
+			},
+			{
+				Code:            `type T = Promise<void>;`,
+				FileName:        "type-global-independent-of-ecma-version.ts",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+			{
+				Code:     `const Record = 1; type T = Record<string, unknown>;`,
+				FileName: "value-binding-does-not-shadow-type-global.ts",
+			},
+			{
+				Code:     `type T = Record.Member;`,
+				FileName: "qualified-type-global.ts",
+			},
+			{
+				Code:     `export { Record }; export type { Record as RecordType }; export default Record;`,
+				FileName: "dual-type-global-exports.ts",
+			},
+			{
+				Code:     `export = Record;`,
+				FileName: "type-global-export-assignment.ts",
+			},
+			{
+				Code:     `type Foo = {}; type T = Foo.Member;`,
+				FileName: "qualified-type-alias-reference.ts",
+			},
+			{
+				Code:     `interface Foo {}; interface Bar extends Foo.Member {}`,
+				FileName: "qualified-interface-heritage-reference.ts",
+			},
+			{
+				Code:     `const outer = 1; declare function f(x: unknown): outer is string;`,
+				FileName: "type-predicate-outer-value-reference.ts",
+			},
+			{
+				Code:     `declare namespace N {}; N;`,
+				FileName: "namespace-is-value-capable.ts",
+			},
+			{
+				Code:     `declare namespace Foo {}; import X = Foo.Member; X;`,
+				FileName: "namespace-import-equals-value-reference.ts",
+			},
+			{
+				Code:     `type T = typeof import("pkg").Foo<Record>;`,
+				FileName: "type-query-import-type-argument.ts",
+			},
+			{
+				Code:     `type T = { [K in K]: K };`,
+				FileName: "mapped-type-key-visible-in-constraint.ts",
+			},
+			{
+				Code:     `type F = (x: typeof y, y: unknown) => void;`,
+				FileName: "function-type-parameter-scope.ts",
+			},
+			{
+				Code:     `type F = <T extends U, U>() => void;`,
+				FileName: "function-type-parameter-declaration-scope.ts",
+			},
+			{
+				Code:     `const node = <div<Record> />;`,
+				FileName: "jsx-intrinsic-type-argument.tsx",
+				Tsx:      true,
+			},
+			{
+				Code:     "declare namespace NS {}\ntype T = NS.Missing;",
+				FileName: "declared-qualified.ts",
+			},
+			{
+				Code:     `type T = import("pkg").MissingNS.Member;`,
+				FileName: "import-type-qualifier.ts",
+			},
+			{
+				Code:     `export type { Missing as Alias } from "pkg";`,
+				FileName: "type-reexport.ts",
+			},
+			{
+				Code:     `type F = (x: unknown) => typeof x;`,
+				FileName: "function-type-parameter-query.ts",
+			},
+			{
+				Code:     `class Existing {} type T = Existing; type U = typeof Existing;`,
+				FileName: "dual-space-class.ts",
+			},
+			{
+				Code:     `/** @type {Missing} */ const x = {};`,
+				FileName: "jsdoc-missing-type.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+			{
+				Code:     `/** @param {Missing} x */ function f(x) { return x; }`,
+				FileName: "jsdoc-missing-param.js",
+				TSConfig: "tsconfig.allowJs.json",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `Record; AsyncIterator;`,
+				FileName: "type-globals-do-not-leak-into-value-space.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code:     `type T = Record<string, unknown>; Record;`,
+				FileName: "type-global-config-off-does-not-define-value.ts",
+				Globals:  map[string]any{"Record": "off"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 35},
+				},
+			},
+			{
+				Code:     `type T = typeof Record;`,
+				FileName: "type-query-needs-value-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code:     `type T = { [Record]: unknown };`,
+				FileName: "computed-type-key-needs-value-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code:     `class C extends Record {}`,
+				FileName: "class-extends-needs-value-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code:     `import X = Record; X;`,
+				FileName: "import-equals-needs-value-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 12},
+				},
+			},
+			{
+				Code:     `declare function f(x: unknown): Record is string;`,
+				FileName: "type-predicate-parameter-needs-value-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 33},
+				},
+			},
+			{
+				Code:     `type T = HTMLElement; type U = NodeJS.Process; type V = Buffer;`,
+				FileName: "unsupported-host-type-globals.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+					{MessageId: "undef", Line: 1, Column: 32},
+					{MessageId: "undef", Line: 1, Column: 57},
+				},
+			},
+			{
+				Code:     `type T = IteratorConstructor;`,
+				FileName: "non-default-type-global.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code:            `type T = globalThis;`,
+				FileName:        "runtime-global-not-default-type-global.ts",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code:     `IteratorObjectConstructor; type T = typeof IteratorObjectConstructor;`,
+				FileName: "type-only-default-global-in-value-space.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 1, Column: 44},
+				},
+			},
+			{
+				Code:     `type Foo = {}; import X = Foo.Member; X;`,
+				FileName: "type-alias-import-equals-value-reference.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code:     `interface Foo {}; Foo;`,
+				FileName: "interface-does-not-define-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 19},
+				},
+			},
+			{
+				Code:     `function Foo() {}; type T = Foo;`,
+				FileName: "function-does-not-define-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 29},
+				},
+			},
+			{
+				Code:     `const Foo = 1; type T = Foo.Member;`,
+				FileName: "value-does-not-define-qualified-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 25},
+				},
+			},
+			{
+				Code:     `const Foo = 1; export type { Foo };`,
+				FileName: "type-only-export-excludes-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 30},
+				},
+			},
+			{
+				Code:     `type Foo = {}; declare function f(x: unknown): Foo is string;`,
+				FileName: "type-predicate-parameter-needs-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 48},
+				},
+			},
+			{
+				Code:     `type T = typeof Missing<Record>;`,
+				FileName: "type-query-value-with-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code:     `type T<X> = X extends infer U ? U : U;`,
+				FileName: "infer-type-not-visible-in-false-branch.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 37},
+				},
+			},
+			{
+				Code:     `type T = { [K in string]: K }; type U = K;`,
+				FileName: "mapped-type-key-not-visible-outside.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 41},
+				},
+			},
+			{
+				Code:     `type F = (x: unknown) => typeof x; type T = typeof x;`,
+				FileName: "function-type-parameter-not-visible-outside.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 52},
+				},
+			},
+			{
+				Code:     `const node = <MissingComponent<Record> />;`,
+				FileName: "jsx-component-with-type-argument.tsx",
+				Tsx:      true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code:     `const f = Missing<Record>;`,
+				FileName: "instantiation-expression-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 11},
+				},
+			},
+			{
+				Code:     `type T = { [key: MissingKey]: MissingValue };`,
+				FileName: "index-signature-type-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 18},
+					{MessageId: "undef", Line: 1, Column: 31},
+				},
+			},
+			{
+				Code:     `type T = new <X extends Missing>() => Missing2;`,
+				FileName: "constructor-type-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 25},
+					{MessageId: "undef", Line: 1, Column: 39},
+				},
+			},
+			{
+				Code:     `type T = Missing;`,
+				FileName: "missing-type-reference.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code:     `type T = MissingNS.Member.Deep;`,
+				FileName: "missing-qualified-root.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code:     `type T = typeof MissingValue;`,
+				FileName: "missing-type-query-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code:     `type T = typeof MissingNS.value.deep;`,
+				FileName: "missing-qualified-type-query-root.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code:     `type F<T> = typeof T;`,
+				FileName: "type-parameter-does-not-define-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 20},
+				},
+			},
+			{
+				Code:     `type F = (x: unknown) => x;`,
+				FileName: "value-parameter-does-not-define-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 26},
+				},
+			},
+			{
+				Code:     `const a = value as MissingA; const b = value2 satisfies MissingB;`,
+				FileName: "missing-assertion-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 11},
+					{MessageId: "undef", Line: 1, Column: 20},
+					{MessageId: "undef", Line: 1, Column: 40},
+					{MessageId: "undef", Line: 1, Column: 57},
+				},
+			},
+			{
+				Code:     `interface I extends MissingNS.Base<MissingArg> {}`,
+				FileName: "missing-interface-heritage.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 21},
+					{MessageId: "undef", Line: 1, Column: 36},
+				},
+			},
+			{
+				Code:     `class C implements MissingNS.Base<MissingArg> {}`,
+				FileName: "missing-class-implements.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 20},
+					{MessageId: "undef", Line: 1, Column: 35},
+				},
+			},
+			{
+				Code:     `type T = import("pkg").Box<MissingArg>;`,
+				FileName: "missing-import-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 28},
+				},
+			},
+			{
+				Code:     `type T = import(MissingSource).Box<MissingArg>;`,
+				FileName: "invalid-import-type-source.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 36},
+				},
+			},
+			{
+				Code:     `type T = import("pkg", { with: { type: MissingOption } }).Box<MissingArg>;`,
+				FileName: "invalid-import-type-options.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 63},
+				},
+			},
+			{
+				Code:     `type T = { plain: MissingType; [MissingKey]: MissingValue; [MissingMethod](): MissingReturn };`,
+				FileName: "missing-type-member-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 19},
+					{MessageId: "undef", Line: 1, Column: 33},
+					{MessageId: "undef", Line: 1, Column: 46},
+					{MessageId: "undef", Line: 1, Column: 61},
+					{MessageId: "undef", Line: 1, Column: 79},
+				},
+			},
+			{
+				Code:     `type T = { [K in keyof MissingKeys as MissingRemap<K>]: MissingValue<K> };`,
+				FileName: "missing-mapped-type-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 24},
+					{MessageId: "undef", Line: 1, Column: 39},
+					{MessageId: "undef", Line: 1, Column: 57},
+				},
+			},
+			{
+				Code:     `type T = MissingObj[MissingIndex];`,
+				FileName: "missing-indexed-access-types.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+					{MessageId: "undef", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code:     `type T = keyof Missing;`,
+				FileName: "missing-keyof-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 16},
+				},
+			},
+			{
+				Code:     `declare function f(x: unknown): missingParam is MissingType;`,
+				FileName: "missing-type-predicate-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 33},
+					{MessageId: "undef", Line: 1, Column: 49},
+				},
+			},
+			{
+				Code:     `type F = <T extends MissingConstraint = MissingDefault>(x: MissingParam) => MissingReturn;`,
+				FileName: "missing-function-type-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 21},
+					{MessageId: "undef", Line: 1, Column: 41},
+					{MessageId: "undef", Line: 1, Column: 60},
+					{MessageId: "undef", Line: 1, Column: 77},
+				},
+			},
+			{
+				Code:     `fn<MissingType>();`,
+				FileName: "missing-call-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 1, Column: 4},
+				},
+			},
+			{
+				Code:     "tag<MissingType>`x`;",
+				FileName: "missing-tagged-template-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 1, Column: 5},
+				},
+			},
+			{
+				Code:     `new Ctor<MissingType>();`,
+				FileName: "missing-new-type-argument.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 5},
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code:     `type T = [label: Missing, optional?: Missing2];`,
+				FileName: "missing-named-tuple-types.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 18},
+					{MessageId: "undef", Line: 1, Column: 38},
+				},
+			},
+			{
+				Code:     `type T<X> = X extends infer U ? U | MissingTrue : MissingFalse;`,
+				FileName: "missing-conditional-type-references.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 37},
+					{MessageId: "undef", Line: 1, Column: 51},
+				},
+			},
+			{
+				Code:     `import X = MissingNS.Member; X;`,
+				FileName: "missing-import-equals-root.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 12},
+				},
+			},
+			{
+				Code:     `export type { Missing as Alias };`,
+				FileName: "missing-type-export.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code:     `namespace N { export type T = Missing; }`,
+				FileName: "missing-namespace-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 31},
+				},
+			},
+			{
+				Code:     `const Existing = 1; type T = Existing;`,
+				FileName: "value-does-not-define-type.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 30},
+				},
+			},
+			{
+				Code:     `interface Existing {} type T = typeof Existing;`,
+				FileName: "type-does-not-define-value.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 39},
+				},
+			},
+			{
+				Code:     `/** @type {Missing} */ const x = {}; Missing;`,
+				FileName: "jsdoc-runtime-reference.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 38},
+				},
+			},
+			{
+				Code:     "/** @typedef {object} Foo */\nFoo;",
+				FileName: "jsdoc-typedef-runtime.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "/** @typedef {object} Foo */\nexport { Foo };",
+				FileName: "jsdoc-typedef-export.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 2, Column: 10},
+				},
+			},
+		},
+	)
+}
+
 func TestNoUndefLanguageDefaults(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -1098,6 +1866,12 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				Globals:  map[string]any{"arguments": "off"},
 			},
 			{
+				Code:     "/** @import { arguments } from \"pkg\" */\narguments;",
+				FileName: "jsdoc-arguments-off.cjs",
+				TSConfig: "tsconfig.allowJs.json",
+				Globals:  map[string]any{"arguments": "off"},
+			},
+			{
 				Code:     `const require = 1; require;`,
 				FileName: "local-require.cjs",
 				Globals:  map[string]any{"require": "off"},
@@ -1113,6 +1887,13 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				Code:     `arguments;`,
 				FileName: "module-file.mjs",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:     "/** @import { arguments } from \"pkg\" */\narguments;",
+				FileName: "jsdoc-arguments-off.mjs",
+				TSConfig: "tsconfig.allowJs.json",
+				Globals:  map[string]any{"arguments": "off"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 2, Column: 1}},
 			},
 			{
 				Code:     `require;`,

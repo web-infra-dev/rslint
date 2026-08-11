@@ -32,14 +32,14 @@ func (i GlobalsInit) access(name string) utils.GlobalAccess {
 
 // RefStoreInit is immutable initialization data supplied to RefStore by the
 // resolved language defaults. Its zero value adds no reference or scope facts.
-// Implicit bindings are facts, not synthetic TypeScript symbols.
+// Implicit wrapper bindings are facts, not synthetic TypeScript symbols.
 type RefStoreInit struct {
-	implicitBindings       []string
-	nonGlobalTopLevelScope bool
+	implicitWrapperBindings []string
+	nonGlobalTopLevelScope  bool
 }
 
-func (i RefStoreInit) defines(name string) bool {
-	for _, candidate := range i.implicitBindings {
+func (i RefStoreInit) hasImplicitWrapperBinding(name string) bool {
+	for _, candidate := range i.implicitWrapperBindings {
 		if candidate == name {
 			return true
 		}
@@ -62,8 +62,8 @@ var commonJSGlobalsInit = GlobalsInit{entries: languageGlobalCatalog}
 var moduleRefStoreInit = RefStoreInit{nonGlobalTopLevelScope: true}
 
 var commonJSRefStoreInit = RefStoreInit{
-	implicitBindings:       []string{"arguments"},
-	nonGlobalTopLevelScope: true,
+	implicitWrapperBindings: []string{"arguments"},
+	nonGlobalTopLevelScope:  true,
 }
 
 // ResolveLanguageDefaults resolves the concrete Globals and RefStore
