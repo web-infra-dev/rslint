@@ -100,4 +100,5 @@ These mirror the upstream `eslint-plugin-jsx-a11y` settings exactly.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-distracting-elements](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-distracting-elements.md)
+- [eslint-plugin-jsx-a11y: no-distracting-elements](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-distracting-elements.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-distracting-elements.js)

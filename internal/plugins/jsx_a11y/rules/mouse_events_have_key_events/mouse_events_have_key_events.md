@@ -97,4 +97,5 @@ corresponding pairing entirely.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/mouse-events-have-key-events](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/mouse-events-have-key-events.md)
+- [eslint-plugin-jsx-a11y: mouse-events-have-key-events](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/mouse-events-have-key-events.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/mouse-events-have-key-events.js)

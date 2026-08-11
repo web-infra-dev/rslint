@@ -57,4 +57,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/iframe-has-title](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/iframe-has-title.md)
+- [eslint-plugin-jsx-a11y: iframe-has-title](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/iframe-has-title.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/iframe-has-title.js)

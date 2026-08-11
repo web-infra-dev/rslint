@@ -161,4 +161,5 @@ Examples of **correct** code for this rule with
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/control-has-associated-label](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/control-has-associated-label.md)
+- [eslint-plugin-jsx-a11y: control-has-associated-label](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/control-has-associated-label.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/control-has-associated-label.js)

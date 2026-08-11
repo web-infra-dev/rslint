@@ -90,4 +90,5 @@ This rule takes no options.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/aria-proptypes](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-proptypes.md)
+- [eslint-plugin-jsx-a11y: aria-proptypes](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/aria-proptypes.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/aria-proptypes.js)
