@@ -50,6 +50,12 @@ func compareNodesUncached(nodeA *ast.Node, nodeB *ast.Node) NodeComparisonResult
 		propA := a.AsPropertyAccessExpression()
 		propB := b.AsPropertyAccessExpression()
 
+		// `b` is the node a `?.` would be written into, and TypeScript has no
+		// syntax for optionally accessing a private member.
+		if ast.IsPrivateIdentifier(propB.Name()) {
+			return NodeComparisonInvalid
+		}
+
 		if propA.Name().Text() != propB.Name().Text() {
 			// Names differ - but a might still be a prefix of b
 			if isChainPrefix(a, b) {
@@ -285,11 +291,25 @@ func isChainPrefix(prefix *ast.Node, chain *ast.Node) bool {
 	p := skipDownwards(prefix)
 	c := skipDownwards(chain)
 
+	// Only an expression that can itself head a chain can be a prefix of one,
+	// so `this && this.foo` is left alone while `this.a && this.a.b` folds.
+	switch p.Kind {
+	case ast.KindIdentifier, ast.KindPropertyAccessExpression,
+		ast.KindElementAccessExpression, ast.KindCallExpression, ast.KindMetaProperty:
+	default:
+		return false
+	}
+
 	// Walk down the left spine of the chain until we find a match
 	for {
 		switch c.Kind {
 		case ast.KindPropertyAccessExpression:
 			prop := c.AsPropertyAccessExpression()
+			// A private member cannot take `?.`, so no prefix of it can be
+			// folded into a chain that would have to pass through it.
+			if ast.IsPrivateIdentifier(prop.Name()) {
+				return false
+			}
 			if compareNodesUncached(p, prop.Expression) == NodeComparisonEqual {
 				return true
 			}

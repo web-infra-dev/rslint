@@ -92,484 +92,417 @@ func (ca *ChainAnalyzer) AnalyzeChain(
 	operator ast.Kind,
 	parentNode *ast.Node,
 ) {
-	if len(operands) < 2 {
-		return
-	}
-
-	// For && chains: each operand should be a valid guard, and consecutive operands
-	// should form subset relationships.
-	// For || chains: each operand (negated) should form subset relationships.
-
-	i := 0
-	for i < len(operands)-1 {
-		// Find the start of a potential chain
-		chainStart := i
-		if operands[i].Validity != OperandValid {
-			i++
-			continue
-		}
-
-		// Try to extend the chain
-		chainEnd := i + 1
-		for chainEnd < len(operands) {
-			curr := operands[chainEnd-1]
-			next := operands[chainEnd]
-
-			if next.Validity != OperandValid {
-				break
-			}
-
-			if curr.ComparedNode == nil || next.ComparedNode == nil {
-				break
-			}
-
-			// Check if the current guard is sufficient for optional chaining.
-			// Strict equality (!== null, !== undefined) only covers one nullish value.
-			// Skip the check if this operand is part of a complementary pair.
-			if !isPairedOperand(operands, chainEnd-1) && !ca.isGuardSufficientForChain(curr) {
-				break
-			}
-
-			cmp := compareNodesUncached(curr.ComparedNode, next.ComparedNode)
-			if cmp != NodeComparisonSubset && cmp != NodeComparisonEqual {
-				break
-			}
-
-			// When extending to a deeper property (Subset), verify the next guard
-			// is sufficient (or paired). Prevents extending through a lone strict
-			// check (e.g., !== undefined after != null).
-			if cmp == NodeComparisonSubset && !isPairedOperand(operands, chainEnd) && !ca.isGuardSufficientForChain(next) {
-				break
-			}
-
-			chainEnd++
-		}
-
-		if chainEnd-chainStart < 2 {
-			// Need at least 2 operands to form a chain
-			i++
-			continue
-		}
-
-		// Check the last operand - it should actually access a property
-		lastOperand := operands[chainEnd-1]
-		if lastOperand.ComparedNode == nil {
-			i++
-			continue
-		}
-
-		// The last operand must extend beyond the second-to-last operand (Subset, not Equal).
-		// If the last operand is Equal to the second-to-last, trim the chain back.
-		// E.g., `foo && foo.bar() && foo.bar()` → chain should be `foo && foo.bar()` only.
-		for chainEnd-chainStart >= 2 {
-			secondToLast := operands[chainEnd-2]
-			lastOp := operands[chainEnd-1]
-			if secondToLast.ComparedNode != nil && lastOp.ComparedNode != nil {
-				if compareNodesUncached(secondToLast.ComparedNode, lastOp.ComparedNode) == NodeComparisonEqual {
-					chainEnd--
-					continue
-				}
-			}
+	// An invalid operand breaks the chain that precedes it; a last-chain
+	// operand closes it. Everything between those boundaries is a run of
+	// guards that may collapse into one optional chain.
+	runStart := 0
+	for i := 0; i <= len(operands); i++ {
+		if i == len(operands) {
+			ca.analyzeRun(operands[runStart:i], nil, operator, parentNode)
 			break
 		}
-		if chainEnd-chainStart < 2 {
-			i++
-			continue
+		switch operands[i].Validity {
+		case OperandInvalid:
+			ca.analyzeRun(operands[runStart:i], nil, operator, parentNode)
+			runStart = i + 1
+		case OperandLast:
+			ca.analyzeRun(operands[runStart:i], &operands[i], operator, parentNode)
+			runStart = i + 1
 		}
-
-		// Skip if the first operand is a bare this/super keyword (not a property access)
-		// e.g., `this && this.foo` should not be flagged
-		firstCompared := operands[chainStart].ComparedNode
-		if firstCompared != nil {
-			fc := ast.SkipParentheses(firstCompared)
-			if fc.Kind == ast.KindThisKeyword || fc.Kind == ast.KindSuperKeyword {
-				i = chainEnd
-				continue
-			}
-		}
-
-		// typeof check on a bare identifier that's NOT nullable (e.g., `typeof globalThis`)
-		// is a "is defined?" check, not a null guard. Skip it from the chain.
-		// But typeof on a nullable parameter (e.g., `globalThis?: ...`) IS a valid guard.
-		if operands[chainStart].IsTypeof && firstCompared != nil {
-			fc := ast.SkipParentheses(firstCompared)
-			if fc.Kind == ast.KindIdentifier && !ca.nodeTypeHasFlags(fc, checker.TypeFlagsUndefined|checker.TypeFlagsVoid) {
-				chainStart++
-				if chainEnd-chainStart < 2 {
-					i = chainEnd
-					continue
-				}
-			}
-		}
-
-		// When the chain trails with a bare truthy/negation check on a call expression
-		// AND any guard uses strict UNDEFINED equality on a call expression result,
-		// truncate the chain for fix generation but keep the tail unchanged.
-		// Matches TS-ESLint: the rule is conservative for `!== undefined` chains with
-		// impure calls because the comparison result and call count both change.
-		originalChainEnd := chainEnd
-		if chainEnd-chainStart >= 2 {
-			last := operands[chainEnd-1]
-			if (last.ComparisonType == ComparisonBoolean || last.ComparisonType == ComparisonNotBoolean) &&
-				last.ComparedNode != nil &&
-				ast.IsCallExpression(ast.SkipParentheses(last.ComparedNode)) {
-				for gi := chainStart; gi < chainEnd-1; gi++ {
-					g := operands[gi]
-					if g.ComparedNode != nil &&
-						(g.ComparisonType == ComparisonNotStrictEqualUndefined ||
-							g.ComparisonType == ComparisonStrictEqualUndefined) &&
-						ast.IsCallExpression(ast.SkipParentheses(g.ComparedNode)) {
-						chainEnd = gi + 1
-						break
-					}
-				}
-			}
-		}
-		if chainEnd-chainStart < 2 {
-			i = originalChainEnd
-			continue
-		}
-
-		// For || chains, restore the last operand's original ComparisonType
-		// for comparison operators. These were inverted by isNegatedComparison()
-		// during DeMorgan classification, but output generation (wrapChainCode)
-		// and fix/suggest decision need the original source operator.
-		// Boolean types (ComparisonBoolean/ComparisonNotBoolean) are set directly
-		// and should NOT be de-inverted.
-		if operator == ast.KindBarBarToken {
-			ct := operands[chainEnd-1].ComparisonType
-			if ct != ComparisonBoolean && ct != ComparisonNotBoolean {
-				operands[chainEnd-1].ComparisonType = invertComparisonType(ct)
-			}
-		}
-
-		// Skip chains where the last operand's strict comparison would change
-		// truthiness when the optional chain returns undefined.
-		// e.g., `data && data.value !== null` → `data?.value !== null` changes
-		// from falsy to true when data is null/undefined.
-		complementaryMerged := false
-		if wouldChangeTruthiness(operands[chainStart:chainEnd], operator) {
-			// Recovery: if the trimmed operand (just past chainEnd) forms a
-			// complementary pair with the last chain operand, merge them into
-			// loose equality (!= null / == null). Together they cover both null
-			// and undefined, making the transformation safe.
-			// E.g., `existing && existing.id !== null && existing.id !== undefined`
-			// → trim to [existing, existing.id !== null] (rejected)
-			// → merge to [existing, existing.id != null] (safe)
-			if chainEnd < len(operands) && chainEnd-chainStart >= 2 {
-				last := &operands[chainEnd-1]
-				next := operands[chainEnd]
-				if last.ComparedNode != nil && next.ComparedNode != nil &&
-					compareNodesUncached(last.ComparedNode, next.ComparedNode) == NodeComparisonEqual &&
-					isComplementaryGuard(*last, next) {
-					if operator == ast.KindAmpersandAmpersandToken {
-						last.ComparisonType = ComparisonNotEqualNullOrUndefined
-					} else {
-						last.ComparisonType = ComparisonEqualNullOrUndefined
-					}
-					last.UsesNull = true
-					last.IsYoda = false
-					last.IsTypeof = false
-					if !wouldChangeTruthiness(operands[chainStart:chainEnd], operator) {
-						complementaryMerged = true
-					}
-				}
-			}
-			if !complementaryMerged {
-				i = originalChainEnd
-				continue
-			}
-		}
-
-		// When a complementary pair was merged, the operand at chainEnd was
-		// consumed into the chain's last operand. Advance past it so it
-		// doesn't appear in the tail or output.
-		if complementaryMerged {
-			// The merged operand's range should be covered by the fix.
-			// Include it in the chain's report range by treating it as part
-			// of the chain for range calculation only.
-			ca.reportChainCoveringMerged(operands[chainStart:chainEnd], operands[chainEnd], operator, parentNode)
-		} else if chainEnd < originalChainEnd {
-			ca.reportChainWithTail(operands[chainStart:chainEnd], operands[chainEnd:originalChainEnd], operator, parentNode)
-		} else {
-			ca.reportChain(operands[chainStart:chainEnd], operator, parentNode)
-		}
-		i = originalChainEnd
 	}
 }
 
+// analyzeRun walks a run of guards, growing the longest chain of subset
+// accesses it can and reporting each chain it completes. lastChainOperand,
+// when present, closes the run's final chain with a comparison against an
+// arbitrary value.
+func (ca *ChainAnalyzer) analyzeRun(
+	chain []Operand,
+	lastChainOperand *Operand,
+	operator ast.Kind,
+	parentNode *ast.Node,
+) {
+	total := len(chain)
+	if lastChainOperand != nil {
+		total++
+	}
+	if total <= 1 {
+		return
+	}
+
+	// A pair of strict checks on the same access, such as
+	// `x !== null && x !== undefined`, is one link of the chain even though it
+	// contributes two operands, so links are counted separately from operands.
+	subChain := make([]Operand, 0, total)
+	links := 0
+	var lastChain *Operand
+
+	reportThenReset := func(seed []Operand) {
+		if links+boolToInt(lastChain != nil) > 1 {
+			ca.reportChain(subChain, lastChain, operator, parentNode)
+		}
+		// The operand that ended this chain may start the next one, as in
+		// `unrelated != null && foo != null && foo.bar`, so keep it.
+		subChain = append(subChain[:0], seed...)
+		links = boolToInt(len(seed) > 0)
+		lastChain = nil
+	}
+
+	for i := 0; i < len(chain); i++ {
+		var prev *Operand
+		if len(subChain) > 0 {
+			prev = &subChain[len(subChain)-1]
+		}
+		operand := chain[i]
+
+		consumed := ca.analyzeGuard(chain, i, operator)
+		if consumed == 0 {
+			// A check against `undefined` that reaches deeper than the chain so
+			// far can still close it, leaving the rest of the expression alone.
+			if prev != nil &&
+				(operand.ComparisonType == ComparisonStrictEqualUndefined ||
+					operand.ComparisonType == ComparisonNotStrictEqualUndefined) &&
+				compareNodesUncached(prev.ComparedNode, operand.ComparedNode) == NodeComparisonSubset {
+				lastChain = &chain[i]
+			}
+			reportThenReset(nil)
+			continue
+		}
+
+		group := chain[i : i+consumed]
+		i += consumed - 1
+
+		if prev == nil {
+			subChain = append(subChain, group[0])
+			links++
+			continue
+		}
+		// Compare against the last operand of the group: the earlier ones check
+		// the same access, so `foo !== null && foo !== undefined` stays one unit.
+		switch compareNodesUncached(prev.ComparedNode, group[len(group)-1].ComparedNode) {
+		case NodeComparisonSubset:
+			subChain = append(subChain, group[0])
+			links++
+		case NodeComparisonInvalid:
+			reportThenReset(group)
+		}
+		// An equal access is a no-op, so `foo && foo` is left alone.
+	}
+
+	if len(subChain) > 0 && lastChainOperand != nil {
+		if resolved, ok := ca.resolveLastChainOperand(subChain, *lastChainOperand, operator); ok {
+			lastChain = &resolved
+		}
+	}
+	reportThenReset(nil)
+}
+
+// analyzeGuard reports how many operands the guard at index consumes, or 0 when
+// it cannot narrow the chain. A pair of strict checks that together cover both
+// null and undefined consumes two.
+func (ca *ChainAnalyzer) analyzeGuard(chain []Operand, index int, operator ast.Kind) int {
+	operand := chain[index]
+	hasMore := index+1 < len(chain)
+	pairsWith := func(want NullishComparisonType) bool {
+		return hasMore &&
+			chain[index+1].ComparisonType == want &&
+			compareNodesUncached(operand.ComparedNode, chain[index+1].ComparedNode) == NodeComparisonEqual
+	}
+
+	if operator == ast.KindAmpersandAmpersandToken {
+		switch operand.ComparisonType {
+		case ComparisonBoolean, ComparisonNotEqualNullOrUndefined:
+			return 1
+		case ComparisonNotStrictEqualNull:
+			if pairsWith(ComparisonNotStrictEqualUndefined) {
+				return 2
+			}
+			// `x !== null` leaves undefined in play, so it only guards a chain
+			// when x cannot be undefined and a later operand carries the chain.
+			if hasMore && !ca.includesType(operand.ComparedNode, checker.TypeFlagsUndefined) {
+				return 1
+			}
+		case ComparisonNotStrictEqualUndefined:
+			if pairsWith(ComparisonNotStrictEqualNull) {
+				return 2
+			}
+			if !ca.includesType(operand.ComparedNode, checker.TypeFlagsNull) {
+				return 1
+			}
+		}
+		return 0
+	}
+
+	switch operand.ComparisonType {
+	case ComparisonNotBoolean, ComparisonEqualNullOrUndefined:
+		return 1
+	case ComparisonStrictEqualNull:
+		if pairsWith(ComparisonStrictEqualUndefined) {
+			return 2
+		}
+		if !ca.includesType(operand.ComparedNode, checker.TypeFlagsUndefined) {
+			return 1
+		}
+	case ComparisonStrictEqualUndefined:
+		if pairsWith(ComparisonStrictEqualNull) {
+			return 2
+		}
+		if !ca.includesType(operand.ComparedNode, checker.TypeFlagsNull) {
+			return 1
+		}
+	}
+	return 0
+}
+
+// includesType reports whether the node's type has any of the given flags,
+// counting `any` and `unknown` as possibly including them.
+func (ca *ChainAnalyzer) includesType(node *ast.Node, flags checker.TypeFlags) bool {
+	return ca.nodeTypeHasFlags(node, flags|checker.TypeFlagsAny|checker.TypeFlagsUnknown)
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// resolveLastChainOperand decides whether `last` closes the chain built from
+// `chain`, and returns it with the chain-target side resolved.
+func (ca *ChainAnalyzer) resolveLastChainOperand(
+	chain []Operand,
+	last Operand,
+	operator ast.Kind,
+) (Operand, bool) {
+	prev := chain[len(chain)-1]
+	if prev.ComparedNode == nil || last.ComparedNode == nil || last.ComparisonValue == nil {
+		return Operand{}, false
+	}
+
+	comparedNode, comparisonValue, isYoda, ok := resolveOperandSubset(prev, last)
+	if !ok {
+		return Operand{}, false
+	}
+	if !ca.isValidLastChainComparison(comparisonValue, last.LastComparison, operator) {
+		return Operand{}, false
+	}
+
+	last.ComparedNode = comparedNode
+	last.ComparisonValue = comparisonValue
+	last.IsYoda = isYoda
+	return last, true
+}
+
+// resolveOperandSubset picks which side of the trailing comparison extends the
+// chain. When both sides are member-based the ambiguity is resolved by which
+// one is a subset of the preceding guard — if both are, or neither is, the
+// chain cannot be folded.
+func resolveOperandSubset(prev, last Operand) (comparedNode, comparisonValue *ast.Node, isYoda, ok bool) {
+	nameIsSubset := compareNodesUncached(prev.ComparedNode, last.ComparedNode) == NodeComparisonSubset
+	if last.Yoda != YodaUnknown {
+		return last.ComparedNode, last.ComparisonValue, last.Yoda == YodaYes, nameIsSubset
+	}
+
+	valueIsSubset := compareNodesUncached(prev.ComparedNode, last.ComparisonValue) == NodeComparisonSubset
+	switch {
+	case nameIsSubset && !valueIsSubset:
+		return last.ComparedNode, last.ComparisonValue, false, true
+	case !nameIsSubset && valueIsSubset:
+		return last.ComparisonValue, last.ComparedNode, true, true
+	}
+	return nil, nil, false, false
+}
+
+// isValidLastChainComparison reports whether folding the chain leaves the
+// trailing comparison's result unchanged. An optional chain yields `undefined`
+// where the original expression short-circuited, so the compared value decides:
+// the comparison must keep the same answer for `undefined` as the short circuit
+// gave.
+func (ca *ChainAnalyzer) isValidLastChainComparison(
+	value *ast.Node,
+	comparison LastComparisonType,
+	operator ast.Kind,
+) bool {
+	if ca.ctx.TypeChecker == nil {
+		return false
+	}
+	t := ca.ctx.TypeChecker.GetTypeAtLocation(value)
+	if t == nil {
+		return false
+	}
+	parts := utils.UnionTypeParts(t)
+
+	someHasFlags := func(flags checker.TypeFlags) bool {
+		for _, part := range parts {
+			if checker.Type_flags(part)&flags != 0 {
+				return true
+			}
+		}
+		return false
+	}
+	everyHasFlags := func(flags checker.TypeFlags) bool {
+		for _, part := range parts {
+			if checker.Type_flags(part)&flags == 0 {
+				return false
+			}
+		}
+		return true
+	}
+
+	const anyOrUnknown = checker.TypeFlagsAny | checker.TypeFlagsUnknown
+	loose := comparison == LastComparisonEqual || comparison == LastComparisonNotEqual
+	negated := comparison == LastComparisonNotEqual || comparison == LastComparisonNotStrictEqual
+
+	// The comparison whose sense matches the chain operator must never match a
+	// nullish value; the opposite one must always match it.
+	if negated == (operator == ast.KindBarBarToken) {
+		if loose {
+			return !someHasFlags(anyOrUnknown | checker.TypeFlagsNull | checker.TypeFlagsUndefined)
+		}
+		return !someHasFlags(anyOrUnknown | checker.TypeFlagsUndefined)
+	}
+	if loose {
+		return everyHasFlags(checker.TypeFlagsNull | checker.TypeFlagsUndefined)
+	}
+	return everyHasFlags(checker.TypeFlagsUndefined)
+}
+
+// reportChain reports one folded chain: the guards in subChain plus, when
+// present, the operand that closes it.
 func (ca *ChainAnalyzer) reportChain(
-	operands []Operand,
+	subChain []Operand,
+	lastChain *Operand,
 	operator ast.Kind,
 	parentNode *ast.Node,
 ) {
-	if len(operands) < 2 {
+	// The fixes are built lazily, after subChain's backing array has been
+	// reused for the next chain, so keep a copy.
+	chain := make([]Operand, 0, len(subChain)+1)
+	chain = append(chain, subChain...)
+	if lastChain != nil {
+		chain = append(chain, *lastChain)
+	}
+	if len(chain) < 2 {
 		return
 	}
 
-	// Check requireNullish option
-	if ca.shouldSkipForRequireNullish(operands) {
+	if ca.shouldSkipForRequireNullish(chain) {
 		return
 	}
 
-	// For chains with strict equality guards, ensure at least one guard is
-	// meaningful (its compared node's type actually includes the nullish value
-	// being checked). This prevents reporting chains where all guards are
-	// vacuous (e.g., `foo.bar !== undefined && foo.bar()` where foo.bar is
-	// always a function and never undefined).
-	if ca.hasOnlyVacuousStrictGuards(operands[:len(operands)-1]) {
-		return
-	}
-
-	// Find the binary expression that encompasses all operands, covering any
-	// enclosing parentheses (e.g., `a && (a.b && a.b.c)` → the outer `&&`).
-	firstNode := operands[0].Node
-	reportNode := findBinaryExpressionCovering(parentNode, firstNode, operands[len(operands)-1].Node)
-	if reportNode == nil {
-		reportNode = parentNode
-	}
-
-	// Compute the fix range start by walking up from firstNode through any
-	// ParenthesizedExpressions to include opening parens in the range.
-	// E.g., `(a && a.b) && a.b.c` → startNode is the ParenthesizedExpression `(a && a.b)`.
-	// But for `foo?.a && bar && bar.a` → startNode stays as `bar` (no wrapping parens).
-	startNode := firstNode
-	n := firstNode.Parent
-	for n != nil && n != reportNode.Parent {
-		if ast.IsParenthesizedExpression(n) {
-			startNode = n
-		}
-		n = n.Parent
-	}
-	reportRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, reportNode.End())
-
-	msg := buildPreferOptionalChainMessage()
-	sugMsg := buildOptionalChainSuggestMessage()
+	reportRange := ca.chainReportRange(chain[0].Node, chain[len(chain)-1].Node, parentNode)
+	hasLastChain := lastChain != nil
 
 	reportRangeWithDeferredFixesOrSuggestions(
 		ca.ctx,
 		reportRange,
-		msg,
-		sugMsg,
+		buildPreferOptionalChainMessage(),
+		buildOptionalChainSuggestMessage(),
 		func() bool {
-			return ca.shouldUseFix(operands)
+			return ca.shouldUseFix(chain, hasLastChain, operator)
 		},
 		func() []rule.RuleFix {
-			fixCode := ca.buildOptionalChainCode(operands, operator)
+			fixCode := ca.buildOptionalChainCode(chain, operator)
 			if fixCode == "" {
 				return nil
 			}
-			fixCode = wrapChainCode(fixCode, operands[len(operands)-1])
-			return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, fixCode)}
+			fixCode = ca.wrapChainCode(fixCode, chain[len(chain)-1])
+			fixes := []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, fixCode)}
+			for _, pos := range ca.orphanedCloseParens(parentNode, reportRange) {
+				fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(pos, pos+1)))
+			}
+			return fixes
 		},
 	)
 }
 
-// reportChainCoveringMerged reports a chain where the last operand was merged
-// with a complementary strict-equality partner (mergedOp). The fix text covers
-// the chain operands, and the fix range extends to include the merged operand
-// so it is replaced along with the rest of the chain.
-func (ca *ChainAnalyzer) reportChainCoveringMerged(
-	operands []Operand,
-	mergedOp Operand,
-	operator ast.Kind,
-	parentNode *ast.Node,
-) {
-	if len(operands) < 2 {
-		return
-	}
+// chainReportRange spans the chain's first through last operand, widened over
+// any parentheses that sit between them and the enclosing logical expression.
+func (ca *ChainAnalyzer) chainReportRange(first, last, boundary *ast.Node) core.TextRange {
+	text := ca.ctx.SourceFile.Text()
+	boundaryStart := scanner.SkipTrivia(text, boundary.Pos())
+	boundaryEnd := boundary.End()
 
-	if ca.shouldSkipForRequireNullish(operands) {
-		return
-	}
-	if ca.hasOnlyVacuousStrictGuards(operands[:len(operands)-1]) {
-		return
-	}
-
-	firstNode := operands[0].Node
-	// The report/fix range must cover up to the merged operand's end.
-	reportNode := findBinaryExpressionCovering(parentNode, firstNode, mergedOp.Node)
-	if reportNode == nil {
-		reportNode = parentNode
-	}
-
-	startNode := firstNode
-	n := firstNode.Parent
-	for n != nil && n != reportNode.Parent {
-		if ast.IsParenthesizedExpression(n) {
-			startNode = n
+	start := scanner.SkipTrivia(text, first.Pos())
+	for n := first.Parent; n != nil; n = n.Parent {
+		nodeStart := scanner.SkipTrivia(text, n.Pos())
+		if ast.IsParenthesizedExpression(n) && nodeStart >= boundaryStart &&
+			scanner.SkipTrivia(text, n.AsParenthesizedExpression().Expression.Pos()) == start {
+			start = nodeStart
+			continue
 		}
-		n = n.Parent
-	}
-	reportRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, reportNode.End())
-
-	// Complementary-pair merges always produce a suggestion, not an auto-fix,
-	// because the output changes the comparison operator (!== to !=).
-	msg := buildPreferOptionalChainMessage()
-	sugMsg := buildOptionalChainSuggestMessage()
-	reportRangeWithDeferredFixesOrSuggestions(
-		ca.ctx,
-		reportRange,
-		msg,
-		sugMsg,
-		func() bool {
-			return false
-		},
-		func() []rule.RuleFix {
-			fixCode := ca.buildOptionalChainCode(operands, operator)
-			if fixCode == "" {
-				return nil
-			}
-			fixCode = wrapChainCode(fixCode, operands[len(operands)-1])
-			return []rule.RuleFix{rule.RuleFixReplaceRange(reportRange, fixCode)}
-		},
-	)
-}
-
-// reportChainWithTail reports a chain where the fix only covers the truncated
-// portion; the tail operands (which were not safe to fold, e.g., because they
-// depend on repeated impure call results) are preserved as-is in the source.
-// The fix range only covers operand[0] through the last truncated operand.
-func (ca *ChainAnalyzer) reportChainWithTail(
-	chainOps []Operand,
-	tailOps []Operand,
-	operator ast.Kind,
-	parentNode *ast.Node,
-) {
-	if len(chainOps) < 2 || len(tailOps) == 0 {
-		return
-	}
-
-	if ca.shouldSkipForRequireNullish(chainOps) {
-		return
-	}
-	// Check vacuousness across the FULL original chain (chain + tail), since the
-	// truncation was only for fix generation. Later guards in the tail may be the
-	// meaningful ones (tsgo narrows earlier guards' types away from nullish).
-	fullOps := make([]Operand, 0, len(chainOps)+len(tailOps))
-	fullOps = append(fullOps, chainOps...)
-	fullOps = append(fullOps, tailOps...)
-	if ca.hasOnlyVacuousStrictGuards(fullOps[:len(fullOps)-1]) {
-		return
-	}
-
-	// Report range covers the full expression (chain + tail) for display purposes,
-	// but fix range only covers the truncated chain — tail source text stays as-is.
-	firstNode := chainOps[0].Node
-	lastChainNode := chainOps[len(chainOps)-1].Node
-	lastTailNode := tailOps[len(tailOps)-1].Node
-	reportNode := findBinaryExpressionCovering(parentNode, firstNode, lastTailNode)
-	if reportNode == nil {
-		reportNode = parentNode
-	}
-
-	startNode := firstNode
-	n := firstNode.Parent
-	for n != nil && n != reportNode.Parent {
-		if ast.IsParenthesizedExpression(n) {
-			startNode = n
+		if nodeStart != start {
+			break
 		}
-		n = n.Parent
 	}
-	// Fix range: from start to the last chain operand's end (tail preserved as-is).
-	fixRange := trimNodeRangeWithEnd(ca.ctx.SourceFile, startNode, lastChainNode.End())
-	// Report range: from start to the end of the full expression (chain + tail).
-	reportRange := fixRange.WithEnd(reportNode.End())
 
-	msg := buildPreferOptionalChainMessage()
-	sugMsg := buildOptionalChainSuggestMessage()
+	end := last.End()
+	for n := last.Parent; n != nil; n = n.Parent {
+		if ast.IsParenthesizedExpression(n) && n.End() <= boundaryEnd &&
+			n.AsParenthesizedExpression().Expression.End() == end {
+			end = n.End()
+			continue
+		}
+		if n.End() != end {
+			break
+		}
+	}
 
-	reportRangeWithDeferredFixesOrSuggestions(
-		ca.ctx,
-		reportRange,
-		msg,
-		sugMsg,
-		func() bool {
-			// For truncated chains, force suggestion for && chains
-			// (matches TS-ESLint).
-			return operator != ast.KindAmpersandAmpersandToken && ca.shouldUseFix(chainOps)
-		},
-		func() []rule.RuleFix {
-			fixCode := ca.buildOptionalChainCode(chainOps, operator)
-			if fixCode == "" {
-				return nil
-			}
-			fixCode = wrapChainCode(fixCode, chainOps[len(chainOps)-1])
-			return []rule.RuleFix{rule.RuleFixReplaceRange(fixRange, fixCode)}
-		},
-	)
+	return core.NewTextRange(start, end)
 }
 
-func (ca *ChainAnalyzer) shouldUseFix(operands []Operand) bool {
+// orphanedCloseParens returns the positions of `)` tokens whose `(` the fix
+// replaces, as in `foo && (foo.bar && baz)` folding to `foo?.bar && baz`.
+func (ca *ChainAnalyzer) orphanedCloseParens(boundary *ast.Node, reportRange core.TextRange) []int {
+	text := ca.ctx.SourceFile.Text()
+	var positions []int
+	var visit func(n *ast.Node) bool
+	visit = func(n *ast.Node) bool {
+		if ast.IsParenthesizedExpression(n) && n.End() > reportRange.End() {
+			open := scanner.SkipTrivia(text, n.Pos())
+			if open >= reportRange.Pos() && open < reportRange.End() {
+				positions = append(positions, n.End()-1)
+			}
+		}
+		n.ForEachChild(visit)
+		return false
+	}
+	boundary.ForEachChild(visit)
+	return positions
+}
+
+// shouldUseFix reports whether the rewrite is safe to apply automatically. An
+// optional chain evaluates to `undefined` where the original short-circuited,
+// so it is only an auto-fix when that cannot change the expression's value.
+func (ca *ChainAnalyzer) shouldUseFix(chain []Operand, hasLastChain bool, operator ast.Kind) bool {
 	if ca.opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing {
 		return true
 	}
-
-	last := operands[len(operands)-1]
-
-	switch last.ComparisonType {
-	case ComparisonBoolean:
-		// For bare truthy checks, auto-fix is safe when the original expression
-		// can already return undefined (meaning the fix doesn't add a new undefined).
-		// This requires a guard that's a bare truthy/negation check (ComparisonBoolean/
-		// ComparisonNotBoolean) whose type includes undefined. Only bare truthy guards
-		// let the expression short-circuit to the guard's actual value (which may be
-		// undefined). Comparison guards (!= null, !== undefined, etc.) short-circuit
-		// to boolean (true/false), so even if the guard's type includes undefined,
-		// the expression can never return undefined.
-		if ca.ctx.TypeChecker != nil {
-			for _, guard := range operands[:len(operands)-1] {
-				if guard.ComparisonType != ComparisonBoolean && guard.ComparisonType != ComparisonNotBoolean {
-					continue
-				}
-				if guard.ComparedNode != nil {
-					t := ca.ctx.TypeChecker.GetTypeAtLocation(guard.ComparedNode)
-					if t != nil && utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsAny) {
-						return true
-					}
-				}
-			}
-		}
-		// Fall through to type check on last operand
-
-	case ComparisonNotBoolean:
-		// !expr always returns boolean. !undefined = true, same as
-		// original || short-circuit. Always safe.
-		return true
-
-	case ComparisonEqualNullOrUndefined:
-		// == null/undefined: undefined == null is true. Matches original. Safe.
-		return true
-
-	case ComparisonNotEqualNullOrUndefined:
-		// != null/undefined: undefined != null is false. Matches original short-circuit. Safe.
-		return true
-
-	case ComparisonNotStrictEqualUndefined,
-		ComparisonStrictEqualUndefined:
-		// !== undefined / === undefined: the comparison result is the same
-		// whether applied to undefined or original short-circuit value. Safe.
-		return true
-
-	case ComparisonNotStrictEqualNull:
-		// !== null: undefined !== null is true, but original && chain
-		// short-circuits to false when guard fails. Semantics change! Not safe.
-		return false
-
-	case ComparisonStrictEqualNull:
-		// === null: undefined === null is false, but original || chain
-		// short-circuits to true. Semantics change! Not safe.
+	// A trailing comparison against an arbitrary value can start answering
+	// differently once the chain feeds it `undefined`.
+	if hasLastChain {
 		return false
 	}
 
-	// Fallback: check if the result type already includes undefined
-	if ca.ctx.TypeChecker != nil && last.ComparedNode != nil {
-		t := ca.ctx.TypeChecker.GetTypeAtLocation(last.ComparedNode)
-		if t != nil && utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsAny) {
+	switch chain[len(chain)-1].ComparisonType {
+	case ComparisonEqualNullOrUndefined, ComparisonNotEqualNullOrUndefined,
+		ComparisonStrictEqualUndefined, ComparisonNotStrictEqualUndefined:
+		// The comparison answers the same for `undefined` as for whatever the
+		// original expression short-circuited to.
+		return true
+	case ComparisonNotBoolean:
+		if operator == ast.KindBarBarToken {
 			return true
 		}
 	}
 
+	// Otherwise the chain widens the result type with `undefined`, which is
+	// only safe when some operand could already produce it.
+	for _, op := range chain {
+		if ca.includesType(op.Node, checker.TypeFlagsUndefined) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -584,98 +517,27 @@ func (ca *ChainAnalyzer) shouldSkipForRequireNullish(operands []Operand) bool {
 	// With requireNullish, at least one guard operand must have null/undefined in its type.
 	// Only check guard operands (all except the last), since the last operand is the
 	// chain target, not a guard. E.g., in `foo && foo.bar`, foo is the guard.
+	//
+	// The type comes from the operand as written, not from the expression it
+	// compares: a guard spelled `foo != null` is a boolean, so only a bare
+	// truthy check like `foo` can carry a nullish type.
 	guards := operands
 	if len(guards) > 1 {
 		guards = operands[:len(operands)-1]
 	}
 	for _, op := range guards {
-		if op.ComparedNode == nil {
+		if op.Node == nil {
 			continue
 		}
-		t := ca.ctx.TypeChecker.GetTypeAtLocation(op.ComparedNode)
+		t := ca.ctx.TypeChecker.GetTypeAtLocation(op.Node)
 		if t == nil {
 			continue
 		}
-		if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) {
+		if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 			return false // has nullish -> don't skip
 		}
 	}
 	return true // no nullish found in any operand -> skip
-}
-
-// isGuardSufficientForChain checks whether a strict equality guard fully covers
-// the nullish types of the operand. Loose equality (!= / ==) catches both null
-// and undefined, so it's always sufficient. Strict equality (!== / ===) only
-// catches one, so we need to verify the type doesn't include the other.
-// isComplementaryGuard checks if two guards together cover both null and undefined.
-// E.g., (!== undefined, !== null) or (!== null, !== undefined) are complementary.
-func isComplementaryGuard(a, b Operand) bool {
-	coversNull := func(ct NullishComparisonType) bool {
-		return ct == ComparisonNotStrictEqualNull || ct == ComparisonStrictEqualNull
-	}
-	coversUndefined := func(ct NullishComparisonType) bool {
-		return ct == ComparisonNotStrictEqualUndefined || ct == ComparisonStrictEqualUndefined
-	}
-	return (coversNull(a.ComparisonType) && coversUndefined(b.ComparisonType)) ||
-		(coversUndefined(a.ComparisonType) && coversNull(b.ComparisonType))
-}
-
-func isPairedOperand(operands []Operand, index int) bool {
-	return index > 0 && operandsFormComplementaryPair(operands[index-1], operands[index]) ||
-		index+1 < len(operands) && operandsFormComplementaryPair(operands[index], operands[index+1])
-}
-
-func operandsFormComplementaryPair(a, b Operand) bool {
-	return a.ComparedNode != nil &&
-		b.ComparedNode != nil &&
-		isComplementaryGuard(a, b) &&
-		compareNodesUncached(a.ComparedNode, b.ComparedNode) == NodeComparisonEqual
-}
-
-func (ca *ChainAnalyzer) isGuardSufficientForChain(guard Operand) bool {
-	switch guard.ComparisonType {
-	case ComparisonBoolean, ComparisonNotBoolean:
-		return true
-	case ComparisonNotEqualNullOrUndefined, ComparisonEqualNullOrUndefined:
-		return true
-	case ComparisonNotStrictEqualNull, ComparisonStrictEqualNull:
-		if ca.ctx.TypeChecker == nil {
-			return false
-		}
-		return !ca.nodeTypeHasFlags(guard.ComparedNode, checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsAny|checker.TypeFlagsUnknown)
-	case ComparisonNotStrictEqualUndefined, ComparisonStrictEqualUndefined:
-		if ca.ctx.TypeChecker == nil {
-			return false
-		}
-		return !ca.nodeTypeHasFlags(guard.ComparedNode, checker.TypeFlagsNull|checker.TypeFlagsAny|checker.TypeFlagsUnknown)
-	}
-	return true
-}
-
-// hasOnlyVacuousStrictGuards returns true if all guards in the given operands
-// use strict equality checks and none of them have a type that actually includes
-// the nullish value being checked. A vacuous guard like `foo !== undefined` where
-// `foo` is always a non-nullable type should not trigger the rule.
-func (ca *ChainAnalyzer) hasOnlyVacuousStrictGuards(guards []Operand) bool {
-	if ca.ctx.TypeChecker == nil {
-		return false // can't determine without type info
-	}
-	for _, guard := range guards {
-		switch guard.ComparisonType {
-		case ComparisonBoolean, ComparisonNotBoolean,
-			ComparisonNotEqualNullOrUndefined, ComparisonEqualNullOrUndefined:
-			return false // non-strict guards are always meaningful
-		case ComparisonNotStrictEqualNull, ComparisonStrictEqualNull:
-			if ca.nodeTypeHasFlags(guard.ComparedNode, checker.TypeFlagsNull|checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
-				return false
-			}
-		case ComparisonNotStrictEqualUndefined, ComparisonStrictEqualUndefined:
-			if ca.nodeTypeHasFlags(guard.ComparedNode, checker.TypeFlagsUndefined|checker.TypeFlagsVoid|checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
-				return false
-			}
-		}
-	}
-	return true // all guards are vacuous
 }
 
 // nodeTypeHasFlags checks if a node's type includes any of the given flags,
@@ -689,60 +551,6 @@ func (ca *ChainAnalyzer) nodeTypeHasFlags(node *ast.Node, flags checker.TypeFlag
 		return false
 	}
 	return utils.IsTypeFlagSetWithUnion(t, flags)
-}
-
-// wouldChangeTruthiness checks if the last operand's strict comparison wrapper
-// would evaluate to `true` when given `undefined` (which optional chain returns
-// for null/undefined), AND at least one guard is a truthy check (which means
-// the original short-circuits to a falsy value). This would change the
-// expression's truthiness, making the transformation unsafe.
-func wouldChangeTruthiness(operands []Operand, operator ast.Kind) bool {
-	last := operands[len(operands)-1]
-
-	// Only applicable when the last operand has a comparison wrapper
-	if last.ComparisonType == ComparisonBoolean || last.ComparisonType == ComparisonNotBoolean {
-		return false
-	}
-
-	// Check if any guard is a truthy check
-	hasTruthyGuard := false
-	for _, op := range operands[:len(operands)-1] {
-		if op.ComparisonType == ComparisonBoolean || op.ComparisonType == ComparisonNotBoolean {
-			hasTruthyGuard = true
-			break
-		}
-	}
-	if !hasTruthyGuard {
-		return false
-	}
-
-	// For && chains: check if `undefined <op> value` would be `true`
-	if operator == ast.KindAmpersandAmpersandToken {
-		switch last.ComparisonType {
-		case ComparisonNotStrictEqualNull:
-			// undefined !== null → true (BAD: changes from falsy to truthy)
-			return true
-		case ComparisonStrictEqualUndefined:
-			// undefined === undefined → true (BAD: changes from falsy to truthy)
-			return true
-		}
-	}
-
-	// For || chains (last operand has been de-inverted to its original source operator):
-	// check if `undefined <op> value` would be `false`
-	// (since || short-circuits on truthy, changing to falsy is problematic)
-	if operator == ast.KindBarBarToken {
-		switch last.ComparisonType {
-		case ComparisonStrictEqualNull:
-			// foo === null || ...: undefined === null → false (BAD: original is truthy)
-			return true
-		case ComparisonNotStrictEqualUndefined:
-			// foo !== undefined || ...: undefined !== undefined → false (BAD: original is truthy)
-			return true
-		}
-	}
-
-	return false
 }
 
 func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast.Kind) string {
@@ -913,7 +721,7 @@ type chainPart struct {
 	accessKind        accessKind
 	accessName        string
 	accessArgument    *ast.Node
-	callArgs          []*ast.Node
+	callArgsText      string
 	typeArgs          []*ast.Node
 	isAlreadyOptional bool
 	hasNonNullAfter   bool // the chain result up to this part is wrapped in NonNullExpression (!)
@@ -927,7 +735,7 @@ func (ca *ChainAnalyzer) flattenChainExpression(node *ast.Node) []chainPart {
 	} else {
 		ca.chainParts = ca.chainParts[:0]
 	}
-	flattenChainExpressionRec(n, &ca.chainParts)
+	ca.flattenChainExpressionRec(n, &ca.chainParts)
 	return ca.chainParts
 }
 
@@ -955,7 +763,7 @@ func chainBase(node *ast.Node) *ast.Node {
 	}
 }
 
-func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
+func (ca *ChainAnalyzer) flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 	n := ast.SkipParentheses(node)
 
 	switch n.Kind {
@@ -967,7 +775,7 @@ func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 			inner.Kind == ast.KindCallExpression {
 			// The NonNullExpression wraps a chain access - recurse into it
 			prevLen := len(*parts)
-			flattenChainExpressionRec(inner, parts)
+			ca.flattenChainExpressionRec(inner, parts)
 			// Mark the last added part as having NonNull after it (e.g., foo.bar! → .bar has NonNull)
 			if len(*parts) > prevLen {
 				(*parts)[len(*parts)-1].hasNonNullAfter = true
@@ -980,7 +788,7 @@ func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 
 	case ast.KindPropertyAccessExpression:
 		prop := n.AsPropertyAccessExpression()
-		flattenChainExpressionRec(prop.Expression, parts)
+		ca.flattenChainExpressionRec(prop.Expression, parts)
 		*parts = append(*parts, chainPart{
 			node:              n,
 			accessKind:        accessKindProperty,
@@ -991,7 +799,7 @@ func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 
 	case ast.KindElementAccessExpression:
 		elem := n.AsElementAccessExpression()
-		flattenChainExpressionRec(elem.Expression, parts)
+		ca.flattenChainExpressionRec(elem.Expression, parts)
 		*parts = append(*parts, chainPart{
 			node:              n,
 			accessKind:        accessKindElement,
@@ -1002,11 +810,7 @@ func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 
 	case ast.KindCallExpression:
 		call := n.AsCallExpression()
-		flattenChainExpressionRec(call.Expression, parts)
-		var callArgs []*ast.Node
-		if call.Arguments != nil {
-			callArgs = call.Arguments.Nodes
-		}
+		ca.flattenChainExpressionRec(call.Expression, parts)
 		var typeArgs []*ast.Node
 		if call.TypeArguments != nil {
 			typeArgs = call.TypeArguments.Nodes
@@ -1014,7 +818,7 @@ func flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
 		*parts = append(*parts, chainPart{
 			node:              n,
 			accessKind:        accessKindCall,
-			callArgs:          callArgs,
+			callArgsText:      ca.callArgumentsText(call),
 			typeArgs:          typeArgs,
 			isAlreadyOptional: call.QuestionDotToken != nil,
 		})
@@ -1067,15 +871,7 @@ func (ca *ChainAnalyzer) writeChainPart(sb *strings.Builder, part chainPart, nee
 			}
 			sb.WriteString(">")
 		}
-		sb.WriteString("(")
-		for j, arg := range part.callArgs {
-			if j > 0 {
-				sb.WriteString(",")
-			}
-			// Use trivia-preserving text to keep comments (e.g., /* comment */a)
-			sb.WriteString(ca.getNodeTextWithTrivia(arg))
-		}
-		sb.WriteString(")")
+		sb.WriteString(part.callArgsText)
 	}
 }
 
@@ -1163,32 +959,28 @@ func needsParensForOptionalBase(node *ast.Node) bool {
 	return false
 }
 
-func findBinaryExpressionCovering(root *ast.Node, first *ast.Node, last *ast.Node) *ast.Node {
-	firstPos, lastEnd := first.Pos(), last.End()
-	for node := first; node != nil; node = node.Parent {
-		if ast.IsBinaryExpression(node) {
-			op := node.AsBinaryExpression().OperatorToken.Kind
-			if (op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken) &&
-				node.Pos() <= firstPos && node.End() >= lastEnd {
-				return node
-			}
-		}
-		if node == root {
+// callArgumentsText returns the argument list verbatim, from `(` through `)`,
+// so that comments and trailing commas survive the rewrite.
+func (ca *ChainAnalyzer) callArgumentsText(call *ast.CallExpression) string {
+	text := ca.ctx.SourceFile.Text()
+	pos := call.Expression.End()
+	if call.TypeArguments != nil {
+		pos = call.TypeArguments.End()
+	}
+	// Only `?.`, the type argument list's `>` and trivia can sit between the
+	// callee and the argument list, so the next `(` opens it.
+	for pos < call.End() {
+		pos = scanner.SkipTrivia(text, pos)
+		if text[pos] == '(' {
 			break
 		}
+		pos++
 	}
-	return nil
+	return text[pos:call.End()]
 }
 
 func (ca *ChainAnalyzer) getNodeText(node *ast.Node) string {
 	return scanner.GetSourceTextOfNodeFromSourceFile(ca.ctx.SourceFile, node, false)
-}
-
-// getNodeTextWithTrivia returns the source text for a node including leading
-// trivia (comments, whitespace). Used for call arguments where comments like
-// /* comment */ should be preserved in the output.
-func (ca *ChainAnalyzer) getNodeTextWithTrivia(node *ast.Node) string {
-	return scanner.GetSourceTextOfNodeFromSourceFile(ca.ctx.SourceFile, node, true)
 }
 
 func (ca *ChainAnalyzer) CheckNullishAndReport(node *ast.Node) bool {
@@ -1295,7 +1087,16 @@ func (ca *ChainAnalyzer) AnalyzeOrEmptyObjectPattern(node *ast.Node) {
 
 // wrapChainCode wraps the generated optional chain code with the last operand's
 // comparison wrapper (e.g., `!= null`, `!`, `typeof ... !== 'undefined'`).
-func wrapChainCode(chainCode string, lastOperand Operand) string {
+func (ca *ChainAnalyzer) wrapChainCode(chainCode string, lastOperand Operand) string {
+	if lastOperand.Validity == OperandLast {
+		bin := lastOperand.Node.AsBinaryExpression()
+		operator := lastComparisonText(lastOperand.LastComparison)
+		if lastOperand.IsYoda {
+			return ca.getNodeText(bin.Left) + " " + operator + " " + chainCode
+		}
+		return chainCode + " " + operator + " " + ca.getNodeText(bin.Right)
+	}
+
 	switch lastOperand.ComparisonType {
 	case ComparisonBoolean:
 		return chainCode
@@ -1365,4 +1166,16 @@ func wrapChainCode(chainCode string, lastOperand Operand) string {
 	}
 
 	return chainCode
+}
+
+func lastComparisonText(comparison LastComparisonType) string {
+	switch comparison {
+	case LastComparisonEqual:
+		return "=="
+	case LastComparisonStrictEqual:
+		return "==="
+	case LastComparisonNotEqual:
+		return "!="
+	}
+	return "!=="
 }

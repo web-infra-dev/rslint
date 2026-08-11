@@ -469,6 +469,33 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		{Code: "declare const entry: {success: boolean; result?: {success: boolean}};\nentry.success && entry.result?.success;"},
 		// a.bar and a.baz.bar share terminal name "bar"
 		{Code: `a.bar && a.baz.bar;`},
+
+		// --- Chains closed by a comparison against an arbitrary value ---
+		// Both sides extend the same guard, so neither can be the chain target
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b !== a.c();"},
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.e !== a.b;"},
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.c() !== a.b;"},
+		// The compared value may itself be nullish, so folding could flip the answer
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\ndeclare const nullish: string | null | undefined;\na === null || a.b !== nullish;"},
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\ndeclare const anyValue: any;\na === null || a.b !== anyValue;"},
+		// `===` against a non-nullish value answers differently once the chain
+		// feeds it undefined
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b === str;"},
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na !== null && a.b !== str;"},
+		// A non-null assertion is not a member access, so nothing closes the chain
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b! !== str;"},
+		// A lone `!== null` guard cannot carry an && chain on its own
+		{Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na !== null && a.b !== u;"},
+
+		// --- A private identifier cannot be optional-chained, so it never closes a chain ---
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: C | null) {\n    foo === null || foo.#bar !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: () => string;\n  m(foo: C | null) {\n    foo === null || foo.#bar() !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: {baz: string};\n  m(foo: C | null) {\n    foo === null || foo.#bar.baz !== s;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: C | null) {\n    foo === null || s !== foo.#bar;\n  }\n}"},
+		{Code: "declare const s: string;\nclass C {\n  #bar!: string;\n  m(foo: {baz: C} | null) {\n    foo === null || foo.baz.#bar !== s;\n  }\n}"},
+		{Code: "class C {\n  #bar!: {baz: string};\n  m(foo: C | null) {\n    foo != null && foo.#bar.baz;\n  }\n}"},
+		{Code: "class C {\n  #bar!: {baz: {qux: string}};\n  m(foo: C) {\n    foo.#bar.baz && foo.#bar.baz.qux;\n  }\n}"},
+		{Code: "class C {\n  #bar!: () => {baz: string};\n  m(foo: C | null) {\n    foo && foo.#bar() && foo.#bar().baz;\n  }\n}"},
 	}
 
 	// =====================================================================
@@ -946,13 +973,13 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		// Category 25: Chain breaking with inconsistent checks
 		// =================================================================
-		// Inconsistent checks (loose != null then strict !== undefined) break chain
+		// An inconsistent check (loose != null then strict !== undefined) ends
+		// the chain on that operand and leaves the rest of the expression alone
 		{
-			Code:   "foo && foo.bar != null && foo.bar.baz !== undefined && foo.bar.baz.buzz;",
-			Output: []string{"foo?.bar != null && foo.bar.baz !== undefined && foo.bar.baz.buzz;"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferOptionalChain"},
-			},
+			Code: "foo && foo.bar != null && foo.bar.baz !== undefined && foo.bar.baz.buzz;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "foo?.bar?.baz !== undefined && foo.bar.baz.buzz;"},
+			}}},
 		},
 
 		// =================================================================
@@ -1036,33 +1063,16 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		// Truthy guard + complementary pair on deeper property → merge to != null
 		{
-			Code: "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting && existing.id !== null && existing.id !== undefined;",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "preferOptionalChain",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "optionalChainSuggest",
-							Output:    "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id != null;",
-						},
-					},
-				},
-			},
+			Code:   "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting && existing.id !== null && existing.id !== undefined;",
+			Output: []string{"declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id !== null && existing.id !== undefined;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
 		// Same pattern with || chain (DeMorgan)
 		{
 			Code: "declare const existing: {id: number | null | undefined} | null | undefined;\n!existing || existing.id === null || existing.id === undefined;",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "preferOptionalChain",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "optionalChainSuggest",
-							Output:    "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id == null;",
-						},
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id === null || existing.id === undefined;"},
+			}}},
 		},
 		// Reversed order: !== undefined first, then !== null.
 		// !== undefined doesn't trigger wouldChangeTruthiness, so the chain
@@ -1639,9 +1649,10 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Chain-breaking: multi-line inconsistent check
 		// =================================================================
 		{
-			Code:   "foo.bar &&\n  foo.bar.baz != null &&\n  foo.bar.baz.qux !== undefined &&\n  foo.bar.baz.qux.buzz;",
-			Output: []string{"foo.bar?.baz != null &&\n  foo.bar.baz.qux !== undefined &&\n  foo.bar.baz.qux.buzz;"},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			Code: "foo.bar &&\n  foo.bar.baz != null &&\n  foo.bar.baz.qux !== undefined &&\n  foo.bar.baz.qux.buzz;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "foo.bar?.baz?.qux !== undefined &&\n  foo.bar.baz.qux.buzz;"},
+			}}},
 		},
 
 		// =================================================================
@@ -1656,12 +1667,6 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		// Strict null checks with declarations
 		// =================================================================
-		{
-			Code: "declare const foo: { bar: string } | null;\nfoo !== null && foo.bar !== null;",
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-				{MessageId: "optionalChainSuggest", Output: "declare const foo: { bar: string } | null;\nfoo?.bar !== null;"},
-			}}},
-		},
 		{
 			Code:   "declare const foo: { bar: string | null } | null;\nfoo !== null && foo.bar != null;",
 			Output: []string{"declare const foo: { bar: string | null } | null;\nfoo?.bar != null;"},
@@ -1766,12 +1771,6 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// =================================================================
 		// Nullish comparison with declarations
 		// =================================================================
-		{
-			Code: "declare const foo: { bar: string | null } | null;\nfoo != null && foo.bar !== null;",
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-				{MessageId: "optionalChainSuggest", Output: "declare const foo: { bar: string | null } | null;\nfoo?.bar !== null;"},
-			}}},
-		},
 
 		// =================================================================
 		// Yoda: null != foo?.bar?.baz
@@ -1849,17 +1848,14 @@ func TestPreferOptionalChainRule(t *testing.T) {
 
 		// =================================================================
 		// Extra: !== undefined / === undefined call chains
-		// When the last operand is a bare call/negation and the chain includes
-		// strict equality guards on call results, trim to avoid changing call count.
+		// Chains of strict `undefined` checks over repeated calls.
 		// =================================================================
-		// Cases with !== undefined / === undefined call chains.
-		// Aligned with TS-ESLint: strict equality on call expression result stops
-		// optional chain extension because each call is a separate invocation.
-		// Case 1: trailing bare call → partial fold (suggestion)
+		// Case 1: trailing bare call → suggestion, because the chain unions
+		// `undefined` into the result
 		{
 			Code: "declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar !== undefined &&\n  foo.bar() !== undefined &&\n  foo.bar().baz !== undefined &&\n  foo.bar().baz.buzz !== undefined &&\n  foo.bar().baz.buzz();",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-				{MessageId: "optionalChainSuggest", Output: "declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.() !== undefined &&\n  foo.bar().baz !== undefined &&\n  foo.bar().baz.buzz !== undefined &&\n  foo.bar().baz.buzz();"},
+				{MessageId: "optionalChainSuggest", Output: "declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.()?.baz?.buzz?.();"},
 			}}},
 		},
 		// Case 2: trailing comparison (auto-fix: !== undefined preserves boolean result)
@@ -1868,10 +1864,10 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Output: []string{"declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.()?.baz?.buzz !== undefined;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
-		// Case 3: || trailing negated call → partial fold (auto-fix)
+		// Case 3: || trailing negated call → auto-fix, since `!` always yields a boolean
 		{
 			Code:   "declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar === undefined ||\n  foo.bar() === undefined ||\n  foo.bar().baz === undefined ||\n  foo.bar().baz.buzz === undefined ||\n  !foo.bar().baz.buzz();",
-			Output: []string{"declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.() === undefined ||\n  foo.bar().baz === undefined ||\n  foo.bar().baz.buzz === undefined ||\n  !foo.bar().baz.buzz();"},
+			Output: []string{"declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\n!foo.bar?.()?.baz?.buzz?.();"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
 		// Case 4: || trailing comparison (auto-fix, full fold)
@@ -1879,6 +1875,75 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Code:   "declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar === undefined ||\n  foo.bar() === undefined ||\n  foo.bar().baz === undefined ||\n  foo.bar().baz.buzz === undefined;",
 			Output: []string{"declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};\nfoo.bar?.()?.baz?.buzz === undefined;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
+
+		// =================================================================
+		// Chains closed by a comparison against an arbitrary value
+		// =================================================================
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b !== str;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.b !== str;"},
+			}}},
+		},
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b != str;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.b != str;"},
+			}}},
+		},
+		// The compared value is only known to be undefined, so `&&` folds too
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na != null && a.b !== u;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.b !== u;"},
+			}}},
+		},
+		// Both sides are member-based: the one that extends the chain wins
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b !== foo.three;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.b !== foo.three;"},
+			}}},
+		},
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || foo.three !== a.b;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\nfoo.three !== a?.b;"},
+			}}},
+		},
+		// Yoda form with a non-member value
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || 'x' !== a.b;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\n'x' !== a?.b;"},
+			}}},
+		},
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a['b'] !== str;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.['b'] !== str;"},
+			}}},
+		},
+		// Deeper chain, and a guard pair in front of the closing comparison
+		{
+			Code: "declare const deep: {b: {c: string} | null} | null;\ndeclare const str: string;\ndeep === null || deep.b === null || deep.b.c !== str;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const deep: {b: {c: string} | null} | null;\ndeclare const str: string;\ndeep?.b?.c !== str;"},
+			}}},
+		},
+		{
+			Code: "declare const a: {b: string} | null | undefined;\ndeclare const str: string;\na === null || a === undefined || a.b !== str;",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string} | null | undefined;\ndeclare const str: string;\na?.b !== str;"},
+			}}},
+		},
+		// The operands after the closed chain are left as written
+		{
+			Code: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na === null || a.b !== str || a.b !== 'y';",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "optionalChainSuggest", Output: "declare const a: {b: string, c: () => string, e: string} | null;\ndeclare const foo: {three: string};\ndeclare const str: string;\ndeclare const u: undefined;\na?.b !== str || a.b !== 'y';"},
+			}}},
 		},
 
 		// Reused analyzer buffers must be fully overwritten between chains,
