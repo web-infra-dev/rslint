@@ -159,5 +159,4 @@ class Foo implements Bar {
 ## Original Documentation
 
 - [typescript-eslint: class-methods-use-this](https://typescript-eslint.io/rules/class-methods-use-this)
-- [ESLint: class-methods-use-this](https://eslint.org/docs/latest/rules/class-methods-use-this)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/class-methods-use-this.ts)

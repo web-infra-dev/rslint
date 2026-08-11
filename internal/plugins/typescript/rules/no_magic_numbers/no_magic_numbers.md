@@ -77,5 +77,4 @@ type Foo = Parameters<Bar>[2];
 ## Original Documentation
 
 - [typescript-eslint: no-magic-numbers](https://typescript-eslint.io/rules/no-magic-numbers)
-- [ESLint: no-magic-numbers](https://eslint.org/docs/latest/rules/no-magic-numbers)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-magic-numbers.ts)

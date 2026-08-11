@@ -84,5 +84,4 @@ class Foo {
 ## Original Documentation
 
 - [typescript-eslint: max-params](https://typescript-eslint.io/rules/max-params)
-- [ESLint: max-params](https://eslint.org/docs/latest/rules/max-params)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/max-params.ts)

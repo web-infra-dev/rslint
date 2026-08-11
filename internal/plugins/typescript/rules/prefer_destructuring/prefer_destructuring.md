@@ -73,5 +73,4 @@ const { x }: { x: string } = obj;
 ## Original Documentation
 
 - [typescript-eslint: prefer-destructuring](https://typescript-eslint.io/rules/prefer-destructuring)
-- [ESLint: prefer-destructuring](https://eslint.org/docs/latest/rules/prefer-destructuring)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-destructuring.ts)

@@ -92,5 +92,4 @@ Detection is shape-based, so the rule cannot see uses that reach the member thro
 ## Original Documentation
 
 - [typescript-eslint: no-unused-private-class-members](https://typescript-eslint.io/rules/no-unused-private-class-members)
-- [ESLint: no-unused-private-class-members](https://eslint.org/docs/latest/rules/no-unused-private-class-members)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unused-private-class-members.ts)

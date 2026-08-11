@@ -197,5 +197,4 @@ If you do not want to be notified about usage of the `this` keyword outside of c
 ## Original Documentation
 
 - [typescript-eslint: no-invalid-this](https://typescript-eslint.io/rules/no-invalid-this)
-- [ESLint: no-invalid-this](https://eslint.org/docs/latest/rules/no-invalid-this)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-invalid-this.ts)

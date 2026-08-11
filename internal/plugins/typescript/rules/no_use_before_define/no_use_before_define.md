@@ -50,5 +50,4 @@ Also accepts `"nofunc"` as a shorthand for `{ functions: false }`.
 ## Original Documentation
 
 - [typescript-eslint: no-use-before-define](https://typescript-eslint.io/rules/no-use-before-define)
-- [ESLint: no-use-before-define](https://eslint.org/docs/latest/rules/no-use-before-define)
 - [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-use-before-define.ts)
