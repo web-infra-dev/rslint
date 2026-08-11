@@ -75,7 +75,9 @@ async function moveArtifacts() {
     // subpackages (flat, alongside the Go binary). Artifacts are named
     // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
     // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
-    const nodeFiles = findBinaries('binaries', 'rslint.');
+    const nodeFiles = findBinaries('binaries', 'rslint.').filter((file) =>
+      file.endsWith('.node'),
+    );
     console.log(`Found ${nodeFiles.length} napi .node files`);
 
     for (const file of nodeFiles) {
